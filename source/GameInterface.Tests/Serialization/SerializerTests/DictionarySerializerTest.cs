@@ -68,7 +68,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             DictionaryBinaryPackage returnedPackage = (DictionaryBinaryPackage)obj;
 
-            Dictionary<string, CampaignTime> newDict = returnedPackage.Unpack<Dictionary<string, CampaignTime>>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Dictionary<string, CampaignTime> newDict = returnedPackage.Unpack<Dictionary<string, CampaignTime>>(deserializeFactory);
 
             Assert.Equal(Dict, newDict);
         }

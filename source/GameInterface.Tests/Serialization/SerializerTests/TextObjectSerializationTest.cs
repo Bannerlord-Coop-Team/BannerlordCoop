@@ -56,7 +56,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             TextObjectBinaryPackage returnedPackage = (TextObjectBinaryPackage)obj;
 
-            TextObject newTextObject = returnedPackage.Unpack<TextObject>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TextObject newTextObject = returnedPackage.Unpack<TextObject>(deserializeFactory);
 
             Assert.Equal(textObject.ToString(), newTextObject.ToString());
         }
@@ -82,7 +83,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             TextObjectBinaryPackage returnedPackage = (TextObjectBinaryPackage)obj;
 
-            TextObject newTextObject = returnedPackage.Unpack<TextObject>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TextObject newTextObject = returnedPackage.Unpack<TextObject>(deserializeFactory);
 
             Assert.Equal(textObject.ToString(), newTextObject.ToString());
         }
@@ -108,7 +110,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             TextObjectBinaryPackage returnedPackage = (TextObjectBinaryPackage)obj;
 
-            TextObject newTextObject = returnedPackage.Unpack<TextObject>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TextObject newTextObject = returnedPackage.Unpack<TextObject>(deserializeFactory);
 
             Assert.Equal(textObject.ToString(), newTextObject.ToString());
         }
@@ -135,7 +138,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             TextObjectBinaryPackage returnedPackage = (TextObjectBinaryPackage)obj;
 
-            TextObject newTextObject = returnedPackage.Unpack<TextObject>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TextObject newTextObject = returnedPackage.Unpack<TextObject>(deserializeFactory);
 
             Assert.Equal(textObject.ToString(), newTextObject.ToString());
             Assert.Equal("Testing with simple nests", newTextObject.ToString());

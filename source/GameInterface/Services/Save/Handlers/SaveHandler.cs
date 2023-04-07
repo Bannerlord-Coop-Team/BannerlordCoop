@@ -41,9 +41,7 @@ namespace GameInterface.Services.Heroes.Handlers
             var gameData = saveInterface.SaveCurrentGame();
 
             var gameObjectGuids = new GameObjectGuids(
-                registryInterface.GetControlledHeroIds(),
-                partyIds: registryInterface.GetPartyIds(),
-                heroIds: registryInterface.GetHeroIds());
+                registryInterface.GetControlledHeroIds());
 
             var packagedMessage = new GameSaveDataPackaged(
                 transactionId,
@@ -58,9 +56,7 @@ namespace GameInterface.Services.Heroes.Handlers
         {
             var transactionId = obj.What.TransactionID;
             var gameObjectGuids = new GameObjectGuids(
-                registryInterface.GetControlledHeroIds(),
-                registryInterface.GetPartyIds(),
-                registryInterface.GetHeroIds());
+                registryInterface.GetControlledHeroIds());
 
             var packagedMessage = new ObjectGuidsPackaged(
                 transactionId,
@@ -73,7 +69,7 @@ namespace GameInterface.Services.Heroes.Handlers
         private void Handle(MessagePayload<LoadExistingObjectGuids> obj)
         {
             var payload = obj.What;
-            registryInterface.LoadObjectGuids(payload.GameObjectGuids);
+            registryInterface.RegisterControlledHeroes(payload.GameObjectGuids.ControlledHeros);
 
             messageBroker.Publish(this, new ExistingObjectGuidsLoaded(payload.TransactionID));
         }

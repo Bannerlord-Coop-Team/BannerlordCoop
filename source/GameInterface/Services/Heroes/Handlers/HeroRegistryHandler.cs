@@ -40,12 +40,12 @@ namespace GameInterface.Services.Heroes.Handlers
             var previousHero = obj.What.PreviousHero;
             var newHero = obj.What.NewHero;
 
-            if (heroRegistry.TryGetValue(previousHero, out Guid previousHeroId))
+            if (heroRegistry.TryGetValue(previousHero, out string previousHeroId))
             {
                 controlledHeroRegistry.RemoveAsControlled(previousHeroId);
             }
 
-            if (heroRegistry.TryGetValue(newHero, out Guid newHeroId))
+            if (heroRegistry.TryGetValue(newHero, out string newHeroId))
             {
                 controlledHeroRegistry.RegisterAsControlled(newHeroId);
             }

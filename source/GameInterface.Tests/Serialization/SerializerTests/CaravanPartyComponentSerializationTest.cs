@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
@@ -56,14 +57,15 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hero hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
             Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             MobileParty party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+            var objectManager = container.Resolve<IObjectManager>();
 
             hero.StringId = "myHero";
             settlement.StringId = "mySettlement";
             party.StringId = "myParty";
 
-            MBObjectManager.Instance.RegisterObject(hero);
-            MBObjectManager.Instance.RegisterObject(settlement);
-            MBObjectManager.Instance.RegisterObject(party);
+            objectManager.AddExisting(hero.StringId, hero);
+            objectManager.AddExisting(settlement.StringId, settlement);
+            objectManager.AddExisting(party.StringId, party);
 
             // Set field classes
             _leader.SetValue(CaravanPartyComponent, hero);
@@ -87,7 +89,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CaravanPartyComponentBinaryPackage returnedPackage = (CaravanPartyComponentBinaryPackage)obj;
 
-            CaravanPartyComponent newCaravanPartyComponent = returnedPackage.Unpack<CaravanPartyComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CaravanPartyComponent newCaravanPartyComponent = returnedPackage.Unpack<CaravanPartyComponent>(deserializeFactory);
 
             Assert.Equal(CaravanPartyComponent.Leader, newCaravanPartyComponent.Leader);
             Assert.Equal(CaravanPartyComponent.Owner, newCaravanPartyComponent.Owner);

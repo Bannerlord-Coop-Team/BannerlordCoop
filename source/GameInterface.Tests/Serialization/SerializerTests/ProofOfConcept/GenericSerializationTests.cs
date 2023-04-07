@@ -34,7 +34,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 
             ClassABinaryPackage deserialized = BinaryFormatterSerializer.Deserialize<ClassABinaryPackage>(bytes);
 
-            TestClassA classA = deserialized.Unpack<TestClassA>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TestClassA classA = deserialized.Unpack<TestClassA>(deserializeFactory);
 
             Assert.Same(classA, classA.testClassB.testClassA);
         }

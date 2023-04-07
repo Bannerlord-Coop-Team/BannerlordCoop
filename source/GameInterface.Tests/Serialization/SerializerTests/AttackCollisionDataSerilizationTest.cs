@@ -62,8 +62,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var bf = BinaryFormatterSerializer.Deserialize<AttackCollisionDataBinaryPackage>(bytes);
             bf.BinaryPackageFactory = deserilizationFactory;
 
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            AttackCollisionData b = bf.Unpack<AttackCollisionData>(deserializeFactory);
 
-            AttackCollisionData b = bf.Unpack<AttackCollisionData>();
             Assert.Equal(b.AttackBlockedWithShield, acd.AttackBlockedWithShield);
             Assert.Equal(b.CorrectSideShieldBlock, acd.CorrectSideShieldBlock);
             Assert.Equal(b.IsAlternativeAttack, acd.IsAlternativeAttack);

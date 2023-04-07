@@ -55,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             SaddleComponentBinaryPackage returnedPackage = (SaddleComponentBinaryPackage)obj;
 
-            SaddleComponent newSaddleComponent = returnedPackage.Unpack<SaddleComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            SaddleComponent newSaddleComponent = returnedPackage.Unpack<SaddleComponent>(deserializeFactory);
 
             Assert.Equal(saddleComponent.Item.StringId, newSaddleComponent.Item.StringId);
             Assert.Equal(saddleComponent.ItemModifierGroup, newSaddleComponent.ItemModifierGroup);

@@ -4,6 +4,7 @@ using GameInterface.Services;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Tests.Stubs;
 
 namespace GameInterface.Tests.Bootstrap.Modules
 {
@@ -12,22 +13,8 @@ namespace GameInterface.Tests.Bootstrap.Modules
         protected override void Load(ContainerBuilder builder)
         {
             base.Load(builder);
-            builder.RegisterType<GameInterface>().As<IGameInterface>().SingleInstance().AutoActivate();
-            builder.RegisterType<MBObjectManagerAdapter>().As<IObjectManagerAdapter<string>>().InstancePerLifetimeScope();
-            builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
-            builder.RegisterModule<ServiceModule>();
-
-            builder.RegisterType<MobilePartyRegistry>()
-                   .As<IMobilePartyRegistry>()
-                   .InstancePerLifetimeScope();
-
-            builder.RegisterType<HeroRegistry>()
-                   .As<IHeroRegistry>()
-                   .InstancePerLifetimeScope();
-
-            builder.RegisterType<ControlledHeroRegistry>()
-                   .As<IControlledHeroRegistry>()
-                   .InstancePerLifetimeScope();
+            builder.RegisterType<ObjectManagerAdapterStub>().As<IObjectManager>().InstancePerLifetimeScope();
+            builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>();
         }
     }
 }

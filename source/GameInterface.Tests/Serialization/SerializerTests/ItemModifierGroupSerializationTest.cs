@@ -67,7 +67,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemModifierGroupBinaryPackage returnedPackage = (ItemModifierGroupBinaryPackage)obj;
 
-            ItemModifierGroup newItemModifierGroup = returnedPackage.Unpack<ItemModifierGroup>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ItemModifierGroup newItemModifierGroup = returnedPackage.Unpack<ItemModifierGroup>(deserializeFactory);
 
             Assert.Equal(ItemModifierGroup.NoModifierLootScore, newItemModifierGroup.NoModifierLootScore);
             Assert.Equal(ItemModifierGroup.NoModifierProductionScore, newItemModifierGroup.NoModifierProductionScore);

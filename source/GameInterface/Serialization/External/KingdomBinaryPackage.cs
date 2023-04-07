@@ -84,7 +84,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
 
             InitializeCachedLists.Invoke(Object, Array.Empty<object>());

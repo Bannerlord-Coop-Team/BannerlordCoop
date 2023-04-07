@@ -20,7 +20,7 @@ namespace GameInterface.Services.Heroes.Interfaces
     {
         void PackageMainHero();
         void ResolveHero(ResolveHero message);
-        void SwitchMainHero(Guid heroId);
+        void SwitchMainHero(string heroId);
         Hero UnpackMainHero(byte[] bytes);
     }
 
@@ -54,7 +54,7 @@ namespace GameInterface.Services.Heroes.Interfaces
         public Hero UnpackMainHero(byte[] bytes)
         {
             HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
-            return package.Unpack<Hero>();
+            return package.Unpack<Hero>(binaryPackageFactory);
         }
 
         public void ResolveHero(ResolveHero message)
@@ -63,7 +63,7 @@ namespace GameInterface.Services.Heroes.Interfaces
             messageBroker.Publish(this, new ResolveDebugHero(message.TransactionID, message.PlayerId));
         }
 
-        public void SwitchMainHero(Guid heroId)
+        public void SwitchMainHero(string heroId)
         {
             if(heroRegistry.TryGetValue(heroId, out Hero resolvedHero))
             {

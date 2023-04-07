@@ -4,16 +4,15 @@ using GameInterface.Services.Save.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Save.Interfaces
 {
     internal interface IRegistryInterface : IGameAbstraction
     {
-        Guid[] GetControlledHeroIds();
-        IReadOnlyDictionary<string, Guid> GetHeroIds();
-        IReadOnlyDictionary<string, Guid> GetPartyIds();
-        void LoadObjectGuids(GameObjectGuids gameObjectGuids);
+        string[] GetControlledHeroIds();
         void RegisterAllGameObjects();
+        void RegisterControlledHeroes(IEnumerable<string> heroIds);
     }
     internal class RegistryInterface : IRegistryInterface
     {
@@ -31,23 +30,14 @@ namespace GameInterface.Services.Save.Interfaces
             this.controlledHeroRegistry = controlledHeroRegistry;
         }
 
-        public IReadOnlyDictionary<string, Guid> GetPartyIds()
-        {
-            return partyRegistry.ToDictionary(kvp => kvp.Value.StringId, kvp => kvp.Key);
-        }
+        public string[] GetControlledHeroIds() => controlledHeroRegistry.ControlledHeros.ToArray();
 
-        public IReadOnlyDictionary<string, Guid> GetHeroIds()
+        public void RegisterControlledHeroes(IEnumerable<string> heroIds)
         {
-            return heroRegistry.ToDictionary(kvp => kvp.Value.StringId, kvp => kvp.Key);
-        }
-
-        public Guid[] GetControlledHeroIds() => controlledHeroRegistry.ControlledHeros.ToArray();
-
-        public void LoadObjectGuids(GameObjectGuids gameObjectGuids)
-        {
-            controlledHeroRegistry.RegisterExistingHeroes(gameObjectGuids.ControlledHeros);
-            heroRegistry.RegisterHeroesWithStringIds(gameObjectGuids.HeroIds);
-            partyRegistry.RegisterPartiesWithStringIds(gameObjectGuids.PartyIds);
+            foreach (string id in heroIds)
+            {
+                controlledHeroRegistry.RegisterAsControlled(id);
+            }
         }
 
         public void RegisterAllGameObjects()

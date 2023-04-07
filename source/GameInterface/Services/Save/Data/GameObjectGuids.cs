@@ -11,27 +11,12 @@ namespace GameInterface.Services.Save.Data
     public class GameObjectGuids
     {
         [ProtoMember(1)]
-        public Guid[] ControlledHeros { get; set; }
-        [ProtoMember(2)]
-        public IReadOnlyDictionary<string, Guid> PartyIds { get; set; }
-        [ProtoMember(3)]
-        public IReadOnlyDictionary<string, Guid> HeroIds { get; set; }
+        public string[] ControlledHeros { get; set; } = Array.Empty<string>();
 
-        public GameObjectGuids()
-        {
-            ControlledHeros = Array.Empty<Guid>();
-            PartyIds = new Dictionary<string, Guid>();
-            HeroIds = new Dictionary<string, Guid>();
-        }
 
-        public GameObjectGuids(
-            Guid[] controlledHeros,
-            IReadOnlyDictionary<string, Guid> partyIds,
-            IReadOnlyDictionary<string, Guid> heroIds)
+        public GameObjectGuids(IEnumerable<string> controlledHeros)
         {
-            ControlledHeros = controlledHeros;
-            PartyIds = partyIds;
-            HeroIds = heroIds;
+            ControlledHeros = controlledHeros.ToArray();
         }
 
         public override bool Equals(object obj)
@@ -45,24 +30,6 @@ namespace GameInterface.Services.Save.Data
             else
             {
                 if (ControlledHeros != otherObjectGuids.ControlledHeros) return false;
-            }
-
-            if (PartyIds != null && otherObjectGuids.PartyIds != null)
-            {
-                if (PartyIds.SequenceEqual(otherObjectGuids.PartyIds) == false) return false;
-            }
-            else
-            {
-                if (PartyIds != otherObjectGuids.PartyIds) return false;
-            }
-
-            if (HeroIds != null && otherObjectGuids.HeroIds != null)
-            {
-                if (HeroIds.SequenceEqual(otherObjectGuids.HeroIds) == false) return false;
-            }
-            else
-            {
-                if (HeroIds != otherObjectGuids.HeroIds) return false;
             }
 
             return true;

@@ -1,26 +1,28 @@
-﻿using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
+﻿using HarmonyLib;
+using SandBox;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
-using SandBox;
-using HarmonyLib;
+using TaleWorlds.ObjectSystem;
+using Xunit;
 
 namespace GameInterface.Tests.Bootstrap
 {
     internal class GameBootStrap
     {
-
         private static object @lock = new object();
 
-        private static bool isInitialized = false;
+        private static bool IsInitialized = false;
 
         private static Harmony harmony = new Harmony("Coop.Testing");
+
+        private static Campaign current;
 
         /// <summary>
         /// Initializes any game functionality used for testing
@@ -31,26 +33,18 @@ namespace GameInterface.Tests.Bootstrap
         {
             lock (@lock)
             {
-                if (isInitialized) return;
+                if (IsInitialized == false)
+                {
+                    harmony.PatchAll();
 
-                isInitialized = true;
+                    InitializeMBObjectManager();
+                    InitializeCampaign();
+                    InitializeGame();
 
-                harmony.PatchAll();
+                    IsInitialized = true;
+                }
 
-                InitializeMBObjectManager();
-                InitializeCampaign();
-                InitializeGame();
-            }
-        }
-
-        private static readonly MethodInfo InitializeManagerObjectLists =
-            typeof(CampaignObjectManager).GetMethod("InitializeManagerObjectLists", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static void SetupCampaignObjectManager()
-        {
-            if(Campaign.Current == null)
-            {
-                Campaign_Current.SetValue(null, new Campaign(CampaignGameMode.Campaign));
-                InitializeManagerObjectLists.Invoke(Campaign.Current.CampaignObjectManager, null);
+                Assert.NotNull(Campaign.Current);
             }
         }
 
@@ -80,17 +74,18 @@ namespace GameInterface.Tests.Bootstrap
         private static readonly PropertyInfo Campaign_Current = typeof(Campaign).GetProperty(nameof(Campaign.Current));
         private static readonly PropertyInfo Campaign_CampaignEvents = typeof(Campaign).GetProperty("CampaignEvents", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly PropertyInfo Campaign_CustomPeriodicCampaignEvents = typeof(Campaign).GetProperty("CustomPeriodicCampaignEvents", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly MethodInfo InitializeManagerObjectLists =
+            typeof(CampaignObjectManager).GetMethod("InitializeManagerObjectLists", BindingFlags.NonPublic | BindingFlags.Instance);
 
         private static void InitializeCampaign()
         {
-            if (Campaign.Current != null) return;
-
             Debug.DebugManager = new TestDebugger();
 
-            Campaign campaign = new Campaign(CampaignGameMode.Campaign);
-            Campaign_Current.SetValue(null, campaign);
-            Campaign_CampaignEvents.SetValue(campaign, new CampaignEvents());
-            Campaign_CustomPeriodicCampaignEvents.SetValue(campaign, new List<MBCampaignEvent>());
+            current = new Campaign(CampaignGameMode.Campaign);
+            Campaign_Current.SetValue(null, current);
+            Campaign_CampaignEvents.SetValue(current, new CampaignEvents());
+            Campaign_CustomPeriodicCampaignEvents.SetValue(current, new List<MBCampaignEvent>());
+            InitializeManagerObjectLists.Invoke(current.CampaignObjectManager, null);
         }
 
         private static readonly FieldInfo Game_Current = typeof(Game).GetField("_current", BindingFlags.NonPublic | BindingFlags.Static);

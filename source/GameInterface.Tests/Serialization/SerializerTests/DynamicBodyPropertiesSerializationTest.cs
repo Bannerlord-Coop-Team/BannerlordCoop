@@ -54,7 +54,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             DynamicBodyPropertiesBinaryPackage returnedPackage = (DynamicBodyPropertiesBinaryPackage)obj;
 
-            DynamicBodyProperties newStaticBodyProperties = returnedPackage.Unpack<DynamicBodyProperties>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            DynamicBodyProperties newStaticBodyProperties = returnedPackage.Unpack<DynamicBodyProperties>(deserializeFactory);
 
             Assert.Equal(DynamicBodyProperties.Age, newStaticBodyProperties.Age);
             Assert.Equal(DynamicBodyProperties.Weight, newStaticBodyProperties.Weight);

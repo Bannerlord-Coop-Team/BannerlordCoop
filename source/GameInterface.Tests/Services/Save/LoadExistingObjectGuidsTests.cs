@@ -14,6 +14,7 @@ using GameInterface.Services.MobileParties;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.Save.Data;
 using System.Linq;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Tests.Services.Save
 {
@@ -26,6 +27,8 @@ namespace GameInterface.Tests.Services.Save
         readonly IMessageBroker _messageBroker;
         public LoadExistingObjectGuidsTests()
         {
+            GameBootStrap.Initialize();
+
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
             builder.RegisterModule<GameInterfaceModule>();
@@ -38,29 +41,14 @@ namespace GameInterface.Tests.Services.Save
         public void LoadExistingObjectGuids_SendReceive()
         {
             // Setup
-            var partyGuids = CreateMobileParties(NUM_PARTIES);
-            var partyAssociations = new Dictionary<string, Guid>();
+            var objectManager = _container.Resolve<IObjectManager>();
+            var heroes = CreateHeroes(objectManager, NUM_HEROES);
 
-            for (int i = 0; i < NUM_PARTIES; i++)
-            {
-                var party = partyGuids[i].Item1;
-                partyAssociations.Add(party.StringId, partyGuids[i].Item2);
-            }
-
-            var heroGuids = CreateHeroes(NUM_HEROES);
-            var heroAssociations = new Dictionary<string, Guid>();
-
-            for (int i = 0; i < NUM_HEROES; i++)
-            {
-                var hero = heroGuids[i].Item1;
-                heroAssociations.Add(hero.StringId, heroGuids[i].Item2);
-            }
-
-            var controlledHeroes = new HashSet<Guid>();
+            var controlledHeroes = new HashSet<string>();
 
             for (int i = 0; i < NUM_HEROES / 2; i++)
             {
-                controlledHeroes.Add(heroGuids[i].Item2);
+                controlledHeroes.Add(heroes[i].StringId);
             }
 
             AutoResetEvent autoResetEvent = new AutoResetEvent(false);
@@ -73,9 +61,7 @@ namespace GameInterface.Tests.Services.Save
             var transactionId = Guid.NewGuid();
 
             var objectGuids = new GameObjectGuids(
-                controlledHeroes.ToArray(),
-                partyAssociations,
-                heroAssociations);
+                controlledHeroes.ToArray());
 
             var message = new LoadExistingObjectGuids(
                 transactionId,
@@ -86,68 +72,31 @@ namespace GameInterface.Tests.Services.Save
             // Verification
             Assert.True(autoResetEvent.WaitOne(TimeSpan.FromSeconds(1)));
 
-            var partyRegistry = _container.Resolve<IMobilePartyRegistry>();
-
-            foreach(var partyGuid in partyGuids)
+            foreach (var hero in heroes)
             {
-                var partyId = partyGuid.Item2;
-                Assert.True(partyRegistry.TryGetValue(partyId, out MobileParty resolvedParty));
+                var heroId = hero.StringId;
+                Assert.True(objectManager.TryGetObject(heroId, out Hero resolvedHero));
 
-                var party = partyGuid.Item1;
-                Assert.Equal(party, resolvedParty);
-            }
-
-            var heroRegistry = _container.Resolve<IHeroRegistry>();
-
-            foreach (var heroGuid in heroGuids)
-            {
-                var heroId = heroGuid.Item2;
-                Assert.True(heroRegistry.TryGetValue(heroId, out Hero resolvedHero));
-
-                var hero = heroGuid.Item1;
                 Assert.Equal(hero, resolvedHero);
             }
         }
 
-        private (MobileParty, Guid)[] CreateMobileParties(int numParties)
+        private Hero[] CreateHeroes(IObjectManager objectManager, int numHeroes)
         {
-            GameBootStrap.SetupCampaignObjectManager();
-
-            var partyGuids = new (MobileParty, Guid)[numParties];
-
-            Type type = typeof(MobileParty);
-
-            for (int i = 0; i < numParties; i++)
-            {
-                var partyId = Guid.NewGuid();
-                var party = (MobileParty)FormatterServices.GetUninitializedObject(type);
-                party.StringId = $"Party {i}";
-                Campaign.Current.CampaignObjectManager.AddMobileParty(party);
-                partyGuids[i] = (party, partyId);
-            }
-
-            return partyGuids;
-        }
-
-        private (Hero, Guid)[] CreateHeroes(int numHeroes)
-        {
-            GameBootStrap.SetupCampaignObjectManager();
-
-            var heroGuids = new (Hero, Guid)[numHeroes];
+            var heroes = new Hero[numHeroes];
 
             Type type = typeof(Hero);
 
             for (int i = 0; i < numHeroes; i++)
             {
-                var heroId = Guid.NewGuid();
                 var hero = (Hero)FormatterServices.GetUninitializedObject(type);
-                hero.StringId = $"Party {i}";
-                Campaign.Current.CampaignObjectManager.AddHero(hero);
+                hero.StringId = $"Hero {i}";
+                objectManager.AddExisting(hero.StringId, hero);
 
-                heroGuids[i] = (hero, heroId);
+                heroes[i] = hero;
             }
 
-            return heroGuids;
+            return heroes;
         }
     }
 }

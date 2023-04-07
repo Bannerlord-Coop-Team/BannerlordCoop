@@ -323,6 +323,7 @@
     <Compile Include="Services\Modules\Handlers\NewHeroHandler.cs" />
     <Compile Include="Services\Modules\Interfaces\ModuleInterface.cs" />
     <Compile Include="Services\ObjectManager\MBObjectManagerAdapter.cs" />
+    <Compile Include="Services\Registry\RegistryBase.cs" />
     <Compile Include="Services\Save\CoopInMemSaveDriver.cs" />
     <Compile Include="Services\Save\Data\GameObjectGuids.cs" />
     <Compile Include="Services\Save\Messages\RegisterAllGameObjects.cs" />

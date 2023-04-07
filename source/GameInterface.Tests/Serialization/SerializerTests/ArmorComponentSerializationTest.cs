@@ -1,9 +1,12 @@
 ﻿using Autofac;
+using Autofac.Features.OwnedInstances;
 using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
+using System.Runtime.Serialization;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit;
@@ -27,7 +30,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void ArmorComponent_Serialize()
         {
-            ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
+            ItemObject itemObject = new ItemObject("Attached Item");
             ArmorComponent ArmorComponent = new ArmorComponent(itemObject);
 
             foreach(var property in typeof(ArmorComponent).GetProperties())
@@ -48,8 +51,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void ArmorComponent_Full_Serialization()
         {
-            ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
+            var objectManager = container.Resolve<IObjectManager>();
+            ItemObject itemObject = new ItemObject("Attached Item");
             ArmorComponent ArmorComponent = new ArmorComponent(itemObject);
+
+            // Register object with new string id
+            Assert.True(objectManager.AddExisting(itemObject.StringId, itemObject));
 
             foreach (var property in typeof(ArmorComponent).GetProperties())
             {
@@ -71,7 +78,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ArmorComponentBinaryPackage returnedPackage = (ArmorComponentBinaryPackage)obj;
 
-            ArmorComponent newArmorComponent = returnedPackage.Unpack<ArmorComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ArmorComponent newArmorComponent = returnedPackage.Unpack<ArmorComponent>(deserializeFactory);
 
             foreach (var property in typeof(ArmorComponent).GetProperties())
             {

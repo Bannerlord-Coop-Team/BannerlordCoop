@@ -55,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             WeaponComponentBinaryPackage returnedPackage = (WeaponComponentBinaryPackage)obj;
 
-            WeaponComponent newWeaponComponent = returnedPackage.Unpack<WeaponComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            WeaponComponent newWeaponComponent = returnedPackage.Unpack<WeaponComponent>(deserializeFactory);
 
             Assert.Equal(weaponComponent.Weapons, newWeaponComponent.Weapons);
         }

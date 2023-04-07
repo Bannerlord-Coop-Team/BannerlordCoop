@@ -44,7 +44,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly PropertyInfo Campaign_Current = typeof(Campaign).GetProperty("Current");
         private static readonly FieldInfo Campaign_hideouts = typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         private static readonly PropertyInfo PartyComponent_MobileParty = typeof(PartyComponent).GetProperty(nameof(PartyComponent.MobileParty));
         private static readonly PropertyInfo BanditPartyComponent_Hideout = typeof(BanditPartyComponent).GetProperty(nameof(BanditPartyComponent.Hideout));
@@ -56,15 +55,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void BanditPartyComponent_Full_Serialization()
         {
-            Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
-
             Hideout hideout = (Hideout)FormatterServices.GetUninitializedObject(typeof(Hideout));
-            var allhideouts = new MBList<Hideout>
-            {
-                hideout
-            };
 
-            Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
+            MBList<Hideout> allhideouts = (MBList<Hideout>)Campaign_hideouts.GetValue(Campaign.Current) ?? new MBList<Hideout>();
+
+            allhideouts.Add(hideout);
 
             MobileParty mobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
             PartyBase party = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
@@ -97,7 +92,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BanditPartyComponentBinaryPackage returnedPackage = (BanditPartyComponentBinaryPackage)obj;
 
-            BanditPartyComponent newBanditPartyComponent = returnedPackage.Unpack<BanditPartyComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            BanditPartyComponent newBanditPartyComponent = returnedPackage.Unpack<BanditPartyComponent>(deserializeFactory);
 
             Assert.Equal(item.IsBossParty, newBanditPartyComponent.IsBossParty);
             Assert.NotNull(newBanditPartyComponent.Hideout);

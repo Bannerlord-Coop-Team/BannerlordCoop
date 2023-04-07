@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
 using System.Runtime.Serialization;
@@ -63,7 +64,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemObjectBinaryPackage returnedPackage = (ItemObjectBinaryPackage)obj;
 
-            ItemObject newItemObject = returnedPackage.Unpack<ItemObject>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ItemObject newItemObject = returnedPackage.Unpack<ItemObject>(deserializeFactory);
 
             Assert.Equal(itemObject.Name, newItemObject.Name);
             Assert.Equal(itemObject.MultiMeshName, newItemObject.MultiMeshName);
@@ -74,10 +76,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void ItemObject_StringId_Serialization()
         {
-            ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
-            itemObject.StringId = "My Item";
+            var objectManager = container.Resolve<IObjectManager>();
+            ItemObject itemObject = new ItemObject("My Item");
 
-            MBObjectManager.Instance.RegisterObject(itemObject);
+            objectManager.AddExisting(itemObject.StringId, itemObject);
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             ItemObjectBinaryPackage package = new ItemObjectBinaryPackage(itemObject, factory);
@@ -94,7 +96,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemObjectBinaryPackage returnedPackage = (ItemObjectBinaryPackage)obj;
 
-            ItemObject newItemObject = returnedPackage.Unpack<ItemObject>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ItemObject newItemObject = returnedPackage.Unpack<ItemObject>(deserializeFactory);
 
             Assert.Same(itemObject, newItemObject);
         }

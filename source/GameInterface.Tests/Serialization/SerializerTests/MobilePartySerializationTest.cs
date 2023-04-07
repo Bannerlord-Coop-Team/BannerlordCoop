@@ -73,7 +73,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MobilePartyBinaryPackage returnedPackage = (MobilePartyBinaryPackage)obj;
 
-            MobileParty newMobilePartyObject = returnedPackage.Unpack<MobileParty>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            MobileParty newMobilePartyObject = returnedPackage.Unpack<MobileParty>(deserializeFactory);
 
             // Verify party values
             Assert.True(mobilePartyObject.Name.Equals(newMobilePartyObject.Name));

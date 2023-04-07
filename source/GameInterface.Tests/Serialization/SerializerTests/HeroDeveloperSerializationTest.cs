@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
@@ -49,10 +50,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void HeroDeveloper_Full_Serialization()
         {
             Hero hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            var objectManager = container.Resolve<IObjectManager>();
 
             hero.StringId = "myHero";
 
-            MBObjectManager.Instance.RegisterObject(hero);
+            objectManager.AddExisting(hero.StringId, hero);
 
             // Setup instance and fields
             HeroDeveloper HeroDeveloper = (HeroDeveloper)FormatterServices.GetUninitializedObject(typeof(HeroDeveloper));
@@ -77,7 +79,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             HeroDeveloperBinaryPackage returnedPackage = (HeroDeveloperBinaryPackage)obj;
 
-            HeroDeveloper newHeroDeveloper = returnedPackage.Unpack<HeroDeveloper>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            HeroDeveloper newHeroDeveloper = returnedPackage.Unpack<HeroDeveloper>(deserializeFactory);
 
             Assert.Equal(HeroDeveloper.TotalXp, newHeroDeveloper.TotalXp);
             Assert.Equal(HeroDeveloper.UnspentFocusPoints, newHeroDeveloper.UnspentFocusPoints);

@@ -56,7 +56,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             WeaponDesignElementBinaryPackage returnedPackage = (WeaponDesignElementBinaryPackage)obj;
 
-            WeaponDesignElement newWeaponDesignElement = returnedPackage.Unpack<WeaponDesignElement>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            WeaponDesignElement newWeaponDesignElement = returnedPackage.Unpack<WeaponDesignElement>(deserializeFactory);
 
             Assert.Equal(weaponDesignElement.ScaleFactor, newWeaponDesignElement.ScaleFactor);
             Assert.Equal(weaponDesignElement.ScalePercentage, newWeaponDesignElement.ScalePercentage);

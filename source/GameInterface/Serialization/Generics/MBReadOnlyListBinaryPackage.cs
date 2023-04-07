@@ -39,9 +39,11 @@ namespace GameInterface.Serialization.Generics
             }
         }
 
-        public object Unpack()
+        public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
             if (IsUnpacked) return Object;
+
+            BinaryPackageFactory = binaryPackageFactory;
 
             IsUnpacked = true;
 
@@ -50,15 +52,15 @@ namespace GameInterface.Serialization.Generics
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
 
             return Object;
         }
 
-        public T Unpack<T>()
+        public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)
         {
-            return (T)Unpack();
+            return (T)Unpack(binaryPackageFactory);
         }
     }
 }

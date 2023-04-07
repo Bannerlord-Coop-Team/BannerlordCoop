@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
@@ -59,13 +60,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Workshop_Full_Serialization()
         {
+            var objectManager = container.Resolve<IObjectManager>();
             Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             Town town = (Town)FormatterServices.GetUninitializedObject(typeof(Town));
 
             // Setup town to be referencable by StringId
             town.StringId = "myTown";
 
-            MBObjectManager.Instance.RegisterObject(town);
+            objectManager.AddExisting(town.StringId, town);
 
             // Set town of workshop settlement
             settlement.Town = town;
@@ -90,7 +92,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             WorkshopBinaryPackage returnedPackage = (WorkshopBinaryPackage)obj;
 
-            Workshop newWorkshop = returnedPackage.Unpack<Workshop>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Workshop newWorkshop = returnedPackage.Unpack<Workshop>(deserializeFactory);
 
             Assert.Same(Workshop, newWorkshop);
         }

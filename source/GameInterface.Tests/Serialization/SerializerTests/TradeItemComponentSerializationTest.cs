@@ -56,7 +56,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             TradeItemComponentBinaryPackage returnedPackage = (TradeItemComponentBinaryPackage)obj;
 
-            TradeItemComponent newtradeItemComponent = returnedPackage.Unpack<TradeItemComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TradeItemComponent newtradeItemComponent = returnedPackage.Unpack<TradeItemComponent>(deserializeFactory);
 
             Assert.Equal(tradeItemComponent.MoraleBonus, newtradeItemComponent.MoraleBonus);
         }

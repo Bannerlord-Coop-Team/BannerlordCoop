@@ -1,8 +1,10 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Save.Messages;
 using System;
 using System.Runtime.Serialization;
@@ -29,35 +31,19 @@ namespace GameInterface.Tests.Services.Save
 
         private void SetupRegistries(int numParties, int numHeroes, int numControlledHeroes)
         {
-            var partyRegistry = _container.Resolve<IMobilePartyRegistry>();
-            var heroRegistry = _container.Resolve<IHeroRegistry>();
+            // TODO Not transiant so it break with other tests
+            var objectManager = _container.Resolve<IObjectManager>();
             var controlledHeros = _container.Resolve<IControlledHeroRegistry>();
-
-            for (int i = 0; i < numParties; i++)
-            {
-                var party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
-                party.StringId = $"Party {i}";
-
-                partyRegistry.RegisterNewObject(party);
-            }
-
-            for (int i = 0; i < numHeroes; i++)
-            {
-                var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
-                hero.StringId = $"Hero {i}";
-
-                heroRegistry.RegisterNewObject(hero);
-            }
 
             for (int i = numHeroes; i < numControlledHeroes + numHeroes; i++)
             {
                 var hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
                 hero.StringId = $"Hero {i}";
 
-                heroRegistry.RegisterNewObject(hero);
+                objectManager.AddExisting(hero.StringId, hero);
 
                 // Ensure hero was registered
-                Assert.True(heroRegistry.TryGetValue(hero, out Guid heroId));
+                Assert.True(objectManager.TryGetId(hero, out string heroId));
 
                 controlledHeros.RegisterAsControlled(heroId);
             }
@@ -92,8 +78,6 @@ namespace GameInterface.Tests.Services.Save
 
             Assert.Equal(transactionId, payload.TransactionID);
 
-            Assert.Equal(partyRegistry.Count, payload.GameObjectGuids.PartyIds.Count);
-            Assert.Equal(heroRegistry.Count, payload.GameObjectGuids.HeroIds.Count);
             Assert.Equal(controlledHeros.ControlledHeros.Count, payload.GameObjectGuids.ControlledHeros.Length);
         }
     }

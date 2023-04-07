@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
 using System.Runtime.Serialization;
@@ -42,6 +43,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void StanceLink_Full_Serialization()
         {
+            var objectManager = container.Resolve<IObjectManager>();
             StanceLink stanceLink = (StanceLink)FormatterServices.GetUninitializedObject(typeof(StanceLink));
 
             // Setup stanceLink factions
@@ -51,8 +53,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             clan1.StringId = "clan1";
             clan2.StringId = "clan2";
 
-            MBObjectManager.Instance.RegisterObject(clan1);
-            MBObjectManager.Instance.RegisterObject(clan2);
+            objectManager.AddExisting(clan1.StringId, clan1);
+            objectManager.AddExisting(clan2.StringId, clan2);
 
             StanceLinkBinaryPackage.StanceLink_Faction1.SetValue(stanceLink, clan1);
             StanceLinkBinaryPackage.StanceLink_Faction2.SetValue(stanceLink, clan2);
@@ -73,7 +75,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             StanceLinkBinaryPackage returnedPackage = (StanceLinkBinaryPackage)obj;
 
-            StanceLink newStanceLink = returnedPackage.Unpack<StanceLink>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            StanceLink newStanceLink = returnedPackage.Unpack<StanceLink>(deserializeFactory);
 
             Assert.Equal(stanceLink.Faction1, newStanceLink.Faction1);
             Assert.Equal(stanceLink.Faction2, newStanceLink.Faction2);

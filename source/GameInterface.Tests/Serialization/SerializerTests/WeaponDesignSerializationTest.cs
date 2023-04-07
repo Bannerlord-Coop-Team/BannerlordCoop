@@ -92,7 +92,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             WeaponDesignBinaryPackage returnedPackage = (WeaponDesignBinaryPackage)obj;
 
-            WeaponDesign newWeaponDesign = returnedPackage.Unpack<WeaponDesign>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            WeaponDesign newWeaponDesign = returnedPackage.Unpack<WeaponDesign>(deserializeFactory);
 
             Assert.Equal(WeaponDesign.CraftedWeaponLength, newWeaponDesign.CraftedWeaponLength);
             Assert.Equal(WeaponDesign.HolsterShiftAmount, newWeaponDesign.HolsterShiftAmount);

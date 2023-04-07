@@ -7,6 +7,7 @@ using TaleWorlds.ObjectSystem;
 using Autofac;
 using GameInterface.Tests.Bootstrap.Modules;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -42,11 +43,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void WorkshopType_Full_Serialization()
         {
+            var objectManager = container.Resolve<IObjectManager>();
             WorkshopType workshopType = new WorkshopType();
 
             workshopType.StringId = "myWorkshop";
 
-            MBObjectManager.Instance.RegisterObject(workshopType);
+            objectManager.AddExisting(workshopType.StringId, workshopType);
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             WorkshopTypeBinaryPackage package = new WorkshopTypeBinaryPackage(workshopType, factory);
@@ -63,7 +65,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             WorkshopTypeBinaryPackage returnedPackage = (WorkshopTypeBinaryPackage)obj;
 
-            WorkshopType newWorkshopType = returnedPackage.Unpack<WorkshopType>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            WorkshopType newWorkshopType = returnedPackage.Unpack<WorkshopType>(deserializeFactory);
 
             Assert.Same(workshopType, newWorkshopType);
         }

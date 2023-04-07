@@ -53,7 +53,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             PathFaceRecordBinaryPackage returnedPackage = (PathFaceRecordBinaryPackage)obj;
 
-            PathFaceRecord newPFRObject = returnedPackage.Unpack<PathFaceRecord>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            PathFaceRecord newPFRObject = returnedPackage.Unpack<PathFaceRecord>(deserializeFactory);
 
             Assert.Equal(pfrObject.FaceIndex, newPFRObject.FaceIndex);
             Assert.Equal(pfrObject.FaceGroupIndex, newPFRObject.FaceGroupIndex);

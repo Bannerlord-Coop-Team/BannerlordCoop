@@ -57,7 +57,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CampaignTimeBinaryPackage returnedPackage = (CampaignTimeBinaryPackage)obj;
 
-            CampaignTime newCampaignTime = returnedPackage.Unpack<CampaignTime>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CampaignTime newCampaignTime = returnedPackage.Unpack<CampaignTime>(deserializeFactory);
 
             Assert.Equal(CampaignTime.GetNumTicks(), newCampaignTime.GetNumTicks());
         }

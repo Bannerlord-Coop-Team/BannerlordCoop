@@ -56,7 +56,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BannerBinaryPackage returnedPackage = (BannerBinaryPackage)obj;
 
-            Banner newBanner = returnedPackage.Unpack<Banner>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Banner newBanner = returnedPackage.Unpack<Banner>(deserializeFactory);
 
             foreach (var data in testBanner.BannerDataList.Zip(newBanner.BannerDataList, (bannerData, newBannerData) => new { bannerData, newBannerData }))
             {

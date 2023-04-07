@@ -2,11 +2,13 @@
 using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit;
@@ -30,7 +32,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void BannerComponent_Serialize()
         {
-            ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
+            ItemObject itemObject = new ItemObject("Attached Item");
             BannerComponent BannerComponent = new BannerComponent(itemObject);
 
             foreach (var property in typeof(BannerComponent).GetProperties())
@@ -52,17 +54,20 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void BannerComponent_Full_Serialization()
         {
-            ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
+            ItemObject itemObject = new ItemObject("Attached Item");
             BannerComponent BannerComponent = new BannerComponent(itemObject);
+            var objectManager = container.Resolve<IObjectManager>();
+
+            objectManager.AddExisting(itemObject.StringId, itemObject);
 
             foreach (var property in typeof(BannerComponent).GetProperties())
             {
                 property.SetRandom(BannerComponent);
             }
 
-            // Set banner effect and register it with the MBObject manager
+            // Set banner effect and register it with the object manager
             BannerEffect effect = new BannerEffect("myEffect");
-            MBObjectManager.Instance.RegisterObject(effect);
+            Assert.True(objectManager.AddExisting(effect.StringId, effect));
 
             BannerEffect.SetValue(BannerComponent, effect);
 
@@ -82,7 +87,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BannerComponentBinaryPackage returnedPackage = (BannerComponentBinaryPackage)obj;
 
-            BannerComponent newBannerComponent = returnedPackage.Unpack<BannerComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            BannerComponent newBannerComponent = returnedPackage.Unpack<BannerComponent>(deserializeFactory);
 
             HashSet<string> excludes = new HashSet<string>
             {

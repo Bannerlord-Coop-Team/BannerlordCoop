@@ -59,7 +59,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MBReadOnlyListBinaryPackage returnedPackage = (MBReadOnlyListBinaryPackage)obj;
 
-            MBReadOnlyList<int> newMBReadOnlyList = returnedPackage.Unpack<MBReadOnlyList<int>>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            MBReadOnlyList<int> newMBReadOnlyList = returnedPackage.Unpack<MBReadOnlyList<int>>(deserializeFactory);
 
             Assert.Equal(MBReadOnlyList, newMBReadOnlyList);
         }

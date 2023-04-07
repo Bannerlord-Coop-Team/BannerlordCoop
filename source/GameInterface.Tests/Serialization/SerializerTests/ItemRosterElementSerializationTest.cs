@@ -58,7 +58,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemRosterElementBinaryPackage returnedPackage = (ItemRosterElementBinaryPackage)obj;
 
-            ItemRosterElement newRosterElement = returnedPackage.Unpack<ItemRosterElement>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ItemRosterElement newRosterElement = returnedPackage.Unpack<ItemRosterElement>(deserializeFactory);
 
             //Equals is defined for ItemRosterElement
             Assert.Equal(itemRosterElement, newRosterElement);

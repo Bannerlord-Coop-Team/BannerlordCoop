@@ -58,7 +58,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MaterialPropertyBinaryPackage returnedPackage = (MaterialPropertyBinaryPackage)obj;
 
-            MaterialProperty newMaterialProperty = returnedPackage.Unpack<MaterialProperty>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            MaterialProperty newMaterialProperty = returnedPackage.Unpack<MaterialProperty>(deserializeFactory);
 
             Assert.Equal(MaterialProperty.Name, newMaterialProperty.Name);
             Assert.Equal(MaterialProperty.MeshMultiplier, newMaterialProperty.MeshMultiplier);

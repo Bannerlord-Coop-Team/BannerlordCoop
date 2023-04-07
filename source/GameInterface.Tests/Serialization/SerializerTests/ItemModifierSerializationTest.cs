@@ -60,7 +60,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemModifierBinaryPackage returnedPackage = (ItemModifierBinaryPackage)obj;
 
-            ItemModifier newItemModifier = returnedPackage.Unpack<ItemModifier>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ItemModifier newItemModifier = returnedPackage.Unpack<ItemModifier>(deserializeFactory);
 
             Assert.Equal(_damage.GetValue(ItemModifier),
                          _damage.GetValue(newItemModifier));

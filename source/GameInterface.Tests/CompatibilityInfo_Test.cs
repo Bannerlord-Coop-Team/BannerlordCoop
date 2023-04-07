@@ -170,8 +170,9 @@ namespace GameInterface.Tests
             CompatibilityInfoBinaryPackage returnedPackage1 = (CompatibilityInfoBinaryPackage)obj1;
             CompatibilityInfoBinaryPackage returnedPackage2 = (CompatibilityInfoBinaryPackage)obj2;
 
-            CompatibilityInfo ret1 = returnedPackage1.Unpack<CompatibilityInfo>();
-            CompatibilityInfo ret2 = returnedPackage2.Unpack<CompatibilityInfo>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CompatibilityInfo ret1 = returnedPackage1.Unpack<CompatibilityInfo>(deserializeFactory);
+            CompatibilityInfo ret2 = returnedPackage2.Unpack<CompatibilityInfo>(deserializeFactory);
 
             Assert.False(ret1 == ret2);
             Assert.Equal(ret1, compatInfo1);

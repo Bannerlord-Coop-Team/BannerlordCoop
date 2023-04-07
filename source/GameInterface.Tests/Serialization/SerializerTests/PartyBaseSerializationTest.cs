@@ -59,7 +59,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             PartyBaseBinaryPackage returnedPackage = (PartyBaseBinaryPackage)obj;
 
-            PartyBase returnedPartyObject = returnedPackage.Unpack<PartyBase>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            PartyBase returnedPartyObject = returnedPackage.Unpack<PartyBase>(deserializeFactory);
 
             Assert.Equal(testPartyObject.RemainingFoodPercentage, returnedPartyObject.RemainingFoodPercentage);
             Assert.Equal(testPartyObject.Index, returnedPartyObject.Index);

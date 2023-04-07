@@ -9,6 +9,7 @@ using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
 using Autofac;
 using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -46,13 +47,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void CharacterAttributes_Full_Serialization()
         {
             CharacterAttributes characterAttributes = new CharacterAttributes();
+            var objectManager = container.Resolve<IObjectManager>();
 
             // Setup non default values for characterAttributes
             CharacterAttribute attr1 = new CharacterAttribute("Attr1");
             CharacterAttribute attr2 = new CharacterAttribute("Attr2");
 
-            MBObjectManager.Instance.RegisterObject(attr1);
-            MBObjectManager.Instance.RegisterObject(attr2);
+            objectManager.AddExisting(attr1.StringId, attr1);
+            objectManager.AddExisting(attr2.StringId, attr2);
 
             Dictionary<CharacterAttribute, int> Attributes = new Dictionary<CharacterAttribute, int>
             {
@@ -77,7 +79,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CharacterAttributesBinaryPackage returnedPackage = (CharacterAttributesBinaryPackage)obj;
 
-            CharacterAttributes newCharacterAttributes = returnedPackage.Unpack<CharacterAttributes>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CharacterAttributes newCharacterAttributes = returnedPackage.Unpack<CharacterAttributes>(deserializeFactory);
 
             // Verify values are equal
             Assert.Equal(characterAttributes.Id, newCharacterAttributes.Id);

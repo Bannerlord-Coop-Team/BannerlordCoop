@@ -2,6 +2,7 @@
 using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
@@ -63,11 +64,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void MobilePartyAi_Full_Serialization()
         {
+            var objectManager = container.Resolve<IObjectManager>();
             MobileParty party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
 
             party.StringId = "myParty";
 
-            MBObjectManager.Instance.RegisterObject(party);
+            objectManager.AddExisting(party.StringId, party);
 
             // Class setup
             MobilePartyAi PartyAI = (MobilePartyAi)FormatterServices.GetUninitializedObject(typeof(MobilePartyAi));
@@ -109,8 +111,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MobilePartyAIBinaryPackage returnedPackage = (MobilePartyAIBinaryPackage)obj;
 
-            MobilePartyAi newPartyAI = returnedPackage.Unpack<MobilePartyAi>();
-
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            MobilePartyAi newPartyAI = returnedPackage.Unpack<MobilePartyAi>(deserializeFactory);
             
             Assert.Equal(_isDisabled.GetValue(PartyAI), _isDisabled.GetValue(newPartyAI));
             Assert.Equal(BehaviorTarget.GetValue(PartyAI), BehaviorTarget.GetValue(newPartyAI));

@@ -4,9 +4,9 @@ namespace GameInterface.Services.Heroes.Messages
 {
     public readonly struct SwitchToHero
     {
-        public Guid HeroId { get; }
+        public string HeroId { get; }
 
-        public SwitchToHero(Guid heroId)
+        public SwitchToHero(string heroId)
         {
             HeroId = heroId;
         }

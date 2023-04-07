@@ -55,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Vec3BinaryPackage returnedPackage = (Vec3BinaryPackage)obj;
 
-            Vec3 newVec3 = returnedPackage.Unpack<Vec3>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Vec3 newVec3 = returnedPackage.Unpack<Vec3>(deserializeFactory);
 
             Assert.Equal(vec3.X, newVec3.X);
             Assert.Equal(vec3.Y, newVec3.Y);

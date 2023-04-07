@@ -18,6 +18,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         IContainer container;
         public HideoutSerializationTest()
         {
+            GameBootStrap.Initialize();
+
             ContainerBuilder builder = new ContainerBuilder();
 
             builder.RegisterModule<SerializationTestModule>();
@@ -25,12 +27,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             container = builder.Build();
         }
 
-        private static readonly PropertyInfo Campaign_Current = typeof(Campaign).GetProperty("Current");
         private static readonly FieldInfo Campaign_hideouts = typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         [Fact]
         public void Hideout_Serialize()
         {
-            Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
             MBList<Hideout> allhideouts = new MBList<Hideout>();
             Hideout item = new Hideout();
             allhideouts.Add(item);
@@ -58,9 +58,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hideout_nextPossibleAttackTime.SetValue(hideout, new CampaignTime());
             Hideout_SceneName.SetValue(hideout, "something");
 
-            MBList<Hideout> allhideouts = new MBList<Hideout> { hideout };
+            MBList<Hideout> allhideouts = (MBList<Hideout>)Campaign_hideouts.GetValue(Campaign.Current) ?? new MBList<Hideout>();
+            
+            allhideouts.Add(hideout);
 
-            Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
             Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
 
             var factory = container.Resolve<IBinaryPackageFactory>();
@@ -78,7 +79,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             HideoutBinaryPackage returnedPackage = (HideoutBinaryPackage)obj;
 
-            Hideout newHideout = returnedPackage.Unpack<Hideout>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Hideout newHideout = returnedPackage.Unpack<Hideout>(deserializeFactory);
 
             Assert.Equal(hideout, newHideout);
             Assert.Equal(hideout.SceneName, newHideout.SceneName);

@@ -129,6 +129,7 @@
     <Compile Include="Bootstrap\Extensions\CampaignObjectManagerExtensions.cs" />
     <Compile Include="Bootstrap\Patches\GamePatches.cs" />
     <Compile Include="Bootstrap\Modules\SerializationTestModule.cs" />
+    <Compile Include="Bootstrap\Patches\HeroPatches.cs" />
     <Compile Include="Bootstrap\TestDebugger.cs" />
     <Compile Include="CompatibilityInfo_Test.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -220,6 +221,7 @@
     <Compile Include="Services\Parties\GuidRegistrationTests.cs" />
     <Compile Include="Services\Save\LoadExistingObjectGuidsTests.cs" />
     <Compile Include="Services\Save\PackageObjectGuidsTests.cs" />
+    <Compile Include="Stubs\ObjectManagerAdapterStub.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />

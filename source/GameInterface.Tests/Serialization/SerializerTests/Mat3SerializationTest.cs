@@ -54,7 +54,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Mat3BinaryPackage returnedPackage = (Mat3BinaryPackage)obj;
 
-            Mat3 newMat3 = returnedPackage.Unpack<Mat3>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Mat3 newMat3 = returnedPackage.Unpack<Mat3>(deserializeFactory);
 
             Assert.Equal(Mat3.f, newMat3.f);
             Assert.Equal(Mat3.s, newMat3.s);

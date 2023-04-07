@@ -96,7 +96,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             TroopRosterBinaryPackage returnedPackage = (TroopRosterBinaryPackage)obj;
 
-            TroopRoster newTroopRoster = returnedPackage.Unpack<TroopRoster>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TroopRoster newTroopRoster = returnedPackage.Unpack<TroopRoster>(deserializeFactory);
 
             Assert.Equal(TroopRoster.Count, newTroopRoster.Count);
             Assert.Equal(_isInitialized.GetValue(TroopRoster), _isInitialized.GetValue(newTroopRoster));

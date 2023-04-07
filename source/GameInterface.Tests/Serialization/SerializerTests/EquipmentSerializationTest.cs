@@ -63,7 +63,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             EquipmentBinaryPackage returnedPackage = (EquipmentBinaryPackage)obj;
 
-            Equipment newEquipment = returnedPackage.Unpack<Equipment>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Equipment newEquipment = returnedPackage.Unpack<Equipment>(deserializeFactory);
 
             Assert.Equal(equipment.IsCivilian, newEquipment.IsCivilian);
             Assert.Equal(equipment.IsValid, newEquipment.IsValid);

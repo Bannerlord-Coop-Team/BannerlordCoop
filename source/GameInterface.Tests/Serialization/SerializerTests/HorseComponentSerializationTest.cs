@@ -89,7 +89,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             HorseComponentBinaryPackage returnedPackage = (HorseComponentBinaryPackage)obj;
 
-            HorseComponent newHorseComponent = returnedPackage.Unpack<HorseComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            HorseComponent newHorseComponent = returnedPackage.Unpack<HorseComponent>(deserializeFactory);
 
             Assert.Equal(HorseComponent.BodyLength, newHorseComponent.BodyLength);
             Assert.Equal(HorseComponent.ChargeDamage, newHorseComponent.ChargeDamage);

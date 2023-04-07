@@ -27,7 +27,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (KeyValuePair<FieldInfo, IBinaryPackage> element in StoredFields)
             {
-                element.Key.SetValueDirect(reference, element.Value.Unpack());
+                element.Key.SetValueDirect(reference, element.Value.Unpack(BinaryPackageFactory));
             }
         }
     }

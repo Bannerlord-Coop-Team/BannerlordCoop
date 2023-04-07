@@ -54,7 +54,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Vec2BinaryPackage returnedPackage = (Vec2BinaryPackage)obj;
 
-            Vec2 newVec2 = returnedPackage.Unpack<Vec2>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Vec2 newVec2 = returnedPackage.Unpack<Vec2>(deserializeFactory);
 
             Assert.Equal(vec2.X, newVec2.X);
             Assert.Equal(vec2.Y, newVec2.Y);

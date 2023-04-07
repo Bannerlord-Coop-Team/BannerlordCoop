@@ -5,6 +5,7 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -21,20 +22,17 @@ namespace GameInterface.Services.MobileParties.Handlers
     internal class MobilePartyMovementHandler : IHandler
     {
         private readonly ILogger Logger = LogManager.GetLogger<MobilePartyMovementHandler>();
-        private readonly IHeroRegistry heroRegistry;
+        private readonly IObjectManager objectManager;
         private readonly IControlledHeroRegistry controlledHeroRegistry;
-        private readonly IMobilePartyInterface partyInterface;
         private readonly IMessageBroker messageBroker;
 
         public MobilePartyMovementHandler(
-            IHeroRegistry heroRegistry,
+            IObjectManager objectManager,
             IControlledHeroRegistry controlledHeroRegistry,
-            IMobilePartyInterface partyInterface,
             IMessageBroker messageBroker)
         {
-            this.heroRegistry = heroRegistry;
+            this.objectManager = objectManager;
             this.controlledHeroRegistry = controlledHeroRegistry;
-            this.partyInterface = partyInterface;
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<UpdatePartyTargetPosition>(Handle);
@@ -45,7 +43,7 @@ namespace GameInterface.Services.MobileParties.Handlers
         {
             var payload = obj.What;
 
-            if(heroRegistry.TryGetValue(payload.Party.Owner, out Guid heroId))
+            if(objectManager.TryGetId(payload.Party.LeaderHero, out string heroId))
             {
                 if (controlledHeroRegistry.IsControlled(heroId))
                 {
@@ -69,7 +67,7 @@ namespace GameInterface.Services.MobileParties.Handlers
             }
 
 
-            if (heroRegistry.TryGetValue(targetPositionData.ControlledHeroId, out Hero resolvedHero) == false)
+            if (objectManager.TryGetObject(targetPositionData.ControlledHeroId, out Hero resolvedHero) == false)
             {
                 Logger.Error("Unable to find controlled hero for {guid}", targetPositionData.ControlledHeroId);
                 return;

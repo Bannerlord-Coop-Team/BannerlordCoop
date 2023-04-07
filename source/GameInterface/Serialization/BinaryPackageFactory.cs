@@ -10,7 +10,7 @@ namespace GameInterface.Serialization
 {
     public interface IBinaryPackageFactory
     {
-        IObjectManagerAdapter<string> ObjectManager { get; }
+        IObjectManager ObjectManager { get; }
 
         T GetBinaryPackage<T>(object obj);
         IBinaryPackage GetBinaryPackage(object obj);
@@ -24,9 +24,9 @@ namespace GameInterface.Serialization
             CollectBinaryPackageTypes();
         }
 
-        public IObjectManagerAdapter<string> ObjectManager { get; }
+        public IObjectManager ObjectManager { get; }
 
-        public BinaryPackageFactory(IObjectManagerAdapter<string> objectManager)
+        public BinaryPackageFactory(IObjectManager objectManager)
         {
             ObjectManager = objectManager;
         }

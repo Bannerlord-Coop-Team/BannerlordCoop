@@ -55,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             StaticBodyPropertiesBinaryPackage returnedPackage = (StaticBodyPropertiesBinaryPackage)obj;
 
-            StaticBodyProperties newStaticBodyProperties = returnedPackage.Unpack<StaticBodyProperties>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            StaticBodyProperties newStaticBodyProperties = returnedPackage.Unpack<StaticBodyProperties>(deserializeFactory);
 
             Assert.Equal(staticBodyProperties.KeyPart1, newStaticBodyProperties.KeyPart1);
             Assert.Equal(staticBodyProperties.KeyPart2, newStaticBodyProperties.KeyPart2);

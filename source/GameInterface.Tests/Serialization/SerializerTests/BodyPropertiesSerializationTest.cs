@@ -55,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BodyPropertiesBinaryPackage returnedPackage = (BodyPropertiesBinaryPackage)obj;
 
-            BodyProperties newBodyProperties = returnedPackage.Unpack<BodyProperties>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            BodyProperties newBodyProperties = returnedPackage.Unpack<BodyProperties>(deserializeFactory);
 
             Assert.Equal(BodyProperties.Age, newBodyProperties.Age);
             Assert.Equal(BodyProperties.Build, newBodyProperties.Build);

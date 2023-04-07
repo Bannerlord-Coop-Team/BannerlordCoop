@@ -58,7 +58,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BladeDataBinaryPackage returnedPackage = (BladeDataBinaryPackage)obj;
 
-            BladeData newBladeData = returnedPackage.Unpack<BladeData>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            BladeData newBladeData = returnedPackage.Unpack<BladeData>(deserializeFactory);
 
             Assert.Equal(BladeData.PieceType, newBladeData.PieceType);
             Assert.Equal(BladeData.BladeLength, newBladeData.BladeLength);

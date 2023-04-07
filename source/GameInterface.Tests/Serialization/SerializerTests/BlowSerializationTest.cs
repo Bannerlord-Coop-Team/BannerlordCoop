@@ -93,7 +93,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var blowBinaryPackage = BinaryFormatterSerializer.Deserialize<BlowBinaryPackage>(bytes);
             blowBinaryPackage.BinaryPackageFactory = deserializedFactory;
 
-            Blow deserializedBlow = blowBinaryPackage.Unpack<Blow>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Blow deserializedBlow = blowBinaryPackage.Unpack<Blow>(deserializeFactory);
+
             Assert.Equal(deserializedBlow.AbsorbedByArmor, blow.AbsorbedByArmor);
             Assert.Equal(deserializedBlow.AttackerStunPeriod, blow.AttackerStunPeriod);
             Assert.Equal(deserializedBlow.AttackType, blow.AttackType);

@@ -70,7 +70,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             SkeletonScaleBinaryPackage returnedPackage = (SkeletonScaleBinaryPackage)obj;
 
-            SkeletonScale newSkeletonScale = returnedPackage.Unpack<SkeletonScale>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            SkeletonScale newSkeletonScale = returnedPackage.Unpack<SkeletonScale>(deserializeFactory);
 
             Assert.Equal(SkeletonScale.SkeletonModel, newSkeletonScale.SkeletonModel);
             Assert.Equal(SkeletonScale.MountSitBoneScale, newSkeletonScale.MountSitBoneScale);

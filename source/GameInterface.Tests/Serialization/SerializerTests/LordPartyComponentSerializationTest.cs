@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
@@ -51,6 +52,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void LordPartyComponent_Full_Serialization()
         {
+            var objectManager = container.Resolve<IObjectManager>();
             Hero hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
             MobileParty mobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
             PartyBase party = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
@@ -64,9 +66,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             MobileParty_Party.SetValue(mobileParty, party);
             MobileParty_actualClan.SetValue(mobileParty, clan);
 
-            MBObjectManager.Instance.RegisterObject(hero);
-            MBObjectManager.Instance.RegisterObject(mobileParty);
-            MBObjectManager.Instance.RegisterObject(clan);
+            objectManager.AddExisting(hero.StringId, hero);
+            objectManager.AddExisting(mobileParty.StringId, mobileParty);
+            objectManager.AddExisting(clan.StringId, clan);
 
             LordPartyComponent LordPartyComponent = (LordPartyComponent)FormatterServices.GetUninitializedObject(typeof(LordPartyComponent));
 
@@ -89,7 +91,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             LordPartyComponentBinaryPackage returnedPackage = (LordPartyComponentBinaryPackage)obj;
 
-            LordPartyComponent newLordPartyComponent = returnedPackage.Unpack<LordPartyComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            LordPartyComponent newLordPartyComponent = returnedPackage.Unpack<LordPartyComponent>(deserializeFactory);
 
             Assert.Equal(LordPartyComponent_leader.GetValue(LordPartyComponent), LordPartyComponent_leader.GetValue(newLordPartyComponent));
             Assert.Equal(LordPartyComponent.Owner, newLordPartyComponent.Owner);

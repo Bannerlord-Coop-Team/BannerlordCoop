@@ -10,18 +10,18 @@ namespace GameInterface.Serialization.Native
     public class DictionaryBinaryPackage : IEnumerableBinaryPackage
     {
         [NonSerialized]
-        readonly IBinaryPackageFactory PackageFactory;
+        private IBinaryPackageFactory binaryPackageFactory;
 
         [NonSerialized]
-        readonly IEnumerable enumerable;
+        private readonly IEnumerable enumerable;
 
         readonly Type enumerableType;
 
         IBinaryPackage[] packages;
 
-        public DictionaryBinaryPackage(IEnumerable enumerable, IBinaryPackageFactory packageFactory)
+        public DictionaryBinaryPackage(IEnumerable enumerable, IBinaryPackageFactory binaryPackageFactory)
         {
-            PackageFactory = packageFactory;
+            this.binaryPackageFactory = binaryPackageFactory;
             this.enumerable = enumerable;
             enumerableType = enumerable.GetType();
         }
@@ -31,15 +31,17 @@ namespace GameInterface.Serialization.Native
             List<IBinaryPackage> binaryPackages = new List<IBinaryPackage>();
             foreach (var obj in enumerable)
             {
-                binaryPackages.Add(PackageFactory.GetBinaryPackage(obj));
+                binaryPackages.Add(binaryPackageFactory.GetBinaryPackage(obj));
             }
 
             packages = binaryPackages.ToArray();
         }
 
-        public object Unpack()
+        public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
-            var unpackedArray = packages.Select(e => e.Unpack()).ToArray();
+            this.binaryPackageFactory = binaryPackageFactory;
+
+            var unpackedArray = packages.Select(e => e.Unpack(binaryPackageFactory)).ToArray();
 
             var newDict = Activator.CreateInstance(enumerableType);
 
@@ -64,9 +66,9 @@ namespace GameInterface.Serialization.Native
             return newDict;
         }
 
-        public T Unpack<T>()
+        public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)
         {
-            return (T)Unpack();
+            return (T)Unpack(binaryPackageFactory);
         }
     }
 }

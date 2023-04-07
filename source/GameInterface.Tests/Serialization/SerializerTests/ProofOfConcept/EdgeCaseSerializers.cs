@@ -33,7 +33,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 
         protected override void UnpackInternal()
         {
-            Object.testClassB = classBPackage.Unpack<TestClassB>();
+            Object.testClassB = classBPackage.Unpack<TestClassB>(BinaryPackageFactory);
         }
     }
 
@@ -58,7 +58,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 
         protected override void UnpackInternal()
         {
-            Object.testClassA = classAPackage.Unpack<TestClassA>();
+            Object.testClassA = classAPackage.Unpack<TestClassA>(BinaryPackageFactory);
         }
     }
 }

@@ -54,7 +54,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             EnumerableBinaryPackage returnedPackage = (EnumerableBinaryPackage)obj;
 
-            int[] newArr = returnedPackage.Unpack<int[]>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            int[] newArr = returnedPackage.Unpack<int[]>(deserializeFactory);
 
             Assert.Equal(arr, newArr);
         }
@@ -100,7 +101,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             EnumerableBinaryPackage returnedPackage = (EnumerableBinaryPackage)obj;
 
-            int[][] newArr = returnedPackage.Unpack<int[][]>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            int[][] newArr = returnedPackage.Unpack<int[][]>(deserializeFactory);
 
             Assert.Equal(arr, newArr);
         }

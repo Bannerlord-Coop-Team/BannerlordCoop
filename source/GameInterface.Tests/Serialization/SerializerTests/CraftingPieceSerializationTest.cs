@@ -55,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CraftingPieceBinaryPackage returnedPackage = (CraftingPieceBinaryPackage)obj;
 
-            CraftingPiece newCraftingPiece = returnedPackage.Unpack<CraftingPiece>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CraftingPiece newCraftingPiece = returnedPackage.Unpack<CraftingPiece>(deserializeFactory);
 
             Assert.Equal(craftingPiece.ArmorBonus, newCraftingPiece.ArmorBonus);
             Assert.Equal(craftingPiece.Length, newCraftingPiece.Length);

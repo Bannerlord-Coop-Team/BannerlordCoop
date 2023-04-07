@@ -69,7 +69,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             TroopRosterElementBinaryPackage returnedPackage = (TroopRosterElementBinaryPackage)obj;
 
-            TroopRosterElement newTroopRosterElement = returnedPackage.Unpack<TroopRosterElement>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TroopRosterElement newTroopRosterElement = returnedPackage.Unpack<TroopRosterElement>(deserializeFactory);
 
             Assert.Equal(TroopRosterElement.Number, newTroopRosterElement.Number);
             Assert.Equal(TroopRosterElement.Xp, newTroopRosterElement.Xp);

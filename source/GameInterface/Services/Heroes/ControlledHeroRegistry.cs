@@ -12,19 +12,19 @@ namespace GameInterface.Services.Heroes
 {
     internal interface IControlledHeroRegistry
     {
-        ISet<Guid> ControlledHeros { get; }
-        void RegisterExistingHeroes(IEnumerable<Guid> heroIds);
-        bool IsControlled(Guid heroId);
-        bool RegisterAsControlled(Guid heroId);
-        bool RemoveAsControlled(Guid heroId);
+        ISet<string> ControlledHeros { get; }
+        void RegisterExistingHeroes(IEnumerable<string> heroIds);
+        bool IsControlled(string heroId);
+        bool RegisterAsControlled(string heroId);
+        bool RemoveAsControlled(string heroId);
     }
 
     internal class ControlledHeroRegistry : IControlledHeroRegistry
     {
         private static readonly ILogger Logger = LogManager.GetLogger<ControlledHeroRegistry>();
 
-        public ISet<Guid> ControlledHeros { get; } = new HashSet<Guid>();
-        public void RegisterExistingHeroes(IEnumerable<Guid> heroIds)
+        public ISet<string> ControlledHeros { get; } = new HashSet<string>();
+        public void RegisterExistingHeroes(IEnumerable<string> heroIds)
         {
             var badIds = new List<string>();
             foreach(var heroId in heroIds)
@@ -42,10 +42,10 @@ namespace GameInterface.Services.Heroes
                     $"as controlled {badIds}");
             }
         }
-        public bool RegisterAsControlled(Guid heroId) => ControlledHeros.Add(heroId);
+        public bool RegisterAsControlled(string heroId) => ControlledHeros.Add(heroId);
 
-        public bool IsControlled(Guid heroId) => ControlledHeros.Contains(heroId);
+        public bool IsControlled(string heroId) => ControlledHeros.Contains(heroId);
 
-        public bool RemoveAsControlled(Guid heroId) => ControlledHeros.Remove(heroId);
+        public bool RemoveAsControlled(string heroId) => ControlledHeros.Remove(heroId);
     }
 }

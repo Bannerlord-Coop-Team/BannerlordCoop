@@ -55,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             EnumerableBinaryPackage returnedPackage = (EnumerableBinaryPackage)obj;
 
-            HashSet<int> newHashSet = returnedPackage.Unpack<HashSet<int>>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            HashSet<int> newHashSet = returnedPackage.Unpack<HashSet<int>>(deserializeFactory);
 
             Assert.Equal(HashSet, newHashSet);
         }

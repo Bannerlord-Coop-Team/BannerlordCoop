@@ -54,7 +54,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             PieceDataBinaryPackage returnedPackage = (PieceDataBinaryPackage)obj;
 
-            PieceData newPieceData = returnedPackage.Unpack<PieceData>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            PieceData newPieceData = returnedPackage.Unpack<PieceData>(deserializeFactory);
 
             Assert.Equal(PieceData.PieceType, newPieceData.PieceType);
             Assert.Equal(PieceData.Order, newPieceData.Order);

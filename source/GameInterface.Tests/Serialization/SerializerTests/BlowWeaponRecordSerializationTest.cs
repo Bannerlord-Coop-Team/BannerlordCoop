@@ -70,7 +70,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var deserialzedlowWeaponRecordBinaryPackage = BinaryFormatterSerializer.Deserialize<BlowWeaponRecordBinaryPackage>(bytes);
             deserialzedlowWeaponRecordBinaryPackage.BinaryPackageFactory = deseriliazedFactory;
 
-            BlowWeaponRecord deserializedBlowWeaponRecord = deserialzedlowWeaponRecordBinaryPackage.Unpack<BlowWeaponRecord>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            BlowWeaponRecord deserializedBlowWeaponRecord = deserialzedlowWeaponRecordBinaryPackage.Unpack<BlowWeaponRecord>(deserializeFactory);
+
             Assert.Equal(deserializedBlowWeaponRecord.AffectorWeaponSlotOrMissileIndex, blowWeaponRecord.AffectorWeaponSlotOrMissileIndex);
             Assert.Equal(deserializedBlowWeaponRecord.BoneNoToAttach, blowWeaponRecord.BoneNoToAttach);
             Assert.Equal(deserializedBlowWeaponRecord.CurrentPosition, blowWeaponRecord.CurrentPosition);

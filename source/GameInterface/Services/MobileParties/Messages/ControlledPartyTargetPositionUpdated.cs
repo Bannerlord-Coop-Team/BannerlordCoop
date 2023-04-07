@@ -9,7 +9,7 @@ namespace GameInterface.Services.MobileParties.Messages
     {
         public TargetPositionData TargetPositionData { get; }
 
-        public ControlledPartyTargetPositionUpdated(Guid controlledHeroId, Vec2 targetPostion)
+        public ControlledPartyTargetPositionUpdated(string controlledHeroId, Vec2 targetPostion)
         {
             TargetPositionData = new TargetPositionData(
                 controlledHeroId, 

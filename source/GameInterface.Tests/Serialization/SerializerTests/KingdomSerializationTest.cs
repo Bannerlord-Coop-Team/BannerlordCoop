@@ -2,6 +2,7 @@
 using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
 using System.Collections.Generic;
@@ -50,9 +51,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Kingdom_Full_Serialization()
         {
+            var objectManager = container.Resolve<IObjectManager>();
             Kingdom kingdomObject = (Kingdom)FormatterServices.GetUninitializedObject(typeof(Kingdom));
             // StringId is required as unpack throws exception if null
             kingdomObject.StringId = "My Kingdom";
+
+            objectManager.AddExisting(kingdomObject.StringId, kingdomObject);
 
             // Assign values
             kingdomObject.LastMercenaryOfferTime = new CampaignTime();
@@ -62,11 +66,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             // Create settlements for one of the kingdoms cache lists
             Settlement settlement1 = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             settlement1.StringId = "s1";
-            MBObjectManager.Instance.RegisterObject(settlement1);
+            objectManager.AddExisting(settlement1.StringId, settlement1);
 
             Settlement settlement2 = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             settlement2.StringId = "s2";
-            MBObjectManager.Instance.RegisterObject(settlement2);
+            objectManager.AddExisting(settlement2.StringId, settlement2);
 
             KingdomBinaryPackage.InitializeCachedLists.Invoke(kingdomObject, new object[0]);
             List<Settlement> settlements = (List<Settlement>)KingdomBinaryPackage.Kingdom_Settlements.GetValue(kingdomObject);
@@ -96,7 +100,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             KingdomBinaryPackage returnedPackage = (KingdomBinaryPackage)obj;
 
-            Kingdom newKingdomObject = returnedPackage.Unpack<Kingdom>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Kingdom newKingdomObject = returnedPackage.Unpack<Kingdom>(deserializeFactory);
 
             Assert.Equal(kingdomObject.LastMercenaryOfferTime, newKingdomObject.LastMercenaryOfferTime);
             Assert.Equal(kingdomObject.LastArmyCreationDay, newKingdomObject.LastArmyCreationDay);
@@ -112,10 +117,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Kingdom_StringId_Serialization()
         {
+            var objectManager = container.Resolve<IObjectManager>();
             Kingdom kingdom = (Kingdom)FormatterServices.GetUninitializedObject(typeof(Kingdom));
 
             kingdom.StringId = "My Kingdom";
-            MBObjectManager.Instance.RegisterObject(kingdom);
+            objectManager.AddExisting(kingdom.StringId, kingdom);
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             KingdomBinaryPackage package = new KingdomBinaryPackage(kingdom, factory);
@@ -132,7 +138,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             KingdomBinaryPackage returnedPackage = (KingdomBinaryPackage)obj;
 
-            Kingdom newKingdom = returnedPackage.Unpack<Kingdom>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Kingdom newKingdom = returnedPackage.Unpack<Kingdom>(deserializeFactory);
 
             Assert.Same(kingdom, newKingdom);
         }

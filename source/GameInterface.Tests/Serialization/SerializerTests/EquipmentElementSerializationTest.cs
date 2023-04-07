@@ -7,6 +7,7 @@ using System.Reflection;
 using GameInterface.Tests.Bootstrap;
 using Autofac;
 using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -44,14 +45,24 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void EquipmentElement_Full_Serialization()
         {
-            ItemObject itemobj = MBObjectManager.Instance.CreateObject<ItemObject>();
-            ItemObject itemobj2 = MBObjectManager.Instance.CreateObject<ItemObject>();
-            ItemModifier ItemModifier = MBObjectManager.Instance.CreateObject<ItemModifier>();
+            
 
-            ItemModifier.ModifyDamage(10);
-            ItemModifier.ModifyArmor(15);
+            ItemObject itemobj = new ItemObject("Item 1");
+            ItemObject itemobj2 = new ItemObject("Item 2");
+            ItemModifier itemModifier = new ItemModifier()
+            {
+                StringId = "Modifier 1"
+            };
+            var objectManager = container.Resolve<IObjectManager>();
 
-            EquipmentElement equipmentElement = new EquipmentElement(itemobj,ItemModifier,itemobj2);
+            objectManager.AddExisting(itemobj.StringId, itemobj);
+            objectManager.AddExisting(itemobj2.StringId, itemobj2);
+            objectManager.AddExisting(itemModifier.StringId, itemModifier);
+
+            itemModifier.ModifyDamage(10);
+            itemModifier.ModifyArmor(15);
+
+            EquipmentElement equipmentElement = new EquipmentElement(itemobj, itemModifier, itemobj2);
             var factory = container.Resolve<IBinaryPackageFactory>();
             EquipmentElementBinaryPackage package = new EquipmentElementBinaryPackage(equipmentElement, factory);
 
@@ -67,7 +78,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             EquipmentElementBinaryPackage returnedPackage = (EquipmentElementBinaryPackage)obj;
 
-            EquipmentElement newEquipmentElement = returnedPackage.Unpack<EquipmentElement>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            EquipmentElement newEquipmentElement = returnedPackage.Unpack<EquipmentElement>(deserializeFactory);
             
             Assert.Equal(_damage.GetValue(equipmentElement.ItemModifier),
                          _damage.GetValue(newEquipmentElement.ItemModifier));
