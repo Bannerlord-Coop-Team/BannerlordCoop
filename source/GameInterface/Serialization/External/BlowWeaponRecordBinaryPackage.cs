@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     public class BlowWeaponRecordBinaryPackage : BinaryPackageBase<BlowWeaponRecord>
     {
 
-        public BlowWeaponRecordBinaryPackage(BlowWeaponRecord obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public BlowWeaponRecordBinaryPackage(BlowWeaponRecord obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
         protected override void PackInternal()
@@ -26,7 +26,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
         }
     }

@@ -38,15 +38,13 @@ namespace Common.Serialization
             using (MemoryStream WrapperStream = new MemoryStream())
             {
                 Serializer.Serialize(WrapperStream, obj);
-                ProtoMessageWrapper wrapper = new ProtoMessageWrapper(obj.GetType(), WrapperStream.ToArray());
-
+                var wrapper = new ProtoMessageWrapper(obj.GetType(), WrapperStream.ToArray());
                 using (MemoryStream InternalStream = new MemoryStream())
                 {
                     Serializer.Serialize(InternalStream, wrapper);
                     return InternalStream.ToArray();
                 }
             }
-
         }
     }
 }

@@ -152,6 +152,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ContainerProvider.cs" />
     <Compile Include="MissionModule.cs" />
     <Compile Include="Services\Agents\Messages\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
@@ -161,6 +162,9 @@
     <Compile Include="Services\Agents\Patches\AgentKilledPatch.cs" />
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
+    <Compile Include="Services\Network\Surrogates\AttackCollisionDataSurrogate.cs" />
+    <Compile Include="Services\Network\Surrogates\BlowSurrogate.cs" />
+    <Compile Include="Services\Network\Surrogates\CharacterObjectSurrogate.cs" />
     <Compile Include="View\MissionsLoadUI.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />

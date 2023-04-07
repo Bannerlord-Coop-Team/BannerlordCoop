@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     {
         public string stringId;
 
-        public ItemCategoryBinaryPackage(ItemCategory obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public ItemCategoryBinaryPackage(ItemCategory obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
 
         }
@@ -19,7 +19,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<ItemCategory>(stringId);
+            Object = ResolveId<ItemCategory>(stringId);
         }
     }
 }

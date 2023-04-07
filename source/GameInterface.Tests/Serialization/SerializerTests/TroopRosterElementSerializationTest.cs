@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
@@ -9,6 +12,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class TroopRosterElementSerializationTest
     {
+        IContainer container;
+        public TroopRosterElementSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void TroopRosterElement_Serialize()
         {
@@ -20,7 +33,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 WoundedNumber = 11
             };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             TroopRosterElementBinaryPackage package = new TroopRosterElementBinaryPackage(TroopRosterElement, factory);
 
             package.Pack();
@@ -41,7 +54,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 WoundedNumber = 11
             };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             TroopRosterElementBinaryPackage package = new TroopRosterElementBinaryPackage(TroopRosterElement, factory);
 
             package.Pack();
@@ -56,7 +69,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             TroopRosterElementBinaryPackage returnedPackage = (TroopRosterElementBinaryPackage)obj;
 
-            TroopRosterElement newTroopRosterElement = returnedPackage.Unpack<TroopRosterElement>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TroopRosterElement newTroopRosterElement = returnedPackage.Unpack<TroopRosterElement>(deserializeFactory);
 
             Assert.Equal(TroopRosterElement.Number, newTroopRosterElement.Number);
             Assert.Equal(TroopRosterElement.Xp, newTroopRosterElement.Xp);

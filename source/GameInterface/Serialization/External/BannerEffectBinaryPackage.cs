@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     {
         public string stringId;
 
-        public BannerEffectBinaryPackage(BannerEffect obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public BannerEffectBinaryPackage(BannerEffect obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -20,7 +20,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<BannerEffect>(stringId);
+            Object = ResolveId<BannerEffect>(stringId);
         }
     }
 }

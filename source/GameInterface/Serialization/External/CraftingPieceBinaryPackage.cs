@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class CraftingPieceBinaryPackage : BinaryPackageBase<CraftingPiece>
     {
-        public CraftingPieceBinaryPackage(CraftingPiece obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CraftingPieceBinaryPackage(CraftingPiece obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -26,7 +26,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
         }
     }

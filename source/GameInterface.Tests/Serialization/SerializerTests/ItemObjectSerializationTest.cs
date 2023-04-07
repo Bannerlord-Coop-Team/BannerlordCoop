@@ -1,6 +1,9 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Runtime.Serialization;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -12,9 +15,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemObjectSerializationTest
     {
+        IContainer container;
         public ItemObjectSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -22,7 +32,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             ItemObject itemObject = (ItemObject)FormatterServices.GetUninitializedObject(typeof(ItemObject));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemObjectBinaryPackage package = new ItemObjectBinaryPackage(itemObject, factory);
 
             package.Pack();
@@ -42,7 +52,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             itemObject.AddWeapon(weaponComponentData, new ItemModifierGroup());
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
 
             byte[] bytes = BinaryFormatterSerializer.Serialize(factory.GetBinaryPackage(itemObject));
 
@@ -54,7 +64,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemObjectBinaryPackage returnedPackage = (ItemObjectBinaryPackage)obj;
 
-            ItemObject newItemObject = returnedPackage.Unpack<ItemObject>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ItemObject newItemObject = returnedPackage.Unpack<ItemObject>(deserializeFactory);
 
             Assert.Equal(itemObject.Name, newItemObject.Name);
             Assert.Equal(itemObject.MultiMeshName, newItemObject.MultiMeshName);
@@ -65,12 +76,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void ItemObject_StringId_Serialization()
         {
-            ItemObject itemObject = MBObjectManager.Instance.CreateObject<ItemObject>();
-            itemObject.StringId = "My Item";
+            var objectManager = container.Resolve<IObjectManager>();
+            ItemObject itemObject = new ItemObject("My Item");
 
-            MBObjectManager.Instance.RegisterObject(itemObject);
+            objectManager.AddExisting(itemObject.StringId, itemObject);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemObjectBinaryPackage package = new ItemObjectBinaryPackage(itemObject, factory);
 
             package.Pack();
@@ -85,7 +96,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemObjectBinaryPackage returnedPackage = (ItemObjectBinaryPackage)obj;
 
-            ItemObject newItemObject = returnedPackage.Unpack<ItemObject>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ItemObject newItemObject = returnedPackage.Unpack<ItemObject>(deserializeFactory);
 
             Assert.Same(itemObject, newItemObject);
         }

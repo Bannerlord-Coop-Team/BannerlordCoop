@@ -7,14 +7,24 @@ using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
 using System.Collections.Generic;
 using TaleWorlds.Library;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ClanSerializationTest
     {
+        IContainer container;
         public ClanSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -22,7 +32,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Clan testClan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ClanBinaryPackage package = new ClanBinaryPackage(testClan, factory);
 
             package.Pack();
@@ -38,12 +48,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Clan testClan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
             Hero hero1 = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
             Hero hero2 = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            var objectManager = container.Resolve<IObjectManager>();
 
             hero1.StringId = "myHero1";
             hero2.StringId = "myHero2";
 
-            MBObjectManager.Instance.RegisterObject(hero1);
-            MBObjectManager.Instance.RegisterObject(hero2);
+            objectManager.AddExisting(hero1.StringId, hero1);
+            objectManager.AddExisting(hero2.StringId, hero2);
 
             CampaignTime time = (CampaignTime)FormatterServices.GetUninitializedObject(typeof(CampaignTime));
 
@@ -61,7 +72,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             ClanBinaryPackage.Clan_lordsCache.SetValue(testClan, heroes);
             ClanBinaryPackage.Clan_supporterNotablesCache.SetValue(testClan, heroes);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ClanBinaryPackage package = new ClanBinaryPackage(testClan, factory);
 
             package.Pack();
@@ -76,7 +87,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ClanBinaryPackage returnedPackage = (ClanBinaryPackage)obj;
 
-            Clan newClan = returnedPackage.Unpack<Clan>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Clan newClan = returnedPackage.Unpack<Clan>(deserializeFactory);
 
             Assert.Equal(testClan.AutoRecruitmentExpenses, newClan.AutoRecruitmentExpenses);
             Assert.Equal(testClan.LastFactionChangeTime, newClan.LastFactionChangeTime);
@@ -91,10 +103,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void Clan_StringId_Serialization()
         {
             Clan clan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));
-            clan.StringId = "My Clan";
-            MBObjectManager.Instance.RegisterObject(clan);
+            var objectManager = container.Resolve<IObjectManager>();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            clan.StringId = "My Clan";
+            objectManager.AddExisting(clan.StringId, clan);
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ClanBinaryPackage package = new ClanBinaryPackage(clan, factory);
 
             package.Pack();
@@ -109,7 +123,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ClanBinaryPackage returnedPackage = (ClanBinaryPackage)obj;
 
-            Clan newHero = returnedPackage.Unpack<Clan>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Clan newHero = returnedPackage.Unpack<Clan>(deserializeFactory);
 
             Assert.Same(clan, newHero);
         }

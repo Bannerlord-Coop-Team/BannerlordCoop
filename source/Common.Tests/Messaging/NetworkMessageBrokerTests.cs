@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
+using Common.Serialization;
 using LiteNetLib;
 using Moq;
 using ProtoBuf;
@@ -12,6 +13,10 @@ namespace Common.Tests.Messaging
         [Fact]
         public void NetworkMessageBroker_Construct()
         {
+            byte[] t = ProtoBufSerializer.Serialize(new ExamplePacket());
+
+            ExamplePacket i = (ExamplePacket)ProtoBufSerializer.Deserialize(t);
+
             var client = new Mock<INetwork>();
 
             var messageBroker = new NetworkMessageBroker

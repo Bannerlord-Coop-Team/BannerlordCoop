@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Serialization;
 using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Agents.Messages;
@@ -35,6 +36,7 @@ namespace Missions.Services
         private readonly INetworkMessageBroker _networkMessageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
+        private readonly IBinaryPackageFactory packageFactory;
 
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
         private CharacterObject[] _gameCharacters;
@@ -43,11 +45,13 @@ namespace Missions.Services
         public CoopArenaController(
             INetworkMessageBroker networkMessageBroker,
             INetworkAgentRegistry agentRegistry, 
-            IRandomEquipmentGenerator equipmentGenerator)
+            IRandomEquipmentGenerator equipmentGenerator,
+            IBinaryPackageFactory packageFactory)
         {
             _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
+            this.packageFactory = packageFactory;
             _playerId = Guid.NewGuid();
 
             _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
@@ -96,6 +100,7 @@ namespace Missions.Services
         private void Handle_AgentDamage(MessagePayload<AgentDamageData> payload)
         {
             AgentDamageData agentDamaData = payload.What;
+
             NetPeer netPeer = payload.Who as NetPeer;
             
 
@@ -171,7 +176,9 @@ namespace Missions.Services
 
             bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
             Vec3 position = Agent.Main?.Position ?? default;
+
             NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, _playerId, position, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
+
             _networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
@@ -208,12 +215,27 @@ namespace Missions.Services
             }
         }
 
-        public override void OnAgentShootMissile(Agent shooterAgent, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
+        public override void OnAgentShootMissile(
+            Agent shooterAgent, 
+            EquipmentIndex weaponIndex, 
+            Vec3 position, 
+            Vec3 velocity, 
+            Mat3 orientation, 
+            bool hasRigidBody, 
+            int forcedMissileIndex)
         {
             if (Agent.Main.Team.TeamAgents.Contains(shooterAgent))
             {
                 _agentRegistry.TryGetAgentId(shooterAgent, out Guid shooterAgentGuid);
-                AgentShoot message = new AgentShoot(shooterAgentGuid, weaponIndex, position, velocity, orientation, hasRigidBody, forcedMissileIndex);
+                AgentShoot message = new AgentShoot(
+                    packageFactory, 
+                    shooterAgentGuid, 
+                    weaponIndex, 
+                    position, 
+                    velocity, 
+                    orientation, 
+                    hasRigidBody, 
+                    forcedMissileIndex);
 
                 _networkMessageBroker.PublishNetworkEvent(message);
             }
