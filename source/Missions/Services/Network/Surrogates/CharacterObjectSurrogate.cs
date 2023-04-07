@@ -14,6 +14,9 @@ namespace Missions.Services.Network.Surrogates
 
         public CharacterObjectSurrogate(CharacterObject obj)
         {
+            // Required to not overwrite data
+            // For some reason protobuf sends 2 character objects
+            // and one is null
             if (obj == null) return;
 
             if (ContainerProvider.TryResolve(out IBinaryPackageFactory packageFactory) == false) return;
