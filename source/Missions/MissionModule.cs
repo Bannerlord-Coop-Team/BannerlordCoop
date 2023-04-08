@@ -44,7 +44,6 @@ namespace Missions
                 .SingleInstance()
                 .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
 
-
             builder.RegisterInstance(NetworkAgentRegistry.Instance)
                 .As<INetworkAgentRegistry>()
                 .SingleInstance();

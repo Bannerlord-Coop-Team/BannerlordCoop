@@ -52,7 +52,8 @@ namespace Missions.Services.Agents
         private void PollAndUpdateAgentMovement(object obj)
         {
             // TODO: also add all player agents
-            var agents = _networkAgentRegistry.ControlledAgents.Values;
+            // TODO: ensure the used dictionary is safe for concurrent operations
+            var agents = _networkAgentRegistry.AgentToId.Keys;
 
             foreach (var agent in agents)
             {

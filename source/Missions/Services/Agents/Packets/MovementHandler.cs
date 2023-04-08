@@ -9,6 +9,7 @@ using Missions.Services.Network;
 using Missions.Services.Network.Messages;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading;
@@ -29,7 +30,7 @@ namespace Missions.Services.Agents.Packets
 
         private readonly AgentPublisher _agentPublisher;
 
-        private Dictionary<Guid, AgentMovement> _agentMovementDeltas = new Dictionary<Guid, AgentMovement>();
+        private ConcurrentDictionary<Guid, AgentMovement> _agentMovementDeltas = new ConcurrentDictionary<Guid, AgentMovement>();
 
         private Timer _senderTimer;
 
@@ -41,17 +42,14 @@ namespace Missions.Services.Agents.Packets
             _agentRegistry = agentRegistry;
             
             _messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
-            _messageBroker.Subscribe<ActionDataChanged>(Handle_ActionDataChanged);
-            _messageBroker.Subscribe<LookDirectionChanged>(Handle_LookDirectionChanged);
-            _messageBroker.Subscribe<MountDataChanged>(Handle_MountDataChanged);
-            _messageBroker.Subscribe<MovementInputVectorChanged>(Handle_MovementInputVectorChanged);
+            _messageBroker.Subscribe<IMovementEvent>(Handle_MovementEvent);
 
             _agentPublisher = agentPublisher;
             _agentPublisherConfig = agentPublisherConfig;
 
             _packetManager.RegisterPacketHandler(this);
 
-            // start the SendMessage every PACKET_UPDATE_RATE milliseconds, 0
+            // start the SendMessage every PACKET_UPDATE_RATE milliseconds
             _senderTimer = new Timer(SendMessage, null, 0, _agentPublisherConfig.PacketUpdateRate);
         }
 
@@ -64,41 +62,61 @@ namespace Missions.Services.Agents.Packets
         {
             _packetManager.RemovePacketHandler(this);
             _messageBroker.Unsubscribe<PeerDisconnected>(Handle_PeerDisconnect);
-            _messageBroker.Unsubscribe<ActionDataChanged>(Handle_ActionDataChanged);
-            _messageBroker.Unsubscribe<LookDirectionChanged>(Handle_LookDirectionChanged);
-            _messageBroker.Unsubscribe<MountDataChanged>(Handle_MountDataChanged);
-            _messageBroker.Unsubscribe<MovementInputVectorChanged>(Handle_MovementInputVectorChanged);
+            _messageBroker.Unsubscribe<IMovementEvent>(Handle_MovementEvent);
             _senderTimer?.Dispose();
         }
 
         public PacketType PacketType => PacketType.Movement;
 
-        private void Handle_ActionDataChanged(MessagePayload<ActionDataChanged> payload)
+        private void Handle_MovementEvent(MessagePayload<IMovementEvent> payload)
         {
-            var delta = GetDelta(payload.What);
-
-            delta.CalculateMovement(payload.What);
+            var payloadType = payload.What.GetType();
+            
+            // TODO: get rid of this horrible mess somehow
+            if (payloadType == typeof(MovementInputVectorChanged)) 
+            {
+                Handle_MovementInputVectorChanged((MovementInputVectorChanged)payload.What);
+            }
+            else if (payloadType == typeof(ActionDataChanged))
+            {
+                Handle_ActionDataChanged((ActionDataChanged)payload.What);
+            }
+            else if (payloadType == typeof(LookDirectionChanged))
+            {
+                Handle_LookDirectionChanged((LookDirectionChanged)payload.What);
+            }
+            else if (payloadType == typeof(MountDataChanged))
+            {
+                Handle_MountDataChanged((MountDataChanged)payload.What);
+            }
         }
 
-        private void Handle_LookDirectionChanged(MessagePayload<LookDirectionChanged> payload)
+        private void Handle_ActionDataChanged(ActionDataChanged payload)
         {
-            var delta = GetDelta(payload.What);
+            var delta = GetDelta(payload);
 
-            delta.CalculateMovement(payload.What);
+            delta.CalculateMovement(payload);
+        }
+
+        private void Handle_LookDirectionChanged(LookDirectionChanged payload)
+        {
+            var delta = GetDelta(payload);
+
+            delta.CalculateMovement(payload);
         }    
 
-        private void Handle_MountDataChanged(MessagePayload<MountDataChanged> payload)
+        private void Handle_MountDataChanged(MountDataChanged payload)
         {
-            var delta = GetDelta(payload.What);
+            var delta = GetDelta(payload);
 
-            delta.CalculateMovement(payload.What);
+            delta.CalculateMovement(payload);
         }
 
-        private void Handle_MovementInputVectorChanged(MessagePayload<MovementInputVectorChanged> payload)
+        private void Handle_MovementInputVectorChanged(MovementInputVectorChanged payload)
         {
-            var delta = GetDelta(payload.What);
+            var delta = GetDelta(payload);
 
-            delta.CalculateMovement(payload.What);
+            delta.CalculateMovement(payload);
         }
 
         private AgentMovement GetDelta(IMovementEvent payload)
@@ -121,19 +139,23 @@ namespace Missions.Services.Agents.Packets
                 agent, 
                 payloadGuid);
 
-            _agentMovementDeltas.Add(payloadGuid, delta);
+            _agentMovementDeltas.TryAdd(payloadGuid, delta);
 
             return delta;
         }
 
         private IEnumerable<AgentMovement> PopAllDeltas()
         {
+            var copiedDeltas = new List<AgentMovement>();
+
             foreach (var kv in _agentMovementDeltas)
             {
-                yield return kv.Value;
+                copiedDeltas.Add(kv.Value);
             }
 
             _agentMovementDeltas.Clear();
+
+            return copiedDeltas;
         }
 
         private void SendMessage(object state)
@@ -177,7 +199,7 @@ namespace Missions.Services.Agents.Packets
                         }
                     });
 
-                    _agentMovementDeltas.Remove(guid);
+                    _agentMovementDeltas.TryRemove(guid, out var _);
                 }
 
                 _agentRegistry.RemovePeer(peer);
