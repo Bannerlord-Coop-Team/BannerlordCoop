@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -50,4 +51,18 @@ namespace Missions.Services.Agents.Patches
             return true;
         }
     }
+    [HarmonyPatch(typeof(Agent), nameof(Agent.ChangeWeaponHitPoints))]
+    public class ShieldDamagePatch
+    {
+        static void Postfix(Agent __instance, EquipmentIndex slotIndex, short hitPoints)
+        {
+            if (NetworkAgentRegistry.Instance.TryGetAgentId(__instance, out Guid agentId) == false) return;
+
+            if (NetworkAgentRegistry.Instance.IsControlled(agentId) == false) return;
+
+            ShieldBreak shieldDamage = new ShieldBreak(__instance, slotIndex);
+            NetworkMessageBroker.Instance.Publish(__instance, shieldDamage);
+        }
+    }
+
 }

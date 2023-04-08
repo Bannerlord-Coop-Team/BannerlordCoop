@@ -30,6 +30,7 @@ namespace Missions
             builder.RegisterType<WeaponPickupHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
             builder.RegisterType<NetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<MissileHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType<ShieldBreakHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
 
             // TODO create handler collector
             builder.RegisterType<ArenaTestGameManager>().AsSelf();

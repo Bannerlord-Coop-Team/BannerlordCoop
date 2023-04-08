@@ -12,6 +12,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Common.Serialization;
+using System.Reflection;
 
 namespace Missions.Services.Missiles.Message
 {
@@ -50,22 +51,25 @@ namespace Missions.Services.Missiles.Message
         private ItemModifier _itemModifier;
         [ProtoMember(9)]
         private byte[] _packedItemModifier;
-
+        [ProtoMember(10)]
+        private bool isItemModifierNull = false;
         public Banner Banner
         {
             get { return UnpackBanner(); }
             set { _packedBanner = PackBanner(value); }
         }
         private Banner _banner;
-        [ProtoMember(10)]
-        private byte[] _packedBanner;
-
         [ProtoMember(11)]
+        private byte[] _packedBanner;
+        [ProtoMember(12)]
+        private bool isBannerNull = false;
+
+        [ProtoMember(13)]
         public int MissileIndex { get; }
 
-        [ProtoMember(12)]
+        [ProtoMember(14)]
         public float BaseSpeed { get; }
-        [ProtoMember(13)]
+        [ProtoMember(15)]
         public float Speed { get; }
 
         public NetworkAgentShoot(Guid agentGuid, Vec3 position, Vec3 velocity, Vec3 orientationS, Vec3 orientationF, Vec3 orientationU, bool hasRigidBody, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex, float baseSpeed, float speed)
@@ -111,6 +115,8 @@ namespace Missions.Services.Missiles.Message
         {
             if (_itemModifier != null) return _itemModifier;
 
+            if (isItemModifierNull) return null;
+
             var factory = new BinaryPackageFactory();
             var ItemModifier = BinaryFormatterSerializer.Deserialize<ItemModifierBinaryPackage>(_packedItemModifier);
             ItemModifier.BinaryPackageFactory = factory;
@@ -122,7 +128,11 @@ namespace Missions.Services.Missiles.Message
 
         private byte[] PackItemModifier(ItemModifier value)
         {
-            if (value == null) { value = new ItemModifier(); }
+            if (value == null)
+            {
+                isItemModifierNull = true;
+                return Array.Empty<byte>();
+            }
             var factory = new BinaryPackageFactory();
             var ItemModifier = new ItemModifierBinaryPackage(value, factory);
             ItemModifier.Pack();
@@ -133,6 +143,7 @@ namespace Missions.Services.Missiles.Message
         private Banner UnpackBanner()
         {
             if (_banner != null) return _banner;
+            if (isBannerNull) return null;
 
             var factory = new BinaryPackageFactory();
             var Banner = BinaryFormatterSerializer.Deserialize<BannerBinaryPackage>(_packedBanner);
@@ -145,7 +156,11 @@ namespace Missions.Services.Missiles.Message
 
         private byte[] PackBanner(Banner value)
         {
-            if (value == null) { value = new Banner(); }
+            if (value == null)
+            {
+                isBannerNull = true;
+                return Array.Empty<byte>();
+            }
             var factory = new BinaryPackageFactory();
             var Banner = new BannerBinaryPackage(value, factory);
             Banner.Pack();
