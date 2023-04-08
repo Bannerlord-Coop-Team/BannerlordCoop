@@ -152,7 +152,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Services\Agents\Handlers\ShieldBreakHandler.cs" />
+    <Compile Include="Services\Agents\Handlers\ShieldDamageHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
     <Compile Include="Services\Agents\Messages\NetworkShieldBreak.cs" />
