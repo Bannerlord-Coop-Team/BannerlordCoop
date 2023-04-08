@@ -60,7 +60,18 @@ namespace Missions.Messages
             UnitStartingPosition = unitStartingPosition;
             UnitIdString = unitIdString;
             IsPlayerAlive = isPlayerAlive;
-            Equipment = characterObject.Equipment;
+            Equipment = updateEquipment(characterObject.Equipment);
+        }
+
+        private Equipment updateEquipment(Equipment inEquipment)
+        {
+            for(int i = 0; i < 4; i++)
+            {
+                MissionWeapon weapon = Agent.Main.Equipment[i];
+                inEquipment[i] = new EquipmentElement(weapon.Item, weapon.ItemModifier);
+            }
+
+            return inEquipment;
         }
 
         private byte[] PackCharacter(CharacterObject characterObject)
