@@ -154,6 +154,7 @@ namespace Missions.Services
             List<Vec3> unitPositions = new List<Vec3>();
             List<string> unitIdStrings = new List<string>();
             List<Guid> guids = new List<Guid>();
+            List<float> unitHealths = new List<float>();
             foreach (Guid agentId in _agentRegistry.ControlledAgents.Keys)
             {
                 Agent agent = _agentRegistry.ControlledAgents[agentId];
@@ -163,13 +164,15 @@ namespace Missions.Services
                 guids.Add(agentId);
                 unitPositions.Add(agent.Position);
                 unitIdStrings.Add(agent.Character.StringId);
+                unitHealths.Add(agent.Health);
             }
 
             Logger.Debug("Sending join request");
 
             bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
             Vec3 position = Agent.Main?.Position ?? default;
-            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, _playerId, position, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
+            float health = Agent.Main.Health;
+            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, _playerId, position, health, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray(), unitHealths.ToArray());
             _networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
@@ -195,12 +198,15 @@ namespace Missions.Services
             if (joinInfo.IsPlayerAlive)
             {
                 Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true, joinInfo.Equipment);
+                newAgent.Health = joinInfo.PlayerHealth;
+
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
             }
 
             for (int i = 0; i < joinInfo.UnitIdString?.Length; i++)
             {
                 Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
+                tempAi.Health = joinInfo.UnitHealthList[i];
 
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
@@ -246,10 +252,10 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            Agent ai = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
+            //Agent ai = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
 
             _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
-            _agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
+            //_agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
         }
 
         private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);

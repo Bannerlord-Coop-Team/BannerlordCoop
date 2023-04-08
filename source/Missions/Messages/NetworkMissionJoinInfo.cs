@@ -51,7 +51,13 @@ namespace Missions.Messages
         [ProtoMember(8)]
         private byte[] _packedEquipment;
 
-        public NetworkMissionJoinInfo(CharacterObject characterObject, bool isPlayerAlive, Guid playerId, Vec3 startingPosition, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString)
+        [ProtoMember(9)]
+        public readonly float[] UnitHealthList;
+
+        [ProtoMember(10)]
+        public readonly float PlayerHealth;
+
+        public NetworkMissionJoinInfo(CharacterObject characterObject, bool isPlayerAlive, Guid playerId, Vec3 startingPosition, float health, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString, float[] unitHealthList)
         {
             PlayerId = playerId;
             StartingPosition = startingPosition;
@@ -60,10 +66,12 @@ namespace Missions.Messages
             UnitStartingPosition = unitStartingPosition;
             UnitIdString = unitIdString;
             IsPlayerAlive = isPlayerAlive;
-            Equipment = updateEquipment(characterObject.Equipment);
+            PlayerHealth = health;
+            Equipment = UpdateEquipment(characterObject.Equipment);
+            UnitHealthList = unitHealthList;
         }
 
-        private Equipment updateEquipment(Equipment inEquipment)
+        private Equipment UpdateEquipment(Equipment inEquipment)
         {
             for(int i = 0; i < 4; i++)
             {
