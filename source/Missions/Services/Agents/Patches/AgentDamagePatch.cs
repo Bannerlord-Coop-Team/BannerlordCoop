@@ -60,9 +60,11 @@ namespace Missions.Services.Agents.Patches
 
             if (NetworkAgentRegistry.Instance.IsControlled(agentId) == false) return;
 
-            ShieldBreak shieldDamage = new ShieldBreak(__instance, slotIndex);
-            NetworkMessageBroker.Instance.Publish(__instance, shieldDamage);
+            if (hitPoints <= 0) 
+            {
+                ShieldBreak shieldDamage = new ShieldBreak(__instance, slotIndex);
+                NetworkMessageBroker.Instance.Publish(__instance, shieldDamage);
+            }
         }
     }
-
 }
