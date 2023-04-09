@@ -1,5 +1,7 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -7,12 +9,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class PieceDataSerializationTest
     {
+        IContainer container;
+        public PieceDataSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void PieceData_Serialize()
         {
             PieceData PieceData = new PieceData(CraftingPiece.PieceTypes.Pommel, 1);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             PieceDataBinaryPackage package = new PieceDataBinaryPackage(PieceData, factory);
 
             package.Pack();
@@ -27,7 +39,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             PieceData PieceData = new PieceData(CraftingPiece.PieceTypes.Guard, 2);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             PieceDataBinaryPackage package = new PieceDataBinaryPackage(PieceData, factory);
 
             package.Pack();
@@ -42,7 +54,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             PieceDataBinaryPackage returnedPackage = (PieceDataBinaryPackage)obj;
 
-            PieceData newPieceData = returnedPackage.Unpack<PieceData>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            PieceData newPieceData = returnedPackage.Unpack<PieceData>(deserializeFactory);
 
             Assert.Equal(PieceData.PieceType, newPieceData.PieceType);
             Assert.Equal(PieceData.Order, newPieceData.Order);

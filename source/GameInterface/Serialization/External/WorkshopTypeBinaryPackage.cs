@@ -12,7 +12,7 @@ namespace GameInterface.Serialization.External
     {
         private string stringId;
 
-        public WorkshopTypeBinaryPackage(WorkshopType obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public WorkshopTypeBinaryPackage(WorkshopType obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -23,7 +23,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<WorkshopType>(stringId);
+            Object = ResolveId<WorkshopType>(stringId);
         }
     }
 }

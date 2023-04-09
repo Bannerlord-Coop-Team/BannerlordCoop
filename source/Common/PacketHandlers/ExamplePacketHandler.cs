@@ -42,11 +42,9 @@ namespace Common.PacketHandlers
     [ProtoContract]
     public readonly struct ExamplePacket : IPacket
     {
-        [ProtoMember(1)]
         public PacketType PacketType => PacketType.Example;
-        [ProtoMember(2)]
         public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableSequenced;
-        [ProtoMember(3)]
+        [ProtoMember(1)]
         public byte[] Data { get; }
 
         public ExamplePacket(byte[] data)

@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
+using GameInterface;
 using IntroServer.Config;
 using Missions.Services;
 using Missions.Services.Agents.Handlers;
@@ -11,6 +12,7 @@ using Missions.Services.BoardGames;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Services.Taverns;
+using TaleWorlds.ObjectSystem;
 
 namespace Missions
 {
@@ -24,6 +26,8 @@ namespace Missions
                 // Creates new singleton
                 new NetworkMessageBroker();
             }
+
+            builder.RegisterModule<GameInterfaceModule>();
 
             // Non interface classes
             builder.RegisterType<WeaponDropHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
@@ -59,7 +63,7 @@ namespace Missions
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
             builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<MovementHandler>().AsSelf().InstancePerLifetimeScope();
-
+            
             base.Load(builder);
         }
     }

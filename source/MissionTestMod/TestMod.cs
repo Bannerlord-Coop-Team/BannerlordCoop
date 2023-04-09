@@ -1,20 +1,19 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using Common.Logging;
 using HarmonyLib;
 using Missions;
 using Missions.Services.Arena;
-using Missions.View;
 using Missions.Services.Network.Surrogates;
 using Missions.Services.Taverns;
+using Missions.View;
 using ProtoBuf.Meta;
 using SandBox;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
-using TaleWorlds.Core;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
@@ -22,8 +21,6 @@ using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.ScreenSystem;
-using Autofac;
-using Missions.Services.Network;
 using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace MissionTestMod
@@ -42,6 +39,8 @@ namespace MissionTestMod
 
         protected override void OnSubModuleLoad()
         {
+            AssemblyHellscape.CreateAssemblyBindingRedirects();
+
             if (Debugger.IsAttached)
             {
                 var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}";
@@ -106,6 +105,8 @@ namespace MissionTestMod
             builder.RegisterModule<MissionModule>();
 
             Container = builder.Build();
+
+            ContainerProvider.SetContainer(Container);
         }
 
         protected override void OnSubModuleUnloaded()
@@ -121,6 +122,9 @@ namespace MissionTestMod
             RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
             RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
             RuntimeTypeModel.Default.SetSurrogate<Mat3, Mat3Surrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<Blow, BlowSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<CharacterObject, CharacterObjectSurrogate>();
         }
 
         private bool m_IsFirstTick = true;

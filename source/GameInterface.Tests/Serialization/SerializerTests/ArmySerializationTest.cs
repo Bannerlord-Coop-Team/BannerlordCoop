@@ -1,10 +1,14 @@
-﻿using Common.Extensions;
+﻿using Autofac;
+using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 
@@ -12,9 +16,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ArmySerializationTest
     {
+        IContainer container;
         public ArmySerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -22,7 +33,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Army armyObject = (Army)FormatterServices.GetUninitializedObject(typeof(Army));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ArmyBinaryPackage package = new ArmyBinaryPackage(armyObject, factory);
 
             package.Pack();
@@ -36,6 +47,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         private static readonly FieldInfo Army_hourlyTickEvent = typeof(Army).GetField("_hourlyTickEvent", BindingFlags.NonPublic | BindingFlags.Instance);
         private static readonly PropertyInfo Army_Cohesion = typeof(Army).GetProperty(nameof(Army.Cohesion));
         private static readonly PropertyInfo Army_Morale = typeof(Army).GetProperty(nameof(Army.Morale));
+        private static readonly PropertyInfo Campaing_MapTimeTracker = typeof(Campaign).GetProperty("MapTimeTracker", BindingFlags.NonPublic | BindingFlags.Instance);
         [Fact]
         public void Army_Full_Serialization()
         {
@@ -45,14 +57,15 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             hero.StringId = "myHero";
 
-            MBObjectManager.Instance.RegisterObject(hero);
+            var objectManager = container.Resolve<IObjectManager>();
+            Assert.True(objectManager.AddExisting(hero.StringId, hero));
 
             armyObject.ArmyOwner = hero;
             Army_Cohesion.SetRandom(armyObject);
             Army_Morale.SetRandom(armyObject);
 
             // Setup serialization for armyObject
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ArmyBinaryPackage package = new ArmyBinaryPackage(armyObject, factory);
 
             package.Pack();
@@ -66,8 +79,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.IsType<ArmyBinaryPackage>(obj);
 
             ArmyBinaryPackage returnedPackage = (ArmyBinaryPackage)obj;
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
 
-            Army newArmyObject = returnedPackage.Unpack<Army>();
+            Army newArmyObject = returnedPackage.Unpack<Army>(deserializeFactory);
 
             // Verify newArmyObject values
             Assert.Equal(armyObject.Cohesion, newArmyObject.Cohesion);

@@ -3,17 +3,30 @@ using GameInterface.Serialization;
 using TaleWorlds.Core;
 using Xunit;
 using System.Runtime.Serialization;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BannerEffectSerializationTest
     {
+        IContainer container;
+        public BannerEffectSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void BannerEffect_Serialize()
         {
             BannerEffect testBannerEffect = (BannerEffect)FormatterServices.GetUninitializedObject(typeof(BannerEffect));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BannerEffectBinaryPackage package = new BannerEffectBinaryPackage(testBannerEffect, factory);
 
             package.Pack();
@@ -28,7 +41,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             BannerEffect testBannerEffect = (BannerEffect)FormatterServices.GetUninitializedObject(typeof(BannerEffect));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BannerEffectBinaryPackage package = new BannerEffectBinaryPackage(testBannerEffect, factory);
 
             package.Pack();

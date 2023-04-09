@@ -40,6 +40,7 @@ namespace Missions.Services
         private readonly INetworkMessageBroker _networkMessageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
+        private readonly IBinaryPackageFactory packageFactory;
 
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
         private CharacterObject[] _gameCharacters;
@@ -47,12 +48,14 @@ namespace Missions.Services
 
         public CoopArenaController(
             INetworkMessageBroker networkMessageBroker,
-            INetworkAgentRegistry agentRegistry,
-            IRandomEquipmentGenerator equipmentGenerator)
+            INetworkAgentRegistry agentRegistry, 
+            IRandomEquipmentGenerator equipmentGenerator,
+            IBinaryPackageFactory packageFactory)
         {
             _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
+            this.packageFactory = packageFactory;
             _playerId = Guid.NewGuid();
 
             _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
@@ -93,6 +96,7 @@ namespace Missions.Services
         private void Handle_AgentDamage(MessagePayload<AgentDamageData> payload)
         {
             AgentDamageData agentDamaData = payload.What;
+
             NetPeer netPeer = payload.Who as NetPeer;
 
 
@@ -123,8 +127,8 @@ namespace Missions.Services
                 _agentRegistry.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
             }
 
-            if (effectorAgent == null) return;
             if (effectedAgent == null) return;
+            if (effectorAgent == null) return;
 
             // extract the blow
             Blow b = agentDamaData.Blow;

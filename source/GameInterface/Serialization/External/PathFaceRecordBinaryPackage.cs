@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class PathFaceRecordBinaryPackage : BinaryPackageBase<PathFaceRecord>
     {
-        public PathFaceRecordBinaryPackage(PathFaceRecord obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public PathFaceRecordBinaryPackage(PathFaceRecord obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -29,7 +29,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
         }
     }

@@ -7,7 +7,6 @@ using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade;
 
 namespace Missions.Messages
 {
@@ -18,26 +17,14 @@ namespace Missions.Messages
         public readonly Guid PlayerId;
         [ProtoMember(2)]
         public readonly Vec3 StartingPosition;
-
-        public CharacterObject CharacterObject
-        {
-            get { return UnpackCharacter(); }
-            set { _packedCharacter = PackCharacter(value); }
-        }
-        private CharacterObject _characterObject;
-
         [ProtoMember(3)]
-        private byte[] _packedCharacter;
-
+        public readonly CharacterObject CharacterObject;
         [ProtoMember(4)]
         public readonly Guid[] UnitId;
-
         [ProtoMember(5)]
         public readonly Vec3[] UnitStartingPosition;
-
         [ProtoMember(6)]
         public readonly string[] UnitIdString;
-
         [ProtoMember(7)]
         public readonly bool IsPlayerAlive;
 
@@ -59,9 +46,9 @@ namespace Missions.Messages
 
         public NetworkMissionJoinInfo(CharacterObject characterObject, bool isPlayerAlive, Guid playerId, Vec3 startingPosition, float health, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString, float[] unitHealthList)
         {
+            CharacterObject = characterObject;
             PlayerId = playerId;
             StartingPosition = startingPosition;
-            CharacterObject = characterObject;
             UnitId = unitId;
             UnitStartingPosition = unitStartingPosition;
             UnitIdString = unitIdString;

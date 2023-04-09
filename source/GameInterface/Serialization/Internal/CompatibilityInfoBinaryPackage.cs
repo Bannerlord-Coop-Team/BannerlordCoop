@@ -14,7 +14,7 @@ namespace GameInterface.Serialization.Internal
     [Serializable]
     public class CompatibilityInfoBinaryPackage : BinaryPackageBase<CompatibilityInfo>
     {
-        public CompatibilityInfoBinaryPackage(CompatibilityInfo obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CompatibilityInfoBinaryPackage(CompatibilityInfo obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -32,7 +32,7 @@ namespace GameInterface.Serialization.Internal
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
         }
     }
