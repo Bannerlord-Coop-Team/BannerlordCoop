@@ -3,7 +3,10 @@ using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using GameInterface;
+using GameInterface.Serialization;
+using GameInterface.Services.ObjectManager;
 using IntroServer.Config;
+using Missions.Messages;
 using Missions.Services;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Packets;
@@ -36,6 +39,7 @@ namespace Missions
             builder.RegisterType<MissileHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
             builder.RegisterType<ShieldBreakHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
 
+
             // TODO create handler collector
             builder.RegisterType<ArenaTestGameManager>().AsSelf();
             builder.RegisterType<TavernsGameManager>().AsSelf();
@@ -58,7 +62,7 @@ namespace Missions
 
             // Interface classes
             builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
-            
+
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
             builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();

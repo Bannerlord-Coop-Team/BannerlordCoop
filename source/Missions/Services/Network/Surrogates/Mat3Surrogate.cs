@@ -8,6 +8,8 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.Library;
 using Common.Serialization;
+using Autofac.Core;
+using Autofac;
 
 namespace Missions.Services.Network.Surrogates
 {
@@ -17,9 +19,12 @@ namespace Missions.Services.Network.Surrogates
         [ProtoMember(1)]
         public byte[] data { get; }
 
+        readonly IContainer container;
         public Mat3Surrogate(Mat3 obj)
         {
-            var factory = new BinaryPackageFactory();
+            ContainerBuilder builder = new ContainerBuilder();
+            container = builder.Build();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             var orientation = new Mat3BinaryPackage(obj, factory);
             orientation.Pack();
 
@@ -28,11 +33,11 @@ namespace Missions.Services.Network.Surrogates
 
         private Mat3 Deserialize()
         {
-            var factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             var orientation = BinaryFormatterSerializer.Deserialize<Mat3BinaryPackage>(data);
             orientation.BinaryPackageFactory = factory;
 
-            return orientation.Unpack<Mat3>();
+            return orientation.Unpack<Mat3>(factory);
         }
 
         public static implicit operator Mat3Surrogate(Mat3 obj)

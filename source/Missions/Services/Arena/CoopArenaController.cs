@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Serialization;
 using HarmonyLib;
 using JetBrains.Annotations;
 using LiteNetLib;

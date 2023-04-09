@@ -13,6 +13,7 @@ using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Common.Serialization;
 using System.Reflection;
+using Autofac;
 
 namespace Missions.Services.Missiles.Message
 {
@@ -72,8 +73,13 @@ namespace Missions.Services.Missiles.Message
         [ProtoMember(15)]
         public float Speed { get; }
 
+        IContainer container;
+
         public NetworkAgentShoot(Guid agentGuid, Vec3 position, Vec3 velocity, Vec3 orientationS, Vec3 orientationF, Vec3 orientationU, bool hasRigidBody, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex, float baseSpeed, float speed)
         {
+            ContainerBuilder builder = new ContainerBuilder();
+            container = builder.Build();
+
             AgentGuid = agentGuid;
             Position = position;
             Velocity = velocity;
@@ -93,18 +99,18 @@ namespace Missions.Services.Missiles.Message
         {
             if (_itemObject != null) return _itemObject;
 
-            var factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             var itemObject = BinaryFormatterSerializer.Deserialize<ItemObjectBinaryPackage>(_packedItemObject);
             itemObject.BinaryPackageFactory = factory;
 
-            _itemObject = itemObject.Unpack<ItemObject>();
+            _itemObject = itemObject.Unpack<ItemObject>(factory);
 
             return _itemObject;
         }
 
         private byte[] PackItemObject(ItemObject value)
         {
-            var factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             var itemObject = new ItemObjectBinaryPackage(value, factory);
             itemObject.Pack();
 
@@ -117,11 +123,11 @@ namespace Missions.Services.Missiles.Message
 
             if (isItemModifierNull) return null;
 
-            var factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             var ItemModifier = BinaryFormatterSerializer.Deserialize<ItemModifierBinaryPackage>(_packedItemModifier);
             ItemModifier.BinaryPackageFactory = factory;
 
-            _itemModifier = ItemModifier.Unpack<ItemModifier>();
+            _itemModifier = ItemModifier.Unpack<ItemModifier>(factory);
 
             return _itemModifier;
         }
@@ -133,7 +139,7 @@ namespace Missions.Services.Missiles.Message
                 isItemModifierNull = true;
                 return Array.Empty<byte>();
             }
-            var factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             var ItemModifier = new ItemModifierBinaryPackage(value, factory);
             ItemModifier.Pack();
 
@@ -145,11 +151,11 @@ namespace Missions.Services.Missiles.Message
             if (_banner != null) return _banner;
             if (isBannerNull) return null;
 
-            var factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             var Banner = BinaryFormatterSerializer.Deserialize<BannerBinaryPackage>(_packedBanner);
             Banner.BinaryPackageFactory = factory;
 
-            _banner = Banner.Unpack<Banner>();
+            _banner = Banner.Unpack<Banner>(factory);
 
             return _banner;
         }
@@ -161,7 +167,7 @@ namespace Missions.Services.Missiles.Message
                 isBannerNull = true;
                 return Array.Empty<byte>();
             }
-            var factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             var Banner = new BannerBinaryPackage(value, factory);
             Banner.Pack();
 
