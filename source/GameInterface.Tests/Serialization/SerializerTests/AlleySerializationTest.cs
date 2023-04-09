@@ -1,6 +1,9 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -15,9 +18,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class AlleySerializationTest
     {
+        IContainer container;
         public AlleySerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -37,7 +47,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Settlement_Alleys.SetValue(settlement, alleys);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             AlleyBinaryPackage package = new AlleyBinaryPackage(alley, factory);
 
             package.Pack();
@@ -63,13 +73,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             Hero owner = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
 
+            // Register object with new string id
+            var objectManager = container.Resolve<IObjectManager>();
+
             // Register owner with MBObjectManager
             owner.StringId = "My Hero";
-            MBObjectManager.Instance.RegisterObject(owner);
+            objectManager.AddExisting(owner.StringId, owner);
 
             // Register settlement with MBObjectManager
             settlement.StringId = "My Settlement";
-            MBObjectManager.Instance.RegisterObject(settlement);
+            objectManager.AddExisting(settlement.StringId, settlement);
 
             // Attach settlement and commonArea
             Alley_Settlement.SetValue(alley, settlement);
@@ -88,7 +101,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Alley_Name.SetValue(alley, new TextObject("TestName"));
             Alley_Tag.SetValue(alley, "TestTag");
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             AlleyBinaryPackage package = new AlleyBinaryPackage(alley, factory);
 
             package.Pack();
@@ -103,7 +116,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             AlleyBinaryPackage returnedPackage = (AlleyBinaryPackage)obj;
 
-            Alley newAlley = returnedPackage.Unpack<Alley>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Alley newAlley = returnedPackage.Unpack<Alley>(deserializeFactory);
 
             Assert.Same(alley.Owner, newAlley.Owner);
             Assert.Same(alley.Settlement, newAlley.Settlement);

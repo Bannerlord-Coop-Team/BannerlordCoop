@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class CharacterTraitsBinaryPackage : BinaryPackageBase<CharacterTraits>
     {
-        public CharacterTraitsBinaryPackage(CharacterTraits obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CharacterTraitsBinaryPackage(CharacterTraits obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
         protected override void PackInternal()
@@ -24,7 +24,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
         }
     }

@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     {
         public string templateId;
 
-        public CraftingTemplateBinaryPackage(CraftingTemplate obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CraftingTemplateBinaryPackage(CraftingTemplate obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
 
         }
@@ -19,7 +19,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<CraftingTemplate>(templateId);
+            Object = ResolveId<CraftingTemplate>(templateId);
         }
     }
 }

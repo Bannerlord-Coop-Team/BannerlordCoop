@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class PieceDataBinaryPackage : BinaryPackageBase<PieceData>
     {
-        public PieceDataBinaryPackage(PieceData obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public PieceDataBinaryPackage(PieceData obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -26,7 +26,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
         }
     }

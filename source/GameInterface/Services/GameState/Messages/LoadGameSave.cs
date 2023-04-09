@@ -1,14 +1,28 @@
 ﻿using Common.Messaging;
-using GameInterface.Data;
+using System;
 
 namespace GameInterface.Services.GameState.Messages
 {
     public readonly struct LoadGameSave : ICommand
     {
-        public IGameSaveData SaveData { get; }
+        public Guid TransactionID { get; }
+
+        public byte[] SaveData { get; }
+
+        public LoadGameSave(Guid transactionID, byte[] saveData)
+        {
+            TransactionID = transactionID;
+            SaveData = saveData;
+        }
     }
 
-    public readonly struct GameSaveLoaded : IEvent
+    public readonly struct GameSaveLoaded : IResponse
     {
+        public Guid TransactionID { get; }
+
+        public GameSaveLoaded(Guid transactionID)
+        {
+            TransactionID = transactionID;
+        }
     }
 }

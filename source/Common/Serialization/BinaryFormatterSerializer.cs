@@ -18,11 +18,15 @@ namespace Common.Serialization
 
         public static T Deserialize<T>(byte[] data)
         {
+            if (data == default) return default;
+
             return (T)Deserialize(data);
         }
 
         public static object Deserialize(byte[] data)
         {
+            if (data == null) return null;
+
             using (MemoryStream ms = new MemoryStream(data))
             {
                 return formatter.Deserialize(ms);

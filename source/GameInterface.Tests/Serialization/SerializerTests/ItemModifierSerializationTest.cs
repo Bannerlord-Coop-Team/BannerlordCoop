@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using System.Reflection;
 using TaleWorlds.Core;
 using Xunit;
@@ -8,12 +11,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemModifierSerializationTest
     {
+        IContainer container;
+        public ItemModifierSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void ItemModifier_Serialize()
         {
             ItemModifier ItemModifier = new ItemModifier();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemModifierBinaryPackage package = new ItemModifierBinaryPackage(ItemModifier, factory);
 
             package.Pack();
@@ -32,7 +45,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             ItemModifier.ModifyDamage(10);
             ItemModifier.ModifyArmor(15);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemModifierBinaryPackage package = new ItemModifierBinaryPackage(ItemModifier, factory);
 
             package.Pack();
@@ -47,7 +60,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemModifierBinaryPackage returnedPackage = (ItemModifierBinaryPackage)obj;
 
-            ItemModifier newItemModifier = returnedPackage.Unpack<ItemModifier>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ItemModifier newItemModifier = returnedPackage.Unpack<ItemModifier>(deserializeFactory);
 
             Assert.Equal(_damage.GetValue(ItemModifier),
                          _damage.GetValue(newItemModifier));

@@ -37,14 +37,24 @@ namespace Missions.Services.Agents.Messages
 
         [ProtoMember(5)]
         private byte[] _packedOrientation;
+        private readonly IBinaryPackageFactory packageFactory;
 
         [ProtoMember(6)]
         public bool HasRigidBody { get; }
         [ProtoMember(7)]
         public int ForcedMissileIndex { get; }
 
-        public AgentShoot(Guid agentGuid, EquipmentIndex weaponIndex, Vec3 position, Vec3 velocity, Mat3 orientation, bool hasRigidBody, int forcedMissileIndex)
+        public AgentShoot(
+            IBinaryPackageFactory packageFactory,
+            Guid agentGuid,
+            EquipmentIndex weaponIndex,
+            Vec3 position,
+            Vec3 velocity,
+            Mat3 orientation,
+            bool hasRigidBody,
+            int forcedMissileIndex)
         {
+            this.packageFactory = packageFactory;
             AgentGuid = agentGuid;
             WeaponIndex = weaponIndex;
             Position = position;
@@ -59,19 +69,16 @@ namespace Missions.Services.Agents.Messages
         {
             if (_orientation != null) return _orientation;
 
-            var factory = new BinaryPackageFactory();
             var orientation = BinaryFormatterSerializer.Deserialize<CharacterObjectBinaryPackage>(_packedOrientation);
-            orientation.BinaryPackageFactory = factory;
 
-            _orientation = orientation.Unpack<Mat3>();
+            _orientation = orientation.Unpack<Mat3>(packageFactory);
 
             return _orientation;
         }
 
         private byte[] PackOrientation(Mat3 value)
         {
-            var factory = new BinaryPackageFactory();
-            var orientation = new Mat3BinaryPackage(value, factory);
+            var orientation = new Mat3BinaryPackage(value, packageFactory);
             orientation.Pack();
 
             return BinaryFormatterSerializer.Serialize(orientation);

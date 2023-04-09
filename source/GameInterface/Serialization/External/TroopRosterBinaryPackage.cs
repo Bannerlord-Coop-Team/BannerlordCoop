@@ -13,7 +13,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class TroopRosterBinaryPackage : BinaryPackageBase<TroopRoster>
     {
-        public TroopRosterBinaryPackage(TroopRoster obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public TroopRosterBinaryPackage(TroopRoster obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -43,7 +43,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
 
             PartyBase ownerParty = (PartyBase)OwnerParty.GetValue(Object);
