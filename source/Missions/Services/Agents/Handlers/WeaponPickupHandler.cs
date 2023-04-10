@@ -1,5 +1,7 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Common.Network;
+using GameInterface.Serialization;
 using HarmonyLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
@@ -19,6 +21,12 @@ namespace Missions.Services.Agents.Handlers
 
         public WeaponPickupHandler()
         {
+            ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterModule<MissionModule>();
+            container = builder.Build();
+
+            binaryPackageFactory = container.Resolve<IBinaryPackageFactory>();
+
             NetworkMessageBroker.Instance.Subscribe<WeaponPickedup>(WeaponPickupSend);
             NetworkMessageBroker.Instance.Subscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
         }
@@ -29,6 +37,8 @@ namespace Missions.Services.Agents.Handlers
         }
 
         private static MethodInfo WeaponEquippedMethod = typeof(Agent).GetMethod("WeaponEquipped", BindingFlags.NonPublic | BindingFlags.Instance);
+        private IContainer container;
+        private IBinaryPackageFactory binaryPackageFactory;
 
         public void WeaponPickupSend(MessagePayload<WeaponPickedup> obj)
         {
@@ -36,7 +46,7 @@ namespace Missions.Services.Agents.Handlers
 
             NetworkAgentRegistry.Instance.TryGetAgentId(agent, out Guid agentId);
 
-            NetworkWeaponPickedup message = new NetworkWeaponPickedup(agentId, obj.What.EquipmentIndex, obj.What.WeaponObject, obj.What.WeaponModifier, obj.What.Banner);
+            NetworkWeaponPickedup message = new NetworkWeaponPickedup(binaryPackageFactory, agentId, obj.What.EquipmentIndex, obj.What.WeaponObject, obj.What.WeaponModifier, obj.What.Banner);
 
             NetworkMessageBroker.Instance.PublishNetworkEvent(message);
         }

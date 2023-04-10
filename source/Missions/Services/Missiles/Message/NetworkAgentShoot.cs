@@ -43,6 +43,7 @@ namespace Missions.Services.Missiles.Message
         private ItemObject _itemObject;
         [ProtoMember(8)]
         private byte[] _packedItemObject;
+        private readonly IBinaryPackageFactory packageFactory;
 
         public ItemModifier ItemModifier
         {
@@ -73,13 +74,9 @@ namespace Missions.Services.Missiles.Message
         [ProtoMember(15)]
         public float Speed { get; }
 
-        IContainer container;
-
-        public NetworkAgentShoot(Guid agentGuid, Vec3 position, Vec3 velocity, Vec3 orientationS, Vec3 orientationF, Vec3 orientationU, bool hasRigidBody, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex, float baseSpeed, float speed)
+        public NetworkAgentShoot(IBinaryPackageFactory packageFactory, Guid agentGuid, Vec3 position, Vec3 velocity, Vec3 orientationS, Vec3 orientationF, Vec3 orientationU, bool hasRigidBody, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex, float baseSpeed, float speed)
         {
-            ContainerBuilder builder = new ContainerBuilder();
-            container = builder.Build();
-
+            this.packageFactory = packageFactory;
             AgentGuid = agentGuid;
             Position = position;
             Velocity = velocity;
@@ -99,19 +96,16 @@ namespace Missions.Services.Missiles.Message
         {
             if (_itemObject != null) return _itemObject;
 
-            var factory = container.Resolve<IBinaryPackageFactory>();
             var itemObject = BinaryFormatterSerializer.Deserialize<ItemObjectBinaryPackage>(_packedItemObject);
-            itemObject.BinaryPackageFactory = factory;
 
-            _itemObject = itemObject.Unpack<ItemObject>(factory);
+            _itemObject = itemObject.Unpack<ItemObject>(packageFactory);
 
             return _itemObject;
         }
 
         private byte[] PackItemObject(ItemObject value)
         {
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            var itemObject = new ItemObjectBinaryPackage(value, factory);
+            var itemObject = new ItemObjectBinaryPackage(value, packageFactory);
             itemObject.Pack();
 
             return BinaryFormatterSerializer.Serialize(itemObject);
@@ -123,11 +117,9 @@ namespace Missions.Services.Missiles.Message
 
             if (isItemModifierNull) return null;
 
-            var factory = container.Resolve<IBinaryPackageFactory>();
             var ItemModifier = BinaryFormatterSerializer.Deserialize<ItemModifierBinaryPackage>(_packedItemModifier);
-            ItemModifier.BinaryPackageFactory = factory;
 
-            _itemModifier = ItemModifier.Unpack<ItemModifier>(factory);
+            _itemModifier = ItemModifier.Unpack<ItemModifier>(packageFactory);
 
             return _itemModifier;
         }
@@ -139,8 +131,7 @@ namespace Missions.Services.Missiles.Message
                 isItemModifierNull = true;
                 return Array.Empty<byte>();
             }
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            var ItemModifier = new ItemModifierBinaryPackage(value, factory);
+            var ItemModifier = new ItemModifierBinaryPackage(value, packageFactory);
             ItemModifier.Pack();
 
             return BinaryFormatterSerializer.Serialize(ItemModifier);
@@ -151,11 +142,8 @@ namespace Missions.Services.Missiles.Message
             if (_banner != null) return _banner;
             if (isBannerNull) return null;
 
-            var factory = container.Resolve<IBinaryPackageFactory>();
             var Banner = BinaryFormatterSerializer.Deserialize<BannerBinaryPackage>(_packedBanner);
-            Banner.BinaryPackageFactory = factory;
-
-            _banner = Banner.Unpack<Banner>(factory);
+            _banner = Banner.Unpack<Banner>(packageFactory);
 
             return _banner;
         }
@@ -167,8 +155,7 @@ namespace Missions.Services.Missiles.Message
                 isBannerNull = true;
                 return Array.Empty<byte>();
             }
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            var Banner = new BannerBinaryPackage(value, factory);
+            var Banner = new BannerBinaryPackage(value, packageFactory);
             Banner.Pack();
 
             return BinaryFormatterSerializer.Serialize(Banner);

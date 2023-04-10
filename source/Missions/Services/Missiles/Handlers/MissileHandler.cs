@@ -1,6 +1,8 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Serialization;
 using LiteNetLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
@@ -22,9 +24,16 @@ namespace Missions.Services.Missiles.Handlers
 {
     public class MissileHandler
     {
-
+        IContainer container;
+        IBinaryPackageFactory binaryPackageFactory;
         public MissileHandler()
         {
+            ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterModule<MissionModule>();
+            container = builder.Build();
+
+            binaryPackageFactory = container.Resolve<IBinaryPackageFactory>();
+
             NetworkMessageBroker.Instance.Subscribe<AgentShoot>(AgentShootSend);
             NetworkMessageBroker.Instance.Subscribe<NetworkAgentShoot>(AgentShootRecieve);
         }
@@ -70,7 +79,7 @@ namespace Missions.Services.Missiles.Handlers
                     missionWeapon = payload.What.MissionWeapon.AmmoWeapon;
                 }
 
-                NetworkAgentShoot message = new NetworkAgentShoot(shooterAgentGuid, payload.What.Position, payload.What.Direction, payload.What.Orientation.s, payload.What.Orientation.f, payload.What.Orientation.u, payload.What.HasRigidBody, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, payload.What.MissileIndex, payload.What.BaseSpeed, payload.What.Speed);
+                NetworkAgentShoot message = new NetworkAgentShoot(binaryPackageFactory, shooterAgentGuid, payload.What.Position, payload.What.Direction, payload.What.Orientation.s, payload.What.Orientation.f, payload.What.Orientation.u, payload.What.HasRigidBody, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, payload.What.MissileIndex, payload.What.BaseSpeed, payload.What.Speed);
                 NetworkMessageBroker.Instance.PublishNetworkEvent(message);
             }
         }

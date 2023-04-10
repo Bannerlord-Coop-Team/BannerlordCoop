@@ -177,7 +177,7 @@ namespace Missions.Services
             bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
             Vec3 position = Agent.Main?.Position ?? default;
             float health = Agent.Main.Health;
-            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, _playerId, position, health, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray(), unitHealths.ToArray());
+            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(packageFactory, characterObject, isPlayerAlive, _playerId, position, health, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray(), unitHealths.ToArray());
             _networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",

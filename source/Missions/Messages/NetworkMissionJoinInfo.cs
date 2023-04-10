@@ -25,6 +25,7 @@ namespace Missions.Messages
             set { _packedCharacter = PackCharacter(value); }
         }
         private CharacterObject _characterObject;
+        private readonly IBinaryPackageFactory packageFactory;
 
         [ProtoMember(3)]
         private byte[] _packedCharacter;
@@ -53,13 +54,9 @@ namespace Missions.Messages
         [ProtoMember(10)]
         public readonly float PlayerHealth;
 
-        readonly IContainer container;
-
-        public NetworkMissionJoinInfo(CharacterObject characterObject, bool isPlayerAlive, Guid playerId, Vec3 startingPosition, float health, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString, float[] unitHealthList)
+        public NetworkMissionJoinInfo(IBinaryPackageFactory packageFactory, CharacterObject characterObject, bool isPlayerAlive, Guid playerId, Vec3 startingPosition, float health, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString, float[] unitHealthList)
         {
-            ContainerBuilder builder = new ContainerBuilder();
-            container = builder.Build();
-
+            this.packageFactory = packageFactory;
             CharacterObject = characterObject;
             PlayerId = playerId;
             StartingPosition = startingPosition;
@@ -85,8 +82,7 @@ namespace Missions.Messages
 
         private byte[] PackCharacter(CharacterObject characterObject)
         {
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            var character = new CharacterObjectBinaryPackage(characterObject, factory);
+            var character = new CharacterObjectBinaryPackage(characterObject, packageFactory);
             character.Pack();
 
             return BinaryFormatterSerializer.Serialize(character);
@@ -96,19 +92,16 @@ namespace Missions.Messages
         {
             if (_characterObject != null) return _characterObject;
 
-            var factory = container.Resolve<IBinaryPackageFactory>();
             var character = BinaryFormatterSerializer.Deserialize<CharacterObjectBinaryPackage>(_packedCharacter);
-            character.BinaryPackageFactory = factory;
 
-            _characterObject = character.Unpack<CharacterObject>(factory);
+            _characterObject = character.Unpack<CharacterObject>(packageFactory);
 
             return _characterObject;
         }
 
         private byte[] PackEquipment(Equipment equipment)
         {
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            var character = new EquipmentBinaryPackage(equipment, factory);
+            var character = new EquipmentBinaryPackage(equipment, packageFactory);
             character.Pack();
 
             return BinaryFormatterSerializer.Serialize(character);
@@ -118,11 +111,9 @@ namespace Missions.Messages
         {
             if (_equipment != null) return _equipment;
 
-            var factory = container.Resolve<IBinaryPackageFactory>();
             var character = BinaryFormatterSerializer.Deserialize<EquipmentBinaryPackage>(_packedEquipment);
-            character.BinaryPackageFactory = factory;
 
-            _equipment = character.Unpack<Equipment>(factory);
+            _equipment = character.Unpack<Equipment>(packageFactory);
 
             return _equipment;
         }
