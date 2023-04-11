@@ -9,7 +9,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Services.Agents.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public class AgentDamageData : INetworkEvent
+    public class NetworkAgentDamage : INetworkEvent
     {
 
         [ProtoMember(1)]
@@ -21,7 +21,7 @@ namespace Missions.Services.Agents.Messages
         [ProtoMember(4)]
         public AttackCollisionData AttackCollisionData { get; }
 
-        public AgentDamageData(
+        public NetworkAgentDamage(
             Guid attackerAgentId,
             Guid victimAgentId, 
             AttackCollisionData attackCollisionData, 

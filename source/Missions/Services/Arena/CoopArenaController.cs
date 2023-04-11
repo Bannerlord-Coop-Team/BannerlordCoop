@@ -61,7 +61,6 @@ namespace Missions.Services
 
             _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
-            _networkMessageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Subscribe<AgentDied>(Handle_AgentDeath);
 
         }
@@ -77,7 +76,6 @@ namespace Missions.Services
 
             _networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
-            _networkMessageBroker.Unsubscribe<AgentDamageData>(Handle_AgentDamage);
             _networkMessageBroker.Unsubscribe<AgentDied>(Handle_AgentDeath);
         }
 
@@ -87,64 +85,6 @@ namespace Missions.Services
             x.IsHero == false &&
             x.Age > 18).ToArray();
             AddPlayerToArena();
-        }
-
-
-        /// <summary>
-        /// A network damage handler for an agent
-        /// </summary>
-        /// <param name="payload">AgentDamage Data which include Attacker GUID, Defender GUID, Blow and AttackCollisionData</param>
-        private void Handle_AgentDamage(MessagePayload<AgentDamageData> payload)
-        {
-            AgentDamageData agentDamaData = payload.What;
-
-            NetPeer netPeer = payload.Who as NetPeer;
-
-
-            Agent effectedAgent = null;
-            Agent effectorAgent = null;
-            // grab the network registry group controller
-            _agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController agentGroupController);
-
-            // start with the attack receiver
-            // first check if the receiver of the damage is one the sender's agents
-            if (agentGroupController != null && agentGroupController.ControlledAgents.ContainsKey(agentDamaData.VictimAgentId))
-            {
-                agentGroupController.ControlledAgents.TryGetValue(agentDamaData.VictimAgentId, out effectedAgent);
-            }
-            // otherwise next, check if it is one of our agents
-            else if (_agentRegistry.ControlledAgents.ContainsKey(agentDamaData.VictimAgentId))
-            {
-                _agentRegistry.ControlledAgents.TryGetValue(agentDamaData.VictimAgentId, out effectedAgent);
-            }
-            // now with the attacker
-            // check if the attacker is one of the senders (should always be true?)
-            if (agentGroupController != null && agentGroupController.ControlledAgents.ContainsKey(agentDamaData.AttackerAgentId))
-            {
-                agentGroupController.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
-            }
-            else if (_agentRegistry.ControlledAgents.ContainsKey(agentDamaData.AttackerAgentId))
-            {
-                _agentRegistry.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
-            }
-
-            if (effectedAgent == null) return;
-            if (effectorAgent == null) return;
-
-            // extract the blow
-            Blow b = agentDamaData.Blow;
-
-            // assign the blow owner from our own index
-            b.OwnerId = effectorAgent.Index;
-
-            // extract the collision data
-            AttackCollisionData collisionData = agentDamaData.AttackCollisionData;
-
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                // register a blow on the effected agent
-                effectedAgent.RegisterBlow(b, collisionData);
-            });
         }
 
         private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)

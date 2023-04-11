@@ -17,27 +17,22 @@ namespace Missions.Services.Network.Surrogates
     public readonly struct Mat3Surrogate
     {
         [ProtoMember(1)]
-        public byte[] data { get; }
+        public Vec3 S { get; }
+        [ProtoMember(2)]
+        public Vec3 F { get; }
+        [ProtoMember(3)]
+        public Vec3 U { get; }
 
-        readonly IContainer container;
         public Mat3Surrogate(Mat3 obj)
         {
-            ContainerBuilder builder = new ContainerBuilder();
-            container = builder.Build();
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            var orientation = new Mat3BinaryPackage(obj, factory);
-            orientation.Pack();
-
-            data = BinaryFormatterSerializer.Serialize(orientation);
+            S = obj.s;
+            F = obj.f;
+            U = obj.u;
         }
 
         private Mat3 Deserialize()
         {
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            var orientation = BinaryFormatterSerializer.Deserialize<Mat3BinaryPackage>(data);
-            orientation.BinaryPackageFactory = factory;
-
-            return orientation.Unpack<Mat3>(factory);
+            return new Mat3(S, F, U);
         }
 
         public static implicit operator Mat3Surrogate(Mat3 obj)

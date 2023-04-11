@@ -48,7 +48,15 @@ namespace Missions.Services.Missiles.Patches
         {
             __state = shooterAgent.WieldedWeapon;
         }
-        private static void Postfix(int __result, Agent shooterAgent, ref Vec3 direction, ref Vec3 position, ref Mat3 orientation, float baseSpeed, float speed, bool addRigidBody, int forcedMissileIndex, ref MissionWeapon __state)
+        private static void Postfix(int __result, 
+            Agent shooterAgent, 
+            ref Vec3 direction, 
+            ref Vec3 position, 
+            ref Mat3 orientation, 
+            float baseSpeed, 
+            float speed, 
+            bool addRigidBody, 
+            ref MissionWeapon __state)
         {
             if (NetworkAgentRegistry.Instance.IsControlled(shooterAgent))
             {

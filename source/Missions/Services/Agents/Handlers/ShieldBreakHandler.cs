@@ -7,31 +7,41 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
 {
-    public class ShieldBreakHandler
+    internal interface IShieldBreakHandler : IHandler
     {
-        public ShieldBreakHandler() 
+        void ShieldBreakSend(MessagePayload<ShieldBreak> payload);
+        void ShieldBreakRecieve(MessagePayload<NetworkShieldBreak> payload);
+    }
+    public class ShieldBreakHandler : IShieldBreakHandler
+    {
+        readonly NetworkAgentRegistry networkAgentRegistry;
+        readonly NetworkMessageBroker networkMessageBroker;
+        public ShieldBreakHandler(NetworkAgentRegistry networkAgentRegistry, NetworkMessageBroker networkMessageBroker) 
         {
-            NetworkMessageBroker.Instance.Subscribe<ShieldBreak>(ShieldBreakSend);
-            NetworkMessageBroker.Instance.Subscribe<NetworkShieldBreak>(ShieldBreakRecieve);
+            this.networkAgentRegistry = networkAgentRegistry;
+            this.networkMessageBroker = networkMessageBroker;
+
+            networkMessageBroker.Subscribe<ShieldBreak>(ShieldBreakSend);
+            networkMessageBroker.Subscribe<NetworkShieldBreak>(ShieldBreakRecieve);
         }
         ~ShieldBreakHandler()
         {
-            NetworkMessageBroker.Instance.Unsubscribe<ShieldBreak>(ShieldBreakSend);
-            NetworkMessageBroker.Instance.Unsubscribe<NetworkShieldBreak>(ShieldBreakRecieve);
+            networkMessageBroker.Unsubscribe<ShieldBreak>(ShieldBreakSend);
+            networkMessageBroker.Unsubscribe<NetworkShieldBreak>(ShieldBreakRecieve);
         }
 
         public void ShieldBreakSend(MessagePayload<ShieldBreak> payload)
         {
-            NetworkAgentRegistry.Instance.TryGetAgentId(payload.What.Agent, out Guid agentId);
+            networkAgentRegistry.TryGetAgentId(payload.What.Agent, out Guid agentId);
 
             NetworkShieldBreak message = new NetworkShieldBreak(agentId, payload.What.EquipmentIndex);
 
-            NetworkMessageBroker.Instance.PublishNetworkEvent(message);
+            networkMessageBroker.PublishNetworkEvent(message);
         }
 
         public void ShieldBreakRecieve(MessagePayload<NetworkShieldBreak> payload)
         {
-            NetworkAgentRegistry.Instance.TryGetAgent(payload.What.AgentGuid, out Agent agent);
+            networkAgentRegistry.TryGetAgent(payload.What.AgentGuid, out Agent agent);
 
             if (!agent.Equipment[payload.What.EquipmentIndex].IsEmpty)
             {

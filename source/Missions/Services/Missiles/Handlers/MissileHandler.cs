@@ -1,5 +1,4 @@
-﻿using Autofac;
-using Common;
+﻿using Common;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Serialization;
@@ -7,46 +6,41 @@ using LiteNetLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Missiles.Message;
-using Missions.Services.Missiles.Patches;
 using Missions.Services.Network;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.Core;
-using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Missiles.Handlers
 {
-    public class MissileHandler
+    internal interface IMissileHandler : IHandler
     {
-        IContainer container;
-        IBinaryPackageFactory binaryPackageFactory;
-        public MissileHandler()
+        void AgentShootSend(MessagePayload<AgentShoot> payload);
+        void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload);
+    }
+
+    public class MissileHandler : IMissileHandler
+    {
+        readonly NetworkMessageBroker networkMessageBroker;
+        readonly NetworkAgentRegistry networkAgentRegistry;
+        public MissileHandler(NetworkMessageBroker networkMessageBroker, NetworkAgentRegistry networkAgentRegistry)
         {
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<MissionModule>();
-            container = builder.Build();
+            this.networkMessageBroker = networkMessageBroker;
+            this.networkAgentRegistry = networkAgentRegistry;
 
-            binaryPackageFactory = container.Resolve<IBinaryPackageFactory>();
-
-            NetworkMessageBroker.Instance.Subscribe<AgentShoot>(AgentShootSend);
-            NetworkMessageBroker.Instance.Subscribe<NetworkAgentShoot>(AgentShootRecieve);
+            networkMessageBroker.Subscribe<AgentShoot>(AgentShootSend);
+            networkMessageBroker.Subscribe<NetworkAgentShoot>(AgentShootRecieve);
         }
 
         ~MissileHandler()
         {
-            NetworkMessageBroker.Instance.Unsubscribe<AgentShoot>(AgentShootSend);
-            NetworkMessageBroker.Instance.Unsubscribe<NetworkAgentShoot>(AgentShootRecieve);
+            networkMessageBroker.Unsubscribe<AgentShoot>(AgentShootSend);
+            networkMessageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootRecieve);
         }
 
-        private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
+        public void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
         {
-            NetworkAgentRegistry.Instance.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
+            networkAgentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
 
 
             NetworkAgentShoot shot = payload.What;
@@ -61,12 +55,12 @@ namespace Missions.Services.Missiles.Handlers
             });
         }
 
-        private void AgentShootSend(MessagePayload<AgentShoot> payload)
+        public void AgentShootSend(MessagePayload<AgentShoot> payload)
         {  
 
-            if (NetworkAgentRegistry.Instance.IsControlled(payload.What.Agent))
+            if (networkAgentRegistry.IsControlled(payload.What.Agent))
             {
-                Guid shooterAgentGuid = NetworkAgentRegistry.Instance.AgentToId[payload.What.Agent];
+                Guid shooterAgentGuid = networkAgentRegistry.AgentToId[payload.What.Agent];
                 MissionWeapon missionWeapon;
 
                 if (payload.What.MissionWeapon.CurrentUsageItem.IsRangedWeapon && payload.What.MissionWeapon.CurrentUsageItem.IsConsumable)
@@ -79,8 +73,22 @@ namespace Missions.Services.Missiles.Handlers
                     missionWeapon = payload.What.MissionWeapon.AmmoWeapon;
                 }
 
-                NetworkAgentShoot message = new NetworkAgentShoot(binaryPackageFactory, shooterAgentGuid, payload.What.Position, payload.What.Direction, payload.What.Orientation.s, payload.What.Orientation.f, payload.What.Orientation.u, payload.What.HasRigidBody, missionWeapon.Item, missionWeapon.ItemModifier, missionWeapon.Banner, payload.What.MissileIndex, payload.What.BaseSpeed, payload.What.Speed);
-                NetworkMessageBroker.Instance.PublishNetworkEvent(message);
+                NetworkAgentShoot message = new NetworkAgentShoot( 
+                    shooterAgentGuid, 
+                    payload.What.Position, 
+                    payload.What.Direction, 
+                    payload.What.Orientation.s, 
+                    payload.What.Orientation.f, 
+                    payload.What.Orientation.u, 
+                    payload.What.HasRigidBody, 
+                    missionWeapon.Item, 
+                    missionWeapon.ItemModifier, 
+                    missionWeapon.Banner, 
+                    payload.What.MissileIndex, 
+                    payload.What.BaseSpeed, 
+                    payload.What.Speed);
+
+                networkMessageBroker.PublishNetworkEvent(message);
             }
         }
     }

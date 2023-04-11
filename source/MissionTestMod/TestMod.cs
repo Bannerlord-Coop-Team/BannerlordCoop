@@ -14,6 +14,7 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.MountAndBlade;
@@ -125,6 +126,9 @@ namespace MissionTestMod
             RuntimeTypeModel.Default.SetSurrogate<Blow, BlowSurrogate>();
             RuntimeTypeModel.Default.SetSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
             RuntimeTypeModel.Default.SetSurrogate<CharacterObject, CharacterObjectSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<Banner, BannerSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<ItemObject, ItemObjectSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<ItemModifier, ItemModifierSurrogate>();
         }
 
         private bool m_IsFirstTick = true;

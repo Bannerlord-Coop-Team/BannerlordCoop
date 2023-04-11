@@ -33,11 +33,7 @@ namespace Missions
             builder.RegisterModule<GameInterfaceModule>();
 
             // Non interface classes
-            builder.RegisterType<WeaponDropHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
-            builder.RegisterType<WeaponPickupHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
             builder.RegisterType<NetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<MissileHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
-            builder.RegisterType<ShieldBreakHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
 
 
             // TODO create handler collector
@@ -67,7 +63,12 @@ namespace Missions
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
             builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<MovementHandler>().AsSelf().InstancePerLifetimeScope();
-            
+            builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType<ShieldBreakHandler>().As<IShieldBreakHandler>().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerLifetimeScope().AutoActivate();
+
             base.Load(builder);
         }
     }

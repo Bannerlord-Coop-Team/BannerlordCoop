@@ -1,4 +1,4 @@
-﻿using Common.Network;
+﻿using Common.Messaging;
 using HarmonyLib;
 using Missions.Services.Agents.Messages;
 using TaleWorlds.Core;
@@ -13,7 +13,7 @@ namespace Missions.Services.Agents.Patches
         {
             MissionWeapon weapon = spawnedItemEntity.WeaponCopy;
             WeaponPickedup message = new WeaponPickedup(__instance, weaponPickUpSlotIndex, weapon.Item, weapon.ItemModifier, weapon.Banner);
-            NetworkMessageBroker.Instance.Publish(__instance, message);
+            MessageBroker.Instance.Publish(__instance, message);
         }
     }
 }

@@ -17,7 +17,15 @@ namespace Missions.Services.Missiles.Message
         public bool HasRigidBody { get; }
         public int MissileIndex { get; }
 
-        public AgentShoot(Agent agent, MissionWeapon missionWeapon, Vec3 position, Vec3 direction, Mat3 orientation, float baseSpeed, float speed, bool hasRigidBody, int missileIndex)
+        public AgentShoot(Agent agent, 
+            MissionWeapon missionWeapon, 
+            Vec3 position, 
+            Vec3 direction, 
+            Mat3 orientation, 
+            float baseSpeed, 
+            float speed, 
+            bool hasRigidBody, 
+            int missileIndex)
         {
             Agent = agent;
             MissionWeapon = missionWeapon;

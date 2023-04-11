@@ -16,46 +16,57 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
 {
-    public class WeaponPickupHandler
+    internal interface IWeaponPickupHandler : IHandler
     {
+        void WeaponPickupSend(MessagePayload<WeaponPickedup> obj);
+        void WeaponPickupReceive(MessagePayload<NetworkWeaponPickedup> obj);
+    }
 
-        public WeaponPickupHandler()
+    public class WeaponPickupHandler : IWeaponPickupHandler
+    {
+        readonly IBinaryPackageFactory packageFactory;
+        readonly NetworkAgentRegistry networkAgentRegistry;
+        readonly NetworkMessageBroker networkMessageBroker;
+        public WeaponPickupHandler(IBinaryPackageFactory packageFactory, NetworkAgentRegistry networkAgentRegistry, NetworkMessageBroker networkMessageBroker)
         {
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<MissionModule>();
-            container = builder.Build();
+            this.packageFactory = packageFactory;
+            this.networkAgentRegistry = networkAgentRegistry;
+            this.networkMessageBroker = networkMessageBroker;
 
-            binaryPackageFactory = container.Resolve<IBinaryPackageFactory>();
+            networkMessageBroker.Subscribe<WeaponPickedup>(WeaponPickupSend);
+            networkMessageBroker.Subscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
 
-            NetworkMessageBroker.Instance.Subscribe<WeaponPickedup>(WeaponPickupSend);
-            NetworkMessageBroker.Instance.Subscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
         }
         ~WeaponPickupHandler()
         {
-            NetworkMessageBroker.Instance.Unsubscribe<WeaponPickedup>(WeaponPickupSend);
-            NetworkMessageBroker.Instance.Unsubscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
+            networkMessageBroker.Unsubscribe<WeaponPickedup>(WeaponPickupSend);
+            networkMessageBroker.Unsubscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
         }
 
         private static MethodInfo WeaponEquippedMethod = typeof(Agent).GetMethod("WeaponEquipped", BindingFlags.NonPublic | BindingFlags.Instance);
-        private IContainer container;
-        private IBinaryPackageFactory binaryPackageFactory;
 
         public void WeaponPickupSend(MessagePayload<WeaponPickedup> obj)
         {
             Agent agent = obj.Who as Agent;
 
-            NetworkAgentRegistry.Instance.TryGetAgentId(agent, out Guid agentId);
+            networkAgentRegistry.TryGetAgentId(agent, out Guid agentId);
 
-            NetworkWeaponPickedup message = new NetworkWeaponPickedup(binaryPackageFactory, agentId, obj.What.EquipmentIndex, obj.What.WeaponObject, obj.What.WeaponModifier, obj.What.Banner);
+            NetworkWeaponPickedup message = new NetworkWeaponPickedup(
+                packageFactory, 
+                agentId, 
+                obj.What.EquipmentIndex, 
+                obj.What.WeaponObject, 
+                obj.What.WeaponModifier, 
+                obj.What.Banner);
 
-            NetworkMessageBroker.Instance.PublishNetworkEvent(message);
+            networkMessageBroker.PublishNetworkEvent(message);
         }
         public void WeaponPickupReceive(MessagePayload<NetworkWeaponPickedup> obj)
         {
             //ItemObject - ItemModifier - Banner creates MissionWeapon
             MissionWeapon missionWeapon = new MissionWeapon(obj.What.ItemObject, obj.What.ItemModifier, obj.What.Banner);
 
-            NetworkAgentRegistry.Instance.TryGetAgent(obj.What.AgentId, out Agent agent);
+            networkAgentRegistry.TryGetAgent(obj.What.AgentId, out Agent agent);
 
             agent.EquipWeaponWithNewEntity(obj.What.EquipmentIndex, ref missionWeapon);
         }

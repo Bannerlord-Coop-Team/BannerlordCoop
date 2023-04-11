@@ -74,9 +74,8 @@ namespace Missions.Services.Missiles.Message
         [ProtoMember(15)]
         public float Speed { get; }
 
-        public NetworkAgentShoot(IBinaryPackageFactory packageFactory, Guid agentGuid, Vec3 position, Vec3 velocity, Vec3 orientationS, Vec3 orientationF, Vec3 orientationU, bool hasRigidBody, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex, float baseSpeed, float speed)
+        public NetworkAgentShoot(Guid agentGuid, Vec3 position, Vec3 velocity, Vec3 orientationS, Vec3 orientationF, Vec3 orientationU, bool hasRigidBody, ItemObject itemObject, ItemModifier itemModifier, Banner banner, int missileIndex, float baseSpeed, float speed)
         {
-            this.packageFactory = packageFactory;
             AgentGuid = agentGuid;
             Position = position;
             Velocity = velocity;

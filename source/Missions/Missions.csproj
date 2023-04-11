@@ -152,6 +152,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Services\Agents\Handlers\AgentDamageHandler.cs" />
     <Compile Include="Services\Agents\Handlers\ShieldBreakHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
@@ -168,14 +169,17 @@
     <Compile Include="Services\Missiles\Handlers\MissileHandler.cs" />
     <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
     <Compile Include="Services\Missiles\Message\AgentShoot.cs" />
-    <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
-    <Compile Include="Services\Agents\Messages\AgentDamageData.cs" />
+    <Compile Include="Services\Agents\Messages\AgentDamage.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkAgentDamage.cs" />
     <Compile Include="Services\Agents\Messages\AgentDied.cs" />
     <Compile Include="Services\Agents\Patches\AgentDamagePatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentKilledPatch.cs" />
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
     <Compile Include="Services\Missiles\Patches\MissileAuxPatches.cs" />
+    <Compile Include="Services\Network\Surrogates\ItemModifierSurrogate.cs" />
+    <Compile Include="Services\Network\Surrogates\ItemObjectSurrogate.cs" />
+    <Compile Include="Services\Network\Surrogates\BannerSurrogate.cs" />
     <Compile Include="Services\Network\Surrogates\Mat3Surrogate.cs" />
     <Compile Include="Services\Network\Surrogates\AttackCollisionDataSurrogate.cs" />
     <Compile Include="Services\Network\Surrogates\BlowSurrogate.cs" />
