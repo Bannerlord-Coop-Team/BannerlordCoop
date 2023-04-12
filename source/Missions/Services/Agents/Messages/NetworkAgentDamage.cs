@@ -8,6 +8,9 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
 {
+    /// <summary>
+    /// External event for agent damage
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public class NetworkAgentDamage : INetworkEvent
     {

@@ -63,11 +63,11 @@ namespace Missions
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
             builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<MovementHandler>().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerLifetimeScope().AutoActivate();
-            builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerLifetimeScope().AutoActivate();
-            builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerLifetimeScope().AutoActivate();
-            builder.RegisterType<ShieldBreakHandler>().As<IShieldBreakHandler>().InstancePerLifetimeScope().AutoActivate();
-            builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType<MissileHandler>().As<IMissileHandler>();
+            builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>();
+            builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>();
+            builder.RegisterType<ShieldBreakHandler>().As<IShieldBreakHandler>();
+            builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>();
 
             base.Load(builder);
         }

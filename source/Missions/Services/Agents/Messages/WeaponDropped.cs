@@ -7,6 +7,9 @@ using static TaleWorlds.MountAndBlade.Mission;
 
 namespace Missions.Services.Agents.Messages
 {
+    /// <summary>
+    /// Internal event for agent weapon drops
+    /// </summary>
     public readonly struct WeaponDropped : IEvent
     {
         public Agent Agent { get; }

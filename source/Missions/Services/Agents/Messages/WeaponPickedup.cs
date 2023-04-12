@@ -6,6 +6,9 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
 {
+    /// <summary>
+    /// Internal event for agent weapon pickups
+    /// </summary>
     public readonly struct WeaponPickedup : IEvent
     {
         public Agent Agent { get; }

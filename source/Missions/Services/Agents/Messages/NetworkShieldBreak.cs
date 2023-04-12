@@ -9,6 +9,9 @@ using TaleWorlds.Core;
 
 namespace Missions.Services.Agents.Messages
 {
+    /// <summary>
+    /// External event for agent shield breaks
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public readonly struct NetworkShieldBreak : INetworkEvent
     {

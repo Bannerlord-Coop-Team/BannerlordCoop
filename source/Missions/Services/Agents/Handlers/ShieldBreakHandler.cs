@@ -7,11 +7,14 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
 {
+    /// <summary>
+    /// Handler for shield breaks in a battle
+    /// </summary>
     internal interface IShieldBreakHandler : IHandler
     {
-        void ShieldBreakSend(MessagePayload<ShieldBreak> payload);
-        void ShieldBreakRecieve(MessagePayload<NetworkShieldBreak> payload);
+
     }
+    /// <inheritdoc/>
     public class ShieldBreakHandler : IShieldBreakHandler
     {
         readonly NetworkAgentRegistry networkAgentRegistry;
@@ -30,7 +33,7 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.Unsubscribe<NetworkShieldBreak>(ShieldBreakRecieve);
         }
 
-        public void ShieldBreakSend(MessagePayload<ShieldBreak> payload)
+        private void ShieldBreakSend(MessagePayload<ShieldBreak> payload)
         {
             networkAgentRegistry.TryGetAgentId(payload.What.Agent, out Guid agentId);
 
@@ -39,7 +42,7 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.PublishNetworkEvent(message);
         }
 
-        public void ShieldBreakRecieve(MessagePayload<NetworkShieldBreak> payload)
+        private void ShieldBreakRecieve(MessagePayload<NetworkShieldBreak> payload)
         {
             networkAgentRegistry.TryGetAgent(payload.What.AgentGuid, out Agent agent);
 

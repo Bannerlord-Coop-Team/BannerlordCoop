@@ -2,12 +2,12 @@
 using ProtoBuf;
 using System;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade;
-using static TaleWorlds.MountAndBlade.Mission;
 
 namespace Missions.Services.Agents.Messages
 {
+    /// <summary>
+    /// External event for agent weapon drops
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public readonly struct NetworkWeaponDropped : INetworkEvent
     {

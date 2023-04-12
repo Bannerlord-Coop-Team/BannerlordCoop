@@ -11,11 +11,14 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
 {
+    /// <summary>
+    /// Handler for agent damage in a battle
+    /// </summary>
     internal interface IAgentDamageHandler : IHandler
     {
-        void AgentDamageSend(MessagePayload<AgentDamage> payload);
-        void AgentDamageRecieve(MessagePayload<NetworkAgentDamage> payload);
+
     }
+    /// <inheritdoc/>
     public class AgentDamageHandler : IAgentDamageHandler
     {
         readonly NetworkAgentRegistry networkAgentRegistry;
@@ -34,7 +37,7 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.Unsubscribe<NetworkAgentDamage>(AgentDamageRecieve);
         }
 
-        public void AgentDamageSend(MessagePayload<AgentDamage> payload)
+        private void AgentDamageSend(MessagePayload<AgentDamage> payload)
         {
             // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
             if (NetworkAgentRegistry.Instance.TryGetAgentId(payload.What.AttackerAgent, out Guid attackerId) == false) return;
@@ -52,7 +55,7 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.PublishNetworkEvent(message);
         }
 
-        public void AgentDamageRecieve(MessagePayload<NetworkAgentDamage> payload)
+        private void AgentDamageRecieve(MessagePayload<NetworkAgentDamage> payload)
         {
             NetworkAgentDamage agentDamaData = payload.What;
 

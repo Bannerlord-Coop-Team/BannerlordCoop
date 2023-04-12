@@ -9,6 +9,9 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
 {
+    /// <summary>
+    /// Internal event for agent shield breaks
+    /// </summary>
     public readonly struct ShieldBreak : IEvent
     {
         public Agent Agent { get; }

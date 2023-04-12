@@ -6,6 +6,10 @@ using TaleWorlds.Core;
 
 namespace Missions.Services.Network.Surrogates
 {
+    /// <summary>
+    /// Surrogate for the Banner Class
+    /// </summary>
+
     [ProtoContract(SkipConstructor = true)]
     public class BannerSurrogate
     {
@@ -14,9 +18,6 @@ namespace Missions.Services.Network.Surrogates
 
         public BannerSurrogate(Banner obj)
         {
-            // Required to not overwrite data
-            // For some reason protobuf sends 2 character objects
-            // and one is null
             if (obj == null) return;
 
             if (ContainerProvider.TryResolve(out IBinaryPackageFactory packageFactory) == false) return;

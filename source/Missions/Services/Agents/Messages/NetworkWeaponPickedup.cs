@@ -1,17 +1,16 @@
-﻿using Autofac;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
-using GameInterface.Serialization.Native;
 using ProtoBuf;
-using Serilog.Core;
 using System;
-using System.Diagnostics;
 using TaleWorlds.Core;
 
 namespace Missions.Services.Agents.Messages
 {
+    /// <summary>
+    /// External event for agent weapon pickups
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public class NetworkWeaponPickedup : INetworkEvent
     {   

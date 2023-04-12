@@ -1,9 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Serialization;
 using LiteNetLib;
-using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Missiles.Message;
 using Missions.Services.Network;
@@ -13,12 +11,15 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Missiles.Handlers
 {
+    /// <summary>
+    /// Handler for missiles within a battle
+    /// </summary>
     internal interface IMissileHandler : IHandler
     {
-        void AgentShootSend(MessagePayload<AgentShoot> payload);
-        void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload);
+
     }
 
+    /// <inheritdoc/>
     public class MissileHandler : IMissileHandler
     {
         readonly NetworkMessageBroker networkMessageBroker;
@@ -38,7 +39,7 @@ namespace Missions.Services.Missiles.Handlers
             networkMessageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootRecieve);
         }
 
-        public void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
+        private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
         {
             networkAgentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
 
@@ -55,7 +56,7 @@ namespace Missions.Services.Missiles.Handlers
             });
         }
 
-        public void AgentShootSend(MessagePayload<AgentShoot> payload)
+        private void AgentShootSend(MessagePayload<AgentShoot> payload)
         {  
 
             if (networkAgentRegistry.IsControlled(payload.What.Agent))

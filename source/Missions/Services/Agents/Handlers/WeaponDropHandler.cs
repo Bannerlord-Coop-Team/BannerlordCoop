@@ -7,11 +7,14 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
 {
+    /// <summary>
+    /// Handler for weapon drops in a battle
+    /// </summary>
     internal interface IWeaponDropHandler : IHandler
     {
-        void WeaponDropSend(MessagePayload<WeaponDropped> obj);
-        void WeaponDropRecieve(MessagePayload<NetworkWeaponDropped> obj);
+
     }
+    /// <inheritdoc/>
     public class WeaponDropHandler : IWeaponDropHandler
     {
         readonly NetworkAgentRegistry networkAgentRegistry;
@@ -31,7 +34,7 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.Unsubscribe<NetworkWeaponDropped>(WeaponDropRecieve);
         }
 
-        public void WeaponDropSend(MessagePayload<WeaponDropped> obj)
+        private void WeaponDropSend(MessagePayload<WeaponDropped> obj)
         {
             networkAgentRegistry.TryGetAgentId(obj.What.Agent, out Guid agentId);
 
@@ -40,7 +43,7 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.PublishNetworkEvent(message);
         }
 
-        public void WeaponDropRecieve(MessagePayload<NetworkWeaponDropped> obj)
+        private void WeaponDropRecieve(MessagePayload<NetworkWeaponDropped> obj)
         { 
             networkAgentRegistry.TryGetAgent(obj.What.AgentGuid, out Agent agent);
 

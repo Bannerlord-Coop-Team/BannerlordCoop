@@ -5,6 +5,9 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Missiles.Message
 {
+    /// <summary>
+    /// Internal event for agent missiles
+    /// </summary>
     public readonly struct AgentShoot : IEvent
     {
         public Agent Agent { get; }

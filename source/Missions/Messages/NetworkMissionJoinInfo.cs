@@ -19,16 +19,8 @@ namespace Missions.Messages
         public readonly Guid PlayerId;
         [ProtoMember(2)]
         public readonly Vec3 StartingPosition;
-        public CharacterObject CharacterObject
-        {
-            get { return UnpackCharacter(); }
-            set { _packedCharacter = PackCharacter(value); }
-        }
-        private CharacterObject _characterObject;
-        private readonly IBinaryPackageFactory packageFactory;
-
         [ProtoMember(3)]
-        private byte[] _packedCharacter;
+        public CharacterObject CharacterObject { get; }
         [ProtoMember(4)]
         public readonly Guid[] UnitId;
         [ProtoMember(5)]
@@ -78,25 +70,6 @@ namespace Missions.Messages
             }
 
             return inEquipment;
-        }
-
-        private byte[] PackCharacter(CharacterObject characterObject)
-        {
-            var character = new CharacterObjectBinaryPackage(characterObject, packageFactory);
-            character.Pack();
-
-            return BinaryFormatterSerializer.Serialize(character);
-        }
-
-        private CharacterObject UnpackCharacter()
-        {
-            if (_characterObject != null) return _characterObject;
-
-            var character = BinaryFormatterSerializer.Deserialize<CharacterObjectBinaryPackage>(_packedCharacter);
-
-            _characterObject = character.Unpack<CharacterObject>(packageFactory);
-
-            return _characterObject;
         }
 
         private byte[] PackEquipment(Equipment equipment)

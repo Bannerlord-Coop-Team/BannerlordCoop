@@ -13,6 +13,9 @@ using Autofac;
 
 namespace Missions.Services.Network.Surrogates
 {
+    /// <summary>
+    /// Surrogate for the Mat3 Class
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public readonly struct Mat3Surrogate
     {

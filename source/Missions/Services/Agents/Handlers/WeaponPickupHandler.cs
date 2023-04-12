@@ -16,12 +16,14 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
 {
+    /// <summary>
+    /// Handler for weapon pickups within a battle
+    /// </summary>
     internal interface IWeaponPickupHandler : IHandler
     {
-        void WeaponPickupSend(MessagePayload<WeaponPickedup> obj);
-        void WeaponPickupReceive(MessagePayload<NetworkWeaponPickedup> obj);
-    }
 
+    }
+    /// <inheritdoc/>
     public class WeaponPickupHandler : IWeaponPickupHandler
     {
         readonly IBinaryPackageFactory packageFactory;
@@ -43,9 +45,7 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.Unsubscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
         }
 
-        private static MethodInfo WeaponEquippedMethod = typeof(Agent).GetMethod("WeaponEquipped", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        public void WeaponPickupSend(MessagePayload<WeaponPickedup> obj)
+        private void WeaponPickupSend(MessagePayload<WeaponPickedup> obj)
         {
             Agent agent = obj.Who as Agent;
 
@@ -61,7 +61,7 @@ namespace Missions.Services.Agents.Handlers
 
             networkMessageBroker.PublishNetworkEvent(message);
         }
-        public void WeaponPickupReceive(MessagePayload<NetworkWeaponPickedup> obj)
+        private void WeaponPickupReceive(MessagePayload<NetworkWeaponPickedup> obj)
         {
             //ItemObject - ItemModifier - Banner creates MissionWeapon
             MissionWeapon missionWeapon = new MissionWeapon(obj.What.ItemObject, obj.What.ItemModifier, obj.What.Banner);
