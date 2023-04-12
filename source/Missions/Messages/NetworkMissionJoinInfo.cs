@@ -12,6 +12,9 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Messages
 {
+    /// <summary>
+    /// External event for Join Info in Mission
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public class NetworkMissionJoinInfo : INetworkEvent
     {

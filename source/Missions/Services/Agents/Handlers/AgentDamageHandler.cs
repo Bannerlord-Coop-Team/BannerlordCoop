@@ -41,10 +41,10 @@ namespace Missions.Services.Agents.Handlers
         {
 
             // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
-            if (NetworkAgentRegistry.Instance.TryGetAgentId(payload.What.AttackerAgent, out Guid attackerId) == false) return;
+            if (networkAgentRegistry.TryGetAgentId(payload.What.AttackerAgent, out Guid attackerId) == false) return;
 
             // next, check if the attacker is one of ours, if not, no networking is needed (not our agent dealing damage)
-            if (NetworkAgentRegistry.Instance.IsControlled(attackerId) == false) return;
+            if (networkAgentRegistry.IsControlled(attackerId) == false) return;
 
             // If there is package factory cannot be resolved, do default behavior
             if (ContainerProvider.TryResolve<IBinaryPackageFactory>(out var packageFactory) == false) return;

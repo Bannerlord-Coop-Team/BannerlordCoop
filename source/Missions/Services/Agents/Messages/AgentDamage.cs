@@ -9,6 +9,9 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
 {
+    /// <summary>
+    /// Internal event for Agent damage
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public readonly struct AgentDamage : IEvent
     {

@@ -36,6 +36,8 @@ namespace Missions.Services.Agents.Handlers
 
         private void WeaponDropSend(MessagePayload<WeaponDropped> obj)
         {
+            if (!networkAgentRegistry.IsControlled(obj.What.Agent)) return;
+            
             networkAgentRegistry.TryGetAgentId(obj.What.Agent, out Guid agentId);
 
             NetworkWeaponDropped message = new NetworkWeaponDropped(agentId, obj.What.EquipmentIndex);

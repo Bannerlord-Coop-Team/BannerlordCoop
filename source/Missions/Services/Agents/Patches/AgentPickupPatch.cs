@@ -6,6 +6,9 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Patches
 {
+    /// <summary>
+    /// Patch on ItemPickups for WeaponPickupHandler
+    /// </summary>
     [HarmonyPatch(typeof(Agent), "OnItemPickup")]
     public class AgentPickupPatch
     {

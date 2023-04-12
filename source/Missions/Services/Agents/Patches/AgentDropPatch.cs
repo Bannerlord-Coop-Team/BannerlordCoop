@@ -7,16 +7,17 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Patches
 {
+    /// <summary>
+    /// Patch on DropItem for WeaponDropHandler
+    /// </summary>
     [HarmonyPatch(typeof(Agent), "DropItem")]
     public class AgentDropPatch
     {
         static void Postfix(EquipmentIndex itemIndex, WeaponClass pickedUpItemType, Agent __instance)
         {
-            if (NetworkAgentRegistry.Instance.IsControlled(__instance)) 
-            {
-                WeaponDropped message = new WeaponDropped(__instance, itemIndex);
-                NetworkMessageBroker.Instance.Publish(__instance, message);
-            }
+            WeaponDropped message = new WeaponDropped(__instance, itemIndex);
+            NetworkMessageBroker.Instance.Publish(__instance, message);
+
         }
     }
 }

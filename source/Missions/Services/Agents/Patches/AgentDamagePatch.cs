@@ -31,17 +31,22 @@ namespace Missions.Services.Agents.Patches
             MessageBroker.Instance.Publish(attacker, agentDamageData);
         }
     }
+    /// <summary>
+    /// Only allow damage from controlled agents
+    /// </summary>
     [HarmonyPatch(typeof(Mission), "OnAgentHit")]
     internal static class OnAgentHitPatch
     {
         private static bool Prefix(ref Agent affectorAgent)
         {
-            // Only allow damage from controlled agents
             if (!NetworkAgentRegistry.Instance.IsControlled(affectorAgent)) return false;
 
             return true;
         }
     }
+    /// <summary>
+    /// Intercept when weapon hitpoints change to send to ShieldDamageHandler (only shields have health)
+    /// </summary>
     [HarmonyPatch(typeof(Agent), nameof(Agent.ChangeWeaponHitPoints))]
     public class ShieldDamagePatch
     {

@@ -15,6 +15,9 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Missiles.Patches
 {
+    /// <summary>
+    /// MissileAuxPatch to send shoot event and returned resulting integer
+    /// </summary>
     [HarmonyPatch(typeof(Mission), "AddMissileAux")]
     public class AddMissileAuxPatch
     {
@@ -40,7 +43,9 @@ namespace Missions.Services.Missiles.Patches
             }
         }
     }
-
+    /// <summary>
+    /// MissileSingleUsageAuxPatch to send shoot event and returned resulting integer
+    /// </summary>
     [HarmonyPatch(typeof(Mission), "AddMissileSingleUsageAux")]
     public class AddMissileSingleUsageAuxPatch
     {
@@ -65,7 +70,9 @@ namespace Missions.Services.Missiles.Patches
             }
         }
     }
-
+    /// <summary>
+    /// Block the locally created missile
+    /// </summary>
     [HarmonyPatch(typeof(Mission), "OnAgentShootMissile")]
     public static class BlockMissileIfNative
     {

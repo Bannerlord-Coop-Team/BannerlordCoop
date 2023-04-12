@@ -47,9 +47,9 @@ namespace Missions.Services.Agents.Handlers
 
         private void WeaponPickupSend(MessagePayload<WeaponPickedup> obj)
         {
-            Agent agent = obj.Who as Agent;
+            if (!networkAgentRegistry.IsControlled(obj.What.Agent)) return;
 
-            networkAgentRegistry.TryGetAgentId(agent, out Guid agentId);
+            networkAgentRegistry.TryGetAgentId(obj.What.Agent, out Guid agentId);
 
             NetworkWeaponPickedup message = new NetworkWeaponPickedup(
                 agentId, 
