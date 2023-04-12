@@ -29,26 +29,16 @@ namespace Missions.Messages
         public readonly string[] UnitIdString;
         [ProtoMember(7)]
         public readonly bool IsPlayerAlive;
-
-        public Equipment Equipment
-        {
-            get { return UnpackEquipment(); }
-            set { _packedEquipment = PackEquipment(value); }
-        }
-        private Equipment _equipment;
-
         [ProtoMember(8)]
-        private byte[] _packedEquipment;
-
+        public Equipment Equipment { get; }
         [ProtoMember(9)]
         public readonly float[] UnitHealthList;
 
         [ProtoMember(10)]
         public readonly float PlayerHealth;
 
-        public NetworkMissionJoinInfo(IBinaryPackageFactory packageFactory, CharacterObject characterObject, bool isPlayerAlive, Guid playerId, Vec3 startingPosition, float health, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString, float[] unitHealthList)
+        public NetworkMissionJoinInfo(CharacterObject characterObject, bool isPlayerAlive, Guid playerId, Vec3 startingPosition, float health, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString, float[] unitHealthList)
         {
-            this.packageFactory = packageFactory;
             CharacterObject = characterObject;
             PlayerId = playerId;
             StartingPosition = startingPosition;
@@ -70,25 +60,6 @@ namespace Missions.Messages
             }
 
             return inEquipment;
-        }
-
-        private byte[] PackEquipment(Equipment equipment)
-        {
-            var character = new EquipmentBinaryPackage(equipment, packageFactory);
-            character.Pack();
-
-            return BinaryFormatterSerializer.Serialize(character);
-        }
-
-        private Equipment UnpackEquipment()
-        {
-            if (_equipment != null) return _equipment;
-
-            var character = BinaryFormatterSerializer.Deserialize<EquipmentBinaryPackage>(_packedEquipment);
-
-            _equipment = character.Unpack<Equipment>(packageFactory);
-
-            return _equipment;
         }
     }
 }

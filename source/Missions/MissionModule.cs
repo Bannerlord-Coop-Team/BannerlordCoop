@@ -66,7 +66,7 @@ namespace Missions
             builder.RegisterType<MissileHandler>().As<IMissileHandler>();
             builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>();
             builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>();
-            builder.RegisterType<ShieldBreakHandler>().As<IShieldBreakHandler>();
+            builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>();
             builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>();
 
             base.Load(builder);

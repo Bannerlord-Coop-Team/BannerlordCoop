@@ -129,6 +129,7 @@ namespace MissionTestMod
             RuntimeTypeModel.Default.SetSurrogate<Banner, BannerSurrogate>();
             RuntimeTypeModel.Default.SetSurrogate<ItemObject, ItemObjectSurrogate>();
             RuntimeTypeModel.Default.SetSurrogate<ItemModifier, ItemModifierSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<Equipment, EquipmentSurrogate>();
         }
 
         private bool m_IsFirstTick = true;

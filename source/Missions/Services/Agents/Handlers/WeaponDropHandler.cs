@@ -10,7 +10,7 @@ namespace Missions.Services.Agents.Handlers
     /// <summary>
     /// Handler for weapon drops in a battle
     /// </summary>
-    internal interface IWeaponDropHandler : IHandler
+    public interface IWeaponDropHandler : IHandler
     {
 
     }

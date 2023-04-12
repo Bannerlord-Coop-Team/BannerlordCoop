@@ -14,7 +14,7 @@ namespace Missions.Services.Missiles.Handlers
     /// <summary>
     /// Handler for missiles within a battle
     /// </summary>
-    internal interface IMissileHandler : IHandler
+    public interface IMissileHandler : IHandler
     {
 
     }

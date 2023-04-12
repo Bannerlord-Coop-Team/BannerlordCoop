@@ -153,13 +153,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Services\Agents\Handlers\AgentDamageHandler.cs" />
-    <Compile Include="Services\Agents\Handlers\ShieldBreakHandler.cs" />
+    <Compile Include="Services\Agents\Handlers\ShieldDamageHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
     <Compile Include="Services\Agents\Messages\NetworkShieldBreak.cs" />
     <Compile Include="Services\Agents\Messages\NetworkWeaponDropped.cs" />
     <Compile Include="Services\Agents\Messages\NetworkWeaponPickedup.cs" />
-    <Compile Include="Services\Agents\Messages\ShieldBreak.cs" />
+    <Compile Include="Services\Agents\Messages\ShieldHealthRemaining.cs" />
     <Compile Include="Services\Agents\Messages\WeaponPickedup.cs" />
     <Compile Include="Services\Agents\Messages\WeaponDropped.cs" />
     <Compile Include="ContainerProvider.cs" />
@@ -177,6 +177,7 @@
     <Compile Include="Services\Arena\ArenaTestGameManager.cs" />
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
     <Compile Include="Services\Missiles\Patches\MissileAuxPatches.cs" />
+    <Compile Include="Services\Network\Surrogates\EquipmentSurrogate.cs" />
     <Compile Include="Services\Network\Surrogates\ItemModifierSurrogate.cs" />
     <Compile Include="Services\Network\Surrogates\ItemObjectSurrogate.cs" />
     <Compile Include="Services\Network\Surrogates\BannerSurrogate.cs" />

@@ -7,10 +7,12 @@ using HarmonyLib;
 using JetBrains.Annotations;
 using LiteNetLib;
 using Missions.Messages;
+using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Agents.Patches;
 using Missions.Services.Arena;
+using Missions.Services.Missiles.Handlers;
 using Missions.Services.Missiles.Message;
 using Missions.Services.Missiles.Patches;
 using Missions.Services.Network;
@@ -51,12 +53,18 @@ namespace Missions.Services
             INetworkMessageBroker networkMessageBroker,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator,
-            IBinaryPackageFactory packageFactory)
+            IBinaryPackageFactory packageFactory,
+            IMissileHandler missileHandler,
+            IWeaponDropHandler weaponDropHandler,
+            IWeaponPickupHandler weaponPickupHandler,
+            IShieldDamageHandler shieldDamageHandler,
+            IAgentDamageHandler agentDamageHandler)
         {
             _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
             this.packageFactory = packageFactory;
+
             _playerId = Guid.NewGuid();
 
             _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
@@ -117,7 +125,7 @@ namespace Missions.Services
             bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
             Vec3 position = Agent.Main?.Position ?? default;
             float health = Agent.Main.Health;
-            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(packageFactory, characterObject, isPlayerAlive, _playerId, position, health, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray(), unitHealths.ToArray());
+            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, _playerId, position, health, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray(), unitHealths.ToArray());
             _networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",

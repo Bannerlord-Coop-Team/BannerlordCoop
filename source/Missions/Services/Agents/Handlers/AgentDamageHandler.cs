@@ -14,7 +14,7 @@ namespace Missions.Services.Agents.Handlers
     /// <summary>
     /// Handler for agent damage in a battle
     /// </summary>
-    internal interface IAgentDamageHandler : IHandler
+    public interface IAgentDamageHandler : IHandler
     {
 
     }
@@ -39,6 +39,7 @@ namespace Missions.Services.Agents.Handlers
 
         private void AgentDamageSend(MessagePayload<AgentDamage> payload)
         {
+
             // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
             if (NetworkAgentRegistry.Instance.TryGetAgentId(payload.What.AttackerAgent, out Guid attackerId) == false) return;
 

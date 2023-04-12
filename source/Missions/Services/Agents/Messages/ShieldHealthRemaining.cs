@@ -10,17 +10,19 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Services.Agents.Messages
 {
     /// <summary>
-    /// Internal event for agent shield breaks
+    /// Internal event for agent shield damage
     /// </summary>
-    public readonly struct ShieldBreak : IEvent
+    public readonly struct ShieldHealthRemaining : IEvent
     {
         public Agent Agent { get; }
         public EquipmentIndex EquipmentIndex { get; }
+        public short Hitpoints { get; }
 
-        public ShieldBreak(Agent agent, EquipmentIndex equipmentIndex)
+        public ShieldHealthRemaining(Agent agent, EquipmentIndex equipmentIndex, short health)
         {
             Agent = agent;
             EquipmentIndex = equipmentIndex;
+            Hitpoints = health;
         }
     }
 }

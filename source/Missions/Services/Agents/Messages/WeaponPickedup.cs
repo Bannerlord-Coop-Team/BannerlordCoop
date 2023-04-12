@@ -17,7 +17,12 @@ namespace Missions.Services.Agents.Messages
         public ItemModifier WeaponModifier { get; }
         public Banner Banner { get; }
 
-        public WeaponPickedup(Agent agent, EquipmentIndex equipmentIndex, ItemObject weaponObject, ItemModifier itemModifier, Banner banner)
+        public WeaponPickedup(
+            Agent agent, 
+            EquipmentIndex equipmentIndex, 
+            ItemObject weaponObject, 
+            ItemModifier itemModifier, 
+            Banner banner)
         {
             Agent = agent;
             EquipmentIndex = equipmentIndex;

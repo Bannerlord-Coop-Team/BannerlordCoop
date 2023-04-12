@@ -19,7 +19,7 @@ namespace Missions.Services.Agents.Handlers
     /// <summary>
     /// Handler for weapon pickups within a battle
     /// </summary>
-    internal interface IWeaponPickupHandler : IHandler
+    public interface IWeaponPickupHandler : IHandler
     {
 
     }
@@ -52,7 +52,6 @@ namespace Missions.Services.Agents.Handlers
             networkAgentRegistry.TryGetAgentId(agent, out Guid agentId);
 
             NetworkWeaponPickedup message = new NetworkWeaponPickedup(
-                packageFactory, 
                 agentId, 
                 obj.What.EquipmentIndex, 
                 obj.What.WeaponObject, 

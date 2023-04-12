@@ -10,32 +10,36 @@ namespace Missions.Services.Agents.Handlers
     /// <summary>
     /// Handler for shield breaks in a battle
     /// </summary>
-    internal interface IShieldBreakHandler : IHandler
+    public interface IShieldDamageHandler : IHandler
     {
 
     }
     /// <inheritdoc/>
-    public class ShieldBreakHandler : IShieldBreakHandler
+    public class ShieldDamageHandler : IShieldDamageHandler
     {
         readonly NetworkAgentRegistry networkAgentRegistry;
         readonly NetworkMessageBroker networkMessageBroker;
-        public ShieldBreakHandler(NetworkAgentRegistry networkAgentRegistry, NetworkMessageBroker networkMessageBroker) 
+        public ShieldDamageHandler(NetworkAgentRegistry networkAgentRegistry, NetworkMessageBroker networkMessageBroker) 
         {
             this.networkAgentRegistry = networkAgentRegistry;
             this.networkMessageBroker = networkMessageBroker;
 
-            networkMessageBroker.Subscribe<ShieldBreak>(ShieldBreakSend);
+            networkMessageBroker.Subscribe<ShieldHealthRemaining>(ShieldBreakSend);
             networkMessageBroker.Subscribe<NetworkShieldBreak>(ShieldBreakRecieve);
         }
-        ~ShieldBreakHandler()
+        ~ShieldDamageHandler()
         {
-            networkMessageBroker.Unsubscribe<ShieldBreak>(ShieldBreakSend);
+            networkMessageBroker.Unsubscribe<ShieldHealthRemaining>(ShieldBreakSend);
             networkMessageBroker.Unsubscribe<NetworkShieldBreak>(ShieldBreakRecieve);
         }
 
-        private void ShieldBreakSend(MessagePayload<ShieldBreak> payload)
+        private void ShieldBreakSend(MessagePayload<ShieldHealthRemaining> payload)
         {
-            networkAgentRegistry.TryGetAgentId(payload.What.Agent, out Guid agentId);
+            if (payload.What.Hitpoints > 0) return;
+
+            if (networkAgentRegistry.TryGetAgentId(payload.What.Agent, out Guid agentId) == false) return;
+
+            if (networkAgentRegistry.IsControlled(agentId) == false) return;
 
             NetworkShieldBreak message = new NetworkShieldBreak(agentId, payload.What.EquipmentIndex);
 
