@@ -27,9 +27,9 @@ namespace Missions.Services.Agents.Handlers
     public class WeaponPickupHandler : IWeaponPickupHandler
     {
         readonly IBinaryPackageFactory packageFactory;
-        readonly NetworkAgentRegistry networkAgentRegistry;
-        readonly NetworkMessageBroker networkMessageBroker;
-        public WeaponPickupHandler(IBinaryPackageFactory packageFactory, NetworkAgentRegistry networkAgentRegistry, NetworkMessageBroker networkMessageBroker)
+        readonly INetworkAgentRegistry networkAgentRegistry;
+        readonly INetworkMessageBroker networkMessageBroker;
+        public WeaponPickupHandler(IBinaryPackageFactory packageFactory, INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker)
         {
             this.packageFactory = packageFactory;
             this.networkAgentRegistry = networkAgentRegistry;

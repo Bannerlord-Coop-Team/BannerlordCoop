@@ -22,9 +22,9 @@ namespace Missions.Services.Missiles.Handlers
     /// <inheritdoc/>
     public class MissileHandler : IMissileHandler
     {
-        readonly NetworkMessageBroker networkMessageBroker;
-        readonly NetworkAgentRegistry networkAgentRegistry;
-        public MissileHandler(NetworkMessageBroker networkMessageBroker, NetworkAgentRegistry networkAgentRegistry)
+        readonly INetworkMessageBroker networkMessageBroker;
+        readonly INetworkAgentRegistry networkAgentRegistry;
+        public MissileHandler(INetworkMessageBroker networkMessageBroker, INetworkAgentRegistry networkAgentRegistry)
         {
             this.networkMessageBroker = networkMessageBroker;
             this.networkAgentRegistry = networkAgentRegistry;

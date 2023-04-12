@@ -17,9 +17,9 @@ namespace Missions.Services.Agents.Handlers
     /// <inheritdoc/>
     public class WeaponDropHandler : IWeaponDropHandler
     {
-        readonly NetworkAgentRegistry networkAgentRegistry;
-        readonly NetworkMessageBroker networkMessageBroker;
-        public WeaponDropHandler(NetworkAgentRegistry networkAgentRegistry, NetworkMessageBroker networkMessageBroker)
+        readonly INetworkAgentRegistry networkAgentRegistry;
+        readonly INetworkMessageBroker networkMessageBroker;
+        public WeaponDropHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker)
         {
             this.networkAgentRegistry = networkAgentRegistry;
             this.networkMessageBroker = networkMessageBroker;

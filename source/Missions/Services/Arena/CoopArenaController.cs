@@ -44,6 +44,11 @@ namespace Missions.Services
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
         private readonly IBinaryPackageFactory packageFactory;
+        private readonly IMissileHandler _missileHandler;
+        private readonly IWeaponDropHandler _weaponDropHandler;
+        private readonly IWeaponPickupHandler _weaponPickupHandler;
+        private readonly IShieldDamageHandler _shieldDamageHandler;
+        private readonly IAgentDamageHandler _agentDamageHandler;
 
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
         private CharacterObject[] _gameCharacters;
@@ -64,6 +69,11 @@ namespace Missions.Services
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
             this.packageFactory = packageFactory;
+            _missileHandler = missileHandler;
+            _weaponDropHandler = weaponDropHandler;
+            _weaponPickupHandler = weaponPickupHandler;
+            _shieldDamageHandler = shieldDamageHandler;
+            _agentDamageHandler = agentDamageHandler;
 
             _playerId = Guid.NewGuid();
 
@@ -205,10 +215,10 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            //Agent ai = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
+            Agent ai = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
 
             _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
-            //_agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
+            _agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
         }
 
         private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);

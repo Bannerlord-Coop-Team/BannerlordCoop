@@ -21,9 +21,9 @@ namespace Missions.Services.Agents.Handlers
     /// <inheritdoc/>
     public class AgentDamageHandler : IAgentDamageHandler
     {
-        readonly NetworkAgentRegistry networkAgentRegistry;
-        readonly NetworkMessageBroker networkMessageBroker;
-        public AgentDamageHandler(NetworkAgentRegistry networkAgentRegistry, NetworkMessageBroker networkMessageBroker) 
+        readonly INetworkAgentRegistry networkAgentRegistry;
+        readonly INetworkMessageBroker networkMessageBroker;
+        public AgentDamageHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker) 
         {
             this.networkAgentRegistry = networkAgentRegistry;
             this.networkMessageBroker = networkMessageBroker;
