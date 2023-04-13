@@ -55,7 +55,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void NetworkClientValidated_Tranitions_ReceivingSavedDataState()
         {
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(true, Guid.Empty));
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(true, string.Empty));
 
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
@@ -69,7 +69,7 @@ namespace Coop.Tests.Client.States
                 startCharacterCreationCount += 1;
             });
 
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(false, Guid.Empty));
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(false, string.Empty));
 
             Assert.Equal(1, startCharacterCreationCount);
         }

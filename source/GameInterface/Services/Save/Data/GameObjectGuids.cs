@@ -14,9 +14,9 @@ namespace GameInterface.Services.Save.Data
         public string[] ControlledHeros { get; set; } = Array.Empty<string>();
 
 
-        public GameObjectGuids(IEnumerable<string> controlledHeros)
+        public GameObjectGuids(string[] controlledHeros)
         {
-            ControlledHeros = controlledHeros.ToArray();
+            ControlledHeros = controlledHeros;
         }
 
         public override bool Equals(object obj)

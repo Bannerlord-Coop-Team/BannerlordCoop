@@ -43,7 +43,6 @@ namespace Common.Serialization
                 {
                     Serializer.Serialize(InternalStream, wrapper);
                     return InternalStream.ToArray();
-
                 }
             }
         }

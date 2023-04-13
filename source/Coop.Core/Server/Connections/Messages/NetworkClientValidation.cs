@@ -22,9 +22,9 @@ namespace Coop.Core.Server.Connections.Messages
         [ProtoMember(1)]
         public bool HeroExists { get; }
         [ProtoMember(2)]
-        public Guid HeroId { get; }
+        public string HeroId { get; }
 
-        public NetworkClientValidated(bool heroExists, Guid heroId)
+        public NetworkClientValidated(bool heroExists, string heroId)
         {
             HeroExists = heroExists;
             HeroId = heroId;

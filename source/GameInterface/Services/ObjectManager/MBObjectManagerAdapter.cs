@@ -19,7 +19,6 @@ namespace GameInterface.Services.ObjectManager
         bool Contains(object obj);
         bool Contains(string id);
         bool TryGetId(object obj, out string id);
-        bool TryGetObject(string id, out object obj);
         bool TryGetObject<T>(string id, out T obj);
         bool AddExisting(string id, object obj);
         bool AddNewObject(object obj, out string newId);

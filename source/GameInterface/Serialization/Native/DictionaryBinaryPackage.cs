@@ -1,4 +1,7 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using Serilog.Core;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +12,8 @@ namespace GameInterface.Serialization.Native
     [Serializable]
     public class DictionaryBinaryPackage : IEnumerableBinaryPackage
     {
+        private static ILogger Logger = LogManager.GetLogger<DictionaryBinaryPackage>();
+
         [NonSerialized]
         private IBinaryPackageFactory binaryPackageFactory;
 
@@ -60,6 +65,13 @@ namespace GameInterface.Serialization.Native
             {
                 var k = Key.GetValue(obj);
                 var v = Value.GetValue(obj);
+
+                if(k == null)
+                {
+                    Logger.Warning("Key was null while unpacking dictionary");
+                    continue;
+                }
+
                 DictAdd.Invoke(newDict, new object[] { k, v });
             }
 

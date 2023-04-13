@@ -24,20 +24,7 @@ namespace Coop.Tests.Server.Services.Save
         [Fact]
         public void SaveSessions()
         {
-            var gameObjectGuids = new GameObjectGuids(
-                new Guid[] { Guid.NewGuid() },
-                new Dictionary<string, Guid>
-                {
-                    { "Party 1", Guid.NewGuid() },
-                    { "Party 2", Guid.NewGuid() },
-                    { "Party 3", Guid.NewGuid() },
-                },
-                new Dictionary<string, Guid>
-                {
-                    { "Hero 1", Guid.NewGuid() },
-                    { "Hero 2", Guid.NewGuid() },
-                    { "Hero 3", Guid.NewGuid() },
-                });
+            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
 
             ICoopSession sessionData = new CoopSession()
             {
@@ -64,20 +51,7 @@ namespace Coop.Tests.Server.Services.Save
         [Fact]
         public void SaveLoadSessions()
         {
-            var gameObjectGuids = new GameObjectGuids(
-                new Guid[] { Guid.NewGuid() },
-                new Dictionary<string, Guid>
-                {
-                    { "Party 1", Guid.NewGuid() },
-                    { "Party 2", Guid.NewGuid() },
-                    { "Party 3", Guid.NewGuid() },
-                },
-                new Dictionary<string, Guid>
-                {
-                    { "Hero 1", Guid.NewGuid() },
-                    { "Hero 2", Guid.NewGuid() },
-                    { "Hero 3", Guid.NewGuid() },
-                });
+            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
 
             ICoopSession sessionData = new CoopSession()
             {

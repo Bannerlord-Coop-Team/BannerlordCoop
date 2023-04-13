@@ -121,9 +121,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Publish hero resolved, this would be from game interface
             var gameObjectGuids = new GameObjectGuids(
-                new Guid[] { Guid.NewGuid() },
-                new Dictionary<string, Guid> { { "TestParty 1", Guid.NewGuid() } },
-                new Dictionary<string, Guid> { { "TestHero 1", Guid.NewGuid() } });
+                new string[] { "Random STR" });
 
             var message = new GameSaveDataPackaged(
                 transactionId,

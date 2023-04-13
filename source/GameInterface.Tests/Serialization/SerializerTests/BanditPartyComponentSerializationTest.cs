@@ -61,6 +61,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             allhideouts.Add(hideout);
 
+            Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
+
             MobileParty mobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
             PartyBase party = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
             Clan clan = (Clan)FormatterServices.GetUninitializedObject(typeof(Clan));

@@ -6,7 +6,7 @@ using System.Threading;
 
 namespace GameInterface.Tests.Stubs
 {
-    internal class ObjectManagerAdapterStub : IObjectManager
+    public class ObjectManagerAdapterStub : IObjectManager
     {
         private Dictionary<string, object> registry = new Dictionary<string, object>();
 

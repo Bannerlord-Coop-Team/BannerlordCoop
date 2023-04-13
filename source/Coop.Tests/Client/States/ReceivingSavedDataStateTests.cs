@@ -62,9 +62,7 @@ namespace Coop.Tests.Client.States
             });
 
             var gameObjectGuids = new GameObjectGuids(
-                new Guid[] { Guid.NewGuid() },
-                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
-                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+                new string[] { "Random STR" });
 
             var networkMessage = new NetworkGameSaveDataReceived(
                 new byte[] { 1 },
@@ -83,10 +81,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Transitions_LoadingState()
         {
             // Setup
-            var gameObjectGuids = new GameObjectGuids(
-                new Guid[] { Guid.NewGuid() },
-                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
-                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
 
             var networkMessage = new NetworkGameSaveDataReceived(
                 new byte[] { 1 },
@@ -130,10 +125,7 @@ namespace Coop.Tests.Client.States
                 isEventPublished = true;
             });
 
-            var gameObjectGuids = new GameObjectGuids(
-                new Guid[] { Guid.NewGuid() },
-                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
-                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
 
             var networkMessage = new NetworkGameSaveDataReceived(
                 null,
@@ -159,10 +151,7 @@ namespace Coop.Tests.Client.States
                 isEventPublished = true;
             });
 
-            var gameObjectGuids = new GameObjectGuids(
-                new Guid[] { Guid.NewGuid() },
-                new Dictionary<string, Guid> { { "TestStrId", Guid.NewGuid() } },
-                new Dictionary<string, Guid> { { "TestStrId2", Guid.NewGuid() } });
+            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
 
             var networkMessage = new NetworkGameSaveDataReceived(
                 Array.Empty<byte>(),

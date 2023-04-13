@@ -35,20 +35,7 @@ namespace Coop.Tests.Server.Services.Save
             // Setup
             var saveManager = container.Resolve<ICoopSaveManager>();
 
-            var gameObjectGuids = new GameObjectGuids(
-                new Guid[] { Guid.NewGuid() },
-                new Dictionary<string, Guid>
-                {
-                    { "Party 1", Guid.NewGuid() },
-                    { "Party 2", Guid.NewGuid() },
-                    { "Party 3", Guid.NewGuid() },
-                },
-                new Dictionary<string, Guid>
-                {
-                    { "Hero 1", Guid.NewGuid() },
-                    { "Hero 2", Guid.NewGuid() },
-                    { "Hero 3", Guid.NewGuid() },
-                });
+            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
 
             ICoopSession sessionData = new CoopSession()
             {
@@ -60,10 +47,10 @@ namespace Coop.Tests.Server.Services.Save
 
             string savePath = saveManager.DefaultPath + saveFile;
 
-            if (File.Exists(savePath))
+            if (File.Exists(savePath + ".json"))
             {
                 // Ensure file does not exist before testing
-                File.Delete(savePath);
+                File.Delete(savePath + ".json");
             }
 
             Assert.False(File.Exists(savePath));
@@ -81,20 +68,7 @@ namespace Coop.Tests.Server.Services.Save
             // Setup
             var saveManager = container.Resolve<ICoopSaveManager>();
 
-            var gameObjectGuids = new GameObjectGuids(
-                new Guid[] { Guid.NewGuid() },
-                new Dictionary<string, Guid>
-                {
-                    { "Party 1", Guid.NewGuid() },
-                    { "Party 2", Guid.NewGuid() },
-                    { "Party 3", Guid.NewGuid() },
-                },
-                new Dictionary<string, Guid>
-                {
-                    { "Hero 1", Guid.NewGuid() },
-                    { "Hero 2", Guid.NewGuid() },
-                    { "Hero 3", Guid.NewGuid() },
-                });
+            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
 
             ICoopSession sessionData = new CoopSession()
             {

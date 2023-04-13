@@ -24,7 +24,7 @@ namespace Coop.Core.Client
         /// </summary>
         ICoopClient NetworkClient { get; }
         INetworkMessageBroker NetworkMessageBroker { get; }
-        Guid ControlledHeroId { get; set; }
+        string ControlledHeroId { get; set; }
     }
 
     /// <inheritdoc cref="IClientLogic"/>
@@ -33,7 +33,7 @@ namespace Coop.Core.Client
         private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
         public ICoopClient NetworkClient { get; }
         public INetworkMessageBroker NetworkMessageBroker { get; }
-        public Guid ControlledHeroId { get; set; }
+        public string ControlledHeroId { get; set; }
         public IClientState State 
         {
             get { return _state; }

@@ -55,7 +55,7 @@ namespace Coop.Core.Server.Connections.States
             var transactionId = obj.What.TransactionID;
             if (ReloveHeroTransactionId == transactionId)
             {
-                var validateMessage = new NetworkClientValidated(false, Guid.Empty);
+                var validateMessage = new NetworkClientValidated(false, string.Empty);
                 ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(validateMessage);
                 ConnectionLogic.CreateCharacter();
             }

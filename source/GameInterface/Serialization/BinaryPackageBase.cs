@@ -1,5 +1,4 @@
-﻿using GameInterface.Serialization;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -129,9 +128,9 @@ namespace GameInterface.Serialization
             if (id == null) return null;
 
             // Get the object with the specified id
-            if (BinaryPackageFactory.ObjectManager.TryGetObject(id, out object resolvedObj) == false) return null;
+            if (BinaryPackageFactory.ObjectManager.TryGetObject(id, out OutT resolvedObj) == false) return null;
 
-            return (OutT)resolvedObj;
+            return resolvedObj;
         }
 
         /// <summary>
