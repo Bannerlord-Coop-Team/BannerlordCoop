@@ -23,7 +23,7 @@ namespace Missions.Messages
         [ProtoMember(2)]
         public readonly Vec3 StartingPosition;
         [ProtoMember(3)]
-        public CharacterObject CharacterObject { get; }
+        public readonly CharacterObject CharacterObject;
         [ProtoMember(4)]
         public readonly Guid[] UnitId;
         [ProtoMember(5)]
@@ -33,14 +33,23 @@ namespace Missions.Messages
         [ProtoMember(7)]
         public readonly bool IsPlayerAlive;
         [ProtoMember(8)]
-        public Equipment Equipment { get; }
+        public readonly Equipment Equipment;
         [ProtoMember(9)]
         public readonly float[] UnitHealthList;
 
         [ProtoMember(10)]
         public readonly float PlayerHealth;
 
-        public NetworkMissionJoinInfo(CharacterObject characterObject, bool isPlayerAlive, Guid playerId, Vec3 startingPosition, float health, Guid[] unitId, Vec3[] unitStartingPosition, string[] unitIdString, float[] unitHealthList)
+        public NetworkMissionJoinInfo(
+            CharacterObject characterObject, 
+            bool isPlayerAlive, 
+            Guid playerId, 
+            Vec3 startingPosition, 
+            float health, 
+            Guid[] unitId, 
+            Vec3[] unitStartingPosition, 
+            string[] unitIdString, float[] 
+            unitHealthList)
         {
             CharacterObject = characterObject;
             PlayerId = playerId;

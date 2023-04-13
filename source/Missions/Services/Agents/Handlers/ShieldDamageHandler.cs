@@ -10,7 +10,7 @@ namespace Missions.Services.Agents.Handlers
     /// <summary>
     /// Handler for shield breaks in a battle
     /// </summary>
-    public interface IShieldDamageHandler : IHandler
+    public interface IShieldDamageHandler : IHandler, IDisposable
     {
 
     }
@@ -24,16 +24,21 @@ namespace Missions.Services.Agents.Handlers
             this.networkAgentRegistry = networkAgentRegistry;
             this.networkMessageBroker = networkMessageBroker;
 
-            networkMessageBroker.Subscribe<ShieldHealthRemaining>(ShieldBreakSend);
+            networkMessageBroker.Subscribe<ShieldDamaged>(ShieldBreakSend);
             networkMessageBroker.Subscribe<NetworkShieldBreak>(ShieldBreakRecieve);
         }
         ~ShieldDamageHandler()
         {
-            networkMessageBroker.Unsubscribe<ShieldHealthRemaining>(ShieldBreakSend);
+            Dispose();
+        }
+
+        public void Dispose()
+        {
+            networkMessageBroker.Unsubscribe<ShieldDamaged>(ShieldBreakSend);
             networkMessageBroker.Unsubscribe<NetworkShieldBreak>(ShieldBreakRecieve);
         }
 
-        private void ShieldBreakSend(MessagePayload<ShieldHealthRemaining> payload)
+        private void ShieldBreakSend(MessagePayload<ShieldDamaged> payload)
         {
             if (payload.What.Hitpoints > 0) return;
 

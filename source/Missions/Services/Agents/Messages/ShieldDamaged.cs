@@ -12,13 +12,13 @@ namespace Missions.Services.Agents.Messages
     /// <summary>
     /// Internal event for agent shield damage
     /// </summary>
-    public readonly struct ShieldHealthRemaining : IEvent
+    public readonly struct ShieldDamaged : IEvent
     {
         public Agent Agent { get; }
         public EquipmentIndex EquipmentIndex { get; }
         public short Hitpoints { get; }
 
-        public ShieldHealthRemaining(Agent agent, EquipmentIndex equipmentIndex, short health)
+        public ShieldDamaged(Agent agent, EquipmentIndex equipmentIndex, short health)
         {
             Agent = agent;
             EquipmentIndex = equipmentIndex;

@@ -10,7 +10,7 @@ namespace Missions.Services.Agents.Handlers
     /// <summary>
     /// Handler for weapon drops in a battle
     /// </summary>
-    public interface IWeaponDropHandler : IHandler
+    public interface IWeaponDropHandler : IHandler, IDisposable
     {
 
     }
@@ -29,6 +29,11 @@ namespace Missions.Services.Agents.Handlers
         }
 
         ~WeaponDropHandler()
+        {
+            Dispose();
+        }
+
+        public void Dispose()
         {
             networkMessageBroker.Unsubscribe<WeaponDropped>(WeaponDropSend);
             networkMessageBroker.Unsubscribe<NetworkWeaponDropped>(WeaponDropRecieve);

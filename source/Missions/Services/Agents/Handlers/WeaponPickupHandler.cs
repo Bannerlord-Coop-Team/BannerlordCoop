@@ -19,19 +19,17 @@ namespace Missions.Services.Agents.Handlers
     /// <summary>
     /// Handler for weapon pickups within a battle
     /// </summary>
-    public interface IWeaponPickupHandler : IHandler
+    public interface IWeaponPickupHandler : IHandler, IDisposable
     {
 
     }
     /// <inheritdoc/>
     public class WeaponPickupHandler : IWeaponPickupHandler
     {
-        readonly IBinaryPackageFactory packageFactory;
         readonly INetworkAgentRegistry networkAgentRegistry;
         readonly INetworkMessageBroker networkMessageBroker;
-        public WeaponPickupHandler(IBinaryPackageFactory packageFactory, INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker)
+        public WeaponPickupHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker)
         {
-            this.packageFactory = packageFactory;
             this.networkAgentRegistry = networkAgentRegistry;
             this.networkMessageBroker = networkMessageBroker;
 
@@ -40,6 +38,11 @@ namespace Missions.Services.Agents.Handlers
 
         }
         ~WeaponPickupHandler()
+        {
+            Dispose();
+        }
+
+        public void Dispose()
         {
             networkMessageBroker.Unsubscribe<WeaponPickedup>(WeaponPickupSend);
             networkMessageBroker.Unsubscribe<NetworkWeaponPickedup>(WeaponPickupReceive);

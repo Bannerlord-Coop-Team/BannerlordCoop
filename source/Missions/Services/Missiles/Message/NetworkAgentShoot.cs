@@ -40,7 +40,8 @@ namespace Missions.Services.Missiles.Message
         [ProtoMember(13)]
         public float Speed { get; }
 
-        public NetworkAgentShoot(Guid agentGuid, 
+        public NetworkAgentShoot(
+            Guid agentGuid, 
             Vec3 position, 
             Vec3 velocity, 
             Vec3 orientationS, 

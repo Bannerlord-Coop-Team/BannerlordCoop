@@ -14,7 +14,7 @@ namespace Missions.Services.Missiles.Handlers
     /// <summary>
     /// Handler for missiles within a battle
     /// </summary>
-    public interface IMissileHandler : IHandler
+    public interface IMissileHandler : IHandler, IDisposable
     {
 
     }
@@ -35,6 +35,11 @@ namespace Missions.Services.Missiles.Handlers
 
         ~MissileHandler()
         {
+            Dispose();
+        }
+
+        public void Dispose()
+        {
             networkMessageBroker.Unsubscribe<AgentShoot>(AgentShootSend);
             networkMessageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootRecieve);
         }
@@ -47,12 +52,27 @@ namespace Missions.Services.Missiles.Handlers
             NetworkAgentShoot shot = payload.What;
 
             Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
-            MissionWeapon missionWeapon = new MissionWeapon(payload.What.ItemObject, payload.What.ItemModifier, payload.What.Banner);
+
+            MissionWeapon missionWeapon = new MissionWeapon(
+                payload.What.ItemObject, 
+                payload.What.ItemModifier, 
+                payload.What.Banner);
+
             Mat3 orientation = new Mat3(shot.Orientations, shot.Orientationf, shot.Orientationu);
 
             GameLoopRunner.RunOnMainThread(() =>
             {
-                Mission.Current.AddCustomMissile(shooter, missionWeapon, shot.Position, shot.Velocity, orientation, shot.BaseSpeed, shot.Speed, shot.HasRigidBody, null, shot.MissileIndex);
+                Mission.Current.AddCustomMissile(
+                    shooter, 
+                    missionWeapon, 
+                    shot.Position, 
+                    shot.Velocity, 
+                    orientation, 
+                    shot.BaseSpeed,
+                    shot.Speed, 
+                    shot.HasRigidBody,
+                    null, 
+                    shot.MissileIndex);
             });
         }
 
@@ -64,7 +84,8 @@ namespace Missions.Services.Missiles.Handlers
                 Guid shooterAgentGuid = networkAgentRegistry.AgentToId[payload.What.Agent];
                 MissionWeapon missionWeapon;
 
-                if (payload.What.MissionWeapon.CurrentUsageItem.IsRangedWeapon && payload.What.MissionWeapon.CurrentUsageItem.IsConsumable)
+                if (payload.What.MissionWeapon.CurrentUsageItem.IsRangedWeapon && 
+                    payload.What.MissionWeapon.CurrentUsageItem.IsConsumable)
                 {
                     missionWeapon = payload.What.MissionWeapon;
 

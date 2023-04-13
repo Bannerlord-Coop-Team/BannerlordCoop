@@ -38,7 +38,16 @@ namespace Missions.Services.Missiles.Patches
         {
             if (NetworkAgentRegistry.Instance.IsControlled(shooterAgent))
             {
-                AgentShoot message = new AgentShoot(shooterAgent, __state, position, direction, orientation, baseSpeed, speed, addRigidBody, __result);
+                AgentShoot message = new AgentShoot(
+                    shooterAgent,
+                    __state, 
+                    position, 
+                    direction, 
+                    orientation, 
+                    baseSpeed, 
+                    speed, 
+                    addRigidBody, 
+                    __result);
                 NetworkMessageBroker.Instance.Publish(shooterAgent, message);
             }
         }
@@ -65,7 +74,16 @@ namespace Missions.Services.Missiles.Patches
         {
             if (NetworkAgentRegistry.Instance.IsControlled(shooterAgent))
             {
-                AgentShoot message = new AgentShoot(shooterAgent, __state, position, direction, orientation, baseSpeed, speed, addRigidBody, __result);
+                AgentShoot message = new AgentShoot(
+                    shooterAgent, 
+                    __state, 
+                    position, 
+                    direction, 
+                    orientation, 
+                    baseSpeed, 
+                    speed, 
+                    addRigidBody, 
+                    __result);
                 NetworkMessageBroker.Instance.Publish(shooterAgent, message);
             }
         }

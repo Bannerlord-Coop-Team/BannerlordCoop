@@ -14,7 +14,7 @@ namespace Missions.Services.Agents.Handlers
     /// <summary>
     /// Handler for agent damage in a battle
     /// </summary>
-    public interface IAgentDamageHandler : IHandler
+    public interface IAgentDamageHandler : IHandler, IDisposable
     {
 
     }
@@ -29,12 +29,16 @@ namespace Missions.Services.Agents.Handlers
             this.networkMessageBroker = networkMessageBroker;
 
             networkMessageBroker.Subscribe<AgentDamage>(AgentDamageSend);
-            networkMessageBroker.Subscribe<NetworkAgentDamage>(AgentDamageRecieve);
+            networkMessageBroker.Subscribe<NetworkAgentDamaged>(AgentDamageRecieve);
         }
         ~AgentDamageHandler()
         {
+            Dispose();
+        }
+        public void Dispose()
+        {
             networkMessageBroker.Unsubscribe<AgentDamage>(AgentDamageSend);
-            networkMessageBroker.Unsubscribe<NetworkAgentDamage>(AgentDamageRecieve);
+            networkMessageBroker.Unsubscribe<NetworkAgentDamaged>(AgentDamageRecieve);
         }
 
         private void AgentDamageSend(MessagePayload<AgentDamage> payload)
@@ -46,19 +50,20 @@ namespace Missions.Services.Agents.Handlers
             // next, check if the attacker is one of ours, if not, no networking is needed (not our agent dealing damage)
             if (networkAgentRegistry.IsControlled(attackerId) == false) return;
 
-            // If there is package factory cannot be resolved, do default behavior
-            if (ContainerProvider.TryResolve<IBinaryPackageFactory>(out var packageFactory) == false) return;
-
             networkAgentRegistry.TryGetAgentId(payload.What.VictimAgent, out Guid victimId);
 
-            NetworkAgentDamage message = new NetworkAgentDamage(attackerId, victimId, payload.What.AttackCollisionData, payload.What.Blow);
+            NetworkAgentDamaged message = new NetworkAgentDamaged(
+                attackerId, 
+                victimId, 
+                payload.What.AttackCollisionData, 
+                payload.What.Blow);
 
             networkMessageBroker.PublishNetworkEvent(message);
         }
 
-        private void AgentDamageRecieve(MessagePayload<NetworkAgentDamage> payload)
+        private void AgentDamageRecieve(MessagePayload<NetworkAgentDamaged> payload)
         {
-            NetworkAgentDamage agentDamaData = payload.What;
+            NetworkAgentDamaged agentDamaData = payload.What;
 
             NetPeer netPeer = payload.Who as NetPeer;
 

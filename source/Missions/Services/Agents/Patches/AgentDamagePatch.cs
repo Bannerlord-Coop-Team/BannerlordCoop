@@ -52,7 +52,7 @@ namespace Missions.Services.Agents.Patches
     {
         private static void Postfix(Agent __instance, EquipmentIndex slotIndex, short hitPoints)
         {
-            ShieldHealthRemaining shieldDamage = new ShieldHealthRemaining(__instance, slotIndex, hitPoints);
+            ShieldDamaged shieldDamage = new ShieldDamaged(__instance, slotIndex, hitPoints);
             NetworkMessageBroker.Instance.Publish(__instance, shieldDamage);
         }
     }

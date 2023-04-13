@@ -28,7 +28,12 @@ namespace Missions.Services.Agents.Messages
         [ProtoMember(5)]
         public Banner Banner { get; }
 
-        public NetworkWeaponPickedup(Guid agentId, EquipmentIndex equipmentIndex, ItemObject weaponObject, ItemModifier itemModifier, Banner banner)
+        public NetworkWeaponPickedup(
+            Guid agentId, 
+            EquipmentIndex equipmentIndex, 
+            ItemObject weaponObject, 
+            ItemModifier itemModifier, 
+            Banner banner)
         {
             AgentId = agentId;
             EquipmentIndex = equipmentIndex;
