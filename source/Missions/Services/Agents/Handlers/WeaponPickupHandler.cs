@@ -1,10 +1,12 @@
 ﻿using Autofac;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Serialization;
 using HarmonyLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,6 +30,7 @@ namespace Missions.Services.Agents.Handlers
     {
         readonly INetworkAgentRegistry networkAgentRegistry;
         readonly INetworkMessageBroker networkMessageBroker;
+        readonly static ILogger Logger = LogManager.GetLogger<WeaponPickupHandler>();
         public WeaponPickupHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker)
         {
             this.networkAgentRegistry = networkAgentRegistry;
@@ -50,9 +53,13 @@ namespace Missions.Services.Agents.Handlers
 
         private void WeaponPickupSend(MessagePayload<WeaponPickedup> obj)
         {
-            if (!networkAgentRegistry.IsControlled(obj.What.Agent)) return;
+            if (networkAgentRegistry.IsControlled(obj.What.Agent) == false) return;
 
-            networkAgentRegistry.TryGetAgentId(obj.What.Agent, out Guid agentId);
+            if(networkAgentRegistry.TryGetAgentId(obj.What.Agent, out Guid agentId) == false)
+            {
+                Logger.Warning("No agentID was found for the Agent: {agent} in {class}", obj.What.Agent, typeof(WeaponPickupHandler));
+                return;
+            }
 
             NetworkWeaponPickedup message = new NetworkWeaponPickedup(
                 agentId, 
@@ -68,7 +75,11 @@ namespace Missions.Services.Agents.Handlers
             //ItemObject - ItemModifier - Banner creates MissionWeapon
             MissionWeapon missionWeapon = new MissionWeapon(obj.What.ItemObject, obj.What.ItemModifier, obj.What.Banner);
 
-            networkAgentRegistry.TryGetAgent(obj.What.AgentId, out Agent agent);
+            if (networkAgentRegistry.TryGetAgent(obj.What.AgentId, out Agent agent) == false)
+            {
+                Logger.Warning("No agent found at {guid} in {class}", obj.What.AgentId, typeof(WeaponPickupHandler));
+                return;
+            }
 
             agent.EquipWeaponWithNewEntity(obj.What.EquipmentIndex, ref missionWeapon);
         }

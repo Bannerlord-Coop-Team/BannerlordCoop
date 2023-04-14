@@ -1,7 +1,10 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
+using Serilog;
+using Serilog.Core;
 using System;
 using TaleWorlds.MountAndBlade;
 
@@ -19,6 +22,8 @@ namespace Missions.Services.Agents.Handlers
     {
         readonly INetworkAgentRegistry networkAgentRegistry;
         readonly INetworkMessageBroker networkMessageBroker;
+        readonly static ILogger Logger = LogManager.GetLogger<ShieldDamageHandler>();
+
         public ShieldDamageHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker) 
         {
             this.networkAgentRegistry = networkAgentRegistry;
@@ -53,12 +58,19 @@ namespace Missions.Services.Agents.Handlers
 
         private void ShieldBreakRecieve(MessagePayload<NetworkShieldBreak> payload)
         {
-            networkAgentRegistry.TryGetAgent(payload.What.AgentGuid, out Agent agent);
-
-            if (!agent.Equipment[payload.What.EquipmentIndex].IsEmpty)
+            if (networkAgentRegistry.TryGetAgent(payload.What.AgentGuid, out Agent agent) == false)
             {
-                agent.RemoveEquippedWeapon(payload.What.EquipmentIndex);
+                Logger.Warning("No agent found at {guid} in {class}", payload.What.AgentGuid, typeof(ShieldDamageHandler));
+                return;
             }
+
+            if (agent.Equipment[payload.What.EquipmentIndex].IsEmpty)
+            {
+                Logger.Warning("Equipment Index for {agent} is already empty in {class}", agent, typeof(ShieldDamageHandler));
+                return;
+            }
+
+            agent.RemoveEquippedWeapon(payload.What.EquipmentIndex);
         }
     }
 }

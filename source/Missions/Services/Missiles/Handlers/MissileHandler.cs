@@ -1,10 +1,13 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using LiteNetLib;
+using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Missiles.Message;
 using Missions.Services.Network;
+using Serilog;
 using System;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -24,6 +27,8 @@ namespace Missions.Services.Missiles.Handlers
     {
         readonly INetworkMessageBroker networkMessageBroker;
         readonly INetworkAgentRegistry networkAgentRegistry;
+        readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
+
         public MissileHandler(INetworkMessageBroker networkMessageBroker, INetworkAgentRegistry networkAgentRegistry)
         {
             this.networkMessageBroker = networkMessageBroker;
@@ -46,7 +51,7 @@ namespace Missions.Services.Missiles.Handlers
 
         private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
         {
-            networkAgentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
+            if (networkAgentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController) == false) return;
 
 
             NetworkAgentShoot shot = payload.What;
@@ -58,8 +63,6 @@ namespace Missions.Services.Missiles.Handlers
                 payload.What.ItemModifier, 
                 payload.What.Banner);
 
-            Mat3 orientation = new Mat3(shot.Orientations, shot.Orientationf, shot.Orientationu);
-
             GameLoopRunner.RunOnMainThread(() =>
             {
                 Mission.Current.AddCustomMissile(
@@ -67,7 +70,7 @@ namespace Missions.Services.Missiles.Handlers
                     missionWeapon, 
                     shot.Position, 
                     shot.Velocity, 
-                    orientation, 
+                    shot.Orientation, 
                     shot.BaseSpeed,
                     shot.Speed, 
                     shot.HasRigidBody,
@@ -99,9 +102,7 @@ namespace Missions.Services.Missiles.Handlers
                     shooterAgentGuid, 
                     payload.What.Position, 
                     payload.What.Direction, 
-                    payload.What.Orientation.s, 
-                    payload.What.Orientation.f, 
-                    payload.What.Orientation.u, 
+                    payload.What.Orientation,
                     payload.What.HasRigidBody, 
                     missionWeapon.Item, 
                     missionWeapon.ItemModifier, 

@@ -19,34 +19,27 @@ namespace Missions.Services.Missiles.Message
         [ProtoMember(3)]
         public Vec3 Velocity { get; }
         [ProtoMember(4)]
-        public Vec3 Orientations{ get; }
+        public Mat3 Orientation { get; }
         [ProtoMember(5)]
-        public Vec3 Orientationf { get; }
-        [ProtoMember(6)]
-        public Vec3 Orientationu { get; }
-        [ProtoMember(7)]
         public bool HasRigidBody { get; }
-        [ProtoMember(8)]
+        [ProtoMember(6)]
         public ItemObject ItemObject { get; }
-        [ProtoMember(9)]
+        [ProtoMember(7)]
         public ItemModifier ItemModifier { get; }
-        [ProtoMember(10)]
+        [ProtoMember(8)]
         public Banner Banner { get; }
-        [ProtoMember(11)]
+        [ProtoMember(9)]
         public int MissileIndex { get; }
-
-        [ProtoMember(12)]
+        [ProtoMember(10)]
         public float BaseSpeed { get; }
-        [ProtoMember(13)]
+        [ProtoMember(11)]
         public float Speed { get; }
 
         public NetworkAgentShoot(
             Guid agentGuid, 
             Vec3 position, 
             Vec3 velocity, 
-            Vec3 orientationS, 
-            Vec3 orientationF, 
-            Vec3 orientationU, 
+            Mat3 orientation, 
             bool hasRigidBody, 
             ItemObject itemObject, 
             ItemModifier itemModifier, 
@@ -58,9 +51,7 @@ namespace Missions.Services.Missiles.Message
             AgentGuid = agentGuid;
             Position = position;
             Velocity = velocity;
-            Orientations = orientationS;
-            Orientationf = orientationF;
-            Orientationu = orientationU;
+            Orientation = orientation;
             HasRigidBody = hasRigidBody;
             ItemObject = itemObject;
             ItemModifier = itemModifier;

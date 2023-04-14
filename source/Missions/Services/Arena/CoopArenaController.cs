@@ -209,7 +209,6 @@ namespace Missions.Services
             Random rand = new Random();
             MatrixFrame randomElement = spawnFrames[rand.Next(spawnFrames.Count)];
 
-
             // spawn an instance of the player (controlled by default)
             Agent player = SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
 
@@ -247,9 +246,6 @@ namespace Missions.Services
             {
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
-
-
-
             }, true);
             agent.FadeIn();
 
@@ -295,7 +291,6 @@ namespace Missions.Services
             // players is defender team
             Mission.Current.PlayerTeam = Mission.Current.DefenderTeam;
 
-
             // find areas of spawn
             List<MatrixFrame> spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
                                              select e.GetGlobalFrame()).ToList();
@@ -307,7 +302,6 @@ namespace Missions.Services
             }
             // get a random spawn point
             MatrixFrame randomElement = spawnFrames.GetRandomElement();
-
 
             // spawn an instance of the player (controlled by default)
             SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);

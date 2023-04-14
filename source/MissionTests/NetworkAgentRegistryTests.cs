@@ -51,11 +51,10 @@ namespace MissionTests
             NetPeer netPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
             networkAgentRegistry.RegisterNetworkControlledAgent(netPeer, remoteGuid, remoteAgent);
 
-            networkAgentRegistry.TryGetAgent(remoteGuid, out Agent remoteTestAgent);
-            networkAgentRegistry.TryGetAgentId(remoteTestAgent, out Guid remoteTestId);
+            networkAgentRegistry.TryGetAgent(remoteGuid, out Agent resolvedAgent);
 
-            Assert.Equal(remoteAgent, remoteTestAgent);
-            Assert.Equal(remoteAgent.Age, remoteTestAgent.Age);
+            Assert.Equal(remoteAgent, resolvedAgent);
+            Assert.Equal(remoteAgent.Age, resolvedAgent.Age);
         }
     }
 }

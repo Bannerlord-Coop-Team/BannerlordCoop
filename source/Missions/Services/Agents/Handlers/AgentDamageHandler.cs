@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Serialization;
@@ -6,6 +7,7 @@ using LiteNetLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Network;
+using Serilog;
 using System;
 using TaleWorlds.MountAndBlade;
 
@@ -23,6 +25,8 @@ namespace Missions.Services.Agents.Handlers
     {
         readonly INetworkAgentRegistry networkAgentRegistry;
         readonly INetworkMessageBroker networkMessageBroker;
+        readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
+
         public AgentDamageHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker) 
         {
             this.networkAgentRegistry = networkAgentRegistry;
@@ -50,7 +54,11 @@ namespace Missions.Services.Agents.Handlers
             // next, check if the attacker is one of ours, if not, no networking is needed (not our agent dealing damage)
             if (networkAgentRegistry.IsControlled(attackerId) == false) return;
 
-            networkAgentRegistry.TryGetAgentId(payload.What.VictimAgent, out Guid victimId);
+            if (networkAgentRegistry.TryGetAgentId(payload.What.VictimAgent, out Guid victimId) == false)
+            {
+                Logger.Warning("Unable to get id for {agent} in {class}", payload.What.VictimAgent, typeof(AgentDamageHandler));
+                return;
+            };
 
             NetworkAgentDamaged message = new NetworkAgentDamaged(
                 attackerId, 
