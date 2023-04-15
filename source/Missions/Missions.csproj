@@ -229,7 +229,7 @@
     <Compile Include="Services\Agents\Packets\AgentEquipmentData.cs" />
     <Compile Include="Services\Agents\Packets\AgentGroupController.cs" />
     <Compile Include="Services\Agents\Packets\AgentMountData.cs" />
-    <Compile Include="Services\Agents\Packets\MovementHandler.cs" />
+    <Compile Include="Services\Agents\Handlers\AgentMovementHandler.cs" />
     <Compile Include="Services\Agents\Patches\AgentInteractionPatches.cs" />
     <Compile Include="Services\BoardGames\Patches\BoardGamePatches.cs" />
     <Compile Include="Services\Pausing\Patches\PausePatch.cs" />

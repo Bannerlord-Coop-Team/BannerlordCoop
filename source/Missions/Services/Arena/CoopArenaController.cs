@@ -235,7 +235,11 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
+            // TODO revert
+            var testCharacter = CharacterObject.Find("forest_bandits_bandit");
+            Agent ai = SpawnAgent(randomElement.origin, testCharacter, false);
+
+            //Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
 
             agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
             agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);

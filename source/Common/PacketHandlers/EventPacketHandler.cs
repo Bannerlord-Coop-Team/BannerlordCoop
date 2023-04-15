@@ -39,7 +39,7 @@ namespace Common.PacketHandlers
 
             INetworkEvent @event = convertedPacket.Event;
 
-            Logger.Information("Received network event from {Peer} of {EventType}", peer, @event.GetType());
+            Logger.Information("Received network event from {Peer} of {EventType}", peer.EndPoint, @event.GetType().Name);
 
             Publish.MakeGenericMethod(@event.GetType()).Invoke(_messageBroker, new object[] { peer, @event });
         }

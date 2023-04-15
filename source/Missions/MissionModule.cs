@@ -9,7 +9,6 @@ using IntroServer.Config;
 using Missions.Messages;
 using Missions.Services;
 using Missions.Services.Agents.Handlers;
-using Missions.Services.Agents.Packets;
 using Missions.Services.Arena;
 using Missions.Services.BoardGames;
 using Missions.Services.Missiles.Handlers;
@@ -62,7 +61,7 @@ namespace Missions
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
             builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<MovementHandler>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<AgentMovementHandler>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<MissileHandler>().As<IMissileHandler>();
             builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>();
             builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>();

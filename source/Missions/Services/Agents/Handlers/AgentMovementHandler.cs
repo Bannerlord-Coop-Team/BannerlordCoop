@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using LiteNetLib;
+using Missions.Services.Agents.Packets;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
 using ProtoBuf;
@@ -11,10 +12,9 @@ using Serilog;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
-namespace Missions.Services.Agents.Packets
+namespace Missions.Services.Agents.Handlers
 {
     [ProtoContract]
     public readonly struct MovementPacket : IPacket
@@ -42,45 +42,45 @@ namespace Missions.Services.Agents.Packets
         }
     }
 
-    public class MovementHandler : IPacketHandler, IDisposable
+    public class AgentMovementHandler : IPacketHandler, IDisposable
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
 
         private readonly CancellationTokenSource m_AgentPollingCancelToken = new CancellationTokenSource();
         private readonly Task m_AgentPollingTask;
-        private readonly IPacketManager _packetManager;
-        private readonly INetwork _client;
-        private readonly IMessageBroker _messageBroker;
-        private readonly INetworkAgentRegistry _agentRegistry;
+        private readonly IPacketManager packetManager;
+        private readonly INetwork client;
+        private readonly IMessageBroker messageBroker;
+        private readonly INetworkAgentRegistry agentRegistry;
 
-        public MovementHandler(
-            INetwork client, 
-            IPacketManager packetManager, 
-            IMessageBroker messageBroker, 
+        public AgentMovementHandler(
+            INetwork client,
+            IPacketManager packetManager,
+            IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry)
         {
-            _packetManager = packetManager;
-            _client = client;
-            _messageBroker = messageBroker;
-            _agentRegistry = agentRegistry;
-            
+            this.packetManager = packetManager;
+            this.client = client;
+            this.messageBroker = messageBroker;
+            this.agentRegistry = agentRegistry;
 
-            _messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
 
-            _packetManager.RegisterPacketHandler(this);
+            this.messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
+
+            this.packetManager.RegisterPacketHandler(this);
 
             m_AgentPollingTask = Task.Factory.StartNew(PollAgents);
         }
 
-        ~MovementHandler()
+        ~AgentMovementHandler()
         {
             Dispose();
         }
 
         public void Dispose()
         {
-            _packetManager.RemovePacketHandler(this);
-            _messageBroker.Unsubscribe<PeerDisconnected>(Handle_PeerDisconnect);
+            packetManager.RemovePacketHandler(this);
+            messageBroker.Unsubscribe<PeerDisconnected>(Handle_PeerDisconnect);
             m_AgentPollingCancelToken.Cancel();
             m_AgentPollingTask.Wait();
         }
@@ -108,13 +108,13 @@ namespace Missions.Services.Agents.Packets
 
                 if (CurrentMission == null) continue;
 
-                foreach (Guid guid in _agentRegistry.ControlledAgents.Keys)
+                foreach (Guid guid in agentRegistry.ControlledAgents.Keys)
                 {
-                    Agent agent = _agentRegistry.ControlledAgents[guid];
+                    Agent agent = agentRegistry.ControlledAgents[guid];
                     if (agent.Mission != null)
                     {
                         MovementPacket packet = new MovementPacket(guid, agent);
-                        _client.SendAll(packet);
+                        client.SendAll(packet);
                     }
                 }
             }
@@ -122,7 +122,7 @@ namespace Missions.Services.Agents.Packets
 
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
-            if (_agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController agentGroupController))
+            if (agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController agentGroupController))
             {
                 MovementPacket movement = (MovementPacket)packet;
                 agentGroupController.ApplyMovement(movement);
@@ -137,13 +137,13 @@ namespace Missions.Services.Agents.Packets
 
             Logger.Debug("Handling disconnect for {peer}", peer);
 
-            if (_agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController controller))
+            if (agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
                 foreach (var agent in controller.ControlledAgents.Values)
                 {
                     GameLoopRunner.RunOnMainThread(() =>
                     {
-                        if(agent.Health > 0)
+                        if (agent.Health > 0)
                         {
                             agent.MakeDead(false, ActionIndexValueCache.act_none);
                             agent.FadeOut(false, true);
@@ -151,29 +151,8 @@ namespace Missions.Services.Agents.Packets
                     });
                 }
 
-                _agentRegistry.RemovePeer(peer);
+                agentRegistry.RemovePeer(peer);
             }
-        }
-
-        public static Vec2 InterpolatePosition(Vec2 controlInput, Vec3 rotation, Vec2 currentPosition, Vec2 newPosition)
-        {
-            Vec2 directionVector = newPosition - currentPosition;
-            double angle = Math.Atan2(rotation.y, rotation.x);
-            directionVector = Rotate(directionVector, angle);
-
-            return directionVector;
-        }
-
-        public static Vec2 Rotate(Vec2 v, double radians)
-        {
-            float sin = MathF.Sin((float)radians);
-            float cos = MathF.Cos((float)radians);
-
-            float tx = v.x;
-            float ty = v.y;
-            v.x = cos * tx - sin * ty;
-            v.y = sin * tx + cos * ty;
-            return v;
         }
     }
 }
