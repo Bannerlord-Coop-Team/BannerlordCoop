@@ -93,8 +93,6 @@ namespace IntroServer.Server
 
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
-            if (latency > 0)
-				_logger.LogDebug("Network latency update of {Latency} for {Peer}", latency, peer.EndPoint);
         }
 
         public void OnNetworkReceive(
