@@ -3,12 +3,18 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Serialization;
+using HarmonyLib;
+using JetBrains.Annotations;
 using LiteNetLib;
 using Missions.Messages;
+using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
 using Missions.Services.Agents.Patches;
 using Missions.Services.Arena;
+using Missions.Services.Missiles.Handlers;
+using Missions.Services.Missiles.Message;
+using Missions.Services.Missiles.Patches;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
 using Serilog;
@@ -21,6 +27,7 @@ using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using static TaleWorlds.MountAndBlade.Source.Objects.Siege.AgentPathNavMeshChecker;
 
 namespace Missions.Services
 {
@@ -37,6 +44,11 @@ namespace Missions.Services
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
         private readonly IBinaryPackageFactory packageFactory;
+        private readonly IMissileHandler _missileHandler;
+        private readonly IWeaponDropHandler _weaponDropHandler;
+        private readonly IWeaponPickupHandler _weaponPickupHandler;
+        private readonly IShieldDamageHandler _shieldDamageHandler;
+        private readonly IAgentDamageHandler _agentDamageHandler;
 
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
         private CharacterObject[] _gameCharacters;
@@ -46,19 +58,29 @@ namespace Missions.Services
             INetworkMessageBroker networkMessageBroker,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator,
-            IBinaryPackageFactory packageFactory)
+            IBinaryPackageFactory packageFactory,
+            IMissileHandler missileHandler,
+            IWeaponDropHandler weaponDropHandler,
+            IWeaponPickupHandler weaponPickupHandler,
+            IShieldDamageHandler shieldDamageHandler,
+            IAgentDamageHandler agentDamageHandler)
         {
             _networkMessageBroker = networkMessageBroker;
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
             this.packageFactory = packageFactory;
+            _missileHandler = missileHandler;
+            _weaponDropHandler = weaponDropHandler;
+            _weaponPickupHandler = weaponPickupHandler;
+            _shieldDamageHandler = shieldDamageHandler;
+            _agentDamageHandler = agentDamageHandler;
+
             _playerId = Guid.NewGuid();
 
             _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
-            _networkMessageBroker.Subscribe<AgentDamageData>(Handle_AgentDamage);
-            _networkMessageBroker.Subscribe<AgentShoot>(Handle_AgentShoot);
-            _networkMessageBroker.Subscribe<AgentDied>(Handler_AgentDeath);
+            _networkMessageBroker.Subscribe<AgentDied>(Handle_AgentDeath);
+
         }
 
         ~CoopArenaController()
@@ -72,81 +94,15 @@ namespace Missions.Services
 
             _networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
-            _networkMessageBroker.Unsubscribe<AgentDamageData>(Handle_AgentDamage);
-            _networkMessageBroker.Unsubscribe<AgentShoot>(Handle_AgentShoot);
-            _networkMessageBroker.Unsubscribe<AgentDied>(Handler_AgentDeath);
+            _networkMessageBroker.Unsubscribe<AgentDied>(Handle_AgentDeath);
         }
 
         public override void AfterStart()
         {
-            _gameCharacters = CharacterObject.All?.Where(x => 
-            x.IsHero == false && 
-            x.Age > 18 && 
-            x.BattleEquipments.Any(y => 
-                y.HasWeaponOfClass(WeaponClass.Bow) || 
-                y.HasWeaponOfClass(WeaponClass.Dagger) ||
-                y.HasWeaponOfClass(WeaponClass.Crossbow) || 
-                y.HasWeaponOfClass(WeaponClass.Javelin) || 
-                y.HasWeaponOfClass(WeaponClass.ThrowingAxe) || 
-                y.HasWeaponOfClass(WeaponClass.ThrowingKnife)) == false).ToArray(); //Remove all HasWeaponOfClass when bows are needed
+            _gameCharacters = CharacterObject.All?.Where(x =>
+            x.IsHero == false &&
+            x.Age > 18).ToArray();
             AddPlayerToArena();
-        }
-
-
-        /// <summary>
-        /// A network damage handler for an agent
-        /// </summary>
-        /// <param name="payload">AgentDamage Data which include Attacker GUID, Defender GUID, Blow and AttackCollisionData</param>
-        private void Handle_AgentDamage(MessagePayload<AgentDamageData> payload)
-        {
-            AgentDamageData agentDamaData = payload.What;
-
-            NetPeer netPeer = payload.Who as NetPeer;
-            
-
-            Agent effectedAgent = null;
-            Agent effectorAgent = null;
-            // grab the network registry group controller
-            _agentRegistry.OtherAgents.TryGetValue(netPeer, out AgentGroupController agentGroupController);
-
-            // start with the attack receiver
-            // first check if the receiver of the damage is one the sender's agents
-            if(agentGroupController != null && agentGroupController.ControlledAgents.ContainsKey(agentDamaData.VictimAgentId)) {
-                agentGroupController.ControlledAgents.TryGetValue(agentDamaData.VictimAgentId, out effectedAgent);
-            }
-            // otherwise next, check if it is one of our agents
-            else if (_agentRegistry.ControlledAgents.ContainsKey(agentDamaData.VictimAgentId))
-            {
-                _agentRegistry.ControlledAgents.TryGetValue(agentDamaData.VictimAgentId, out effectedAgent);
-            }
-            // now with the attacker
-            // check if the attacker is one of the senders (should always be true?)
-            if (agentGroupController != null && agentGroupController.ControlledAgents.ContainsKey(agentDamaData.AttackerAgentId))
-            {
-                agentGroupController.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
-            }
-            else if (_agentRegistry.ControlledAgents.ContainsKey(agentDamaData.AttackerAgentId))
-            {
-                _agentRegistry.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
-            }
-
-            if (effectedAgent == null) return;
-            if (effectorAgent == null) return;
-
-            // extract the blow
-            Blow b = agentDamaData.Blow;
-
-            // assign the blow owner from our own index
-            b.OwnerId = effectorAgent.Index;
-
-            // extract the collision data
-            AttackCollisionData collisionData = agentDamaData.AttackCollisionData;
-
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                // register a blow on the effected agent
-                effectedAgent.RegisterBlow(b, collisionData);
-            });            
         }
 
         private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)
@@ -161,6 +117,7 @@ namespace Missions.Services
             List<Vec3> unitPositions = new List<Vec3>();
             List<string> unitIdStrings = new List<string>();
             List<Guid> guids = new List<Guid>();
+            List<float> unitHealths = new List<float>();
             foreach (Guid agentId in _agentRegistry.ControlledAgents.Keys)
             {
                 Agent agent = _agentRegistry.ControlledAgents[agentId];
@@ -170,15 +127,15 @@ namespace Missions.Services
                 guids.Add(agentId);
                 unitPositions.Add(agent.Position);
                 unitIdStrings.Add(agent.Character.StringId);
+                unitHealths.Add(agent.Health);
             }
 
             Logger.Debug("Sending join request");
 
             bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
             Vec3 position = Agent.Main?.Position ?? default;
-
-            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, _playerId, position, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray());
-
+            float health = Agent.Main.Health;
+            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, _playerId, position, health, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray(), unitHealths.ToArray());
             _networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
@@ -197,73 +154,31 @@ namespace Missions.Services
 
             Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
-                joinInfo.CharacterObject.Name, newAgentId, 
+                joinInfo.CharacterObject.Name, newAgentId,
                 netPeer.EndPoint,
                 joinInfo.UnitIdString?.Length);
 
-            if(joinInfo.IsPlayerAlive)
+            if (joinInfo.IsPlayerAlive)
             {
-                Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true);
+                Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true, joinInfo.Equipment);
+                newAgent.Health = joinInfo.PlayerHealth;
+
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
             }
 
             for (int i = 0; i < joinInfo.UnitIdString?.Length; i++)
             {
                 Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
-                
+                tempAi.Health = joinInfo.UnitHealthList[i];
+
                 _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
             }
         }
 
-        public override void OnAgentShootMissile(
-            Agent shooterAgent, 
-            EquipmentIndex weaponIndex, 
-            Vec3 position, 
-            Vec3 velocity, 
-            Mat3 orientation, 
-            bool hasRigidBody, 
-            int forcedMissileIndex)
-        {
-            if (Agent.Main.Team.TeamAgents.Contains(shooterAgent))
-            {
-                _agentRegistry.TryGetAgentId(shooterAgent, out Guid shooterAgentGuid);
-                AgentShoot message = new AgentShoot(
-                    packageFactory, 
-                    shooterAgentGuid, 
-                    weaponIndex, 
-                    position, 
-                    velocity, 
-                    orientation, 
-                    hasRigidBody, 
-                    forcedMissileIndex);
-
-                _networkMessageBroker.PublishNetworkEvent(message);
-            }
-        }
-
-        private static MethodInfo OnAgentShootMissileMethod = typeof(Mission).GetMethod("OnAgentShootMissile", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static FieldInfo Mission_missiles = typeof(Mission).GetField("_missiles", BindingFlags.NonPublic | BindingFlags.Instance);
-        private void Handle_AgentShoot(MessagePayload<AgentShoot> payload)
-        {
-            _agentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController);
-
-            AgentShoot shot = payload.What;
-
-            OnAgentShootMissileMethod.Invoke(Mission.Current, new object[] { 
-                agentGroupController.ControlledAgents[shot.AgentGuid], 
-                shot.WeaponIndex, 
-                shot.Position,
-                shot.Velocity, 
-                shot.Orientation, 
-                shot.HasRigidBody, 
-                true, 
-                shot.ForcedMissileIndex });
-        }
-
-        private void Handler_AgentDeath(MessagePayload<AgentDied> obj)
+        private void Handle_AgentDeath(MessagePayload<AgentDied> obj)
         {
             Agent agent = obj.What.Agent;
-            if(_agentRegistry.TryGetAgentId(agent, out Guid agentId))
+            if (_agentRegistry.TryGetAgentId(agent, out Guid agentId))
             {
                 _agentRegistry.RemoveControlledAgent(agentId);
                 _agentRegistry.RemoveNetworkControlledAgent(agentId);
@@ -282,7 +197,7 @@ namespace Missions.Services
             Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
 
             spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
-                                             select e.GetGlobalFrame()).ToList();
+                           select e.GetGlobalFrame()).ToList();
             for (int i = 0; i < spawnFrames.Count; i++)
             {
                 MatrixFrame value = spawnFrames[i];
@@ -292,8 +207,7 @@ namespace Missions.Services
 
             // get a random spawn point
             Random rand = new Random();
-            MatrixFrame randomElement = spawnFrames[rand.Next(spawnFrames.Count)];  
-
+            MatrixFrame randomElement = spawnFrames[rand.Next(spawnFrames.Count)];
 
             // spawn an instance of the player (controlled by default)
             Agent player = SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
@@ -305,7 +219,6 @@ namespace Missions.Services
             _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
             _agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
         }
-
 
         private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);
         /// <summary>
@@ -323,7 +236,7 @@ namespace Missions.Services
             vec = vec.Normalized();
             Equipment generatedEquipment = _equipmentGenerator.CreateRandomEquipment(true);
             agentBuildData.Equipment(generatedEquipment);
-            Hero_BattleEquipment.SetValue(character.HeroObject, generatedEquipment); 
+            Hero_BattleEquipment.SetValue(character.HeroObject, generatedEquipment);
             agentBuildData.InitialDirection(vec);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(Agent.ControllerType.Player);
@@ -339,7 +252,7 @@ namespace Missions.Services
             return agent;
         }
 
-        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool isEnemy)
+        public Agent SpawnAgent(Vec3 startingPos, CharacterObject character, bool isEnemy, Equipment equipment = null)
         {
             AgentBuildData agentBuildData = new AgentBuildData(character);
             agentBuildData.BodyProperties(character.GetBodyPropertiesMax());
@@ -347,7 +260,7 @@ namespace Missions.Services
             agentBuildData.Team(isEnemy ? Mission.Current.PlayerEnemyTeam : Mission.Current.PlayerTeam);
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
-            agentBuildData.Equipment(character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment);
+            agentBuildData.Equipment(equipment ?? (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment));
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(isEnemy ? Agent.ControllerType.None : Agent.ControllerType.AI);
 
@@ -378,7 +291,6 @@ namespace Missions.Services
             // players is defender team
             Mission.Current.PlayerTeam = Mission.Current.DefenderTeam;
 
-
             // find areas of spawn
             List<MatrixFrame> spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
                                              select e.GetGlobalFrame()).ToList();
@@ -390,7 +302,6 @@ namespace Missions.Services
             }
             // get a random spawn point
             MatrixFrame randomElement = spawnFrames.GetRandomElement();
-
 
             // spawn an instance of the player (controlled by default)
             SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);

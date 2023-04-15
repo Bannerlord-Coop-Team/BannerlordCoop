@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 using ItemTypeEnum = TaleWorlds.Core.ItemObject.ItemTypeEnum;
 
 namespace Missions.Services.Arena
@@ -29,10 +30,10 @@ namespace Missions.Services.Arena
         private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
         private static readonly ItemTypeEnum[][] WeaponLoadouts = new ItemTypeEnum[][]
         {
-            new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon },
+            new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon, ItemTypeEnum.Thrown },
             new ItemTypeEnum[] { ItemTypeEnum.Polearm },
-            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, /*ItemTypeEnum.Thrown*/ },
-            //new ItemTypeEnum[] { ItemTypeEnum.Bow, ItemTypeEnum.Arrows, ItemTypeEnum.Thrown }, Both comments are for testing without missiles
+            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Thrown },
+            new ItemTypeEnum[] { ItemTypeEnum.Bow, ItemTypeEnum.Arrows, ItemTypeEnum.Thrown },
             new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
         };
 

@@ -4,6 +4,9 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Patches
 {
+    /// <summary>
+    /// Patch on OnHealthChanged to publish Agent deaths
+    /// </summary>
     [HarmonyPatch(typeof(Agent))]
     internal class AgentKilledPatch
     {

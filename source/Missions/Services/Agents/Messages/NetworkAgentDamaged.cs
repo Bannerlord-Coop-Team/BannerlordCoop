@@ -8,8 +8,11 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
 {
+    /// <summary>
+    /// External event for agent damage
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public class AgentDamageData : INetworkEvent
+    public class NetworkAgentDamaged : INetworkEvent
     {
 
         [ProtoMember(1)]
@@ -21,7 +24,7 @@ namespace Missions.Services.Agents.Messages
         [ProtoMember(4)]
         public AttackCollisionData AttackCollisionData { get; }
 
-        public AgentDamageData(
+        public NetworkAgentDamaged(
             Guid attackerAgentId,
             Guid victimAgentId, 
             AttackCollisionData attackCollisionData, 
