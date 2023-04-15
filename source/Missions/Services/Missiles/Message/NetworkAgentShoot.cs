@@ -34,6 +34,8 @@ namespace Missions.Services.Missiles.Message
         public float BaseSpeed { get; }
         [ProtoMember(11)]
         public float Speed { get; }
+        [ProtoMember(12)]
+        public bool SingleUse { get; }
 
         public NetworkAgentShoot(
             Guid agentGuid, 
@@ -46,7 +48,8 @@ namespace Missions.Services.Missiles.Message
             Banner banner, 
             int missileIndex, 
             float baseSpeed, 
-            float speed)
+            float speed,
+            bool singleUse)
         {
             AgentGuid = agentGuid;
             Position = position;
@@ -59,6 +62,7 @@ namespace Missions.Services.Missiles.Message
             MissileIndex = missileIndex;
             BaseSpeed = baseSpeed;
             Speed = speed;
+            SingleUse = singleUse;
         }
     }
 }
