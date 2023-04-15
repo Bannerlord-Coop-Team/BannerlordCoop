@@ -172,6 +172,8 @@ namespace Missions.Services
                     joinInfo.UnitHealthList[i],
                     joinInfo.UnitId[i]);
             }
+
+            networkMessageBroker.Publish(this, new PeerReady(netPeer));
         }
 
         private void SpawnAIAgent(
@@ -297,7 +299,7 @@ namespace Missions.Services
 
             if (agent.IsAIControlled)
             {
-                agent.SetWatchState(Agent.WatchState.Alarmed);
+                agent.SetWatchState(Agent.WatchState.Patrolling);
             }
 
             return agent;
