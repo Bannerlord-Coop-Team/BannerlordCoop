@@ -63,6 +63,9 @@ namespace Missions.Services.Missiles.Handlers
                 payload.What.ItemModifier, 
                 payload.What.Banner);
 
+            // Use consume a projectile from inventory
+            missionWeapon.ConsumeAmmo(1);
+
             GameLoopRunner.RunOnMainThread(() =>
             {
                 Mission.Current.AddCustomMissile(
