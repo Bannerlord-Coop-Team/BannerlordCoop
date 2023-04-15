@@ -148,16 +148,18 @@ namespace Missions.Services.Missiles.Handlers
             }
 
             weaponData.DeinitializeManagedPointers();
-            Mission.Missile missile1 = new Mission.Missile(Mission.Current, missileEntity);
-            missile1.ShooterAgent = shooter;
-            missile1.Weapon = missileWeapon;
-            missile1.MissionObjectToIgnore = null;
-            missile1.Index = num;
-            Mission.Missile missile2 = missile1;
+            Mission.Missile missile = new Mission.Missile(Mission.Current, missileEntity)
+            {
+                Index = num,
+                ShooterAgent = shooter,
+                Weapon = missileWeapon,
+            };
+
+            missileEntity.ManualInvalidate();
 
             var missiles = (Dictionary<int, Mission.Missile>)_missiles.GetValue(Mission.Current);
-
-            missiles.Add(num, missile2);
+            
+            missiles.Add(num, missile);
 
             if(indexMap.TryGetValue(shot.MissileIndex, out int idx))
             {
