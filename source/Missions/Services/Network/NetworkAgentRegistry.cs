@@ -253,7 +253,9 @@ namespace Missions.Services.Network
         {
             if (agent == null) return false;
 
-            if (ControlledAgents.ContainsKey(AgentToId[agent])) { return true; }
+            if (AgentToId.TryGetValue(agent, out var id) == false) return false;
+
+            if (ControlledAgents.ContainsKey(id)) { return true; }
             return false;
         }
 
