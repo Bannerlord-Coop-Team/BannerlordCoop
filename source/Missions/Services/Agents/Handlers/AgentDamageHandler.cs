@@ -6,6 +6,7 @@ using GameInterface.Serialization;
 using LiteNetLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
+using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Serilog;
@@ -24,14 +25,20 @@ namespace Missions.Services.Agents.Handlers
     /// <inheritdoc/>
     public class AgentDamageHandler : IAgentDamageHandler
     {
-        readonly INetworkAgentRegistry networkAgentRegistry;
-        readonly INetworkMessageBroker networkMessageBroker;
-        readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
+        private readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
 
-        public AgentDamageHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker) 
+        private readonly INetworkAgentRegistry networkAgentRegistry;
+        private readonly INetworkMessageBroker networkMessageBroker;
+        private readonly INetworkMissileRegistry networkMissileRegistry;
+
+        public AgentDamageHandler(
+            INetworkAgentRegistry networkAgentRegistry,
+            INetworkMessageBroker networkMessageBroker,
+            INetworkMissileRegistry networkMissileRegistry) 
         {
             this.networkAgentRegistry = networkAgentRegistry;
             this.networkMessageBroker = networkMessageBroker;
+            this.networkMissileRegistry = networkMissileRegistry;
 
             networkMessageBroker.Subscribe<AgentDamage>(AgentDamageSend);
             networkMessageBroker.Subscribe<NetworkAgentDamaged>(AgentDamageRecieve);
@@ -111,7 +118,9 @@ namespace Missions.Services.Agents.Handlers
 
             if (b.IsMissile)
             {
-                b.WeaponRecord.AffectorWeaponSlotOrMissileIndex = MissileHandler.MissileIndexMap[netPeer][b.WeaponRecord.AffectorWeaponSlotOrMissileIndex];
+                var peerIdx = b.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
+                networkMissileRegistry.TryGetIndex(netPeer, peerIdx, out int localIdx);
+                b.WeaponRecord.AffectorWeaponSlotOrMissileIndex = localIdx;
             }
 
             // assign the blow owner from our own index

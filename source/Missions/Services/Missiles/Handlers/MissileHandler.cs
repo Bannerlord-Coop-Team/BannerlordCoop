@@ -13,9 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.Engine;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using static TaleWorlds.MountAndBlade.Source.Objects.Siege.AgentPathNavMeshChecker;
 
 namespace Missions.Services.Missiles.Handlers
 {
@@ -34,7 +32,9 @@ namespace Missions.Services.Missiles.Handlers
         readonly INetworkAgentRegistry networkAgentRegistry;
         readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
 
-        public MissileHandler(INetworkMessageBroker networkMessageBroker, INetworkAgentRegistry networkAgentRegistry)
+        public MissileHandler(
+            INetworkMessageBroker networkMessageBroker,
+            INetworkAgentRegistry networkAgentRegistry)
         {
             this.networkMessageBroker = networkMessageBroker;
             this.networkAgentRegistry = networkAgentRegistry;
@@ -58,17 +58,10 @@ namespace Missions.Services.Missiles.Handlers
         private readonly static MethodInfo AddMissileAux = typeof(Mission).GetMethod("AddMissileAux", BindingFlags.NonPublic | BindingFlags.Instance);
         private readonly static FieldInfo _missiles = typeof(Mission).GetField("_missiles", BindingFlags.NonPublic | BindingFlags.Instance);
 
-        public readonly static Dictionary<NetPeer, Dictionary<int, int>> MissileIndexMap = new Dictionary<NetPeer, Dictionary<int, int>>();
-
         private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
         {
             var peer = (NetPeer)payload.Who;
             if (networkAgentRegistry.TryGetGroupController(peer, out AgentGroupController agentGroupController) == false) return;
-
-            if (MissileIndexMap.TryGetValue(peer, out var indexMap) == false){
-                indexMap = new Dictionary<int, int>();
-                MissileIndexMap.Add(peer, indexMap);
-            }
 
             NetworkAgentShoot shot = payload.What;
 
@@ -161,14 +154,7 @@ namespace Missions.Services.Missiles.Handlers
             
             missiles.Add(num, missile);
 
-            if(indexMap.TryGetValue(shot.MissileIndex, out int idx))
-            {
-                idx = num;
-            }
-            else
-            {
-                indexMap.Add(shot.MissileIndex, num);
-            }
+            networkMessageBroker.Publish(this, new PeerMissileAdded(peer, shot.MissileIndex, num));
 
             //GameLoopRunner.RunOnMainThread(() =>
             //{
