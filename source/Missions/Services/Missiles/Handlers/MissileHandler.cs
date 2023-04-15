@@ -58,9 +58,17 @@ namespace Missions.Services.Missiles.Handlers
         private readonly static MethodInfo AddMissileAux = typeof(Mission).GetMethod("AddMissileAux", BindingFlags.NonPublic | BindingFlags.Instance);
         private readonly static FieldInfo _missiles = typeof(Mission).GetField("_missiles", BindingFlags.NonPublic | BindingFlags.Instance);
 
+        public readonly static Dictionary<NetPeer, Dictionary<int, int>> MissileIndexMap = new Dictionary<NetPeer, Dictionary<int, int>>();
+
         private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
         {
-            if (networkAgentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController) == false) return;
+            var peer = (NetPeer)payload.Who;
+            if (networkAgentRegistry.TryGetGroupController(peer, out AgentGroupController agentGroupController) == false) return;
+
+            if (MissileIndexMap.TryGetValue(peer, out var indexMap) == false){
+                indexMap = new Dictionary<int, int>();
+                MissileIndexMap.Add(peer, indexMap);
+            }
 
             NetworkAgentShoot shot = payload.What;
 
@@ -84,7 +92,7 @@ namespace Missions.Services.Missiles.Handlers
                 WeaponStatsData weaponStatsData = missileWeapon.GetWeaponStatsDataForUsage(0);
                 var parameters = new object[]
                 {
-                    shot.MissileIndex,
+                    -1,
                     false,
                     shooter,
                     weaponData,
@@ -114,7 +122,7 @@ namespace Missions.Services.Missiles.Handlers
 
                 var parameters = new object[]
                 {
-                    shot.MissileIndex,
+                    -1,
                     false,
                     shooter,
                     weaponData,
@@ -139,8 +147,6 @@ namespace Missions.Services.Missiles.Handlers
                 missileEntity = (GameEntity)parameters.Last();
             }
 
-            
-
             weaponData.DeinitializeManagedPointers();
             Mission.Missile missile1 = new Mission.Missile(Mission.Current, missileEntity);
             missile1.ShooterAgent = shooter;
@@ -151,7 +157,9 @@ namespace Missions.Services.Missiles.Handlers
 
             var missiles = (Dictionary<int, Mission.Missile>)_missiles.GetValue(Mission.Current);
 
-            missiles.Add(shot.MissileIndex, missile2);
+            missiles.Add(num, missile2);
+
+            indexMap.Add(shot.MissileIndex, num);
 
             //GameLoopRunner.RunOnMainThread(() =>
             //{

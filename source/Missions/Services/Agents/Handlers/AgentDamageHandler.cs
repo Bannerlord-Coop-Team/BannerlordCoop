@@ -6,6 +6,7 @@ using GameInterface.Serialization;
 using LiteNetLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
+using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Serilog;
 using System;
@@ -108,6 +109,11 @@ namespace Missions.Services.Agents.Handlers
 
             // extract the blow
             Blow b = agentDamaData.Blow;
+
+            if (b.IsMissile)
+            {
+                b.WeaponRecord.AffectorWeaponSlotOrMissileIndex = MissileHandler.MissileIndexMap[netPeer][b.WeaponRecord.AffectorWeaponSlotOrMissileIndex];
+            }
 
             // assign the blow owner from our own index
             b.OwnerId = effectorAgent.Index;
