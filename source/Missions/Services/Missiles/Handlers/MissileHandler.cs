@@ -10,6 +10,7 @@ using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
@@ -73,7 +74,9 @@ namespace Missions.Services.Missiles.Handlers
                 shot.Banner);
 
             WeaponData weaponData = missileWeapon.GetWeaponData(true);
+
             GameEntity missileEntity = null;
+
             int num = 0;
 
             if (shot.SingleUse)
@@ -95,13 +98,15 @@ namespace Missions.Services.Missiles.Handlers
                     shot.HasRigidBody,
                     null,
                     false,
-                    missileEntity,
+                    null,
                 };
 
                 GameLoopRunner.RunOnMainThread(() =>
                 {
                     num = (int)AddMissileSingleUsageAux.Invoke(Mission.Current, parameters);
                 }, true);
+
+                missileEntity = (GameEntity)parameters.Last();
             }
             else
             {
@@ -123,14 +128,19 @@ namespace Missions.Services.Missiles.Handlers
                     shot.HasRigidBody,
                     null,
                     false,
-                    missileEntity,
+                    null,
                 };
 
                 GameLoopRunner.RunOnMainThread(() =>
                 {
                     num = (int)AddMissileAux.Invoke(Mission.Current, parameters);
                 }, true);
+
+                missileEntity = (GameEntity)parameters.Last();
             }
+
+            
+
             weaponData.DeinitializeManagedPointers();
             Mission.Missile missile1 = new Mission.Missile(Mission.Current, missileEntity);
             missile1.ShooterAgent = shooter;
@@ -141,7 +151,7 @@ namespace Missions.Services.Missiles.Handlers
 
             var missiles = (Dictionary<int, Mission.Missile>)_missiles.GetValue(Mission.Current);
 
-            missiles.Add(num, missile2);
+            missiles.Add(shot.MissileIndex, missile2);
 
             //GameLoopRunner.RunOnMainThread(() =>
             //{
