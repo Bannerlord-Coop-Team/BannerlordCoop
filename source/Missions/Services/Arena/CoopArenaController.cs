@@ -166,11 +166,34 @@ namespace Missions.Services
 
             for (int i = 0; i < joinInfo.UnitIdString?.Length; i++)
             {
-                Agent tempAi = SpawnAgent(joinInfo.UnitStartingPosition[i], CharacterObject.Find(joinInfo.UnitIdString[i]), true);
-                tempAi.Health = joinInfo.UnitHealthList[i];
-
-                agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.UnitId[i], tempAi);
+                SpawnAIAgent(
+                    netPeer,
+                    joinInfo.UnitIdString[i],
+                    joinInfo.UnitStartingPosition[i],
+                    joinInfo.UnitHealthList[i],
+                    joinInfo.UnitId[i]);
             }
+        }
+
+        private void SpawnAIAgent(
+            NetPeer controller, 
+            string characterStringId, 
+            Vec3 startingPos, 
+            float health, 
+            Guid unitId)
+        {
+            var AICharacter = CharacterObject.Find(characterStringId);
+
+            if (AICharacter == null)
+            {
+                Logger.Error("Could not find character with stringID: {stringid}", characterStringId);
+                return;
+            }
+
+            Agent tempAi = SpawnAgent(startingPos, AICharacter, true);
+            tempAi.Health = health;
+
+            agentRegistry.RegisterNetworkControlledAgent(controller, unitId, tempAi);
         }
 
         private void Handle_AgentDeath(MessagePayload<AgentDied> obj)
