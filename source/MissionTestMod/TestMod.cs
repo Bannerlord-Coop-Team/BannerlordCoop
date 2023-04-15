@@ -30,7 +30,6 @@ namespace MissionTestMod
     {
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
 
-        public static IContainer Container { get; private set; }
 
         private static ILogger Logger;
         private static UpdateableList Updateables { get; } = new UpdateableList();
@@ -67,8 +66,6 @@ namespace MissionTestMod
                     .MinimumLevel.Verbose();
             }
 
-            BuildContainer();
-
             harmony.PatchAll(typeof(MissionModule).Assembly);
 
             Logger = LogManager.GetLogger<TestMod>();
@@ -99,15 +96,17 @@ namespace MissionTestMod
             Logger.Verbose("Bannerlord Coop Mod loaded");
         }
 
-        private void BuildContainer()
+        private static IContainer BuildContainer()
         {
             ContainerBuilder builder = new ContainerBuilder();
 
             builder.RegisterModule<MissionModule>();
 
-            Container = builder.Build();
+            var container = builder.Build();
 
-            ContainerProvider.SetContainer(Container);
+            ContainerProvider.SetContainer(container);
+
+            return container;
         }
 
         protected override void OnSubModuleUnloaded()
@@ -159,6 +158,7 @@ namespace MissionTestMod
 
         private static void SelectSaveTavern()
         {
+            
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<MissionLoadGameGauntletScreen>(new object[]
                   {
                       new Action<SaveGameFileInfo>((SaveGameFileInfo saveGame)=>
@@ -170,13 +170,15 @@ namespace MissionTestMod
 
         private static void StartGameTavern(LoadResult loadResult)
         {
-            _gameManager = Container.Resolve<TavernsGameManager>(new NamedParameter("loadedGameResult", loadResult));
+            var container = BuildContainer();
+            _gameManager = container.Resolve<TavernsGameManager>(new NamedParameter("loadedGameResult", loadResult));
             _gameManager.StartGame();
         }
 
         private static void StartGameArena(LoadResult loadResult)
         {
-            _gameManager = Container.Resolve<ArenaTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
+            var container = BuildContainer();
+            _gameManager = container.Resolve<ArenaTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
             _gameManager.StartGame();
         }
     }
