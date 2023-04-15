@@ -65,6 +65,7 @@ namespace Missions.Messages
 
         private Equipment UpdateEquipment(Equipment inEquipment)
         {
+            if (Agent.Main == null) return null;
             for(int i = 0; i < 4; i++)
             {
                 MissionWeapon weapon = Agent.Main.Equipment[i];
