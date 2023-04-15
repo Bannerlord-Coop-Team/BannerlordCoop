@@ -159,7 +159,14 @@ namespace Missions.Services.Missiles.Handlers
 
             missiles.Add(num, missile2);
 
-            indexMap.Add(shot.MissileIndex, num);
+            if(indexMap.TryGetValue(shot.MissileIndex, out int idx))
+            {
+                idx = num;
+            }
+            else
+            {
+                indexMap.Add(shot.MissileIndex, num);
+            }
 
             //GameLoopRunner.RunOnMainThread(() =>
             //{
@@ -197,6 +204,8 @@ namespace Missions.Services.Missiles.Handlers
                     missionWeapon = payload.What.MissionWeapon.AmmoWeapon;
                     singleUse = false;
                 }
+
+                Logger.Debug("Sending Agent Shoot with index {idx}", payload.What.MissileIndex);
 
                 NetworkAgentShoot message = new NetworkAgentShoot( 
                     shooterAgentGuid, 

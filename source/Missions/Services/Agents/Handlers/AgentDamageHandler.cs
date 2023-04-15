@@ -76,7 +76,6 @@ namespace Missions.Services.Agents.Handlers
 
             NetPeer netPeer = payload.Who as NetPeer;
 
-
             Agent effectedAgent = null;
             Agent effectorAgent = null;
             // grab the network registry group controller
