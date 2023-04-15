@@ -98,6 +98,8 @@ namespace Missions.Services.Missiles.Handlers
                     missionWeapon = payload.What.MissionWeapon.AmmoWeapon;
                 }
 
+                Logger.Debug("Current weapon count {weapon count}", payload.What.MissionWeapon.WeaponsCount);
+
                 NetworkAgentShoot message = new NetworkAgentShoot( 
                     shooterAgentGuid, 
                     payload.What.Position, 
