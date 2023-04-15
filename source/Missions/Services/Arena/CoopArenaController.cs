@@ -43,12 +43,8 @@ namespace Missions.Services
         private readonly INetworkMessageBroker _networkMessageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
         private readonly IRandomEquipmentGenerator _equipmentGenerator;
-        private readonly IBinaryPackageFactory packageFactory;
-        private readonly IMissileHandler _missileHandler;
-        private readonly IWeaponDropHandler _weaponDropHandler;
-        private readonly IWeaponPickupHandler _weaponPickupHandler;
-        private readonly IShieldDamageHandler _shieldDamageHandler;
-        private readonly IAgentDamageHandler _agentDamageHandler;
+
+        private readonly IDisposable[] handlers;
 
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
         private CharacterObject[] _gameCharacters;
@@ -69,11 +65,15 @@ namespace Missions.Services
             _agentRegistry = agentRegistry;
             _equipmentGenerator = equipmentGenerator;
             this.packageFactory = packageFactory;
-            _missileHandler = missileHandler;
-            _weaponDropHandler = weaponDropHandler;
-            _weaponPickupHandler = weaponPickupHandler;
-            _shieldDamageHandler = shieldDamageHandler;
-            _agentDamageHandler = agentDamageHandler;
+
+            handlers = new IDisposable[]
+            {
+                missileHandler,
+                weaponDropHandler,
+                weaponPickupHandler,
+                shieldDamageHandler,
+                agentDamageHandler,
+            };
 
             _playerId = Guid.NewGuid();
 
@@ -91,6 +91,11 @@ namespace Missions.Services
         public void Dispose()
         {
             _agentRegistry.Clear();
+
+            foreach (var handler in handlers)
+            {
+                handler.Dispose();
+            }
 
             _networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);

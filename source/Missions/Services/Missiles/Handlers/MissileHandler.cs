@@ -53,7 +53,6 @@ namespace Missions.Services.Missiles.Handlers
         {
             if (networkAgentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController) == false) return;
 
-
             NetworkAgentShoot shot = payload.What;
 
             Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
@@ -100,8 +99,6 @@ namespace Missions.Services.Missiles.Handlers
                 {
                     missionWeapon = payload.What.MissionWeapon.AmmoWeapon;
                 }
-
-                Logger.Debug("Current weapon count {weapon count}", payload.What.MissionWeapon.WeaponsCount);
 
                 NetworkAgentShoot message = new NetworkAgentShoot( 
                     shooterAgentGuid, 
