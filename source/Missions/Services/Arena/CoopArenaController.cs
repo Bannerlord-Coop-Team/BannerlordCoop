@@ -3,18 +3,12 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Serialization;
-using HarmonyLib;
-using JetBrains.Annotations;
 using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Agents.Handlers;
-using Missions.Services.Agents.Messages;
-using Missions.Services.Agents.Packets;
 using Missions.Services.Agents.Patches;
 using Missions.Services.Arena;
 using Missions.Services.Missiles.Handlers;
-using Missions.Services.Missiles.Message;
-using Missions.Services.Missiles.Patches;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
 using Serilog;
@@ -27,7 +21,6 @@ using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using static TaleWorlds.MountAndBlade.Source.Objects.Siege.AgentPathNavMeshChecker;
 
 namespace Missions.Services
 {

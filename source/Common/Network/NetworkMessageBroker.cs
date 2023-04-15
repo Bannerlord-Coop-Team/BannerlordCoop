@@ -57,7 +57,7 @@ namespace Common.Network
         public void PublishNetworkEvent(INetworkEvent networkEvent)
         {
             System.Diagnostics.StackTrace trace = new System.Diagnostics.StackTrace();
-            Logger.Debug("Publishing {event} to all clients from {frame}", networkEvent.GetType().Name, trace.GetFrame(1));
+            Logger.Debug("Publishing {event} to all clients from {frame}", networkEvent.GetType().Name, trace);
 
             EventPacket eventPacket = new EventPacket(networkEvent);
 
