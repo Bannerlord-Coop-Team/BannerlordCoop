@@ -55,7 +55,7 @@ namespace Missions.Services.Missiles.Handlers
 
         private readonly static MethodInfo AddMissileSingleUsageAux = typeof(Mission).GetMethod("AddMissileSingleUsageAux", BindingFlags.NonPublic | BindingFlags.Instance);
         private readonly static MethodInfo AddMissileAux = typeof(Mission).GetMethod("AddMissileAux", BindingFlags.NonPublic | BindingFlags.Instance);
-        private readonly static FieldInfo _missles = typeof(Mission).GetField("_mission", BindingFlags.NonPublic | BindingFlags.Instance);
+        private readonly static FieldInfo _missles = typeof(Mission).GetField("_missles", BindingFlags.NonPublic | BindingFlags.Instance);
 
         private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
         {
