@@ -73,7 +73,6 @@ namespace Missions.Services
             this.networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             this.networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
             this.networkMessageBroker.Subscribe<AgentDied>(Handle_AgentDeath);
-
         }
 
         ~CoopArenaController()

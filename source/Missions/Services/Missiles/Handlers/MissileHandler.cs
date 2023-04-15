@@ -57,13 +57,12 @@ namespace Missions.Services.Missiles.Handlers
 
             Agent shooter = agentGroupController.ControlledAgents[shot.AgentGuid];
 
+            Logger.Debug("Firing missile with id {id}", shot.MissileIndex);
+
             MissionWeapon missionWeapon = new MissionWeapon(
                 payload.What.ItemObject, 
                 payload.What.ItemModifier, 
                 payload.What.Banner);
-
-            // Use consume a projectile from inventory
-            missionWeapon.Consume(1);
 
             GameLoopRunner.RunOnMainThread(() =>
             {
