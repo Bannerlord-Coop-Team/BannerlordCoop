@@ -83,6 +83,7 @@ namespace Missions.Services.Missiles.Handlers
             if (shot.SingleUse)
             {
                 WeaponStatsData weaponStatsData = missileWeapon.GetWeaponStatsDataForUsage(0);
+                weaponStatsData.ThrustDamage = 0;
                 var parameters = new object[]
                 {
                     -1,
@@ -112,6 +113,11 @@ namespace Missions.Services.Missiles.Handlers
             else
             {
                 WeaponStatsData[] weaponStatsData = missileWeapon.GetWeaponStatsData();
+
+                for(int i = 0; i < weaponStatsData.Length; i++)
+                {
+                    weaponStatsData[i].ThrustDamage = 0;
+                }
 
                 var parameters = new object[]
                 {
