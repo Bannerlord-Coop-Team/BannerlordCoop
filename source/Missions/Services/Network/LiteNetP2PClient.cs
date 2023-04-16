@@ -205,12 +205,14 @@ namespace Missions.Services.Network
             if(tokens.Length != 3)
             {
                 // Invalid token length
+                Logger.Error("Nat introduction token length was invalid");
                 return;
             }
 
             if (TokenToNatTypeMap.TryGetValue(tokens[0], out NatAddressType expectedNatType) == false)
             {
                 // String does not exist in map
+                Logger.Error("token value was {tokenVal} but something in {natTypes} was expected", tokens[0], TokenToNatTypeMap.Keys);
                 return;
             }
 
@@ -246,7 +248,7 @@ namespace Missions.Services.Network
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
         {
-
+            Logger.Error("Network error {socketError} sending to {endpoint}", socketError, endPoint);
         }
         
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)

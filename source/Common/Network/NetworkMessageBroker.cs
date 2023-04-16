@@ -47,7 +47,7 @@ namespace Common.Network
 
         public void PublishNetworkEvent(NetPeer peer, INetworkEvent networkEvent)
         {
-            Logger.Debug("Publishing {event} to {ip}", networkEvent.GetType().Name, peer.EndPoint);
+            Logger.Verbose("Publishing {event} to {ip}", networkEvent.GetType().Name, peer.EndPoint);
 
             EventPacket eventPacket = new EventPacket(networkEvent);
 
@@ -57,7 +57,7 @@ namespace Common.Network
         public void PublishNetworkEvent(INetworkEvent networkEvent)
         {
             System.Diagnostics.StackTrace trace = new System.Diagnostics.StackTrace();
-            Logger.Debug("Publishing {event} to all clients from {frame}", 
+            Logger.Verbose("Publishing {event} to all clients from {frame}", 
                 networkEvent.GetType().Name, 
                 trace.GetFrame(0).GetMethod().Name);
 

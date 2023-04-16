@@ -4,22 +4,24 @@ namespace Missions
 {
     public static class ContainerProvider
     {
-        private static IContainer container;
+        private static IContainer Container;
 
         public static void SetContainer(IContainer container) 
         {
             if (container == null) return;
 
-            ContainerProvider.container = container;
+            Container?.Dispose();
+
+            Container = container;
         }
 
         public static bool TryResolve<T>(out T resolvedObj)
         {
             resolvedObj = default;
 
-            if (container == null) return false;
+            if (Container == null) return false;
 
-            resolvedObj = container.Resolve<T>();
+            resolvedObj = Container.Resolve<T>();
 
             return true;
         }

@@ -53,20 +53,22 @@ namespace Missions.Services.Agents.Handlers
 
         private void WeaponPickupSend(MessagePayload<WeaponPickedup> obj)
         {
-            if (networkAgentRegistry.IsControlled(obj.What.Agent) == false) return;
+            var payload = obj.What;
 
-            if(networkAgentRegistry.TryGetAgentId(obj.What.Agent, out Guid agentId) == false)
+            if (networkAgentRegistry.IsControlled(payload.Agent) == false) return;
+
+            if(networkAgentRegistry.TryGetAgentId(payload.Agent, out Guid agentId) == false)
             {
-                Logger.Warning("No agentID was found for the Agent: {agent} in {class}", obj.What.Agent, typeof(WeaponPickupHandler));
+                Logger.Warning("No agentID was found for the Agent: {agent} in {class}", payload.Agent, typeof(WeaponPickupHandler));
                 return;
             }
 
             NetworkWeaponPickedup message = new NetworkWeaponPickedup(
-                agentId, 
-                obj.What.EquipmentIndex, 
-                obj.What.WeaponObject, 
-                obj.What.WeaponModifier, 
-                obj.What.Banner);
+                agentId,
+                payload.EquipmentIndex,
+                payload.WeaponObject,
+                payload.WeaponModifier,
+                payload.Banner);
 
             networkMessageBroker.PublishNetworkEvent(message);
         }
