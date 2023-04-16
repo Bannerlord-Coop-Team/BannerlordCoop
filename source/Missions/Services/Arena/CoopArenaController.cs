@@ -154,13 +154,25 @@ namespace Missions.Services
 
             Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
-                joinInfo.CharacterObject.Name, newAgentId,
+                joinInfo.CharacterObject.Name,
+                newAgentId,
                 netPeer.EndPoint,
                 joinInfo.UnitIdString?.Length);
 
             if (joinInfo.IsPlayerAlive)
             {
+                string[] weapons =
+                {
+                    joinInfo.Equipment[0].Item?.Name.ToString(),
+                    joinInfo.Equipment[1].Item?.Name.ToString(),
+                    joinInfo.Equipment[2].Item?.Name.ToString(),
+                    joinInfo.Equipment[3].Item?.Name.ToString(),
+                    joinInfo.Equipment[4].Item?.Name.ToString(),
+                };
+
+                Logger.Verbose("Recieved player with {weapons}", weapons);
                 Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true, joinInfo.Equipment);
+
                 newAgent.Health = joinInfo.PlayerHealth;
 
                 agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);

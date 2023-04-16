@@ -72,7 +72,7 @@ namespace Common
             _isRunning = false;
 
             // Cancel the cancellation token
-            _cts.Cancel();
+            _cts?.Cancel();
         }
     }
 }

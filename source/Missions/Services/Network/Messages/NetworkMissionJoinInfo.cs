@@ -1,9 +1,11 @@
 ﻿using Autofac;
+using Common.Logging;
 using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using ProtoBuf;
+using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -18,6 +20,8 @@ namespace Missions.Messages
     [ProtoContract(SkipConstructor = true)]
     public class NetworkMissionJoinInfo : INetworkEvent
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<NetworkMissionJoinInfo>();
+
         [ProtoMember(1)]
         public readonly Guid PlayerId;
         [ProtoMember(2)]
@@ -60,13 +64,37 @@ namespace Missions.Messages
             IsPlayerAlive = isPlayerAlive;
             PlayerHealth = health;
             Equipment = UpdateEquipment(characterObject.Equipment);
+
+            string[] weapons =
+            {
+                Equipment[0].Item?.Name.ToString(),
+                Equipment[1].Item?.Name.ToString(),
+                Equipment[2].Item?.Name.ToString(),
+                Equipment[3].Item?.Name.ToString(),
+                Equipment[4].Item?.Name.ToString(),
+            };
+
+            Logger.Verbose("Packaging equipment {weapons}", weapons);
+
             UnitHealthList = unitHealthList;
         }
 
         private Equipment UpdateEquipment(Equipment inEquipment)
         {
-            if (Agent.Main == null) return null;
-            for(int i = 0; i < 5; i++)
+            if (Agent.Main == null) return inEquipment;
+
+            string[] weapons =
+            {
+                Agent.Main.Equipment[0].Item?.Name.ToString(),
+                Agent.Main.Equipment[1].Item?.Name.ToString(),
+                Agent.Main.Equipment[2].Item?.Name.ToString(),
+                Agent.Main.Equipment[3].Item?.Name.ToString(),
+                Agent.Main.Equipment[4].Item?.Name.ToString(),
+            };
+
+            Logger.Verbose("Packaging equipment {weapons}", weapons);
+
+            for (int i = 0; i < 5; i++)
             {
                 MissionWeapon weapon = Agent.Main.Equipment[i];
                 inEquipment[i] = new EquipmentElement(weapon.Item, weapon.ItemModifier);
