@@ -83,7 +83,6 @@ namespace Missions.Services.Missiles.Handlers
             if (shot.SingleUse)
             {
                 WeaponStatsData weaponStatsData = missileWeapon.GetWeaponStatsDataForUsage(0);
-                weaponStatsData.ThrustDamage = 0;
                 var parameters = new object[]
                 {
                     -1,
@@ -113,11 +112,6 @@ namespace Missions.Services.Missiles.Handlers
             else
             {
                 WeaponStatsData[] weaponStatsData = missileWeapon.GetWeaponStatsData();
-
-                for(int i = 0; i < weaponStatsData.Length; i++)
-                {
-                    weaponStatsData[i].ThrustDamage = 0;
-                }
 
                 var parameters = new object[]
                 {
@@ -161,21 +155,6 @@ namespace Missions.Services.Missiles.Handlers
             missiles.Add(num, missile);
 
             networkMessageBroker.Publish(this, new PeerMissileAdded(peer, shot.MissileIndex, num));
-
-            //GameLoopRunner.RunOnMainThread(() =>
-            //{
-            //    Mission.Current.AddCustomMissile(
-            //        shooter, 
-            //        missileWeapon, 
-            //        shot.Position, 
-            //        shot.Velocity, 
-            //        shot.Orientation, 
-            //        shot.BaseSpeed,
-            //        shot.Speed, 
-            //        shot.HasRigidBody,
-            //        null, 
-            //        shot.MissileIndex);
-            //});
         }
 
         private void AgentShootSend(MessagePayload<AgentShoot> payload)

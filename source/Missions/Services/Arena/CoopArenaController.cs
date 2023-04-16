@@ -302,6 +302,7 @@ namespace Missions.Services
 
             if (agent.IsAIControlled)
             {
+                // TODO revert to Alerted
                 agent.SetWatchState(Agent.WatchState.Patrolling);
             }
 

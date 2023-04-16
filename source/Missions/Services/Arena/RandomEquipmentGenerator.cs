@@ -30,6 +30,7 @@ namespace Missions.Services.Arena
         private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
         private static readonly ItemTypeEnum[][] WeaponLoadouts = new ItemTypeEnum[][]
         {
+            // TODO uncomment
             //new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon, ItemTypeEnum.Thrown },
             //new ItemTypeEnum[] { ItemTypeEnum.Polearm },
             //new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Thrown },

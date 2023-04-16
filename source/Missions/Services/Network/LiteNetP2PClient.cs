@@ -254,11 +254,6 @@ namespace Missions.Services.Network
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
             _batchLogger.Log(packet.PacketType);
 
-            if(packet.PacketType == PacketType.Event)
-            {
-
-            }
-
             PacketManager.HandleRecieve(peer, packet);
         }
 

@@ -31,19 +31,7 @@ namespace Missions.Services.Agents.Patches
             MessageBroker.Instance.Publish(attacker, agentDamageData);
         }
     }
-    /// <summary>
-    /// Only allow damage from controlled agents
-    /// </summary>
-    [HarmonyPatch(typeof(Mission), "OnAgentHit")]
-    internal static class OnAgentHitPatch
-    {
-        private static bool Prefix(ref Agent affectorAgent)
-        {
-            if (!NetworkAgentRegistry.Instance.IsControlled(affectorAgent)) return false;
 
-            return true;
-        }
-    }
     /// <summary>
     /// Intercept when weapon hitpoints change to send to ShieldDamageHandler (only shields have health)
     /// </summary>
@@ -56,4 +44,51 @@ namespace Missions.Services.Agents.Patches
             NetworkMessageBroker.Instance.Publish(__instance, shieldDamage);
         }
     }
+
+    #region SkipPatches
+    [HarmonyPatch(typeof(Mission), "ChargeDamageCallback")]
+    public class ChargeDamageCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "FallDamageCallback")]
+    public class FallDamageCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "MeleeHitCallback")]
+    public class MeleeHitCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "MissileAreaDamageCallback")]
+    public class MissileAreaDamageCallbackPatch
+    {
+        private static bool Prefix(ref Agent shooterAgent)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(shooterAgent);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "MissileHitCallback")]
+    public class MissileHitCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+    #endregion
 }
