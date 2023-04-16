@@ -48,8 +48,8 @@ namespace Missions.Messages
             float health, 
             Guid[] unitId, 
             Vec3[] unitStartingPosition, 
-            string[] unitIdString, float[] 
-            unitHealthList)
+            string[] unitIdString,
+            float[] unitHealthList)
         {
             CharacterObject = characterObject;
             PlayerId = playerId;
@@ -66,7 +66,7 @@ namespace Missions.Messages
         private Equipment UpdateEquipment(Equipment inEquipment)
         {
             if (Agent.Main == null) return null;
-            for(int i = 0; i < 4; i++)
+            for(int i = 0; i < 5; i++)
             {
                 MissionWeapon weapon = Agent.Main.Equipment[i];
                 inEquipment[i] = new EquipmentElement(weapon.Item, weapon.ItemModifier);

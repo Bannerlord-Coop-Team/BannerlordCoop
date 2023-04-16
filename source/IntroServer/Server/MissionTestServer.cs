@@ -145,9 +145,20 @@ namespace IntroServer.Server
                 foreach (var existingPeer in _peerRegistry.GetPeersInInstance(instance))
                 {
                     var p2pSetting = existingPeer.ExternalAddr.Address == remoteEndPoint.Address ? "Internal" : "External";
+
+                    if(existingPeer.ExternalAddr.Address == remoteEndPoint.Address)
+                    {
+                        _logger.LogInformation("Connecting internally {LocalAgent} to {Peer}", localEndPoint, existingPeer.InternalAddr);
+                    }
+                    else
+                    {
+                        _logger.LogInformation("Connecting externally {LocalAgent} to {Peer}", remoteEndPoint, existingPeer.ExternalAddr);
+                    }
+
+
                     var newToken = string.Join("%", p2pSetting, token);
 
-                    _logger.LogInformation("Connecting {LocalAgent} to {Peer}", localEndPoint, existingPeer.InternalAddr);
+                    
                     _netManager.NatPunchModule.NatIntroduce(
                         existingPeer.InternalAddr, // host internal
                         existingPeer.ExternalAddr, // host external
