@@ -12,7 +12,7 @@ namespace Missions.Services.Agents.Patches
     {
         [HarmonyPatch(nameof(Agent.Die))]
         [HarmonyPostfix]
-        private static void OnHealthChanged(ref Agent __instance)
+        private static void OnDeath(ref Agent __instance)
         {
             if(__instance.Health <= 0)
             {

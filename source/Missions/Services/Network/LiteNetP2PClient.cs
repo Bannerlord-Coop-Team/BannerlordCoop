@@ -204,7 +204,7 @@ namespace Missions.Services.Network
 
             if(tokens.Length != 3)
             {
-                // Invalid token lenght
+                // Invalid token length
                 return;
             }
 
@@ -253,6 +253,12 @@ namespace Missions.Services.Network
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
             _batchLogger.Log(packet.PacketType);
+
+            if(packet.PacketType == PacketType.Event)
+            {
+
+            }
+
             PacketManager.HandleRecieve(peer, packet);
         }
 

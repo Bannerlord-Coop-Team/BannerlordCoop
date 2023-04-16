@@ -11,6 +11,7 @@ using Missions.Services;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.Arena;
 using Missions.Services.BoardGames;
+using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Services.Taverns;
@@ -58,9 +59,11 @@ namespace Missions
             // Interface classes
             builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
 
+            builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>();
+
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
-            builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<EventQueueManager>().As<IEventPacketHandler>().InstancePerLifetimeScope();
             builder.RegisterType<AgentMovementHandler>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<MissileHandler>().As<IMissileHandler>();
             builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>();

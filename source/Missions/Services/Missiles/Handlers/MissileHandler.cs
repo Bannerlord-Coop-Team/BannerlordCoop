@@ -13,9 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.Engine;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using static TaleWorlds.MountAndBlade.Source.Objects.Siege.AgentPathNavMeshChecker;
 
 namespace Missions.Services.Missiles.Handlers
 {
@@ -34,7 +32,9 @@ namespace Missions.Services.Missiles.Handlers
         readonly INetworkAgentRegistry networkAgentRegistry;
         readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
 
-        public MissileHandler(INetworkMessageBroker networkMessageBroker, INetworkAgentRegistry networkAgentRegistry)
+        public MissileHandler(
+            INetworkMessageBroker networkMessageBroker,
+            INetworkAgentRegistry networkAgentRegistry)
         {
             this.networkMessageBroker = networkMessageBroker;
             this.networkAgentRegistry = networkAgentRegistry;
@@ -60,7 +60,8 @@ namespace Missions.Services.Missiles.Handlers
 
         private void AgentShootRecieve(MessagePayload<NetworkAgentShoot> payload)
         {
-            if (networkAgentRegistry.TryGetGroupController(payload.Who as NetPeer, out AgentGroupController agentGroupController) == false) return;
+            var peer = (NetPeer)payload.Who;
+            if (networkAgentRegistry.TryGetGroupController(peer, out AgentGroupController agentGroupController) == false) return;
 
             NetworkAgentShoot shot = payload.What;
 
@@ -84,7 +85,7 @@ namespace Missions.Services.Missiles.Handlers
                 WeaponStatsData weaponStatsData = missileWeapon.GetWeaponStatsDataForUsage(0);
                 var parameters = new object[]
                 {
-                    shot.MissileIndex,
+                    -1,
                     false,
                     shooter,
                     weaponData,
@@ -114,7 +115,7 @@ namespace Missions.Services.Missiles.Handlers
 
                 var parameters = new object[]
                 {
-                    shot.MissileIndex,
+                    -1,
                     false,
                     shooter,
                     weaponData,
@@ -139,19 +140,21 @@ namespace Missions.Services.Missiles.Handlers
                 missileEntity = (GameEntity)parameters.Last();
             }
 
-            
-
             weaponData.DeinitializeManagedPointers();
-            Mission.Missile missile1 = new Mission.Missile(Mission.Current, missileEntity);
-            missile1.ShooterAgent = shooter;
-            missile1.Weapon = missileWeapon;
-            missile1.MissionObjectToIgnore = null;
-            missile1.Index = num;
-            Mission.Missile missile2 = missile1;
+            Mission.Missile missile = new Mission.Missile(Mission.Current, missileEntity)
+            {
+                Index = num,
+                ShooterAgent = shooter,
+                Weapon = missileWeapon,
+            };
+
+            missileEntity.ManualInvalidate();
 
             var missiles = (Dictionary<int, Mission.Missile>)_missiles.GetValue(Mission.Current);
+            
+            missiles.Add(num, missile);
 
-            missiles.Add(shot.MissileIndex, missile2);
+            networkMessageBroker.Publish(this, new PeerMissileAdded(peer, shot.MissileIndex, num));
 
             //GameLoopRunner.RunOnMainThread(() =>
             //{
@@ -189,6 +192,8 @@ namespace Missions.Services.Missiles.Handlers
                     missionWeapon = payload.What.MissionWeapon.AmmoWeapon;
                     singleUse = false;
                 }
+
+                Logger.Debug("Sending Agent Shoot with index {idx}", payload.What.MissileIndex);
 
                 NetworkAgentShoot message = new NetworkAgentShoot( 
                     shooterAgentGuid, 

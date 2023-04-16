@@ -1,4 +1,4 @@
-﻿namespace Missions.Services.Network
+﻿namespace Missions.Services.Network.Enums
 {
     public enum EDisconnectReason : byte
     {

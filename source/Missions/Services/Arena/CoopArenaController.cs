@@ -8,6 +8,7 @@ using Missions.Messages;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.Agents.Patches;
 using Missions.Services.Arena;
+using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
@@ -52,7 +53,8 @@ namespace Missions.Services
             IWeaponDropHandler weaponDropHandler,
             IWeaponPickupHandler weaponPickupHandler,
             IShieldDamageHandler shieldDamageHandler,
-            IAgentDamageHandler agentDamageHandler)
+            IAgentDamageHandler agentDamageHandler,
+            INetworkMissileRegistry networkMissileRegistry)
         {
             this.networkMessageBroker = networkMessageBroker;
             this.agentRegistry = agentRegistry;
@@ -66,6 +68,7 @@ namespace Missions.Services
                 weaponPickupHandler,
                 shieldDamageHandler,
                 agentDamageHandler,
+                networkMissileRegistry,
             };
 
             playerId = Guid.NewGuid();
@@ -172,6 +175,8 @@ namespace Missions.Services
                     joinInfo.UnitHealthList[i],
                     joinInfo.UnitId[i]);
             }
+
+            networkMessageBroker.Publish(this, new PeerReady(netPeer));
         }
 
         private void SpawnAIAgent(
@@ -297,7 +302,7 @@ namespace Missions.Services
 
             if (agent.IsAIControlled)
             {
-                agent.SetWatchState(Agent.WatchState.Alarmed);
+                agent.SetWatchState(Agent.WatchState.Patrolling);
             }
 
             return agent;
