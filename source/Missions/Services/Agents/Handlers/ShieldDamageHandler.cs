@@ -49,13 +49,10 @@ namespace Missions.Services.Agents.Handlers
         {
 
             if (networkAgentRegistry.TryGetAgentId(payload.What.Agent, out Guid agentId) == false) return;
-
-            if (networkAgentRegistry.IsControlled(agentId) == false) return;
-
             NetworkShieldDamaged message = new NetworkShieldDamaged(agentId, payload.What.EquipmentIndex, payload.What.InflictedDamage);
             networkMessageBroker.PublishNetworkEvent(message);
         }
-        private static readonly MethodInfo OnShieldDamaged = typeof(Agent).GetMethod("OnShieldDamage", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly MethodInfo OnShieldDamaged = typeof(Agent).GetMethod("OnShieldDamaged", BindingFlags.NonPublic | BindingFlags.Instance);
         private void ShieldDamageReceive(MessagePayload<NetworkShieldDamaged> payload)
         {
             if (networkAgentRegistry.TryGetAgent(payload.What.AgentGuid, out Agent agent) == false)
