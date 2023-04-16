@@ -156,6 +156,7 @@
     <Compile Include="Services\Agents\Messages\NetworkShieldBreak.cs" />
     <Compile Include="Services\Agents\Messages\NetworkWeaponDropped.cs" />
     <Compile Include="Services\Agents\Messages\NetworkWeaponPickedup.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkShieldDamaged.cs" />
     <Compile Include="Services\Agents\Messages\ShieldDamaged.cs" />
     <Compile Include="Services\Agents\Messages\WeaponPickedup.cs" />
     <Compile Include="Services\Agents\Messages\WeaponDropped.cs" />
@@ -163,6 +164,7 @@
     <Compile Include="MissionModule.cs" />
     <Compile Include="Services\Agents\Patches\AgentDropPatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentPickupPatch.cs" />
+    <Compile Include="Services\Agents\Patches\AgentShieldDamagePatch.cs" />
     <Compile Include="Services\Missiles\Handlers\MissileHandler.cs" />
     <Compile Include="Services\Missiles\Message\PeerMissileAdded.cs" />
     <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
