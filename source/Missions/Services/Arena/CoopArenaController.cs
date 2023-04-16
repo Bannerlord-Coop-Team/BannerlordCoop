@@ -239,11 +239,7 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            // TODO revert
-            var testCharacter = CharacterObject.Find("forest_bandits_bandit");
-            Agent ai = SpawnAgent(randomElement.origin, testCharacter, false);
-
-            //Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
+            Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
 
             agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
             agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
@@ -302,8 +298,7 @@ namespace Missions.Services
 
             if (agent.IsAIControlled)
             {
-                // TODO revert to Alerted
-                agent.SetWatchState(Agent.WatchState.Patrolling);
+                agent.SetWatchState(Agent.WatchState.Alarmed);
             }
 
             return agent;
