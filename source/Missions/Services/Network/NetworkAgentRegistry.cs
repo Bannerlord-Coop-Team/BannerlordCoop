@@ -12,6 +12,7 @@ using Serilog;
 using Common.Logging;
 using TaleWorlds.Core;
 using System.Security.Policy;
+using System.Collections.Concurrent;
 
 namespace Missions.Services.Network
 {
@@ -156,15 +157,15 @@ namespace Missions.Services.Network
 
         /// <inheritdoc/>
         public IReadOnlyDictionary<Agent, Guid> AgentToId => _agentToId;
-        private readonly Dictionary<Agent, Guid> _agentToId = new Dictionary<Agent, Guid>();
+        private readonly ConcurrentDictionary<Agent, Guid> _agentToId = new ConcurrentDictionary<Agent, Guid>();
 
         /// <inheritdoc/>
         public IReadOnlyDictionary<Guid, Agent> ControlledAgents => _controlledAgents;
-        private readonly Dictionary<Guid, Agent> _controlledAgents = new Dictionary<Guid, Agent>();
+        private readonly ConcurrentDictionary<Guid, Agent> _controlledAgents = new ConcurrentDictionary<Guid, Agent>();
 
         /// <inheritdoc/>
         public IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents => _otherAgents;
-        private readonly Dictionary<NetPeer, AgentGroupController> _otherAgents = new Dictionary<NetPeer, AgentGroupController>();
+        private readonly ConcurrentDictionary<NetPeer, AgentGroupController> _otherAgents = new ConcurrentDictionary<NetPeer, AgentGroupController>();
 
         /// <inheritdoc/>
         public bool RegisterControlledAgent(Guid agentId, Agent agent)
@@ -174,8 +175,8 @@ namespace Missions.Services.Network
             if (_agentToId.ContainsKey(agent)) return false;
             if (_controlledAgents.ContainsKey(agentId)) return false;
 
-            _controlledAgents.Add(agentId, agent);
-            _agentToId.Add(agent, agentId);
+            _controlledAgents.TryAdd(agentId, agent);
+            _agentToId.TryAdd(agent, agentId);
 
             return true;
         }
@@ -191,14 +192,14 @@ namespace Missions.Services.Network
                 if (controller.Contains(agentId)) return false;
 
                 controller.AddAgent(agentId, agent);
-                _agentToId.Add(agent, agentId);
+                _agentToId.TryAdd(agent, agentId);
             }
             else
             {
                 AgentGroupController newGroupController = new AgentGroupController();
                 newGroupController.AddAgent(agentId, agent);
-                _agentToId.Add(agent, agentId);
-                _otherAgents.Add(peer, newGroupController);
+                _agentToId.TryAdd(agent, agentId);
+                _otherAgents.TryAdd(peer, newGroupController);
             }
 
             return true;
@@ -209,8 +210,8 @@ namespace Missions.Services.Network
         {
             if (_controlledAgents.TryGetValue(agentId, out Agent agent))
             {
-                _controlledAgents.Remove(agentId);
-                return _agentToId.Remove(agent);
+                _controlledAgents.TryRemove(agentId, out var _);
+                return _agentToId.TryRemove(agent, out var _);
             }
             return false;
         }
@@ -223,7 +224,7 @@ namespace Missions.Services.Network
                 Agent agent = group.RemoveAgent(agentId);
                 if (agent != null)
                 {
-                    return _agentToId.Remove(agent);
+                    return _agentToId.TryRemove(agent, out var _);
                 }
                 else
                 {
@@ -238,8 +239,8 @@ namespace Missions.Services.Network
             bool result = true;
             if (_otherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
-                result &= controller.ControlledAgents.All(kvp => _agentToId.Remove(kvp.Value));
-                result &= _otherAgents.Remove(peer);
+                result &= controller.ControlledAgents.All(kvp => _agentToId.TryRemove(kvp.Value, out var _));
+                result &= _otherAgents.TryRemove(peer, out var _);
             }
             else
             {
