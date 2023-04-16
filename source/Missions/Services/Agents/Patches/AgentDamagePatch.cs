@@ -32,19 +32,6 @@ namespace Missions.Services.Agents.Patches
         }
     }
 
-    /// <summary>
-    /// Intercept when weapon hitpoints change to send to ShieldDamageHandler (only shields have health)
-    /// </summary>
-    [HarmonyPatch(typeof(Agent), nameof(Agent.ChangeWeaponHitPoints))]
-    public class ShieldDamagePatch
-    {
-        private static void Postfix(Agent __instance, EquipmentIndex slotIndex, short hitPoints)
-        {
-            ShieldDamaged shieldDamage = new ShieldDamaged(__instance, slotIndex, hitPoints);
-            NetworkMessageBroker.Instance.Publish(__instance, shieldDamage);
-        }
-    }
-
     #region SkipPatches
     [HarmonyPatch(typeof(Mission), "ChargeDamageCallback")]
     public class ChargeDamageCallbackPatch
