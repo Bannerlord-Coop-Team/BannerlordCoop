@@ -286,10 +286,10 @@ namespace Missions.Services
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(equipment ?? (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment));
-            if(equipment != null)
+            if(character.IsHero)
             {
                 MissionEquipment missionEquipment = new MissionEquipment();
-                missionEquipment.FillFrom(equipment, new Banner());
+                missionEquipment.FillFrom(equipment, character.HeroObject.ClanBanner);
                 agentBuildData.MissionEquipment(missionEquipment);
             }
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
