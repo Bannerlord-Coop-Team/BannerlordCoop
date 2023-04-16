@@ -16,7 +16,7 @@ namespace Missions.Services.Agents.Patches
     {
         private static void Postfix(Agent __instance, EquipmentIndex slotIndex, int inflictedDamage)
         {
-            if (NetworkAgentRegistry.Instance.IsControlled(__instance) == false) return;
+            if (NetworkAgentRegistry.Instance.IsControlled(__instance) == true) return;
             ShieldDamaged shieldDamage = new ShieldDamaged(__instance, slotIndex, inflictedDamage);
             MessageBroker.Instance.Publish(__instance, shieldDamage);
         }
