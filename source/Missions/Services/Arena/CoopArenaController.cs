@@ -286,6 +286,9 @@ namespace Missions.Services
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(equipment ?? (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment));
+            MissionEquipment missionEquipment = new MissionEquipment();
+            missionEquipment.FillFrom(equipment, new Banner());
+            agentBuildData.MissionEquipment(missionEquipment);
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(isEnemy ? Agent.ControllerType.None : Agent.ControllerType.AI);
 
