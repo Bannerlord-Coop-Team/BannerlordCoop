@@ -117,7 +117,7 @@ namespace Missions.Services
 
             List<AiAgentData> aiAgentDatas = new List<AiAgentData>();
 
-            foreach (Guid agentId in _agentRegistry.ControlledAgents.Keys)
+            foreach (Guid agentId in agentRegistry.ControlledAgents.Keys)
             {
                 Agent agent = agentRegistry.ControlledAgents[agentId];
 
@@ -142,12 +142,12 @@ namespace Missions.Services
             NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(
                 characterObject, 
                 isPlayerAlive, 
-                _playerId, 
+                playerId, 
                 position, 
                 health, 
                 aiAgentDatas.ToArray());
 
-            _networkMessageBroker.PublishNetworkEvent(peer, request);
+            networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
                 characterObject.Name, request.PlayerId, peer.EndPoint);
@@ -192,41 +192,31 @@ namespace Missions.Services
             for (int i = 0; i < joinInfo.AiAgentData.Length; i++)
             {
                 AiAgentData aiAgentData = joinInfo.AiAgentData[i];
-                SpawnAIAgent(
-                    netPeer,
-                    joinInfo.UnitIdString[i],
-                    joinInfo.UnitStartingPosition[i],
-                    joinInfo.UnitHealthList[i],
-                    joinInfo.UnitId[i]);
-                
-                _agentRegistry.RegisterNetworkControlledAgent(netPeer, aiAgentData.UnitId, tempAi);
+                SpawnAIAgent(netPeer, aiAgentData);
             }
 
             networkMessageBroker.Publish(this, new PeerReady(netPeer));
         }
 
         private void SpawnAIAgent(
-            NetPeer controller, 
-            string characterStringId, 
-            Vec3 startingPos, 
-            float health, 
-            Guid unitId)
+            NetPeer controller,
+            AiAgentData agentData)
         {
-            var AICharacter = CharacterObject.Find(characterStringId);
+            var AICharacter = CharacterObject.Find(agentData.UnitIdString);
 
             if (AICharacter == null)
             {
-                Logger.Error("Could not find character with stringID: {stringid}", characterStringId);
+                Logger.Error("Could not find character with stringID: {stringid}", agentData.UnitIdString);
                 return;
             }
 
-            Agent aiAgent = SpawnAgent(startingPos, AICharacter, true);
-            aiAgent.Health = health;
+            Agent aiAgent = SpawnAgent(agentData.UnitPosition, AICharacter, true);
+            aiAgent.Health = agentData.UnitHealth;
 
             // TODO revert
             aiAgent.SetWatchState(Agent.WatchState.Patrolling);
 
-            agentRegistry.RegisterNetworkControlledAgent(controller, unitId, aiAgent);
+            agentRegistry.RegisterNetworkControlledAgent(controller, agentData.UnitId, aiAgent);
         }
 
         private void Handle_AgentDeath(MessagePayload<AgentDied> obj)
@@ -239,7 +229,7 @@ namespace Missions.Services
             }
         }
 
-        public void AddPlayerToArena()
+        private void AddPlayerToArena()
         {
             // reset teams if any exists
             Mission.Current.ResetMission();
