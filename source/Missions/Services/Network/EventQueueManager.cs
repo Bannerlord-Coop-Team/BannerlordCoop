@@ -11,6 +11,10 @@ using System.Collections.Generic;
 
 namespace Missions.Services.Network
 {
+    /// <summary>
+    /// This class stores events from a connected client that are not ready to be processed,
+    /// When the client events can be processed this class will process those events
+    /// </summary>
     public class EventQueueManager : EventPacketHandler, IDisposable
     {
         private static readonly ILogger Logger = LogManager.GetLogger<EventQueueManager>();
