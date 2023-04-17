@@ -47,7 +47,7 @@ namespace Common.Network
 
         public void PublishNetworkEvent(NetPeer peer, INetworkEvent networkEvent)
         {
-            Logger.Verbose("Publishing {event} to {ip}", networkEvent.GetType().Name, peer.EndPoint);
+            Logger.Verbose("Publishing {event} to {ip}", networkEvent.GetType().Name, peer?.EndPoint);
 
             EventPacket eventPacket = new EventPacket(networkEvent);
 

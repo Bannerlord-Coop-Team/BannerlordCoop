@@ -13,11 +13,10 @@ namespace Missions.Services.Agents.Patches
     [HarmonyPatch(typeof(Agent), "DropItem")]
     public class AgentDropPatch
     {
-        static void Postfix(EquipmentIndex itemIndex, WeaponClass pickedUpItemType, Agent __instance)
+        static void Postfix(EquipmentIndex itemIndex, Agent __instance)
         {
             WeaponDropped message = new WeaponDropped(__instance, itemIndex);
             NetworkMessageBroker.Instance.Publish(__instance, message);
-
         }
     }
 }

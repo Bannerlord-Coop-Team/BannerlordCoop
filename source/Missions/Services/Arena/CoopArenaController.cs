@@ -206,10 +206,13 @@ namespace Missions.Services
                 return;
             }
 
-            Agent tempAi = SpawnAgent(startingPos, AICharacter, true);
-            tempAi.Health = health;
+            Agent aiAgent = SpawnAgent(startingPos, AICharacter, true);
+            aiAgent.Health = health;
 
-            agentRegistry.RegisterNetworkControlledAgent(controller, unitId, tempAi);
+            // TODO revert
+            aiAgent.SetWatchState(Agent.WatchState.Patrolling);
+
+            agentRegistry.RegisterNetworkControlledAgent(controller, unitId, aiAgent);
         }
 
         private void Handle_AgentDeath(MessagePayload<AgentDied> obj)
@@ -298,12 +301,6 @@ namespace Missions.Services
             agentBuildData.InitialDirection(Vec2.Forward);
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(equipment ?? (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment));
-            if(character.IsHero)
-            {
-                MissionEquipment missionEquipment = new MissionEquipment();
-                missionEquipment.FillFrom(equipment, character.HeroObject.ClanBanner);
-                agentBuildData.MissionEquipment(missionEquipment);
-            }
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
             agentBuildData.Controller(isEnemy ? Agent.ControllerType.None : Agent.ControllerType.AI);
 
@@ -313,11 +310,6 @@ namespace Missions.Services
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
             }, true);
-
-            if (agent.IsAIControlled)
-            {
-                agent.SetWatchState(Agent.WatchState.Alarmed);
-            }
 
             return agent;
         }

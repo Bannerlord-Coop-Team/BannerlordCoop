@@ -74,7 +74,7 @@ namespace Missions.Messages
                 Equipment[4].Item?.Name.ToString(),
             };
 
-            Logger.Verbose("Packaging equipment {weapons}", weapons);
+            Logger.Debug("Packaging equipment {weapons}", weapons);
 
             UnitHealthList = unitHealthList;
         }
@@ -82,17 +82,6 @@ namespace Missions.Messages
         private Equipment UpdateEquipment(Equipment inEquipment)
         {
             if (Agent.Main == null) return inEquipment;
-
-            string[] weapons =
-            {
-                Agent.Main.Equipment[0].Item?.Name.ToString(),
-                Agent.Main.Equipment[1].Item?.Name.ToString(),
-                Agent.Main.Equipment[2].Item?.Name.ToString(),
-                Agent.Main.Equipment[3].Item?.Name.ToString(),
-                Agent.Main.Equipment[4].Item?.Name.ToString(),
-            };
-
-            Logger.Verbose("Packaging equipment {weapons}", weapons);
 
             for (int i = 0; i < 5; i++)
             {

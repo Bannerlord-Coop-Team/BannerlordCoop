@@ -24,8 +24,10 @@ namespace Missions.Services.Agents.Patches
     {
         private static void Prefix(Agent attacker, Agent victim, Blow b, ref AttackCollisionData collisionData)
         {
+            if (NetworkAgentRegistry.Instance.IsControlled(attacker) == false) return;
+
             // construct a agent damage data
-            AgentDamage agentDamageData = new AgentDamage(attacker, victim, b, collisionData);
+            AgentDamaged agentDamageData = new AgentDamaged(attacker, victim, b, collisionData);
 
             // publish the event
             MessageBroker.Instance.Publish(attacker, agentDamageData);

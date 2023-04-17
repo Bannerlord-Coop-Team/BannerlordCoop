@@ -30,7 +30,6 @@ namespace MissionTestMod
     {
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
 
-
         private static ILogger Logger;
         private static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
@@ -68,8 +67,6 @@ namespace MissionTestMod
                     .WriteTo.File(filePath, outputTemplate: outputTemplate)
                     .MinimumLevel.Verbose();
             }
-
-            BuildContainer();
 
             harmony.PatchAll(typeof(MissionModule).Assembly);
 
@@ -173,12 +170,14 @@ namespace MissionTestMod
 
         private void StartGameTavern(LoadResult loadResult)
         {
+            BuildContainer();
             gameManager = container.Resolve<TavernsGameManager>(new NamedParameter("loadedGameResult", loadResult));
             gameManager.StartGame();
         }
 
         private void StartGameArena(LoadResult loadResult)
         {
+            BuildContainer();
             gameManager = container.Resolve<ArenaTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
             gameManager.StartGame();
         }
