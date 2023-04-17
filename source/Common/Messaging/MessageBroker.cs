@@ -61,10 +61,7 @@ namespace Common.Messaging
                             _subscribers[typeof(T)] : new ConcurrentList<WeakDelegate>();
             if (!delegates.Contains(subscription))
             {
-                lock (delegates)
-                {
-                    delegates.Add(subscription);
-                }
+                delegates.Add(subscription);
             }
             _subscribers[typeof(T)] = delegates;
         }
