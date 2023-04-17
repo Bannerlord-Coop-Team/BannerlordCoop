@@ -11,6 +11,7 @@ using Missions.Services.Arena;
 using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
+using Missions.Services.Network.Data;
 using Missions.Services.Network.Messages;
 using Serilog;
 using System;
@@ -114,20 +115,22 @@ namespace Missions.Services
         {
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
 
-            List<Vec3> unitPositions = new List<Vec3>();
-            List<string> unitIdStrings = new List<string>();
-            List<Guid> guids = new List<Guid>();
-            List<float> unitHealths = new List<float>();
-            foreach (Guid agentId in agentRegistry.ControlledAgents.Keys)
+            List<AiAgentData> aiAgentDatas = new List<AiAgentData>();
+
+            foreach (Guid agentId in _agentRegistry.ControlledAgents.Keys)
             {
                 Agent agent = agentRegistry.ControlledAgents[agentId];
 
                 if (agent == Agent.Main) continue;
 
-                guids.Add(agentId);
-                unitPositions.Add(agent.Position);
-                unitIdStrings.Add(agent.Character.StringId);
-                unitHealths.Add(agent.Health);
+                AiAgentData aiAgentData = new AiAgentData(
+                    agentId, 
+                    agent.Position, 
+                    agent.Character.StringId, 
+                    agent.Health);
+
+
+                aiAgentDatas.Add(aiAgentData);
             }
 
             Logger.Debug("Sending join request");
@@ -135,8 +138,16 @@ namespace Missions.Services
             bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
             Vec3 position = Agent.Main?.Position ?? default;
             float health = Agent.Main?.Health ?? 0;
-            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(characterObject, isPlayerAlive, playerId, position, health, guids.ToArray(), unitPositions.ToArray(), unitIdStrings.ToArray(), unitHealths.ToArray());
-            networkMessageBroker.PublishNetworkEvent(peer, request);
+
+            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(
+                characterObject, 
+                isPlayerAlive, 
+                _playerId, 
+                position, 
+                health, 
+                aiAgentDatas.ToArray());
+
+            _networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
                 characterObject.Name, request.PlayerId, peer.EndPoint);
@@ -157,7 +168,7 @@ namespace Missions.Services
                 joinInfo.CharacterObject.Name,
                 newAgentId,
                 netPeer.EndPoint,
-                joinInfo.UnitIdString?.Length);
+                joinInfo.AiAgentData.Length);
 
             if (joinInfo.IsPlayerAlive)
             {
@@ -178,14 +189,17 @@ namespace Missions.Services
                 agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
             }
 
-            for (int i = 0; i < joinInfo.UnitIdString?.Length; i++)
+            for (int i = 0; i < joinInfo.AiAgentData.Length; i++)
             {
+                AiAgentData aiAgentData = joinInfo.AiAgentData[i];
                 SpawnAIAgent(
                     netPeer,
                     joinInfo.UnitIdString[i],
                     joinInfo.UnitStartingPosition[i],
                     joinInfo.UnitHealthList[i],
                     joinInfo.UnitId[i]);
+                
+                _agentRegistry.RegisterNetworkControlledAgent(netPeer, aiAgentData.UnitId, tempAi);
             }
 
             networkMessageBroker.Publish(this, new PeerReady(netPeer));

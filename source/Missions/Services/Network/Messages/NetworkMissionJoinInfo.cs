@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using Missions.Services.Network.Data;
 using ProtoBuf;
 using Serilog;
 using System;
@@ -27,42 +28,29 @@ namespace Missions.Messages
         [ProtoMember(3)]
         public readonly CharacterObject CharacterObject;
         [ProtoMember(4)]
-        public readonly Guid[] UnitId;
-        [ProtoMember(5)]
-        public readonly Vec3[] UnitStartingPosition;
-        [ProtoMember(6)]
-        public readonly string[] UnitIdString;
-        [ProtoMember(7)]
         public readonly bool IsPlayerAlive;
-        [ProtoMember(8)]
+        [ProtoMember(5)]
         public readonly Equipment Equipment;
-        [ProtoMember(9)]
-        public readonly float[] UnitHealthList;
-
-        [ProtoMember(10)]
+        [ProtoMember(6)]
         public readonly float PlayerHealth;
+        [ProtoMember(7)]
+        public readonly AiAgentData[] AiAgentData;
 
         public NetworkMissionJoinInfo(
             CharacterObject characterObject, 
             bool isPlayerAlive, 
             Guid playerId, 
             Vec3 startingPosition, 
-            float health, 
-            Guid[] unitId, 
-            Vec3[] unitStartingPosition, 
-            string[] unitIdString,
-            float[] unitHealthList)
+            float health,
+            AiAgentData[] aiAgentDatas)
         {
             CharacterObject = characterObject;
             PlayerId = playerId;
             StartingPosition = startingPosition;
-            UnitId = unitId;
-            UnitStartingPosition = unitStartingPosition;
-            UnitIdString = unitIdString;
             IsPlayerAlive = isPlayerAlive;
             PlayerHealth = health;
             Equipment = UpdateEquipment(characterObject.Equipment);
-            UnitHealthList = unitHealthList;
+            AiAgentData = aiAgentDatas;
         }
 
         private Equipment UpdateEquipment(Equipment inEquipment)
