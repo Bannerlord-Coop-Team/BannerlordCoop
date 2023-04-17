@@ -154,13 +154,25 @@ namespace Missions.Services
 
             Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
-                joinInfo.CharacterObject.Name, newAgentId,
+                joinInfo.CharacterObject.Name,
+                newAgentId,
                 netPeer.EndPoint,
                 joinInfo.UnitIdString?.Length);
 
             if (joinInfo.IsPlayerAlive)
             {
+                string[] weapons =
+                {
+                    joinInfo.Equipment[0].Item?.Name.ToString(),
+                    joinInfo.Equipment[1].Item?.Name.ToString(),
+                    joinInfo.Equipment[2].Item?.Name.ToString(),
+                    joinInfo.Equipment[3].Item?.Name.ToString(),
+                    joinInfo.Equipment[4].Item?.Name.ToString(),
+                };
+
+                Logger.Verbose("Recieved player with {weapons}", weapons);
                 Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true, joinInfo.Equipment);
+
                 newAgent.Health = joinInfo.PlayerHealth;
 
                 agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
@@ -194,10 +206,13 @@ namespace Missions.Services
                 return;
             }
 
-            Agent tempAi = SpawnAgent(startingPos, AICharacter, true);
-            tempAi.Health = health;
+            Agent aiAgent = SpawnAgent(startingPos, AICharacter, true);
+            aiAgent.Health = health;
 
-            agentRegistry.RegisterNetworkControlledAgent(controller, unitId, tempAi);
+            // TODO revert
+            aiAgent.SetWatchState(Agent.WatchState.Patrolling);
+
+            agentRegistry.RegisterNetworkControlledAgent(controller, unitId, aiAgent);
         }
 
         private void Handle_AgentDeath(MessagePayload<AgentDied> obj)
@@ -239,11 +254,7 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            // TODO revert
-            var testCharacter = CharacterObject.Find("forest_bandits_bandit");
-            Agent ai = SpawnAgent(randomElement.origin, testCharacter, false);
-
-            //Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
+            Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
 
             agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
             agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
@@ -299,11 +310,6 @@ namespace Missions.Services
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
             }, true);
-
-            if (agent.IsAIControlled)
-            {
-                agent.SetWatchState(Agent.WatchState.Patrolling);
-            }
 
             return agent;
         }

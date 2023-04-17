@@ -33,7 +33,7 @@ namespace Missions.Services.Missiles
 
         private readonly IMessageBroker messageBroker;
 
-        private readonly Dictionary<NetPeer, PeerMissileIndexMap> peerMissileRegistries = new Dictionary<NetPeer, PeerMissileIndexMap>();
+        private readonly Dictionary<int, PeerMissileIndexMap> peerMissileRegistries = new Dictionary<int, PeerMissileIndexMap>();
 
         public NetworkMissileRegistry(IMessageBroker messageBroker)
         {
@@ -60,14 +60,14 @@ namespace Missions.Services.Missiles
         {
             var peer = obj.What.Peer;
 
-            peerMissileRegistries.Add(peer, new PeerMissileIndexMap(peer));
+            peerMissileRegistries.Add(peer.Id, new PeerMissileIndexMap(peer.Id));
         }
 
         private void Handle_PeerMissileAdded(MessagePayload<PeerMissileAdded> obj)
         {
             var payload = obj.What;
             var peer = payload.Peer;
-            if (peerMissileRegistries.TryGetValue(peer, out var peerMissileRegistry))
+            if (peerMissileRegistries.TryGetValue(peer.Id, out var peerMissileRegistry))
             {
 
                 peerMissileRegistry.RegisterIndex(payload.PeerMissileId, payload.LocalMissileId);
@@ -82,7 +82,7 @@ namespace Missions.Services.Missiles
         public bool TryGetIndex(NetPeer peer, int peerIdx, out int localIdx)
         {
             localIdx = -1;
-            if (peerMissileRegistries.TryGetValue(peer, out var peerMissileRegistry) == false)
+            if (peerMissileRegistries.TryGetValue(peer.Id, out var peerMissileRegistry) == false)
             {
                 return false;
             }
@@ -97,11 +97,11 @@ namespace Missions.Services.Missiles
         /// </summary>
         internal class PeerMissileIndexMap
         {
-            public readonly NetPeer Peer;
+            public readonly int PeerId;
 
-            public PeerMissileIndexMap(NetPeer peer)
+            public PeerMissileIndexMap(int peerId)
             {
-                Peer = peer;
+                PeerId = peerId;
             }
 
             private readonly Dictionary<int, int> missileIndexMap = new Dictionary<int, int>();

@@ -155,21 +155,6 @@ namespace Missions.Services.Missiles.Handlers
             missiles.Add(num, missile);
 
             networkMessageBroker.Publish(this, new PeerMissileAdded(peer, shot.MissileIndex, num));
-
-            //GameLoopRunner.RunOnMainThread(() =>
-            //{
-            //    Mission.Current.AddCustomMissile(
-            //        shooter, 
-            //        missileWeapon, 
-            //        shot.Position, 
-            //        shot.Velocity, 
-            //        shot.Orientation, 
-            //        shot.BaseSpeed,
-            //        shot.Speed, 
-            //        shot.HasRigidBody,
-            //        null, 
-            //        shot.MissileIndex);
-            //});
         }
 
         private void AgentShootSend(MessagePayload<AgentShoot> payload)

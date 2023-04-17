@@ -30,12 +30,14 @@ namespace MissionTestMod
     {
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
 
-
         private static ILogger Logger;
         private static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
         private static InitialStateOption JoinArena;
-        private static IMissionGameManager _gameManager;
+
+        private IMissionGameManager gameManager;
+
+        private IContainer container;
 
         protected override void OnSubModuleLoad()
         {
@@ -96,17 +98,15 @@ namespace MissionTestMod
             Logger.Verbose("Bannerlord Coop Mod loaded");
         }
 
-        private static IContainer BuildContainer()
+        private void BuildContainer()
         {
             ContainerBuilder builder = new ContainerBuilder();
 
             builder.RegisterModule<MissionModule>();
 
-            var container = builder.Build();
+            container = builder.Build();
 
             ContainerProvider.SetContainer(container);
-
-            return container;
         }
 
         protected override void OnSubModuleUnloaded()
@@ -144,7 +144,7 @@ namespace MissionTestMod
             Updateables.UpdateAll(frameTime);
         }
 
-        private static void SelectSaveArena()
+        private void SelectSaveArena()
         {
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<MissionLoadGameGauntletScreen>(new object[]
                   {
@@ -156,7 +156,7 @@ namespace MissionTestMod
         }
 
 
-        private static void SelectSaveTavern()
+        private void SelectSaveTavern()
         {
             
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<MissionLoadGameGauntletScreen>(new object[]
@@ -168,18 +168,18 @@ namespace MissionTestMod
                   }));
         }
 
-        private static void StartGameTavern(LoadResult loadResult)
+        private void StartGameTavern(LoadResult loadResult)
         {
-            var container = BuildContainer();
-            _gameManager = container.Resolve<TavernsGameManager>(new NamedParameter("loadedGameResult", loadResult));
-            _gameManager.StartGame();
+            BuildContainer();
+            gameManager = container.Resolve<TavernsGameManager>(new NamedParameter("loadedGameResult", loadResult));
+            gameManager.StartGame();
         }
 
-        private static void StartGameArena(LoadResult loadResult)
+        private void StartGameArena(LoadResult loadResult)
         {
-            var container = BuildContainer();
-            _gameManager = container.Resolve<ArenaTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
-            _gameManager.StartGame();
+            BuildContainer();
+            gameManager = container.Resolve<ArenaTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
+            gameManager.StartGame();
         }
     }
 }

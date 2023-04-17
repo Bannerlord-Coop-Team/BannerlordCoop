@@ -6,6 +6,8 @@ using Missions.Services.Network;
 using Serilog;
 using Serilog.Core;
 using System;
+using System.Reflection;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
@@ -24,13 +26,13 @@ namespace Missions.Services.Agents.Handlers
         readonly INetworkMessageBroker networkMessageBroker;
         readonly static ILogger Logger = LogManager.GetLogger<ShieldDamageHandler>();
 
-        public ShieldDamageHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker) 
+        public ShieldDamageHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker)
         {
             this.networkAgentRegistry = networkAgentRegistry;
             this.networkMessageBroker = networkMessageBroker;
 
-            networkMessageBroker.Subscribe<ShieldDamaged>(ShieldBreakSend);
-            networkMessageBroker.Subscribe<NetworkShieldBreak>(ShieldBreakRecieve);
+            networkMessageBroker.Subscribe<ShieldDamaged>(ShieldDamageSend);
+            networkMessageBroker.Subscribe<NetworkShieldDamaged>(ShieldDamageReceive);
         }
         ~ShieldDamageHandler()
         {
@@ -39,24 +41,19 @@ namespace Missions.Services.Agents.Handlers
 
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<ShieldDamaged>(ShieldBreakSend);
-            networkMessageBroker.Unsubscribe<NetworkShieldBreak>(ShieldBreakRecieve);
+            networkMessageBroker.Unsubscribe<ShieldDamaged>(ShieldDamageSend);
+            networkMessageBroker.Unsubscribe<NetworkShieldDamaged>(ShieldDamageReceive);
         }
 
-        private void ShieldBreakSend(MessagePayload<ShieldDamaged> payload)
+        private void ShieldDamageSend(MessagePayload<ShieldDamaged> payload)
         {
-            if (payload.What.Hitpoints > 0) return;
 
             if (networkAgentRegistry.TryGetAgentId(payload.What.Agent, out Guid agentId) == false) return;
-
-            if (networkAgentRegistry.IsControlled(agentId) == false) return;
-
-            NetworkShieldBreak message = new NetworkShieldBreak(agentId, payload.What.EquipmentIndex);
-
+            NetworkShieldDamaged message = new NetworkShieldDamaged(agentId, payload.What.EquipmentIndex, payload.What.InflictedDamage);
             networkMessageBroker.PublishNetworkEvent(message);
         }
-
-        private void ShieldBreakRecieve(MessagePayload<NetworkShieldBreak> payload)
+        private static readonly MethodInfo OnShieldDamaged = typeof(Agent).GetMethod("OnShieldDamaged", BindingFlags.NonPublic | BindingFlags.Instance);
+        private void ShieldDamageReceive(MessagePayload<NetworkShieldDamaged> payload)
         {
             if (networkAgentRegistry.TryGetAgent(payload.What.AgentGuid, out Agent agent) == false)
             {
@@ -69,8 +66,8 @@ namespace Missions.Services.Agents.Handlers
                 Logger.Warning("Equipment Index for {agent} is already empty in {class}", agent, typeof(ShieldDamageHandler));
                 return;
             }
+            OnShieldDamaged.Invoke(agent, new object[] { payload.What.EquipmentIndex, payload.What.InflictedDamage });
 
-            agent.RemoveEquippedWeapon(payload.What.EquipmentIndex);
         }
     }
 }

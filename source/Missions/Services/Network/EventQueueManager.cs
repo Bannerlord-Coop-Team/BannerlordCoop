@@ -40,6 +40,9 @@ namespace Missions.Services.Network
                 return;
             }
 
+            // Peer is already ready, there is no need to process prejoin event queue
+            if (ReadyPeers[peer] == true) return;
+
             if(Queues.ContainsKey(peer) == false)
             {
                 Logger.Error("Tried to process queue for peer that was " +

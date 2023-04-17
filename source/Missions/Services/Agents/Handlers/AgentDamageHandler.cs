@@ -40,7 +40,7 @@ namespace Missions.Services.Agents.Handlers
             this.networkMessageBroker = networkMessageBroker;
             this.networkMissileRegistry = networkMissileRegistry;
 
-            networkMessageBroker.Subscribe<AgentDamage>(AgentDamageSend);
+            networkMessageBroker.Subscribe<AgentDamaged>(AgentDamageSend);
             networkMessageBroker.Subscribe<NetworkAgentDamaged>(AgentDamageRecieve);
         }
         ~AgentDamageHandler()
@@ -49,11 +49,11 @@ namespace Missions.Services.Agents.Handlers
         }
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<AgentDamage>(AgentDamageSend);
+            networkMessageBroker.Unsubscribe<AgentDamaged>(AgentDamageSend);
             networkMessageBroker.Unsubscribe<NetworkAgentDamaged>(AgentDamageRecieve);
         }
 
-        private void AgentDamageSend(MessagePayload<AgentDamage> payload)
+        private void AgentDamageSend(MessagePayload<AgentDamaged> payload)
         {
 
             // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
