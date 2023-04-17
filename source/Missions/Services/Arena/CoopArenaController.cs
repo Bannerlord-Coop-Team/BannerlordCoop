@@ -172,16 +172,6 @@ namespace Missions.Services
 
             if (joinInfo.IsPlayerAlive)
             {
-                string[] weapons =
-                {
-                    joinInfo.Equipment[0].Item?.Name.ToString(),
-                    joinInfo.Equipment[1].Item?.Name.ToString(),
-                    joinInfo.Equipment[2].Item?.Name.ToString(),
-                    joinInfo.Equipment[3].Item?.Name.ToString(),
-                    joinInfo.Equipment[4].Item?.Name.ToString(),
-                };
-
-                Logger.Verbose("Recieved player with {weapons}", weapons);
                 Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true, joinInfo.Equipment);
 
                 newAgent.Health = joinInfo.PlayerHealth;
