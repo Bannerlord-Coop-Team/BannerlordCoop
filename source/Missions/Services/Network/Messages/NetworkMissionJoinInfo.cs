@@ -20,8 +20,6 @@ namespace Missions.Messages
     [ProtoContract(SkipConstructor = true)]
     public class NetworkMissionJoinInfo : INetworkEvent
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<NetworkMissionJoinInfo>();
-
         [ProtoMember(1)]
         public readonly Guid PlayerId;
         [ProtoMember(2)]
@@ -64,18 +62,6 @@ namespace Missions.Messages
             IsPlayerAlive = isPlayerAlive;
             PlayerHealth = health;
             Equipment = UpdateEquipment(characterObject.Equipment);
-
-            string[] weapons =
-            {
-                Equipment[0].Item?.Name.ToString(),
-                Equipment[1].Item?.Name.ToString(),
-                Equipment[2].Item?.Name.ToString(),
-                Equipment[3].Item?.Name.ToString(),
-                Equipment[4].Item?.Name.ToString(),
-            };
-
-            Logger.Debug("Packaging equipment {weapons}", weapons);
-
             UnitHealthList = unitHealthList;
         }
 
