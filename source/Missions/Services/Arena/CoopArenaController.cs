@@ -6,7 +6,6 @@ using GameInterface.Serialization;
 using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Agents.Handlers;
-using Missions.Services.Agents.Patches;
 using Missions.Services.Arena;
 using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
@@ -55,6 +54,7 @@ namespace Missions.Services
             IWeaponPickupHandler weaponPickupHandler,
             IShieldDamageHandler shieldDamageHandler,
             IAgentDamageHandler agentDamageHandler,
+            IAgentDeathHandler agentDeathHandler,
             INetworkMissileRegistry networkMissileRegistry)
         {
             this.networkMessageBroker = networkMessageBroker;
@@ -69,6 +69,7 @@ namespace Missions.Services
                 weaponPickupHandler,
                 shieldDamageHandler,
                 agentDamageHandler,
+                agentDeathHandler,
                 networkMissileRegistry,
             };
 
@@ -76,7 +77,6 @@ namespace Missions.Services
 
             this.networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             this.networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
-            this.networkMessageBroker.Subscribe<AgentDied>(Handle_AgentDeath);
         }
 
         ~CoopArenaController()
@@ -95,7 +95,6 @@ namespace Missions.Services
 
             networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
-            networkMessageBroker.Unsubscribe<AgentDied>(Handle_AgentDeath);
         }
 
         public override void AfterStart()
@@ -207,16 +206,6 @@ namespace Missions.Services
             aiAgent.SetWatchState(Agent.WatchState.Patrolling);
 
             agentRegistry.RegisterNetworkControlledAgent(controller, agentData.UnitId, aiAgent);
-        }
-
-        private void Handle_AgentDeath(MessagePayload<AgentDied> obj)
-        {
-            Agent agent = obj.What.Agent;
-            if (agentRegistry.TryGetAgentId(agent, out Guid agentId))
-            {
-                agentRegistry.RemoveControlledAgent(agentId);
-                agentRegistry.RemoveNetworkControlledAgent(agentId);
-            }
         }
 
         private void AddPlayerToArena()
