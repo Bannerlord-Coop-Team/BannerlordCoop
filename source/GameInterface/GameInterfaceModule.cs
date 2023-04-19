@@ -15,7 +15,7 @@ namespace GameInterface
             base.Load(builder);
             builder.RegisterType<GameInterface>().As<IGameInterface>().SingleInstance().AutoActivate();
             builder.RegisterType<MBObjectManagerAdapter>().As<IObjectManager>().InstancePerLifetimeScope();
-            builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().AutoActivate().SingleInstance();
+            builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>();
             builder.RegisterModule<ServiceModule>();
 
             builder.RegisterType<MobilePartyRegistry>()

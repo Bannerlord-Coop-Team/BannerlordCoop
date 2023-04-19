@@ -1,6 +1,9 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.PacketHandlers;
 using LiteNetLib;
+using Serilog;
+using Serilog.Core;
 using System;
 
 namespace Common.Network
@@ -28,6 +31,8 @@ namespace Common.Network
     /// <inheritdoc cref="INetworkMessageBroker"/>
     public class NetworkMessageBroker : MessageBroker, INetworkMessageBroker
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<NetworkMessageBroker>();
+
         /// <summary>
         /// Auto-wired dependency
         /// </summary>
@@ -42,6 +47,8 @@ namespace Common.Network
 
         public void PublishNetworkEvent(NetPeer peer, INetworkEvent networkEvent)
         {
+            Logger.Verbose("Publishing {event} to {ip}", networkEvent.GetType().Name, peer?.EndPoint);
+
             EventPacket eventPacket = new EventPacket(networkEvent);
 
             Network.Send(peer, eventPacket);
@@ -49,6 +56,11 @@ namespace Common.Network
 
         public void PublishNetworkEvent(INetworkEvent networkEvent)
         {
+            System.Diagnostics.StackTrace trace = new System.Diagnostics.StackTrace();
+            Logger.Verbose("Publishing {event} to all clients from {frame}", 
+                networkEvent.GetType().Name, 
+                trace.GetFrame(0).GetMethod().Name);
+
             EventPacket eventPacket = new EventPacket(networkEvent);
 
             Network.SendAll(eventPacket);

@@ -6,6 +6,8 @@ using GameInterface.Serialization;
 using LiteNetLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
+using Missions.Services.Missiles;
+using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Serilog;
 using System;
@@ -23,16 +25,22 @@ namespace Missions.Services.Agents.Handlers
     /// <inheritdoc/>
     public class AgentDamageHandler : IAgentDamageHandler
     {
-        readonly INetworkAgentRegistry networkAgentRegistry;
-        readonly INetworkMessageBroker networkMessageBroker;
-        readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
+        private readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
 
-        public AgentDamageHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker) 
+        private readonly INetworkAgentRegistry networkAgentRegistry;
+        private readonly INetworkMessageBroker networkMessageBroker;
+        private readonly INetworkMissileRegistry networkMissileRegistry;
+
+        public AgentDamageHandler(
+            INetworkAgentRegistry networkAgentRegistry,
+            INetworkMessageBroker networkMessageBroker,
+            INetworkMissileRegistry networkMissileRegistry) 
         {
             this.networkAgentRegistry = networkAgentRegistry;
             this.networkMessageBroker = networkMessageBroker;
+            this.networkMissileRegistry = networkMissileRegistry;
 
-            networkMessageBroker.Subscribe<AgentDamage>(AgentDamageSend);
+            networkMessageBroker.Subscribe<AgentDamaged>(AgentDamageSend);
             networkMessageBroker.Subscribe<NetworkAgentDamaged>(AgentDamageRecieve);
         }
         ~AgentDamageHandler()
@@ -41,11 +49,11 @@ namespace Missions.Services.Agents.Handlers
         }
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<AgentDamage>(AgentDamageSend);
+            networkMessageBroker.Unsubscribe<AgentDamaged>(AgentDamageSend);
             networkMessageBroker.Unsubscribe<NetworkAgentDamaged>(AgentDamageRecieve);
         }
 
-        private void AgentDamageSend(MessagePayload<AgentDamage> payload)
+        private void AgentDamageSend(MessagePayload<AgentDamaged> payload)
         {
 
             // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
@@ -74,7 +82,6 @@ namespace Missions.Services.Agents.Handlers
             NetworkAgentDamaged agentDamaData = payload.What;
 
             NetPeer netPeer = payload.Who as NetPeer;
-
 
             Agent effectedAgent = null;
             Agent effectorAgent = null;
@@ -108,6 +115,13 @@ namespace Missions.Services.Agents.Handlers
 
             // extract the blow
             Blow b = agentDamaData.Blow;
+
+            if (b.IsMissile)
+            {
+                var peerIdx = b.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
+                networkMissileRegistry.TryGetIndex(netPeer, peerIdx, out int localIdx);
+                b.WeaponRecord.AffectorWeaponSlotOrMissileIndex = localIdx;
+            }
 
             // assign the blow owner from our own index
             b.OwnerId = effectorAgent.Index;

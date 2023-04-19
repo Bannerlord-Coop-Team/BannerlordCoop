@@ -1,9 +1,4 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
@@ -16,13 +11,14 @@ namespace Missions.Services.Agents.Messages
     {
         public Agent Agent { get; }
         public EquipmentIndex EquipmentIndex { get; }
-        public short Hitpoints { get; }
+        public int InflictedDamage { get; }
 
-        public ShieldDamaged(Agent agent, EquipmentIndex equipmentIndex, short health)
+        public ShieldDamaged(Agent agent, EquipmentIndex equipmentIndex, int inflictedDamage)
         {
             Agent = agent;
             EquipmentIndex = equipmentIndex;
-            Hitpoints = health;
+            InflictedDamage = inflictedDamage;
         }
     }
+
 }

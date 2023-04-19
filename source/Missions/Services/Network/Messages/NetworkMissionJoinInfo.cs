@@ -1,10 +1,12 @@
 ﻿using Autofac;
+using Common.Logging;
 using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using Missions.Services.Network.Data;
 using ProtoBuf;
+using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -53,7 +55,9 @@ namespace Missions.Messages
 
         private Equipment UpdateEquipment(Equipment inEquipment)
         {
-            for(int i = 0; i < 4; i++)
+            if (Agent.Main == null) return inEquipment;
+
+            for (int i = 0; i < 5; i++)
             {
                 MissionWeapon weapon = Agent.Main.Equipment[i];
                 inEquipment[i] = new EquipmentElement(weapon.Item, weapon.ItemModifier);

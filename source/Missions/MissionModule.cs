@@ -3,19 +3,15 @@ using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using GameInterface;
-using GameInterface.Serialization;
-using GameInterface.Services.ObjectManager;
 using IntroServer.Config;
-using Missions.Messages;
 using Missions.Services;
 using Missions.Services.Agents.Handlers;
-using Missions.Services.Agents.Packets;
 using Missions.Services.Arena;
 using Missions.Services.BoardGames;
+using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Services.Taverns;
-using TaleWorlds.ObjectSystem;
 
 namespace Missions
 {
@@ -59,15 +55,18 @@ namespace Missions
             // Interface classes
             builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
 
+            builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>();
+
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
-            builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
-            builder.RegisterType<MovementHandler>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<EventQueueManager>().As<IEventPacketHandler>().InstancePerLifetimeScope();
+            builder.RegisterType<AgentMovementHandler>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<MissileHandler>().As<IMissileHandler>();
             builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>();
             builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>();
             builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>();
             builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>();
+            builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>();
 
             base.Load(builder);
         }

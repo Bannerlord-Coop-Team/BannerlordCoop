@@ -47,8 +47,10 @@ namespace IntroductionServerTests
                 default,
                 default,
                 default,
-                default,
-                Array.Empty<string>());
+                Array.Empty<Guid>(),
+                Array.Empty<Vec3>(),
+                Array.Empty<string>(),
+                Array.Empty<float>());
 
             byte[] bytes = ProtoBufSerializer.Serialize(missionJoinInfo);
 

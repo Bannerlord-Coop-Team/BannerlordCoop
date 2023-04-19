@@ -2,7 +2,6 @@
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace Common.Messaging
@@ -20,12 +19,12 @@ namespace Common.Messaging
     {
         private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
         protected static MessageBroker _instance;
-        protected readonly Dictionary<Type, List<Delegate>> _subscribers;
+        protected readonly Dictionary<Type, ConcurrentList<WeakDelegate>> _subscribers;
         public static MessageBroker Instance => _instance;
 
         public MessageBroker()
         {
-            _subscribers = new Dictionary<Type, List<Delegate>>();
+            _subscribers = new Dictionary<Type, ConcurrentList<WeakDelegate>>();
         }
 
         public virtual void Publish<T>(object source, T message)
@@ -43,17 +42,23 @@ namespace Common.Messaging
             var delegates = _subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);
-            foreach (var handler in delegates.Select
-            (item => item as Action<MessagePayload<T>>))
+            for(int i = 0; i < delegates.Count; i++)
             {
-                Task.Factory.StartNew(() => handler?.Invoke(payload));
+                var weakDelegate = delegates[i];
+                if (weakDelegate.IsAlive == false)
+                {
+                    delegates.RemoveAt(i--);
+                    continue;
+                }
+                
+                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
             }
         }
 
         public virtual void Subscribe<T>(Action<MessagePayload<T>> subscription)
         {
             var delegates = _subscribers.ContainsKey(typeof(T)) ?
-                            _subscribers[typeof(T)] : new List<Delegate>();
+                            _subscribers[typeof(T)] : new ConcurrentList<WeakDelegate>();
             if (!delegates.Contains(subscription))
             {
                 delegates.Add(subscription);

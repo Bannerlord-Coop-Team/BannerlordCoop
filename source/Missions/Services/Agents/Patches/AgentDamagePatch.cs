@@ -24,36 +24,60 @@ namespace Missions.Services.Agents.Patches
     {
         private static void Prefix(Agent attacker, Agent victim, Blow b, ref AttackCollisionData collisionData)
         {
+            if (NetworkAgentRegistry.Instance.IsControlled(attacker) == false) return;
+
             // construct a agent damage data
-            AgentDamage agentDamageData = new AgentDamage(attacker, victim, b, collisionData);
+            AgentDamaged agentDamageData = new AgentDamaged(attacker, victim, b, collisionData);
 
             // publish the event
             MessageBroker.Instance.Publish(attacker, agentDamageData);
         }
     }
-    /// <summary>
-    /// Only allow damage from controlled agents
-    /// </summary>
-    [HarmonyPatch(typeof(Mission), "OnAgentHit")]
-    internal static class OnAgentHitPatch
-    {
-        private static bool Prefix(ref Agent affectorAgent)
-        {
-            if (!NetworkAgentRegistry.Instance.IsControlled(affectorAgent)) return false;
 
-            return true;
-        }
-    }
-    /// <summary>
-    /// Intercept when weapon hitpoints change to send to ShieldDamageHandler (only shields have health)
-    /// </summary>
-    [HarmonyPatch(typeof(Agent), nameof(Agent.ChangeWeaponHitPoints))]
-    public class ShieldDamagePatch
+    #region SkipPatches
+    [HarmonyPatch(typeof(Mission), "ChargeDamageCallback")]
+    public class ChargeDamageCallbackPatch
     {
-        private static void Postfix(Agent __instance, EquipmentIndex slotIndex, short hitPoints)
+        private static bool Prefix(ref Agent attacker)
         {
-            ShieldDamaged shieldDamage = new ShieldDamaged(__instance, slotIndex, hitPoints);
-            NetworkMessageBroker.Instance.Publish(__instance, shieldDamage);
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
         }
     }
+
+    [HarmonyPatch(typeof(Mission), "FallDamageCallback")]
+    public class FallDamageCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "MeleeHitCallback")]
+    public class MeleeHitCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "MissileAreaDamageCallback")]
+    public class MissileAreaDamageCallbackPatch
+    {
+        private static bool Prefix(ref Agent shooterAgent)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(shooterAgent);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "MissileHitCallback")]
+    public class MissileHitCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+    #endregion
 }

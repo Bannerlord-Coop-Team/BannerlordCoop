@@ -7,7 +7,7 @@ namespace Missions.Services.Network.Data
     /// <summary>
     /// Data Class for AiAgent
     /// </summary>
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class AiAgentData
     {
         [ProtoMember(1)]

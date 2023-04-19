@@ -32,21 +32,21 @@ namespace Missions.Services.Missiles.Patches
             ref Vec3 position,
             ref Mat3 orientation,
             float baseSpeed,
-            float speed, 
-            bool addRigidBody, 
+            float speed,
+            bool addRigidBody,
             ref MissionWeapon __state)
         {
             if (NetworkAgentRegistry.Instance.IsControlled(shooterAgent))
             {
                 AgentShoot message = new AgentShoot(
                     shooterAgent,
-                    __state, 
-                    position, 
-                    direction, 
-                    orientation, 
-                    baseSpeed, 
-                    speed, 
-                    addRigidBody, 
+                    __state,
+                    position,
+                    direction,
+                    orientation,
+                    baseSpeed,
+                    speed,
+                    addRigidBody,
                     __result);
                 NetworkMessageBroker.Instance.Publish(shooterAgent, message);
             }
@@ -62,27 +62,27 @@ namespace Missions.Services.Missiles.Patches
         {
             __state = shooterAgent.WieldedWeapon;
         }
-        private static void Postfix(int __result, 
-            Agent shooterAgent, 
-            ref Vec3 direction, 
-            ref Vec3 position, 
-            ref Mat3 orientation, 
-            float baseSpeed, 
-            float speed, 
-            bool addRigidBody, 
+        private static void Postfix(int __result,
+            Agent shooterAgent,
+            ref Vec3 direction,
+            ref Vec3 position,
+            ref Mat3 orientation,
+            float baseSpeed,
+            float speed,
+            bool addRigidBody,
             ref MissionWeapon __state)
         {
             if (NetworkAgentRegistry.Instance.IsControlled(shooterAgent))
             {
                 AgentShoot message = new AgentShoot(
-                    shooterAgent, 
-                    __state, 
-                    position, 
-                    direction, 
-                    orientation, 
-                    baseSpeed, 
-                    speed, 
-                    addRigidBody, 
+                    shooterAgent,
+                    __state,
+                    position,
+                    direction,
+                    orientation,
+                    baseSpeed,
+                    speed,
+                    addRigidBody,
                     __result);
                 NetworkMessageBroker.Instance.Publish(shooterAgent, message);
             }

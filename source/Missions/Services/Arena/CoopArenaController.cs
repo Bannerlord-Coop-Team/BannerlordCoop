@@ -3,18 +3,12 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Serialization;
-using HarmonyLib;
-using JetBrains.Annotations;
 using LiteNetLib;
 using Missions.Messages;
 using Missions.Services.Agents.Handlers;
-using Missions.Services.Agents.Messages;
-using Missions.Services.Agents.Packets;
-using Missions.Services.Agents.Patches;
 using Missions.Services.Arena;
+using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
-using Missions.Services.Missiles.Message;
-using Missions.Services.Missiles.Patches;
 using Missions.Services.Network;
 using Missions.Services.Network.Data;
 using Missions.Services.Network.Messages;
@@ -28,7 +22,6 @@ using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using static TaleWorlds.MountAndBlade.Source.Objects.Siege.AgentPathNavMeshChecker;
 
 namespace Missions.Services
 {
@@ -41,19 +34,15 @@ namespace Missions.Services
 
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly INetworkMessageBroker _networkMessageBroker;
-        private readonly INetworkAgentRegistry _agentRegistry;
-        private readonly IRandomEquipmentGenerator _equipmentGenerator;
+        private readonly INetworkMessageBroker networkMessageBroker;
+        private readonly INetworkAgentRegistry agentRegistry;
+        private readonly IRandomEquipmentGenerator equipmentGenerator;
         private readonly IBinaryPackageFactory packageFactory;
-        private readonly IMissileHandler _missileHandler;
-        private readonly IWeaponDropHandler _weaponDropHandler;
-        private readonly IWeaponPickupHandler _weaponPickupHandler;
-        private readonly IShieldDamageHandler _shieldDamageHandler;
-        private readonly IAgentDamageHandler _agentDamageHandler;
+        private readonly IDisposable[] handlers;
 
         private List<MatrixFrame> spawnFrames = new List<MatrixFrame>();
-        private CharacterObject[] _gameCharacters;
-        private readonly Guid _playerId;
+        private CharacterObject[] gameCharacters;
+        private readonly Guid playerId;
 
         public CoopArenaController(
             INetworkMessageBroker networkMessageBroker,
@@ -64,24 +53,30 @@ namespace Missions.Services
             IWeaponDropHandler weaponDropHandler,
             IWeaponPickupHandler weaponPickupHandler,
             IShieldDamageHandler shieldDamageHandler,
-            IAgentDamageHandler agentDamageHandler)
+            IAgentDamageHandler agentDamageHandler,
+            IAgentDeathHandler agentDeathHandler,
+            INetworkMissileRegistry networkMissileRegistry)
         {
-            _networkMessageBroker = networkMessageBroker;
-            _agentRegistry = agentRegistry;
-            _equipmentGenerator = equipmentGenerator;
+            this.networkMessageBroker = networkMessageBroker;
+            this.agentRegistry = agentRegistry;
+            this.equipmentGenerator = equipmentGenerator;
             this.packageFactory = packageFactory;
-            _missileHandler = missileHandler;
-            _weaponDropHandler = weaponDropHandler;
-            _weaponPickupHandler = weaponPickupHandler;
-            _shieldDamageHandler = shieldDamageHandler;
-            _agentDamageHandler = agentDamageHandler;
 
-            _playerId = Guid.NewGuid();
+            handlers = new IDisposable[]
+            {
+                missileHandler,
+                weaponDropHandler,
+                weaponPickupHandler,
+                shieldDamageHandler,
+                agentDamageHandler,
+                agentDeathHandler,
+                networkMissileRegistry,
+            };
 
-            _networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            _networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
-            _networkMessageBroker.Subscribe<AgentDied>(Handle_AgentDeath);
+            playerId = Guid.NewGuid();
 
+            this.networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            this.networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
         }
 
         ~CoopArenaController()
@@ -91,16 +86,20 @@ namespace Missions.Services
 
         public void Dispose()
         {
-            _agentRegistry.Clear();
+            agentRegistry.Clear();
 
-            _networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            _networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
-            _networkMessageBroker.Unsubscribe<AgentDied>(Handle_AgentDeath);
+            foreach (var handler in handlers)
+            {
+                handler.Dispose();
+            }
+
+            networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
         }
 
         public override void AfterStart()
         {
-            _gameCharacters = CharacterObject.All?.Where(x =>
+            gameCharacters = CharacterObject.All?.Where(x =>
             x.IsHero == false &&
             x.Age > 18).ToArray();
             AddPlayerToArena();
@@ -117,9 +116,9 @@ namespace Missions.Services
 
             List<AiAgentData> aiAgentDatas = new List<AiAgentData>();
 
-            foreach (Guid agentId in _agentRegistry.ControlledAgents.Keys)
+            foreach (Guid agentId in agentRegistry.ControlledAgents.Keys)
             {
-                Agent agent = _agentRegistry.ControlledAgents[agentId];
+                Agent agent = agentRegistry.ControlledAgents[agentId];
 
                 if (agent == Agent.Main) continue;
 
@@ -137,17 +136,17 @@ namespace Missions.Services
 
             bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
             Vec3 position = Agent.Main?.Position ?? default;
-            float health = Agent.Main.Health;
+            float health = Agent.Main?.Health ?? 0;
 
             NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(
                 characterObject, 
                 isPlayerAlive, 
-                _playerId, 
+                playerId, 
                 position, 
                 health, 
                 aiAgentDatas.ToArray());
 
-            _networkMessageBroker.PublishNetworkEvent(peer, request);
+            networkMessageBroker.PublishNetworkEvent(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
                 characterObject.Name, request.PlayerId, peer.EndPoint);
@@ -165,39 +164,51 @@ namespace Missions.Services
 
             Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
-                joinInfo.CharacterObject.Name, newAgentId,
+                joinInfo.CharacterObject.Name,
+                newAgentId,
                 netPeer.EndPoint,
                 joinInfo.AiAgentData.Length);
 
             if (joinInfo.IsPlayerAlive)
             {
                 Agent newAgent = SpawnAgent(startingPos, joinInfo.CharacterObject, true, joinInfo.Equipment);
+
                 newAgent.Health = joinInfo.PlayerHealth;
 
-                _agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
+                agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
             }
 
             for (int i = 0; i < joinInfo.AiAgentData.Length; i++)
             {
                 AiAgentData aiAgentData = joinInfo.AiAgentData[i];
-                Agent tempAi = SpawnAgent(aiAgentData.UnitPosition, CharacterObject.Find(aiAgentData.UnitIdString), true);
-                tempAi.Health = aiAgentData.UnitHealth;
-
-                _agentRegistry.RegisterNetworkControlledAgent(netPeer, aiAgentData.UnitId, tempAi);
+                SpawnAIAgent(netPeer, aiAgentData);
             }
+
+            networkMessageBroker.Publish(this, new PeerReady(netPeer));
         }
 
-        private void Handle_AgentDeath(MessagePayload<AgentDied> obj)
+        private void SpawnAIAgent(
+            NetPeer controller,
+            AiAgentData agentData)
         {
-            Agent agent = obj.What.Agent;
-            if (_agentRegistry.TryGetAgentId(agent, out Guid agentId))
+            var AICharacter = CharacterObject.Find(agentData.UnitIdString);
+
+            if (AICharacter == null)
             {
-                _agentRegistry.RemoveControlledAgent(agentId);
-                _agentRegistry.RemoveNetworkControlledAgent(agentId);
+                Logger.Error("Could not find character with stringID: {stringid}", agentData.UnitIdString);
+                return;
             }
+
+            Agent aiAgent = SpawnAgent(agentData.UnitPosition, AICharacter, true);
+            aiAgent.Health = agentData.UnitHealth;
+
+            // TODO revert
+            aiAgent.SetWatchState(Agent.WatchState.Patrolling);
+
+            agentRegistry.RegisterNetworkControlledAgent(controller, agentData.UnitId, aiAgent);
         }
 
-        public void AddPlayerToArena()
+        private void AddPlayerToArena()
         {
             // reset teams if any exists
             Mission.Current.ResetMission();
@@ -226,10 +237,10 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            Agent ai = SpawnAgent(randomElement.origin, _gameCharacters[rand.Next(_gameCharacters.Length - 1)], false);
+            Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
 
-            _agentRegistry.RegisterControlledAgent(_playerId, Agent.Main);
-            _agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
+            agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
+            agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
         }
 
         private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);
@@ -246,7 +257,7 @@ namespace Missions.Services
 
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
-            Equipment generatedEquipment = _equipmentGenerator.CreateRandomEquipment(true);
+            Equipment generatedEquipment = equipmentGenerator.CreateRandomEquipment(true);
             agentBuildData.Equipment(generatedEquipment);
             Hero_BattleEquipment.SetValue(character.HeroObject, generatedEquipment);
             agentBuildData.InitialDirection(vec);
@@ -282,11 +293,6 @@ namespace Missions.Services
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
             }, true);
-
-            if (agent.IsAIControlled)
-            {
-                agent.SetWatchState(Agent.WatchState.Alarmed);
-            }
 
             return agent;
         }
