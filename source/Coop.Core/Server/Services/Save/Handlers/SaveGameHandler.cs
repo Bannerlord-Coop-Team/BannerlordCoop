@@ -31,6 +31,16 @@ namespace Coop.Core.Server.Services.Save.Handlers
             messageBroker.Subscribe<ExistingObjectGuidsLoaded>(Handle_ExistingObjectGuidsLoaded);
         }
 
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<GameSaved>(Handle_GameSaved);
+            messageBroker.Unsubscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
+            messageBroker.Unsubscribe<GameLoaded>(Handle_GameLoaded);
+
+            messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+            messageBroker.Unsubscribe<ExistingObjectGuidsLoaded>(Handle_ExistingObjectGuidsLoaded);
+        }
+
         private string saveName;
         private Guid packageObjectsTransactionId;
         private void Handle_GameSaved(MessagePayload<GameSaved> obj)

@@ -1,6 +1,8 @@
-﻿namespace Common.Messaging
+﻿using System;
+
+namespace Common.Messaging
 {
-    public interface IHandler
+    public interface IHandler : IDisposable
     {
     }
 }

@@ -2,7 +2,7 @@
 using Common.Network;
 using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Save.Messages;
+using GameInterface.Services.Heroes.Handlers;
 using System;
 
 namespace Coop.Core.Client.Services.Save.Handler
@@ -11,7 +11,7 @@ namespace Coop.Core.Client.Services.Save.Handler
     {
         private readonly INetworkMessageBroker networkMessageBroker;
         private NetworkGameSaveDataReceived saveDataMessage;
-        private bool saveDataRecieve = false;
+        //private bool saveDataRecieve = false;
         public SaveDataHandler(INetworkMessageBroker networkMessageBroker)
         {
             this.networkMessageBroker = networkMessageBroker;
@@ -20,22 +20,23 @@ namespace Coop.Core.Client.Services.Save.Handler
             networkMessageBroker.Subscribe<CampaignLoaded>(Handle_CampaignLoaded);
         }
 
+        public void Dispose()
+        {
+            networkMessageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+            networkMessageBroker.Unsubscribe<CampaignLoaded>(Handle_CampaignLoaded);
+        }
+
         private void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
         {
             saveDataMessage = obj.What;
-            saveDataRecieve = true;
+            //saveDataRecieve = true;
         }
 
         private void Handle_CampaignLoaded(MessagePayload<CampaignLoaded> obj)
         {
-            if(saveDataRecieve)
-            {
-                var message = new LoadExistingObjectGuids(
-                Guid.Empty, /* Transaction Id not required */
-                saveDataMessage.GameObjectGuids);
+            var message = new RegisterAllGameObjects(Guid.Empty);
 
-                networkMessageBroker.Publish(this, message);
-            }
+            networkMessageBroker.Publish(this, message);
         }
     }
 }

@@ -1,6 +1,9 @@
-﻿using GameInterface.Services.Heroes;
+﻿using Common.Logging;
+using GameInterface.Services.Heroes;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Save.Data;
+using Serilog;
+using Serilog.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +19,8 @@ namespace GameInterface.Services.Save.Interfaces
     }
     internal class RegistryInterface : IRegistryInterface
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<RegistryInterface>();
+
         private readonly IMobilePartyRegistry partyRegistry;
         private readonly IHeroRegistry heroRegistry;
         private readonly IControlledHeroRegistry controlledHeroRegistry;
@@ -34,6 +39,12 @@ namespace GameInterface.Services.Save.Interfaces
 
         public void RegisterControlledHeroes(IEnumerable<string> heroIds)
         {
+            if (heroIds == null)
+            {
+                Logger.Warning("Parameter {heroIds} was null", nameof(heroIds));
+                return;
+            }
+
             foreach (string id in heroIds)
             {
                 controlledHeroRegistry.RegisterAsControlled(id);

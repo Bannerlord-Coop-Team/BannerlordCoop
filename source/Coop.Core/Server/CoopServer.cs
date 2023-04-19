@@ -8,6 +8,7 @@ using Coop.Core.Server.Connections.Messages;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 
@@ -15,12 +16,15 @@ namespace Coop.Core.Server
 {
     public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, IDisposable
     {
+        IEnumerable<NetPeer> ConnectedPeers { get; }
         void AllowJoining();
     }
 
     public class CoopServer : CoopNetworkBase, ICoopServer
     {
         public override int Priority => 0;
+
+        public IEnumerable<NetPeer> ConnectedPeers => netManager.ConnectedPeerList;
 
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;

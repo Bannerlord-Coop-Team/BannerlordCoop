@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
 using TaleWorlds.Engine;
@@ -18,6 +19,12 @@ namespace GameInterface.Services.GameDebug.Interfaces
 
             messageBroker.Subscribe<StartLoadingScreen>(Handle);
             messageBroker.Subscribe<EndLoadingScreen>(Handle);
+        }
+
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<StartLoadingScreen>(Handle);
+            messageBroker.Unsubscribe<EndLoadingScreen>(Handle);
         }
 
         private void Handle(MessagePayload<StartLoadingScreen> obj)

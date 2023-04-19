@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common;
 using Common.LogicStates;
+using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client;
 using Coop.Core.Server;
@@ -12,7 +13,23 @@ namespace Coop.Core
     {
         public static UpdateableList Updateables { get; } = new UpdateableList();
 
-        private static IContainer _container;
+        private IContainer _container;
+
+        private IUpdateable updateable
+        {
+            get { return _updateable; }
+            set
+            {
+                if(_updateable != null) 
+                {
+                    Updateables.Remove(value);
+                }
+                _updateable = value;
+                Updateables.Add(_updateable);
+            }
+        }
+
+        private IUpdateable _updateable;
 
         public int Priority => 0;
 
@@ -23,16 +40,12 @@ namespace Coop.Core
 
         public void StartAsServer()
         {
-            if(_container == null)
-            {
-                ContainerBuilder builder = new ContainerBuilder();
-                builder.RegisterModule<CoopModule>();
-                builder.RegisterModule<ServerModule>();
-                _container = builder.Build();
+            ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterModule<CoopModule>();
+            builder.RegisterModule<ServerModule>();
+            _container = builder.Build();
 
-                var server = _container.Resolve<INetwork>();
-                Updateables.Add(server);
-            }
+            updateable = _container.Resolve<INetwork>();
 
             var logic = _container.Resolve<ILogic>();
             logic.Start();
@@ -40,16 +53,12 @@ namespace Coop.Core
 
         public void StartAsClient()
         {
-            if (_container == null)
-            {
-                ContainerBuilder builder = new ContainerBuilder();
-                builder.RegisterModule<CoopModule>();
-                builder.RegisterModule<ClientModule>();
-                _container = builder.Build();
+            ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterModule<CoopModule>();
+            builder.RegisterModule<ClientModule>();
+            _container = builder.Build();
 
-                var client = _container.Resolve<INetwork>();
-                Updateables.Add(client);
-            }
+            updateable = _container.Resolve<INetwork>();
 
             var logic = _container.Resolve<ILogic>();
             logic.Start();

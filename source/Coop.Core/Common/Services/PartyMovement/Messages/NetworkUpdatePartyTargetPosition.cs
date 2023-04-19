@@ -16,5 +16,10 @@ namespace Coop.Core.Common.Services.PartyMovement.Messages
 
             TargetPositionData = payload.TargetPositionData;
         }
+
+        public NetworkUpdatePartyTargetPosition(TargetPositionData positionData)
+        {
+            TargetPositionData = positionData;
+        }
     }
 }

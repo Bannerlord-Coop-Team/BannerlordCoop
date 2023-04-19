@@ -21,6 +21,11 @@ namespace GameInterface.Services.GameDebug.Interfaces
         public static readonly string Player1_Id = "Player 1";
         public static readonly string Player2_Id = "Player 2";
 
+        private static Dictionary<string, string> PlayerIdMap = new Dictionary<string, string>
+        {
+            { Player1_Id, "TransferredHero2862" }
+        };
+
         private readonly IMessageBroker messageBroker;
 
         public DebugHeroInterface(IMessageBroker messageBroker)
@@ -30,7 +35,13 @@ namespace GameInterface.Services.GameDebug.Interfaces
 
         public void ResolveHero(ResolveDebugHero message)
         {
-            messageBroker.Publish(this, new HeroResolved(message.TransactionID, message.PlayerId));
+            if(PlayerIdMap.TryGetValue(message.PlayerId, out string stringId) == false)
+            {
+                Logger.Warning("Could not find {player} in {dict}", message.PlayerId, PlayerIdMap);
+                return;
+            }
+
+            messageBroker.Publish(this, new HeroResolved(message.TransactionID, stringId));
         }
     }
 }

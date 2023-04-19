@@ -26,6 +26,11 @@ namespace GameInterface.Services.MobileParties.Patches
         [HarmonyPatch(MethodType.Setter)]
         private static void MovementPrefix(ref MobileParty __instance, ref Vec2 value)
         {
+            if (AllowedChangeParty == __instance) 
+            {
+                return;
+            }
+
             var message = new PartyTargetPositionChanged(__instance, value);
             MessageBroker.Instance.Publish(__instance, message);
         }
@@ -37,7 +42,8 @@ namespace GameInterface.Services.MobileParties.Patches
             lock (AllowedChangeParty)
             {
                 MobileParty_TargetPosition.SetValue(party, position);
-            }    
+            }
+            AllowedChangeParty = null;
         }
     }
 }

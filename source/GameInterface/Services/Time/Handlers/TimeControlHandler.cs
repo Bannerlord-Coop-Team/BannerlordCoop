@@ -22,6 +22,13 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<SetTimeControlMode>(Handle);
         }
 
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<PauseAndDisableGameTimeControls>(Handle);
+            messageBroker.Unsubscribe<EnableGameTimeControls>(Handle);
+            messageBroker.Unsubscribe<SetTimeControlMode>(Handle);
+        }
+
         private void Handle(MessagePayload<PauseAndDisableGameTimeControls> obj)
         {
             timeControlInterface.PauseAndDisableTimeControls();

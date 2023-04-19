@@ -283,7 +283,6 @@
     <Compile Include="Services\Heroes\Patches\ChangePlayerCharacterActionPatches.cs" />
     <Compile Include="Services\MobileParties\Data\TargetPositionData.cs" />
     <Compile Include="Services\MobileParties\Handlers\MobilePartyMovementHandler.cs" />
-    <Compile Include="Services\MobileParties\Handlers\MobilePartyRegistryHandler.cs" />
     <Compile Include="Services\MobileParties\Messages\ControlledPartyTargetPositionUpdated.cs" />
     <Compile Include="Services\MobileParties\Messages\UpdatePartyTargetPosition.cs" />
     <Compile Include="Services\MobileParties\Patches\PartyMovementPatch.cs" />

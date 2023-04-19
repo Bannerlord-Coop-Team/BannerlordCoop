@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.MobileParties.Interfaces;
+using GameInterface.Services.Modules.Messages;
 using Serilog;
 using Serilog.Core;
 using System.Linq;
@@ -23,6 +24,11 @@ namespace GameInterface.Services.MobileParties.Handlers
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<NewPlayerHeroRegistered>(Handle);
+        }
+
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<NewPlayerHeroRegistered>(Handle);
         }
 
         private void Handle(MessagePayload<NewPlayerHeroRegistered> obj)

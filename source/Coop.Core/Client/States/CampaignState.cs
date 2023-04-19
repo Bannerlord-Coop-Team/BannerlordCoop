@@ -2,9 +2,11 @@
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Handlers;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Time.Messages;
 using System;
+using System.Transactions;
 
 namespace Coop.Core.Client.States
 {
@@ -13,12 +15,23 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class CampaignState : ClientStateBase
     {
+        private Guid transactionId;
+
         public CampaignState(IClientLogic logic) : base(logic)
         {
             Logic.NetworkMessageBroker.Subscribe<NetworkDisableTimeControls>(Handle);
 
             Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
             Logic.NetworkMessageBroker.Subscribe<MissionStateEntered>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<AllGameObjectsRegistered>(Handle);
+
+            transactionId = Guid.NewGuid();
+            Logic.NetworkMessageBroker.Publish(this, new RegisterAllGameObjects(transactionId));
+        }
+
+        private void Handle(MessagePayload<AllGameObjectsRegistered> obj)
+        {
+            Logic.NetworkMessageBroker.Publish(this, new SwitchToHero(Logic.ControlledHeroId));
         }
 
         public override void Dispose()

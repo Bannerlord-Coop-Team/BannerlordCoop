@@ -98,15 +98,15 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Client\HandlerCollector.cs" />
     <Compile Include="Client\Messages\NetworkGameSaveDataReceived.cs" />
     <Compile Include="Client\Messages\NetworkDisconnected.cs" />
     <Compile Include="Client\Messages\NetworkConnected.cs" />
     <Compile Include="Client\Packets\NewHeroPacket.cs" />
-    <Compile Include="Client\Services\Heroes\Handler\SwitchHeroHandler.cs" />
+    <Compile Include="Client\Services\MobileParties\Handlers\MobilePartyMovementHandler.cs" />
     <Compile Include="Client\Services\Save\Handler\SaveDataHandler.cs" />
     <Compile Include="Client\Services\Time\Handlers\TimeHandler.cs" />
     <Compile Include="Common\Services\PartyMovement\Messages\NetworkUpdatePartyTargetPosition.cs" />
-    <Compile Include="Common\Services\PartyMovement\PartyMovementHandler.cs" />
     <Compile Include="Common\Network\CoopNetworkBase.cs" />
     <Compile Include="Client\States\CampaignState.cs" />
     <Compile Include="Client\States\CharacterCreationState.cs" />
@@ -148,6 +148,7 @@
     <Compile Include="Server\Config\ServerConfig.cs" />
     <Compile Include="Server\ServerLogic.cs" />
     <Compile Include="Client\Data\ClientData.cs" />
+    <Compile Include="Server\Services\MobileParties\Handlers\MobilePartyMovementHandler.cs" />
     <Compile Include="Server\Services\Save\Messages\CreateNewSession.cs" />
     <Compile Include="Server\Services\Save\Handlers\SaveGameHandler.cs" />
     <Compile Include="Server\Services\Save\CoopSaveManager.cs" />

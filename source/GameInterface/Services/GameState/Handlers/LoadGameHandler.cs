@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,6 +21,11 @@ namespace GameInterface.Services.GameState.Handlers
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<LoadGameSave>(Handle);
+        }
+
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<LoadGameSave>(Handle);
         }
 
         private void Handle(MessagePayload<LoadGameSave> obj)

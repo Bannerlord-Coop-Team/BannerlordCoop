@@ -17,6 +17,11 @@ namespace GameInterface.Services.MobileParties.Handlers
             messageBroker.Subscribe<RemoveMainParty>(Handle);
         }
 
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<RemoveMainParty>(Handle);
+        }
+
         private void Handle(MessagePayload<RemoveMainParty> obj)
         {
             mainPartyInterface.RemoveMainParty();
