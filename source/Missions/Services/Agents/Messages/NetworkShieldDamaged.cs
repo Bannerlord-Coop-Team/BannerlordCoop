@@ -1,20 +1,13 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.Core;
-using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
 {
     /// <summary>
-    /// Internal event for agent shield damage
+    /// Event for agent shield damage
     /// </summary>
-    /// 
-
     [ProtoContract(SkipConstructor = true)]
     public readonly struct NetworkShieldDamaged : INetworkEvent
     {

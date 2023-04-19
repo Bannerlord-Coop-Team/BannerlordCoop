@@ -3,10 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using GameInterface;
-using GameInterface.Serialization;
-using GameInterface.Services.ObjectManager;
 using IntroServer.Config;
-using Missions.Messages;
 using Missions.Services;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.Arena;
@@ -15,7 +12,6 @@ using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Services.Taverns;
-using TaleWorlds.ObjectSystem;
 
 namespace Missions
 {
@@ -70,6 +66,7 @@ namespace Missions
             builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>();
             builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>();
             builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>();
+            builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>();
 
             base.Load(builder);
         }
