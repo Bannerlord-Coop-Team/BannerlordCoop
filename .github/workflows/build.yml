@@ -25,6 +25,7 @@ jobs:
         run: docker image pull ${{ env.DOCKERHUB_IMAGE }}
 
       - name: Run Build
+        shell: pwsh
         run: |
           docker run -it --rm --entrypoint cmd ${{ env.DOCKERHUB_IMAGE }}
           git clone https://github.com/${{ github.repository }}
