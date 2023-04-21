@@ -9,9 +9,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
-    container:
-      image: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.0
-        
     steps:
       - uses: actions/checkout@v3
 
