@@ -1,0 +1,36 @@
+name: Build
+on: 
+  push:
+  pull_request:
+    types:
+      [opened, synchronize]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: hulkhan/bannerlordcoop:1.0.0
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull repository
+        run: git clone https://github.com/${{ github.repository }}
+      
+      - name: Checkout branch
+        run: git checkout ${{ github.ref }}
+        
+      - name: Copy necessary assemblies
+        run: |
+          echo d | xcopy /e /v "BannerlordAssemblies" "BannerlordCoop\mb2\bin\Win64_Shipping_Client\"
+          cd BannerlordCoop/source
+          
+      - name: Nuget restore
+        run: nuget restore Coop.sln
+        
+      - name: Build solution
+        run: msbuild Coop.sln
