@@ -4,14 +4,19 @@ on:
   pull_request:
     types:
       [opened, synchronize]
+    
+env:
+  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+  
 jobs:
   build:
     runs-on: ubuntu-latest
     container:
       image: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.0
       credentials:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+        username: ${{ env.DOCKERHUB_USERNAME }}
+        password: ${{ env.DOCKERHUB_TOKEN }}
         
     steps:
       - uses: actions/checkout@v3
