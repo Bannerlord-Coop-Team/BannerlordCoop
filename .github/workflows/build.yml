@@ -8,16 +8,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     
     container:
-      image: ${{ env.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.0
+      image: $DOCKERHUB_USERNAME/bannerlordcoop:1.0.0
       credentials:
-        username: ${{ env.DOCKERHUB_USERNAME }}
-        password: ${{ env.DOCKERHUB_TOKEN }}
+        username: $DOCKERHUB_USERNAME
+        password: $DOCKERHUB_TOKEN
         
     steps:
       - uses: actions/checkout@v3
