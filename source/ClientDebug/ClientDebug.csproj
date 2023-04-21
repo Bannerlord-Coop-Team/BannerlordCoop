@@ -54,6 +54,6 @@
     </PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>"$(DevEnvDir)devenv" "$(SolutionDir)Coop.sln" /Rebuild $(configuration) /project "$(SolutionDir)Coop\Coop.csproj"</PostBuildEvent>
+    <PostBuildEvent>msbuild "$(SolutionDir)Coop.sln" /t:"Coop:Rebuild" /p:Configuration=$(configuration)</PostBuildEvent>
   </PropertyGroup>
 </Project>
