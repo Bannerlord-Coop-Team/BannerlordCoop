@@ -4,14 +4,15 @@ on:
   pull_request:
     types:
       [opened, synchronize]
-    
-env:
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
   
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    
     container:
       image: ${{ env.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.0
       credentials:
@@ -30,7 +31,7 @@ jobs:
       - name: Copy necessary assemblies
         run: |
           echo d | xcopy /e /v "BannerlordAssemblies" "BannerlordCoop\mb2\bin\Win64_Shipping_Client\"
-          cd BannerlordCoop/source
+          cd "BannerlordCoop\source"
           
       - name: Nuget restore
         run: nuget restore Coop.sln
