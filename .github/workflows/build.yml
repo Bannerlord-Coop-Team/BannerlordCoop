@@ -17,7 +17,7 @@ jobs:
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-          image: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:latest
+          image: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.0
           run: |
             git clone https://github.com/${{ github.repository }}
             git checkout ${{ github.ref }}
