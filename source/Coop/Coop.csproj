@@ -236,7 +236,7 @@
   </ItemGroup>
   <PropertyGroup>
     <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
-            -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
-            -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\\"</PostBuildEvent>
+            -File "$(SolutionDir)../deploy.ps1" -SolutionDir "$(SolutionDir)" ^
+            -TargetDir "$(SolutionDir)Coop/bin/$(Configuration)/"</PostBuildEvent>
   </PropertyGroup>
 </Project>
