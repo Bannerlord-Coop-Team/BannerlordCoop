@@ -234,7 +234,15 @@
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
   </ItemGroup>
-  <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)../deploy.ps1" -SolutionDir "$(SolutionDir)" -TargetDir "$(SolutionDir)Coop/bin/$(Configuration)/"</PostBuildEvent>
-  </PropertyGroup>
+
+  <Target Name="RunDeploy" AfterTargets="Build">
+    <Exec Condition=" '$(OS)' == 'Windows_NT' " 
+          Command='powershell -ExecutionPolicy Unrestricted ^
+          -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)" ^
+          -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\"'/>
+    <Exec Condition=" '$(OS)' != 'Windows_NT' " 
+          Command='pwsh -ExecutionPolicy Unrestricted ^
+          -File "$(SolutionDir)../deploy.ps1" -SolutionDir "$(SolutionDir)" ^
+          -TargetDir "$(SolutionDir)Coop/bin/$(Configuration)/"'/>
+  </Target>
 </Project>
