@@ -235,8 +235,6 @@
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
   </ItemGroup>
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
-            -File "$(SolutionDir)../deploy.ps1" -SolutionDir "$(SolutionDir)" ^
-            -TargetDir "$(SolutionDir)Coop/bin/$(Configuration)/"</PostBuildEvent>
+    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted -File "$(SolutionDir)../deploy.ps1" -SolutionDir "$(SolutionDir)" -TargetDir "$(SolutionDir)Coop/bin/$(Configuration)/"</PostBuildEvent>
   </PropertyGroup>
 </Project>
