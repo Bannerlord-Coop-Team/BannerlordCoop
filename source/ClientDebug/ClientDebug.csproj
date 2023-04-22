@@ -50,6 +50,6 @@
     </PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>msbuild "$(SolutionDir)Coop.sln" /t:"Coop:Rebuild" /p:Configuration=$(configuration)</PostBuildEvent>
+    <PostBuildEvent>dotnet build $(SolutionDir)Coop/Coop.csproj --no-incremental -c $(configuration) /p:SolutionDir=$(SolutionDir)</PostBuildEvent>
   </PropertyGroup>
 </Project>
