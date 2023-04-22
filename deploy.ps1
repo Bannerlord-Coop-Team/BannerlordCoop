@@ -16,12 +16,11 @@ $TemplateDir    = "${BaseDir}template"
 $UIMovieDir     = "${BaseDir}UIMovies"
 
 # create output directory structure
-$DeployBinDir = "$DeployDir\bin\Win64_Shipping_Client"
+$DeployBinDir = "$DeployDir\mb2"
 
 Remove-Item ${DeployBinDir} -Recurse -ErrorAction Ignore
 
 New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
-New-Item -ItemType Directory -Force -Path $DeployBinDir | Out-Null
 
 # read config
 $config = Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json
@@ -35,9 +34,15 @@ $subModuleContent = $subModuleContent.replace('${version}', $config.version)
 $subModuleContent = $subModuleContent.replace('${game_version}', $config.game_version)
 $subModuleContent | Out-File -Encoding utf8 -FilePath $DeployDir\SubModule.xml
 
+# copy all dlls
+Copy-Item mb2 -Force -Filter "TaleWorlds*.dll" -Destination $DeployDir -Recurse
+Copy-Item mb2 -Force -Filter "SandBox*.dll" -Destination $DeployDir -Recurse
 
-# copy mod dll
-Copy-item -Force *.dll -Destination $DeployBinDir
+# remove empty folders
+Get-ChildItem $DeployBinDir -Recurse -Force -Directory | 
+    Sort-Object -Property FullName -Descending |
+    Where-Object { $($_ | Get-ChildItem -Force | Select-Object -First 1).Count -eq 0 } |
+    Remove-Item
 
 # copy to games mod folder
 if(Test-Path (${BaseDir} + $config.modsDir))

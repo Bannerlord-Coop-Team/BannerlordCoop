@@ -1,90 +1,57 @@
-ARG REPO=mcr.microsoft.com/dotnet/framework/runtime
-FROM $REPO:4.8-20230214-windowsservercore-ltsc2019
+ARG REPO=mcr.microsoft.com/dotnet/aspnet
+FROM $REPO:6.0.16-alpine3.17-amd64
 
+# Unset ASPNETCORE_URLS from aspnet base image
+ENV ASPNETCORE_URLS=
 # Do not generate certificate
 ENV DOTNET_GENERATE_ASPNET_CERTIFICATE=false
-# NuGet version to install
-ENV NUGET_VERSION=6.5.0
-# Install location of Roslyn
-ENV ROSLYN_COMPILER_LOCATION="C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\Roslyn"
+# Do not show first run text
+ENV DOTNET_NOLOGO=true
+# SDK version
+ENV DOTNET_SDK_VERSION=6.0.408
+# Disable the invariant mode (set in base image)
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
+# Enable correct mode for dotnet watch (only mode supported in a container)
+ENV DOTNET_USE_POLLING_FILE_WATCHER=true
+# Skip extraction of XML docs - generally not useful within an image/container - helps performance
+ENV NUGET_XMLDOC_MODE=skip
+# PowerShell telemetry for docker image usage
+ENV POWERSHELL_DISTRIBUTION_CHANNEL=PSDocker-DotnetSDK-Alpine-3.17
 
-# Install NuGet CLI
-RUN mkdir "%ProgramFiles%\NuGet\latest" \
-    && curl -fSLo "%ProgramFiles%\NuGet\nuget.exe" "https://dist.nuget.org/win-x86-commandline/v%NUGET_VERSION%/nuget.exe" \
-    && mklink "%ProgramFiles%\NuGet\latest\nuget.exe" "%ProgramFiles%\NuGet\nuget.exe"
+RUN apk add --no-cache \
+        curl \
+        icu-data-full \
+        icu-libs \
+        git
 
-# Install VS components
-RUN \
-    # Install VS Test Agent
-    curl -fSLo vs_TestAgent.exe https://aka.ms/vs/17/release/vs_TestAgent.exe \
-    && start /w vs_TestAgent --quiet --norestart --nocache --wait --installPath "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\TestAgent" \
-    && powershell -Command "if ($err = dir $Env:TEMP -Filter dd_setup_*_errors.log | where Length -gt 0 | Get-Content) { throw $err }" \
-    && del vs_TestAgent.exe \
-    \
-    # Install VS Build Tools
-    && curl -fSLo vs_BuildTools.exe https://aka.ms/vs/17/release/vs_BuildTools.exe \
-    && start /w vs_BuildTools ^ \
-        --installPath "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\BuildTools" ^ \
-        --add Microsoft.Net.Component.4.8.SDK ^ \
-        --add Microsoft.VisualStudio.Component.NuGet.BuildTools ^ \
-        --add Microsoft.NetCore.Component.Runtime.6.0 ^ \
-        --add Microsoft.NetCore.Component.SDK ^ \
-        --add Microsoft.VisualStudio.Workload.MSBuildTools ^ \
-        --quiet --norestart --nocache --wait \
-    && powershell -Command "if ($err = dir $Env:TEMP -Filter dd_setup_*_errors.log | where Length -gt 0 | Get-Content) { throw $err }" \
-    && del vs_BuildTools.exe \
-    \
-    # Trigger dotnet first run experience by running arbitrary cmd
-    && "%ProgramFiles%\dotnet\dotnet" help \
-    \
-    # Workaround for issues with 64-bit ngen
-    && %windir%\Microsoft.NET\Framework64\v4.0.30319\ngen uninstall "%ProgramFiles(x86)%\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\SecAnnotate.exe" \
-    && %windir%\Microsoft.NET\Framework64\v4.0.30319\ngen uninstall "%ProgramFiles(x86)%\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\WinMDExp.exe" \
-    \
-    # ngen assemblies queued by VS installers
-    && %windir%\Microsoft.NET\Framework64\v4.0.30319\ngen update \
-    && %windir%\Microsoft.NET\Framework\v4.0.30319\ngen update \
-    \
-    # Cleanup
-    && (for /D %i in ("%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\*") do rmdir /S /Q "%i") \
-    && (for %i in ("%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\*") do if not "%~nxi" == "vswhere.exe" del "%~i") \
-    && powershell Remove-Item -Force -Recurse "%TEMP%\*" \
-    && rmdir /S /Q "%ProgramData%\Package Cache"
+# Install .NET SDK
+RUN wget -O dotnet.tar.gz https://dotnetcli.azureedge.net/dotnet/Sdk/$DOTNET_SDK_VERSION/dotnet-sdk-$DOTNET_SDK_VERSION-linux-musl-x64.tar.gz \
+    && dotnet_sha512='241f1ef5c32a277bed881443de2ff17ceeba100f7191c4929108b65fde42d267aa4ab53f45fde728009185d4b5ac061d1e276d14e56b964d1b3104db0608fafd' \
+    && echo "$dotnet_sha512  dotnet.tar.gz" | sha512sum -c - \
+    && mkdir -p /usr/share/dotnet \
+    && tar -oxzf dotnet.tar.gz -C /usr/share/dotnet ./packs ./sdk ./sdk-manifests ./templates ./LICENSE.txt ./ThirdPartyNotices.txt \
+    && rm dotnet.tar.gz \
+    # Trigger first run experience by running arbitrary cmd
+    && dotnet help
 
-# Set PATH in one layer to keep image size down.
-RUN powershell setx /M PATH $(${Env:PATH} \
-    + \";${Env:ProgramFiles}\NuGet\" \
-    + \";${Env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\TestAgent\Common7\IDE\CommonExtensions\Microsoft\TestWindow\" \
-    + \";${Env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools\MSBuild\Current\Bin\amd64\" \
-    + \";${Env:ProgramFiles(x86)}\Microsoft SDKs\Windows\v10.0A\bin\NETFX 4.8 Tools\" \
-    + \";${Env:ProgramFiles(x86)}\Microsoft SDKs\ClickOnce\SignTool\")
+# Install PowerShell global tool
+RUN powershell_version=7.2.10 \
+    && wget -O PowerShell.Linux.Alpine.$powershell_version.nupkg https://pwshtool.blob.core.windows.net/tool/$powershell_version/PowerShell.Linux.Alpine.$powershell_version.nupkg \
+    && powershell_sha512='d6a5c2c54a9ba84fc3c2631bb91312ee8ef40cb1e8232432e8bd9680bf114e8f9a6f33b8622789931977a2e783c23b5b1076822c4007e37a2c64c85e22195def' \
+    && echo "$powershell_sha512  PowerShell.Linux.Alpine.$powershell_version.nupkg" | sha512sum -c - \
+    && mkdir -p /usr/share/powershell \
+    && dotnet tool install --add-source / --tool-path /usr/share/powershell --version $powershell_version PowerShell.Linux.Alpine \
+    && dotnet nuget locals all --clear \
+    && rm PowerShell.Linux.Alpine.$powershell_version.nupkg \
+    && ln -s /usr/share/powershell/pwsh /usr/bin/pwsh \
+    && chmod 755 /usr/share/powershell/pwsh \
+    # To reduce image size, remove the copy nupkg that nuget keeps.
+    && find /usr/share/powershell -print | grep -i '.*[.]nupkg$' | xargs rm \
+    # Add ncurses-terminfo-base to resolve psreadline dependency
+    && apk add --no-cache ncurses-terminfo-base 
 
-# Install Targeting Packs
-RUN powershell " \
-    $ErrorActionPreference = 'Stop'; \
-    $ProgressPreference = 'SilentlyContinue'; \
-    @('4.0', '4.5.2', '4.6.2', '4.7.2', '4.8', '4.8.1') \
-    | %{ \
-        Invoke-WebRequest \
-            -UseBasicParsing \
-            -Uri https://dotnetbinaries.blob.core.windows.net/referenceassemblies/v${_}.zip \
-            -OutFile referenceassemblies.zip; \
-        Expand-Archive referenceassemblies.zip -DestinationPath \"${Env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\"; \
-        Remove-Item -Force referenceassemblies.zip; \
-    }"
-
-# Install git CLI
-RUN powershell " \
-    $ErrorActionPreference = 'Stop'; \
-    $ProgressPreference = 'SilentlyContinue'; \
-    $latestGitCliUri = $(Invoke-RestMethod https://api.github.com/repos/git-for-windows/git/releases/latest).assets.browser_download_url | Where-Object {$_.EndsWith('64-bit.exe')}; \
-    Invoke-WebRequest -Uri $latestGitCliUri -OutFile '.\git_cli.exe'; \
-    Start-Process -FilePath '.\git_cli.exe' -Wait -ArgumentList '/SP- /SUPPRESSMSGBOXES /VERYSILENT'; \
-    "
-
-WORKDIR /usr/local/BannerlordAssemblies
-COPY bin/Win64_Shipping_Client/TaleWorlds*.dll ./
-COPY bin/Win64_Shipping_Client/SandBox*.dll ./
+# Copy MB assemblies (make sure you run deploy.ps1 first)
+WORKDIR /usr/local/mb2
+COPY mb2 ./
+COPY mb2 ./
 WORKDIR /usr/local
-
-SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
