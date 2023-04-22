@@ -135,7 +135,7 @@ namespace Missions.Services.Agents.Packets
                 {
                     GameLoopRunner.RunOnMainThread(() =>
                     {
-                        agent.MakeDead(false, ActionIndexCache.act_none);
+                        agent.MakeDead(false, ActionIndexValueCache.act_none);
                         agent.FadeOut(false, true);
                     });
                 }

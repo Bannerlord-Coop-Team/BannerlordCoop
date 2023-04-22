@@ -5,6 +5,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using Common.PacketHandlers;
 using Serilog;
 
 namespace Missions.Services.Network
@@ -31,9 +34,9 @@ namespace Missions.Services.Network
             if (message == null)
                 return;
 
-            var payload = new MessagePayload<T>(message, string.Empty);
+            var payload = new MessagePayload<T>(string.Empty, message);
 
-            EventPacket messagePacket = new EventPacket(payload);
+            IPac messagePacket = new EventPacket(payload);
 
             if (peer != null)
             {
@@ -117,6 +120,18 @@ namespace Missions.Services.Network
 
         public void Publish<T>(object source, T message)
         {
+            Logger.Debug("Publishing {PacketType} : {Payload}", typeof(T).Name, message);
+            Publish(message, null);
+        }
+
+        public void PublishNetworkEvent(INetworkEvent networkEvent)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void PublishNetworkEvent(NetPeer peer, INetworkEvent networkEvent)
+        {
+            throw new NotImplementedException();
         }
     }
 }

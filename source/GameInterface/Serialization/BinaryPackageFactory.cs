@@ -2,7 +2,6 @@
 using GameInterface.Serialization.Native;
 using System;
 using System.Collections.Generic;
-using System.Data.Linq;
 using System.Linq;
 
 namespace GameInterface.Serialization
@@ -101,7 +100,7 @@ namespace GameInterface.Serialization
 
         private void Register(ObjectAndType wrappedObj, IBinaryPackage serializer)
         {
-            if (InstantiatedPackages.ContainsKey(wrappedObj)) throw new DuplicateKeyException(
+            if (InstantiatedPackages.ContainsKey(wrappedObj)) throw new System.Data.DuplicateNameException(
                 $"{wrappedObj} already has a registered serializer.");
 
             InstantiatedPackages.Add(wrappedObj, serializer);
