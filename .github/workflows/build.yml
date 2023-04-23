@@ -21,11 +21,13 @@ jobs:
       - name: Checkout Repo
         run: |
           git clone https://github.com/${{ github.repository }}
+          pwd
           cd BannerlordCoop
           git checkout "${{ github.ref_name }}"
 
       - name: Copy Assemblies
         run: |
+          pwd
           cp -R /usr/local/mb2 /usr/local/BannerlordCoop/mb2
           
       - name: Build Solution
