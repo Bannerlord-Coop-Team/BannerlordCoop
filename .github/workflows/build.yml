@@ -10,7 +10,7 @@ env:
     
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     
     steps:
       - name: Login to Docker Hub
