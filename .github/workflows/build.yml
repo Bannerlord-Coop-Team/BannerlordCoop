@@ -26,7 +26,7 @@ jobs:
 
       - name: Copy Assemblies
         run: |
-          cp -R /usr/local/mb2 /usr/local/mb2/BannerlordCoop/mb2
+          cp -R /usr/local/mb2 /usr/local/BannerlordCoop/mb2
           
       - name: Build Solution
         run: |
