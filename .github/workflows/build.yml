@@ -33,6 +33,8 @@ jobs:
           pwd
           echo "Running ls"
           ls
+          ls ../
+          ls ../../
           cp -R ../assemblies BannerlordCoop/mb2
           
       - name: Build Solution
