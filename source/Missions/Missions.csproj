@@ -163,6 +163,7 @@
     <Compile Include="Services\Agents\Messages\WeaponDropped.cs" />
     <Compile Include="ContainerProvider.cs" />
     <Compile Include="MissionModule.cs" />
+    <Compile Include="Services\Agents\Packets\MovementPacket.cs" />
     <Compile Include="Services\Agents\Patches\AgentDropPatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentPickupPatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentShieldDamagePatch.cs" />

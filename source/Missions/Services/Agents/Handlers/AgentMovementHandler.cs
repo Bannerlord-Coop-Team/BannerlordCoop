@@ -16,38 +16,16 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
 {
-    [ProtoContract]
-    public readonly struct MovementPacket : IPacket
+    public interface IAgentMovementHandler : IPacketHandler, IDisposable
     {
-        public DeliveryMethod DeliveryMethod => DeliveryMethod.Unreliable;
-
-        public PacketType PacketType => PacketType.Movement;
-
-        public byte[] Data => new byte[0];
-
-        [ProtoMember(1)]
-        public AgentData Agent { get; }
-        [ProtoMember(2)]
-        public Guid AgentId { get; }
-
-        public MovementPacket(Guid agentGuid, Agent agent)
-        {
-            AgentId = agentGuid;
-            Agent = new AgentData(agent);
-        }
-
-        public void Apply(Agent agent)
-        {
-            Agent.Apply(agent);
-        }
     }
 
-    public class AgentMovementHandler : IPacketHandler, IDisposable
+    public class AgentMovementHandler : IAgentMovementHandler
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
 
-        private readonly CancellationTokenSource m_AgentPollingCancelToken = new CancellationTokenSource();
-        private readonly Task m_AgentPollingTask;
+        private readonly CancellationTokenSource agentPollingCancelToken = new CancellationTokenSource();
+        private readonly Task agentPollingTask;
         private readonly IPacketManager packetManager;
         private readonly INetwork client;
         private readonly IMessageBroker messageBroker;
@@ -59,6 +37,8 @@ namespace Missions.Services.Agents.Handlers
             IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry)
         {
+            Logger.Verbose("Creating {handlerType}", typeof(AgentMovementHandler));
+
             this.packetManager = packetManager;
             this.client = client;
             this.messageBroker = messageBroker;
@@ -69,7 +49,7 @@ namespace Missions.Services.Agents.Handlers
 
             this.packetManager.RegisterPacketHandler(this);
 
-            m_AgentPollingTask = Task.Factory.StartNew(PollAgents);
+            agentPollingTask = Task.Factory.StartNew(PollAgents);
         }
 
         ~AgentMovementHandler()
@@ -79,45 +59,40 @@ namespace Missions.Services.Agents.Handlers
 
         public void Dispose()
         {
+            Logger.Verbose("Disposing {handlerType}", typeof(AgentMovementHandler));
+
             packetManager.RemovePacketHandler(this);
             messageBroker.Unsubscribe<PeerDisconnected>(Handle_PeerDisconnect);
-            m_AgentPollingCancelToken.Cancel();
-            m_AgentPollingTask.Wait();
+            agentPollingCancelToken.Cancel();
+            agentPollingTask.Wait();
         }
 
         public PacketType PacketType => PacketType.Movement;
 
-        Mission CurrentMission
-        {
-            get
-            {
-                Mission current = null;
-                GameLoopRunner.RunOnMainThread(() =>
-                {
-                    current = Mission.Current;
-                }, true);
-                return current;
-            }
-        }
-
         private async void PollAgents()
         {
-            while (m_AgentPollingCancelToken.IsCancellationRequested == false)
+            Logger.Verbose("Starting agent polling");
+
+            while (agentPollingCancelToken.IsCancellationRequested == false)
             {
                 await Task.Delay(10);
 
-                if (CurrentMission == null) continue;
+                if (Mission.Current == null) continue;
 
                 foreach (Guid guid in agentRegistry.ControlledAgents.Keys)
                 {
-                    Agent agent = agentRegistry.ControlledAgents[guid];
-                    if (agent.Mission != null)
+                    if (agentRegistry.ControlledAgents.TryGetValue(guid, out var agent))
                     {
-                        MovementPacket packet = new MovementPacket(guid, agent);
-                        client.SendAll(packet);
+                        if (agent.Mission != null)
+                        {
+                            MovementPacket packet = new MovementPacket(guid, agent);
+                            client.SendAll(packet);
+                        }
                     }
                 }
             }
+
+            Logger.Verbose("Stopping agent polling");
         }
 
         public void HandlePacket(NetPeer peer, IPacket packet)

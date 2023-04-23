@@ -7,6 +7,7 @@ using GameInterface.Tests.Stubs;
 using Missions;
 using Missions.Messages;
 using Missions.Services.Agents.Messages;
+using Missions.Services.Network.Data;
 using Missions.Services.Network.Surrogates;
 using ProtoBuf.Meta;
 using System;
@@ -47,10 +48,7 @@ namespace IntroductionServerTests
                 default,
                 default,
                 default,
-                Array.Empty<Guid>(),
-                Array.Empty<Vec3>(),
-                Array.Empty<string>(),
-                Array.Empty<float>());
+                Array.Empty<AiAgentData>());
 
             byte[] bytes = ProtoBufSerializer.Serialize(missionJoinInfo);
 

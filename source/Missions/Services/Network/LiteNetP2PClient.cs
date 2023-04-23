@@ -233,12 +233,8 @@ namespace Missions.Services.Network
         {
             if (PeerServer != null && peer.EndPoint != PeerServer.EndPoint)
             {
-                Task.Factory.StartNew(async () =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(.5));
-                    var peerConnectedEvent = new PeerConnected(peer);
-                    messageBroker.Publish(this, peerConnectedEvent);
-                });
+                var peerConnectedEvent = new PeerConnected(peer);
+                messageBroker.Publish(this, peerConnectedEvent);
             }
 
             Logger.Verbose("{LocalPort} received connection from {peer}", netManager.LocalPort, peer.EndPoint);
