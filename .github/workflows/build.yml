@@ -17,7 +17,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
       volumes:
         - ${{ github.workspace }}:/workspace
-        - /__w/BannerlordCoop/assemblies:/usr/local/mb2
+        - /home/runner/work/assemblies:/usr/local/mb2
     
     steps:
           
