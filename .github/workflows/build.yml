@@ -1,8 +1,5 @@
 name: Build
 
-env:
-  DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.1
-  
 on: 
   push:
   pull_request:
@@ -14,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ${{ env.DOCKERHUB_IMAGE }}
+      image: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.1
       credentials:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
