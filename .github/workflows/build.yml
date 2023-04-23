@@ -24,7 +24,9 @@ jobs:
       - name: Checkout Repo
         run: |
           cd ..
-          pwd
+          ls
+          cd BannerlordCoop
+          ls
           git clone https://github.com/${{ github.repository }}
           pwd
           cd BannerlordCoop
