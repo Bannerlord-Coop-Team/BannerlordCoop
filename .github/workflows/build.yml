@@ -22,7 +22,7 @@ jobs:
         run: |
           git clone https://github.com/${{ github.repository }}
           cd BannerlordCoop
-          git checkout "${{ github.after }}"
+          git checkout "${{ github.ref_name }}"
 
       - name: Copy Assemblies
         run: |
