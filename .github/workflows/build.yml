@@ -23,12 +23,12 @@ jobs:
         run: docker image pull ${{ env.DOCKERHUB_IMAGE }}
 
       - name: Run Image
-        shell: bash
+        shell: pwsh
         run: |
           docker run -it --rm /bin/sh ${{ env.DOCKERHUB_IMAGE }}
           
       - name: Checkout Repo
-        shell: bash
+        shell: pwsh
         run: |
           git clone https://github.com/${{ github.repository }}
           cd BannerlordCoop
@@ -36,12 +36,12 @@ jobs:
           git checkout "$branch"
 
       - name: Copy Assemblies
-        shell: bash
+        shell: pwsh
         run: |
           cp -R ../mb2 mb2
           
       - name: Build Solution
-        shell: bash
+        shell: pwsh
         run: |
           cd source
           dotnet build
