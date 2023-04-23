@@ -46,8 +46,9 @@ namespace Missions.Services.Agents.Handlers
             Agent agent = obj.What.Agent;
             if (agentRegistry.TryGetAgentId(agent, out Guid agentId))
             {
-                agentRegistry.RemoveControlledAgent(agentId);
-                agentRegistry.RemoveNetworkControlledAgent(agentId);
+                // TODO find a way to keep alive for any non-processed damage
+                //agentRegistry.RemoveControlledAgent(agentId);
+                //agentRegistry.RemoveNetworkControlledAgent(agentId);
             }
         }
     }
