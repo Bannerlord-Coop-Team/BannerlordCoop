@@ -162,12 +162,16 @@ namespace Missions.Services
             Guid newAgentId = joinInfo.PlayerId;
             Vec3 startingPos = joinInfo.StartingPosition;
 
-            Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
+            try
+            {
+                Logger.Information("Spawning {EntityType} called {AgentName}({AgentID}) from {Peer} with {ControlledAgentCount} controlled agents",
                 joinInfo.CharacterObject.IsPlayerCharacter ? "Player" : "Agent",
                 joinInfo.CharacterObject.Name,
                 newAgentId,
-                netPeer.EndPoint,
-                joinInfo.AiAgentData.Length);
+                netPeer?.EndPoint,
+                joinInfo?.AiAgentData?.Length);
+            }
+            catch (Exception) { }
 
             if (joinInfo.IsPlayerAlive)
             {
@@ -202,8 +206,7 @@ namespace Missions.Services
             Agent aiAgent = SpawnAgent(agentData.UnitPosition, AICharacter, true);
             aiAgent.Health = agentData.UnitHealth;
 
-            // TODO revert
-            aiAgent.SetWatchState(Agent.WatchState.Patrolling);
+            aiAgent.SetWatchState(Agent.WatchState.Alarmed);
 
             agentRegistry.RegisterNetworkControlledAgent(controller, agentData.UnitId, aiAgent);
         }
