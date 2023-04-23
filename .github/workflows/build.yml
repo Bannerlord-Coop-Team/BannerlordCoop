@@ -33,5 +33,10 @@ jobs:
           
       - name: Build Solution
         run: |
+          pwd
+          ls
+          cd ..
+          ls
+          ls assemblies
           cd BannerlordCoop/source
           dotnet build
