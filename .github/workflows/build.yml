@@ -19,7 +19,7 @@ jobs:
     steps:
           
       - name: Checkout Repo
-        shell: bash
+        shell: sh
         run: |
           git clone https://github.com/${{ github.repository }}
           cd BannerlordCoop
