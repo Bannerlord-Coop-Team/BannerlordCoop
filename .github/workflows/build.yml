@@ -6,6 +6,8 @@ on:
     types:
       [opened, synchronize]
     
+
+    
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,7 +18,7 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
       volumes:
-        - assemblies:/usr/local/mb2
+        - /usr/local/mb2:/__w/mb2
     
     steps:
           
