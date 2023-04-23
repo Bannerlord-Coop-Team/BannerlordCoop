@@ -23,8 +23,7 @@ jobs:
         run: |
           git clone https://github.com/${{ github.repository }}
           cd BannerlordCoop
-          branch = "git name-rev --name-only ${{ github.ref }}"
-          git checkout "$branch"
+          git checkout "${{ github.ref }}"
 
       - name: Copy Assemblies
         shell: pwsh
