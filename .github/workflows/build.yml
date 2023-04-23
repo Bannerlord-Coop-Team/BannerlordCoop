@@ -28,10 +28,12 @@ jobs:
         run: |
           echo "Running pwd"
           pwd
+          echo "Running ls1"
+          ls /__w/BannerlordCoop
           echo "Running ls2"
-          /__w/BannerlordCoop/BannerlordCoop
+          ls /__w/BannerlordCoop/BannerlordCoop
           echo "Running ls3"
-          /__w/BannerlordCoop/BannerlordCoop/BannerlordCoop
+          ls /__w/BannerlordCoop/BannerlordCoop/BannerlordCoop
           cp -R ../mb2 BannerlordCoop/mb2
           
       - name: Build Solution
