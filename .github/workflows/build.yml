@@ -29,9 +29,9 @@ jobs:
 
       - name: Copy Assemblies
         run: |
-          cp -R ../assemblies Bannerlord/mb2
+          cp -R ../assemblies BannerlordCoop/mb2
           
       - name: Build Solution
         run: |
-          cd Bannerlord/source
+          cd BannerlordCoop/source
           dotnet build
