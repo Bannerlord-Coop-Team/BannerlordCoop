@@ -272,7 +272,10 @@
     <Compile Include="Serialization\External\BlowWeaponRecordBinaryPackage.cs" />
     <Compile Include="Serialization\External\CustomPartyComponentBinaryPackage.cs" />
     <Compile Include="Serialization\External\MobilePartyAIBinaryPackage.cs" />
+    <Compile Include="Services\Entity\ControlledEntityRegistery.cs" />
+    <Compile Include="Services\Entity\Data\ControlledEntity.cs" />
     <Compile Include="Services\Heroes\ControlledHeroRegistry.cs" />
+    <Compile Include="Services\MobileParties\ControlledPartyRegistry.cs" />
     <Compile Include="Services\MobileParties\Messages\PartyTargetPositionChanged.cs" />
     <Compile Include="Services\MobileParties\MobilePartyRegistry.cs" />
     <Compile Include="Services\Heroes\HeroRegistry.cs" />
@@ -342,6 +345,7 @@
     <Compile Include="Services\Time\Messages\PauseAndDisableGameTimeControls.cs" />
     <Compile Include="Services\Time\Messages\SetTimeControlMode.cs" />
     <Compile Include="Services\Time\Messages\TimeSpeedChanged.cs" />
+    <Compile Include="Services\Time\Patches\MapClickPausePatch.cs" />
     <Compile Include="Services\Time\Patches\TimePatches.cs" />
     <Compile Include="Services\UI\Handlers\LoadingScreenHandler.cs" />
     <Compile Include="Services\UI\Interfaces\UIInterface.cs" />

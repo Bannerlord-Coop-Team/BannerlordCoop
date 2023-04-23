@@ -32,6 +32,7 @@ namespace Coop.Core.Client.States
         private void Handle(MessagePayload<AllGameObjectsRegistered> obj)
         {
             Logic.NetworkMessageBroker.Publish(this, new SwitchToHero(Logic.ControlledHeroId));
+            Logic.NetworkMessageBroker.PublishNetworkEvent(new NetworkPlayerCampaignEntered());
         }
 
         public override void Dispose()

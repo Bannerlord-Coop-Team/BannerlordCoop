@@ -26,16 +26,20 @@ namespace Coop.Core.Server.Services.Save.Handlers
             messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
             messageBroker.Subscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
             messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
+            messageBroker.Subscribe<CampaignLoaded>(Handle_CampaignLoaded);
 
             messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
             messageBroker.Subscribe<ExistingObjectGuidsLoaded>(Handle_ExistingObjectGuidsLoaded);
         }
+
+        
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<GameSaved>(Handle_GameSaved);
             messageBroker.Unsubscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
             messageBroker.Unsubscribe<GameLoaded>(Handle_GameLoaded);
+            messageBroker.Unsubscribe<CampaignLoaded>(Handle_CampaignLoaded);
 
             messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
             messageBroker.Unsubscribe<ExistingObjectGuidsLoaded>(Handle_ExistingObjectGuidsLoaded);
@@ -66,36 +70,26 @@ namespace Coop.Core.Server.Services.Save.Handlers
             }
         }
 
+        private ICoopSession savedSession;
         private void Handle_GameLoaded(MessagePayload<GameLoaded> obj)
         {
-            string saveName = obj.What.SaveName;
+            savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
+        }
 
-            ICoopSession session = saveManager.LoadCoopSession(saveName);
-
-            Action<MessagePayload<CampaignLoaded>> postLoadHandler = null;
-
-            if (session == null)
+        private void Handle_CampaignLoaded(MessagePayload<CampaignLoaded> obj)
+        {
+            if (savedSession == null)
             {
-                postLoadHandler = (payload) =>
-                {
-                    messageBroker.Publish(this, new RegisterAllGameObjects());
-                    messageBroker.Unsubscribe(postLoadHandler);
-                };
+                messageBroker.Publish(this, new RegisterAllGameObjects());
             }
             else
             {
                 var message = new LoadExistingObjectGuids(
                     Guid.Empty, /* Transaction Id not required */
-                    session.GameObjectGuids);
+                    savedSession.GameObjectGuids);
 
-                postLoadHandler = (payload) =>
-                {
-                    messageBroker.Publish(this, message);
-                    messageBroker.Unsubscribe(postLoadHandler);
-                };
+                messageBroker.Publish(this, message);
             }
-
-            messageBroker.Subscribe(postLoadHandler);
         }
 
         private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)

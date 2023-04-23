@@ -9,7 +9,7 @@ namespace Common
     /// Thread safe list
     /// </summary>
     /// <typeparam name="T">The type of elements in the list.</typeparam>
-    public class ConcurrentList<T> : IList<T>
+    public class ConcurrentList<T> : IList<T>, ICollection<T>
     {
         public T this[int index]
         {
