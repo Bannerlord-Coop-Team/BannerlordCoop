@@ -33,10 +33,20 @@ jobs:
           
       - name: Build Solution
         run: |
+          echo "Running pwd"
           pwd
+          echo "Running ls"
           ls
+          echo "Running cd.."
           cd ..
+          echo "Running ls"
           ls
-          ls assemblies
+          echo "Running cd assemblies"
+          cd assemblies
+          echo "Running pwd"
+          pwd
+          echo "Running ls"
+          ls
+          echo "Running cd BannerlordCoop/source"
           cd BannerlordCoop/source
           dotnet build
