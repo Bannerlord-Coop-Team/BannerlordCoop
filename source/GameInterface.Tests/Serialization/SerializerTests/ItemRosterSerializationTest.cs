@@ -5,6 +5,7 @@ using GameInterface.Serialization.External;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

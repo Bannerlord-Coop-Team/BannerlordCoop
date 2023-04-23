@@ -2,6 +2,7 @@
 using GameInterface.Serialization;
 using TaleWorlds.Core;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

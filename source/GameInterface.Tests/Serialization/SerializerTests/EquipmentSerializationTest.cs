@@ -4,6 +4,7 @@ using TaleWorlds.Core;
 using Xunit;
 using System.Reflection;
 using static TaleWorlds.Core.Equipment;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

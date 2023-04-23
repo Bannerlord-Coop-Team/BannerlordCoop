@@ -10,6 +10,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using GameInterface.Tests.Bootstrap;
 using TaleWorlds.Library;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

@@ -23,23 +23,15 @@ namespace GameInterface.Serialization.External
             "_hourlyTickEvent",
             "_tickEvent",
         };
-
+        
         protected override void PackInternal()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackInternal(excludes);
         }
 
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackInternal();
 
             // Resolves _hourlyTickEvent and _tickEvent
             AddEventHandlers.Invoke(Object, new object[0]);

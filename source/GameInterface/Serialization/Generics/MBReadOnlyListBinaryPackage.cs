@@ -2,6 +2,8 @@
 using GameInterface.Serialization.Native;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 
@@ -19,23 +21,24 @@ namespace GameInterface.Serialization.Generics
         [NonSerialized]
         BinaryPackageFactory BinaryPackageFactory;
 
-        protected Dictionary<FieldInfo, IBinaryPackage> StoredFields = new Dictionary<FieldInfo, IBinaryPackage>();
+        protected Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
-        Type ObjectType;
+        string ObjectType;
 
         public MBReadOnlyListBinaryPackage(object obj, BinaryPackageFactory binaryPackageFactory)
         {
             BinaryPackageFactory = binaryPackageFactory;
-            ObjectType = obj.GetType();
+            ObjectType = obj.GetType().AssemblyQualifiedName;
             Object = obj;
         }
 
         public void Pack()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
+            var type = Type.GetType(ObjectType);
+            foreach (FieldInfo field in type.GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First()))
             {
                 object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
+                StoredFields.Add(field.Name, BinaryPackageFactory.GetBinaryPackage(obj));
             }
         }
 
@@ -44,13 +47,24 @@ namespace GameInterface.Serialization.Generics
             if (IsUnpacked) return Object;
 
             IsUnpacked = true;
+            var type = Type.GetType(ObjectType);
+            Object = FormatterServices.GetUninitializedObject(type);
+            var fields = type.GetAllInstanceFields();
 
-            Object = FormatterServices.GetUninitializedObject(ObjectType);
-
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
+            foreach (string fieldName in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+
+                if (type.IsValueType)
+                {
+                    object boxed = Object;
+                    field.SetValue(boxed, StoredFields[fieldName].Unpack());
+                    Object = boxed;
+                }
+                else
+                {
+                    field.SetValue(Object, StoredFields[fieldName].Unpack());
+                }
             }
 
             return Object;

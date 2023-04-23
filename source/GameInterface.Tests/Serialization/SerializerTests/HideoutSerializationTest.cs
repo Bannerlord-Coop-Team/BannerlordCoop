@@ -7,6 +7,7 @@ using Xunit;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

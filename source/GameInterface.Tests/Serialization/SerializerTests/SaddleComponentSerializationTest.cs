@@ -2,12 +2,19 @@
 using GameInterface.Serialization.External;
 using System.Runtime.Serialization;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class SaddleComponentSerializationTest
     {
+        public SaddleComponentSerializationTest()
+        {
+            MBObjectManager.Init();
+        }
+        
         [Fact]
         public void SaddleComponent_Serialize()
         {

@@ -31,21 +31,13 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackInternal(excludes);
         }
 
         private static readonly FieldInfo MobilePartyAi_lastTargetedParties = typeof(MobilePartyAi).GetField("_lastTargetedParties", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackInternal();
 
             MobilePartyAi_lastTargetedParties.SetValue(Object, new List<MobileParty>());
         }

@@ -15,12 +15,6 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class HeroBinaryPackage : BinaryPackageBase<Hero>
     {
-        public static readonly FieldInfo Hero_Father = typeof(Hero).GetField("_father", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_Mother = typeof(Hero).GetField("_mother", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_Spouse = typeof(Hero).GetField("_spouse", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_ExSpouses = typeof(Hero).GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_Children = typeof(Hero).GetField("_children", BindingFlags.NonPublic | BindingFlags.Instance);
-
         private string stringId;
         private string fatherId;
         private string motherId;
@@ -46,16 +40,13 @@ namespace GameInterface.Serialization.External
         {
             stringId = Object.StringId;
 
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(Excludes))
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackInternal(Excludes);
 
             fatherId = Object.Father?.StringId;
             motherId = Object.Mother?.StringId;
             spouseId = Object.Spouse?.StringId;
 
+            FieldInfo Hero_ExSpouses = typeof(Hero).GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance);
             List<Hero> exSpoueses = (List<Hero>)Hero_ExSpouses.GetValue(Object);
             exSpousesIds = PackIds(exSpoueses);
             childrenIds = PackIds(Object.Children);
@@ -83,13 +74,15 @@ namespace GameInterface.Serialization.External
             Object.Init();
 
             // Set the values of all the stored fields on the object
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackInternal();
 
             // Set the values of the object's father, mother, spouse, ex-spouses, and children
+            FieldInfo Hero_Father = typeof(Hero).GetField("_father", BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo Hero_Mother = typeof(Hero).GetField("_mother", BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo Hero_Spouse = typeof(Hero).GetField("_spouse", BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo Hero_ExSpouses = typeof(Hero).GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo Hero_Children = typeof(Hero).GetField("_children", BindingFlags.NonPublic | BindingFlags.Instance);
+            
             Hero_Father.SetValue(Object, ResolveId<Hero>(fatherId));
             Hero_Mother.SetValue(Object, ResolveId<Hero>(motherId));
             Hero_Spouse.SetValue(Object, ResolveId<Hero>(spouseId));

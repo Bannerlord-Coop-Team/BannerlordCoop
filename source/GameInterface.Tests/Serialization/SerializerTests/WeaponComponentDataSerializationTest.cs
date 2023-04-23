@@ -4,6 +4,7 @@ using TaleWorlds.Core;
 using Xunit;
 using static TaleWorlds.Core.WeaponComponentData;
 using TaleWorlds.Library;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

@@ -1,6 +1,7 @@
 ﻿using GameInterface.Serialization;
 using Xunit;
 using GameInterface.Serialization.Native;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

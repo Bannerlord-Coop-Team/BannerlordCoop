@@ -13,7 +13,8 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class PartyBaseBinaryPackage : BinaryPackageBase<PartyBase>
     {
-        public PartyBaseBinaryPackage(PartyBase obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public PartyBaseBinaryPackage(PartyBase obj, BinaryPackageFactory binaryPackageFactory) : base(obj,
+            binaryPackageFactory)
         {
         }
 
@@ -30,24 +31,17 @@ namespace GameInterface.Serialization.External
             "_visual",
         };
 
+        private static readonly FieldInfo PartyBase_Visual = typeof(PartyBase).GetField("_visual", BindingFlags.NonPublic | BindingFlags.Instance);
+        
         protected override void PackInternal()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackInternal(excludes);
         }
 
-        private static readonly FieldInfo PartyBase_Visual = typeof(PartyBase).GetField("_visual", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
-
+            base.UnpackInternal();
+            
             IPartyVisual partyVisual = Campaign.Current?.VisualCreator?.CreatePartyVisual();
             PartyBase_Visual.SetValue(Object, partyVisual);
         }

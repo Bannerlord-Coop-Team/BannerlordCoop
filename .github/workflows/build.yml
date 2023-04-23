@@ -6,7 +6,7 @@ on:
       [opened, synchronize]
     
 env:
-  DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.0
+  DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.1
     
 jobs:
   build:
@@ -25,10 +25,9 @@ jobs:
       - name: Run Build
         shell: pwsh
         run: |
-          docker run -it --rm --entrypoint powershell ${{ env.DOCKERHUB_IMAGE }}
+          docker run -it --rm /bin/sh ${{ env.DOCKERHUB_IMAGE }}
           git clone https://github.com/${{ github.repository }}
-          git checkout ${{ github.ref }}
-          echo d | xcopy /e /v "BannerlordAssemblies" "BannerlordCoop\mb2\bin\Win64_Shipping_Client\"
+          cp -R mb2 "BannerlordCoop/mb2"
           cd "BannerlordCoop\source"
-          nuget restore Coop.sln
-          msbuild Coop.sln
+          git checkout ${{ github.ref }}
+          dotnet build

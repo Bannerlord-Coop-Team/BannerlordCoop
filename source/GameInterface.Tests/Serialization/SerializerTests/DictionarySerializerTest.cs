@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Xunit;
 using TaleWorlds.CampaignSystem;
 using GameInterface.Serialization.Native;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -11,7 +12,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Dictionary_Serialize()
         {
-            Dictionary<string, CampaignTime> Dict = new Dictionary<string, CampaignTime>
+            Dictionary<string, CampaignTime> dict = new Dictionary<string, CampaignTime>
             {
                 { "1", new CampaignTime() },
                 { "2", new CampaignTime() },
@@ -19,7 +20,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             };
 
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            DictionaryBinaryPackage package = new DictionaryBinaryPackage(Dict, factory);
+            DictionaryBinaryPackage package = new DictionaryBinaryPackage(dict, factory);
 
             package.Pack();
 
@@ -31,17 +32,15 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Dictionary_Full_Serialization()
         {
-            Dictionary<string, CampaignTime> Dict = new Dictionary<string, CampaignTime>
+            Dictionary<string, CampaignTime> dict = new Dictionary<string, CampaignTime>
             {
                 { "1", new CampaignTime() },
                 { "2", new CampaignTime() },
                 { "3", new CampaignTime() },
             };
 
-            Dictionary<string, CampaignTime> Dict2 = new Dictionary<string, CampaignTime>(Dict);
-
             BinaryPackageFactory factory = new BinaryPackageFactory();
-            DictionaryBinaryPackage package = new DictionaryBinaryPackage(Dict, factory);
+            DictionaryBinaryPackage package = new DictionaryBinaryPackage(dict, factory);
 
             package.Pack();
 
@@ -57,7 +56,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Dictionary<string, CampaignTime> newDict = returnedPackage.Unpack<Dictionary<string, CampaignTime>>();
 
-            Assert.Equal(Dict, newDict);
+            Assert.Equal(dict, newDict);
         }
     }
 }

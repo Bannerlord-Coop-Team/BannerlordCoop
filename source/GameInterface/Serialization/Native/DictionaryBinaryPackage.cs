@@ -15,7 +15,7 @@ namespace GameInterface.Serialization.Native
         [NonSerialized]
         readonly IEnumerable enumerable;
 
-        readonly Type enumerableType;
+        readonly string enumerableType;
 
         IBinaryPackage[] packages;
 
@@ -23,7 +23,7 @@ namespace GameInterface.Serialization.Native
         {
             PackageFactory = packageFactory;
             this.enumerable = enumerable;
-            enumerableType = enumerable.GetType();
+            enumerableType = enumerable.GetType().AssemblyQualifiedName;
         }
 
         public void Pack()
@@ -31,7 +31,8 @@ namespace GameInterface.Serialization.Native
             List<IBinaryPackage> binaryPackages = new List<IBinaryPackage>();
             foreach (var obj in enumerable)
             {
-                binaryPackages.Add(PackageFactory.GetBinaryPackage(obj));
+                var package = PackageFactory.GetBinaryPackage(obj);
+                binaryPackages.Add(package);
             }
 
             packages = binaryPackages.ToArray();
@@ -40,13 +41,13 @@ namespace GameInterface.Serialization.Native
         public object Unpack()
         {
             var unpackedArray = packages.Select(e => e.Unpack()).ToArray();
+            var type = Type.GetType(enumerableType);
+            var newDict = Activator.CreateInstance(type);
 
-            var newDict = Activator.CreateInstance(enumerableType);
+            MethodInfo DictAdd = type.GetMethod("Add");
 
-            MethodInfo DictAdd = enumerableType.GetMethod("Add");
-
-            Type KeyType = enumerableType.GetGenericArguments()[0];
-            Type ValueType = enumerableType.GetGenericArguments()[1];
+            Type KeyType = type.GetGenericArguments()[0];
+            Type ValueType = type.GetGenericArguments()[1];
 
             Type kvpType = typeof(KeyValuePair<,>).MakeGenericType(KeyType, ValueType);
 

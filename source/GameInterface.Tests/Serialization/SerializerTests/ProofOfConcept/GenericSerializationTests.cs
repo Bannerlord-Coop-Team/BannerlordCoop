@@ -1,5 +1,6 @@
 ﻿using GameInterface.Serialization;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 {

@@ -12,10 +12,11 @@ namespace GameInterface.Serialization
         IBinaryPackage GetBinaryPackage(object obj);
     }
 
+    [Serializable]
     public class BinaryPackageFactory : IBinaryPackageFactory
     {
         readonly Dictionary<ObjectAndType, IBinaryPackage> InstantiatedPackages = new Dictionary<ObjectAndType, IBinaryPackage>();
-        static readonly Dictionary<Type, Type> PackagesTypes = new Dictionary<Type, Type>();
+        static readonly Dictionary<string, string> PackagesTypes = new Dictionary<string, string>();
 
         static BinaryPackageFactory()
         {
@@ -40,19 +41,19 @@ namespace GameInterface.Serialization
 
         private static void RegisterNormalBinaryPackage(Type type)
         {
-            Type coveredType = type.BaseType.GenericTypeArguments.Single();
+            string coveredType = type.BaseType.GenericTypeArguments.Single().AssemblyQualifiedName;
 
             if (PackagesTypes.ContainsKey(coveredType)) throw new Exception(
-                $"{coveredType.Name} already has a registered binary package while trying to register {type.Name}.");
+                $"{coveredType} already has a registered binary package while trying to register {type.Name}.");
 
-            PackagesTypes.Add(coveredType, type);
+            PackagesTypes.Add(coveredType, type.AssemblyQualifiedName);
         }
 
         private static  void RegisterEnumerableBinaryPackage()
         {
             foreach(var kvp in NativeBinaryPackageCollection.CollectTypes())
             {
-                PackagesTypes.Add(kvp.Key, kvp.Value);
+                PackagesTypes.Add(kvp.Key.AssemblyQualifiedName, kvp.Value.AssemblyQualifiedName);
             }
         }
 
@@ -69,7 +70,7 @@ namespace GameInterface.Serialization
    
             if (type.IsFullySerializable()) return new PrimitiveBinaryPackage(obj);
 
-            ObjectAndType wrappedObj = new ObjectAndType(type, obj);
+            ObjectAndType wrappedObj = new ObjectAndType(type.AssemblyQualifiedName, obj);
 
             if (InstantiatedPackages.TryGetValue(wrappedObj, out IBinaryPackage serializer))
             {
@@ -90,12 +91,12 @@ namespace GameInterface.Serialization
 
             objectType = objectType.IsGenericType ? objectType.GetGenericTypeDefinition() : objectType;
             objectType = objectType.IsArray ? typeof(Array) : objectType;
-            if (PackagesTypes.TryGetValue(objectType, out Type packageType) == false)
+            if (PackagesTypes.TryGetValue(objectType.AssemblyQualifiedName, out string packageTypeStr) == false)
             { 
                 throw new Exception($"No binary package exists for {objectType}");
             }  
 
-            return (IBinaryPackage)Activator.CreateInstance(packageType, new object[] { obj, this });
+            return (IBinaryPackage)Activator.CreateInstance(Type.GetType(packageTypeStr), new object[] { obj, this });
         }
 
         private void Register(ObjectAndType wrappedObj, IBinaryPackage serializer)
@@ -109,16 +110,16 @@ namespace GameInterface.Serialization
 
     public class ObjectAndType
     {
-        public Type Type { get; private set; }
+        public string Type { get; private set; }
         public object Object { get; private set; }
 
         public ObjectAndType(object @object)
         {
-            Type = @object.GetType();
+            Type = @object.GetType().FullName;
             Object = @object;
         }
 
-        public ObjectAndType(Type type, object @object)
+        public ObjectAndType(string type, object @object)
         {
             Type = type;
             Object = @object;
