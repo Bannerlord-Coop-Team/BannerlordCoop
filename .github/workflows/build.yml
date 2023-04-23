@@ -5,15 +5,12 @@ on:
     types:
       [opened, synchronize]
     
-env:
-  DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.1
-    
 jobs:
   build:
     runs-on: ubuntu-latest
     
     container:
-      image: ${{ env.DOCKERHUB_IMAGE }}
+      image: hulkhan/bannerlordcoop:1.0.1
         
     steps:
       - name: Login to Docker Hub
