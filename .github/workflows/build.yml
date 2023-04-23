@@ -23,19 +23,13 @@ jobs:
           
       - name: Checkout Repo
         run: |
-          cd ..
-          ls
-          cd BannerlordCoop
-          ls
           git clone https://github.com/${{ github.repository }}
-          pwd
           cd BannerlordCoop
           git checkout "${{ github.ref_name }}"
 
       - name: Copy Assemblies
         run: |
-          pwd
-          cp -R ../mb2 mb2
+          cp -R ../assemblies mb2
           
       - name: Build Solution
         run: |
