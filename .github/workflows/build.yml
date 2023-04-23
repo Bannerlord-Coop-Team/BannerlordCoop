@@ -29,11 +29,9 @@ jobs:
 
       - name: Copy Assemblies
         run: |
-          cp -R ../assemblies mb2
+          cp -R ../assemblies Bannerlord/mb2
           
       - name: Build Solution
         run: |
-          pwd
-          ls
-          cd source
+          cd Bannerlord/source
           dotnet build
