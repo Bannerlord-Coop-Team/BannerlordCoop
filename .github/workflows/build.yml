@@ -14,8 +14,8 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: hulkhan/bannerlordcoop:1.0.1
-      with:
+      image: ${{ env.DOCKERHUB_IMAGE }}
+      credentials:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
     
