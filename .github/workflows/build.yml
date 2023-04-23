@@ -22,12 +22,26 @@ jobs:
       - name: Pull Image
         run: docker image pull ${{ env.DOCKERHUB_IMAGE }}
 
-      - name: Run Build
-        shell: pwsh
+      - name: Run Image
+        shell: bash
         run: |
           docker run -it --rm /bin/sh ${{ env.DOCKERHUB_IMAGE }}
+          
+      - name: Checkout Repo
+        shell: bash
+        run: |
           git clone https://github.com/${{ github.repository }}
-          cp -R mb2 "BannerlordCoop/mb2"
-          cd "BannerlordCoop\source"
-          git checkout ${{ github.ref }}
+          cd BannerlordCoop
+          branch = "git name-rev --name-only ${{ github.ref }}"
+          git checkout "$branch"
+
+      - name: Copy Assemblies
+        shell: bash
+        run: |
+          cp -R ../mb2 mb2
+          
+      - name: Build Solution
+        shell: bash
+        run: |
+          cd source
           dotnet build
