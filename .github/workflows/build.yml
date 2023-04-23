@@ -12,16 +12,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
-    spec:
-      containers:
-        - name: private-reg-container
-          image: ${{ env.DOCKERHUB_IMAGE }}
-      imagePullSecrets:
-        - name: ${{ secrets.DOCKERHUB_TOKEN }}
-    
+
     container:
-      name: private-reg-container
+      image: hulkhan/bannerlordcoop:1.0.1
+      auth:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
     
     steps:
           
