@@ -16,12 +16,13 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
       volumes:
-        - /usr/local
+        - ${{ github.workspace }}:/workspace
     
     steps:
           
       - name: Checkout Repo
         run: |
+          pwd
           git clone https://github.com/${{ github.repository }}
           pwd
           cd BannerlordCoop
