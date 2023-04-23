@@ -25,7 +25,7 @@ namespace Missions.Services.Network
             LiteNetP2PClient client,
             INetworkMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry,
-            AgentMovementHandler movementHandler,
+            IAgentMovementHandler movementHandler,
             IEventPacketHandler eventPacketHandler)
         {
             this.client = client;
