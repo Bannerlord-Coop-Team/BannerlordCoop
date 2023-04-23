@@ -17,7 +17,7 @@ jobs:
         password: ${{ secrets.DOCKERHUB_TOKEN }}
       volumes:
         - ${{ github.workspace }}:/workspace
-        - /usr/local/mb2:/home/runner/work/BannerlordCoop/assemblies
+        - /usr/local/mb2:/__w/BannerlordCoop/BannerlordCoop/assemblies
     
     steps:
           
@@ -29,6 +29,10 @@ jobs:
 
       - name: Copy Assemblies
         run: |
+          echo "Running pwd"
+          pwd
+          echo "Running ls"
+          ls
           cp -R ../assemblies BannerlordCoop/mb2
           
       - name: Build Solution
