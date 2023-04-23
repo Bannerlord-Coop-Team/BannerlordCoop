@@ -1,17 +1,8 @@
-apiVersion: v1
-kind: Pod
-metadata:
-  name: private-reg
+name: Build
+
 env:
   DOCKERHUB_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.1
-spec:
-  containers:
-    - name: private-reg-container
-      image: ${{ env.DOCKERHUB_IMAGE }}
-  imagePullSecrets:
-    - name: ${{ secrets.DOCKERHUB_TOKEN }}
-
-name: Build
+  
 on: 
   push:
   pull_request:
@@ -21,6 +12,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    spec:
+      containers:
+        - name: private-reg-container
+          image: ${{ env.DOCKERHUB_IMAGE }}
+      imagePullSecrets:
+        - name: ${{ secrets.DOCKERHUB_TOKEN }}
     
     container:
       name: private-reg-container
