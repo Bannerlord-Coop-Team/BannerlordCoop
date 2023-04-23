@@ -19,19 +19,16 @@ jobs:
     steps:
           
       - name: Checkout Repo
-        shell: sh
         run: |
           git clone https://github.com/${{ github.repository }}
           cd BannerlordCoop
-          git checkout "${{ github.ref }}"
+          git checkout "${{ github.after }}"
 
       - name: Copy Assemblies
-        shell: pwsh
         run: |
           cp -R ../mb2 mb2
           
       - name: Build Solution
-        shell: pwsh
         run: |
           cd source
           dotnet build
