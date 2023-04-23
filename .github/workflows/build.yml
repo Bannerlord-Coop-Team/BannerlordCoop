@@ -15,6 +15,8 @@ jobs:
       credentials:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
+      volumes:
+        - /usr/local
     
     steps:
           
@@ -28,9 +30,9 @@ jobs:
       - name: Copy Assemblies
         run: |
           pwd
-          cp -R /usr/local/mb2 /usr/local/BannerlordCoop/mb2
+          cp -R ../mb2 mb2
           
       - name: Build Solution
         run: |
-          cd /usr/local/BannerlordCoop/source
+          cd source
           dotnet build
