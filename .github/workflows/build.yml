@@ -39,6 +39,8 @@ jobs:
           ls /__w/BannerlordCoop
           echo "Running ls3"
           ls /__w/BannerlordCoop/BannerlordCoop
+          echo "Running ls4"
+          ls /home/runner/work/BannerlordCoop/assemblies
           echo "Running pwd"
           pwd
           echo "Running ls"
