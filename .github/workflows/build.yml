@@ -25,7 +25,7 @@ jobs:
       - name: Run Image
         shell: pwsh
         run: |
-          docker run -it --rm /bin/sh ${{ env.DOCKERHUB_IMAGE }}
+          docker run --rm /bin/sh ${{ env.DOCKERHUB_IMAGE }}
           
       - name: Checkout Repo
         shell: pwsh
