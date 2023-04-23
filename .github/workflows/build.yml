@@ -35,6 +35,8 @@ jobs:
           echo "Running ls2"
           ls /__w/BannerlordCoop/BannerlordCoop
           echo "Running ls3"
+          ls /assemblies
+          echo "Running ls4
           ls /__w/BannerlordCoop/BannerlordCoop/BannerlordCoop
           cp -R ../mb2 BannerlordCoop/mb2
           
