@@ -15,8 +15,6 @@ jobs:
       credentials:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-      volumes:
-        - ${{ github.workspace }}:/workspace
     
     steps:
           
@@ -31,10 +29,10 @@ jobs:
           echo "Running pwd"
           pwd
           echo "Running ls"
-          ls mb2
+          ls
           ls ../
           ls ../../
-          cp -R ../assemblies BannerlordCoop/mb2
+          cp -R ../mb2 BannerlordCoop/mb2
           
       - name: Build Solution
         run: |
