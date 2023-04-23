@@ -33,5 +33,7 @@ jobs:
           
       - name: Build Solution
         run: |
+          pwd
+          ls
           cd source
           dotnet build
