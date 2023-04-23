@@ -23,6 +23,7 @@ jobs:
           
       - name: Checkout Repo
         run: |
+          cd ..
           pwd
           git clone https://github.com/${{ github.repository }}
           pwd
