@@ -18,7 +18,7 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
       volumes:
-        - /usr/local/mb2:/__w/mb2
+        - /usr/local/mb2:/__w/BannerlordCoop/BannerlordCoop/mb2
     
     steps:
           
@@ -30,19 +30,9 @@ jobs:
 
       - name: Copy Assemblies
         run: |
-          echo "Running ls1"
-          ls /__w/BannerlordCoop
-          echo "Running ls2"
-          ls /__w/BannerlordCoop/BannerlordCoop
-          echo "Running ls3"
-          ls /__w/
-          echo "Running ls4"
-          ls /__w/BannerlordCoop/BannerlordCoop/BannerlordCoop
-          echo "Running pwd"
-          pwd
           cp -R ../mb2 BannerlordCoop/mb2
           
       - name: Build Solution
         run: |
-          cd BannerlordCoop/source
+          cd source
           dotnet build
