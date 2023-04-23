@@ -30,15 +30,9 @@ jobs:
 
       - name: Copy Assemblies
         run: |
-          echo "running pwd"
-          pwd
-          echo "running ls"
-          ls
-          echo "running ls2"
-          ls ../
-          cp -R ../mb2 BannerlordCoop/mb2
+          cp -R mb2 BannerlordCoop/mb2
           
       - name: Build Solution
         run: |
-          cd source
+          cd BannerlordCoop/source
           dotnet build
