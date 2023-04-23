@@ -31,6 +31,10 @@ jobs:
       - name: Copy Assemblies
         run: |
           cp -R mb2 BannerlordCoop/mb2
+          echo "mb2:"
+          ls mb2
+          echo "BannerlordCoop/mb2:"
+          ls BannerlordCoop/mb2
           
       - name: Build Solution
         run: |
