@@ -220,8 +220,12 @@ namespace Missions.Services.Network
 
             if (type == expectedNatType)
             {
-                Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
+                Logger.Verbose("Connecting P2P: {TargetEndPoint}", targetEndPoint);
                 netManager.Connect(targetEndPoint, token);
+            }
+            else
+            {
+                Logger.Debug("Expected {expected} but got {actual}", expectedNatType, type);
             }
         }
 
@@ -236,7 +240,8 @@ namespace Missions.Services.Network
                     messageBroker.Publish(this, peerConnectedEvent);
                 });
             }
-            Logger.Information("{LocalPort} received connection from {peer}", netManager.LocalPort, peer.EndPoint);
+
+            Logger.Verbose("{LocalPort} received connection from {peer}", netManager.LocalPort, peer.EndPoint);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
@@ -246,6 +251,8 @@ namespace Missions.Services.Network
                 var peerDisconnectedEvent = new PeerDisconnected(peer, disconnectInfo);
                 messageBroker.Publish(this, peerDisconnectedEvent);
             }
+
+            Logger.Verbose("{LocalPort} received disconnected from {peer}", netManager.LocalPort, peer.EndPoint);
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
@@ -275,7 +282,11 @@ namespace Missions.Services.Network
         {
             string[] data = request.Data.GetString().Split('%');
 
-            if (data.Length != 3) return;
+            if (data.Length != 3)
+            {
+                Logger.Error("Invalid data length, expected {expected} but got {actual}", 3, data.Length);
+                return;
+            }
 
             string instance = data[1];
 
@@ -285,6 +296,8 @@ namespace Missions.Services.Network
             }
             else
             {
+                Logger.Error("Incoming connection was a part of a different instance," +
+                    "this means there is an issue with the server");
                 request.Reject();
             }
         }

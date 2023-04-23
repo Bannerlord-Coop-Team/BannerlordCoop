@@ -8,6 +8,7 @@ using Missions.Services;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.Arena;
 using Missions.Services.BoardGames;
+using Missions.Services.Exceptions;
 using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
@@ -27,6 +28,8 @@ namespace Missions
             }
 
             builder.RegisterModule<GameInterfaceModule>();
+
+            builder.RegisterType<ExceptionLogger>().AsSelf().AutoActivate().SingleInstance();
 
             // Non interface classes
             builder.RegisterType<NetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
