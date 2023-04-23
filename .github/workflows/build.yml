@@ -26,9 +26,9 @@ jobs:
 
       - name: Copy Assemblies
         run: |
-          cp -R mb2 BannerlordCoop/mb2
+          cp -R /usr/local/mb2 /usr/local/mb2/BannerlordCoop/mb2
           
       - name: Build Solution
         run: |
-          cd BannerlordCoop/source
+          cd /usr/local/BannerlordCoop/source
           dotnet build
