@@ -28,8 +28,6 @@ jobs:
         run: |
           echo "Running pwd"
           pwd
-          echo "Running ls1"
-          /__w/BannerlordCoop
           echo "Running ls2"
           /__w/BannerlordCoop/BannerlordCoop
           echo "Running ls3"
