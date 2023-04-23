@@ -182,7 +182,7 @@ namespace Missions.Services
                 agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
             }
 
-            for (int i = 0; i < joinInfo.AiAgentData.Length; i++)
+            for (int i = 0; i < joinInfo.AiAgentData?.Length; i++)
             {
                 AiAgentData aiAgentData = joinInfo.AiAgentData[i];
                 SpawnAIAgent(netPeer, aiAgentData);

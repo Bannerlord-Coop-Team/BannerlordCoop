@@ -23,7 +23,7 @@ namespace Common.Messaging
         {
             var obj = target.Target;
 
-            if (obj == null) return;
+            if (IsAlive == false) return;
 
             method.Invoke(obj, parameters);
         }

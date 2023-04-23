@@ -5,6 +5,7 @@ using Missions.Services.Missiles.Message;
 using Missions.Services.Network.Messages;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 namespace Missions.Services.Missiles
@@ -33,7 +34,7 @@ namespace Missions.Services.Missiles
 
         private readonly IMessageBroker messageBroker;
 
-        private readonly Dictionary<int, PeerMissileIndexMap> peerMissileRegistries = new Dictionary<int, PeerMissileIndexMap>();
+        private readonly ConcurrentDictionary<int, PeerMissileIndexMap> peerMissileRegistries = new ConcurrentDictionary<int, PeerMissileIndexMap>();
 
         public NetworkMissileRegistry(IMessageBroker messageBroker)
         {
@@ -60,7 +61,7 @@ namespace Missions.Services.Missiles
         {
             var peer = obj.What.Peer;
 
-            peerMissileRegistries.Add(peer.Id, new PeerMissileIndexMap(peer.Id));
+            peerMissileRegistries.TryAdd(peer.Id, new PeerMissileIndexMap(peer.Id));
         }
 
         private void Handle_PeerMissileAdded(MessagePayload<PeerMissileAdded> obj)

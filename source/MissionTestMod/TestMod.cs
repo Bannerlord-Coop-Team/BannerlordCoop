@@ -43,30 +43,7 @@ namespace MissionTestMod
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
 
-            if (Debugger.IsAttached)
-            {
-                var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}";
-
-                var filePath = $"Arena_Vertical_Slice_{Process.GetCurrentProcess().Id}.log";
-
-                var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-
-                // Delete all old log files
-                foreach (var file in dir.EnumerateFiles("Arena_Vertical_Slice_*.log"))
-                {
-                    try
-                    {
-                        file.Delete();
-                    }
-                    catch (IOException) { }
-                }
-
-                LogManager.Configuration
-                    .Enrich.WithProcessId()
-                    .WriteTo.Debug(outputTemplate: outputTemplate)
-                    .WriteTo.File(filePath, outputTemplate: outputTemplate)
-                    .MinimumLevel.Verbose();
-            }
+            SetupLogger();
 
             harmony.PatchAll(typeof(MissionModule).Assembly);
 
@@ -96,6 +73,35 @@ namespace MissionTestMod
 
             base.OnSubModuleLoad();
             Logger.Verbose("Bannerlord Coop Mod loaded");
+        }
+
+        private void SetupLogger()
+        {
+            var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}";
+
+            var filePath = $"Arena_Vertical_Slice_{Process.GetCurrentProcess().Id}.log";
+
+            var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+
+            // Delete all old log files
+            foreach (var file in dir.EnumerateFiles("Arena_Vertical_Slice_*.log"))
+            {
+                try
+                {
+                    file.Delete();
+                }
+                catch (IOException) { }
+            }
+
+            LogManager.Configuration
+                    .Enrich.WithProcessId()
+                    .WriteTo.File(filePath, outputTemplate: outputTemplate)
+                    .MinimumLevel.Verbose();
+
+            if (Debugger.IsAttached)
+            {
+                LogManager.Configuration.WriteTo.Debug(outputTemplate: outputTemplate);
+            }
         }
 
         private void BuildContainer()

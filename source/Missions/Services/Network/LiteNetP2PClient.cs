@@ -147,6 +147,8 @@ namespace Missions.Services.Network
 
         private void TryPunch(string instance)
         {
+            Logger.Verbose("Attempting NAT Punch");
+
             string token = $"{instance}%{id}";
             if (networkConfig.NATType == NatAddressType.Internal)
             {

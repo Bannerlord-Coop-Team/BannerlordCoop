@@ -18,7 +18,7 @@ namespace Missions.Messages
     /// <summary>
     /// External event for Join Info in Mission
     /// </summary>
-    [ProtoContract(SkipConstructor = true)]
+    [ProtoContract]
     public class NetworkMissionJoinInfo : INetworkEvent
     {
         [ProtoMember(1)]
@@ -35,6 +35,16 @@ namespace Missions.Messages
         public readonly float PlayerHealth;
         [ProtoMember(7)]
         public readonly AiAgentData[] AiAgentData;
+
+        public NetworkMissionJoinInfo()
+        {
+            PlayerId = default;
+            StartingPosition = default;
+            CharacterObject = default;
+            IsPlayerAlive = false;
+            Equipment = default;
+            AiAgentData = Array.Empty<AiAgentData>();
+        }
 
         public NetworkMissionJoinInfo(
             CharacterObject characterObject, 
