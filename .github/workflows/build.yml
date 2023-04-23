@@ -32,7 +32,7 @@ jobs:
           echo "Running pwd"
           pwd
           echo "Running ls"
-          ls
+          ls /home/runner/work/
           ls ../
           ls ../../
           cp -R ../assemblies BannerlordCoop/mb2
