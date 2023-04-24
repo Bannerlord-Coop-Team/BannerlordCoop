@@ -1,9 +1,10 @@
 name: Build
 
 on: 
-  push:
-    branches:
-      - development
+  pull_request:
+    types:
+      [opened, synchronize]
+    
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,7 +20,8 @@ jobs:
         run: |
           git clone https://github.com/${{ github.repository }}
           cd BannerlordCoop
-          git checkout "${{ github.ref_name }}"
+          git fetch origin "pull/${{ github.event.number }}/head:${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
+          git checkout "${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
 
       - name: Copy Assemblies
         run: |

@@ -2,6 +2,7 @@
 using GameInterface.Serialization;
 using Xunit;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

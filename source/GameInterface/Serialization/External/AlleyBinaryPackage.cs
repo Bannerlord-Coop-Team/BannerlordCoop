@@ -16,7 +16,7 @@ namespace GameInterface.Serialization.External
         public AlleyBinaryPackage(Alley obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
-
+        
         protected override void PackInternal()
         {
             settlementStringId = Object.Settlement.StringId;

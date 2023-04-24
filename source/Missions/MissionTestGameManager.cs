@@ -124,7 +124,7 @@ namespace Missions
             agentBuildData = agentBuildData.Team(Mission.Current.PlayerAllyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
-            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);
+            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false);
             agent.FadeIn();
             agent.Controller = Agent.ControllerType.None;
             return agent;
@@ -139,7 +139,7 @@ namespace Missions
             agentBuildData = agentBuildData.Team(isMain ? Mission.Current.PlayerTeam : Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
-            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);                             //this spawns an archer
+            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false);                             //this spawns an archer
             agent.FadeIn();
 
             if (isMain)

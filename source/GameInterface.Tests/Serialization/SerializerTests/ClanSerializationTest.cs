@@ -7,6 +7,7 @@ using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
 using System.Collections.Generic;
 using TaleWorlds.Library;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

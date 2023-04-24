@@ -3,6 +3,7 @@ using System.Runtime.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Serialization;
 using TaleWorlds.CampaignSystem.Party;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

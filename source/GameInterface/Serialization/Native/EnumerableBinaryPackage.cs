@@ -15,7 +15,7 @@ namespace GameInterface.Serialization.Native
         [NonSerialized]
         IEnumerable enumerable;
 
-        Type enumerableType;
+        string enumerableType;
 
         IBinaryPackage[] packages;
 
@@ -23,7 +23,7 @@ namespace GameInterface.Serialization.Native
         {
             PackageFactory = packageFactory;
             this.enumerable = enumerable;
-            enumerableType = enumerable.GetType();
+            enumerableType = enumerable.GetType().AssemblyQualifiedName;
         }
 
         public void Pack()
@@ -39,15 +39,16 @@ namespace GameInterface.Serialization.Native
 
         public object Unpack()
         {
-            if (typeof(Array).IsAssignableFrom(enumerableType))
+            var type = Type.GetType(enumerableType);
+            if (typeof(Array).IsAssignableFrom(type))
             {
                 return UnpackArray();
             }
-            else if (typeof(List<>) == enumerableType.GetGenericTypeDefinition())
+            else if (typeof(List<>) == type.GetGenericTypeDefinition())
             {
                 return UnpackList();
             }
-            else if (typeof(HashSet<>) == enumerableType.GetGenericTypeDefinition())
+            else if (typeof(HashSet<>) == type.GetGenericTypeDefinition())
             {
                 return UnpackList();
             }
@@ -61,23 +62,23 @@ namespace GameInterface.Serialization.Native
         private object UnpackList()
         {
             var unpackedArray = packages.Select(e => e.Unpack());
-
-            var cast = Cast.MakeGenericMethod(enumerableType.GenericTypeArguments.Single());
+            var type = Type.GetType(enumerableType);
+            var cast = Cast.MakeGenericMethod(type.GenericTypeArguments.Single());
 
             var castedEnumerable = cast.Invoke(null, new object[] { unpackedArray });
 
-            return Activator.CreateInstance(enumerableType, new object[] { castedEnumerable });
+            return Activator.CreateInstance(type, new object[] { castedEnumerable });
         }
 
         private object UnpackArray()
         {
             var unpackedArray = packages.Select(e => e.Unpack());
-
-            var cast = Cast.MakeGenericMethod(enumerableType.GetElementType());
+            var type = Type.GetType(enumerableType);
+            var cast = Cast.MakeGenericMethod(type.GetElementType());
 
             var castedEnumerable = cast.Invoke(null, new object[] { unpackedArray });
 
-            var toArray = ToArray.MakeGenericMethod(enumerableType.GetElementType());
+            var toArray = ToArray.MakeGenericMethod(type.GetElementType());
 
             return toArray.Invoke(null, new object[] { castedEnumerable });
         }

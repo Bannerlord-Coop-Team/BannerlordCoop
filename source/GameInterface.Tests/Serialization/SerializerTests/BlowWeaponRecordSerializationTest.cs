@@ -7,6 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.MountAndBlade;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

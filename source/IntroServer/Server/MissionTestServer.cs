@@ -100,6 +100,7 @@ namespace IntroServer.Server
         public void OnNetworkReceive(
             NetPeer peer,
             NetPacketReader reader,
+            byte channelNumber,
             DeliveryMethod deliveryMethod)
         {
             

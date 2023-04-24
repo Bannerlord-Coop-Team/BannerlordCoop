@@ -3,6 +3,7 @@ using GameInterface.Serialization.External;
 using System.Collections.Generic;
 using TaleWorlds.Localization;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -104,9 +105,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void TextObject_Full_Serialization_BasicNested()
         {
             string var = "{=12345678}Testing with {INSERT}";
-            Dictionary<string, object> dict = new Dictionary<string, object>() { ["INSERT"] = new TextObject("simple nests") };
+            Dictionary<string, object> dict = new Dictionary<string, object>() { {"INSERT", new TextObject("simple nests")} };
             TextObject textObject = new TextObject(var, dict);
-
             BinaryPackageFactory factory = new BinaryPackageFactory();
             TextObjectBinaryPackage package = new TextObjectBinaryPackage(textObject, factory);
 
@@ -125,7 +125,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             TextObject newTextObject = returnedPackage.Unpack<TextObject>();
 
             Assert.Equal(textObject.ToString(), newTextObject.ToString());
-            Assert.Equal("Testing with simple nests", newTextObject.ToString());
+            Assert.True(textObject.HasSameValue(newTextObject));
         }
     }
 }

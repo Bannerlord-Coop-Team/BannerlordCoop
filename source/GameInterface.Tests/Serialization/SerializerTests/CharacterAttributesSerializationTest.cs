@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using System.Collections.Generic;
 using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

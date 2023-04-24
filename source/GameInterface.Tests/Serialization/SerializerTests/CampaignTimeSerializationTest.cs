@@ -3,6 +3,7 @@ using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using TaleWorlds.CampaignSystem;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

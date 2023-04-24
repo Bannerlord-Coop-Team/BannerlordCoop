@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Xunit;
 using GameInterface.Serialization.Native;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

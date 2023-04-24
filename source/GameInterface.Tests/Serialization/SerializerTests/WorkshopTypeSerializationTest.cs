@@ -4,6 +4,7 @@ using Xunit;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.ObjectSystem;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

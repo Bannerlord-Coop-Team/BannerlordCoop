@@ -3,6 +3,7 @@ using GameInterface.Serialization.Internal;
 using GameInterface.Tests.Serialization;
 using System.Collections.Generic;
 using System.Globalization;
+using Common.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using Xunit;
@@ -144,8 +145,8 @@ namespace GameInterface.Tests
             Assert.NotEmpty(bytes1);
             Assert.NotEmpty(bytes2);
 
-            object obj1 = BinaryFormatterSerializer.Deserialize(bytes1);
-            object obj2 = BinaryFormatterSerializer.Deserialize(bytes2);
+            object obj1 = BinaryFormatterSerializer.Deserialize<CompatibilityInfoBinaryPackage>(bytes1);
+            object obj2 = BinaryFormatterSerializer.Deserialize<CompatibilityInfoBinaryPackage>(bytes2);
 
             Assert.IsType<CompatibilityInfoBinaryPackage>(obj1);
             Assert.IsType<CompatibilityInfoBinaryPackage>(obj2);

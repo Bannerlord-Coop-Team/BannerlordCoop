@@ -4,11 +4,18 @@ using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit;
+using Common.Serialization;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class TroopRosterElementSerializationTest
     {
+        public TroopRosterElementSerializationTest()
+        {
+            MBObjectManager.Init();
+        }
+        
         [Fact]
         public void TroopRosterElement_Serialize()
         {
