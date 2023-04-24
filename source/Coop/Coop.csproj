@@ -241,9 +241,5 @@
           Command='powershell -ExecutionPolicy Unrestricted ^
           -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)" ^
           -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\"'/>
-    <Exec Condition=" '$(OS)' != 'Windows_NT' " 
-          Command='pwsh -ExecutionPolicy Unrestricted \
-          -File "$(SolutionDir)../deploy.ps1" -SolutionDir "$(SolutionDir)" \
-          -TargetDir "$(SolutionDir)Coop/bin/$(Configuration)/"'/>
   </Target>
 </Project>
