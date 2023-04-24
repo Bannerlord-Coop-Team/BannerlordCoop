@@ -1,7 +1,9 @@
 name: Build
 
 on: 
-  push:
+  pull_request:
+    types:
+      [opened, synchronize]
     
 jobs:
   build:
@@ -18,7 +20,8 @@ jobs:
         run: |
           git clone https://github.com/${{ github.repository }}
           cd BannerlordCoop
-          git checkout "${{ github.ref_name }}"
+          git fetch origin pull/${{ github.event.pull_request.id }}/head:${{ github.event.pull_request.base.ref }}
+          git checkout "${{ github.event.pull_request.base.ref }}"
 
       - name: Copy Assemblies
         run: |
