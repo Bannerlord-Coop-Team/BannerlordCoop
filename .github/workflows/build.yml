@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Prepare environment
-        uses: ./.github/workflows/common.yml
+        uses: hakanyildizhan/BannerlordCoop/.github/workflows/common.yml@development-net-standard
         with:
           DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
