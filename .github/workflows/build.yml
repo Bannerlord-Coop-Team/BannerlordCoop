@@ -8,8 +8,8 @@ on:
     
 jobs:
   build:
+    runs-on: ubuntu-latest
     steps:
-      
       - name: Prepare environment
         uses: ./.github/workflows/common.yml
         with:
