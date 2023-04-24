@@ -20,8 +20,9 @@ jobs:
         run: |
           git clone https://github.com/${{ github.repository }}
           cd BannerlordCoop
-          git fetch origin pull/${{ github.event.number }}/head:${{ github.event.pull_request.base.ref#refs/heads/ }}
-          git checkout "${{ github.event.pull_request.base.ref#refs/heads/ }}"
+          
+          git fetch origin pull/${{ github.event.number }}/head:${github.event.pull_request.base.ref#refs/heads/}
+          git checkout "${github.event.pull_request.base.ref#refs/heads/}"
 
       - name: Copy Assemblies
         run: |
