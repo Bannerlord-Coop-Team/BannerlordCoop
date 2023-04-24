@@ -27,6 +27,8 @@ jobs:
       - name: Copy Assemblies
         run: |
           dotnet --info
+          echo "home:"
+          ls /home
           echo "pwd:"
           pwd
           echo "mb2:"
