@@ -11,12 +11,10 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: $DOCKERHUB_USERNAME/bannerlordcoop:1.0.1
+      image: ${{ DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.1
       credentials:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        username: ${{ DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-      env:
-        DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         
     steps:
           
