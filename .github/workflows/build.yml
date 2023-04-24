@@ -12,7 +12,7 @@ jobs:
     steps:
       - name: Prepare environment
         uses:
-          actions/checkout@v2.3.4
+          actions/checkout@v3
           ./.github/workflows/common.yml
         with:
           DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
