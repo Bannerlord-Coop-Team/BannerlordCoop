@@ -9,14 +9,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    uses: hakanyildizhan/BannerlordCoop/.github/workflows/common.yml@development-net-standard
+    with:
+      DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_IMAGE }}
+      
     steps:
-      - name: Prepare environment
-        uses: hakanyildizhan/BannerlordCoop/.github/workflows/common.yml@development-net-standard
-        with:
-          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_IMAGE }}
-          
       - name: Checkout Repo
         run: |
           git clone https://github.com/${{ github.repository }}
