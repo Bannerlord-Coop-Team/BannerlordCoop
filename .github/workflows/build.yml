@@ -26,18 +26,21 @@ jobs:
 
       - name: Copy Assemblies
         run: |
-          dotnet --info
           echo "home:"
           ls /home
           echo "pwd:"
           pwd
+          echo "ls:"
+          ls
+          echo "ls .. :"
+          ls ../
           echo "mb2:"
           ls mb2
           echo "BannerlordCoop/mb2:"
           ls BannerlordCoop/mb2
           echo "/__w/BannerlordCoop/BannerlordCoop/mb2:"
           ls /__w/BannerlordCoop/BannerlordCoop/mb2
-          cp -R mb2 BannerlordCoop/mb2
+          cp -R /home/mb2 BannerlordCoop/mb2
           
       - name: Build Solution
         run: |

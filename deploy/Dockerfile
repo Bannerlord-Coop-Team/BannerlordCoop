@@ -51,7 +51,7 @@ RUN powershell_version=7.2.10 \
     && apk add --no-cache ncurses-terminfo-base 
 
 # Copy MB assemblies (make sure you run deploy.ps1 first)
-WORKDIR /usr/local/mb2
+WORKDIR /home/mb2
 COPY mb2 ./
 COPY mb2 ./
-WORKDIR /usr/local
+WORKDIR /home
