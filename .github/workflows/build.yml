@@ -18,7 +18,7 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
       volumes:
-        - /usr/local/mb2:/__w/BannerlordCoop/BannerlordCoop/mb2
+        - /__w/BannerlordCoop/BannerlordCoop/mb2:/usr/local/mb2
     
     steps:
           
