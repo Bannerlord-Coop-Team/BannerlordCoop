@@ -20,3 +20,5 @@ jobs:
       credentials:
         username: ${{ inputs.DOCKERHUB_USERNAME }}
         password: ${{ inputs.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v2.3.4
