@@ -35,6 +35,8 @@ jobs:
           ls mb2
           echo "BannerlordCoop/mb2:"
           ls BannerlordCoop/mb2
+          echo "/__w/BannerlordCoop/BannerlordCoop/mb2:"
+          ls /__w/BannerlordCoop/BannerlordCoop/mb2
           
       - name: Build Solution
         run: |
