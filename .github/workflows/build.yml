@@ -9,19 +9,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    uses:
+      ./.github/workflows/common.yml
+    with:
+      DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_IMAGE }}
+    
     steps:
-      - name: Checkout
-        uses:
-          actions/checkout@v3
-        
-      - name: Prepare environment
-        uses:
-          ./.github/workflows/action.yml
-        with:
-          DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_IMAGE }}
-          
       - name: Checkout Repo
         run: |
           git clone https://github.com/${{ github.repository }}
