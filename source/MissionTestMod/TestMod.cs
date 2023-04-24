@@ -34,6 +34,7 @@ namespace MissionTestMod
         private static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
         private static InitialStateOption JoinArena;
+        private static InitialStateOption JoinBattle;
 
         private IMissionGameManager gameManager;
 
@@ -68,8 +69,16 @@ namespace MissionTestMod
                SelectSaveArena,
                () => (false, new TextObject()));
 
+            JoinBattle = new InitialStateOption(
+               "Join Online Battle",
+               new TextObject("Join Online Battle"),
+               9992,
+               SelectSaveBattle,
+               () => (false, new TextObject()));
+
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
             Module.CurrentModule.AddInitialStateOption(JoinArena);
+            Module.CurrentModule.AddInitialStateOption(JoinBattle);
 
             base.OnSubModuleLoad();
             Logger.Verbose("Bannerlord Coop Mod loaded");
@@ -174,6 +183,18 @@ namespace MissionTestMod
                   }));
         }
 
+        private void SelectSaveBattle()
+        {
+
+            ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<MissionLoadGameGauntletScreen>(new object[]
+                  {
+                      new Action<SaveGameFileInfo>((SaveGameFileInfo saveGame)=>
+                      {
+                          SandBoxSaveHelper.TryLoadSave(saveGame, StartGameBattle, null);
+                      })
+                  }));
+        }
+
         private void StartGameTavern(LoadResult loadResult)
         {
             BuildContainer();
@@ -185,6 +206,13 @@ namespace MissionTestMod
         {
             BuildContainer();
             gameManager = container.Resolve<ArenaTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
+            gameManager.StartGame();
+        }
+
+        private void StartGameBattle(LoadResult loadResult)
+        {
+            BuildContainer();
+            gameManager = container.Resolve<BattlesTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
             gameManager.StartGame();
         }
     }

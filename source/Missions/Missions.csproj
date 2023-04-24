@@ -166,6 +166,8 @@
     <Compile Include="Services\Agents\Patches\AgentDropPatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentPickupPatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentShieldDamagePatch.cs" />
+    <Compile Include="Services\Battles\BattlesTestGameManager.cs" />
+    <Compile Include="Services\Battles\CoopBattlesController.cs" />
     <Compile Include="Services\Missiles\Handlers\MissileHandler.cs" />
     <Compile Include="Services\Missiles\Message\PeerMissileAdded.cs" />
     <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
