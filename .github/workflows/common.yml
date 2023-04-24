@@ -1,4 +1,5 @@
-name: parameterized job
+name: Common
+
 on:
   workflow_call:
     inputs:
@@ -11,14 +12,13 @@ on:
       DOCKERHUB_IMAGE:
         required: true
         type: string
-
+        
 jobs:
   common:
     name: Common
-    runs-on: ubuntu-latest
+    uses: actions/checkout@v3
     container:
       image: ${{ inputs.DOCKERHUB_USERNAME }}/${{ inputs.DOCKERHUB_IMAGE }}
       credentials:
         username: ${{ inputs.DOCKERHUB_USERNAME }}
         password: ${{ inputs.DOCKERHUB_TOKEN }}
-    uses: actions/checkout@v3

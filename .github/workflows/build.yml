@@ -8,12 +8,10 @@ on:
     
 jobs:
   build:
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/common.yml
     steps:
       
       - name: Prepare environment
-        uses:
-          ./.github/workflows/common.yml
         with:
           DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
