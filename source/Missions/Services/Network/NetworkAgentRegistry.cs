@@ -135,6 +135,14 @@ namespace Missions.Services.Network
         /// <param name="guid">guid to check for Agent</param>
         /// <returns>True if guid is found and assigns agent, false otherwise</returns>
         bool TryGetGroupController(NetPeer peer, out AgentGroupController agentGroupController);
+        
+        /// <summary>
+        /// Try to get the NetPeer of a Group Controller
+        /// </summary>
+        /// <param name="guid">guid to check for Agent</param>
+        /// <returns>True if guid is found and assigns agent, false otherwise</returns>
+        bool TryGetNetPeer(Agent agent, out NetPeer netPeer);
+
     }
 
     /// <inheritdoc/>
@@ -335,6 +343,26 @@ namespace Missions.Services.Network
                 return true;
             }
             agentGroupController = default;
+            return false;
+        }
+
+        public bool TryGetNetPeer(Agent agent, out NetPeer netPeer)
+        {
+            foreach (AgentGroupController controller in OtherAgents.Values)
+            {
+                if (controller.Contains(agent))
+                {
+                    AgentGroupController resolvedController = controller;
+                    NetPeer resolvedNetPeer = OtherAgents.FirstOrDefault(x => x.Value.Equals(resolvedController)).Key;
+                    if (resolvedNetPeer != null)
+                    {
+                        netPeer = resolvedNetPeer;
+                        return true;
+                    }
+                }
+            }
+
+            netPeer = default;
             return false;
         }
 

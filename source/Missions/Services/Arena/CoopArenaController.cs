@@ -238,7 +238,7 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            for(int i = 0; i < 10; i++)
+            for(int i = 0; i < 0; i++)
             {
                 Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
                 agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);

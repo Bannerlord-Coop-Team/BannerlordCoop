@@ -26,6 +26,13 @@ namespace Common.Network
         /// <param name="networkEvent">Event to publish</param>
         /// <param name="peer">Peer to send event</param>
         void PublishNetworkEvent(NetPeer peer, INetworkEvent networkEvent);
+
+        /// <summary>
+        /// Publishes event to all but specified peer
+        /// </summary>
+        /// <param name="networkEvent">Event to publish</param>
+        /// <param name="peer">Peer to not send event to</param>
+        void PublishNetworkEventExcept(NetPeer exceptPeer, INetworkEvent networkEvent);
     }
 
     /// <inheritdoc cref="INetworkMessageBroker"/>
@@ -64,6 +71,15 @@ namespace Common.Network
             EventPacket eventPacket = new EventPacket(networkEvent);
 
             Network.SendAll(eventPacket);
+        }
+
+        public void PublishNetworkEventExcept(NetPeer exceptPeer, INetworkEvent networkEvent)
+        {
+            Logger.Verbose("Publishing {event} to all client but {ip}", networkEvent.GetType().Name, exceptPeer?.EndPoint);
+
+            EventPacket eventPacket = new EventPacket(networkEvent);
+
+            Network.SendAllBut(exceptPeer, eventPacket);
         }
 
         public override void Publish<T>(object source, T message)

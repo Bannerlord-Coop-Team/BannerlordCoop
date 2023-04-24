@@ -154,6 +154,8 @@
     <Compile Include="Services\Agents\Handlers\ShieldDamageHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
+    <Compile Include="Services\Agents\Messages\ConfirmedNetworkAgentDamaged.cs" />
+    <Compile Include="Services\Agents\Messages\MultiNetworkAgentDamaged.cs" />
     <Compile Include="Services\Agents\Messages\NetworkShieldBreak.cs" />
     <Compile Include="Services\Agents\Messages\NetworkWeaponDropped.cs" />
     <Compile Include="Services\Agents\Messages\NetworkWeaponPickedup.cs" />
