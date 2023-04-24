@@ -9,8 +9,25 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    uses: hakanyildizhan/BannerlordCoop/.github/workflows/common.yml@development-net-standard
-    with:
-      DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
-      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-      DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_IMAGE }}
+    
+    container:
+      image: hulkhan/bannerlordcoop:1.0.1
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+    steps:
+      - name: Checkout Repo
+        run: |
+          git clone https://github.com/${{ github.repository }}
+          cd BannerlordCoop
+          git checkout "${{ github.ref_name }}"
+
+      - name: Copy Assemblies
+        run: |
+          cp -R /home/mb2 BannerlordCoop/mb2
+          
+      - name: Build Solution
+        run: |
+          cd BannerlordCoop/source
+          dotnet build
