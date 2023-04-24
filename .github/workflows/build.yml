@@ -6,8 +6,6 @@ on:
     types:
       [opened, synchronize]
     
-
-    
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,8 +15,6 @@ jobs:
       credentials:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-      volumes:
-        - /__w/BannerlordCoop/BannerlordCoop/mb2:/usr/local/mb2
     
     steps:
           
@@ -30,6 +26,9 @@ jobs:
 
       - name: Copy Assemblies
         run: |
+          dotnet --info
+          echo "pwd:"
+          pwd
           echo "mb2:"
           ls mb2
           echo "BannerlordCoop/mb2:"
