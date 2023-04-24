@@ -16,7 +16,7 @@ jobs:
         
       - name: Prepare environment
         uses:
-          ./.github/workflows/common.yml
+          ./.github/workflows/action.yml
         with:
           DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
