@@ -15,7 +15,6 @@ on:
 jobs:
   common:
     name: Common
-    runs-on: ubuntu-latest
     container:
       image: ${{ inputs.DOCKERHUB_USERNAME }}/${{ inputs.DOCKERHUB_IMAGE }}
       credentials:
