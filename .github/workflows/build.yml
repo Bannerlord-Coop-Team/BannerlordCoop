@@ -11,11 +11,13 @@ jobs:
     runs-on: ubuntu-latest
 
     container:
-      image: ${{ secrets.DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.1
+      image: ${{ DOCKERHUB_USERNAME }}/bannerlordcoop:1.0.1
       credentials:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
-    
+      secrets:
+        DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        
     steps:
           
       - name: Checkout Repo
