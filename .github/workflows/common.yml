@@ -1,0 +1,23 @@
+name: parameterized job
+on:
+  workflow_call:
+    inputs:
+      DOCKERHUB_USERNAME:
+        required: true
+        type: string
+      DOCKERHUB_TOKEN:
+        required: true
+        type: string
+      DOCKERHUB_IMAGE:
+        required: true
+        type: string
+
+jobs:
+  common:
+    name: Common
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ inputs.DOCKERHUB_USERNAME }}/${{ inputs.DOCKERHUB_IMAGE }}
+      credentials:
+        username: ${{ inputs.DOCKERHUB_USERNAME }}
+        password: ${{ inputs.DOCKERHUB_TOKEN }}

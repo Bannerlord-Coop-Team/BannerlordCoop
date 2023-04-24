@@ -8,16 +8,13 @@ on:
     
 jobs:
   build:
-    runs-on: ubuntu-latest
-
-    container:
-      image: ${{DOCKERHUB_USERNAME}}/bannerlordcoop:1.0.1
-      credentials:
-        username: ${{ DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
-        
-    steps:
+    uses: /.github/workflows/common.yml
+    with:
+      DOCKERHUB_USERNAME: ${{ env.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      DOCKERHUB_IMAGE: ${{ env.DOCKERHUB_IMAGE }}
           
+    steps:
       - name: Checkout Repo
         run: |
           git clone https://github.com/${{ github.repository }}
