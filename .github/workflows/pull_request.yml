@@ -20,9 +20,8 @@ jobs:
         run: |
           git clone https://github.com/${{ github.repository }}
           cd BannerlordCoop
-          BRANCH_NAME = "${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
-          git fetch origin "pull/${{ github.event.number }}/head:${BRANCH_NAME}"
-          git checkout "${BRANCH_NAME}"
+          git fetch origin "pull/${{ github.event.number }}/head:${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
+          git checkout "${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
 
       - name: Copy Assemblies
         run: |
