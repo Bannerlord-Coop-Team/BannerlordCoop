@@ -77,6 +77,7 @@ namespace Missions.Services
 
             this.networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
             this.networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
+            this.networkMessageBroker.Subscribe<ServerDisconnected>(Handle_ServerDisconnected);
         }
 
         ~CoopArenaController()
@@ -108,6 +109,21 @@ namespace Missions.Services
         private void Handle_PeerConnected(MessagePayload<PeerConnected> payload)
         {
             SendJoinInfo(payload.What.Peer);
+        }
+
+        private void Handle_ServerDisconnected(MessagePayload<ServerDisconnected> obj)
+        {
+            InformationManager.ShowInquiry(
+                new InquiryData(
+                "Disconnected From Server",
+                "You have been disconnected from the server, returning to the main menu may take a few seconds after clicking the button",
+                true,
+                false,
+                "Back to Menu",
+                "",
+                new Action(() => { MBGameManager.EndGame(); }),
+                null), 
+                true);
         }
 
         private void SendJoinInfo(NetPeer peer)

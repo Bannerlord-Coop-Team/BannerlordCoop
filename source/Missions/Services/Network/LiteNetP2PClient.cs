@@ -246,6 +246,11 @@ namespace Missions.Services.Network
                 var peerDisconnectedEvent = new PeerDisconnected(peer, disconnectInfo);
                 messageBroker.Publish(this, peerDisconnectedEvent);
             }
+            else if (PeerServer != null)
+            {
+                ServerDisconnected serverDisconnected = new ServerDisconnected();
+                messageBroker.Publish(this, serverDisconnected);
+            }
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)

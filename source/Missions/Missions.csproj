@@ -182,6 +182,7 @@
     <Compile Include="Services\Network\EventQueueManager.cs" />
     <Compile Include="Services\Network\Messages\PeerReady.cs" />
     <Compile Include="Services\Network\Data\AiAgentData.cs" />
+    <Compile Include="Services\Network\Messages\ServerDisconnected.cs" />
     <Compile Include="Services\Network\Surrogates\EquipmentSurrogate.cs" />
     <Compile Include="Services\Network\Surrogates\ItemModifierSurrogate.cs" />
     <Compile Include="Services\Network\Surrogates\ItemObjectSurrogate.cs" />
