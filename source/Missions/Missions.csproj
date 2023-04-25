@@ -168,6 +168,8 @@
     <Compile Include="Services\Agents\Patches\AgentPickupPatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentShieldDamagePatch.cs" />
     <Compile Include="Services\Exceptions\ExceptionLogger.cs" />
+    <Compile Include="Services\Battles\BattlesTestGameManager.cs" />
+    <Compile Include="Services\Battles\CoopBattlesController.cs" />
     <Compile Include="Services\Missiles\Handlers\MissileHandler.cs" />
     <Compile Include="Services\Missiles\Message\PeerMissileAdded.cs" />
     <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
@@ -181,6 +183,7 @@
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
     <Compile Include="Services\Missiles\NetworkMissileRegistry.cs" />
     <Compile Include="Services\Missiles\Patches\MissileAuxPatches.cs" />
+    <Compile Include="Services\Network\Data\ConnectionToken.cs" />
     <Compile Include="Services\Network\EventQueueManager.cs" />
     <Compile Include="Services\Network\Messages\PeerReady.cs" />
     <Compile Include="Services\Network\Data\AiAgentData.cs" />

@@ -1,19 +1,13 @@
-﻿using Autofac;
-using Common.Logging;
-using Common.Messaging;
-using Common.Serialization;
-using GameInterface.Serialization;
-using GameInterface.Serialization.External;
+﻿using Common.Messaging;
 using Missions.Services.Network.Data;
 using ProtoBuf;
-using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
-namespace Missions.Messages
+namespace Missions.Services.Network.Messages
 {
     /// <summary>
     /// External event for Join Info in Mission
@@ -37,10 +31,10 @@ namespace Missions.Messages
         public readonly AiAgentData[] AiAgentData = Array.Empty<AiAgentData>();
 
         public NetworkMissionJoinInfo(
-            CharacterObject characterObject, 
-            bool isPlayerAlive, 
-            Guid playerId, 
-            Vec3 startingPosition, 
+            CharacterObject characterObject,
+            bool isPlayerAlive,
+            Guid playerId,
+            Vec3 startingPosition,
             float health,
             AiAgentData[] aiAgentDatas)
         {
