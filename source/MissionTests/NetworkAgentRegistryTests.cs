@@ -54,6 +54,12 @@ namespace MissionTests
 
             Assert.Equal(remoteAgent, resolvedAgent);
             Assert.Equal(remoteAgent.Age, resolvedAgent.Age);
+
+            Assert.True(networkAgentRegistry.TryGetExternalController(remoteAgent, out var resolvedPeer));
+            Assert.Equal(netPeer, resolvedPeer);
+
+            Assert.True(networkAgentRegistry.TryGetExternalController(remoteGuid, out var resolvedPeerWithId));
+            Assert.Equal(netPeer, resolvedPeerWithId);
         }
     }
 }

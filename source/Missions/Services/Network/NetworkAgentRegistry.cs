@@ -143,6 +143,17 @@ namespace Missions.Services.Network
         /// <param name="controllerPeer">Controlling peer</param>
         /// <returns>True if retrieval of controlling peer was successful, otherwise False</returns>
         bool TryGetExternalController(Agent agent, out NetPeer controllerPeer);
+
+        /// <summary>
+        /// Attempts to get the controlling peer of a given agent
+        /// </summary>
+        /// <remarks>
+        /// This will fail if the agent is controlled internally
+        /// </remarks>
+        /// <param name="agentId">AgentId to get controller</param>
+        /// <param name="controllerPeer">Controlling peer</param>
+        /// <returns>True if retrieval of controlling peer was successful, otherwise False</returns>
+        bool TryGetExternalController(Guid agentId, out NetPeer controllerPeer);
     }
 
     /// <inheritdoc cref="INetworkAgentRegistry"/>
@@ -365,12 +376,20 @@ namespace Missions.Services.Network
                 return false;
             }
 
+            return TryGetExternalController(agentId, out controllerPeer);
+        }
+
+        /// <inheritdoc/>
+        public bool TryGetExternalController(Guid agentId, out NetPeer controllerPeer)
+        {
+            controllerPeer = default;
+
             if (_controlledAgents.ContainsKey(agentId))
             {
                 return false;
             }
 
-            foreach(AgentGroupController controller in OtherAgents.Values)
+            foreach (AgentGroupController controller in OtherAgents.Values)
             {
                 if (controller.Contains(agentId))
                 {
