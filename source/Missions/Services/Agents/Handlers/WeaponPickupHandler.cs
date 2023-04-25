@@ -83,6 +83,12 @@ namespace Missions.Services.Agents.Handlers
                 return;
             }
 
+            if (obj.What.EquipmentIndex == EquipmentIndex.ExtraWeaponSlot)
+            {
+                agent.EquipWeaponToExtraSlotAndWield(ref missionWeapon);
+                return;
+            }
+
             agent.EquipWeaponWithNewEntity(obj.What.EquipmentIndex, ref missionWeapon);
         }
     }
