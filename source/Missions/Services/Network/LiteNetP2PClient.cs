@@ -9,6 +9,7 @@ using IntroServer.Data;
 using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Missions.Services.Network.Data;
 using Missions.Services.Network.Messages;
 using Serilog;
 using Serilog.Events;
@@ -36,7 +37,7 @@ namespace Missions.Services.Network
         private string instance;
 
         private readonly Guid id = Guid.NewGuid();
-        private readonly BatchLogger<PacketType> _batchLogger = new BatchLogger<PacketType>(LogEventLevel.Verbose, 10000);
+        private readonly BatchLogger<PacketType> batchLogger = new BatchLogger<PacketType>(LogEventLevel.Verbose, 10000);
         private readonly NetManager netManager;
         private readonly NetworkConfiguration networkConfig;
         private readonly Version version = typeof(MissionTestServer).Assembly.GetName().Version;
@@ -70,7 +71,7 @@ namespace Missions.Services.Network
 
         public void Dispose()
         {
-            _batchLogger.Dispose();
+            batchLogger.Dispose();
             Stop();
         }
 
@@ -149,7 +150,7 @@ namespace Missions.Services.Network
         {
             Logger.Verbose("Attempting NAT Punch");
 
-            string token = $"{instance}%{id}";
+            ConnectionToken token = new ConnectionToken(id, instance, NatAddressType.External);
             if (networkConfig.NATType == NatAddressType.Internal)
             {
                 netManager.NatPunchModule.SendNatIntroduceRequest(networkConfig.LanAddress.ToString(), networkConfig.LanPort, token);
@@ -195,30 +196,11 @@ namespace Missions.Services.Network
             // No requests on client
         }
 
-        private static Dictionary<string, NatAddressType> TokenToNatTypeMap = new Dictionary<string, NatAddressType>
-        {
-            { "Internal", NatAddressType.Internal },
-            { "External", NatAddressType.External }
-        };
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
-            string[] tokens = token.Split('%');
+            if (ConnectionToken.TryParse(token, out var connectionToken) == false) return;
 
-            if(tokens.Length != 3)
-            {
-                // Invalid token length
-                Logger.Error("Nat introduction token length was invalid");
-                return;
-            }
-
-            if (TokenToNatTypeMap.TryGetValue(tokens[0], out NatAddressType expectedNatType) == false)
-            {
-                // String does not exist in map
-                Logger.Error("token value was {tokenVal} but something in {natTypes} was expected", tokens[0], TokenToNatTypeMap.Keys);
-                return;
-            }
-
-            if (type == expectedNatType)
+            if (type == connectionToken.NatType)
             {
                 Logger.Verbose("Connecting P2P: {TargetEndPoint}", targetEndPoint);
                 netManager.Connect(targetEndPoint, token);
@@ -259,7 +241,7 @@ namespace Missions.Services.Network
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
-            _batchLogger.Log(packet.PacketType);
+            batchLogger.Log(packet.PacketType);
 
             PacketManager.HandleRecieve(peer, packet);
         }
@@ -276,17 +258,11 @@ namespace Missions.Services.Network
 
         public void OnConnectionRequest(ConnectionRequest request)
         {
-            string[] data = request.Data.GetString().Split('%');
+            string token = request.Data.GetString();
 
-            if (data.Length != 3)
-            {
-                Logger.Error("Invalid data length, expected {expected} but got {actual}", 3, data.Length);
-                return;
-            }
+            if (ConnectionToken.TryParse(token, out var connectionToken) == false) return;
 
-            string instance = data[1];
-
-            if (this.instance == instance)
+            if (instance == connectionToken.InstanceName)
             {
                 request.Accept();
             }

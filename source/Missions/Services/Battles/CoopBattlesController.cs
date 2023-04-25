@@ -25,11 +25,11 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Services
 {
     /// <summary>
-    /// Mission Controller that does all the logic in the Coop Arena
+    /// Mission Controller that does all the logic in the Coop Battles
     /// </summary>
-    public class CoopArenaController : MissionBehavior, IDisposable
+    public class CoopBattlesController : MissionBehavior, IDisposable
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
+        private static readonly ILogger Logger = LogManager.GetLogger<CoopBattlesController>();
 
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
@@ -43,7 +43,7 @@ namespace Missions.Services
         private CharacterObject[] gameCharacters;
         private readonly Guid playerId;
 
-        public CoopArenaController(
+        public CoopBattlesController(
             INetworkMessageBroker networkMessageBroker,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator,
@@ -78,7 +78,7 @@ namespace Missions.Services
             this.networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
         }
 
-        ~CoopArenaController()
+        ~CoopBattlesController()
         {
             Dispose();
         }
@@ -205,6 +205,8 @@ namespace Missions.Services
             Agent aiAgent = SpawnAgent(agentData.UnitPosition, AICharacter, true);
             aiAgent.Health = agentData.UnitHealth;
 
+            aiAgent.SetWatchState(Agent.WatchState.Alarmed);
+
             agentRegistry.RegisterNetworkControlledAgent(controller, agentData.UnitId, aiAgent);
         }
 
@@ -219,7 +221,7 @@ namespace Missions.Services
             // players is attacker team
             Mission.Current.PlayerTeam = Mission.Current.AttackerTeam;
 
-            spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
+            spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_player")
                            select e.GetGlobalFrame()).ToList();
             for (int i = 0; i < spawnFrames.Count; i++)
             {
@@ -237,11 +239,10 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            for(int i = 0; i < 10; i++)
-            {
-                Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
-                agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
-            }
+            Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
+
+            agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
+            agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
         }
 
         private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);
@@ -271,8 +272,7 @@ namespace Missions.Services
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
             }, true);
-
-            agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
+            agent.FadeIn();
 
             return agent;
         }
@@ -287,16 +287,7 @@ namespace Missions.Services
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(equipment ?? (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment));
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-            
-
-            if(isEnemy)
-            {
-                agentBuildData.Controller(Agent.ControllerType.None);
-            }
-            else
-            {
-                agentBuildData.Controller(Agent.ControllerType.AI);
-            }
+            agentBuildData.Controller(isEnemy ? Agent.ControllerType.None : Agent.ControllerType.AI);
 
             Agent agent = default;
             GameLoopRunner.RunOnMainThread(() =>
@@ -305,37 +296,7 @@ namespace Missions.Services
                 agent.FadeIn();
             }, true);
 
-            agent.SetWatchState(Agent.WatchState.Alarmed);
-
             return agent;
-        }
-
-        // DEBUG METHOD: Starts an Arena fight
-        public void StartArenaFight()
-        {
-            // reset teams if any exists
-            Mission.Current.ResetMission();
-
-            Mission.Current.Teams.Add(BattleSideEnum.Defender, Hero.MainHero.MapFaction.Color, Hero.MainHero.MapFaction.Color2, null, true, false, true);
-            Mission.Current.Teams.Add(BattleSideEnum.Attacker, Hero.MainHero.MapFaction.Color2, Hero.MainHero.MapFaction.Color, null, true, false, true);
-
-            // players is defender team
-            Mission.Current.PlayerTeam = Mission.Current.DefenderTeam;
-
-            // find areas of spawn
-            List<MatrixFrame> spawnFrames = (from e in Mission.Current.Scene.FindEntitiesWithTag("sp_arena")
-                                             select e.GetGlobalFrame()).ToList();
-            for (int i = 0; i < spawnFrames.Count; i++)
-            {
-                MatrixFrame value = spawnFrames[i];
-                value.rotation.OrthonormalizeAccordingToForwardAndKeepUpAsZAxis();
-                spawnFrames[i] = value;
-            }
-            // get a random spawn point
-            MatrixFrame randomElement = spawnFrames.GetRandomElement();
-
-            // spawn an instance of the player (controlled by default)
-            SpawnPlayerAgent(CharacterObject.PlayerCharacter, randomElement);
         }
 
         protected override void OnEndMission()
