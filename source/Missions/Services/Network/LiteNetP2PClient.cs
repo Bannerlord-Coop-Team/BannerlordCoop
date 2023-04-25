@@ -207,7 +207,7 @@ namespace Missions.Services.Network
             }
             else
             {
-                Logger.Debug("Expected {expected} but got {actual}", expectedNatType, type);
+                Logger.Debug("Expected {expected} but got {actual}", type, connectionToken.NatType);
             }
         }
 

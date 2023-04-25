@@ -361,7 +361,7 @@ namespace Missions.Services.Network
 
             if(_agentToId.TryGetValue(agent, out var agentId) == false)
             {
-                Logger.Verbose("Unable to find agent in {idList} in method {method}", nameof(_agentToId), nameof(TryGetExternalController);
+                Logger.Verbose("Unable to find agent in {idList} in method {method}", nameof(_agentToId), nameof(TryGetExternalController));
                 return false;
             }
 

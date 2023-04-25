@@ -15,7 +15,6 @@ namespace MissionTests
     {
         NetworkAgentRegistry networkAgentRegistry = new NetworkAgentRegistry();
 
-
         [Fact]
         public void FullTestLocal()
         {
