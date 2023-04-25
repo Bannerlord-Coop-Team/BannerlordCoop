@@ -228,6 +228,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="DistributedLock.FileSystem" Version="1.0.0" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="5.0.0" />
     <PackageReference Include="MonoMod.RuntimeDetour" Version="22.7.31.1" />
     <PackageReference Include="MonoMod.Utils" Version="22.7.31.1" />
     <PackageReference Include="Serilog.Enrichers.Process" Version="2.0.2" />
@@ -240,6 +241,6 @@
     <Exec Condition=" '$(OS)' == 'Windows_NT' " 
           Command='powershell -ExecutionPolicy Unrestricted ^
           -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)" ^
-          -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\"'/>
+          -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\netstandard2.0\"'/>
   </Target>
 </Project>
