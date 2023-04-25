@@ -272,7 +272,6 @@ namespace Missions.Services
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
             }, true);
-            agent.FadeIn();
 
             agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
 
