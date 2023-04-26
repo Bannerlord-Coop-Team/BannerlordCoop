@@ -12,7 +12,7 @@ namespace Missions.Services.Network.Messages
     /// <summary>
     /// External event for Join Info in Mission
     /// </summary>
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class NetworkMissionJoinInfo : INetworkEvent
     {
         [ProtoMember(1)]
@@ -28,17 +28,7 @@ namespace Missions.Services.Network.Messages
         [ProtoMember(6)]
         public readonly float PlayerHealth;
         [ProtoMember(7)]
-        public readonly AiAgentData[] AiAgentData;
-
-        public NetworkMissionJoinInfo()
-        {
-            PlayerId = default;
-            StartingPosition = default;
-            CharacterObject = default;
-            IsPlayerAlive = false;
-            Equipment = default;
-            AiAgentData = Array.Empty<AiAgentData>();
-        }
+        public readonly AiAgentData[] AiAgentData = Array.Empty<AiAgentData>();
 
         public NetworkMissionJoinInfo(
             CharacterObject characterObject,

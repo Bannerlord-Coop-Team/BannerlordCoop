@@ -113,6 +113,9 @@ namespace Missions.Services.Agents.Handlers
             if (effectedAgent == null) return;
             if (effectorAgent == null) return;
 
+            // If agent is already dead return
+            if (effectedAgent.Health <= 0) return;
+
             // extract the blow
             Blow b = agentDamaData.Blow;
 

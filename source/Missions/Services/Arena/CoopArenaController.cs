@@ -205,8 +205,6 @@ namespace Missions.Services
             Agent aiAgent = SpawnAgent(agentData.UnitPosition, AICharacter, true);
             aiAgent.Health = agentData.UnitHealth;
 
-            aiAgent.SetWatchState(Agent.WatchState.Alarmed);
-
             agentRegistry.RegisterNetworkControlledAgent(controller, agentData.UnitId, aiAgent);
         }
 
@@ -239,10 +237,11 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
-
-            agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
-            agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
+            for(int i = 0; i < 10; i++)
+            {
+                Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
+                agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
+            }
         }
 
         private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);
@@ -272,7 +271,8 @@ namespace Missions.Services
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
             }, true);
-            agent.FadeIn();
+
+            agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
 
             return agent;
         }
@@ -287,7 +287,16 @@ namespace Missions.Services
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(equipment ?? (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment));
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-            agentBuildData.Controller(isEnemy ? Agent.ControllerType.None : Agent.ControllerType.AI);
+            
+
+            if(isEnemy)
+            {
+                agentBuildData.Controller(Agent.ControllerType.None);
+            }
+            else
+            {
+                agentBuildData.Controller(Agent.ControllerType.AI);
+            }
 
             Agent agent = default;
             GameLoopRunner.RunOnMainThread(() =>
@@ -295,6 +304,8 @@ namespace Missions.Services
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
             }, true);
+
+            agent.SetWatchState(Agent.WatchState.Alarmed);
 
             return agent;
         }

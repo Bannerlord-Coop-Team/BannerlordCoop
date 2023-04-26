@@ -34,7 +34,8 @@ namespace Missions.Services.Missiles
 
         private readonly IMessageBroker messageBroker;
 
-        private readonly ConcurrentDictionary<int, PeerMissileIndexMap> peerMissileRegistries = new ConcurrentDictionary<int, PeerMissileIndexMap>();
+        private readonly ConcurrentDictionary<int, PeerMissileIndexMap> peerMissileRegistries = 
+            new ConcurrentDictionary<int, PeerMissileIndexMap>();
 
         public NetworkMissileRegistry(IMessageBroker messageBroker)
         {
@@ -54,7 +55,7 @@ namespace Missions.Services.Missiles
 
         private void Handle_PeerDisconnected(MessagePayload<PeerDisconnected> obj)
         {
-            peerMissileRegistries.Clear();
+            peerMissileRegistries.TryRemove(obj.What.NetPeer.Id, out var _);
         }
 
         private void Handle_PeerConnected(MessagePayload<PeerConnected> obj)

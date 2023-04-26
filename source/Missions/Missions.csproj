@@ -163,9 +163,11 @@
     <Compile Include="Services\Agents\Messages\WeaponDropped.cs" />
     <Compile Include="ContainerProvider.cs" />
     <Compile Include="MissionModule.cs" />
+    <Compile Include="Services\Agents\Packets\MovementPacket.cs" />
     <Compile Include="Services\Agents\Patches\AgentDropPatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentPickupPatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentShieldDamagePatch.cs" />
+    <Compile Include="Services\Exceptions\ExceptionLogger.cs" />
     <Compile Include="Services\Battles\BattlesTestGameManager.cs" />
     <Compile Include="Services\Battles\CoopBattlesController.cs" />
     <Compile Include="Services\Missiles\Handlers\MissileHandler.cs" />

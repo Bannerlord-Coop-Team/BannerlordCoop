@@ -202,8 +202,12 @@ namespace Missions.Services.Network
 
             if (type == connectionToken.NatType)
             {
-                Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
+                Logger.Verbose("Connecting P2P: {TargetEndPoint}", targetEndPoint);
                 netManager.Connect(targetEndPoint, token);
+            }
+            else
+            {
+                Logger.Debug("Expected {expected} but got {actual}", type, connectionToken.NatType);
             }
         }
 
@@ -211,14 +215,11 @@ namespace Missions.Services.Network
         {
             if (PeerServer != null && peer.EndPoint != PeerServer.EndPoint)
             {
-                Task.Factory.StartNew(async () =>
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(.5));
-                    var peerConnectedEvent = new PeerConnected(peer);
-                    messageBroker.Publish(this, peerConnectedEvent);
-                });
+                var peerConnectedEvent = new PeerConnected(peer);
+                messageBroker.Publish(this, peerConnectedEvent);
             }
-            Logger.Information("{LocalPort} received connection from {peer}", netManager.LocalPort, peer.EndPoint);
+
+            Logger.Verbose("{LocalPort} received connection from {peer}", netManager.LocalPort, peer.EndPoint);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
@@ -228,6 +229,8 @@ namespace Missions.Services.Network
                 var peerDisconnectedEvent = new PeerDisconnected(peer, disconnectInfo);
                 messageBroker.Publish(this, peerDisconnectedEvent);
             }
+
+            Logger.Verbose("{LocalPort} received disconnected from {peer}", netManager.LocalPort, peer.EndPoint);
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
@@ -265,6 +268,8 @@ namespace Missions.Services.Network
             }
             else
             {
+                Logger.Error("Incoming connection was a part of a different instance," +
+                    "this means there is an issue with the server");
                 request.Reject();
             }
         }
