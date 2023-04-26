@@ -34,7 +34,7 @@ namespace Missions.Messages
 
         private byte[] PackCharacter(CharacterObject characterObject)
         {
-            IBinaryPackageFactory factory = null; //TODO
+            var factory = new BinaryPackageFactory();
             var character = new CharacterObjectBinaryPackage(characterObject, factory);
             character.Pack();
 
@@ -43,11 +43,11 @@ namespace Missions.Messages
 
         private CharacterObject UnpackCharacter()
         {
-            IBinaryPackageFactory factory = null; //TODO
+            var factory = new BinaryPackageFactory();
             var character = BinaryFormatterSerializer.Deserialize<CharacterObjectBinaryPackage>(_packedCharacter);
             character.BinaryPackageFactory = factory;
 
-            return character.Unpack<CharacterObject>(factory);
+            return character.Unpack<CharacterObject>();
         }
     }
 }

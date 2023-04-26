@@ -26,12 +26,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "Common\Common.csp
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IntroServer", "IntroServer\IntroServer.csproj", "{B24413E5-4371-47EE-BBFF-947E13EE6CCC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Missions", "Missions\Missions.csproj", "{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MissionTestMod", "MissionTestMod\MissionTestMod.csproj", "{BE74C4D9-6541-4043-8745-8ED1F030802C}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MissionTests", "MissionTests\MissionTests.csproj", "{A9712824-3CB1-473C-994A-28236DE65344}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerConsole", "ServerConsole\ServerConsole.csproj", "{08184158-2865-4481-AD38-9E82F1A44FD5}"
 EndProject
 Global
@@ -78,18 +72,6 @@ Global
 		{B24413E5-4371-47EE-BBFF-947E13EE6CCC}.Debug|x64.Build.0 = Debug|Any CPU
 		{B24413E5-4371-47EE-BBFF-947E13EE6CCC}.Release|x64.ActiveCfg = Release|Any CPU
 		{B24413E5-4371-47EE-BBFF-947E13EE6CCC}.Release|x64.Build.0 = Release|Any CPU
-		{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}.Debug|x64.ActiveCfg = Debug|x64
-		{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}.Debug|x64.Build.0 = Debug|x64
-		{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}.Release|x64.ActiveCfg = Release|x64
-		{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}.Release|x64.Build.0 = Release|x64
-		{BE74C4D9-6541-4043-8745-8ED1F030802C}.Debug|x64.ActiveCfg = Debug|x64
-		{BE74C4D9-6541-4043-8745-8ED1F030802C}.Debug|x64.Build.0 = Debug|x64
-		{BE74C4D9-6541-4043-8745-8ED1F030802C}.Release|x64.ActiveCfg = Release|x64
-		{BE74C4D9-6541-4043-8745-8ED1F030802C}.Release|x64.Build.0 = Release|x64
-		{A9712824-3CB1-473C-994A-28236DE65344}.Release|x64.ActiveCfg = Release|Any CPU
-		{A9712824-3CB1-473C-994A-28236DE65344}.Release|x64.Build.0 = Release|Any CPU
-		{A9712824-3CB1-473C-994A-28236DE65344}.Debug|x64.ActiveCfg = Debug|x64
-		{A9712824-3CB1-473C-994A-28236DE65344}.Debug|x64.Build.0 = Debug|x64
 		{08184158-2865-4481-AD38-9E82F1A44FD5}.Debug|x64.ActiveCfg = Debug|Any CPU
 		{08184158-2865-4481-AD38-9E82F1A44FD5}.Debug|x64.Build.0 = Debug|Any CPU
 		{08184158-2865-4481-AD38-9E82F1A44FD5}.Release|x64.ActiveCfg = Release|Any CPU

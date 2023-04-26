@@ -25,7 +25,7 @@ namespace Missions.Services.Network
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
         private static readonly Dictionary<PacketType, List<IPacketHandler>> PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
         
-        public int ConnectedPeersCount => _netManager.ConnectedPeerList.Count;
+        public int ConnectedPeersCount => _netManager.ConnectedPeersCount;
 
         public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
@@ -227,8 +227,8 @@ namespace Missions.Services.Network
         {
 
         }
-
-        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+        
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
             if (PacketHandlers.TryGetValue(packet.PacketType, out var handlers))
