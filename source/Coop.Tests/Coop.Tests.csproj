@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <LangVersion>10</LangVersion>
     <Platforms>x64</Platforms>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>

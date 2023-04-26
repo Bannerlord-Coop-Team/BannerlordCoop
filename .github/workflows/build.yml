@@ -21,12 +21,16 @@ jobs:
           cd BannerlordCoop
           git checkout "${{ github.ref_name }}"
 
-      - name: Link Game Assemblies
+      - name: Link Game Assemblies Folder
         run: |
-          mkdir BannerlordCoop/mb2
-          ln -s /home/mb2 BannerlordCoop/mb2
+          ln -s /home/mb2 BannerlordCoop
           
       - name: Build Solution
         run: |
           cd BannerlordCoop/source
           dotnet build
+          
+      - name: Run Unit Tests
+        run: |
+          cd BannerlordCoop/source
+          dotnet test
