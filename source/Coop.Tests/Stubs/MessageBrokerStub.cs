@@ -23,14 +23,20 @@ namespace Coop.Tests.Stubs
             {
                 return;
             }
-            Delegate[] delegates = new Delegate[_subscribers[typeof(T)].Count];
-            //_subscribers[typeof(T)].CopyTo(delegates, 0); //TODO
-            if (delegates == null || delegates.Length == 0) return;
+
+            var delegates = _subscribers[typeof(T)];
+            if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);
-            foreach (var handler in delegates.Select
-            (item => item as Action<MessagePayload<T>>))
+            for (int i = 0; i < delegates.Count; i++)
             {
-                handler?.Invoke(payload);
+                var weakDelegate = delegates[i];
+                if (weakDelegate.IsAlive == false)
+                {
+                    delegates.RemoveAt(i--);
+                    continue;
+                }
+
+                weakDelegate.Invoke(new object[] { payload });
             }
         }
     }
