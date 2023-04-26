@@ -29,7 +29,7 @@
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <DebugType>pdbonly</DebugType>
-    <Optimize>true</Optimize>
+    <Optimize>false</Optimize>
     <OutputPath>bin\Release\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
@@ -237,7 +237,7 @@
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
   </ItemGroup>
 
-  <Target Name="RunDeploy" AfterTargets="Build">
+  <Target Name="RunDeploy" AfterTargets="ReBuild">
     <Exec Condition=" '$(OS)' == 'Windows_NT' " 
           Command='powershell -ExecutionPolicy Unrestricted ^
           -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)" ^
