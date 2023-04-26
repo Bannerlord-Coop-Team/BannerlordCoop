@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     
     container:
-      image: hulkhan/bannerlordcoop:1.0.1
+      image: hulkhan/bannerlordcoop:1.0.2
       credentials:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -23,9 +23,10 @@ jobs:
           git fetch origin "pull/${{ github.event.number }}/head:${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
           git checkout "${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
 
-      - name: Copy Assemblies
+      - name: Link Game Assemblies
         run: |
-          cp -R /home/mb2 BannerlordCoop/mb2
+          mkdir BannerlordCoop/mb2
+          ln -s /home/mb2 BannerlordCoop/mb2
           
       - name: Build Solution
         run: |

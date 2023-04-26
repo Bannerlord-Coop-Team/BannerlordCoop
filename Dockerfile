@@ -50,8 +50,6 @@ RUN powershell_version=7.2.10 \
     # Add ncurses-terminfo-base to resolve psreadline dependency
     && apk add --no-cache ncurses-terminfo-base 
 
-# Copy MB assemblies (make sure you run deploy.ps1 first)
-WORKDIR /home/mb2
-COPY mb2 ./
-COPY mb2 ./
+# Copy MB assemblies (Make sure you run DockerPrepare.ps1 first)
 WORKDIR /home
+COPY DockerAssembliesTemp ./mb2

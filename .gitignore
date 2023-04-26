@@ -536,7 +536,8 @@ MigrationBackup/
 # Backup folder for Package Reference Convert tool in Visual Studio 2017
 
 # End of https://www.gitignore.io/api/csharp,powershell,dotnetcore,visualstudio,visualstudiocode
-Win64_Shipping_Client/**
+deploy/**
+DockerAssembliesTemp/**
 mb2
 mb2/**
 source/.editorconfig

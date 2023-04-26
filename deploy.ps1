@@ -38,10 +38,6 @@ $subModuleContent | Out-File -Encoding utf8 -FilePath $DeployDir\SubModule.xml
 # copy mod dll
 Copy-Item -Force *.dll -Destination $DeployBinDir
 
-# copy game dlls for deployment
-Copy-Item ${BaseDir}mb2 -Force -Filter "TaleWorlds*.dll" -Destination $DeployDir -Recurse
-Copy-Item ${BaseDir}mb2 -Force -Filter "SandBox*.dll" -Destination $DeployDir -Recurse
-
 # remove empty folders from deployment
 Get-ChildItem $DeployBinDir -Recurse -Force -Directory | 
     Sort-Object -Property FullName -Descending |
