@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     public class BlowWeaponRecordBinaryPackage : BinaryPackageBase<BlowWeaponRecord>
     {
 
-        public BlowWeaponRecordBinaryPackage(BlowWeaponRecord obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public BlowWeaponRecordBinaryPackage(BlowWeaponRecord obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

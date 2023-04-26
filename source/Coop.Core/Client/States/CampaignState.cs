@@ -19,8 +19,6 @@ namespace Coop.Core.Client.States
 
             Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
             Logic.NetworkMessageBroker.Subscribe<MissionStateEntered>(Handle);
-
-            Logic.NetworkMessageBroker.Publish(this, new SwitchToHero(Logic.HeroStringId));
         }
 
         public override void Dispose()
@@ -79,10 +77,6 @@ namespace Coop.Core.Client.States
         }
 
         public override void EnterCampaignState()
-        {
-        }
-
-        public override void ResolveNetworkGuids()
         {
         }
 

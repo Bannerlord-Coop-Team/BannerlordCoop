@@ -1,4 +1,7 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using Serilog.Core;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,19 +12,21 @@ namespace GameInterface.Serialization.Native
     [Serializable]
     public class DictionaryBinaryPackage : IEnumerableBinaryPackage
     {
-        [NonSerialized]
-        readonly IBinaryPackageFactory PackageFactory;
+        private static ILogger Logger = LogManager.GetLogger<DictionaryBinaryPackage>();
 
         [NonSerialized]
-        readonly IEnumerable enumerable;
+        private IBinaryPackageFactory binaryPackageFactory;
+
+        [NonSerialized]
+        private readonly IEnumerable enumerable;
 
         readonly string enumerableType;
 
         IBinaryPackage[] packages;
 
-        public DictionaryBinaryPackage(IEnumerable enumerable, IBinaryPackageFactory packageFactory)
+        public DictionaryBinaryPackage(IEnumerable enumerable, IBinaryPackageFactory binaryPackageFactory)
         {
-            PackageFactory = packageFactory;
+            this.binaryPackageFactory = binaryPackageFactory;
             this.enumerable = enumerable;
             enumerableType = enumerable.GetType().AssemblyQualifiedName;
         }
@@ -31,18 +36,19 @@ namespace GameInterface.Serialization.Native
             List<IBinaryPackage> binaryPackages = new List<IBinaryPackage>();
             foreach (var obj in enumerable)
             {
-                var package = PackageFactory.GetBinaryPackage(obj);
-                binaryPackages.Add(package);
+                binaryPackages.Add(binaryPackageFactory.GetBinaryPackage(obj));
             }
 
             packages = binaryPackages.ToArray();
         }
 
-        public object Unpack()
+        public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
-            var unpackedArray = packages.Select(e => e.Unpack()).ToArray();
+            this.binaryPackageFactory = binaryPackageFactory;
+
+            var unpackedArray = packages.Select(e => e.Unpack(binaryPackageFactory)).ToArray();
             var type = Type.GetType(enumerableType);
-            var newDict = Activator.CreateInstance(type);
+            var newDict = Activator.CreateInstance(enumerableType);
 
             MethodInfo DictAdd = type.GetMethod("Add");
 
@@ -59,15 +65,22 @@ namespace GameInterface.Serialization.Native
             {
                 var k = Key.GetValue(obj);
                 var v = Value.GetValue(obj);
+
+                if(k == null)
+                {
+                    Logger.Warning("Key was null while unpacking dictionary");
+                    continue;
+                }
+
                 DictAdd.Invoke(newDict, new object[] { k, v });
             }
 
             return newDict;
         }
 
-        public T Unpack<T>()
+        public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)
         {
-            return (T)Unpack();
+            return (T)Unpack(binaryPackageFactory);
         }
     }
 }

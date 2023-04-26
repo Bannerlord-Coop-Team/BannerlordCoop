@@ -20,7 +20,7 @@ namespace Coop.Tests.Server.Connections.States
         private readonly NetPeer _differentPlayer = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
         public CreateCharacterStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(_playerId, NetworkMessageBroker);
+            _connectionLogic = new ConnectionLogic(_playerId, StubNetworkMessageBroker);
             _differentPlayer.SetId(_playerId.Id + 1);
         }
 
@@ -29,11 +29,11 @@ namespace Coop.Tests.Server.Connections.States
         {
             _connectionLogic.State = new CampaignState(_connectionLogic);
 
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             _connectionLogic.State.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
@@ -65,16 +65,16 @@ namespace Coop.Tests.Server.Connections.States
             _connectionLogic.State = new CreateCharacterState(_connectionLogic);
 
             var registerNewPlayerHeroCount = 0;
-            NetworkMessageBroker.Subscribe<RegisterNewPlayerHero>((payload) =>
+            StubNetworkMessageBroker.Subscribe<RegisterNewPlayerHero>((payload) =>
             {
                 registerNewPlayerHeroCount += 1;
 
                 // Message should state hero does not exist
-                Assert.Equal(_playerId.Id, payload.What.PeerId);
+                Assert.NotEqual(default, payload.What.TransactionID);
             });
 
             // Publish hero resolved, this would be from game interface
-            NetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkTransferedHero(Array.Empty<byte>()));
+            StubNetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkTransferedHero(Array.Empty<byte>()));
 
             // A single message is sent
             Assert.Equal(1, registerNewPlayerHeroCount);
@@ -88,13 +88,13 @@ namespace Coop.Tests.Server.Connections.States
             _connectionLogic.State = new CreateCharacterState(_connectionLogic);
 
             var registerNewPlayerHeroCount = 0;
-            NetworkMessageBroker.Subscribe<RegisterNewPlayerHero>((payload) =>
+            StubNetworkMessageBroker.Subscribe<RegisterNewPlayerHero>((payload) =>
             {
                 registerNewPlayerHeroCount += 1;
             });
 
             // Publish hero resolved, this would be from game interface
-            NetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkTransferedHero(Array.Empty<byte>()));
+            StubNetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkTransferedHero(Array.Empty<byte>()));
 
             // A single message is sent
             Assert.Equal(0, registerNewPlayerHeroCount);
@@ -108,13 +108,13 @@ namespace Coop.Tests.Server.Connections.States
             _connectionLogic.State = new CreateCharacterState(_connectionLogic);
 
             var registerNewPlayerHeroCount = 0;
-            NetworkMessageBroker.TestNetworkSubscribe<NetworkPlayerData>((payload) =>
+            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkPlayerData>((payload) =>
             {
                 registerNewPlayerHeroCount += 1;
             });
 
             // Publish hero resolved, this would be from game interface
-            NetworkMessageBroker.Publish(_playerId, new NewPlayerHeroRegistered());
+            StubNetworkMessageBroker.Publish(_playerId, new NewPlayerHeroRegistered());
 
             Assert.IsType<TransferSaveState>(_connectionLogic.State);
         }
@@ -125,13 +125,13 @@ namespace Coop.Tests.Server.Connections.States
             _connectionLogic.State = new CreateCharacterState(_connectionLogic);
 
             var registerNewPlayerHeroCount = 0;
-            NetworkMessageBroker.TestNetworkSubscribe<NetworkPlayerData>((payload) =>
+            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkPlayerData>((payload) =>
             {
                 registerNewPlayerHeroCount += 1;
             });
 
             // Publish hero resolved, this would be from game interface
-            NetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkTransferedHero(Array.Empty<byte>()));
+            StubNetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkTransferedHero(Array.Empty<byte>()));
 
             // A single message is sent
             Assert.Equal(0, registerNewPlayerHeroCount);

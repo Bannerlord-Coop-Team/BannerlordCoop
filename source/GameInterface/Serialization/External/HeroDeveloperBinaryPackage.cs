@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class HeroDeveloperBinaryPackage : BinaryPackageBase<HeroDeveloper>
     {
-        public HeroDeveloperBinaryPackage(HeroDeveloper obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public HeroDeveloperBinaryPackage(HeroDeveloper obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

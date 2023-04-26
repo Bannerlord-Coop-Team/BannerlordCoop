@@ -25,7 +25,7 @@ namespace GameInterface.Serialization.External
         string[] companionsIds;
 
 
-        public ClanBinaryPackage(Clan obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public ClanBinaryPackage(Clan obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -55,7 +55,7 @@ namespace GameInterface.Serialization.External
             // If the stringId already exists in the object manager use that object
             if (stringId != null)
             {
-                var newObject = MBObjectManager.Instance.GetObject<Clan>(stringId);
+                var newObject = ResolveId<Clan>(stringId);
                 if (newObject != null)
                 {
                     Object = newObject;

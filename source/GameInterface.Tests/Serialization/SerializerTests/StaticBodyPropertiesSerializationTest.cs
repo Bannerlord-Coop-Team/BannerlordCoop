@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using TaleWorlds.Core;
 using Xunit;
 using Common.Serialization;
@@ -8,12 +11,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class StaticBodyPropertiesSerializationTest
     {
+        IContainer container;
+        public StaticBodyPropertiesSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void StaticBodyProperties_Serialize()
         {
             StaticBodyProperties staticBodyProperties = new StaticBodyProperties();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             StaticBodyPropertiesBinaryPackage package = new StaticBodyPropertiesBinaryPackage(staticBodyProperties, factory);
 
             package.Pack();
@@ -28,7 +41,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             StaticBodyProperties staticBodyProperties = new StaticBodyProperties(1, 2, 3, 4, 5, 6, 7, 8);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             StaticBodyPropertiesBinaryPackage package = new StaticBodyPropertiesBinaryPackage(staticBodyProperties, factory);
 
             package.Pack();
@@ -43,7 +56,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             StaticBodyPropertiesBinaryPackage returnedPackage = (StaticBodyPropertiesBinaryPackage)obj;
 
-            StaticBodyProperties newStaticBodyProperties = returnedPackage.Unpack<StaticBodyProperties>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            StaticBodyProperties newStaticBodyProperties = returnedPackage.Unpack<StaticBodyProperties>(deserializeFactory);
 
             Assert.Equal(staticBodyProperties.KeyPart1, newStaticBodyProperties.KeyPart1);
             Assert.Equal(staticBodyProperties.KeyPart2, newStaticBodyProperties.KeyPart2);

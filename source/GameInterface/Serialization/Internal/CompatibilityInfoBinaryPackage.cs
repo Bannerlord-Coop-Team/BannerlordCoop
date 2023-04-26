@@ -14,7 +14,7 @@ namespace GameInterface.Serialization.Internal
     [Serializable]
     public class CompatibilityInfoBinaryPackage : BinaryPackageBase<CompatibilityInfo>
     {
-        public CompatibilityInfoBinaryPackage(CompatibilityInfo obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CompatibilityInfoBinaryPackage(CompatibilityInfo obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

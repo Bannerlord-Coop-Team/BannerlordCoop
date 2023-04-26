@@ -30,9 +30,6 @@ namespace Coop.Core.Client.States
         public abstract void LoadSavedData();
 
         /// <inheritdoc/>
-        public abstract void ResolveNetworkGuids();
-
-        /// <inheritdoc/>
         public abstract void ExitGame();
 
         /// <inheritdoc/>

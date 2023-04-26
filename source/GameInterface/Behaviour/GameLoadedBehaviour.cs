@@ -23,45 +23,45 @@ namespace GameInterface.Behaviour
         {
         }
 
-        private static void LoadPlayers()
-        {
-            string pattern = $"({Campaign.Current.UniqueGameId})([0-9-]+)";
-            string path = BasePath.Name + "Modules/Coop/";
+        //private static void LoadPlayers()
+        //{
+        //    string pattern = $"({Campaign.Current.UniqueGameId})([0-9-]+)";
+        //    string path = BasePath.Name + "Modules/Coop/";
 
-            Dictionary<DateTime, string> creationTimes = new Dictionary<DateTime, string>();
+        //    Dictionary<DateTime, string> creationTimes = new Dictionary<DateTime, string>();
 
-            foreach (string filepath in Directory.GetFiles(path))
-            {
-                if (filepath.Contains(Campaign.Current.UniqueGameId))
-                {
-                    creationTimes.Add(File.GetCreationTime(filepath), filepath);
-                }
-            }
-            if (creationTimes.Count > 0)
-            {
-                DateTime latestDate = creationTimes.Max(kvp => kvp.Key);
-                string filePath = creationTimes[latestDate];
+        //    foreach (string filepath in Directory.GetFiles(path))
+        //    {
+        //        if (filepath.Contains(Campaign.Current.UniqueGameId))
+        //        {
+        //            creationTimes.Add(File.GetCreationTime(filepath), filepath);
+        //        }
+        //    }
+        //    if (creationTimes.Count > 0)
+        //    {
+        //        DateTime latestDate = creationTimes.Max(kvp => kvp.Key);
+        //        string filePath = creationTimes[latestDate];
 
-                foreach (string line in File.ReadAllLines(filePath))
-                {
-                    string[] data = line.Split(' ');
+        //        foreach (string line in File.ReadAllLines(filePath))
+        //        {
+        //            string[] data = line.Split(' ');
 
-                    string clientId = data[0];
-                    Guid partyGUID = Guid.Parse(data[1]);
+        //            string clientId = data[0];
+        //            Guid partyGUID = Guid.Parse(data[1]);
 
-                    if (CoopSaveManager.PlayerParties.ContainsKey(clientId))
-                    {
-                        if (CoopSaveManager.PlayerParties[clientId] != partyGUID)
-                        {
-                            throw new Exception("Party GUID does not equal saved ID when loading from file.");
-                        }
-                    }
-                    else
-                    {
-                        CoopSaveManager.PlayerParties.Add(clientId, partyGUID);
-                    }
-                }
-            }
-        }
+        //            if (CoopSaveManager.PlayerParties.ContainsKey(clientId))
+        //            {
+        //                if (CoopSaveManager.PlayerParties[clientId] != partyGUID)
+        //                {
+        //                    throw new Exception("Party GUID does not equal saved ID when loading from file.");
+        //                }
+        //            }
+        //            else
+        //            {
+        //                CoopSaveManager.PlayerParties.Add(clientId, partyGUID);
+        //            }
+        //        }
+        //    }
+        //}
     }
 }

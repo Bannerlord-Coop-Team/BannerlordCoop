@@ -2,18 +2,30 @@
 using System.Collections.Generic;
 using Xunit;
 using GameInterface.Serialization.Native;
-using Common.Serialization;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ListSerializationTest
     {
+        IContainer container;
+        public ListSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void List_Serialize()
         {
             List<int> List = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             EnumerableBinaryPackage package = new EnumerableBinaryPackage(List, factory);
 
             package.Pack();
@@ -28,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             List<int> List = new List<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             EnumerableBinaryPackage package = new EnumerableBinaryPackage(List, factory);
 
             package.Pack();
@@ -43,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             EnumerableBinaryPackage returnedPackage = (EnumerableBinaryPackage)obj;
 
-            List<int> newList = returnedPackage.Unpack<List<int>>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            List<int> newList = returnedPackage.Unpack<List<int>>(deserializeFactory);
 
             Assert.Equal(List, newList);
         }

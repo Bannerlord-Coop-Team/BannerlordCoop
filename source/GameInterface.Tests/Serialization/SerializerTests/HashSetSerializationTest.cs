@@ -2,18 +2,30 @@
 using System.Collections.Generic;
 using Xunit;
 using GameInterface.Serialization.Native;
-using Common.Serialization;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class HashSetSerializationTest
     {
+        IContainer container;
+        public HashSetSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void HashSet_Serialize()
         {
             HashSet<int> HashSet = new HashSet<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             EnumerableBinaryPackage package = new EnumerableBinaryPackage(HashSet, factory);
 
             package.Pack();
@@ -28,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             HashSet<int> HashSet = new HashSet<int> { 1, 2, 3, 4, 5, 6, 7, 8 };
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             EnumerableBinaryPackage package = new EnumerableBinaryPackage(HashSet, factory);
 
             package.Pack();
@@ -43,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             EnumerableBinaryPackage returnedPackage = (EnumerableBinaryPackage)obj;
 
-            HashSet<int> newHashSet = returnedPackage.Unpack<HashSet<int>>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            HashSet<int> newHashSet = returnedPackage.Unpack<HashSet<int>>(deserializeFactory);
 
             Assert.Equal(HashSet, newHashSet);
         }

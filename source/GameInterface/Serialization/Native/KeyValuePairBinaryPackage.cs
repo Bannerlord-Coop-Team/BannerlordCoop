@@ -12,7 +12,7 @@ namespace GameInterface.Serialization.Native
     public class KeyValuePairBinaryPackage : IBinaryPackage
     {
         [NonSerialized]
-        private readonly BinaryPackageFactory BinaryPackageFactory;
+        private readonly IBinaryPackageFactory binaryPackageFactory;
         [NonSerialized]
         private object Object;
         [NonSerialized]
@@ -24,12 +24,12 @@ namespace GameInterface.Serialization.Native
         
         protected Type T => Type.GetType(ObjectType);
 
-        public KeyValuePairBinaryPackage(object kvp, BinaryPackageFactory binaryPackageFactory)
+        public KeyValuePairBinaryPackage(object kvp, IBinaryPackageFactory binaryPackageFactory)
         {
             ObjectType = kvp.GetType().AssemblyQualifiedName;
             var type = Type.GetType(ObjectType);
             Object = kvp;
-            BinaryPackageFactory = binaryPackageFactory;
+            this.binaryPackageFactory = binaryPackageFactory;
 
             if (type.GetGenericTypeDefinition() != typeof(KeyValuePair<,>)) throw new Exception(
                 $"{ObjectType} is not {typeof(KeyValuePair<,>)}");
@@ -44,19 +44,26 @@ namespace GameInterface.Serialization.Native
                 // Get the value of the current field in the object
                 // Add a binary package of the field value to the StoredFields collection
                 object obj = field.GetValue(Object);
-                StoredFields.Add(field.Name, BinaryPackageFactory.GetBinaryPackage(obj));
+                StoredFields.Add(field.Name, binaryPackageFactory.GetBinaryPackage(obj));
             }
         }
 
-        public object Unpack()
+        public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
             if (IsUnpacked) return Object;
             var type = Type.GetType(ObjectType);
+            this.binaryPackageFactory = binaryPackageFactory;
+            
             Object = FormatterServices.GetUninitializedObject(type);
 
             UnpackInternal();
 
             return Object;
+        }
+
+        public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)
+        {
+            return (T)Unpack(binaryPackageFactory);
         }
         
         private void UnpackInternal()
@@ -79,11 +86,6 @@ namespace GameInterface.Serialization.Native
                     field.SetValue(Object, StoredFields[fieldName].Unpack());
                 }
             }
-        }
-
-        public T Unpack<T>()
-        {
-            return (T)Object;
         }
     }
 }

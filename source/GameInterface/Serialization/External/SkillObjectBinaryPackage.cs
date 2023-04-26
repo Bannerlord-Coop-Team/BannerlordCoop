@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     public class SkillObjectBinaryPackage : BinaryPackageBase<SkillObject>
     {
         public string StringId;
-        public SkillObjectBinaryPackage(SkillObject obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public SkillObjectBinaryPackage(SkillObject obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
 
         }
@@ -18,7 +18,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<SkillObject>(StringId);
+            Object = ResolveId<SkillObject>(StringId);
         }
     }
 }

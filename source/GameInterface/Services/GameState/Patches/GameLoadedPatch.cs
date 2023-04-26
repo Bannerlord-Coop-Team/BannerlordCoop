@@ -21,7 +21,7 @@ namespace GameInterface.Services.GameState.Patches
         [HarmonyPatch("OnActivate")]
         static void OnGameLoaded(ref MapScreen __instance)
         {
-            MessageBroker.Instance.Publish(__instance, new GameLoaded());
+            MessageBroker.Instance.Publish(__instance, new CampaignLoaded());
         }
     }
 }

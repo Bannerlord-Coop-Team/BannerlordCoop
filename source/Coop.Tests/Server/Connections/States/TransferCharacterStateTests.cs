@@ -1,13 +1,16 @@
-﻿using Coop.Core.Client.Messages;
+﻿using Common.Serialization;
+using Coop.Core.Client.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Save.Data;
 using GameInterface.Services.Time.Messages;
 using LiteNetLib;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
 using Xunit;
@@ -23,7 +26,7 @@ namespace Coop.Tests.Server.Connections.States
 
         public TransferCharacterStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(_playerId, NetworkMessageBroker);
+            _connectionLogic = new ConnectionLogic(_playerId, StubNetworkMessageBroker);
             _differentPlayer.SetId(_playerId.Id + 1);
         }
 
@@ -32,11 +35,11 @@ namespace Coop.Tests.Server.Connections.States
         {
             _connectionLogic.State = new CampaignState(_connectionLogic);
 
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             _connectionLogic.State.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
@@ -67,23 +70,24 @@ namespace Coop.Tests.Server.Connections.States
         {
             // Setup event callbacks
             var networkDisableTimeControlsCount = 0;
-            NetworkMessageBroker.TestNetworkSubscribe<NetworkDisableTimeControls>((payload) =>
+            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkDisableTimeControls>((payload) =>
             {
                 networkDisableTimeControlsCount += 1;
             });
 
             var pauseAndDisableGameTimeControlsCount = 0;
-            NetworkMessageBroker.Subscribe<PauseAndDisableGameTimeControls>((payload) =>
+            StubNetworkMessageBroker.Subscribe<PauseAndDisableGameTimeControls>((payload) =>
             {
                 pauseAndDisableGameTimeControlsCount += 1;
             });
 
             var packageGameSaveDataCount = 0;
-            NetworkMessageBroker.Subscribe<PackageGameSaveData>((payload) =>
+            StubNetworkMessageBroker.Subscribe<PackageGameSaveData>((payload) =>
             {
                 packageGameSaveDataCount += 1;
 
-                Assert.Equal(_playerId.Id, payload.What.PeerId);
+                // Verify new transaction id is generated
+                Assert.NotEqual(default, payload.What.TransactionID);
             });
 
             // Trigger state entry
@@ -96,37 +100,60 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void GameSaveDataPackaged_ValidPlayerId()
+        public void GameSaveDataPackaged_ValidTransactionId()
         {
+            Guid transactionId = default;
+            StubNetworkMessageBroker.Subscribe<PackageGameSaveData>((payload) =>
+            {
+                transactionId = payload.What.TransactionID;
+            });
+
             _connectionLogic.State = new TransferSaveState(_connectionLogic);
 
+            // Ensure transaction id was generated
+            Assert.NotEqual(default, transactionId);
+
             var networkGameSaveDataRecievedCount = 0;
-            NetworkMessageBroker.TestNetworkSubscribe<NetworkGameSaveDataRecieved>((payload) =>
+            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkGameSaveDataReceived>((payload) =>
             {
                 networkGameSaveDataRecievedCount += 1;
             });
 
             // Publish hero resolved, this would be from game interface
-            MessageBroker.Publish(_playerId, new GameSaveDataPackaged(_playerId.Id, Array.Empty<byte>()));
+            var gameObjectGuids = new GameObjectGuids(
+                new string[] { "Random STR" });
+
+            var message = new GameSaveDataPackaged(
+                transactionId,
+                Array.Empty<byte>(),
+                "TestCampaingId",
+                gameObjectGuids);
+
+            StubMessageBroker.Publish(_playerId, message);
 
             Assert.Equal(1, networkGameSaveDataRecievedCount);
             Assert.IsType<LoadingState>(_connectionLogic.State);
         }
 
         [Fact]
-        public void GameSaveDataPackaged_InvalidPlayerId()
+        public void GameSaveDataPackaged_InvalidTransactionId()
         {
-            int _otherPlayerId = _playerId.Id + 1;
             _connectionLogic.State = new TransferSaveState(_connectionLogic);
 
             var networkGameSaveDataRecievedCount = 0;
-            NetworkMessageBroker.TestNetworkSubscribe<NetworkGameSaveDataRecieved>((payload) =>
+            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkGameSaveDataReceived>((payload) =>
             {
                 networkGameSaveDataRecievedCount += 1;
             });
 
             // Publish hero resolved, this would be from game interface
-            MessageBroker.Publish(_playerId, new GameSaveDataPackaged(_otherPlayerId, Array.Empty<byte>()));
+            var message = new GameSaveDataPackaged(
+                Guid.NewGuid(),
+                Array.Empty<byte>(),
+                "TestCampaingId",
+                default);
+
+            StubMessageBroker.Publish(_playerId, message);
 
             Assert.Equal(0, networkGameSaveDataRecievedCount);
             Assert.IsType<TransferSaveState>(_connectionLogic.State);

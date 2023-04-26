@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class PathFaceRecordBinaryPackage : BinaryPackageBase<PathFaceRecord>
     {
-        public PathFaceRecordBinaryPackage(PathFaceRecord obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public PathFaceRecordBinaryPackage(PathFaceRecord obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

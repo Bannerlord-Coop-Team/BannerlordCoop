@@ -27,7 +27,7 @@ namespace GameInterface.Serialization.External
         private string quartermasterId;
         private string surgeonId;
 
-        public MobilePartyBinaryPackage(MobileParty obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public MobilePartyBinaryPackage(MobileParty obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -81,7 +81,7 @@ namespace GameInterface.Serialization.External
         private static readonly MethodInfo MobileParty_InitCached = typeof(MobileParty).GetMethod("InitCached", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
-            MobileParty mobileParty = MBObjectManager.Instance.GetObject<MobileParty>(stringId);
+            MobileParty mobileParty = ResolveId<MobileParty>(stringId);
             if(mobileParty != null)
             {
                 Object = mobileParty;

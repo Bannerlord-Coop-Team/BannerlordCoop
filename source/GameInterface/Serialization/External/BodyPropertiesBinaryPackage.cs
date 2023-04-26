@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class BodyPropertiesBinaryPackage : BinaryPackageBase<BodyProperties>
     {
-        public BodyPropertiesBinaryPackage(BodyProperties obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public BodyPropertiesBinaryPackage(BodyProperties obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

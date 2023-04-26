@@ -12,7 +12,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class MobilePartyAIBinaryPackage : BinaryPackageBase<MobilePartyAi>
     {
-        public MobilePartyAIBinaryPackage(MobilePartyAi obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public MobilePartyAIBinaryPackage(MobilePartyAi obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

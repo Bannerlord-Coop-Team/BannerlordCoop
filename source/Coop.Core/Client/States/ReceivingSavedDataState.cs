@@ -1,6 +1,9 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Handlers;
+using GameInterface.Services.Save.Messages;
 using System;
 
 namespace Coop.Core.Client.States
@@ -10,35 +13,37 @@ namespace Coop.Core.Client.States
     /// </summary>
     public class ReceivingSavedDataState : ClientStateBase
     {
-        byte[] saveData;
+        private NetworkGameSaveDataReceived saveDataMessage = default;
 
         public ReceivingSavedDataState(IClientLogic logic) : base(logic)
         {
-            Logic.NetworkMessageBroker.Subscribe<NetworkGameSaveDataRecieved>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle);
             Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
         }
 
         public override void Dispose()
         {
-            Logic.NetworkMessageBroker.Unsubscribe<NetworkGameSaveDataRecieved>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle);
             Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
         }
 
-        private void Handle(MessagePayload<NetworkGameSaveDataRecieved> obj)
+        private void Handle(MessagePayload<NetworkGameSaveDataReceived> obj)
         {
-            saveData = obj.What.GameSaveData;
+            saveDataMessage = obj.What;
             Logic.EnterMainMenu();
         }
 
         private void Handle(MessagePayload<MainMenuEntered> obj)
         {
+            var saveData = saveDataMessage.GameSaveData;
+
             if (saveData == null) return;
             if (saveData.Length == 0) return;
 
-            var commandLoad = new LoadGameSave(saveData);
+            var commandLoad = new LoadGameSave(Guid.NewGuid(), saveData);
             Logic.NetworkMessageBroker.Publish(this, commandLoad);
 
-            Logic.State = new LoadingState(Logic);
+            Logic.LoadSavedData();
         }
 
         public override void EnterMainMenu()
@@ -62,6 +67,7 @@ namespace Coop.Core.Client.States
 
         public override void LoadSavedData()
         {
+            Logic.State = new LoadingState(Logic);
         }
 
         public override void StartCharacterCreation()
@@ -73,10 +79,6 @@ namespace Coop.Core.Client.States
         }
 
         public override void EnterMissionState()
-        {
-        }
-
-        public override void ResolveNetworkGuids()
         {
         }
 

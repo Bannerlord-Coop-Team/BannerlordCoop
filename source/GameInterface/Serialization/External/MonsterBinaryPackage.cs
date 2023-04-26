@@ -12,7 +12,7 @@ namespace GameInterface.Serialization.External
     {
         public string StringId;
 
-        public MonsterBinaryPackage(Monster obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public MonsterBinaryPackage(Monster obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -23,7 +23,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            MBObjectManager.Instance.GetObject<Monster>(StringId);
+            ResolveId<Monster>(StringId);
         }
     }
 }

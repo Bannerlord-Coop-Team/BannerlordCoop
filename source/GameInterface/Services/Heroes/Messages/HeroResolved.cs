@@ -3,15 +3,14 @@ using System;
 
 namespace GameInterface.Services.Heroes.Messages
 {
-    public readonly struct HeroResolved : IEvent
+    public readonly struct HeroResolved : IResponse
     {
-        public int PeerId { get; }
-        public string HeroStringId { get; }
-
-        public HeroResolved(int peerId, string heroStringId)
+        public Guid TransactionID { get; }
+        public string HeroId { get; }
+        public HeroResolved(Guid transactionID, string heroId)
         {
-            PeerId = peerId;
-            HeroStringId = heroStringId;
+            TransactionID = transactionID;
+            HeroId = heroId;
         }
     }
 }

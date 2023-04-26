@@ -12,13 +12,13 @@ namespace Coop.Core.Client.States
     {
         public LoadingState(IClientLogic logic) : base(logic)
         {
-            Logic.NetworkMessageBroker.Subscribe<GameLoaded>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<CampaignLoaded>(Handle);
             Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
         }
 
         public override void Dispose()
         {
-            Logic.NetworkMessageBroker.Unsubscribe<GameLoaded>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<CampaignLoaded>(Handle);
             Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
         }
 
@@ -32,14 +32,9 @@ namespace Coop.Core.Client.States
             Logic.State = new MainMenuState(Logic);
         }
 
-        private void Handle(MessagePayload<GameLoaded> obj)
+        private void Handle(MessagePayload<CampaignLoaded> obj)
         {
-            Logic.ResolveNetworkGuids();
-        }
-
-        public override void ResolveNetworkGuids()
-        {
-            Logic.State = new ResolveNetworkGuidsState(Logic);
+            Logic.EnterCampaignState();
         }
 
         public override void Connect()
@@ -65,6 +60,7 @@ namespace Coop.Core.Client.States
 
         public override void EnterCampaignState()
         {
+            Logic.State = new CampaignState(Logic);
         }
 
         public override void EnterMissionState()

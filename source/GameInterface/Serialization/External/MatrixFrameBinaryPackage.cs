@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class MatrixFrameBinaryPackage : BinaryPackageBase<MatrixFrame>
     {
-        public MatrixFrameBinaryPackage(MatrixFrame obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public MatrixFrameBinaryPackage(MatrixFrame obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

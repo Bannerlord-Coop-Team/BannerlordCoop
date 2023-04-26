@@ -15,6 +15,12 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class HeroBinaryPackage : BinaryPackageBase<Hero>
     {
+        public static readonly FieldInfo Hero_Father = typeof(Hero).GetField("_father", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static readonly FieldInfo Hero_Mother = typeof(Hero).GetField("_mother", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static readonly FieldInfo Hero_Spouse = typeof(Hero).GetField("_spouse", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static readonly FieldInfo Hero_ExSpouses = typeof(Hero).GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static readonly FieldInfo Hero_Children = typeof(Hero).GetField("_children", BindingFlags.NonPublic | BindingFlags.Instance);
+
         private string stringId;
         private string fatherId;
         private string motherId;
@@ -22,7 +28,7 @@ namespace GameInterface.Serialization.External
         private string spouseId;
         private string[] childrenIds;
 
-        public HeroBinaryPackage(Hero obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public HeroBinaryPackage(Hero obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -63,7 +69,7 @@ namespace GameInterface.Serialization.External
             // Otherwise, create a new object and initialize it
             if (stringId != null)
             {
-                var newObject = MBObjectManager.Instance.GetObject<Hero>(stringId);
+                var newObject = ResolveId<Hero>(stringId);
                 if (newObject != null)
                 {
                     Object = newObject;

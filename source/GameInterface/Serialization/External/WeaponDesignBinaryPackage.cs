@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class WeaponDesignBinaryPackage : BinaryPackageBase<WeaponDesign>
     {
-        public WeaponDesignBinaryPackage(WeaponDesign obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public WeaponDesignBinaryPackage(WeaponDesign obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

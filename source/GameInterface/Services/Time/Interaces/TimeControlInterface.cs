@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
 using System.Reflection;
+using GameInterface.Services.Time.Patches;
 
 namespace GameInterface.Services.Heroes.Interfaces
 {
@@ -20,11 +21,12 @@ namespace GameInterface.Services.Heroes.Interfaces
     {
         void PauseAndDisableTimeControls();
         void EnableTimeControls();
+        void SetTimeControl(CampaignTimeControlMode newMode);
     }
 
     internal class TimeControlInterface : ITimeControlInterface
     {
-        internal static bool TimeLock = false;
+        internal static bool TimeLock = true;
 
         public void PauseAndDisableTimeControls()
         {
@@ -38,6 +40,11 @@ namespace GameInterface.Services.Heroes.Interfaces
         public void EnableTimeControls()
         {
             TimeLock = false;
+        }
+
+        public void SetTimeControl(CampaignTimeControlMode newMode)
+        {
+            TimePatches.OverrideTimeControlMode(Campaign.Current, newMode);
         }
     }
 }

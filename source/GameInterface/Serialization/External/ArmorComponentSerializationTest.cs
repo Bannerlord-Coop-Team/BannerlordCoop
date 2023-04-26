@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class ArmorComponentBinaryPackage : BinaryPackageBase<ArmorComponent>
     {
-        public ArmorComponentBinaryPackage(ArmorComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public ArmorComponentBinaryPackage(ArmorComponent obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

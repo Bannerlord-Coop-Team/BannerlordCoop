@@ -1,13 +1,17 @@
 ﻿using Common.Extensions;
 using GameInterface.Serialization.Native;
+using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
+using System.Data.Linq;
 using System.Linq;
 
 namespace GameInterface.Serialization
 {
     public interface IBinaryPackageFactory
     {
+        IObjectManager ObjectManager { get; }
+
         T GetBinaryPackage<T>(object obj);
         IBinaryPackage GetBinaryPackage(object obj);
     }
@@ -15,13 +19,20 @@ namespace GameInterface.Serialization
     [Serializable]
     public class BinaryPackageFactory : IBinaryPackageFactory
     {
-        readonly Dictionary<ObjectAndType, IBinaryPackage> InstantiatedPackages = new Dictionary<ObjectAndType, IBinaryPackage>();
-        static readonly Dictionary<string, string> PackagesTypes = new Dictionary<string, string>();
-
+        static readonly Dictionary<Type, Type> PackagesTypes = new Dictionary<Type, Type>();
         static BinaryPackageFactory()
         {
             CollectBinaryPackageTypes();
         }
+
+        public IObjectManager ObjectManager { get; }
+
+        public BinaryPackageFactory(IObjectManager objectManager)
+        {
+            ObjectManager = objectManager;
+        }
+
+        private readonly Dictionary<ObjectAndType, IBinaryPackage> InstantiatedPackages = new Dictionary<ObjectAndType, IBinaryPackage>();
 
         private static void CollectBinaryPackageTypes()
         {

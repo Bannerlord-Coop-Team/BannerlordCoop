@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     public class SaddleComponentBinaryPackage : BinaryPackageBase<SaddleComponent>
     {
 
-        public SaddleComponentBinaryPackage(SaddleComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public SaddleComponentBinaryPackage(SaddleComponent obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

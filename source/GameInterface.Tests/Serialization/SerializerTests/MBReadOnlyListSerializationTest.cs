@@ -1,5 +1,7 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.Generics;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Collections.Generic;
 using TaleWorlds.Library;
 using Xunit;
@@ -9,6 +11,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class MBReadOnlyListSerializationTest
     {
+        IContainer container;
+        public MBReadOnlyListSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void MBReadOnlyList_Serialize()
         {
@@ -16,7 +28,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MBReadOnlyList<int> MBReadOnlyList = new MBReadOnlyList<int>(ints);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             MBReadOnlyListBinaryPackage package = new MBReadOnlyListBinaryPackage(MBReadOnlyList, factory);
 
             package.Pack();
@@ -33,7 +45,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MBReadOnlyList<int> MBReadOnlyList = new MBReadOnlyList<int>(ints);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             MBReadOnlyListBinaryPackage package = new MBReadOnlyListBinaryPackage(MBReadOnlyList, factory);
 
             package.Pack();
@@ -48,7 +60,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MBReadOnlyListBinaryPackage returnedPackage = (MBReadOnlyListBinaryPackage)obj;
 
-            MBReadOnlyList<int> newMBReadOnlyList = returnedPackage.Unpack<MBReadOnlyList<int>>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            MBReadOnlyList<int> newMBReadOnlyList = returnedPackage.Unpack<MBReadOnlyList<int>>(deserializeFactory);
 
             Assert.Equal(MBReadOnlyList, newMBReadOnlyList);
         }

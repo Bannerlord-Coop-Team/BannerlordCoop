@@ -16,30 +16,30 @@ namespace Coop.Tests.Client.States
         public CampaignStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, NetworkMessageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
             clientLogic.State = new CampaignState(clientLogic);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
         public void NetworkDisableTimeControls_Publishes_PauseAndDisableGameTimeControls()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<PauseAndDisableGameTimeControls>((payload) =>
+            StubMessageBroker.Subscribe<PauseAndDisableGameTimeControls>((payload) =>
             {
                 isEventPublished = true;
             });
 
-            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkDisableTimeControls());
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkDisableTimeControls());
 
             Assert.True(isEventPublished);
         }
@@ -48,7 +48,7 @@ namespace Coop.Tests.Client.States
         public void EnterMissionState_Publishes_EnterMissionState()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMissionState>((payload) =>
+            StubMessageBroker.Subscribe<EnterMissionState>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -61,7 +61,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void MissionState_Transitions_MissionState()
         {
-            MessageBroker.Publish(this, new MissionStateEntered());
+            StubMessageBroker.Publish(this, new MissionStateEntered());
 
             Assert.IsType<MissionState>(clientLogic.State);
         }
@@ -70,7 +70,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -83,7 +83,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void MainMenuEntered_Transitions_MainMenuState()
         {
-            MessageBroker.Publish(this, new MainMenuEntered());
+            StubMessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
@@ -92,7 +92,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -121,9 +121,6 @@ namespace Coop.Tests.Client.States
             Assert.IsType<CampaignState>(clientLogic.State);
 
             clientLogic.EnterCampaignState();
-            Assert.IsType<CampaignState>(clientLogic.State);
-
-            clientLogic.ResolveNetworkGuids();
             Assert.IsType<CampaignState>(clientLogic.State);
 
             clientLogic.ValidateModules();

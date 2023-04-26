@@ -1,4 +1,6 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
+using GameInterface.Tests.Bootstrap.Modules;
 using Xunit;
 using Common.Serialization;
 
@@ -6,12 +8,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 {
     public class GenericSerializationTests
     {
+        IContainer container;
+        public GenericSerializationTests()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void CircularReference_Full_Serialization()
         {
             TestClassA testClassA = new TestClassA();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
 
             ClassABinaryPackage package = factory.GetBinaryPackage<ClassABinaryPackage>(testClassA);
 
@@ -23,7 +35,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 
             ClassABinaryPackage deserialized = BinaryFormatterSerializer.Deserialize<ClassABinaryPackage>(bytes);
 
-            TestClassA classA = deserialized.Unpack<TestClassA>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TestClassA classA = deserialized.Unpack<TestClassA>(deserializeFactory);
 
             Assert.Same(classA, classA.testClassB.testClassA);
         }

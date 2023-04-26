@@ -13,7 +13,7 @@ namespace GameInterface.Serialization.External
         private string settlementStringId;
         private int commonAreaIndex;
 
-        public AlleyBinaryPackage(Alley obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public AlleyBinaryPackage(Alley obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
         
@@ -28,7 +28,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Settlement settlement = MBObjectManager.Instance.GetObject<Settlement>(settlementStringId);
+            Settlement settlement = ResolveId<Settlement>(settlementStringId);
 
             // CommonArea is generated once per campaign so we can resolve it by
             // Using the index of that common area in it's settlement

@@ -1,5 +1,9 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -14,12 +18,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CaravanPartyComponentSerializationTest
     {
+        IContainer container;
         public CaravanPartyComponentSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<Settlement>("Settlement", "Settlements", 4U, true, false);
-            MBObjectManager.Instance.RegisterType<Hero>("Hero", "Heros", 5U, true, false);
-            MBObjectManager.Instance.RegisterType<MobileParty>("MobileParty", "MobilePartys", 5U, true, false);
+            GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -27,7 +35,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             CaravanPartyComponent CaravanPartyComponent = (CaravanPartyComponent)FormatterServices.GetUninitializedObject(typeof(CaravanPartyComponent));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CaravanPartyComponentBinaryPackage package = new CaravanPartyComponentBinaryPackage(CaravanPartyComponent, factory);
 
             package.Pack();
@@ -50,14 +58,15 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hero hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
             Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             MobileParty party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+            var objectManager = container.Resolve<IObjectManager>();
 
             hero.StringId = "myHero";
             settlement.StringId = "mySettlement";
             party.StringId = "myParty";
 
-            MBObjectManager.Instance.RegisterObject(hero);
-            MBObjectManager.Instance.RegisterObject(settlement);
-            MBObjectManager.Instance.RegisterObject(party);
+            objectManager.AddExisting(hero.StringId, hero);
+            objectManager.AddExisting(settlement.StringId, settlement);
+            objectManager.AddExisting(party.StringId, party);
 
             // Set field classes
             _leader.SetValue(CaravanPartyComponent, hero);
@@ -66,7 +75,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Settlement.SetValue(CaravanPartyComponent, settlement);
 
             // Setup package and dependencies
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CaravanPartyComponentBinaryPackage package = new CaravanPartyComponentBinaryPackage(CaravanPartyComponent, factory);
 
             package.Pack();
@@ -81,7 +90,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CaravanPartyComponentBinaryPackage returnedPackage = (CaravanPartyComponentBinaryPackage)obj;
 
-            CaravanPartyComponent newCaravanPartyComponent = returnedPackage.Unpack<CaravanPartyComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CaravanPartyComponent newCaravanPartyComponent = returnedPackage.Unpack<CaravanPartyComponent>(deserializeFactory);
 
             Assert.Equal(CaravanPartyComponent.Leader, newCaravanPartyComponent.Leader);
             Assert.Equal(CaravanPartyComponent.Owner, newCaravanPartyComponent.Owner);

@@ -6,6 +6,10 @@ using System.Reflection;
 
 namespace GameInterface.Serialization.Native
 {
+    public interface IEnumerableBinaryPackage : IBinaryPackage
+    {
+    }
+
     [Serializable]
     public class EnumerableBinaryPackage : IEnumerableBinaryPackage
     {
@@ -37,20 +41,21 @@ namespace GameInterface.Serialization.Native
             packages = binaryPackages.ToArray();
         }
 
-        public object Unpack()
+        public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
+            PackageFactory = binaryPackageFactory;
             var type = Type.GetType(enumerableType);
             if (typeof(Array).IsAssignableFrom(type))
             {
-                return UnpackArray();
+                return UnpackArray(binaryPackageFactory);
             }
             else if (typeof(List<>) == type.GetGenericTypeDefinition())
             {
-                return UnpackList();
+                return UnpackList(binaryPackageFactory);
             }
             else if (typeof(HashSet<>) == type.GetGenericTypeDefinition())
             {
-                return UnpackList();
+                return UnpackList(binaryPackageFactory);
             }
 
             throw new Exception($"Type {enumerableType} not handled");
@@ -59,9 +64,9 @@ namespace GameInterface.Serialization.Native
 
         private static readonly MethodInfo Cast = typeof(Enumerable).GetMethod(nameof(Enumerable.Cast));
         private static readonly MethodInfo ToArray = typeof(Enumerable).GetMethod(nameof(Enumerable.ToArray));
-        private object UnpackList()
+        private object UnpackList(IBinaryPackageFactory binaryPackageFactory)
         {
-            var unpackedArray = packages.Select(e => e.Unpack());
+            var unpackedArray = packages.Select(e => e.Unpack(binaryPackageFactory));
             var type = Type.GetType(enumerableType);
             var cast = Cast.MakeGenericMethod(type.GenericTypeArguments.Single());
 
@@ -70,7 +75,7 @@ namespace GameInterface.Serialization.Native
             return Activator.CreateInstance(type, new object[] { castedEnumerable });
         }
 
-        private object UnpackArray()
+        private object UnpackArray(IBinaryPackageFactory binaryPackageFactory)
         {
             var unpackedArray = packages.Select(e => e.Unpack());
             var type = Type.GetType(enumerableType);
@@ -83,9 +88,9 @@ namespace GameInterface.Serialization.Native
             return toArray.Invoke(null, new object[] { castedEnumerable });
         }
 
-        public T Unpack<T>()
+        public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)
         {
-            return (T)Unpack();
+            return (T)Unpack(binaryPackageFactory);
         }
     }
 }

@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class MBEquipmentRosterBinaryPackage : BinaryPackageBase<MBEquipmentRoster>
     {
-        public MBEquipmentRosterBinaryPackage(MBEquipmentRoster obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public MBEquipmentRosterBinaryPackage(MBEquipmentRoster obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

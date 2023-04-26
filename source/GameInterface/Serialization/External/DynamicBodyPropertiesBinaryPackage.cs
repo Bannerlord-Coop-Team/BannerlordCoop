@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class DynamicBodyPropertiesBinaryPackage : BinaryPackageBase<DynamicBodyProperties>
     {
-        public DynamicBodyPropertiesBinaryPackage(DynamicBodyProperties obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public DynamicBodyPropertiesBinaryPackage(DynamicBodyProperties obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

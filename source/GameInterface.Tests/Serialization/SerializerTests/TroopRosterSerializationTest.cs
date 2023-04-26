@@ -1,29 +1,36 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit;
-using Common.Serialization;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class TroopRosterSerializationTest
     {
+        IContainer container;
         public TroopRosterSerializationTest()
         {
-            MBObjectManager.Init();
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
+
         [Fact]
         public void TroopRoster_Serialize()
         {
             PartyBase partybase = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
             TroopRoster TroopRoster = new TroopRoster(partybase);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             TroopRosterBinaryPackage package = new TroopRosterBinaryPackage(TroopRoster, factory);
 
             package.Pack();
@@ -74,7 +81,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             _totalWoundedRegulars.SetValue(TroopRoster, 12);
 
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             TroopRosterBinaryPackage package = new TroopRosterBinaryPackage(TroopRoster, factory);
 
             package.Pack();
@@ -89,7 +96,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             TroopRosterBinaryPackage returnedPackage = (TroopRosterBinaryPackage)obj;
 
-            TroopRoster newTroopRoster = returnedPackage.Unpack<TroopRoster>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            TroopRoster newTroopRoster = returnedPackage.Unpack<TroopRoster>(deserializeFactory);
 
             Assert.Equal(TroopRoster.Count, newTroopRoster.Count);
             Assert.Equal(_isInitialized.GetValue(TroopRoster), _isInitialized.GetValue(newTroopRoster));

@@ -1,6 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -13,9 +15,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class MobilePartySerializationTest
     {
+        IContainer container;
         public MobilePartySerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -23,7 +32,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             MobileParty mobilePartyObject = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));           
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             MobilePartyBinaryPackage package = new MobilePartyBinaryPackage(mobilePartyObject, factory);
 
             package.Pack();
@@ -50,7 +59,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             MobilePartyBinaryPackage.MobileParty_Surgeon.SetValue(mobilePartyObject, surgeon);
 
             // Setup serialization for mobilePartyObject
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             MobilePartyBinaryPackage package = new MobilePartyBinaryPackage(mobilePartyObject, factory);
 
             package.Pack();
@@ -65,7 +74,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MobilePartyBinaryPackage returnedPackage = (MobilePartyBinaryPackage)obj;
 
-            MobileParty newMobilePartyObject = returnedPackage.Unpack<MobileParty>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            MobileParty newMobilePartyObject = returnedPackage.Unpack<MobileParty>(deserializeFactory);
 
             // Verify party values
             Assert.True(mobilePartyObject.Name.Equals(newMobilePartyObject.Name));

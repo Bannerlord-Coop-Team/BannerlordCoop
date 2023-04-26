@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     public class PolicyObjectBinaryPackage : BinaryPackageBase<PolicyObject>
     {
         public string StringId;
-        public PolicyObjectBinaryPackage(PolicyObject obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public PolicyObjectBinaryPackage(PolicyObject obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
 
         }
@@ -18,7 +18,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            MBObjectManager.Instance.GetObject<PolicyObject>(StringId);
+            Object = ResolveId<PolicyObject>(StringId);
         }
     }
 }

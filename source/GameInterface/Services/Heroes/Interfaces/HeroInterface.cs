@@ -20,19 +20,26 @@ namespace GameInterface.Services.Heroes.Interfaces
     {
         void PackageMainHero();
         void ResolveHero(ResolveHero message);
-        Hero SwitchMainHero(string heroId);
+        void SwitchMainHero(string heroId);
         Hero UnpackMainHero(byte[] bytes);
     }
 
     internal class HeroInterface : IHeroInterface
     {
         private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
-
+        private readonly IHeroRegistry heroRegistry;
+        private readonly IControlledHeroRegistry controlledHeroRegistry;
         private readonly IBinaryPackageFactory binaryPackageFactory;
         private readonly IMessageBroker messageBroker;
 
-        public HeroInterface(IBinaryPackageFactory binaryPackageFactory, IMessageBroker messageBroker)
+        public HeroInterface(
+            IHeroRegistry heroRegistry,
+            IControlledHeroRegistry controlledHeroRegistry,
+            IBinaryPackageFactory binaryPackageFactory,
+            IMessageBroker messageBroker)
         {
+            this.heroRegistry = heroRegistry;
+            this.controlledHeroRegistry = controlledHeroRegistry;
             this.binaryPackageFactory = binaryPackageFactory;
             this.messageBroker = messageBroker;
         }
@@ -47,26 +54,27 @@ namespace GameInterface.Services.Heroes.Interfaces
         public Hero UnpackMainHero(byte[] bytes)
         {
             HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
-            return package.Unpack<Hero>();
+            return package.Unpack<Hero>(binaryPackageFactory);
         }
 
         public void ResolveHero(ResolveHero message)
         {
             // TODO implement
-            messageBroker.Publish(this, new ResolveDebugHero(message.TransactionId, message.PlayerId));
+            messageBroker.Publish(this, new ResolveDebugHero(message.TransactionID, message.PlayerId));
         }
 
-        public Hero SwitchMainHero(string heroId)
+        public void SwitchMainHero(string heroId)
         {
-            Hero resolvedHero = Campaign.Current?.CampaignObjectManager?.Find<Hero>(heroId);
+            if(heroRegistry.TryGetValue(heroId, out Hero resolvedHero))
+            {
+                Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
 
-            if (resolvedHero == default) return default;
-
-            Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
-
-            ChangePlayerCharacterAction.Apply(resolvedHero);
-
-            return resolvedHero;
+                ChangePlayerCharacterAction.Apply(resolvedHero);
+            }
+            else
+            {
+                Logger.Warning("Could not find hero with id of: {guid}", heroId);
+            }
         }
     }
 }

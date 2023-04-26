@@ -4,18 +4,30 @@ using TaleWorlds.Core;
 using Xunit;
 using static TaleWorlds.Core.WeaponComponentData;
 using TaleWorlds.Library;
-using Common.Serialization;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WeaponComponentDataSerializationTest
     {
+        IContainer container;
+        public WeaponComponentDataSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void WeaponComponentData_Serialize()
         {
             WeaponComponentData weapondComponentData = new WeaponComponentData(new ItemObject());
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WeaponComponentDataBinaryPackage package = new WeaponComponentDataBinaryPackage(weapondComponentData, factory);
 
             package.Pack();
@@ -32,7 +44,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             weapondComponentData.Init("testName","Cu","slicy",new DamageTypes(),new DamageTypes(),9,57,45,34,12,54,23,78,34,"testname",11,56,new MatrixFrame(1,2,3,4,5,6,7,8,9,10,11,12),new WeaponClass(),70,71,72,73,75,new Vec3(1,2,3),new WeaponTiers(),4);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WeaponComponentDataBinaryPackage package = new WeaponComponentDataBinaryPackage(weapondComponentData, factory);
 
             package.Pack();
@@ -47,7 +59,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             WeaponComponentDataBinaryPackage returnedPackage = (WeaponComponentDataBinaryPackage)obj;
 
-            WeaponComponentData newWeapondComponentData = returnedPackage.Unpack<WeaponComponentData>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            WeaponComponentData newWeapondComponentData = returnedPackage.Unpack<WeaponComponentData>(deserializeFactory);
 
             Assert.Equal(weapondComponentData.WeaponBalance, newWeapondComponentData.WeaponBalance);
             Assert.Equal(weapondComponentData.SweetSpotReach, newWeapondComponentData.SweetSpotReach);

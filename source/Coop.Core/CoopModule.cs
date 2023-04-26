@@ -2,7 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
-using Coop.Core.Configuration;
+using Coop.Core.Common.Configuration;
 using Coop.Core.Server.Connections;
 using GameInterface;
 

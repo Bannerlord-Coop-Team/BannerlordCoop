@@ -2,10 +2,11 @@
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
-using Coop.Core.Communication.Network;
+using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using LiteNetLib;
+using LiteNetLib.Utils;
 using System;
 using System.Net;
 using System.Net.Sockets;
@@ -14,6 +15,7 @@ namespace Coop.Core.Server
 {
     public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, IDisposable
     {
+        void AllowJoining();
     }
 
     public class CoopServer : CoopNetworkBase, ICoopServer
@@ -24,6 +26,8 @@ namespace Coop.Core.Server
         private readonly IPacketManager packetManager;
         private readonly IClientRegistry clientOrchestrator;
         private readonly NetManager netManager;
+
+        private bool allowJoining = false;
 
         public CoopServer(
             INetworkConfiguration configuration, 
@@ -52,7 +56,15 @@ namespace Coop.Core.Server
 
         public void OnConnectionRequest(ConnectionRequest request)
         {
-            request.Accept();
+            if(allowJoining)
+            {
+                request.Accept();
+            }
+            else
+            {
+                request.Reject();
+            }
+            
         }
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -122,6 +134,11 @@ namespace Coop.Core.Server
         public override void SendAllBut(NetPeer netPeer, IPacket packet)
         {
             SendAllBut(netManager, netPeer, packet);
+        }
+
+        public void AllowJoining()
+        {
+            allowJoining = true;
         }
     }
 }

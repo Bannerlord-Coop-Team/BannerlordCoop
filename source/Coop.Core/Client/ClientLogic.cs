@@ -5,6 +5,7 @@ using Common.Network;
 using Coop.Core.Client.States;
 using GameInterface;
 using Serilog;
+using System;
 
 namespace Coop.Core.Client
 {
@@ -23,7 +24,7 @@ namespace Coop.Core.Client
         /// </summary>
         ICoopClient NetworkClient { get; }
         INetworkMessageBroker NetworkMessageBroker { get; }
-        string HeroStringId { get; set; }
+        string ControlledHeroId { get; set; }
     }
 
     /// <inheritdoc cref="IClientLogic"/>
@@ -32,7 +33,7 @@ namespace Coop.Core.Client
         private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
         public ICoopClient NetworkClient { get; }
         public INetworkMessageBroker NetworkMessageBroker { get; }
-        public string HeroStringId { get; set; }
+        public string ControlledHeroId { get; set; }
         public IClientState State 
         {
             get { return _state; }
@@ -75,8 +76,6 @@ namespace Coop.Core.Client
         public void StartCharacterCreation() => State.StartCharacterCreation();
 
         public void LoadSavedData() => State.LoadSavedData();
-
-        public void ResolveNetworkGuids() => State.ResolveNetworkGuids();
 
         public void ExitGame() => State.ExitGame();
 

@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class MaterialPropertyBinaryPackage : BinaryPackageBase<MaterialProperty>
     {
-        public MaterialPropertyBinaryPackage(MaterialProperty obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public MaterialPropertyBinaryPackage(MaterialProperty obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

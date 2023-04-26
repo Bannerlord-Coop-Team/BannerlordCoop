@@ -24,7 +24,7 @@ namespace Coop.Tests.Server.States
         {
 
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            IServerState currentState = new ServerRunningState(serverLogic.Object, MessageBroker);
+            IServerState currentState = new ServerRunningState(serverLogic.Object, StubMessageBroker);
             serverLogic.SetupSet(x => x.State = currentState);
 
             currentState.Start();
@@ -39,13 +39,13 @@ namespace Coop.Tests.Server.States
 
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
             Mock<ICoopServer> coopServer = new Mock<ICoopServer>();
-            IServerState currentState = new ServerRunningState(serverLogic.Object, MessageBroker);
+            IServerState currentState = new ServerRunningState(serverLogic.Object, StubMessageBroker);
             serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
             serverLogic.Setup(m => m.NetworkServer).Returns(coopServer.Object);
 
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
-                MessageBroker.Publish(null, new MainMenuEntered());
+                StubMessageBroker.Publish(null, new MainMenuEntered());
             });
 
             currentState.Stop();
@@ -58,13 +58,13 @@ namespace Coop.Tests.Server.States
         {
 
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            IServerState currentState = new ServerRunningState(serverLogic.Object, MessageBroker);
+            IServerState currentState = new ServerRunningState(serverLogic.Object, StubMessageBroker);
 
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             currentState.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
     }
 }

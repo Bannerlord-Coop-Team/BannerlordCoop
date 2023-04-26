@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class TextObjectBinaryPackage : BinaryPackageBase<TextObject>
     {
-        public TextObjectBinaryPackage(TextObject obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public TextObjectBinaryPackage(TextObject obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

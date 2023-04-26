@@ -14,7 +14,7 @@ namespace GameInterface.Serialization.External
     {
 
         private static readonly MethodInfo AddEventHandlers = typeof(Army).GetMethod("AddEventHandlers", BindingFlags.NonPublic | BindingFlags.Instance);
-        public ArmyBinaryPackage(Army obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public ArmyBinaryPackage(Army obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -23,7 +23,7 @@ namespace GameInterface.Serialization.External
             "_hourlyTickEvent",
             "_tickEvent",
         };
-        
+
         protected override void PackInternal()
         {
             base.PackInternal(excludes);

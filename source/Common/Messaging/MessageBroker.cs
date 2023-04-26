@@ -30,10 +30,10 @@ namespace Common.Messaging
 
         public virtual void Publish<T>(object source, T message)
         {
-            if (message == null || source == null)
+            if (message == null)
                 return;
 
-            Logger.Verbose($"Publishing {message.GetType().Name} from {source.GetType().Name}");
+            Logger.Verbose($"Publishing {message.GetType().Name} from {source?.GetType().Name}");
 
             if (!_subscribers.ContainsKey(typeof(T)))
             {

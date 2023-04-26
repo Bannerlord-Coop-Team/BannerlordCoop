@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     {
         public string StringId;
 
-        public PerkObjectBinaryPackage(PerkObject obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public PerkObjectBinaryPackage(PerkObject obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -20,7 +20,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<PerkObject>(StringId);
+            Object = ResolveId<PerkObject>(StringId);
         }
     }
 }

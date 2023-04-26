@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using System.Runtime.Serialization;
 using TaleWorlds.Core;
 using Xunit;
@@ -9,12 +12,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class MonsterSerializationTest
     {
+        IContainer container;
+        public MonsterSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void Monster_Serialize()
         {
             Monster testMonster = (Monster)FormatterServices.GetUninitializedObject(typeof(Monster));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             MonsterBinaryPackage package = new MonsterBinaryPackage(testMonster, factory);
 
             package.Pack();
@@ -29,7 +42,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Monster testMonster = (Monster)FormatterServices.GetUninitializedObject(typeof(Monster));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             MonsterBinaryPackage package = new MonsterBinaryPackage(testMonster, factory);
 
             package.Pack();

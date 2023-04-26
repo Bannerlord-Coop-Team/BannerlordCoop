@@ -19,13 +19,13 @@ namespace GameInterface.Serialization.Generics
         object Object;
 
         [NonSerialized]
-        BinaryPackageFactory BinaryPackageFactory;
+        IBinaryPackageFactory BinaryPackageFactory;
 
         protected Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
         string ObjectType;
 
-        public MBReadOnlyListBinaryPackage(object obj, BinaryPackageFactory binaryPackageFactory)
+        public MBReadOnlyListBinaryPackage(object obj, IBinaryPackageFactory binaryPackageFactory)
         {
             BinaryPackageFactory = binaryPackageFactory;
             ObjectType = obj.GetType().AssemblyQualifiedName;
@@ -42,9 +42,11 @@ namespace GameInterface.Serialization.Generics
             }
         }
 
-        public object Unpack()
+        public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
             if (IsUnpacked) return Object;
+
+            BinaryPackageFactory = binaryPackageFactory;
 
             IsUnpacked = true;
             var type = Type.GetType(ObjectType);
@@ -70,9 +72,9 @@ namespace GameInterface.Serialization.Generics
             return Object;
         }
 
-        public T Unpack<T>()
+        public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)
         {
-            return (T)Unpack();
+            return (T)Unpack(binaryPackageFactory);
         }
     }
 }

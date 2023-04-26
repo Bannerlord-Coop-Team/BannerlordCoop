@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using System;
 
 namespace Coop.Core.Server.Connections.Messages
 {
@@ -21,12 +22,12 @@ namespace Coop.Core.Server.Connections.Messages
         [ProtoMember(1)]
         public bool HeroExists { get; }
         [ProtoMember(2)]
-        public string HeroStringId { get; }
+        public string HeroId { get; }
 
-        public NetworkClientValidated(bool heroExists, string heroStringId)
+        public NetworkClientValidated(bool heroExists, string heroId)
         {
             HeroExists = heroExists;
-            HeroStringId = heroStringId;
+            HeroId = heroId;
         }
     }
 }

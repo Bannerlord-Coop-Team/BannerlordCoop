@@ -5,7 +5,7 @@ using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
-using Coop.Core.Communication.Network;
+using Coop.Core.Common.Network;
 using LiteNetLib;
 using Serilog;
 using System;

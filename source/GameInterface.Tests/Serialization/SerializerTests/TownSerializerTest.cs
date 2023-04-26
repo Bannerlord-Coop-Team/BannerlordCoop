@@ -3,18 +3,30 @@ using GameInterface.Serialization;
 using Xunit;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem.Settlements;
-using Common.Serialization;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class TownSerializationTest
     {
+        IContainer container;
+        public TownSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void Town_Serialize()
         {
             Town testTown = (Town)FormatterServices.GetUninitializedObject(typeof(Town));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             TownBinaryPackage package = new TownBinaryPackage(testTown, factory);
 
             package.Pack();
@@ -29,7 +41,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Town testTown = (Town)FormatterServices.GetUninitializedObject(typeof(Town));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             TownBinaryPackage package = new TownBinaryPackage(testTown, factory);
 
             package.Pack();

@@ -29,11 +29,6 @@ namespace Coop.Core.Client.States
         void LoadSavedData();
 
         /// <summary>
-        /// Ensure data alignment before Entering Coop Server
-        /// </summary>
-        void ResolveNetworkGuids();
-
-        /// <summary>
         /// Exit Bannerlord
         /// </summary>
         void ExitGame();

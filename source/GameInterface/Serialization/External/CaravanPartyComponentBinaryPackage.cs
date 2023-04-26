@@ -12,7 +12,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class CaravanPartyComponentBinaryPackage : BinaryPackageBase<CaravanPartyComponent>
     {
-        public CaravanPartyComponentBinaryPackage(CaravanPartyComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CaravanPartyComponentBinaryPackage(CaravanPartyComponent obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

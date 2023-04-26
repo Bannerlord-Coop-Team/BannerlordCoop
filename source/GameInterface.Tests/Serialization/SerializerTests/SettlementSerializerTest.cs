@@ -3,18 +3,29 @@ using GameInterface.Serialization;
 using Xunit;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem.Settlements;
-using Common.Serialization;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class SettlementSerializationTest
     {
+        IContainer container;
+        public SettlementSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void Settlement_Serialize()
         {
             Settlement testSettlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             SettlementBinaryPackage package = new SettlementBinaryPackage(testSettlement, factory);
 
             package.Pack();
@@ -29,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Settlement testSettlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             SettlementBinaryPackage package = new SettlementBinaryPackage(testSettlement, factory);
 
             package.Pack();

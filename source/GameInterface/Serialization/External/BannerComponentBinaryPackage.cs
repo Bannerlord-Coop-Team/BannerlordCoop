@@ -11,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class BannerComponentBinaryPackage : BinaryPackageBase<BannerComponent>
     {
-        public BannerComponentBinaryPackage(BannerComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public BannerComponentBinaryPackage(BannerComponent obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

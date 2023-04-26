@@ -17,7 +17,7 @@ namespace GameInterface.Serialization.External
 
         private string faction1Id;
         private string faction2Id;
-        public StanceLinkBinaryPackage(StanceLink obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public StanceLinkBinaryPackage(StanceLink obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

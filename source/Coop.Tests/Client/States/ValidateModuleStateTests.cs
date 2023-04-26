@@ -9,6 +9,7 @@ using GameInterface.Services.Modules.Messages;
 using GameInterface.Services.Time.Messages;
 using LiteNetLib.Utils;
 using Moq;
+using System;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -20,18 +21,18 @@ namespace Coop.Tests.Client.States
         public ValidateModuleStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, NetworkMessageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
             clientLogic.State = new ValidateModuleState(clientLogic);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
@@ -39,7 +40,7 @@ namespace Coop.Tests.Client.States
         {
             // Setup event callbacks
             var networkClientValidateCount = 0;
-            NetworkMessageBroker.TestNetworkSubscribe<NetworkClientValidate>((payload) =>
+            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkClientValidate>((payload) =>
             {
                 networkClientValidateCount += 1;
             });
@@ -54,7 +55,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void NetworkClientValidated_Tranitions_ReceivingSavedDataState()
         {
-            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(true, string.Empty));
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(true, string.Empty));
 
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
@@ -63,12 +64,12 @@ namespace Coop.Tests.Client.States
         public void NetworkClientValidated_Tranitions_CharacterCreationState()
         {
             var startCharacterCreationCount = 0;
-            MessageBroker.Subscribe<StartCharacterCreation>((payload) =>
+            StubMessageBroker.Subscribe<StartCharacterCreation>((payload) =>
             {
                 startCharacterCreationCount += 1;
             });
 
-            NetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(false, string.Empty));
+            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(false, string.Empty));
 
             Assert.Equal(1, startCharacterCreationCount);
         }
@@ -77,7 +78,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             var enterMainMenuCount = 0;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 enterMainMenuCount += 1;
             });
@@ -91,7 +92,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void EnterMainMenu_Transitions_MainMenuState()
         {
-            MessageBroker.Publish(this, new MainMenuEntered());
+            StubMessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
@@ -108,7 +109,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -122,7 +123,7 @@ namespace Coop.Tests.Client.States
         public void StartCharacterCreation_Publishes_StartCharacterCreation()
         {
             var startCharacterCreationCount = 0;
-            MessageBroker.Subscribe<StartCharacterCreation>((payload) =>
+            StubMessageBroker.Subscribe<StartCharacterCreation>((payload) =>
             {
                 startCharacterCreationCount += 1;
             });
@@ -136,7 +137,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void CharacterCreationStarted_Transitions_CharacterCreationState()
         {
-            MessageBroker.Publish(this, new CharacterCreationStarted());
+            StubMessageBroker.Publish(this, new CharacterCreationStarted());
 
             Assert.IsType<CharacterCreationState>(clientLogic.State);
         }
@@ -160,9 +161,6 @@ namespace Coop.Tests.Client.States
             Assert.IsType<ValidateModuleState>(clientLogic.State);
 
             clientLogic.StartCharacterCreation();
-            Assert.IsType<ValidateModuleState>(clientLogic.State);
-
-            clientLogic.ResolveNetworkGuids();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
 
             clientLogic.ValidateModules();

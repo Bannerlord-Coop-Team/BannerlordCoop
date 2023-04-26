@@ -1,15 +1,16 @@
 ﻿using Common.Messaging;
+using System;
 
 namespace GameInterface.Services.Heroes.Messages
 {
     public readonly struct ResolveHero : ICommand
     {
-        public int TransactionId { get; }
+        public Guid TransactionID { get; }
         public string PlayerId { get; }
 
-        public ResolveHero(int transactionId, string playerId)
+        public ResolveHero(Guid transactionId, string playerId)
         {
-            TransactionId = transactionId;
+            TransactionID = transactionId;
             PlayerId = playerId;
         }
     }

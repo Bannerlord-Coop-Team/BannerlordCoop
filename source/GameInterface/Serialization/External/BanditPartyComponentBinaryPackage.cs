@@ -10,7 +10,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class BanditPartyComponentBinaryPackage : BinaryPackageBase<BanditPartyComponent>
     {
-        public BanditPartyComponentBinaryPackage(BanditPartyComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public BanditPartyComponentBinaryPackage(BanditPartyComponent obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

@@ -12,7 +12,7 @@ namespace GameInterface.Serialization.External
 
         public string stringId;
 
-        public ItemObjectBinaryPackage(ItemObject obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public ItemObjectBinaryPackage(ItemObject obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -27,7 +27,7 @@ namespace GameInterface.Serialization.External
         {
             if(stringId != null)
             {
-                var newObject = MBObjectManager.Instance.GetObject<ItemObject>(stringId);
+                var newObject = ResolveId<ItemObject>(stringId);
                 if(newObject != null)
                 {
                     Object = newObject;

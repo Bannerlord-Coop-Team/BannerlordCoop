@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Common.Messaging;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,14 +7,14 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Services.GameDebug.Messages
 {
-    public readonly struct ResolveDebugHero
+    public readonly struct ResolveDebugHero : ICommand
     {
-        public int TransactionId { get; }
+        public Guid TransactionID { get; }
         public string PlayerId { get; }
 
-        public ResolveDebugHero(int transactionId, string playerId)
+        public ResolveDebugHero(Guid transactionId, string playerId)
         {
-            TransactionId = transactionId;
+            TransactionID = transactionId;
             PlayerId = playerId;
         }
     }

@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using System;
 using Xunit;
 using static TaleWorlds.Core.HorseComponent;
@@ -9,13 +12,23 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class MaterialPropertySerializationTest
     {
+        IContainer container;
+        public MaterialPropertySerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void MaterialProperty_Serialize()
         {
             MaterialProperty MaterialProperty = new MaterialProperty("mat1");
             MaterialProperty.MeshMultiplier.Add(new Tuple<uint, float>(1, .5f));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             MaterialPropertyBinaryPackage package = new MaterialPropertyBinaryPackage(MaterialProperty, factory);
 
             package.Pack();
@@ -31,7 +44,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             MaterialProperty MaterialProperty = new MaterialProperty("mat1");
             MaterialProperty.MeshMultiplier.Add(new Tuple<uint, float>(1, .5f));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             MaterialPropertyBinaryPackage package = new MaterialPropertyBinaryPackage(MaterialProperty, factory);
 
             package.Pack();
@@ -46,7 +59,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             MaterialPropertyBinaryPackage returnedPackage = (MaterialPropertyBinaryPackage)obj;
 
-            MaterialProperty newMaterialProperty = returnedPackage.Unpack<MaterialProperty>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            MaterialProperty newMaterialProperty = returnedPackage.Unpack<MaterialProperty>(deserializeFactory);
 
             Assert.Equal(MaterialProperty.Name, newMaterialProperty.Name);
             Assert.Equal(MaterialProperty.MeshMultiplier, newMaterialProperty.MeshMultiplier);

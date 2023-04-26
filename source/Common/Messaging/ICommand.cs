@@ -1,4 +1,6 @@
-﻿namespace Common.Messaging
+﻿using System;
+
+namespace Common.Messaging
 {
     /// <summary>
     /// A command drives functionality rather than reacting to it like
@@ -7,5 +9,6 @@
     /// <inheritdoc/>
     public interface ICommand : IInternalMessage
     {
+        Guid TransactionID { get; }
     }
 }

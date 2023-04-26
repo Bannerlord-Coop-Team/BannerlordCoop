@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class EquipmentElementBinaryPackage : BinaryPackageBase<EquipmentElement>
     {
-        public EquipmentElementBinaryPackage(EquipmentElement obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public EquipmentElementBinaryPackage(EquipmentElement obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
     }

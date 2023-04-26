@@ -27,21 +27,23 @@ namespace Coop.Core.Server.Connections.States
             ConnectionLogic.NetworkMessageBroker.Unsubscribe<NewPlayerHeroRegistered>(PlayerHeroRegisteredHandler);
         }
 
+        private Guid RegisterPlayerTransactionId;
         private void PlayerTransferedHeroHandler(MessagePayload<NetworkTransferedHero> obj)
         {
             var peerId = ((NetPeer)obj.Who).Id;
             
             if(peerId == ConnectionLogic.PlayerId.Id)
             {
-                var registerCommand = new RegisterNewPlayerHero(peerId, obj.What.PlayerHero);
+                RegisterPlayerTransactionId = Guid.NewGuid();
+                var registerCommand = new RegisterNewPlayerHero(RegisterPlayerTransactionId, obj.What.PlayerHero);
                 ConnectionLogic.NetworkMessageBroker.Publish(this, registerCommand);
             }
         }
         private void PlayerHeroRegisteredHandler(MessagePayload<NewPlayerHeroRegistered> obj)
         {
-            var peerId = obj.What.PeerId;
+            var transactionId = obj.What.TransactionID;
 
-            if (peerId == ConnectionLogic.PlayerId.Id)
+            if (RegisterPlayerTransactionId == transactionId)
             {
                 NetworkPlayerData playerData = new NetworkPlayerData(obj.What);
                 ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(playerData);
