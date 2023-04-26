@@ -6,7 +6,6 @@ namespace GameInterface.Services.GameState.Messages
     public readonly struct LoadGameSave : ICommand
     {
         public Guid TransactionID { get; }
-
         public byte[] SaveData { get; }
 
         public LoadGameSave(Guid transactionID, byte[] saveData)

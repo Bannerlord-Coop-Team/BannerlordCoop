@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 
 namespace GameInterface.Services.GameState.Handlers
@@ -12,6 +13,11 @@ namespace GameInterface.Services.GameState.Handlers
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<EnterCampaignState>(Handle);
+        }
+
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<EnterCampaignState>(Handle);
         }
 
         private void Handle(MessagePayload<EnterCampaignState> obj)

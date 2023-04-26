@@ -19,6 +19,11 @@ namespace GameInterface.Services.GameDebug.Handlers
             messageBroker.Subscribe<ResolveDebugHero>(Handle);
         }
 
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<ResolveDebugHero>(Handle);
+        }
+
         private void Handle(MessagePayload<ResolveDebugHero> obj)
         {
             heroDebugInterface.ResolveHero(obj.What);

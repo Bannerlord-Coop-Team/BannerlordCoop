@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace GameInterface.Services.Save.Data
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public class GameObjectGuids
     {
         [ProtoMember(1)]

@@ -18,6 +18,11 @@ namespace GameInterface.Services.GameDebug.Handlers
             messageBroker.Subscribe<CharacterCreationStarted>(Handle);
         }
 
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<CharacterCreationStarted>(Handle);
+        }
+
         private void Handle(MessagePayload<CharacterCreationStarted> obj)
         {
             characterCreationInterface.SkipCharacterCreation();

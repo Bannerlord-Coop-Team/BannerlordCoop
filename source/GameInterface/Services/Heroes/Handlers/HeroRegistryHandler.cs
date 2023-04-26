@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MobileParties.Messages;
@@ -33,6 +34,11 @@ namespace GameInterface.Services.Heroes.Handlers
             this.controlledHeroRegistry = controlledHeroRegistry;
 
             messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
+        }
+
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
         }
 
         private void Handle_PlayerHeroChanged(MessagePayload<PlayerHeroChanged> obj)

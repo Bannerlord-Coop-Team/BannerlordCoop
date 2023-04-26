@@ -18,8 +18,10 @@ namespace Common.Extensions
         /// </remarks>
         /// <param name="domain">Domain to get types from</param>
         /// <returns>Enumarable of all domain types</returns>
-        public static IEnumerable<Type> GetDomainTypes(this AppDomain domain)
+        public static IEnumerable<Type> GetDomainTypes(this AppDomain domain, string namespacePrefix = null)
         {
+            namespacePrefix = namespacePrefix == null ? string.Empty : namespacePrefix;
+
             List<Type> types = new List<Type>();
 
             Assembly[] assemblies = domain.GetAssemblies();
@@ -29,6 +31,9 @@ namespace Common.Extensions
                 {
                     foreach (Type type in _assembly.GetTypes())
                     {
+                        if (type.Namespace == null) continue;
+                        if (type.Namespace.StartsWith(namespacePrefix) == false) continue;
+
                         types.Add(type);
                     }
                 }

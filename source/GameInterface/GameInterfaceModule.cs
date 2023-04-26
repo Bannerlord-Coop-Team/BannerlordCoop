@@ -29,6 +29,10 @@ namespace GameInterface
             builder.RegisterType<ControlledHeroRegistry>()
                    .As<IControlledHeroRegistry>()
                    .InstancePerLifetimeScope();
+
+            builder.RegisterType<ControlledPartyRegistry>()
+                   .As<IControlledPartyRegistry>()
+                   .InstancePerLifetimeScope();
         }
     }
 }

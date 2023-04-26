@@ -68,7 +68,7 @@ namespace Coop.Core.Server.Connections
             if (ConnectionStates.Any(state => state.Value.State is LoadingState)) return;
 
             _messageBroker.PublishNetworkEvent(new NetworkEnableTimeControls());
-            _messageBroker.Publish(this, new EnableGameTimeControls());
+            _messageBroker.Publish(this, new EnableGameTimeControls(Guid.Empty));
         }
     }
 }

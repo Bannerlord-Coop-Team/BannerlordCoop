@@ -19,6 +19,11 @@ namespace GameInterface.Services.CharacterCreation.Handlers
             messageBroker.Subscribe<StartCharacterCreation>(Handle);
         }
 
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<StartCharacterCreation>(Handle);
+        }
+
         private void Handle(MessagePayload<StartCharacterCreation> obj)
         {
             gameStateInterface.StartNewGame();

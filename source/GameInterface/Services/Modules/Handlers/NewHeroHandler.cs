@@ -1,10 +1,7 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Heroes.Handlers;
-using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules.Interfaces;
 using GameInterface.Services.Modules.Messages;
 using System;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Modules.Handlers
 {
@@ -21,6 +18,11 @@ namespace GameInterface.Services.Modules.Handlers
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<ValidateModules>(Handle);
+        }
+
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<ValidateModules>(Handle);
         }
 
         private void Handle(MessagePayload<ValidateModules> obj)

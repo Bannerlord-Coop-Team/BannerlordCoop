@@ -19,6 +19,11 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<SwitchToHero>(Handle);
         }
 
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<SwitchToHero>(Handle);
+        }
+
         private void Handle(MessagePayload<SwitchToHero> obj)
         {
             heroInterface.SwitchMainHero(obj.What.HeroId);

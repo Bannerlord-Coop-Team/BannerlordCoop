@@ -26,6 +26,12 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
         }
 
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<PackageMainHero>(Handle);
+            messageBroker.Unsubscribe<RegisterNewPlayerHero>(Handle);
+        }
+
         private void Handle(MessagePayload<PackageMainHero> obj)
         {
             try

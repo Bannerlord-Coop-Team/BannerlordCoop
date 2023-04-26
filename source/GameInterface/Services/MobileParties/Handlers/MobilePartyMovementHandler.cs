@@ -1,21 +1,13 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes;
-using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
@@ -35,8 +27,14 @@ namespace GameInterface.Services.MobileParties.Handlers
             this.controlledHeroRegistry = controlledHeroRegistry;
             this.messageBroker = messageBroker;
 
-            messageBroker.Subscribe<UpdatePartyTargetPosition>(Handle);
+            messageBroker.Subscribe<UpdatePartyTargetPosition>(Handle_UpdatePartyTargetPosition);
             messageBroker.Subscribe<PartyTargetPositionChanged>(Handle_PartyTargetPositionChanged);
+        }
+
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<UpdatePartyTargetPosition>(Handle_UpdatePartyTargetPosition);
+            messageBroker.Unsubscribe<PartyTargetPositionChanged>(Handle_PartyTargetPositionChanged);
         }
 
         private void Handle_PartyTargetPositionChanged(MessagePayload<PartyTargetPositionChanged> obj)
@@ -57,7 +55,7 @@ namespace GameInterface.Services.MobileParties.Handlers
             }
         }
 
-        private void Handle(MessagePayload<UpdatePartyTargetPosition> obj)
+        private void Handle_UpdatePartyTargetPosition(MessagePayload<UpdatePartyTargetPosition> obj)
         {
             var targetPositionData = obj.What.TargetPositionData;
             if (controlledHeroRegistry.IsControlled(targetPositionData.ControlledHeroId))
@@ -69,7 +67,7 @@ namespace GameInterface.Services.MobileParties.Handlers
 
             if (objectManager.TryGetObject(targetPositionData.ControlledHeroId, out Hero resolvedHero) == false)
             {
-                Logger.Error("Unable to find controlled hero for {guid}", targetPositionData.ControlledHeroId);
+                Logger.Error("Unable to find hero for {guid}", targetPositionData.ControlledHeroId);
                 return;
             }
 

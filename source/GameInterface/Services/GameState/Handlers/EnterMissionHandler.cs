@@ -17,9 +17,14 @@ namespace GameInterface.Services.GameState.Handlers
             messageBroker.Subscribe<EnterMainMenu>(Handle);
         }
 
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<EnterMainMenu>(Handle);
+        }
+
         private void Handle(MessagePayload<EnterMainMenu> obj)
         {
-            messageBroker.Publish(this, new EnterMissionState());
+            messageBroker.Publish(this, new EnterMissionState(obj.What.TransactionID));
         }
     }
 }

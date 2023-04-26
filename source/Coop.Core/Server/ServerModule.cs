@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.LogicStates;
 using Common.Network;
+using Coop.Core.Client;
 using Coop.Core.Common.Services.PartyMovement;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Save;
@@ -26,7 +27,10 @@ namespace Coop.Core.Server
             // TODO create collector
             builder.RegisterType<SaveGameHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
 
-            builder.RegisterType<PartyMovementHandler>().As<IPartyMovementHandler>().InstancePerLifetimeScope().AutoActivate();
+            foreach (var handlerType in HandlerCollector.Collect<ServerModule>())
+            {
+                builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            }
 
             base.Load(builder);
         }

@@ -7,6 +7,7 @@ using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Handlers;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using Serilog.Core;
 using System;
@@ -27,18 +28,18 @@ namespace GameInterface.Services.Heroes.Interfaces
     internal class HeroInterface : IHeroInterface
     {
         private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
-        private readonly IHeroRegistry heroRegistry;
+        private readonly IObjectManager objectManager;
         private readonly IControlledHeroRegistry controlledHeroRegistry;
         private readonly IBinaryPackageFactory binaryPackageFactory;
         private readonly IMessageBroker messageBroker;
 
         public HeroInterface(
-            IHeroRegistry heroRegistry,
+            IObjectManager objectManager,
             IControlledHeroRegistry controlledHeroRegistry,
             IBinaryPackageFactory binaryPackageFactory,
             IMessageBroker messageBroker)
         {
-            this.heroRegistry = heroRegistry;
+            this.objectManager = objectManager;
             this.controlledHeroRegistry = controlledHeroRegistry;
             this.binaryPackageFactory = binaryPackageFactory;
             this.messageBroker = messageBroker;
@@ -65,7 +66,7 @@ namespace GameInterface.Services.Heroes.Interfaces
 
         public void SwitchMainHero(string heroId)
         {
-            if(heroRegistry.TryGetValue(heroId, out Hero resolvedHero))
+            if(objectManager.TryGetObject(heroId, out Hero resolvedHero))
             {
                 Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
 

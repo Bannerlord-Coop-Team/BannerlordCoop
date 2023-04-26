@@ -35,6 +35,14 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<RegisterAllGameObjects>(Handle);
         }
 
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<PackageGameSaveData>(Handle);
+            messageBroker.Unsubscribe<PackageObjectGuids>(Handle);
+            messageBroker.Unsubscribe<LoadExistingObjectGuids>(Handle);
+            messageBroker.Unsubscribe<RegisterAllGameObjects>(Handle);
+        }
+
         private void Handle(MessagePayload<PackageGameSaveData> obj)
         {
             var transactionId = obj.What.TransactionID;
