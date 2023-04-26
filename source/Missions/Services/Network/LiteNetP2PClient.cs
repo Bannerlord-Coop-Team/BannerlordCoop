@@ -228,6 +228,13 @@ namespace Missions.Services.Network
             {
                 var peerDisconnectedEvent = new PeerDisconnected(peer, disconnectInfo);
                 messageBroker.Publish(this, peerDisconnectedEvent);
+                return;
+            }
+            if (peer == PeerServer)
+            {
+                ServerDisconnected serverDisconnected = new ServerDisconnected();
+                messageBroker.Publish(this, serverDisconnected);
+                return;
             }
 
             Logger.Verbose("{LocalPort} received disconnected from {peer}", netManager.LocalPort, peer.EndPoint);
