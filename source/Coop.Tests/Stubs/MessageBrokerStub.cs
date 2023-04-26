@@ -24,7 +24,7 @@ namespace Coop.Tests.Stubs
                 return;
             }
             Delegate[] delegates = new Delegate[_subscribers[typeof(T)].Count];
-            _subscribers[typeof(T)].CopyTo(delegates);
+            //_subscribers[typeof(T)].CopyTo(delegates, 0); //TODO
             if (delegates == null || delegates.Length == 0) return;
             var payload = new MessagePayload<T>(source, message);
             foreach (var handler in delegates.Select
