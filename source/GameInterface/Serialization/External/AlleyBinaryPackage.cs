@@ -1,6 +1,5 @@
 ﻿using System;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {
@@ -16,7 +15,7 @@ namespace GameInterface.Serialization.External
         public AlleyBinaryPackage(Alley obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
-        
+
         protected override void PackInternal()
         {
             settlementStringId = Object.Settlement.StringId;

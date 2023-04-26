@@ -1,8 +1,5 @@
-﻿using Common.Extensions;
-using System;
-using System.Reflection;
+﻿using System;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {
@@ -20,7 +17,7 @@ namespace GameInterface.Serialization.External
         {
             stringId = Object.StringId;
             
-            base.PackInternal();
+            base.PackFields();
         }
 
         protected override void UnpackInternal()
@@ -35,7 +32,7 @@ namespace GameInterface.Serialization.External
                 }
             }
 
-            base.UnpackInternal();
+            base.UnpackFields();
         }
     }
 }

@@ -1,11 +1,8 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
 using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.External
@@ -54,7 +51,7 @@ namespace GameInterface.Serialization.External
         {
             stringId = Object.StringId;
 
-            base.PackInternal(excludes);
+            base.PackFields(excludes);
 
             clanIds = PackIds(Object.Clans);
             fiefIds = PackIds(Object.Fiefs);
@@ -77,7 +74,7 @@ namespace GameInterface.Serialization.External
                 }
             }
 
-            base.UnpackInternal();
+            base.UnpackFields();
 
             InitializeCachedLists.Invoke(Object, Array.Empty<object>());
 

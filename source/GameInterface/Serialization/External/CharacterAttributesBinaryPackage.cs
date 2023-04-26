@@ -1,6 +1,4 @@
-﻿using Common.Extensions;
-using System;
-using System.Reflection;
+﻿using System;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Serialization.External
@@ -10,6 +8,16 @@ namespace GameInterface.Serialization.External
     {
         public CharacterAttributesBinaryPackage(CharacterAttributes obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
+        }
+        
+        protected override void PackInternal()
+        {
+            base.PackFields();
+        }
+
+        protected override void UnpackInternal()
+        {
+            base.UnpackFields();
         }
     }
 }

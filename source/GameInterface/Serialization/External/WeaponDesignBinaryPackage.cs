@@ -1,6 +1,4 @@
-﻿using Common.Extensions;
-using System;
-using System.Reflection;
+﻿using System;
 using TaleWorlds.Core;
 
 namespace GameInterface.Serialization.External
@@ -11,7 +9,15 @@ namespace GameInterface.Serialization.External
         public WeaponDesignBinaryPackage(WeaponDesign obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
+        
+        protected override void PackInternal()
+        {
+            base.PackFields();
+        }
 
-        //private static MethodInfo BuildHashedCode = typeof(WeaponDesign).GetMethod("BuildHashedCode", BindingFlags.NonPublic | BindingFlags.Instance);
+        protected override void UnpackInternal()
+        {
+            base.UnpackFields();
+        }
     }
 }

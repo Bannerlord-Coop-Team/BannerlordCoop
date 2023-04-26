@@ -1,11 +1,9 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {
@@ -69,7 +67,7 @@ namespace GameInterface.Serialization.External
 
             stringId = Object.StringId ?? string.Empty;
 
-            base.PackInternal(excludes);
+            base.PackFields(excludes);
 
             scoutId = Object.EffectiveScout?.StringId;
             engineerId = Object.EffectiveEngineer?.StringId;
@@ -90,7 +88,7 @@ namespace GameInterface.Serialization.External
 
             MobileParty_InitCached.Invoke(Object, new object[0]);
 
-            base.UnpackInternal();
+            base.UnpackFields();
 
             MobileParty_Scout        .SetValue(Object, ResolveId<Hero>(scoutId));
             MobileParty_Engineer     .SetValue(Object, ResolveId<Hero>(engineerId));

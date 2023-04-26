@@ -1,8 +1,4 @@
-﻿using Common.Extensions;
-using GameInterface.Serialization;
-using GameInterface;
-using System.Reflection;
-using System;
+﻿using System;
 
 
 namespace GameInterface.Serialization.Internal
@@ -16,6 +12,16 @@ namespace GameInterface.Serialization.Internal
     {
         public CompatibilityInfoBinaryPackage(CompatibilityInfo obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
+        }
+
+        protected override void PackInternal()
+        {
+            base.PackFields();
+        }
+
+        protected override void UnpackInternal()
+        {
+            base.UnpackFields();
         }
     }
 }

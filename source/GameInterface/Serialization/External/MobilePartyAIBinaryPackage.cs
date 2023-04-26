@@ -1,5 +1,4 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
@@ -31,13 +30,13 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            base.PackInternal(excludes);
+            base.PackFields(excludes);
         }
 
         private static readonly FieldInfo MobilePartyAi_lastTargetedParties = typeof(MobilePartyAi).GetField("_lastTargetedParties", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
-            base.UnpackInternal();
+            base.UnpackFields();
 
             MobilePartyAi_lastTargetedParties.SetValue(Object, new List<MobileParty>());
         }

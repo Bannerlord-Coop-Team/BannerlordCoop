@@ -9,5 +9,15 @@ namespace GameInterface.Serialization.External
         public ItemModifierGroupBinaryPackage(ItemModifierGroup obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
+        
+        protected override void PackInternal()
+        {
+            base.PackFields();
+        }
+
+        protected override void UnpackInternal()
+        {
+            base.UnpackFields();
+        }
     }
 }

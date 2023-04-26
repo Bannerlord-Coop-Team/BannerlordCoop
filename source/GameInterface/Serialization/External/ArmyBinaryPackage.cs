@@ -25,12 +25,12 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            base.PackInternal(excludes);
+            base.PackFields(excludes);
         }
 
         protected override void UnpackInternal()
         {
-            base.UnpackInternal();
+            base.UnpackFields();
 
             // Resolves _hourlyTickEvent and _tickEvent
             AddEventHandlers.Invoke(Object, new object[0]);

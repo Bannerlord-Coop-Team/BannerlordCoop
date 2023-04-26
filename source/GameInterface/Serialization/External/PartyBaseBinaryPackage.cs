@@ -1,5 +1,4 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -34,12 +33,12 @@ namespace GameInterface.Serialization.External
         
         protected override void PackInternal()
         {
-            base.PackInternal(excludes);
+            base.PackFields(excludes);
         }
 
         protected override void UnpackInternal()
         {
-            base.UnpackInternal();
+            base.UnpackFields();
             
             IPartyVisual partyVisual = Campaign.Current?.VisualCreator?.CreatePartyVisual();
             PartyBase_Visual.SetValue(Object, partyVisual);

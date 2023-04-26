@@ -15,7 +15,6 @@ namespace GameInterface.Serialization
         IBinaryPackage GetBinaryPackage(object obj);
     }
 
-    [Serializable]
     public class BinaryPackageFactory : IBinaryPackageFactory
     {
         static readonly Dictionary<string, string> PackagesTypes = new Dictionary<string, string>();

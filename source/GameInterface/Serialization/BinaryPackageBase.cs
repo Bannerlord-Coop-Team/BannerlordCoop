@@ -51,8 +51,11 @@ namespace GameInterface.Serialization
             Object = obj;
             BinaryPackageFactory = binaryPackageFactory;
         }
+        
+        protected abstract void PackInternal();
+        protected abstract void UnpackInternal();
 
-        protected virtual void PackInternal()
+        protected void PackFields()
         {
             // Iterate through all of the instance fields of the object's type
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First()))
@@ -64,7 +67,7 @@ namespace GameInterface.Serialization
             }
         }
         
-        protected virtual void PackInternal(HashSet<string> excludes)
+        protected void PackFields(HashSet<string> excludes)
         {
             // Iterate through all of the instance fields of the object's type, excluding any fields that are specified in the Excludes collection
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes).GroupBy(o => o.Name).Select(g => g.First()))
@@ -76,7 +79,7 @@ namespace GameInterface.Serialization
             }
         }
         
-        protected virtual void UnpackInternal()
+        protected void UnpackFields()
         {
             var type = Object.GetType();
             var fields = type.GetAllInstanceFields();

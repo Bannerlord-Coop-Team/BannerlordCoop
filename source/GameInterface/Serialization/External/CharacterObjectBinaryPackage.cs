@@ -4,8 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {
@@ -43,7 +41,7 @@ namespace GameInterface.Serialization.External
         {
             stringId = Object.StringId ?? string.Empty;
 
-            base.PackInternal(Excludes);
+            base.PackFields(Excludes);
 
             // Get the value of the CharacterObject_battleEquipmentTemplate field in the object
             CharacterObject battleEquipmentTemplate = CharacterObject_battleEquipmentTemplate.GetValue<CharacterObject>(Object);
@@ -70,7 +68,7 @@ namespace GameInterface.Serialization.External
                 return;
             }
 
-            base.UnpackInternal();
+            base.UnpackFields();
 
             // Resolve Ids for StringId resolvable objects
             CharacterObject_battleEquipmentTemplate.SetValue(Object, ResolveId<CharacterObject>(battleEquipmentTemplateId));

@@ -27,7 +27,7 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            base.PackInternal(excludes);
+            base.PackFields(excludes);
         }
 
         private static PropertyInfo OwnerParty = typeof(TroopRoster).GetProperty("OwnerParty", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -36,7 +36,7 @@ namespace GameInterface.Serialization.External
         private static MethodInfo MemberRosterNumberChanged = typeof(PartyBase).GetMethod("MemberRosterNumberChanged", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
-            base.UnpackInternal();
+            base.UnpackFields();
 
             PartyBase ownerParty = (PartyBase)OwnerParty.GetValue(Object);
             Type delegateType = NumberChangedCallback.PropertyType;

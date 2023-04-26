@@ -1,11 +1,8 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {
@@ -41,7 +38,7 @@ namespace GameInterface.Serialization.External
         {
             stringId = Object.StringId;
 
-            base.PackInternal();
+            base.PackFields();
             
             supporterNotablesIds = PackIds((List<Hero>)Clan_supporterNotablesCache.GetValue(Object));
             lordsIds = PackIds((List<Hero>)Clan_lordsCache.GetValue(Object));
@@ -65,7 +62,7 @@ namespace GameInterface.Serialization.External
 
             Clan_InitMembers.Invoke(Object, new object[0]);
 
-            base.UnpackInternal();
+            base.UnpackFields();
 
             // Unpack special cases
             Clan_supporterNotablesCache.SetValue(Object, ResolveIds<Hero>(supporterNotablesIds).ToMBList());

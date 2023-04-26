@@ -1,7 +1,5 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Serialization.External
@@ -28,7 +26,12 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            base.PackInternal(excludes);
+            base.PackFields(excludes);
+        }
+
+        protected override void UnpackInternal()
+        {
+            base.UnpackFields();
         }
     }
 }

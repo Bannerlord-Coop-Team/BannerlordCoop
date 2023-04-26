@@ -1,5 +1,4 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -29,7 +28,7 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            base.PackInternal(excludes);
+            base.PackFields(excludes);
 
             faction1Id = Object.Faction1?.StringId;
             faction2Id = Object.Faction2?.StringId;
@@ -37,7 +36,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            base.UnpackInternal();
+            base.UnpackFields();
 
             StanceLink_Faction1.SetValue(Object, ResolveId<Clan>(faction1Id));
             StanceLink_Faction2.SetValue(Object, ResolveId<Clan>(faction2Id));
