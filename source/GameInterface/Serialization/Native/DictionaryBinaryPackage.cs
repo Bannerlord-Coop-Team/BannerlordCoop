@@ -1,6 +1,5 @@
 ﻿using Common.Logging;
 using Serilog;
-using Serilog.Core;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -48,23 +47,23 @@ namespace GameInterface.Serialization.Native
 
             var unpackedArray = packages.Select(e => e.Unpack(binaryPackageFactory)).ToArray();
             var type = Type.GetType(enumerableType);
-            var newDict = Activator.CreateInstance(enumerableType);
+            var newDict = Activator.CreateInstance(type);
 
-            MethodInfo DictAdd = type.GetMethod("Add");
+            MethodInfo dictAdd = type.GetMethod("Add");
 
-            Type KeyType = type.GetGenericArguments()[0];
-            Type ValueType = type.GetGenericArguments()[1];
+            Type keyType = type.GetGenericArguments()[0];
+            Type valueType = type.GetGenericArguments()[1];
 
-            Type kvpType = typeof(KeyValuePair<,>).MakeGenericType(KeyType, ValueType);
+            Type kvpType = typeof(KeyValuePair<,>).MakeGenericType(keyType, valueType);
 
-            FieldInfo Key = kvpType.GetField("key", BindingFlags.Instance | BindingFlags.NonPublic);
-            FieldInfo Value = kvpType.GetField("value", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo key = kvpType.GetField("key", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo value = kvpType.GetField("value", BindingFlags.Instance | BindingFlags.NonPublic);
 
 
             foreach (object obj in unpackedArray)
             {
-                var k = Key.GetValue(obj);
-                var v = Value.GetValue(obj);
+                var k = key.GetValue(obj);
+                var v = value.GetValue(obj);
 
                 if(k == null)
                 {
@@ -72,7 +71,7 @@ namespace GameInterface.Serialization.Native
                     continue;
                 }
 
-                DictAdd.Invoke(newDict, new object[] { k, v });
+                dictAdd.Invoke(newDict, new object[] { k, v });
             }
 
             return newDict;

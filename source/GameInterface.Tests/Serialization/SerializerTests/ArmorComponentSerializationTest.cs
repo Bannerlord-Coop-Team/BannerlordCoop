@@ -1,14 +1,14 @@
+using System;
+using System.Linq;
+using System.Reflection;
 using Autofac;
-using Autofac.Features.OwnedInstances;
 using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
-using System.Runtime.Serialization;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 using Xunit;
 using Common.Serialization;
 

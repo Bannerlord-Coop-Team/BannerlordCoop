@@ -1,7 +1,6 @@
 ﻿using Common.Extensions;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -12,7 +11,7 @@ namespace GameInterface.Serialization.Native
     public class KeyValuePairBinaryPackage : IBinaryPackage
     {
         [NonSerialized]
-        private readonly IBinaryPackageFactory binaryPackageFactory;
+        private IBinaryPackageFactory binaryPackageFactory;
         [NonSerialized]
         private object Object;
         [NonSerialized]
@@ -78,12 +77,12 @@ namespace GameInterface.Serialization.Native
                 if (type.IsValueType)
                 {
                     object boxed = Object;
-                    field.SetValue(boxed, StoredFields[fieldName].Unpack());
+                    field.SetValue(boxed, StoredFields[fieldName].Unpack(binaryPackageFactory));
                     Object = boxed;
                 }
                 else
                 {
-                    field.SetValue(Object, StoredFields[fieldName].Unpack());
+                    field.SetValue(Object, StoredFields[fieldName].Unpack(binaryPackageFactory));
                 }
             }
         }

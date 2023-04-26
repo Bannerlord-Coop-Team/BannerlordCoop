@@ -1,13 +1,12 @@
 ﻿using GameInterface.Serialization.External;
 using GameInterface.Serialization;
-using System.Collections.Generic;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using Autofac;
+using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
 using GameInterface.Tests.Bootstrap;
 

@@ -1,18 +1,10 @@
 ﻿using Autofac;
 using GameInterface.Serialization;
 using GameInterface.Serialization.Internal;
-using GameInterface.Services.Heroes;
-using GameInterface.Services.MobileParties;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services;
-using GameInterface.Tests.Serialization;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
+using Common.Serialization;
 using TaleWorlds.Library;
 using Xunit;
-using Xunit.Sdk;
 using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests

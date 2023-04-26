@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
+using Common.Extensions;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization
@@ -35,8 +36,6 @@ namespace GameInterface.Serialization
             get;
             set;
         }
-        [NonSerialized]
-        private IBinaryPackageFactory _binaryPackageFactory;
 
         protected Type ObjectType => typeof(T);
 
@@ -89,12 +88,12 @@ namespace GameInterface.Serialization
                 if (type.IsValueType)
                 {
                     object boxed = Object;
-                    field.SetValue(boxed, StoredFields[fieldName].Unpack());
+                    field.SetValue(boxed, StoredFields[fieldName].Unpack(BinaryPackageFactory));
                     Object = (T)boxed;
                 }
                 else
                 {
-                    field.SetValue(Object, StoredFields[fieldName].Unpack());
+                    field.SetValue(Object, StoredFields[fieldName].Unpack(BinaryPackageFactory));
                 }
             }
         }

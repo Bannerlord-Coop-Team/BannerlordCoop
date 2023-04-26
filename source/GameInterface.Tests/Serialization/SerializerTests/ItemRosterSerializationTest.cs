@@ -6,6 +6,7 @@ using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
 using Autofac;
+using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests

@@ -2,7 +2,6 @@
 using GameInterface.Serialization.Native;
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -60,12 +59,12 @@ namespace GameInterface.Serialization.Generics
                 if (type.IsValueType)
                 {
                     object boxed = Object;
-                    field.SetValue(boxed, StoredFields[fieldName].Unpack());
+                    field.SetValue(boxed, StoredFields[fieldName].Unpack(binaryPackageFactory));
                     Object = boxed;
                 }
                 else
                 {
-                    field.SetValue(Object, StoredFields[fieldName].Unpack());
+                    field.SetValue(Object, StoredFields[fieldName].Unpack(binaryPackageFactory));
                 }
             }
 

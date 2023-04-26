@@ -35,17 +35,18 @@ namespace Missions.Services.Network
                 return;
 
             var payload = new MessagePayload<T>(string.Empty, message);
-
-            IPac messagePacket = new EventPacket(payload);
-
-            if (peer != null)
-            {
-                m_Client.Send(messagePacket, peer);
-            }
-            else
-            {
-                m_Client.SendAll(messagePacket);
-            }
+            
+            //TODO
+            // var messagePacket = new EventPacket(payload);
+            //
+            // if (peer != null)
+            // {
+            //     m_Client.Send(messagePacket, peer);
+            // }
+            // else
+            // {
+            //     m_Client.SendAll(messagePacket);
+            // }
         }
 
         public void Subscribe<T>(Action<MessagePayload<T>> subscription)
@@ -79,7 +80,7 @@ namespace Missions.Services.Network
         public virtual void HandlePacket(NetPeer peer, IPacket packet)
         {
             Logger.Verbose("Received message {Packet} from {Peer}", packet, peer.EndPoint);
-            object payload = ProtoBufSerializer.Deserialize(packet.Data);
+            object payload = null; //TODO ProtoBufSerializer.Deserialize(packet.Data);
 
             Type type = payload.GetType();
             if (type.GetGenericTypeDefinition() != typeof(MessagePayload<>))

@@ -77,7 +77,7 @@ namespace GameInterface.Serialization.Native
 
         private object UnpackArray(IBinaryPackageFactory binaryPackageFactory)
         {
-            var unpackedArray = packages.Select(e => e.Unpack());
+            var unpackedArray = packages.Select(e => e.Unpack(binaryPackageFactory));
             var type = Type.GetType(enumerableType);
             var cast = Cast.MakeGenericMethod(type.GetElementType());
 

@@ -2,8 +2,8 @@
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap.Modules;
-using GameInterface.Tests.Bootstrap;
 using System.Collections.Generic;
+using Common.Serialization;
 using TaleWorlds.Localization;
 using Xunit;
 

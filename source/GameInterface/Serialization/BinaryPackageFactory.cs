@@ -3,7 +3,6 @@ using GameInterface.Serialization.Native;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
-using System.Data.Linq;
 using System.Linq;
 
 namespace GameInterface.Serialization
@@ -19,7 +18,7 @@ namespace GameInterface.Serialization
     [Serializable]
     public class BinaryPackageFactory : IBinaryPackageFactory
     {
-        static readonly Dictionary<Type, Type> PackagesTypes = new Dictionary<Type, Type>();
+        static readonly Dictionary<string, string> PackagesTypes = new Dictionary<string, string>();
         static BinaryPackageFactory()
         {
             CollectBinaryPackageTypes();
