@@ -20,7 +20,6 @@ namespace GameInterface.Serialization.Native
         private Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
         private string ObjectType;
-        
         protected Type T => Type.GetType(ObjectType);
 
         public KeyValuePairBinaryPackage(object kvp, IBinaryPackageFactory binaryPackageFactory)
