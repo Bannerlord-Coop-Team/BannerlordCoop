@@ -212,7 +212,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Autofac" Version="4.9.4" />
+    <PackageReference Include="Autofac" Version="7.0.1" />
     <PackageReference Include="Bannerlord.Lib.Harmony" Version="2.2.2-beta3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
