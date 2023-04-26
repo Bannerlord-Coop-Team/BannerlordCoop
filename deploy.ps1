@@ -17,11 +17,12 @@ $UIMovieDir     = "${BaseDir}UIMovies"
 $MBBinDir       = "${BaseDir}\mb2\bin\Win64_Shipping_Client"
 
 # create output directory structure
-$DeployBinDir = "${DeployDir}\mb2"
+$DeployBinDir = "$DeployDir\bin\Win64_Shipping_Client"
 
 Remove-Item ${DeployBinDir} -Recurse -ErrorAction Ignore
 
 New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
+New-Item -ItemType Directory -Force -Path $DeployBinDir | Out-Null
 
 # read config
 $config = Get-Content -Raw -Path $ConfigPath | ConvertFrom-Json
@@ -37,12 +38,6 @@ $subModuleContent | Out-File -Encoding utf8 -FilePath $DeployDir\SubModule.xml
 
 # copy mod dll
 Copy-Item -Force *.dll -Destination $DeployBinDir
-
-# remove empty folders from deployment
-Get-ChildItem $DeployBinDir -Recurse -Force -Directory | 
-    Sort-Object -Property FullName -Descending |
-    Where-Object { $($_ | Get-ChildItem -Force | Select-Object -First 1).Count -eq 0 } |
-    Remove-Item
 
 # copy to games mod folder
 if(Test-Path (${BaseDir} + $config.modsDir))
