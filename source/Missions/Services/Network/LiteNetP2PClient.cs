@@ -245,11 +245,13 @@ namespace Missions.Services.Network
             {
                 var peerDisconnectedEvent = new PeerDisconnected(peer, disconnectInfo);
                 messageBroker.Publish(this, peerDisconnectedEvent);
+                return;
             }
-            else if (PeerServer != null)
+            if (peer == PeerServer)
             {
                 ServerDisconnected serverDisconnected = new ServerDisconnected();
                 messageBroker.Publish(this, serverDisconnected);
+                return;
             }
         }
 
