@@ -8,20 +8,20 @@ namespace Common.Messaging
     /// </summary>
     public class WeakDelegate
     {
-        public bool IsAlive => target.IsAlive;
+        public bool IsAlive => reference.IsAlive;
 
-        private WeakReference target;
+        private WeakReference reference;
         private MethodInfo method;
 
         public WeakDelegate(Delegate @delegate)
         {
-            target = new WeakReference(@delegate.Target);
+            reference = new WeakReference(@delegate.Target);
             method = @delegate.Method;
         }
 
         public void Invoke(object[] parameters)
         {
-            var obj = target.Target;
+            var obj = reference.Target;
 
             if (obj == null) return;
 
@@ -33,7 +33,7 @@ namespace Common.Messaging
             if (obj is WeakDelegate weakDelegate == false) return false;
 
             if (weakDelegate.method != method) return false;
-            if (weakDelegate.target != target) return false;
+            if (weakDelegate.reference.Target != reference.Target) return false;
 
             return true;
         }
@@ -45,7 +45,7 @@ namespace Common.Messaging
 
         private Delegate ToDelegate()
         {
-            return Delegate.CreateDelegate(target.Target.GetType(), method);
+            return Delegate.CreateDelegate(reference.Target.GetType(), method);
         }
 
         public static implicit operator WeakDelegate(Delegate d) => new WeakDelegate(d);

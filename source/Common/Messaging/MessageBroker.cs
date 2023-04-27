@@ -68,9 +68,10 @@ namespace Common.Messaging
 
         public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
         {
+            
             if (!_subscribers.ContainsKey(typeof(T))) return;
             var delegates = _subscribers[typeof(T)];
-            if (delegates.Contains(subscription))
+            if (delegates.Contains(new WeakDelegate(subscription)))
                 delegates.Remove(subscription);
             if (delegates.Count == 0)
                 _subscribers.Remove(typeof(T));

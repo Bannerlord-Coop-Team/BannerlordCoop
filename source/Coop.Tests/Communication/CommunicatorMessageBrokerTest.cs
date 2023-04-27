@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using Autofac;
+using Common;
 using Common.Messaging;
 using Xunit;
 
@@ -19,7 +20,7 @@ namespace Coop.Tests.Communication
             communicator.Subscribe<ExampleIncomingMessage>(payload => { });
             
             var subscribers = typeof(MessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
-                ?.GetValue(communicator) as Dictionary<Type, List<Delegate>>;
+                ?.GetValue(communicator) as Dictionary<Type, ConcurrentList<WeakDelegate>>;
 
             if (subscribers == null)
                 throw new Exception("Subscribers dictionary couldn't not be found.");
