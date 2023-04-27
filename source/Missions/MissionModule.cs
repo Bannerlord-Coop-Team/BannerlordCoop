@@ -36,6 +36,8 @@ namespace Missions
 
 
             // TODO create handler collector
+            builder.RegisterType<BattlesTestGameManager>().AsSelf();
+            builder.RegisterType<CoopBattlesController>().AsSelf();
             builder.RegisterType<ArenaTestGameManager>().AsSelf();
             builder.RegisterType<TavernsGameManager>().AsSelf();
             builder.RegisterType<CoopArenaController>().AsSelf();

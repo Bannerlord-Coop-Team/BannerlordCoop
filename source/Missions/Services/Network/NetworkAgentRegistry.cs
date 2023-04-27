@@ -1,21 +1,18 @@
-﻿using Common;
-using Common.Messaging;
+﻿using Common.Logging;
 using LiteNetLib;
+using Missions.Services.Agents.Packets;
+using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
-using Missions.Services.Network;
-using Missions.Services.Agents.Messages;
-using Missions.Services.Agents.Packets;
-using Serilog;
-using Common.Logging;
-using TaleWorlds.Core;
-using System.Security.Policy;
-using System.Collections.Concurrent;
 
 namespace Missions.Services.Network
 {
+    /// <summary>
+    /// Agent Registry for associating Agents over the network
+    /// </summary>
     public interface INetworkAgentRegistry
     {
         /// <summary>
@@ -135,17 +132,31 @@ namespace Missions.Services.Network
         /// <param name="guid">guid to check for Agent</param>
         /// <returns>True if guid is found and assigns agent, false otherwise</returns>
         bool TryGetGroupController(NetPeer peer, out AgentGroupController agentGroupController);
-        
-        /// <summary>
-        /// Try to get the NetPeer of a Group Controller
-        /// </summary>
-        /// <param name="guid">guid to check for Agent</param>
-        /// <returns>True if guid is found and assigns agent, false otherwise</returns>
-        bool TryGetNetPeer(Agent agent, out NetPeer netPeer);
 
+        /// <summary>
+        /// Attempts to get the controlling peer of a given agent
+        /// </summary>
+        /// <remarks>
+        /// This will fail if the agent is controlled internally
+        /// </remarks>
+        /// <param name="agent">Agent to get controller</param>
+        /// <param name="controllerPeer">Controlling peer</param>
+        /// <returns>True if retrieval of controlling peer was successful, otherwise False</returns>
+        bool TryGetExternalController(Agent agent, out NetPeer controllerPeer);
+
+        /// <summary>
+        /// Attempts to get the controlling peer of a given agent
+        /// </summary>
+        /// <remarks>
+        /// This will fail if the agent is controlled internally
+        /// </remarks>
+        /// <param name="agentId">AgentId to get controller</param>
+        /// <param name="controllerPeer">Controlling peer</param>
+        /// <returns>True if retrieval of controlling peer was successful, otherwise False</returns>
+        bool TryGetExternalController(Guid agentId, out NetPeer controllerPeer);
     }
 
-    /// <inheritdoc/>
+    /// <inheritdoc cref="INetworkAgentRegistry"/>
     public class NetworkAgentRegistry : INetworkAgentRegistry
     {
         private static readonly ILogger Logger = LogManager.GetLogger<NetworkAgentRegistry>();
@@ -204,7 +215,7 @@ namespace Missions.Services.Network
             }
             else
             {
-                AgentGroupController newGroupController = new AgentGroupController();
+                AgentGroupController newGroupController = new AgentGroupController(peer);
                 newGroupController.AddAgent(agentId, agent);
                 _agentToId.TryAdd(agent, agentId);
                 _otherAgents.TryAdd(peer, newGroupController);
@@ -346,32 +357,48 @@ namespace Missions.Services.Network
             return false;
         }
 
-        public bool TryGetNetPeer(Agent agent, out NetPeer netPeer)
-        {
-            foreach (AgentGroupController controller in OtherAgents.Values)
-            {
-                if (controller.Contains(agent))
-                {
-                    AgentGroupController resolvedController = controller;
-                    NetPeer resolvedNetPeer = OtherAgents.FirstOrDefault(x => x.Value.Equals(resolvedController)).Key;
-                    if (resolvedNetPeer != null)
-                    {
-                        netPeer = resolvedNetPeer;
-                        return true;
-                    }
-                }
-            }
-
-            netPeer = default;
-            return false;
-        }
-
         /// <inheritdoc/>
         public void Clear()
         {
             _controlledAgents.Clear();
             _otherAgents.Clear();
             _agentToId.Clear();
+        }
+
+        /// <inheritdoc/>
+        public bool TryGetExternalController(Agent agent, out NetPeer controllerPeer)
+        {
+            controllerPeer = default;
+
+            if(_agentToId.TryGetValue(agent, out var agentId) == false)
+            {
+                Logger.Verbose("Unable to find agent in {idList} in method {method}", nameof(_agentToId), nameof(TryGetExternalController));
+                return false;
+            }
+
+            return TryGetExternalController(agentId, out controllerPeer);
+        }
+
+        /// <inheritdoc/>
+        public bool TryGetExternalController(Guid agentId, out NetPeer controllerPeer)
+        {
+            controllerPeer = default;
+
+            if (_controlledAgents.ContainsKey(agentId))
+            {
+                return false;
+            }
+
+            foreach (AgentGroupController controller in OtherAgents.Values)
+            {
+                if (controller.Contains(agentId))
+                {
+                    controllerPeer = controller.ControllingPeer;
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }
