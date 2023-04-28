@@ -51,6 +51,6 @@
     </PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>dotnet build "$(SolutionDir)Coop/Coop.csproj" --no-incremental -c $(configuration) /p:SolutionDir="$(SolutionDir)\"</PostBuildEvent>
+    <PostBuildEvent>dotnet build "$(SolutionDir)Coop/Coop.csproj" --no-incremental -c $(configuration) /p:SolutionDir="$(SolutionDir)/"</PostBuildEvent>
   </PropertyGroup>
 </Project>
