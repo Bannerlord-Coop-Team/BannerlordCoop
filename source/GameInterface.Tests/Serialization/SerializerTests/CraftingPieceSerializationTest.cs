@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -7,12 +10,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CraftingPieceSerializationTest
     {
+        IContainer container;
+        public CraftingPieceSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void CraftingPiece_Serialize()
         {
             CraftingPiece craftingPiece = new CraftingPiece();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CraftingPieceBinaryPackage package = new CraftingPieceBinaryPackage(craftingPiece, factory);
 
             package.Pack();
@@ -27,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             CraftingPiece craftingPiece = new CraftingPiece();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CraftingPieceBinaryPackage package = new CraftingPieceBinaryPackage(craftingPiece, factory);
 
             package.Pack();
@@ -42,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CraftingPieceBinaryPackage returnedPackage = (CraftingPieceBinaryPackage)obj;
 
-            CraftingPiece newCraftingPiece = returnedPackage.Unpack<CraftingPiece>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CraftingPiece newCraftingPiece = returnedPackage.Unpack<CraftingPiece>(deserializeFactory);
 
             Assert.Equal(craftingPiece.ArmorBonus, newCraftingPiece.ArmorBonus);
             Assert.Equal(craftingPiece.Length, newCraftingPiece.Length);

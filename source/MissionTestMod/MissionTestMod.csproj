@@ -187,7 +187,7 @@
       <Name>Common</Name>
     </ProjectReference>
     <ProjectReference Include="..\Missions\Missions.csproj">
-      <Project>{e12f967c-1cc9-4e4d-8d8f-5029e0ba96ee}</Project>
+      <Project>{E12F967C-1CC9-4E4D-8D8F-5029E0BA96EE}</Project>
       <Name>Missions</Name>
     </ProjectReference>
   </ItemGroup>

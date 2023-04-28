@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     {
         public string StringId;
 
-        public SettlementBinaryPackage(Settlement obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public SettlementBinaryPackage(Settlement obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
 
         }
@@ -19,7 +19,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<Settlement>(StringId);
+            Object = ResolveId<Settlement>(StringId);
         }
     }
 }

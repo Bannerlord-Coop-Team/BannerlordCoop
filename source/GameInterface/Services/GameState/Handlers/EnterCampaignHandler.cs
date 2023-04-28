@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
 
 namespace GameInterface.Services.GameState.Handlers
@@ -17,6 +16,7 @@ namespace GameInterface.Services.GameState.Handlers
 
         private void Handle(MessagePayload<EnterCampaignState> obj)
         {
+            // TODO implement
             messageBroker.Publish(this, new CampaignStateEntered());
         }
     }

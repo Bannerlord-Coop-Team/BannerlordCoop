@@ -10,7 +10,7 @@ namespace GameInterface.Serialization.Native
     public class KeyValuePairBinaryPackage : IBinaryPackage
     {
         [NonSerialized]
-        private readonly BinaryPackageFactory BinaryPackageFactory;
+        private IBinaryPackageFactory binaryPackageFactory;
         [NonSerialized]
         private object Object;
         [NonSerialized]
@@ -20,11 +20,11 @@ namespace GameInterface.Serialization.Native
 
         private Type ObjectType;
 
-        public KeyValuePairBinaryPackage(object kvp, BinaryPackageFactory binaryPackageFactory)
+        public KeyValuePairBinaryPackage(object kvp, IBinaryPackageFactory binaryPackageFactory)
         {
             ObjectType = kvp.GetType();
             Object = kvp;
-            BinaryPackageFactory = binaryPackageFactory;
+            this.binaryPackageFactory = binaryPackageFactory;
 
             if (ObjectType.GetGenericTypeDefinition() != typeof(KeyValuePair<,>)) throw new Exception(
                 $"{ObjectType} is not {typeof(KeyValuePair<,>)}");
@@ -35,28 +35,30 @@ namespace GameInterface.Serialization.Native
             foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
             {
                 object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
+                StoredFields.Add(field, binaryPackageFactory.GetBinaryPackage(obj));
             }
         }
 
-        public object Unpack()
+        public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
             if (IsUnpacked) return Object;
+
+            this.binaryPackageFactory = binaryPackageFactory;
 
             Object = FormatterServices.GetUninitializedObject(ObjectType);
 
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(binaryPackageFactory));
             }
 
             return Object;
         }
 
-        public T Unpack<T>()
+        public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)
         {
-            return (T)Object;
+            return (T)Unpack(binaryPackageFactory);
         }
     }
 }

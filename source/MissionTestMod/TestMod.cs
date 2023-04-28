@@ -1,19 +1,19 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using Common.Logging;
 using HarmonyLib;
 using Missions;
 using Missions.Services.Arena;
-using Missions.View;
 using Missions.Services.Network.Surrogates;
 using Missions.Services.Taverns;
+using Missions.View;
 using ProtoBuf.Meta;
 using SandBox;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -22,8 +22,6 @@ using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.ScreenSystem;
-using Autofac;
-using Missions.Services.Network;
 using Module = TaleWorlds.MountAndBlade.Module;
 
 namespace MissionTestMod
@@ -32,44 +30,21 @@ namespace MissionTestMod
     {
         private readonly Harmony harmony = new Harmony("Coop.MissonTestMod");
 
-        public static IContainer Container { get; private set; }
-
         private static ILogger Logger;
         private static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
         private static InitialStateOption JoinArena;
-        private static IMissionGameManager _gameManager;
+        private static InitialStateOption JoinBattle;
+
+        private IMissionGameManager gameManager;
+
+        private IContainer container;
 
         protected override void OnSubModuleLoad()
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
 
-            if (Debugger.IsAttached)
-            {
-                var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}";
-
-                var filePath = $"Arena_Vertical_Slice_{Process.GetCurrentProcess().Id}.log";
-
-                var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
-
-                // Delete all old log files
-                foreach (var file in dir.EnumerateFiles("Arena_Vertical_Slice_*.log"))
-                {
-                    try
-                    {
-                        file.Delete();
-                    }
-                    catch (IOException) { }
-                }
-
-                LogManager.Configuration
-                    .Enrich.WithProcessId()
-                    .WriteTo.Debug(outputTemplate: outputTemplate)
-                    .WriteTo.File(filePath, outputTemplate: outputTemplate)
-                    .MinimumLevel.Verbose();
-            }
-
-            BuildContainer();
+            SetupLogger();
 
             harmony.PatchAll(typeof(MissionModule).Assembly);
 
@@ -94,11 +69,48 @@ namespace MissionTestMod
                SelectSaveArena,
                () => (false, new TextObject()));
 
+            JoinBattle = new InitialStateOption(
+               "Join Online Battle",
+               new TextObject("Join Online Battle"),
+               9992,
+               SelectSaveBattle,
+               () => (false, new TextObject()));
+
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
             Module.CurrentModule.AddInitialStateOption(JoinArena);
+            Module.CurrentModule.AddInitialStateOption(JoinBattle);
 
             base.OnSubModuleLoad();
             Logger.Verbose("Bannerlord Coop Mod loaded");
+        }
+
+        private void SetupLogger()
+        {
+            var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}";
+
+            var filePath = $"Arena_Vertical_Slice_{Process.GetCurrentProcess().Id}.log";
+
+            var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+
+            // Delete all old log files
+            foreach (var file in dir.EnumerateFiles("Arena_Vertical_Slice_*.log"))
+            {
+                try
+                {
+                    file.Delete();
+                }
+                catch (IOException) { }
+            }
+
+            LogManager.Configuration
+                    .Enrich.WithProcessId()
+                    .WriteTo.File(filePath, outputTemplate: outputTemplate)
+                    .MinimumLevel.Verbose();
+
+            if (Debugger.IsAttached)
+            {
+                LogManager.Configuration.WriteTo.Debug(outputTemplate: outputTemplate);
+            }
         }
 
         private void BuildContainer()
@@ -107,7 +119,9 @@ namespace MissionTestMod
 
             builder.RegisterModule<MissionModule>();
 
-            Container = builder.Build();
+            container = builder.Build();
+
+            ContainerProvider.SetContainer(container);
         }
 
         protected override void OnSubModuleUnloaded()
@@ -122,6 +136,14 @@ namespace MissionTestMod
 
             RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
             RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<Mat3, Mat3Surrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<Blow, BlowSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<CharacterObject, CharacterObjectSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<Banner, BannerSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<ItemObject, ItemObjectSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<ItemModifier, ItemModifierSurrogate>();
+            RuntimeTypeModel.Default.SetSurrogate<Equipment, EquipmentSurrogate>();
         }
 
         private bool m_IsFirstTick = true;
@@ -137,7 +159,7 @@ namespace MissionTestMod
             Updateables.UpdateAll(frameTime);
         }
 
-        private static void SelectSaveArena()
+        private void SelectSaveArena()
         {
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<MissionLoadGameGauntletScreen>(new object[]
                   {
@@ -149,8 +171,9 @@ namespace MissionTestMod
         }
 
 
-        private static void SelectSaveTavern()
+        private void SelectSaveTavern()
         {
+            
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<MissionLoadGameGauntletScreen>(new object[]
                   {
                       new Action<SaveGameFileInfo>((SaveGameFileInfo saveGame)=>
@@ -160,16 +183,37 @@ namespace MissionTestMod
                   }));
         }
 
-        private static void StartGameTavern(LoadResult loadResult)
+        private void SelectSaveBattle()
         {
-            _gameManager = Container.Resolve<TavernsGameManager>(new NamedParameter("loadedGameResult", loadResult));
-            _gameManager.StartGame();
+
+            ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<MissionLoadGameGauntletScreen>(new object[]
+                  {
+                      new Action<SaveGameFileInfo>((SaveGameFileInfo saveGame)=>
+                      {
+                          SandBoxSaveHelper.TryLoadSave(saveGame, StartGameBattle, null);
+                      })
+                  }));
         }
 
-        private static void StartGameArena(LoadResult loadResult)
+        private void StartGameTavern(LoadResult loadResult)
         {
-            _gameManager = Container.Resolve<ArenaTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
-            _gameManager.StartGame();
+            BuildContainer();
+            gameManager = container.Resolve<TavernsGameManager>(new NamedParameter("loadedGameResult", loadResult));
+            gameManager.StartGame();
+        }
+
+        private void StartGameArena(LoadResult loadResult)
+        {
+            BuildContainer();
+            gameManager = container.Resolve<ArenaTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
+            gameManager.StartGame();
+        }
+
+        private void StartGameBattle(LoadResult loadResult)
+        {
+            BuildContainer();
+            gameManager = container.Resolve<BattlesTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
+            gameManager.StartGame();
         }
     }
 }

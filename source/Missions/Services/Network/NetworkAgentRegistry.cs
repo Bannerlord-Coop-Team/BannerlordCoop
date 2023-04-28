@@ -1,20 +1,18 @@
-﻿using Common;
-using Common.Messaging;
+﻿using Common.Logging;
 using LiteNetLib;
+using Missions.Services.Agents.Packets;
+using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
-using Missions.Services.Network;
-using Missions.Services.Agents.Messages;
-using Missions.Services.Agents.Packets;
-using Serilog;
-using Common.Logging;
-using TaleWorlds.Core;
-using System.Security.Policy;
 
 namespace Missions.Services.Network
 {
+    /// <summary>
+    /// Agent Registry for associating Agents over the network
+    /// </summary>
     public interface INetworkAgentRegistry
     {
         /// <summary>
@@ -134,9 +132,31 @@ namespace Missions.Services.Network
         /// <param name="guid">guid to check for Agent</param>
         /// <returns>True if guid is found and assigns agent, false otherwise</returns>
         bool TryGetGroupController(NetPeer peer, out AgentGroupController agentGroupController);
+
+        /// <summary>
+        /// Attempts to get the controlling peer of a given agent
+        /// </summary>
+        /// <remarks>
+        /// This will fail if the agent is controlled internally
+        /// </remarks>
+        /// <param name="agent">Agent to get controller</param>
+        /// <param name="controllerPeer">Controlling peer</param>
+        /// <returns>True if retrieval of controlling peer was successful, otherwise False</returns>
+        bool TryGetExternalController(Agent agent, out NetPeer controllerPeer);
+
+        /// <summary>
+        /// Attempts to get the controlling peer of a given agent
+        /// </summary>
+        /// <remarks>
+        /// This will fail if the agent is controlled internally
+        /// </remarks>
+        /// <param name="agentId">AgentId to get controller</param>
+        /// <param name="controllerPeer">Controlling peer</param>
+        /// <returns>True if retrieval of controlling peer was successful, otherwise False</returns>
+        bool TryGetExternalController(Guid agentId, out NetPeer controllerPeer);
     }
 
-    /// <inheritdoc/>
+    /// <inheritdoc cref="INetworkAgentRegistry"/>
     public class NetworkAgentRegistry : INetworkAgentRegistry
     {
         private static readonly ILogger Logger = LogManager.GetLogger<NetworkAgentRegistry>();
@@ -156,15 +176,15 @@ namespace Missions.Services.Network
 
         /// <inheritdoc/>
         public IReadOnlyDictionary<Agent, Guid> AgentToId => _agentToId;
-        private readonly Dictionary<Agent, Guid> _agentToId = new Dictionary<Agent, Guid>();
+        private readonly ConcurrentDictionary<Agent, Guid> _agentToId = new ConcurrentDictionary<Agent, Guid>();
 
         /// <inheritdoc/>
         public IReadOnlyDictionary<Guid, Agent> ControlledAgents => _controlledAgents;
-        private readonly Dictionary<Guid, Agent> _controlledAgents = new Dictionary<Guid, Agent>();
+        private readonly ConcurrentDictionary<Guid, Agent> _controlledAgents = new ConcurrentDictionary<Guid, Agent>();
 
         /// <inheritdoc/>
         public IReadOnlyDictionary<NetPeer, AgentGroupController> OtherAgents => _otherAgents;
-        private readonly Dictionary<NetPeer, AgentGroupController> _otherAgents = new Dictionary<NetPeer, AgentGroupController>();
+        private readonly ConcurrentDictionary<NetPeer, AgentGroupController> _otherAgents = new ConcurrentDictionary<NetPeer, AgentGroupController>();
 
         /// <inheritdoc/>
         public bool RegisterControlledAgent(Guid agentId, Agent agent)
@@ -174,8 +194,8 @@ namespace Missions.Services.Network
             if (_agentToId.ContainsKey(agent)) return false;
             if (_controlledAgents.ContainsKey(agentId)) return false;
 
-            _controlledAgents.Add(agentId, agent);
-            _agentToId.Add(agent, agentId);
+            _controlledAgents.TryAdd(agentId, agent);
+            _agentToId.TryAdd(agent, agentId);
 
             return true;
         }
@@ -191,14 +211,14 @@ namespace Missions.Services.Network
                 if (controller.Contains(agentId)) return false;
 
                 controller.AddAgent(agentId, agent);
-                _agentToId.Add(agent, agentId);
+                _agentToId.TryAdd(agent, agentId);
             }
             else
             {
-                AgentGroupController newGroupController = new AgentGroupController();
+                AgentGroupController newGroupController = new AgentGroupController(peer);
                 newGroupController.AddAgent(agentId, agent);
-                _agentToId.Add(agent, agentId);
-                _otherAgents.Add(peer, newGroupController);
+                _agentToId.TryAdd(agent, agentId);
+                _otherAgents.TryAdd(peer, newGroupController);
             }
 
             return true;
@@ -209,8 +229,8 @@ namespace Missions.Services.Network
         {
             if (_controlledAgents.TryGetValue(agentId, out Agent agent))
             {
-                _controlledAgents.Remove(agentId);
-                return _agentToId.Remove(agent);
+                _controlledAgents.TryRemove(agentId, out var _);
+                return _agentToId.TryRemove(agent, out var _);
             }
             return false;
         }
@@ -223,7 +243,7 @@ namespace Missions.Services.Network
                 Agent agent = group.RemoveAgent(agentId);
                 if (agent != null)
                 {
-                    return _agentToId.Remove(agent);
+                    return _agentToId.TryRemove(agent, out var _);
                 }
                 else
                 {
@@ -238,8 +258,8 @@ namespace Missions.Services.Network
             bool result = true;
             if (_otherAgents.TryGetValue(peer, out AgentGroupController controller))
             {
-                result &= controller.ControlledAgents.All(kvp => _agentToId.Remove(kvp.Value));
-                result &= _otherAgents.Remove(peer);
+                result &= controller.ControlledAgents.All(kvp => _agentToId.TryRemove(kvp.Value, out var _));
+                result &= _otherAgents.TryRemove(peer, out var _);
             }
             else
             {
@@ -253,7 +273,9 @@ namespace Missions.Services.Network
         {
             if (agent == null) return false;
 
-            if (ControlledAgents.ContainsKey(AgentToId[agent])) { return true; }
+            if (AgentToId.TryGetValue(agent, out var id) == false) return false;
+
+            if (ControlledAgents.ContainsKey(id)) { return true; }
             return false;
         }
 
@@ -341,6 +363,42 @@ namespace Missions.Services.Network
             _controlledAgents.Clear();
             _otherAgents.Clear();
             _agentToId.Clear();
+        }
+
+        /// <inheritdoc/>
+        public bool TryGetExternalController(Agent agent, out NetPeer controllerPeer)
+        {
+            controllerPeer = default;
+
+            if(_agentToId.TryGetValue(agent, out var agentId) == false)
+            {
+                Logger.Verbose("Unable to find agent in {idList} in method {method}", nameof(_agentToId), nameof(TryGetExternalController));
+                return false;
+            }
+
+            return TryGetExternalController(agentId, out controllerPeer);
+        }
+
+        /// <inheritdoc/>
+        public bool TryGetExternalController(Guid agentId, out NetPeer controllerPeer)
+        {
+            controllerPeer = default;
+
+            if (_controlledAgents.ContainsKey(agentId))
+            {
+                return false;
+            }
+
+            foreach (AgentGroupController controller in OtherAgents.Values)
+            {
+                if (controller.Contains(agentId))
+                {
+                    controllerPeer = controller.ControllingPeer;
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

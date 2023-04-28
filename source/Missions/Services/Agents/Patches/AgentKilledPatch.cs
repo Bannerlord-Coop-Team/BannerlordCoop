@@ -4,13 +4,15 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Patches
 {
+    /// <summary>
+    /// Patch on OnHealthChanged to publish Agent deaths
+    /// </summary>
     [HarmonyPatch(typeof(Agent))]
     internal class AgentKilledPatch
     {
-        [HarmonyPatch(MethodType.Setter)]
-        [HarmonyPatch(nameof(Agent.Health))]
+        [HarmonyPatch(nameof(Agent.Die))]
         [HarmonyPostfix]
-        private static void OnHealthChanged(ref Agent __instance)
+        private static void OnDeath(ref Agent __instance)
         {
             if(__instance.Health <= 0)
             {

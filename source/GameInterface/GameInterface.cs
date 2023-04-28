@@ -1,23 +1,24 @@
 ﻿using Autofac;
 using GameInterface.Services;
 using HarmonyLib;
+using System;
+using System.Reflection;
 
 namespace GameInterface
 {
+    public interface IGameInterface
+    {
+    }
+
     public class GameInterface : IGameInterface
     {
-        public IContainer Container { get; }
+        private static Harmony harmony;
         public GameInterface()
         {
-            Harmony harmony = new Harmony("com.Coop.GameInterface");
-            harmony.PatchAll();
+            if (harmony != null) return;
 
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<GameInterfaceModule>();
-            IContainer container = builder.Build();
-
-            IServiceModule serviceModule = container.Resolve<IServiceModule>();
-            serviceModule.InstantiateServices(container);
+            harmony = new Harmony("com.Coop.GameInterface");
+            harmony.PatchAll(typeof(GameInterface).Assembly);
         }
     }
 }

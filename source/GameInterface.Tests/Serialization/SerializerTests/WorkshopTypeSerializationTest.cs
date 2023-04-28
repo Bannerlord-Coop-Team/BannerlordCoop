@@ -4,15 +4,25 @@ using Xunit;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.ObjectSystem;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WorkshopTypeSerializationTest
     {
+        IContainer container;
         public WorkshopTypeSerializationTest()
         {
-            MBObjectManager.Init();
-            MBObjectManager.Instance.RegisterType<WorkshopType>("WorkshopType", "WorkshopTypes", 4U, true, false);
+            GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -20,7 +30,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             WorkshopType testWorkshopType = (WorkshopType)FormatterServices.GetUninitializedObject(typeof(WorkshopType));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WorkshopTypeBinaryPackage package = new WorkshopTypeBinaryPackage(testWorkshopType, factory);
 
             package.Pack();
@@ -33,13 +43,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void WorkshopType_Full_Serialization()
         {
+            var objectManager = container.Resolve<IObjectManager>();
             WorkshopType workshopType = new WorkshopType();
 
             workshopType.StringId = "myWorkshop";
 
-            MBObjectManager.Instance.RegisterObject(workshopType);
+            objectManager.AddExisting(workshopType.StringId, workshopType);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WorkshopTypeBinaryPackage package = new WorkshopTypeBinaryPackage(workshopType, factory);
 
             package.Pack();
@@ -54,7 +65,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             WorkshopTypeBinaryPackage returnedPackage = (WorkshopTypeBinaryPackage)obj;
 
-            WorkshopType newWorkshopType = returnedPackage.Unpack<WorkshopType>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            WorkshopType newWorkshopType = returnedPackage.Unpack<WorkshopType>(deserializeFactory);
 
             Assert.Same(workshopType, newWorkshopType);
         }

@@ -1,28 +1,24 @@
 ﻿using Common.Messaging;
-using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Messages
 {
-    [ProtoContract(SkipConstructor = true)]
-    internal readonly struct AgentDamaged : INetworkEvent
+    /// <summary>
+    /// Internal event for Agent damage
+    /// </summary>
+    public readonly struct AgentDamaged : IEvent
     {
-        [ProtoMember(1)]
-        public float DamageAmount { get; }
-        [ProtoMember(2)]
-        public Guid RecievingAgent { get; }
-        [ProtoMember(3)]
-        public Guid AttackingAgent { get; }
+        public Agent AttackerAgent { get; }
+        public Agent VictimAgent { get; }
+        public Blow Blow { get; }
+        public AttackCollisionData AttackCollisionData { get; }
 
-        public AgentDamaged(float damageAmount, Guid recievingAgent, Guid attackingAgent)
+        public AgentDamaged(Agent attacker, Agent victim, Blow b, AttackCollisionData collisionData)
         {
-            DamageAmount = damageAmount;
-            RecievingAgent = recievingAgent;
-            AttackingAgent = attackingAgent;
+            AttackerAgent = attacker;
+            VictimAgent = victim;
+            AttackCollisionData = collisionData;
+            Blow = b;
         }
     }
 }

@@ -17,7 +17,6 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Packets
 {
-
     public class MovementHandler : IPacketHandler, IDisposable
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
@@ -40,7 +39,7 @@ namespace Missions.Services.Agents.Packets
             _client = client;
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
-            
+
             _messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
             _messageBroker.Subscribe<IMovementEvent>(Handle_MovementEvent);
 
@@ -71,9 +70,9 @@ namespace Missions.Services.Agents.Packets
         private void Handle_MovementEvent(MessagePayload<IMovementEvent> payload)
         {
             var payloadType = payload.What.GetType();
-            
+
             // TODO: get rid of this horrible mess somehow
-            if (payloadType == typeof(MovementInputVectorChanged)) 
+            if (payloadType == typeof(MovementInputVectorChanged))
             {
                 Handle_MovementInputVectorChanged((MovementInputVectorChanged)payload.What);
             }
@@ -103,7 +102,7 @@ namespace Missions.Services.Agents.Packets
             var delta = GetDelta(payload);
 
             delta.CalculateMovement(payload);
-        }    
+        }
 
         private void Handle_MountDataChanged(MountDataChanged payload)
         {
@@ -133,10 +132,10 @@ namespace Missions.Services.Agents.Packets
 
             var agent = payload.Agent;
             delta = new AgentMovement(
-                agent.Position, 
+                agent.Position,
                 agent.GetMovementDirection(),
                 new AgentEquipmentData(agent),
-                agent, 
+                agent,
                 payloadGuid);
 
             _agentMovementDeltas.TryAdd(payloadGuid, delta);
@@ -192,7 +191,7 @@ namespace Missions.Services.Agents.Packets
 
                     GameLoopRunner.RunOnMainThread(() =>
                     {
-                        if(agent.Health > 0)
+                        if (agent.Health > 0)
                         {
                             agent.MakeDead(false, ActionIndexValueCache.act_none);
                             agent.FadeOut(false, true);

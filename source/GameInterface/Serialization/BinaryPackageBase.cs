@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GameInterface.Serialization;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -10,8 +11,8 @@ namespace GameInterface.Serialization
     public interface IBinaryPackage
     {
         void Pack();
-        object Unpack();
-        T Unpack<T>();
+        object Unpack(IBinaryPackageFactory binaryPackageFactory);
+        T Unpack<T>(IBinaryPackageFactory binaryPackageFactory);
     }
 
     /// <summary>
@@ -29,13 +30,13 @@ namespace GameInterface.Serialization
         [NonSerialized]
         protected T Object;
 
-        public BinaryPackageFactory BinaryPackageFactory
+        public IBinaryPackageFactory BinaryPackageFactory
         {
             get { return _binaryPackageFactory; }
             set { _binaryPackageFactory = value; }
         }
         [NonSerialized]
-        private BinaryPackageFactory _binaryPackageFactory;
+        private IBinaryPackageFactory _binaryPackageFactory;
 
         protected Type ObjectType => typeof(T);
 
@@ -44,7 +45,7 @@ namespace GameInterface.Serialization
         /// </summary>
         protected Dictionary<FieldInfo, IBinaryPackage> StoredFields = new Dictionary<FieldInfo, IBinaryPackage>();
 
-        protected BinaryPackageBase(T obj, BinaryPackageFactory binaryPackageFactory)
+        protected BinaryPackageBase(T obj, IBinaryPackageFactory binaryPackageFactory)
         {
             if (obj == null) throw new ArgumentNullException();
 
@@ -69,9 +70,11 @@ namespace GameInterface.Serialization
         /// <returns>
         /// The object created from the stored data.
         /// </returns>
-        public object Unpack()
+        public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
             if (IsUnpacked) return Object;
+
+            BinaryPackageFactory = binaryPackageFactory;
 
             Object = CreateObject();
 
@@ -82,9 +85,9 @@ namespace GameInterface.Serialization
             return Object;
         }
 
-        public CastType Unpack<CastType>()
+        public CastType Unpack<CastType>(IBinaryPackageFactory binaryPackageFactory)
         {
-            return (CastType)Unpack();
+            return (CastType)Unpack(binaryPackageFactory);
         }
 
         protected static T CreateObject()
@@ -120,13 +123,15 @@ namespace GameInterface.Serialization
         /// The object corresponding to the specified string ID, 
         /// or null if the ID is null or the object cannot be found.
         /// </returns>
-        protected static OutT ResolveId<OutT>(string id) where OutT : MBObjectBase
+        protected OutT ResolveId<OutT>(string id) where OutT : MBObjectBase
         {
             // Return if id is null
             if (id == null) return null;
 
-            // Get the character object with the specified id
-            return MBObjectManager.Instance.GetObject<OutT>(id);
+            // Get the object with the specified id
+            if (BinaryPackageFactory.ObjectManager.TryGetObject(id, out OutT resolvedObj) == false) return null;
+
+            return resolvedObj;
         }
 
         /// <summary>
@@ -138,7 +143,7 @@ namespace GameInterface.Serialization
         /// The collection of objects corresponding to the specified string IDs. 
         /// An exception is thrown if any of the IDs cannot be resolved.
         /// </returns>
-        protected static IEnumerable<OutT> ResolveIds<OutT>(string[] ids) where OutT : MBObjectBase
+        protected IEnumerable<OutT> ResolveIds<OutT>(string[] ids) where OutT : MBObjectBase
         {
             // Convert ids to instances using the MBObjectManager
             IEnumerable<OutT> values = ids.Select(id => ResolveId<OutT>(id));

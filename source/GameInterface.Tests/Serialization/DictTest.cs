@@ -2,16 +2,23 @@
 using System;
 using System.Collections.Generic;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace GameInterface.Tests.Serialization
 {
     public class DictTest
     {
+        private readonly ITestOutputHelper output;
+
+        public DictTest(ITestOutputHelper output)
+        {
+            this.output = output;
+        }
+
         [Fact]
         public void Test_DuplicateClassAdd()
         {
             Dictionary<ObjectAndType, int> tDict = new Dictionary<ObjectAndType, int>();
-
             int i = 5;
 
             ObjectAndType OAT = new ObjectAndType(i);

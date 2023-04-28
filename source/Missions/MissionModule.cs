@@ -2,12 +2,17 @@
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
+using GameInterface;
 using IntroServer.Config;
 using Missions.Services;
 using Missions.Services.Agents;
 using Missions.Services.Agents.Packets;
+using Missions.Services.Agents.Handlers;
 using Missions.Services.Arena;
 using Missions.Services.BoardGames;
+using Missions.Services.Exceptions;
+using Missions.Services.Missiles;
+using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Services.Taverns;
 using System;
@@ -26,10 +31,17 @@ namespace Missions
                 new NetworkMessageBroker();
             }
 
+            builder.RegisterModule<GameInterfaceModule>();
+
+            builder.RegisterType<ExceptionLogger>().AsSelf().AutoActivate().SingleInstance();
+
             // Non interface classes
             builder.RegisterType<NetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
 
+
             // TODO create handler collector
+            builder.RegisterType<BattlesTestGameManager>().AsSelf();
+            builder.RegisterType<CoopBattlesController>().AsSelf();
             builder.RegisterType<ArenaTestGameManager>().AsSelf();
             builder.RegisterType<TavernsGameManager>().AsSelf();
             builder.RegisterType<CoopArenaController>().AsSelf();
@@ -54,9 +66,20 @@ namespace Missions
 
             // Interface classes
             builder.RegisterType<LiteNetP2PClient>().As<INetwork>().AsSelf().InstancePerLifetimeScope();
-            
+
+            builder.RegisterType<NetworkMissileRegistry>().As<INetworkMissileRegistry>();
+
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
+            builder.RegisterType<EventQueueManager>().As<IEventPacketHandler>().InstancePerLifetimeScope();
+            builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerLifetimeScope();
+            builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerLifetimeScope();
+            builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerLifetimeScope();
+            builder.RegisterType<WeaponDropHandler>().As<IWeaponDropHandler>().InstancePerLifetimeScope();
+            builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerLifetimeScope();
+            builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerLifetimeScope();
+            builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerLifetimeScope();
+
             builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<MovementHandler>().AsSelf().InstancePerLifetimeScope();
             builder.RegisterType<AgentPublisher>().AsSelf().InstancePerLifetimeScope();

@@ -14,7 +14,7 @@ namespace GameInterface.Serialization.External
     {
 
         private static readonly MethodInfo AddEventHandlers = typeof(Army).GetMethod("AddEventHandlers", BindingFlags.NonPublic | BindingFlags.Instance);
-        public ArmyBinaryPackage(Army obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public ArmyBinaryPackage(Army obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -38,7 +38,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
 
             // Resolves _hourlyTickEvent and _tickEvent

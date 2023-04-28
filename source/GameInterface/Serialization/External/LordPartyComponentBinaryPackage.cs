@@ -13,7 +13,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class LordPartyComponentBinaryPackage : BinaryPackageBase<LordPartyComponent>
     {
-        public LordPartyComponentBinaryPackage(LordPartyComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public LordPartyComponentBinaryPackage(LordPartyComponent obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -36,7 +36,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
 
             // Resolves _warPartyComponentsCache for Kingdom

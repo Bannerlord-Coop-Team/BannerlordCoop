@@ -28,7 +28,7 @@ namespace GameInterface.Serialization.External
         private string spouseId;
         private string[] childrenIds;
 
-        public HeroBinaryPackage(Hero obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public HeroBinaryPackage(Hero obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -72,7 +72,7 @@ namespace GameInterface.Serialization.External
             // Otherwise, create a new object and initialize it
             if (stringId != null)
             {
-                var newObject = MBObjectManager.Instance.GetObject<Hero>(stringId);
+                var newObject = ResolveId<Hero>(stringId);
                 if (newObject != null)
                 {
                     Object = newObject;
@@ -86,7 +86,7 @@ namespace GameInterface.Serialization.External
             TypedReference reference = __makeref(Object);
             foreach (FieldInfo field in StoredFields.Keys)
             {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
+                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
             }
 
             // Set the values of the object's father, mother, spouse, ex-spouses, and children

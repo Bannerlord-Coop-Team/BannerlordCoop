@@ -1,4 +1,6 @@
-﻿using Common.Network;
+﻿using Common.Messaging;
+using Common.Network;
+using GameInterface.Serialization;
 using HarmonyLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
@@ -7,7 +9,9 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.Core;
 using TaleWorlds.Engine;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Patches
@@ -18,24 +22,62 @@ namespace Missions.Services.Agents.Patches
     [HarmonyPatch(typeof(Mission), "RegisterBlow")]
     public class AgentDamagePatch
     {
-        static bool Prefix(Agent attacker, Agent victim, GameEntity realHitEntity, Blow b, ref AttackCollisionData collisionData, in MissionWeapon attackerWeapon, ref CombatLogData combatLogData)
+        private static void Prefix(Agent attacker, Agent victim, Blow b, ref AttackCollisionData collisionData)
         {
-            // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
-            if (NetworkAgentRegistry.Instance.TryGetAgentId(attacker, out Guid attackerId) == false) return true;
-
-            // next, check if the attacker is one of ours, if not, no networking is needed (not our agent dealing damage)
-            if (NetworkAgentRegistry.Instance.IsControlled(attackerId) == false) return true;
-
-            // get the victim GUI
-            NetworkAgentRegistry.Instance.AgentToId.TryGetValue(victim, out Guid victimId);
+            if (NetworkAgentRegistry.Instance.IsControlled(attacker) == false) return;
 
             // construct a agent damage data
-            AgentDamageData _agentDamageData = new AgentDamageData(attackerId, victimId, collisionData, b);
+            AgentDamaged agentDamageData = new AgentDamaged(attacker, victim, b, collisionData);
 
             // publish the event
-            NetworkMessageBroker.Instance.PublishNetworkEvent(_agentDamageData);
-
-            return true;
+            MessageBroker.Instance.Publish(attacker, agentDamageData);
         }
     }
+
+    #region SkipPatches
+    [HarmonyPatch(typeof(Mission), "ChargeDamageCallback")]
+    public class ChargeDamageCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "FallDamageCallback")]
+    public class FallDamageCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "MeleeHitCallback")]
+    public class MeleeHitCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "MissileAreaDamageCallback")]
+    public class MissileAreaDamageCallbackPatch
+    {
+        private static bool Prefix(ref Agent shooterAgent)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(shooterAgent);
+        }
+    }
+
+    [HarmonyPatch(typeof(Mission), "MissileHitCallback")]
+    public class MissileHitCallbackPatch
+    {
+        private static bool Prefix(ref Agent attacker)
+        {
+            return NetworkAgentRegistry.Instance.IsControlled(attacker);
+        }
+    }
+    #endregion
 }

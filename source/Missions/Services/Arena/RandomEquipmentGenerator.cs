@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.Core;
 using ItemTypeEnum = TaleWorlds.Core.ItemObject.ItemTypeEnum;
 
@@ -22,17 +21,17 @@ namespace Missions.Services.Arena
     /// <inheritdoc cref="IRandomEquipmentGenerator"/>
     public class RandomEquipmentGenerator : IRandomEquipmentGenerator
     {
-        //Here im harcoding the elements that are causing the arrows not to spawn and the same for the throwing weapons
+        // Excluded elements that are causing the arrows not to spawn and the same for the throwing weapons
         private static readonly HashSet<string> ExcludedItems = new HashSet<string>{"ballista_projectile_burning", "ballista_projectile", "throwing_stone", "boulder",
             "pot", "grapeshot_stack", "grapeshot_fire_stack", "grapeshot_projectile", "grapeshot_fire_projectile" };
         private static readonly ItemTypeEnum[] ArmorLoadout = new ItemTypeEnum[] { ItemTypeEnum.HeadArmor, ItemTypeEnum.Cape, ItemTypeEnum.BodyArmor, ItemTypeEnum.HandArmor, ItemTypeEnum.LegArmor };
         private static readonly ItemTypeEnum[] HorseLoadout = new ItemTypeEnum[] { ItemTypeEnum.Horse, ItemTypeEnum.HorseHarness };
         private static readonly ItemTypeEnum[][] WeaponLoadouts = new ItemTypeEnum[][]
         {
-            new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon },
+            new ItemTypeEnum[] { ItemTypeEnum.TwoHandedWeapon, ItemTypeEnum.Thrown },
             new ItemTypeEnum[] { ItemTypeEnum.Polearm },
-            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, /*ItemTypeEnum.Thrown*/ },
-            //new ItemTypeEnum[] { ItemTypeEnum.Bow, ItemTypeEnum.Arrows, ItemTypeEnum.Thrown }, Both comments are for testing without missiles
+            new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Thrown },
+            new ItemTypeEnum[] { ItemTypeEnum.Bow, ItemTypeEnum.Arrows, ItemTypeEnum.Thrown },
             new ItemTypeEnum[] { ItemTypeEnum.OneHandedWeapon, ItemTypeEnum.Shield },
         };
 
@@ -111,7 +110,6 @@ namespace Missions.Services.Arena
             {
                 ItemTypeEnum loadoutItem = loadout[i];
 
-                //Some items doesnt exists, they are harcoded at the dictionary
                 int randomItemIndex = Random.Next(ExistingItems[loadoutItem].Count);
                 equipment[i] = new EquipmentElement(ExistingItems[loadoutItem][randomItemIndex]);
             }
