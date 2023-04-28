@@ -75,7 +75,7 @@ namespace Coop.Lib.NoHarmony
         protected override void OnSubModuleLoad()
         {
             base.OnSubModuleLoad();
-            var  myLock = new FileDistributedLock(new FileInfo("HarmonyGlobalMutex"));
+            var myLock = new FileDistributedLock(new FileInfo("HarmonyGlobalMutex"));
             using (myLock.Acquire())
             {
                 NoHarmonyInit();

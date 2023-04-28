@@ -72,17 +72,7 @@ namespace GameInterface.Serialization.Native
             foreach (string fieldName in StoredFields.Keys)
             {
                 var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
-
-                if (type.IsValueType)
-                {
-                    object boxed = Object;
-                    field.SetValue(boxed, StoredFields[fieldName].Unpack(binaryPackageFactory));
-                    Object = boxed;
-                }
-                else
-                {
-                    field.SetValue(Object, StoredFields[fieldName].Unpack(binaryPackageFactory));
-                }
+                field.SetValue((object)Object, StoredFields[fieldName].Unpack(binaryPackageFactory));
             }
         }
     }

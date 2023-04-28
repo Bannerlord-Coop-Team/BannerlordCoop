@@ -239,8 +239,6 @@
 
   <Target Name="RunDeploy" AfterTargets="ReBuild">
     <Exec Condition=" '$(OS)' == 'Windows_NT' " 
-          Command='powershell -ExecutionPolicy Unrestricted ^
-          -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)" ^
-          -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\netstandard2.0\"'/>
+          Command="powershell -ExecutionPolicy Unrestricted -File &quot;$(SolutionDir)..\deploy.ps1&quot; -SolutionDir &quot;$(SolutionDir)\&quot; -TargetDir &quot;$(SolutionDir)Coop\bin\$(Configuration)\netstandard2.0&quot;"/>
   </Target>
 </Project>
