@@ -5,6 +5,8 @@ using Common.PacketHandlers;
 using GameInterface;
 using IntroServer.Config;
 using Missions.Services;
+using Missions.Services.Agents;
+using Missions.Services.Agents.Packets;
 using Missions.Services.Agents.Handlers;
 using Missions.Services.Arena;
 using Missions.Services.BoardGames;
@@ -13,11 +15,13 @@ using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Services.Taverns;
+using System;
 
 namespace Missions
 {
     public class MissionModule : Module
     {
+
         protected override void Load(ContainerBuilder builder)
         {
             // TODO find how to make this not disgusting
@@ -52,9 +56,12 @@ namespace Missions
                 .SingleInstance()
                 .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
 
-
             builder.RegisterInstance(NetworkAgentRegistry.Instance)
                 .As<INetworkAgentRegistry>()
+                .SingleInstance();
+
+            builder.RegisterInstance(new AgentPublisherConfig())
+                .As<IAgentPublisherConfig>()
                 .SingleInstance();
 
             // Interface classes
@@ -72,6 +79,10 @@ namespace Missions
             builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerLifetimeScope();
             builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerLifetimeScope();
             builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerLifetimeScope();
+
+            builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<MovementHandler>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<AgentPublisher>().AsSelf().InstancePerLifetimeScope();
 
             base.Load(builder);
         }

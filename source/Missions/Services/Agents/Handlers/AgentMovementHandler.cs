@@ -16,6 +16,7 @@ using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
 {
+    // TODO: this needs to be adjusted or replaced with code of MovementHandler
     public interface IAgentMovementHandler : IPacketHandler, IDisposable
     {
     }
@@ -85,8 +86,8 @@ namespace Missions.Services.Agents.Handlers
                     {
                         if (agent.Mission != null)
                         {
-                            MovementPacket packet = new MovementPacket(guid, agent);
-                            client.SendAll(packet);
+                            //MovementPacket packet = new MovementPacket(guid, agent);
+                            //client.SendAll(packet);
                         }
                     }
                 }
@@ -99,8 +100,8 @@ namespace Missions.Services.Agents.Handlers
         {
             if (agentRegistry.OtherAgents.TryGetValue(peer, out AgentGroupController agentGroupController))
             {
-                MovementPacket movement = (MovementPacket)packet;
-                agentGroupController.ApplyMovement(movement);
+                //MovementPacket movement = (MovementPacket)packet;
+                //agentGroupController.ApplyMovement(movement);
             }
         }
 

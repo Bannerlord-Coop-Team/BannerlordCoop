@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Missions.Services.Agents.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -50,7 +51,7 @@ namespace Missions.Services.Agents.Packets
             return null;
         }
 
-        public void ApplyMovement(MovementPacket movement)
+        public void ApplyMovement(AgentMovement movement)
         {
             if (m_ControlledAgents.TryGetValue(movement.AgentId, out Agent agent))
             {

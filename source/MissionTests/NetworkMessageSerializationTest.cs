@@ -35,10 +35,17 @@ namespace IntroductionServerTests
         [Fact]
         public void Serialize_Test()
         {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<CharacterObject, CharacterObjectSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Equipment, EquipmentSurrogate>();
+            try
+            {
+                RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
+                RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>(); 
+                RuntimeTypeModel.Default.SetSurrogate<CharacterObject, CharacterObjectSurrogate>();
+                RuntimeTypeModel.Default.SetSurrogate<Equipment, EquipmentSurrogate>();
+            }
+            catch
+            {
+                // nop
+            }
 
             var character = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
 
@@ -64,11 +71,17 @@ namespace IntroductionServerTests
         [Fact]
         public void Serialize2_Test()
         {
-            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<CharacterObject, CharacterObjectSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<AttackCollisionData, AttackCollisionDataSurrogate>();
-            RuntimeTypeModel.Default.SetSurrogate<Blow, BlowSurrogate>();
+            try
+            {
+                RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
+                RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
+                RuntimeTypeModel.Default.SetSurrogate<CharacterObject, CharacterObjectSurrogate>();
+                RuntimeTypeModel.Default.SetSurrogate<Equipment, EquipmentSurrogate>();
+            }
+            catch
+            {
+                // nop
+            }
 
             var attackerGuid = Guid.NewGuid();
 

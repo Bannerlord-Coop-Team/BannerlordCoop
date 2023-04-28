@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -45,7 +45,7 @@ namespace Missions.Services
 
         public CoopArenaController(
             INetworkMessageBroker networkMessageBroker,
-            INetworkAgentRegistry agentRegistry, 
+            INetworkAgentRegistry agentRegistry,
             IRandomEquipmentGenerator equipmentGenerator,
             IBinaryPackageFactory packageFactory,
             IMissileHandler missileHandler,
@@ -121,7 +121,7 @@ namespace Missions.Services
                 "Back to Menu",
                 "",
                 new Action(() => { MBGameManager.EndGame(); }),
-                null), 
+                null),
                 true);
         }
 
@@ -138,9 +138,9 @@ namespace Missions.Services
                 if (agent == Agent.Main) continue;
 
                 AiAgentData aiAgentData = new AiAgentData(
-                    agentId, 
-                    agent.Position, 
-                    agent.Character.StringId, 
+                    agentId,
+                    agent.Position,
+                    agent.Character.StringId,
                     agent.Health);
 
 
@@ -154,11 +154,11 @@ namespace Missions.Services
             float health = Agent.Main?.Health ?? 0;
 
             NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(
-                characterObject, 
-                isPlayerAlive, 
-                playerId, 
-                position, 
-                health, 
+                characterObject,
+                isPlayerAlive,
+                playerId,
+                position,
+                health,
                 aiAgentDatas.ToArray());
 
             networkMessageBroker.PublishNetworkEvent(peer, request);
@@ -253,7 +253,7 @@ namespace Missions.Services
 
             Agent.Main.SetTeam(Mission.Current.PlayerTeam, false);
 
-            for(int i = 0; i < 10; i++)
+            for (int i = 0; i < 10; i++)
             {
                 Agent ai = SpawnAgent(randomElement.origin, gameCharacters[rand.Next(gameCharacters.Length - 1)], false);
                 agentRegistry.RegisterControlledAgent(Guid.NewGuid(), ai);
@@ -303,9 +303,9 @@ namespace Missions.Services
             agentBuildData.NoHorses(true);
             agentBuildData.Equipment(equipment ?? (character.IsHero ? character.HeroObject.BattleEquipment : character.Equipment));
             agentBuildData.TroopOrigin(new SimpleAgentOrigin(character, -1, null, default));
-            
 
-            if(isEnemy)
+
+            if (isEnemy)
             {
                 agentBuildData.Controller(Agent.ControllerType.None);
             }
