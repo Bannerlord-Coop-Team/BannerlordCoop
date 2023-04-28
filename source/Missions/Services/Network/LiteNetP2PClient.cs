@@ -206,19 +206,6 @@ namespace Missions.Services.Network
                 Logger.Error("Nat introduction token length was invalid");
                 return;
             }
-
-            if (TokenToNatTypeMap.TryGetValue(tokens[0], out NatAddressType expectedNatType) == false)
-            {
-                // String does not exist in map
-                Logger.Error("token value was {tokenVal} but something in {natTypes} was expected", tokens[0], TokenToNatTypeMap.Keys);
-                return;
-            }
-
-            if (type == expectedNatType)
-            {
-                Logger.Verbose("Connecting P2P: {TargetEndPoint}", targetEndPoint);
-                netManager.Connect(targetEndPoint, token);
-            }
             else
             {
                 Logger.Debug("Expected {expected} but got {actual}", type, connectionToken.NatType);

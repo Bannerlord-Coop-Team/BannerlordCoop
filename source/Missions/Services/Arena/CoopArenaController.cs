@@ -290,8 +290,6 @@ namespace Missions.Services
 
             agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
 
-            agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
-
             return agent;
         }
 

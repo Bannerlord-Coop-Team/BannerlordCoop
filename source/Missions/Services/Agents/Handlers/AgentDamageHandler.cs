@@ -70,7 +70,7 @@ public class AgentDamageHandler : IAgentDamageHandler
             return;
         };
 
-        if (networkAgentRegistry.TryGetNetPeer(payload.What.VictimAgent, out NetPeer netPeer) == false) return;
+        if (networkAgentRegistry.TryGetExternalController(payload.What.VictimAgent, out NetPeer netPeer) == false) return;
 
         NetworkAgentDamaged message = new NetworkAgentDamaged(
             attackerId, 
@@ -93,47 +93,13 @@ public class AgentDamageHandler : IAgentDamageHandler
             payload.What.AttackCollisionData,
             payload.What.Blow);
 
-            networkMessageBroker.Subscribe<AgentDamaged>(AgentDamageSend);
-            networkMessageBroker.Subscribe<NetworkAgentDamaged>(AgentDamageRecieve);
+            networkMessageBroker.PublishNetworkEventExcept((NetPeer)payload.Who, message);
+            networkMessageBroker.Publish(resolvedAgent, message);
     }
 
-    ~AgentDamageHandler()
+    private void AgentDamageRecieve(MessagePayload<ConfirmedNetworkAgentDamaged> payload)
     {
-        Dispose();
-    }
-    public void Dispose()
-    {
-        networkMessageBroker.Unsubscribe<AgentDamaged>(AgentDamageSend);
-        networkMessageBroker.Unsubscribe<NetworkAgentDamaged>(AgentDamageRecieve);
-    }
-
-    private void AgentDamageSend(MessagePayload<AgentDamaged> payload)
-    {
-
-        // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
-        if (networkAgentRegistry.TryGetAgentId(payload.What.AttackerAgent, out Guid attackerId) == false) return;
-
-        // next, check if the attacker is one of ours, if not, no networking is needed (not our agent dealing damage)
-        if (networkAgentRegistry.IsControlled(attackerId) == false) return;
-
-        if (networkAgentRegistry.TryGetAgentId(payload.What.VictimAgent, out Guid victimId) == false)
-        {
-            Logger.Warning("Unable to get id for {agent} in {class}", payload.What.VictimAgent, typeof(AgentDamageHandler));
-            return;
-        };
-
-        NetworkAgentDamaged message = new NetworkAgentDamaged(
-            attackerId, 
-            victimId, 
-            payload.What.AttackCollisionData, 
-            payload.What.Blow);
-
-        networkMessageBroker.PublishNetworkEvent(message);
-    }
-
-    private void AgentDamageRecieve(MessagePayload<NetworkAgentDamaged> payload)
-    {
-        NetworkAgentDamaged agentDamaData = payload.What;
+        ConfirmedNetworkAgentDamaged agentDamaData = payload.What;
 
         NetPeer netPeer = payload.Who as NetPeer;
 
