@@ -44,7 +44,9 @@ if(Test-Path (${BaseDir} + $config.modsDir))
     $ModSourceDir = ${SolutionDir} + "\" + $config.name
     Get-ChildItem -Path "${ModSourceDir}" -Filter "*.dll" -Recurse -ErrorAction Ignore | Where { $_.PSIsContainer -eq $false } | Copy-Item -Destination "${ModDir}\bin\Win64_Shipping_Client"
     $BindingRedirectFile = $config.name + ".dll.config"
-    Get-ChildItem -Path "${ModSourceDir}" -Filter $BindingRedirectFile -ErrorAction Ignore -Recurse | Copy-Item -Destination "${MBBinDir}\Bannerlord.exe.config"
+
+    # TODO ensure redirect version does not exist in Bannerlord.exe directory, if it does use that version instead
+    # Get-ChildItem -Path "${ModSourceDir}" -Filter $BindingRedirectFile -ErrorAction Ignore -Recurse | Copy-Item -Destination "${MBBinDir}\Bannerlord.exe.config"
     Copy-Item -Force "${DeployDir}\SubModule.xml" -Destination "${ModDir}\"
 }
 

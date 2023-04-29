@@ -1,5 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.IO;
 using System.Text;
 using System.Text.Json;
@@ -33,6 +34,8 @@ namespace Common.Serialization
     /// <inheritdoc/>
     public class JsonFileIO : IJsonFileIO
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<JsonFileIO>();
+
         /// <summary>
         /// File encoding format
         /// </summary>
@@ -67,7 +70,29 @@ namespace Common.Serialization
             }
 
             string jsonText = JsonSerializer.Serialize(obj, JsonOptions);
-            File.WriteAllText(filePath, jsonText, Encoding);
+
+            var tokenSource = new CancellationTokenSource();
+            tokenSource.CancelAfter(TimeSpan.FromSeconds(1));
+            Task.Factory.StartNew(async () => { await AsyncWriteToFile(filePath, jsonText, tokenSource.Token); });
+        }
+
+        private async Task AsyncWriteToFile(string filePath, string jsonText, CancellationToken cancellationToken)
+        {
+            while (cancellationToken.IsCancellationRequested == false)
+            {
+                try
+                {
+                    File.WriteAllText(filePath, jsonText, Encoding);
+                    return;
+                }
+                catch (IOException)
+                {
+                    // IO did not work, try again after a delay
+                    await Task.Delay(TimeSpan.FromMilliseconds(100));
+                }
+            }
+
+            Logger.Error("Unable to write to {fileName}", filePath);
         }
 
         /// <inheritdoc/>

@@ -545,3 +545,4 @@ source/.editorconfig
 source/.idea
 !*ClientDebug.csproj.user
 !*MissionTestMod.csproj.user
+!*Coop.csproj.user
