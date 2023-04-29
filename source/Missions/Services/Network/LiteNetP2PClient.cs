@@ -245,8 +245,8 @@ namespace Missions.Services.Network
         {
             Logger.Error("Network error {socketError} sending to {endpoint}", socketError, endPoint);
         }
-        
-        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
+
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
             batchLogger.Log(packet.PacketType);

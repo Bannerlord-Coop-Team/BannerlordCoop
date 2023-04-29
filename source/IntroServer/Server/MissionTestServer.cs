@@ -95,12 +95,9 @@ namespace IntroServer.Server
         {
         }
 
-        public void OnNetworkReceive(
-            NetPeer peer,
-            NetPacketReader reader,
-            DeliveryMethod deliveryMethod)
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
         {
-            
+            // TODO create packet forwarding for strict nat
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
