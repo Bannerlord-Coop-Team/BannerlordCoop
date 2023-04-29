@@ -12,32 +12,30 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientDebug", "ClientDebug\
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common.Tests", "Common.Tests\Common.Tests.csproj", "{52CC5E00-CAA6-4B05-A713-4D387B60B138}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coop.Tests", "Coop.Tests\Coop.Tests.csproj", "{CD22C2AE-B9D7-4529-9081-816F4A3B778E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coop.Tests", "Coop.Tests\Coop.Tests.csproj", "{CD22C2AE-B9D7-4529-9081-816F4A3B778E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameInterface", "GameInterface\GameInterface.csproj", "{D22CB8FA-40CC-4F47-986F-1C5A4415980B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameInterface", "GameInterface\GameInterface.csproj", "{D22CB8FA-40CC-4F47-986F-1C5A4415980B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "GameInterface.Tests", "GameInterface.Tests\GameInterface.Tests.csproj", "{AFD76C22-8732-44C1-834B-059AE2097ED7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameInterface.Tests", "GameInterface.Tests\GameInterface.Tests.csproj", "{AFD76C22-8732-44C1-834B-059AE2097ED7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coop.Core", "Coop.Core\Coop.Core.csproj", "{442B73F2-B103-4EF6-8B4B-A2F36F169515}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coop.Core", "Coop.Core\Coop.Core.csproj", "{442B73F2-B103-4EF6-8B4B-A2F36F169515}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coop", "Coop\Coop.csproj", "{229FC85F-1E43-413B-B7A9-5762F2F0F831}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Common", "Common\Common.csproj", "{E474A5B5-3F73-46CB-B68C-E8FA5199950B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IntroServer", "IntroServer\IntroServer.csproj", "{B24413E5-4371-47EE-BBFF-947E13EE6CCC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "IntroServer", "IntroServer\IntroServer.csproj", "{B24413E5-4371-47EE-BBFF-947E13EE6CCC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerConsole", "ServerConsole\ServerConsole.csproj", "{08184158-2865-4481-AD38-9E82F1A44FD5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ServerConsole", "ServerConsole\ServerConsole.csproj", "{08184158-2865-4481-AD38-9E82F1A44FD5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
-		Debug|x64 = Debug|x64
-		Release|x64 = Release|x64
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Debug|x64.ActiveCfg = Debug|x64
-		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Debug|x64.Build.0 = Debug|x64
+		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Debug|x64.Build.0 = Debug|Any CPU
 		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Release|x64.ActiveCfg = Release|x64
 		{EF347686-F2D4-4757-A1C4-15F4EF53C0EC}.Release|x64.Build.0 = Release|x64
 		{52CC5E00-CAA6-4B05-A713-4D387B60B138}.Debug|x64.ActiveCfg = Debug|x64
@@ -56,12 +54,12 @@ Global
 		{AFD76C22-8732-44C1-834B-059AE2097ED7}.Debug|x64.Build.0 = Debug|x64
 		{AFD76C22-8732-44C1-834B-059AE2097ED7}.Release|x64.ActiveCfg = Release|x64
 		{AFD76C22-8732-44C1-834B-059AE2097ED7}.Release|x64.Build.0 = Release|x64
-		{442B73F2-B103-4EF6-8B4B-A2F36F169515}.Release|x64.ActiveCfg = Release|x64
-		{442B73F2-B103-4EF6-8B4B-A2F36F169515}.Release|x64.Build.0 = Release|x64
 		{442B73F2-B103-4EF6-8B4B-A2F36F169515}.Debug|x64.ActiveCfg = Debug|x64
 		{442B73F2-B103-4EF6-8B4B-A2F36F169515}.Debug|x64.Build.0 = Debug|x64
-		{229FC85F-1E43-413B-B7A9-5762F2F0F831}.Debug|x64.ActiveCfg = Debug|x64
-		{229FC85F-1E43-413B-B7A9-5762F2F0F831}.Debug|x64.Build.0 = Debug|x64
+		{442B73F2-B103-4EF6-8B4B-A2F36F169515}.Release|x64.ActiveCfg = Release|x64
+		{442B73F2-B103-4EF6-8B4B-A2F36F169515}.Release|x64.Build.0 = Release|x64
+		{229FC85F-1E43-413B-B7A9-5762F2F0F831}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{229FC85F-1E43-413B-B7A9-5762F2F0F831}.Debug|x64.Build.0 = Debug|Any CPU
 		{229FC85F-1E43-413B-B7A9-5762F2F0F831}.Release|x64.ActiveCfg = Release|x64
 		{229FC85F-1E43-413B-B7A9-5762F2F0F831}.Release|x64.Build.0 = Release|x64
 		{E474A5B5-3F73-46CB-B68C-E8FA5199950B}.Debug|x64.ActiveCfg = Debug|x64
