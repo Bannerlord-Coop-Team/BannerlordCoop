@@ -6,6 +6,7 @@ using GameInterface.Serialization;
 using LiteNetLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
+using Missions.Services.Agents.Patches;
 using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
@@ -94,7 +95,7 @@ public class AgentDamageHandler : IAgentDamageHandler
             payload.What.Blow);
 
             networkMessageBroker.PublishNetworkEventExcept((NetPeer)payload.Who, message);
-            //networkMessageBroker.Publish(resolvedAgent, message);
+            AgentDamagePatch.OverrideAgentDamage(resolvedAgent, payload.What.Blow, payload.What.AttackCollisionData);
     }
 
     private void AgentDamageRecieve(MessagePayload<ConfirmedNetworkAgentDamaged> payload)
