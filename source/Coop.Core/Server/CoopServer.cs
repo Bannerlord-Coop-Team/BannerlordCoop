@@ -91,7 +91,7 @@ namespace Coop.Core.Server
 
         }
 
-        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
             packetManager.HandleRecieve(peer, packet);
