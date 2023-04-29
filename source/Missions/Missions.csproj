@@ -39,8 +39,8 @@
     <Reference Include="Autofac, Version=7.0.1.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
       <HintPath>..\packages\Autofac.7.0.1\lib\netstandard2.0\Autofac.dll</HintPath>
     </Reference>
-    <Reference Include="LiteNetLib, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\LiteNetLib.1.1.0\lib\net471\LiteNetLib.dll</HintPath>
+    <Reference Include="LiteNetLib, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\LiteNetLib.0.9.5.2\lib\net35\LiteNetLib.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.7.0.0\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
@@ -185,7 +185,6 @@
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
     <Compile Include="Services\Missiles\NetworkMissileRegistry.cs" />
     <Compile Include="Services\Missiles\Patches\MissileAuxPatches.cs" />
-    <Compile Include="Services\Network\Data\ConnectionToken.cs" />
     <Compile Include="Services\Network\EventQueueManager.cs" />
     <Compile Include="Services\Network\Messages\PeerReady.cs" />
     <Compile Include="Services\Network\Data\AiAgentData.cs" />

@@ -3,7 +3,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 
-namespace Missions.Services.Network.Data
+namespace Common.Network.Data
 {
     /// <summary>
     /// Represents a connection token containing information required for connecting to a game instance.

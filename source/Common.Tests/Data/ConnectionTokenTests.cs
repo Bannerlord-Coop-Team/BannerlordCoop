@@ -1,13 +1,7 @@
-﻿using LiteNetLib;
-using Missions.Services.Network.Data;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Xunit;
+﻿using Common.Network.Data;
+using LiteNetLib;
 
-namespace IntroductionServerTests.Services.Network.Data
+namespace Common.Tests.Data
 {
     public class ConnectionTokenTests
     {
