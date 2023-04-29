@@ -28,11 +28,11 @@ namespace GameInterface.Services.Time.Patches
         [HarmonyPatch(MethodType.Setter)]
         private static bool Prefix(ref Campaign __instance, ref CampaignTimeControlMode value)
         {
-            bool isAllowed = !TimeControlInterface.TimeLock;
+            bool isAllowed = !TimeControlInterface.IsTimeLocked;
 
             Logger.Verbose("Attempting to change time mode. Allowed: {allowed}", isAllowed);
 
-            if (TimeControlInterface.TimeLock == false &&
+            if (TimeControlInterface.IsTimeLocked == false &&
                 __instance.TimeControlModeLock == false &&
                 value != _getTimeControlMode(__instance))
             {

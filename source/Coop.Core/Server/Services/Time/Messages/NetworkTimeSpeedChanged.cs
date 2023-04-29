@@ -2,10 +2,10 @@
 using GameInterface.Services.Time.Enum;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Services.Time.Handlers
+namespace Coop.Core.Server.Services.Time.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public struct NetworkTimeSpeedChanged : INetworkEvent
+    public readonly struct NetworkTimeSpeedChanged : INetworkEvent
     {
         [ProtoMember(1)]
         public TimeControlEnum NewControlMode { get; }

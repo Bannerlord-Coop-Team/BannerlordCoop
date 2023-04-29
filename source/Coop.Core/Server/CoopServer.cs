@@ -27,7 +27,7 @@ namespace Coop.Core.Server
 
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
-        private readonly IClientRegistry clientOrchestrator;
+        private readonly IClientRegistry clientRegistry;
         private readonly NetManager netManager;
 
         private bool allowJoining = false;
@@ -41,7 +41,7 @@ namespace Coop.Core.Server
             // Dependancy assignment
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
-            this.clientOrchestrator = clientOrchestrator;
+            this.clientRegistry = clientOrchestrator;
 
             // TODO add configuration
             netManager = new NetManager(this);

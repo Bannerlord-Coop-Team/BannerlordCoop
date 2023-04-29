@@ -1,10 +1,8 @@
 ﻿using Common.Messaging;
-using System;
-using System.Linq;
 
 namespace Coop.Tests.Stubs
 {
-    public class MessageBrokerStub : MessageBroker
+    public class StubMessageBroker : MessageBroker
     {
         public int GetTotalSubscribers()
         {
