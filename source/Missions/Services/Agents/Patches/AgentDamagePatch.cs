@@ -13,6 +13,7 @@ namespace Missions.Services.Agents.Patches
     [HarmonyPatch(typeof(Mission), "RegisterBlow")]
     public class AgentDamagePatch
     {
+        private static object _lock = new object();
         private static Agent _applyDamageAgent;
 
         private static void Prefix(Agent attacker, Agent victim, Blow b, ref AttackCollisionData collisionData)
@@ -32,10 +33,11 @@ namespace Missions.Services.Agents.Patches
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
-                lock (_applyDamageAgent)
+                lock (_lock)
                 {
                     _applyDamageAgent = victim;
                     _applyDamageAgent.RegisterBlow(blow, collisionData);
+                    _applyDamageAgent = null;
                 }
             });
         }
