@@ -94,7 +94,7 @@ public class AgentDamageHandler : IAgentDamageHandler
             payload.What.Blow);
 
             networkMessageBroker.PublishNetworkEventExcept((NetPeer)payload.Who, message);
-            networkMessageBroker.Publish(resolvedAgent, message);
+            //networkMessageBroker.Publish(resolvedAgent, message);
     }
 
     private void AgentDamageRecieve(MessagePayload<ConfirmedNetworkAgentDamaged> payload)
