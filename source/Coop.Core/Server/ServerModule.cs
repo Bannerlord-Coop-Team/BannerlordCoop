@@ -24,9 +24,6 @@ namespace Coop.Core.Server
             builder.RegisterType<ClientRegistry>().As<IClientRegistry>().InstancePerLifetimeScope();
             builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
 
-            // TODO create collector
-            builder.RegisterType<SaveGameHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
-
             foreach (var handlerType in HandlerCollector.Collect<ServerModule>())
             {
                 builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope().AutoActivate();

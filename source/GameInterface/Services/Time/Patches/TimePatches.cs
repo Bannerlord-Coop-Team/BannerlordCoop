@@ -1,9 +1,11 @@
-﻿using Common.Logging;
+﻿using Common.Extensions;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Time.Messages;
 using HarmonyLib;
 using Serilog;
+using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 
@@ -13,7 +15,14 @@ namespace GameInterface.Services.Time.Patches
     internal class TimePatches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<TimePatches>();
-        private static readonly FieldInfo _timeControlMode = typeof(Campaign).GetField("_timeControlMode", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static readonly Action<Campaign, CampaignTimeControlMode> _setTimeControlMode = 
+            typeof(Campaign)
+            .GetField("_timeControlMode", BindingFlags.NonPublic | BindingFlags.Instance)
+            .BuildUntypedSetter<Campaign, CampaignTimeControlMode>();
+        private static readonly Func<Campaign, CampaignTimeControlMode> _getTimeControlMode =
+            typeof(Campaign)
+            .GetField("_timeControlMode", BindingFlags.NonPublic | BindingFlags.Instance)
+            .BuildUntypedGetter<Campaign, CampaignTimeControlMode>();
 
         [HarmonyPatch("TimeControlMode")]
         [HarmonyPatch(MethodType.Setter)]
@@ -25,10 +34,10 @@ namespace GameInterface.Services.Time.Patches
 
             if (TimeControlInterface.TimeLock == false &&
                 __instance.TimeControlModeLock == false &&
-                value != (CampaignTimeControlMode)_timeControlMode.GetValue(__instance))
+                value != _getTimeControlMode(__instance))
             {
                 MessageBroker.Instance.Publish(__instance, new TimeSpeedChanged(value));
-                _timeControlMode.SetValue(__instance, value);
+                _setTimeControlMode(__instance, value);
             }
 
             return false;
@@ -36,7 +45,7 @@ namespace GameInterface.Services.Time.Patches
 
         public static void OverrideTimeControlMode(Campaign campaign, CampaignTimeControlMode value)
         {
-            _timeControlMode.SetValue(campaign, value);
+            _setTimeControlMode(campaign, value);
         }
     }
 }

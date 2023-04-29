@@ -153,6 +153,9 @@
     <Compile Include="Server\Services\Save\Handlers\SaveGameHandler.cs" />
     <Compile Include="Server\Services\Save\CoopSaveManager.cs" />
     <Compile Include="Server\Services\Save\Data\CoopSession.cs" />
+    <Compile Include="Server\Services\Time\Messages\NetworkRequestTimeSpeedChange.cs" />
+    <Compile Include="Server\Services\Time\Messages\NetworkTimeSpeedChanged.cs" />
+    <Compile Include="Server\Services\Time\Handlers\TimeHandler.cs" />
     <Compile Include="Server\States\InitialServerState.cs" />
     <Compile Include="Server\States\IServerState.cs" />
     <Compile Include="Server\States\ServerRunningState.cs" />

@@ -6,7 +6,6 @@ using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using LiteNetLib;
-using LiteNetLib.Utils;
 using System;
 using System.Collections.Generic;
 using System.Net;

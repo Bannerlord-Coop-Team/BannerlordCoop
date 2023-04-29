@@ -41,6 +41,7 @@ namespace Coop.Core.Client.States
 
             Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
             Logic.NetworkMessageBroker.Unsubscribe<MissionStateEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle);
         }
 
         private void Handle(MessagePayload<NetworkDisableTimeControls> obj)
