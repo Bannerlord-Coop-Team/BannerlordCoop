@@ -13,13 +13,8 @@ namespace Missions.Services.Agents.Patches
     [HarmonyPatch(typeof(Mission), "RegisterBlow")]
     public class AgentDamagePatch
     {
-        private static object _lock = new object();
-        private static Agent _applyDamageAgent;
-
         private static void Prefix(Agent attacker, Agent victim, Blow b, ref AttackCollisionData collisionData)
         {
-            if(_applyDamageAgent == victim) return;
-
             if (NetworkAgentRegistry.Instance.IsControlled(attacker) == false) return;
 
             // construct a agent damage data
@@ -31,14 +26,10 @@ namespace Missions.Services.Agents.Patches
 
         public static void OverrideAgentDamage(Agent victim, Blow blow, AttackCollisionData collisionData)
         {
+            var original = AccessTools.Method(typeof(Agent), nameof(Agent.RegisterBlow));
             GameLoopRunner.RunOnMainThread(() =>
             {
-                lock (_lock)
-                {
-                    _applyDamageAgent = victim;
-                    _applyDamageAgent.RegisterBlow(blow, collisionData);
-                    _applyDamageAgent = null;
-                }
+                original.Invoke(victim, new object[] { blow, collisionData });
             });
         }
     }
