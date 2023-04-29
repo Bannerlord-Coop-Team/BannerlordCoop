@@ -1,10 +1,9 @@
 ﻿using Common;
 using Common.Logging;
 using Serilog;
-using System;
 using System.Collections;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Registry
@@ -13,7 +12,7 @@ namespace GameInterface.Services.Registry
     {
         protected readonly ILogger Logger = LogManager.GetLogger<RegistryBase<T>>();
 
-        protected readonly Dictionary<string, T> objIds = new Dictionary<string, T>();
+        protected readonly ConcurrentDictionary<string, T> objIds = new ConcurrentDictionary<string, T>();
 
         public int Count => objIds.Count;
 
@@ -25,7 +24,7 @@ namespace GameInterface.Services.Registry
         {
             if (objIds.ContainsKey(id)) return false;
 
-            objIds.Add(id, obj);
+            objIds.TryAdd(id, obj);
 
             return true;
         }
@@ -37,9 +36,9 @@ namespace GameInterface.Services.Registry
             return true;
         }
 
-        public bool Remove(T obj) => objIds.Remove(obj.StringId);
+        public bool Remove(T obj) => objIds.TryRemove(obj.StringId, out var _);
 
-        public bool Remove(string id) => objIds.Remove(id);
+        public bool Remove(string id) => objIds.TryRemove(id, out var _);
 
         public bool TryGetValue(T obj, out string id)
         {

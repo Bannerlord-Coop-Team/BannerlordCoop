@@ -73,7 +73,7 @@ namespace Common.Serialization
 
             var tokenSource = new CancellationTokenSource();
             tokenSource.CancelAfter(TimeSpan.FromSeconds(1));
-            Task.Factory.StartNew(async () => { await AsyncWriteToFile(filePath, jsonText, tokenSource.Token); });
+            Task.Factory.StartNew(async () => { await AsyncWriteToFile(filePath, jsonText, tokenSource.Token); }, tokenSource.Token);
         }
 
         private async Task AsyncWriteToFile(string filePath, string jsonText, CancellationToken cancellationToken)

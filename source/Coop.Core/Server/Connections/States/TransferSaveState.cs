@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Serialization;
 using Coop.Core.Client.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
@@ -41,6 +42,9 @@ namespace Coop.Core.Server.Connections.States
                     payload.GameSaveData,
                     payload.CampaignID,
                     payload.GameObjectGuids);
+
+                byte[] test = ProtoBufSerializer.Serialize(networkEvent);
+                ProtoBufSerializer.Deserialize(test);
 
                 ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(peer, networkEvent);
 
