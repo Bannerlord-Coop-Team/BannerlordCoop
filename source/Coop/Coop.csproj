@@ -237,8 +237,7 @@
     <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.5.4" />
   </ItemGroup>
 
-  <Target Name="RunDeploy" AfterTargets="ReBuild">
-    <Exec Condition=" '$(OS)' == 'Windows_NT' " 
-          Command="powershell -ExecutionPolicy Unrestricted -File &quot;$(SolutionDir)..\deploy.ps1&quot; -SolutionDir &quot;$(SolutionDir)\&quot; -TargetDir &quot;$(SolutionDir)Coop\bin\$(Configuration)\netstandard2.0&quot;"/>
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+	  <Exec Condition=" '$(OS)' == 'Windows_NT' " Command="powershell -ExecutionPolicy Unrestricted -File &quot;$(SolutionDir)..\deploy.ps1&quot; -SolutionDir &quot;$(SolutionDir)\&quot; -TargetDir &quot;$(SolutionDir)Coop\bin\$(Configuration)\netstandard2.0&quot;" />
   </Target>
 </Project>

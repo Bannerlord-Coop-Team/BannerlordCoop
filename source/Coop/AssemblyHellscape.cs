@@ -14,6 +14,7 @@ namespace Coop
         private static readonly string[] RedirectedAssemblies = new string[]
         {
             "System.Collections.Immutable",
+            "System.Memory",
             "System.Runtime.CompilerServices.Unsafe",
             "Microsoft.Bcl.AsyncInterfaces",
             "System.Threading.Tasks.Extensions",

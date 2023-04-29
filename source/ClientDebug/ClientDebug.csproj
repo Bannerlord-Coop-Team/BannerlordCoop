@@ -24,9 +24,6 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
     <StartAction>Program</StartAction>
-    <StartWorkingDirectory>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client</StartWorkingDirectory>
-    <StartProgram>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
-    <StartArguments>/singleplayer /client _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_</StartArguments>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
     <PlatformTarget>x64</PlatformTarget>
@@ -51,6 +48,6 @@
     </PreBuildEvent>
   </PropertyGroup>
   <PropertyGroup>
-    <PostBuildEvent>dotnet build "$(SolutionDir)Coop/Coop.csproj" --no-incremental -c $(configuration) /p:SolutionDir="$(SolutionDir)/"</PostBuildEvent>
+    <PostBuildEvent>dotnet build "$(SolutionDir)Coop/Coop.csproj" --no-incremental -c $(configuration) /p:SolutionDir="$(SolutionDir)\"</PostBuildEvent>
   </PropertyGroup>
 </Project>

@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "BannerlordStarter": {
+      "commandName": "Executable",
+      "executablePath": "./Bannerlord.exe",
+      "commandLineArgs": "/singleplayer /server _MODULES_*Native*SandBoxCore*CustomBattle*SandBox*StoryMode*Coop*_MODULES_",
+      "workingDirectory": "../../mb2/bin/Win64_Shipping_Client/",
+      "nativeDebugging": true
+    }
+  }
+}
