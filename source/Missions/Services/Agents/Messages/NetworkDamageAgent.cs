@@ -12,7 +12,7 @@ namespace Missions.Services.Agents.Messages
     /// External event for agent damage
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct MultiNetworkAgentDamaged : INetworkEvent
+    public readonly struct NetworkDamageAgent : INetworkEvent
     {
 
         [ProtoMember(1)]
@@ -24,7 +24,7 @@ namespace Missions.Services.Agents.Messages
         [ProtoMember(4)]
         public AttackCollisionData AttackCollisionData { get; }
 
-        public MultiNetworkAgentDamaged(
+        public NetworkDamageAgent(
             Guid attackerAgentId,
             Guid victimAgentId, 
             AttackCollisionData attackCollisionData, 

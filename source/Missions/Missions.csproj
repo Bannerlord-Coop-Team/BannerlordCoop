@@ -154,8 +154,7 @@
     <Compile Include="Services\Agents\Handlers\ShieldDamageHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
-    <Compile Include="Services\Agents\Messages\ConfirmedNetworkAgentDamaged.cs" />
-    <Compile Include="Services\Agents\Messages\MultiNetworkAgentDamaged.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkAgentDamaged.cs" />
     <Compile Include="Services\Agents\Messages\NetworkShieldBreak.cs" />
     <Compile Include="Services\Agents\Messages\NetworkWeaponDropped.cs" />
     <Compile Include="Services\Agents\Messages\NetworkWeaponPickedup.cs" />
@@ -177,7 +176,7 @@
     <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
     <Compile Include="Services\Missiles\Message\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
-    <Compile Include="Services\Agents\Messages\NetworkAgentDamaged.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkDamageAgent.cs" />
     <Compile Include="Services\Agents\Messages\AgentDied.cs" />
     <Compile Include="Services\Agents\Patches\AgentDamagePatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentKilledPatch.cs" />

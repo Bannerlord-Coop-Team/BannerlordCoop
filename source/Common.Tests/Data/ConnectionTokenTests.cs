@@ -50,5 +50,24 @@ namespace Common.Tests.Data
 
             Assert.Throws<ArgumentException>(() => new ConnectionToken(peerId, instanceName, natType));
         }
+
+        [Fact]
+        public void Stringify_Full()
+        {
+            // Arrange
+            Guid peerId = Guid.NewGuid();
+            string instanceName = "TestString";
+            NatAddressType natType = NatAddressType.Internal;
+
+            // Act & Assert
+
+            ConnectionToken connectionToken = new ConnectionToken(peerId, instanceName, natType);
+
+            string connectionTokenString = connectionToken;
+
+            ConnectionToken resolvedToken = connectionTokenString;
+
+            Assert.Equal(resolvedToken, connectionToken);
+        }
     }
 }

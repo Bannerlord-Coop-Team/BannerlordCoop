@@ -56,6 +56,24 @@ namespace Common.Network.Data
             return false;
         }
 
+        public override bool Equals(object obj)
+        {
+            if (obj is ConnectionToken == false) return false;
+
+            ConnectionToken token = (ConnectionToken)obj;
+
+            if (token.InstanceName != InstanceName) return false;
+            if (token.NatType != NatType) return false;
+            if (token.PeerId != PeerId) return false;
+
+            return true;
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
+        }
+
         public static implicit operator ConnectionToken(string tokenString)
         {
             string[] data = tokenString.Split('%');
