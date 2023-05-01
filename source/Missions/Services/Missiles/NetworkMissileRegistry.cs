@@ -37,6 +37,8 @@ namespace Missions.Services.Missiles
         private readonly ConcurrentDictionary<int, PeerMissileIndexMap> peerMissileRegistries = 
             new ConcurrentDictionary<int, PeerMissileIndexMap>();
 
+        private List<MessagePayload<PeerMissileAdded>> queuedMissiles;
+
         public NetworkMissileRegistry(IMessageBroker messageBroker)
         {
             this.messageBroker = messageBroker;
@@ -63,6 +65,12 @@ namespace Missions.Services.Missiles
             var peer = obj.What.Peer;
 
             peerMissileRegistries.TryAdd(peer.Id, new PeerMissileIndexMap(peer.Id));
+
+            foreach(MessagePayload<PeerMissileAdded> payload in queuedMissiles)
+            {
+                if (payload.Who != peer) continue;
+                Handle_PeerMissileAdded(payload);
+            }
         }
 
         private void Handle_PeerMissileAdded(MessagePayload<PeerMissileAdded> obj)
@@ -76,7 +84,8 @@ namespace Missions.Services.Missiles
             }
             else
             {
-                Logger.Warning("Tried to register added missile but peer was not registered in {peerRegistries}", peerMissileRegistries);
+                queuedMissiles.Add(obj);
+                Logger.Warning("Tried to register added missile but peer was not registered in {peerRegistries} yet", peerMissileRegistries);
             }
         }
 
