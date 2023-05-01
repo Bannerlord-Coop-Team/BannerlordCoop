@@ -26,8 +26,6 @@ namespace Missions.Services.Network
     public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable, INetwork
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
-
-        private readonly NetPacketProcessor _netPacketProcessor = new NetPacketProcessor();
         public int ConnectedPeersCount => netManager.ConnectedPeersCount;
 
         public NetPeer PeerServer { get; private set; }
