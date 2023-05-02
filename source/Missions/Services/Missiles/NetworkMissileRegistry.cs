@@ -68,7 +68,7 @@ namespace Missions.Services.Missiles
 
             foreach(MessagePayload<PeerMissileAdded> payload in queuedMissiles)
             {
-                if (payload.Who != peer) continue;
+                if ((payload.Who as NetPeer).Id != peer.Id) continue;
                 Handle_PeerMissileAdded(payload);
             }
         }
