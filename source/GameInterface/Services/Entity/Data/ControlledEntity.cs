@@ -11,7 +11,7 @@ namespace GameInterface.Services.Entity.Data
     /// </summary>
     public class ControlledEntity
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<ControlledPartyRegistry>();
+        private static readonly ILogger Logger = LogManager.GetLogger<ControlledEntity>();
 
         /// <summary>
         /// Id of owner of the controlled entity.

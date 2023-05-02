@@ -29,7 +29,9 @@ namespace GameInterface.Services.ObjectManager
         private readonly IHeroRegistry heroRegistry;
         private readonly IMobilePartyRegistry partyRegistry;
 
-        public MBObjectManagerAdapter(IHeroRegistry heroRegistry, IMobilePartyRegistry partyRegistry)
+        public MBObjectManagerAdapter(
+            IHeroRegistry heroRegistry,
+            IMobilePartyRegistry partyRegistry)
         {
             this.heroRegistry = heroRegistry;
             this.partyRegistry = partyRegistry;

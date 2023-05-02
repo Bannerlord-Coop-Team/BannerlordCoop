@@ -24,6 +24,7 @@ namespace Coop.Core.Server
         public override int Priority => 0;
 
         public IEnumerable<NetPeer> ConnectedPeers => netManager.ConnectedPeerList;
+        public Guid ServerId { get; } = Guid.NewGuid();
 
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;

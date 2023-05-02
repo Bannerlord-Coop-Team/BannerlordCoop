@@ -1,15 +1,9 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.MobileParties.Messages;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
@@ -20,18 +14,18 @@ namespace GameInterface.Services.Heroes.Handlers
         private readonly IHeroInterface heroInterface;
         private readonly IMessageBroker messageBroker;
         private readonly IHeroRegistry heroRegistry;
-        private readonly IControlledHeroRegistry controlledHeroRegistry;
+        private readonly IControlledEntityRegistery controlledEntityRegistery;
 
         public HeroRegistryHandler(
             IHeroInterface heroInterface,
             IMessageBroker messageBroker,
             IHeroRegistry heroRegistry,
-            IControlledHeroRegistry controlledHeroRegistry)
+            IControlledEntityRegistery controlledEntityRegistery)
         {
             this.heroInterface = heroInterface;
             this.messageBroker = messageBroker;
             this.heroRegistry = heroRegistry;
-            this.controlledHeroRegistry = controlledHeroRegistry;
+            this.controlledEntityRegistery = controlledEntityRegistery;
 
             messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
         }
@@ -48,12 +42,12 @@ namespace GameInterface.Services.Heroes.Handlers
 
             if (heroRegistry.TryGetValue(previousHero, out string previousHeroId))
             {
-                controlledHeroRegistry.RemoveAsControlled(previousHeroId);
+                controlledEntityRegistery.RemoveAsControlled(previousHeroId);
             }
 
             if (heroRegistry.TryGetValue(newHero, out string newHeroId))
             {
-                controlledHeroRegistry.RegisterAsControlled(newHeroId);
+                controlledEntityRegistery.RegisterAsControlled(newHeroId);
             }
         }
     }

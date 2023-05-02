@@ -274,10 +274,9 @@
     <Compile Include="Serialization\External\MobilePartyAIBinaryPackage.cs" />
     <Compile Include="Services\Entity\ControlledEntityRegistery.cs" />
     <Compile Include="Services\Entity\Data\ControlledEntity.cs" />
-    <Compile Include="Services\Heroes\ControlledHeroRegistry.cs" />
-    <Compile Include="Services\MobileParties\ControlledPartyRegistry.cs" />
+    <Compile Include="Services\MobileParties\Handlers\MobilePartyControlHandler.cs" />
     <Compile Include="Services\MobileParties\Messages\PartyTargetPositionChanged.cs" />
-    <Compile Include="Services\MobileParties\MobilePartyRegistry.cs" />
+    <Compile Include="Services\MobileParties\Messages\RegisterAllPartiesAsControlled.cs" />
     <Compile Include="Services\Heroes\HeroRegistry.cs" />
     <Compile Include="Services\Heroes\Handlers\HeroRegistryHandler.cs" />
     <Compile Include="Services\Heroes\Handlers\SwitchHeroHandler.cs" />
@@ -288,6 +287,7 @@
     <Compile Include="Services\MobileParties\Handlers\MobilePartyMovementHandler.cs" />
     <Compile Include="Services\MobileParties\Messages\ControlledPartyTargetPositionUpdated.cs" />
     <Compile Include="Services\MobileParties\Messages\UpdatePartyTargetPosition.cs" />
+    <Compile Include="Services\MobileParties\MobilePartyRegistry.cs" />
     <Compile Include="Services\MobileParties\Patches\PartyMovementPatch.cs" />
     <Compile Include="Services\Modules\CompatibilityInfo.cs" />
     <Compile Include="Exceptions\Exceptions.cs" />
