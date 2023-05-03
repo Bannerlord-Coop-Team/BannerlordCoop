@@ -1,6 +1,5 @@
 ﻿using Common.Logging;
 using Serilog;
-using Serilog.Core;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -20,7 +19,7 @@ namespace GameInterface.Serialization.Native
         [NonSerialized]
         private readonly IEnumerable enumerable;
 
-        readonly Type enumerableType;
+        readonly string enumerableType;
 
         IBinaryPackage[] packages;
 
@@ -28,7 +27,7 @@ namespace GameInterface.Serialization.Native
         {
             this.binaryPackageFactory = binaryPackageFactory;
             this.enumerable = enumerable;
-            enumerableType = enumerable.GetType();
+            enumerableType = enumerable.GetType().AssemblyQualifiedName;
         }
 
         public void Pack()
@@ -47,24 +46,24 @@ namespace GameInterface.Serialization.Native
             this.binaryPackageFactory = binaryPackageFactory;
 
             var unpackedArray = packages.Select(e => e.Unpack(binaryPackageFactory)).ToArray();
+            var type = Type.GetType(enumerableType);
+            var newDict = Activator.CreateInstance(type);
 
-            var newDict = Activator.CreateInstance(enumerableType);
+            MethodInfo dictAdd = type.GetMethod("Add");
 
-            MethodInfo DictAdd = enumerableType.GetMethod("Add");
+            Type keyType = type.GetGenericArguments()[0];
+            Type valueType = type.GetGenericArguments()[1];
 
-            Type KeyType = enumerableType.GetGenericArguments()[0];
-            Type ValueType = enumerableType.GetGenericArguments()[1];
+            Type kvpType = typeof(KeyValuePair<,>).MakeGenericType(keyType, valueType);
 
-            Type kvpType = typeof(KeyValuePair<,>).MakeGenericType(KeyType, ValueType);
-
-            FieldInfo Key = kvpType.GetField("key", BindingFlags.Instance | BindingFlags.NonPublic);
-            FieldInfo Value = kvpType.GetField("value", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo key = kvpType.GetField("key", BindingFlags.Instance | BindingFlags.NonPublic);
+            FieldInfo value = kvpType.GetField("value", BindingFlags.Instance | BindingFlags.NonPublic);
 
 
             foreach (object obj in unpackedArray)
             {
-                var k = Key.GetValue(obj);
-                var v = Value.GetValue(obj);
+                var k = key.GetValue(obj);
+                var v = value.GetValue(obj);
 
                 if(k == null)
                 {
@@ -72,7 +71,7 @@ namespace GameInterface.Serialization.Native
                     continue;
                 }
 
-                DictAdd.Invoke(newDict, new object[] { k, v });
+                dictAdd.Invoke(newDict, new object[] { k, v });
             }
 
             return newDict;

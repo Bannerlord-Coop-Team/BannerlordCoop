@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

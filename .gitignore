@@ -537,6 +537,7 @@ MigrationBackup/
 
 # End of https://www.gitignore.io/api/csharp,powershell,dotnetcore,visualstudio,visualstudiocode
 deploy/**
+DockerAssembliesTemp/**
 mb2
 mb2/**
 source/.editorconfig

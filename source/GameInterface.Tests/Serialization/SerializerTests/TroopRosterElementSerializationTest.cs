@@ -2,8 +2,8 @@
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap.Modules;
-using GameInterface.Tests.Bootstrap;
 using System.Runtime.Serialization;
+using Common.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 using Xunit;
@@ -47,7 +47,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void TroopRosterElement_Full_Serialization()
         {
             CharacterObject character = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
-            TroopRosterElement TroopRosterElement = new TroopRosterElement(character)
+            TroopRosterElement troopRosterElement = new TroopRosterElement(character)
             {
                 Number = 5,
                 Xp = 100,
@@ -55,7 +55,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             };
 
             var factory = container.Resolve<IBinaryPackageFactory>();
-            TroopRosterElementBinaryPackage package = new TroopRosterElementBinaryPackage(TroopRosterElement, factory);
+            TroopRosterElementBinaryPackage package = new TroopRosterElementBinaryPackage(troopRosterElement, factory);
 
             package.Pack();
 
@@ -72,9 +72,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
             TroopRosterElement newTroopRosterElement = returnedPackage.Unpack<TroopRosterElement>(deserializeFactory);
 
-            Assert.Equal(TroopRosterElement.Number, newTroopRosterElement.Number);
-            Assert.Equal(TroopRosterElement.Xp, newTroopRosterElement.Xp);
-            Assert.Equal(TroopRosterElement.WoundedNumber, newTroopRosterElement.WoundedNumber);
+            Assert.Equal(troopRosterElement.Number, newTroopRosterElement.Number);
+            Assert.Equal(troopRosterElement.Xp, newTroopRosterElement.Xp);
+            Assert.Equal(troopRosterElement.WoundedNumber, newTroopRosterElement.WoundedNumber);
         }
     }
 }

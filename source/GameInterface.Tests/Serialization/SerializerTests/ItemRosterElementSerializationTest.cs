@@ -4,8 +4,8 @@ using Xunit;
 using TaleWorlds.Core;
 using System.Reflection;
 using Autofac;
+using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
-using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

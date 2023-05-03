@@ -10,6 +10,7 @@ using TaleWorlds.Library;
 using Autofac;
 using GameInterface.Tests.Bootstrap.Modules;
 using GameInterface.Services.ObjectManager;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

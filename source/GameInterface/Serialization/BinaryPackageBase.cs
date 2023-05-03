@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
+using Common.Extensions;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization
@@ -29,20 +30,19 @@ namespace GameInterface.Serialization
         [NonSerialized]
         protected T Object;
 
+        [field: NonSerialized]
         public IBinaryPackageFactory BinaryPackageFactory
         {
-            get { return _binaryPackageFactory; }
-            set { _binaryPackageFactory = value; }
+            get;
+            set;
         }
-        [NonSerialized]
-        private IBinaryPackageFactory _binaryPackageFactory;
 
         protected Type ObjectType => typeof(T);
 
         /// <summary>
-        /// Dictionary of fields and their objects converted to BinaryPackages
+        /// Dictionary of field names and their objects converted to BinaryPackages
         /// </summary>
-        protected Dictionary<FieldInfo, IBinaryPackage> StoredFields = new Dictionary<FieldInfo, IBinaryPackage>();
+        protected Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
         protected BinaryPackageBase(T obj, IBinaryPackageFactory binaryPackageFactory)
         {
@@ -51,9 +51,55 @@ namespace GameInterface.Serialization
             Object = obj;
             BinaryPackageFactory = binaryPackageFactory;
         }
-
+        
         protected abstract void PackInternal();
         protected abstract void UnpackInternal();
+
+        protected void PackFields()
+        {
+            // Iterate through all of the instance fields of the object's type
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First()))
+            {
+                // Get the value of the current field in the object
+                // Add a binary package of the field value to the StoredFields collection
+                object obj = field.GetValue(Object);
+                StoredFields.Add(field.Name, BinaryPackageFactory.GetBinaryPackage(obj));
+            }
+        }
+        
+        protected void PackFields(HashSet<string> excludes)
+        {
+            // Iterate through all of the instance fields of the object's type, excluding any fields that are specified in the Excludes collection
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes).GroupBy(o => o.Name).Select(g => g.First()))
+            {
+                // Get the value of the current field in the object
+                // Add a binary package of the field value to the StoredFields collection
+                object obj = field.GetValue(Object);
+                StoredFields.Add(field.Name, BinaryPackageFactory.GetBinaryPackage(obj));
+            }
+        }
+        
+        protected void UnpackFields()
+        {
+            var type = Object.GetType();
+            var fields = type.GetAllInstanceFields();
+
+            foreach (string fieldName in StoredFields.Keys)
+            {
+                var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+
+                if (type.IsValueType)
+                {
+                    object boxed = Object;
+                    field.SetValue(boxed, StoredFields[fieldName].Unpack(BinaryPackageFactory));
+                    Object = (T)boxed;
+                }
+                else
+                {
+                    field.SetValue(Object, StoredFields[fieldName].Unpack(BinaryPackageFactory));
+                }
+            }
+        }
 
         /// <summary>
         /// Packs data for an object.

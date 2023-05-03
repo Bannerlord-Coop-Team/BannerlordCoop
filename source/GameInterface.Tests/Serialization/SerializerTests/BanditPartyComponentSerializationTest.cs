@@ -12,6 +12,7 @@ using GameInterface.Tests.Bootstrap;
 using TaleWorlds.Library;
 using Autofac;
 using GameInterface.Tests.Bootstrap.Modules;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

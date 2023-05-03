@@ -6,6 +6,7 @@ using GameInterface.Tests.Bootstrap;
 using System.Runtime.Serialization;
 using TaleWorlds.Core;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

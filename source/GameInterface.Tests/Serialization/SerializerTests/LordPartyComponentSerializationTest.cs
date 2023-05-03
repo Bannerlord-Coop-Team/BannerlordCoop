@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.ObjectSystem;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

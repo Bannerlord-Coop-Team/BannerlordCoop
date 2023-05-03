@@ -1,10 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Xml.Serialization;
+using System.Linq;
 using TaleWorlds.Library;
-using GameInterface.Serialization;
-using System.Reflection;
-using Common.Extensions;
 
 namespace GameInterface
 {
@@ -95,6 +92,22 @@ namespace GameInterface
             if (obj is CompatibilityInfo == false) return false;
 
             return CompatibleWith(obj as CompatibilityInfo);
+        }
+
+        public override int GetHashCode()
+        {
+            var hashCode = 0;
+            if (Modules == null || !Modules.Any())
+            {
+                return hashCode;
+            }
+            
+            foreach (var module in Modules)
+            {
+                hashCode += module.GetHashCode();
+            }
+
+            return hashCode;
         }
 
         private void AddModule(ModuleInfo moduleInfo)

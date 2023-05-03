@@ -4,8 +4,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {
@@ -43,14 +41,7 @@ namespace GameInterface.Serialization.External
         {
             stringId = Object.StringId ?? string.Empty;
 
-            // Iterate through all of the instance fields of the object's type, excluding any fields that are specified in the Excludes collection
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(Excludes))
-            {
-                // Get the value of the current field in the object
-                // Add a binary package of the field value to the StoredFields collection
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackFields(Excludes);
 
             // Get the value of the CharacterObject_battleEquipmentTemplate field in the object
             CharacterObject battleEquipmentTemplate = CharacterObject_battleEquipmentTemplate.GetValue<CharacterObject>(Object);
@@ -77,11 +68,7 @@ namespace GameInterface.Serialization.External
                 return;
             }
 
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack(BinaryPackageFactory));
-            }
+            base.UnpackFields();
 
             // Resolve Ids for StringId resolvable objects
             CharacterObject_battleEquipmentTemplate.SetValue(Object, ResolveId<CharacterObject>(battleEquipmentTemplateId));

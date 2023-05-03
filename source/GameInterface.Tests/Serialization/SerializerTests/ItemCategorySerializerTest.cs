@@ -4,6 +4,7 @@ using TaleWorlds.Core;
 using Xunit;
 using System.Runtime.Serialization;
 using Autofac;
+using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
 using GameInterface.Tests.Bootstrap;
 
