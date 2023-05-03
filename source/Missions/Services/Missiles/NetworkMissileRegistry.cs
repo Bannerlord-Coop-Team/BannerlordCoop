@@ -37,7 +37,7 @@ namespace Missions.Services.Missiles
         private readonly ConcurrentDictionary<int, PeerMissileIndexMap> peerMissileRegistries = 
             new ConcurrentDictionary<int, PeerMissileIndexMap>();
 
-        private List<MessagePayload<PeerMissileAdded>> queuedMissiles;
+        private List<MessagePayload<PeerMissileAdded>> queuedMissiles = new List<MessagePayload<PeerMissileAdded>>();
 
         public NetworkMissileRegistry(IMessageBroker messageBroker)
         {
