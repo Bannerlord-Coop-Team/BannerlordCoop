@@ -44,7 +44,10 @@ namespace Missions.Services.Network
         private readonly IMessageBroker messageBroker;
         private readonly Poller poller;
         
-        public LiteNetP2PClient(NetworkConfiguration config, INetworkMessageBroker messageBroker, IPacketManager packetManager)
+        public LiteNetP2PClient(
+            NetworkConfiguration config,
+            INetworkMessageBroker messageBroker,
+            IPacketManager packetManager)
         {
             NetworkMessageBroker.Instance.Network = this;
 
@@ -228,17 +231,15 @@ namespace Missions.Services.Network
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            if (PeerServer != null && peer != PeerServer)
+            if (PeerServer != peer)
             {
                 var peerDisconnectedEvent = new PeerDisconnected(peer, disconnectInfo);
                 messageBroker.Publish(this, peerDisconnectedEvent);
-                return;
             }
-            if (peer == PeerServer)
+            else
             {
-                ServerDisconnected serverDisconnected = new ServerDisconnected();
+                ServerDisconnected serverDisconnected = new ServerDisconnected(peer, disconnectInfo);
                 messageBroker.Publish(this, serverDisconnected);
-                return;
             }
 
             Logger.Verbose("{LocalPort} received disconnected from {peer}", netManager.LocalPort, peer.EndPoint);

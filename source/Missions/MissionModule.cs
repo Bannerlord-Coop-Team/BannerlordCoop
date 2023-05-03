@@ -12,6 +12,7 @@ using Missions.Services.Exceptions;
 using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
+using Missions.Services.Network.Handlers;
 using Missions.Services.Taverns;
 
 namespace Missions
@@ -72,6 +73,8 @@ namespace Missions
             builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerLifetimeScope();
             builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerLifetimeScope();
             builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerLifetimeScope();
+
+            builder.RegisterType<ServerDisconnectHandler>().As<IServerDisconnectHandler>().InstancePerLifetimeScope().AutoActivate();
 
             base.Load(builder);
         }

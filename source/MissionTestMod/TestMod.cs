@@ -78,7 +78,8 @@ namespace MissionTestMod
 
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
             Module.CurrentModule.AddInitialStateOption(JoinArena);
-            Module.CurrentModule.AddInitialStateOption(JoinBattle);
+            // TODO re-enable for battles
+            //Module.CurrentModule.AddInitialStateOption(JoinBattle);
 
             base.OnSubModuleLoad();
             Logger.Verbose("Bannerlord Coop Mod loaded");
