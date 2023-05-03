@@ -55,7 +55,7 @@ namespace Common.PacketHandlers
     [ProtoContract(SkipConstructor = true)]
     public class EventPacket : IPacket
     {
-        public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
+        public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableUnordered;
 
         public PacketType PacketType => PacketType.Event;
 

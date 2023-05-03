@@ -5,6 +5,7 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
+using Common.Network.Data;
 
 namespace IntroServer.Server
 {
@@ -95,12 +96,9 @@ namespace IntroServer.Server
         {
         }
 
-        public void OnNetworkReceive(
-            NetPeer peer,
-            NetPacketReader reader,
-            DeliveryMethod deliveryMethod)
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
-            
+            // TODO create packet forwarding for strict nat
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
@@ -120,31 +118,23 @@ namespace IntroServer.Server
         {
             try
             {
-                string[] data = token.Split('%');
-
-                if (data.Length != 2)
+                if(ConnectionToken.TryParse(token, out var connectionToken) == false)
                 {
-                    _logger.LogWarning("Invalid token format from {endpoint}: {token}", remoteEndPoint, token);
+                    _logger.LogWarning("Unable to parse token: {tokenString}", token);
                     return;
                 }
 
-                string instance = data[0];
-                if (Guid.TryParse(data[1], out Guid id) == false)
-                {
-                    _logger.LogWarning("Invalid Guid format from {endpoint}: {token}", remoteEndPoint, token);
-                    return;
-                }
+                var instance = connectionToken.InstanceName;
+                var id = connectionToken.PeerId;
 
                 if (_peerRegistry.ContainsP2PPeer(instance, id))
                 {
                     return;
                 }
 
-                
-
                 foreach (var existingPeer in _peerRegistry.GetPeersInInstance(instance))
                 {
-                    var p2pSetting = existingPeer.ExternalAddr.Address == remoteEndPoint.Address ? "Internal" : "External";
+                    
 
                     if(existingPeer.ExternalAddr.Address == remoteEndPoint.Address)
                     {
@@ -155,8 +145,8 @@ namespace IntroServer.Server
                         _logger.LogInformation("Connecting externally {LocalAgent} to {Peer}", remoteEndPoint, existingPeer.ExternalAddr);
                     }
 
-
-                    var newToken = string.Join("%", p2pSetting, token);
+                    var p2pNatType = existingPeer.ExternalAddr.Address == remoteEndPoint.Address ? NatAddressType.Internal : NatAddressType.External;
+                    var newToken = new ConnectionToken(id, instance, p2pNatType);
 
                     
                     _netManager.NatPunchModule.NatIntroduce(

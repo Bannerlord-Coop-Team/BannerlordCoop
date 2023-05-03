@@ -1,17 +1,8 @@
-﻿using Common.Messaging;
-using Common.Network;
-using GameInterface.Serialization;
+﻿using Common;
+using Common.Messaging;
 using HarmonyLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Network;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.Core;
-using TaleWorlds.Engine;
-using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Patches
@@ -31,6 +22,15 @@ namespace Missions.Services.Agents.Patches
 
             // publish the event
             MessageBroker.Instance.Publish(attacker, agentDamageData);
+        }
+
+        public static void OverrideAgentDamage(Agent victim, Blow blow, AttackCollisionData collisionData)
+        {
+            var original = AccessTools.Method(typeof(Agent), nameof(Agent.RegisterBlow));
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                original.Invoke(victim, new object[] { blow, collisionData });
+            });
         }
     }
 

@@ -36,8 +36,8 @@
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Lib.Harmony.2.2.2\lib\net472\0Harmony.dll</HintPath>
     </Reference>
-    <Reference Include="Autofac, Version=7.0.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
-      <HintPath>..\packages\Autofac.7.0.0\lib\netstandard2.0\Autofac.dll</HintPath>
+    <Reference Include="Autofac, Version=7.0.1.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autofac.7.0.1\lib\netstandard2.0\Autofac.dll</HintPath>
     </Reference>
     <Reference Include="LiteNetLib, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\LiteNetLib.0.9.5.2\lib\net35\LiteNetLib.dll</HintPath>
@@ -154,6 +154,7 @@
     <Compile Include="Services\Agents\Handlers\ShieldDamageHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkAgentDamaged.cs" />
     <Compile Include="Services\Agents\Messages\NetworkShieldBreak.cs" />
     <Compile Include="Services\Agents\Messages\NetworkWeaponDropped.cs" />
     <Compile Include="Services\Agents\Messages\NetworkWeaponPickedup.cs" />
@@ -175,7 +176,7 @@
     <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
     <Compile Include="Services\Missiles\Message\AgentShoot.cs" />
     <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
-    <Compile Include="Services\Agents\Messages\NetworkAgentDamaged.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkDamageAgent.cs" />
     <Compile Include="Services\Agents\Messages\AgentDied.cs" />
     <Compile Include="Services\Agents\Patches\AgentDamagePatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentKilledPatch.cs" />
@@ -183,7 +184,6 @@
     <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
     <Compile Include="Services\Missiles\NetworkMissileRegistry.cs" />
     <Compile Include="Services\Missiles\Patches\MissileAuxPatches.cs" />
-    <Compile Include="Services\Network\Data\ConnectionToken.cs" />
     <Compile Include="Services\Network\EventQueueManager.cs" />
     <Compile Include="Services\Network\Messages\PeerReady.cs" />
     <Compile Include="Services\Network\Data\AiAgentData.cs" />

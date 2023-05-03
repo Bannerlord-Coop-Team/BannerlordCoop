@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Network.Data;
 using Common.PacketHandlers;
 using Common.Serialization;
 using IntroServer.Config;
@@ -9,7 +10,6 @@ using IntroServer.Data;
 using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
-using Missions.Services.Network.Data;
 using Missions.Services.Network.Messages;
 using Serilog;
 using Serilog.Events;
@@ -198,11 +198,15 @@ namespace Missions.Services.Network
 
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
-            if (ConnectionToken.TryParse(token, out var connectionToken) == false) return;
+            if (ConnectionToken.TryParse(token, out var connectionToken) == false)
+            {
+                Logger.Warning("Unable to parse connection token: {tokenString}", token);
+                return;
+            }
 
             if (type == connectionToken.NatType)
             {
-                Logger.Verbose("Connecting P2P: {TargetEndPoint}", targetEndPoint);
+                Logger.Information("Connecting P2P: {TargetEndPoint}", targetEndPoint);
                 netManager.Connect(targetEndPoint, token);
             }
             else
@@ -244,7 +248,7 @@ namespace Missions.Services.Network
         {
             Logger.Error("Network error {socketError} sending to {endpoint}", socketError, endPoint);
         }
-        
+
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());

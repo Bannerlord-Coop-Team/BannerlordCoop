@@ -72,13 +72,13 @@ namespace IntroductionServerTests
 
             var attackerGuid = Guid.NewGuid();
 
-            NetworkAgentDamaged missionJoinInfo = new NetworkAgentDamaged(attackerGuid, default, default, default);
+            NetworkDamageAgent missionJoinInfo = new NetworkDamageAgent(attackerGuid, default, default, default);
 
             byte[] bytes = ProtoBufSerializer.Serialize(missionJoinInfo);
 
             Assert.NotNull(bytes);
 
-            NetworkAgentDamaged newEvent = (NetworkAgentDamaged)ProtoBufSerializer.Deserialize(bytes);
+            NetworkDamageAgent newEvent = (NetworkDamageAgent)ProtoBufSerializer.Deserialize(bytes);
 
             Assert.Equal(attackerGuid, newEvent.AttackerAgentId);
         }

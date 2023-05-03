@@ -1,13 +1,7 @@
-﻿using LiteNetLib;
-using Missions.Services.Network.Data;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Xunit;
+﻿using Common.Network.Data;
+using LiteNetLib;
 
-namespace IntroductionServerTests.Services.Network.Data
+namespace Common.Tests.Data
 {
     public class ConnectionTokenTests
     {
@@ -55,6 +49,25 @@ namespace IntroductionServerTests.Services.Network.Data
             instanceName = string.Empty;
 
             Assert.Throws<ArgumentException>(() => new ConnectionToken(peerId, instanceName, natType));
+        }
+
+        [Fact]
+        public void Stringify_Full()
+        {
+            // Arrange
+            Guid peerId = Guid.NewGuid();
+            string instanceName = "TestString";
+            NatAddressType natType = NatAddressType.Internal;
+
+            // Act & Assert
+
+            ConnectionToken connectionToken = new ConnectionToken(peerId, instanceName, natType);
+
+            string connectionTokenString = connectionToken;
+
+            ConnectionToken resolvedToken = connectionTokenString;
+
+            Assert.Equal(resolvedToken, connectionToken);
         }
     }
 }

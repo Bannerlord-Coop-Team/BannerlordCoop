@@ -6,6 +6,7 @@ using GameInterface.Serialization;
 using LiteNetLib;
 using Missions.Services.Agents.Messages;
 using Missions.Services.Agents.Packets;
+using Missions.Services.Agents.Patches;
 using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
@@ -40,7 +41,8 @@ namespace Missions.Services.Agents.Handlers
             this.networkMessageBroker = networkMessageBroker;
             this.networkMissileRegistry = networkMissileRegistry;
 
-            networkMessageBroker.Subscribe<AgentDamaged>(AgentDamageSend);
+            networkMessageBroker.Subscribe<AgentDamaged>(AgentDamageCheckSend);
+            networkMessageBroker.Subscribe<NetworkDamageAgent>(AgentDamageCheck);
             networkMessageBroker.Subscribe<NetworkAgentDamaged>(AgentDamageRecieve);
         }
         ~AgentDamageHandler()
@@ -49,11 +51,12 @@ namespace Missions.Services.Agents.Handlers
         }
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<AgentDamaged>(AgentDamageSend);
+            networkMessageBroker.Unsubscribe<AgentDamaged>(AgentDamageCheckSend);
+            networkMessageBroker.Unsubscribe<NetworkDamageAgent>(AgentDamageCheck);
             networkMessageBroker.Unsubscribe<NetworkAgentDamaged>(AgentDamageRecieve);
         }
 
-        private void AgentDamageSend(MessagePayload<AgentDamaged> payload)
+        private void AgentDamageCheckSend(MessagePayload<AgentDamaged> payload)
         {
 
             // first, check if the attacker exists in the agent to ID groud, if not, no networking is needed (not a network agent)
@@ -68,13 +71,43 @@ namespace Missions.Services.Agents.Handlers
                 return;
             };
 
-            NetworkAgentDamaged message = new NetworkAgentDamaged(
+            // Handles friend fire event
+            if (networkAgentRegistry.IsControlled(victimId))
+            {
+                NetworkAgentDamaged friendlyFireMessage = new NetworkAgentDamaged(
+                    attackerId,
+                    victimId,
+                    payload.What.AttackCollisionData,
+                    payload.What.Blow);
+                networkMessageBroker.PublishNetworkEvent(friendlyFireMessage);
+                return;
+            }
+
+                if (networkAgentRegistry.TryGetExternalController(payload.What.VictimAgent, out NetPeer netPeer) == false) return;
+
+            NetworkDamageAgent message = new NetworkDamageAgent(
                 attackerId, 
                 victimId, 
                 payload.What.AttackCollisionData, 
                 payload.What.Blow);
 
-            networkMessageBroker.PublishNetworkEvent(message);
+            networkMessageBroker.PublishNetworkEvent(netPeer, message);
+        }
+
+        private void AgentDamageCheck(MessagePayload<NetworkDamageAgent> payload)
+        {
+            if (networkAgentRegistry.TryGetAgent(payload.What.VictimAgentId, out Agent resolvedAgent) == false) return;
+
+            if (resolvedAgent.Health <= 0) return;
+
+            NetworkAgentDamaged message = new NetworkAgentDamaged(
+                payload.What.AttackerAgentId,
+                payload.What.VictimAgentId,
+                payload.What.AttackCollisionData,
+                payload.What.Blow);
+
+            networkMessageBroker.PublishNetworkEventExcept((NetPeer)payload.Who, message);
+            AgentDamagePatch.OverrideAgentDamage(resolvedAgent, payload.What.Blow, payload.What.AttackCollisionData);
         }
 
         private void AgentDamageRecieve(MessagePayload<NetworkAgentDamaged> payload)

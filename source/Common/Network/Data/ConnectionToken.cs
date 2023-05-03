@@ -3,7 +3,7 @@ using LiteNetLib;
 using Serilog;
 using System;
 
-namespace Missions.Services.Network.Data
+namespace Common.Network.Data
 {
     /// <summary>
     /// Represents a connection token containing information required for connecting to a game instance.
@@ -54,6 +54,24 @@ namespace Missions.Services.Network.Data
             }
 
             return false;
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (obj is ConnectionToken == false) return false;
+
+            ConnectionToken token = (ConnectionToken)obj;
+
+            if (token.InstanceName != InstanceName) return false;
+            if (token.NatType != NatType) return false;
+            if (token.PeerId != PeerId) return false;
+
+            return true;
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
         }
 
         public static implicit operator ConnectionToken(string tokenString)
