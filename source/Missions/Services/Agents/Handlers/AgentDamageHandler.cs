@@ -83,7 +83,11 @@ namespace Missions.Services.Agents.Handlers
                 return;
             }
 
-                if (networkAgentRegistry.TryGetExternalController(payload.What.VictimAgent, out NetPeer netPeer) == false) return;
+            if (networkAgentRegistry.TryGetExternalController(payload.What.VictimAgent, out NetPeer netPeer) == false)
+            {
+                Logger.Error("Could not get ExternalController for " + payload.What.VictimAgent.Name);
+                return;
+            }
 
             NetworkDamageAgent message = new NetworkDamageAgent(
                 attackerId, 
