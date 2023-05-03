@@ -7,15 +7,15 @@ namespace GameInterface.Services.MobileParties.Data
     public readonly struct TargetPositionData
     {
         [ProtoMember(1)]
-        public string ControlledHeroId { get; }
+        public string PartyId { get; }
         [ProtoMember(2)]
         public float TargetPositionX { get; }
         [ProtoMember(3)]
         public float TargetPositionY { get; }
 
-        public TargetPositionData(string controlledHeroId, float targetPositionX, float targetPositionY)
+        public TargetPositionData(string partyId, float targetPositionX, float targetPositionY)
         {
-            ControlledHeroId = controlledHeroId;
+            PartyId = partyId;
             TargetPositionX = targetPositionX;
             TargetPositionY = targetPositionY;
         }

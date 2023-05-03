@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Serialization;
 using GameInterface.Services;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
@@ -26,12 +27,8 @@ namespace GameInterface
                    .As<IHeroRegistry>()
                    .InstancePerLifetimeScope();
 
-            builder.RegisterType<ControlledHeroRegistry>()
-                   .As<IControlledHeroRegistry>()
-                   .InstancePerLifetimeScope();
-
-            builder.RegisterType<ControlledPartyRegistry>()
-                   .As<IControlledPartyRegistry>()
+            builder.RegisterType<ControlledEntityRegistery>()
+                   .As<IControlledEntityRegistery>()
                    .InstancePerLifetimeScope();
         }
     }

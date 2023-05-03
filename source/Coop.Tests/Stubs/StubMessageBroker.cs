@@ -1,10 +1,8 @@
 ﻿using Common.Messaging;
-using System;
-using System.Linq;
 
 namespace Coop.Tests.Stubs
 {
-    public class MessageBrokerStub : MessageBroker
+    public class StubMessageBroker : MessageBroker
     {
         public int GetTotalSubscribers()
         {
@@ -23,7 +21,6 @@ namespace Coop.Tests.Stubs
             {
                 return;
             }
-
             var delegates = _subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);

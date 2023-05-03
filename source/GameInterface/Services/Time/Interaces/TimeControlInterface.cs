@@ -1,19 +1,5 @@
-﻿using Common.Messaging;
-using Common.Serialization;
-using GameInterface.Serialization.External;
-using GameInterface.Serialization;
-using GameInterface.Services.CharacterCreation.Messages;
-using SandBox;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using GameInterface.Services.Time.Patches;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.ObjectSystem;
-using System.Reflection;
-using GameInterface.Services.Time.Patches;
 
 namespace GameInterface.Services.Heroes.Interfaces
 {
@@ -26,7 +12,7 @@ namespace GameInterface.Services.Heroes.Interfaces
 
     internal class TimeControlInterface : ITimeControlInterface
     {
-        internal static bool TimeLock = true;
+        internal static bool IsTimeLocked = true;
 
         public void PauseAndDisableTimeControls()
         {
@@ -34,16 +20,18 @@ namespace GameInterface.Services.Heroes.Interfaces
 
             Campaign.Current.SetTimeControlModeLock(false);
             Campaign.Current.TimeControlMode = CampaignTimeControlMode.Stop;
-            TimeLock = true;
+            IsTimeLocked = true;
         }
 
         public void EnableTimeControls()
         {
-            TimeLock = false;
+            IsTimeLocked = false;
         }
 
         public void SetTimeControl(CampaignTimeControlMode newMode)
         {
+            if (IsTimeLocked) return;
+
             TimePatches.OverrideTimeControlMode(Campaign.Current, newMode);
         }
     }

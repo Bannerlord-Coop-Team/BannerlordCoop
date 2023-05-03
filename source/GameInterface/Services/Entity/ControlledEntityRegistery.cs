@@ -1,17 +1,12 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Entity.Data;
-using GameInterface.Services.MobileParties;
-using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace GameInterface.Services.Entity
 {
@@ -22,9 +17,9 @@ namespace GameInterface.Services.Entity
     internal interface IControlledEntityRegistery
     {
         /// <summary>
-        /// Ownership id associated with this game instance
+        /// Owner id of the current client or server that instantiated this object.
         /// </summary>
-        Guid OwnershipId { get; set; }
+        Guid InstanceOwnerId { get; set; }
 
         /// <summary>
         /// Packages an immutable dictionary of controlled entities
@@ -81,9 +76,10 @@ namespace GameInterface.Services.Entity
 
     internal class ControlledEntityRegistery : IControlledEntityRegistery
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<ControlledPartyRegistry>();
+        private static readonly ILogger Logger = LogManager.GetLogger<ControlledEntityRegistery>();
 
-        public Guid OwnershipId { get; set; }
+        public Guid InstanceOwnerId { get; set; }
+
         private ConcurrentDictionary<Guid, HashSet<ControlledEntity>> controlledEntities = new ConcurrentDictionary<Guid, HashSet<ControlledEntity>>();
 
         private ConcurrentDictionary<string, ControlledEntity> controllerIdLookup = new ConcurrentDictionary<string, ControlledEntity>();
@@ -111,7 +107,7 @@ namespace GameInterface.Services.Entity
         {
             if(controllerIdLookup.TryGetValue(entityId, out var entity) == false) return false;
 
-            return entity.Equals(OwnershipId);
+            return entity.Equals(instanceOwnerId);
         }
 
         public bool RegisterAsControlled(Guid ownerId, string entityId) => RegisterAsControlled(ownerId, entityId, out var _);

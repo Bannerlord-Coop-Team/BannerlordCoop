@@ -13,11 +13,11 @@ namespace GameInterface.Services.Time.Messages
             switch (newControlMode)
             {
                 case CampaignTimeControlMode.Stop:
+                case CampaignTimeControlMode.FastForwardStop:
                     NewControlMode = TimeControlEnum.Pause;
                     break;
                 case CampaignTimeControlMode.StoppablePlay:
                 case CampaignTimeControlMode.UnstoppablePlay:
-                case CampaignTimeControlMode.FastForwardStop: // Maybe stops fast forward? Not used atm
                     NewControlMode = TimeControlEnum.Play_1x;
                     break;
                 case CampaignTimeControlMode.UnstoppableFastForward:

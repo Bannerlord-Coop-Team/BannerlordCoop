@@ -1,14 +1,13 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Coop.Tests.Stubs;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 
-namespace Coop.Tests
+namespace Coop.Tests.Stubs
 {
-    public class NetworkMessageBrokerStub : MessageBrokerStub, INetworkMessageBroker
+    public class StubNetworkMessageBroker : StubMessageBroker, INetworkMessageBroker
     {
         protected readonly Dictionary<Type, List<Delegate>> _testSubscribers = new Dictionary<Type, List<Delegate>>();
 
