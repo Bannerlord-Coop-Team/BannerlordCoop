@@ -29,18 +29,15 @@ namespace GameInterface.Services.Heroes.Interfaces
     {
         private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
         private readonly IObjectManager objectManager;
-        private readonly IControlledHeroRegistry controlledHeroRegistry;
         private readonly IBinaryPackageFactory binaryPackageFactory;
         private readonly IMessageBroker messageBroker;
 
         public HeroInterface(
             IObjectManager objectManager,
-            IControlledHeroRegistry controlledHeroRegistry,
             IBinaryPackageFactory binaryPackageFactory,
             IMessageBroker messageBroker)
         {
             this.objectManager = objectManager;
-            this.controlledHeroRegistry = controlledHeroRegistry;
             this.binaryPackageFactory = binaryPackageFactory;
             this.messageBroker = messageBroker;
         }

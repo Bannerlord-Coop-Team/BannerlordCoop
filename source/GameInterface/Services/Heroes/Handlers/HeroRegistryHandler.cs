@@ -4,6 +4,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
+using System;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
@@ -42,12 +43,14 @@ namespace GameInterface.Services.Heroes.Handlers
 
             if (heroRegistry.TryGetValue(previousHero, out string previousHeroId))
             {
-                controlledEntityRegistery.RemoveAsControlled(previousHeroId);
+                // TODO remove old
+                // controlledEntityRegistery.RemoveAsControlled(previousHeroId);
             }
 
             if (heroRegistry.TryGetValue(newHero, out string newHeroId))
             {
-                controlledEntityRegistery.RegisterAsControlled(newHeroId);
+                // TODO register
+                // controlledEntityRegistery.RegisterAsControlled(newHeroId);
             }
         }
     }

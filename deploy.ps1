@@ -16,7 +16,6 @@ $DeployDir              = "${BaseDirWithoutQuotes}deploy\"
 $ConfigPath             = "${BaseDirWithoutQuotes}config.json"
 $TemplateDir            = "${BaseDirWithoutQuotes}template"
 $UIMovieDir             = "${BaseDirWithoutQuotes}UIMovies"
-$MBBinDir               = "${BaseDirWithoutQuotes}\mb2\bin\Win64_Shipping_Client"
 
 # create output directory structure
 New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
@@ -43,8 +42,6 @@ if(Test-Path (${BaseDir} + $config.modsDir))
     New-Item -Force -ItemType Directory -Path "${ModDir}\bin\Win64_Shipping_Client" | Out-Null
     $ModSourceDir = ${SolutionDir} + "\" + $config.name
     Get-ChildItem -Path "${ModSourceDir}" -Filter "*.dll" -Recurse -ErrorAction Ignore | Where { $_.PSIsContainer -eq $false } | Copy-Item -Destination "${ModDir}\bin\Win64_Shipping_Client"
-    $BindingRedirectFile = $config.name + ".dll.config"
-    Get-ChildItem -Path "${ModSourceDir}" -Filter $BindingRedirectFile -ErrorAction Ignore -Recurse | Copy-Item -Destination "${MBBinDir}\Bannerlord.exe.config"
     Copy-Item -Force "${DeployDir}\SubModule.xml" -Destination "${ModDir}\"
 }
 

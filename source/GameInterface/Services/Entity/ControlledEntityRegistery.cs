@@ -107,7 +107,7 @@ namespace GameInterface.Services.Entity
         {
             if(controllerIdLookup.TryGetValue(entityId, out var entity) == false) return false;
 
-            return entity.Equals(instanceOwnerId);
+            return entity.OwnerId == InstanceOwnerId;
         }
 
         public bool RegisterAsControlled(Guid ownerId, string entityId) => RegisterAsControlled(ownerId, entityId, out var _);

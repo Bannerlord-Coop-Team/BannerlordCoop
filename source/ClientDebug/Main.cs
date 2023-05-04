@@ -1,6 +1,0 @@
-﻿namespace ClientDebug
-{
-    class Main
-    {
-    }
-}

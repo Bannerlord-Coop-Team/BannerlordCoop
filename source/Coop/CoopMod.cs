@@ -191,8 +191,8 @@ namespace Coop
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             Exception ex = (Exception)e.ExceptionObject;
-            Logger.Fatal(ex, "Unhandled exception");
-            Logger.Fatal(ex.StackTrace);
+            Logger?.Fatal(ex, "Unhandled exception");
+            Logger?.Fatal(ex.StackTrace);
             Serilog.Log.CloseAndFlush();
         }
 
