@@ -237,7 +237,7 @@ namespace Missions.Services.Network
             }
             else
             {
-                ServerDisconnected serverDisconnected = new ServerDisconnected(peer, disconnectInfo);
+                ServerDisconnected serverDisconnected = new ServerDisconnected(disconnectInfo);
                 messageBroker.Publish(this, serverDisconnected);
             }
 
