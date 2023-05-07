@@ -1,14 +1,15 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using LiteNetLib;
 
 namespace Missions.Services.Network.Messages
 {
     public readonly struct ServerDisconnected : IEvent
     {
+        public DisconnectInfo DisconnectInfo { get; }
 
+        public ServerDisconnected(DisconnectInfo disconnectInfo)
+        {
+            DisconnectInfo = disconnectInfo;
+        }
     }
 }
