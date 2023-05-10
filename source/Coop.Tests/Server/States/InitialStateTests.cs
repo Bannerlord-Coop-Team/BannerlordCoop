@@ -3,7 +3,7 @@ using Moq;
 using Xunit.Abstractions;
 using Xunit;
 using Coop.Core.Server.States;
-using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using Coop.Core.Server;
 
 namespace Coop.Tests.Server.States

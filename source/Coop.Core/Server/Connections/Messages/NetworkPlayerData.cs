@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.Messages;
 using ProtoBuf;
 
 namespace Coop.Core.Server.Connections.Messages

@@ -6,6 +6,7 @@ using Common.Serialization;
 using TaleWorlds.Library;
 using Xunit;
 using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Services.Modules;
 
 namespace GameInterface.Tests
 {

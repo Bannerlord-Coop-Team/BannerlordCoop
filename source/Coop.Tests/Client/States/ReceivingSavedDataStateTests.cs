@@ -1,13 +1,13 @@
 ﻿using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
-using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Save.Data;
+using GameInterface.Services.Heroes.Data;
 using Moq;
 using System;
 using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Tests.Client.States
 {

@@ -2,8 +2,8 @@
 using Common.Network;
 using Coop.Core.Server.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
-using GameInterface.Services.Time.Enum;
-using GameInterface.Services.Time.Messages;
+using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;

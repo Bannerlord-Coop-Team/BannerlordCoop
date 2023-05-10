@@ -1,12 +1,12 @@
 ﻿using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Time.Messages;
+using GameInterface.Services.Heroes.Messages;
 using Moq;
 using Serilog;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Tests.Client.States
 {

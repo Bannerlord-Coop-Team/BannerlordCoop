@@ -1,10 +1,4 @@
-﻿using Coop.Mod.Patch.World;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Library;
+﻿using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Behaviour
 {

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GameInterface.Services.Modules;
+using System;
 
 
 namespace GameInterface.Serialization.Internal

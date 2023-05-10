@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Reflection;
+using GameInterface.Services.Modules;
 using GameInterface.Utils;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -8,6 +9,7 @@ using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using TaleWorlds.SaveSystem.Save;
 using Module = TaleWorlds.MountAndBlade.Module;
+using ModuleInfo = GameInterface.Services.Modules.ModuleInfo;
 
 namespace GameInterface.Helpers
 {

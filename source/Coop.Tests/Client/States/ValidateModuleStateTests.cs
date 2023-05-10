@@ -4,14 +4,14 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Messages;
-using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules.Messages;
-using GameInterface.Services.Time.Messages;
+using GameInterface.Services.Heroes.Messages;
 using LiteNetLib.Utils;
 using Moq;
 using System;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Tests.Client.States
 {

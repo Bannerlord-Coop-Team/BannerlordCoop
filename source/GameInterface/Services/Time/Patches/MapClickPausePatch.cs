@@ -6,35 +6,34 @@ using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Time.Patches
+namespace GameInterface.Services.Heroes.Patches;
+
+[HarmonyPatch(typeof(MapScreen))]
+internal class MapClickPausePatch
 {
-    [HarmonyPatch(typeof(MapScreen))]
-    internal class MapClickPausePatch
+    private static void SetTimeControlModeDeference(Campaign _, CampaignTimeControlMode _2)
     {
-        private static void SetTimeControlModeDeference(Campaign _, CampaignTimeControlMode _2)
+        ;
+    }
+
+    [HarmonyPatch("HandleLeftMouseButtonClick")]
+    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+    {
+        List< CodeInstruction> instrs = instructions.ToList();
+
+        MethodInfo timeControlSetter = typeof(Campaign).GetProperty(nameof(Campaign.TimeControlMode)).GetSetMethod();
+        MethodInfo deferFunction = typeof(MapClickPausePatch).GetMethod("SetTimeControlModeDeference", BindingFlags.Static | BindingFlags.NonPublic);
+
+        foreach(var instr in instructions)
         {
-            ;
-        }
-
-        [HarmonyPatch("HandleLeftMouseButtonClick")]
-        private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        {
-            List< CodeInstruction> instrs = instructions.ToList();
-
-            MethodInfo timeControlSetter = typeof(Campaign).GetProperty(nameof(Campaign.TimeControlMode)).GetSetMethod();
-            MethodInfo deferFunction = typeof(MapClickPausePatch).GetMethod("SetTimeControlModeDeference", BindingFlags.Static | BindingFlags.NonPublic);
-
-            foreach(var instr in instructions)
+            if(instr.opcode == OpCodes.Callvirt &&
+                instr.operand == timeControlSetter)
             {
-                if(instr.opcode == OpCodes.Callvirt &&
-                    instr.operand == timeControlSetter)
-                {
-                    instr.opcode = OpCodes.Call;
-                    instr.operand = deferFunction;
-                }
+                instr.opcode = OpCodes.Call;
+                instr.operand = deferFunction;
             }
-
-            return instrs;
         }
+
+        return instrs;
     }
 }

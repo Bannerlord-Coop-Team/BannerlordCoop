@@ -9,10 +9,10 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
 using Xunit;
 using GameInterface.Tests.Bootstrap.Extensions;
-using GameInterface.Services.Save.Messages;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Heroes;
-using GameInterface.Services.Save.Data;
+using GameInterface.Services.Heroes.Data;
 using System.Linq;
 using GameInterface.Services.ObjectManager;
 

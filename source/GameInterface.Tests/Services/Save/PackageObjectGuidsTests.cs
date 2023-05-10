@@ -1,11 +1,11 @@
 ﻿using Autofac;
 using Common;
 using Common.Messaging;
-using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Heroes;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Save.Messages;
+using GameInterface.Services.Registry;
+using GameInterface.Services.Heroes.Messages;
 using System;
 using System.Runtime.Serialization;
 using System.Threading;

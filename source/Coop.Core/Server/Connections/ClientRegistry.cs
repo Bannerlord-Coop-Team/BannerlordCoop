@@ -3,7 +3,7 @@ using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Core.Server.Services.Time.Messages;
-using GameInterface.Services.Time.Messages;
+using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;

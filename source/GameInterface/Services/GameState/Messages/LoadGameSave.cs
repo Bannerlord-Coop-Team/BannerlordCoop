@@ -1,27 +1,26 @@
 ﻿using Common.Messaging;
 using System;
 
-namespace GameInterface.Services.GameState.Messages
+namespace GameInterface.Services.GameState.Messages;
+
+public readonly struct LoadGameSave : ICommand
 {
-    public readonly struct LoadGameSave : ICommand
-    {
-        public Guid TransactionID { get; }
-        public byte[] SaveData { get; }
+    public Guid TransactionID { get; }
+    public byte[] SaveData { get; }
 
-        public LoadGameSave(Guid transactionID, byte[] saveData)
-        {
-            TransactionID = transactionID;
-            SaveData = saveData;
-        }
+    public LoadGameSave(Guid transactionID, byte[] saveData)
+    {
+        TransactionID = transactionID;
+        SaveData = saveData;
     }
+}
 
-    public readonly struct GameSaveLoaded : IResponse
+public readonly struct GameSaveLoaded : IResponse
+{
+    public Guid TransactionID { get; }
+
+    public GameSaveLoaded(Guid transactionID)
     {
-        public Guid TransactionID { get; }
-
-        public GameSaveLoaded(Guid transactionID)
-        {
-            TransactionID = transactionID;
-        }
+        TransactionID = transactionID;
     }
 }

@@ -1,8 +1,8 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
-using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {

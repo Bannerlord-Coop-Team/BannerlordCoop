@@ -1,9 +1,8 @@
-﻿namespace GameInterface.Services.Example
+﻿namespace GameInterface.Services.Example;
+
+/// <summary>
+/// Service for a specific game boundary
+/// </summary>
+internal interface IExampleService
 {
-    /// <summary>
-    /// Service for a specific game boundary
-    /// </summary>
-    internal interface IExampleService
-    {
-    }
 }

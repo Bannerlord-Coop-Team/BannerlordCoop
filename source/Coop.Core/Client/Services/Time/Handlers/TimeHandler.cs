@@ -3,7 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
-using GameInterface.Services.Time.Messages;
+using GameInterface.Services.Heroes.Messages;
 using Serilog;
 using Serilog.Core;
 using System;

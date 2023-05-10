@@ -1,33 +1,31 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Modules.Interfaces;
 using GameInterface.Services.Modules.Messages;
-using System;
 
-namespace GameInterface.Services.Modules.Handlers
+namespace GameInterface.Services.Modules.Handlers;
+
+internal class ModuleHandler : IHandler
 {
-    internal class ModuleHandler : IHandler
+    private readonly IModuleInterface moduleInterface;
+    private readonly IMessageBroker messageBroker;
+
+    public ModuleHandler(
+        IModuleInterface moduleInterface,
+        IMessageBroker messageBroker)
     {
-        private readonly IModuleInterface moduleInterface;
-        private readonly IMessageBroker messageBroker;
+        this.moduleInterface = moduleInterface;
+        this.messageBroker = messageBroker;
 
-        public ModuleHandler(
-            IModuleInterface moduleInterface,
-            IMessageBroker messageBroker)
-        {
-            this.moduleInterface = moduleInterface;
-            this.messageBroker = messageBroker;
+        messageBroker.Subscribe<ValidateModules>(Handle);
+    }
 
-            messageBroker.Subscribe<ValidateModules>(Handle);
-        }
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<ValidateModules>(Handle);
+    }
 
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<ValidateModules>(Handle);
-        }
-
-        private void Handle(MessagePayload<ValidateModules> obj)
-        {
-            moduleInterface.ValidateModules();
-        }
+    private void Handle(MessagePayload<ValidateModules> obj)
+    {
+        moduleInterface.ValidateModules();
     }
 }

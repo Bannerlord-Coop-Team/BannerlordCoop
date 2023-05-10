@@ -4,10 +4,9 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
-using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.Save.Data;
-using GameInterface.Services.Time.Messages;
+using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
@@ -15,6 +14,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Tests.Server.Connections.States
 {

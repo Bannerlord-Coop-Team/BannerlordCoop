@@ -2,8 +2,8 @@
 using Coop.Core.Client.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
 using Coop.Tests.Mocks;
-using GameInterface.Services.Time.Enum;
-using GameInterface.Services.Time.Messages;
+using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Messages;
 using System;
 using TaleWorlds.CampaignSystem;
 using Xunit;

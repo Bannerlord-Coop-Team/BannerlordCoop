@@ -2,7 +2,7 @@
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.Time.Messages;
+using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System.Linq;
 using System.Runtime.Serialization;

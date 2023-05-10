@@ -1,21 +1,18 @@
-﻿using Autofac;
-using GameInterface.Services;
-using HarmonyLib;
+﻿using HarmonyLib;
 using System.Reflection;
 
-namespace GameInterface
-{
-    public interface IGameInterface
-    {
-    }
+namespace GameInterface;
 
-    public class GameInterface : IGameInterface
+public interface IGameInterface
+{
+}
+
+public class GameInterface : IGameInterface
+{
+    private readonly Harmony harmony;
+    public GameInterface()
     {
-        private readonly Harmony harmony;
-        public GameInterface()
-        {
-            harmony = new Harmony("com.Coop.GameInterface");
-            harmony.PatchAll(Assembly.GetExecutingAssembly());
-        }
+        harmony = new Harmony("com.Coop.GameInterface");
+        harmony.PatchAll(Assembly.GetExecutingAssembly());
     }
 }

@@ -3,7 +3,7 @@ using Coop.Core;
 using Coop.Core.Server;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.Services.Save.Data;
-using GameInterface.Services.Save.Data;
+using GameInterface.Services.Heroes.Data;
 using System;
 using System.Collections.Generic;
 using System.IO;

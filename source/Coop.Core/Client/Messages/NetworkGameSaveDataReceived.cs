@@ -2,7 +2,7 @@
 using ProtoBuf;
 using System.Collections.Generic;
 using System;
-using GameInterface.Services.Save.Data;
+using GameInterface.Services.Heroes.Data;
 
 namespace Coop.Core.Client.Messages
 {

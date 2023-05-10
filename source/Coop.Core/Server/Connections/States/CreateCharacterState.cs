@@ -2,7 +2,7 @@
 using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Heroes.Handlers;
-using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using Serilog;
 using Serilog.Core;

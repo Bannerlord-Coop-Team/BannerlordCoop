@@ -1,27 +1,22 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
 using HarmonyLib;
 using SandBox;
 using SandBox.View.Map;
 using Serilog;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Services.GameState.Patches
+namespace GameInterface.Services.GameState.Patches;
+
+[HarmonyPatch(typeof(MapScreen))]
+internal class GameLoadedPatch
 {
-    [HarmonyPatch(typeof(MapScreen))]
-    internal class GameLoadedPatch
-    {
-        private static readonly ILogger Logger = LogManager.GetLogger<SandBoxGameManager>();
+    private static readonly ILogger Logger = LogManager.GetLogger<SandBoxGameManager>();
 
-        [HarmonyPostfix]
-        [HarmonyPatch("OnActivate")]
-        static void OnGameLoaded(ref MapScreen __instance)
-        {
-            MessageBroker.Instance.Publish(__instance, new CampaignLoaded());
-        }
+    [HarmonyPostfix]
+    [HarmonyPatch("OnActivate")]
+    static void OnGameLoaded(ref MapScreen __instance)
+    {
+        MessageBroker.Instance.Publish(__instance, new CampaignLoaded());
     }
 }

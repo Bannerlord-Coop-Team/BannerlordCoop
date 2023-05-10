@@ -1,32 +1,31 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Time.Enum;
+using GameInterface.Services.Heroes.Enum;
 using System;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Time.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+public readonly struct TimeSpeedChanged : IEvent
 {
-    public readonly struct TimeSpeedChanged : IEvent
+    public TimeControlEnum NewControlMode { get; }
+    public TimeSpeedChanged(CampaignTimeControlMode newControlMode)
     {
-        public TimeControlEnum NewControlMode { get; }
-        public TimeSpeedChanged(CampaignTimeControlMode newControlMode)
+        switch (newControlMode)
         {
-            switch (newControlMode)
-            {
-                case CampaignTimeControlMode.Stop:
-                case CampaignTimeControlMode.FastForwardStop:
-                    NewControlMode = TimeControlEnum.Pause;
-                    break;
-                case CampaignTimeControlMode.StoppablePlay:
-                case CampaignTimeControlMode.UnstoppablePlay:
-                    NewControlMode = TimeControlEnum.Play_1x;
-                    break;
-                case CampaignTimeControlMode.UnstoppableFastForward:
-                case CampaignTimeControlMode.StoppableFastForward:
-                    NewControlMode = TimeControlEnum.Play_2x;
-                    break;
-                default:
-                    throw new InvalidCastException($"{newControlMode} could not be converted to {nameof(TimeControlEnum)}");
-            }
+            case CampaignTimeControlMode.Stop:
+            case CampaignTimeControlMode.FastForwardStop:
+                NewControlMode = TimeControlEnum.Pause;
+                break;
+            case CampaignTimeControlMode.StoppablePlay:
+            case CampaignTimeControlMode.UnstoppablePlay:
+                NewControlMode = TimeControlEnum.Play_1x;
+                break;
+            case CampaignTimeControlMode.UnstoppableFastForward:
+            case CampaignTimeControlMode.StoppableFastForward:
+                NewControlMode = TimeControlEnum.Play_2x;
+                break;
+            default:
+                throw new InvalidCastException($"{newControlMode} could not be converted to {nameof(TimeControlEnum)}");
         }
     }
 }

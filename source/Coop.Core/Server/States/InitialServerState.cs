@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.MobileParties.Messages;
 
 namespace Coop.Core.Server.States
 {

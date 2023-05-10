@@ -1,9 +1,7 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Save.Data;
-using GameInterface.Services.Time.Messages;
+using GameInterface.Services.Heroes.Messages;
 using System;
 
 namespace Coop.Core.Server.Connections.States
@@ -40,7 +38,7 @@ namespace Coop.Core.Server.Connections.States
                 var networkEvent = new NetworkGameSaveDataReceived(
                     payload.GameSaveData,
                     payload.CampaignID,
-                    payload.GameObjectGuids);
+                    null); // TODO manage controlled objects
 
                 ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(peer, networkEvent);
 

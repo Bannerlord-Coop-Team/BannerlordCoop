@@ -1,10 +1,11 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Messages;
-using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.Heroes.Handlers;
-using GameInterface.Services.Save.Messages;
+using GameInterface.Services.Heroes.Messages;
 using System;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States
 {

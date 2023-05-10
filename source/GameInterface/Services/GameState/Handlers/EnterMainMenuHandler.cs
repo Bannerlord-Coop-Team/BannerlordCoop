@@ -2,31 +2,30 @@
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 
-namespace GameInterface.Services.GameState.Handlers
+namespace GameInterface.Services.GameState.Handlers;
+
+internal class EnterMainMenuHandler : IHandler
 {
-    internal class EnterMainMenuHandler : IHandler
+    private readonly IGameStateInterface gameStateInterface;
+    private readonly IMessageBroker messageBroker;
+
+    public EnterMainMenuHandler(IGameStateInterface gameStateInterface, IMessageBroker messageBroker)
     {
-        private readonly IGameStateInterface gameStateInterface;
-        private readonly IMessageBroker messageBroker;
+        this.gameStateInterface = gameStateInterface;
+        this.messageBroker = messageBroker;
 
-        public EnterMainMenuHandler(IGameStateInterface gameStateInterface, IMessageBroker messageBroker)
-        {
-            this.gameStateInterface = gameStateInterface;
-            this.messageBroker = messageBroker;
+        messageBroker.Subscribe<EnterMainMenu>(Handle);
+    }
 
-            messageBroker.Subscribe<EnterMainMenu>(Handle);
-        }
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<EnterMainMenu>(Handle);
+    }
 
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<EnterMainMenu>(Handle);
-        }
+    private void Handle(MessagePayload<EnterMainMenu> payload)
+    {
+        gameStateInterface.EnterMainMenu();
 
-        private void Handle(MessagePayload<EnterMainMenu> payload)
-        {
-            gameStateInterface.EnterMainMenu();
-
-            messageBroker.Publish(this, new MainMenuEntered());
-        }
+        messageBroker.Publish(this, new MainMenuEntered());
     }
 }

@@ -1,14 +1,11 @@
-﻿using System;
+﻿namespace GameInterface.Services.Heroes.Messages;
 
-namespace GameInterface.Services.Heroes.Messages
+public readonly struct SwitchToHero
 {
-    public readonly struct SwitchToHero
-    {
-        public string HeroId { get; }
+    public string HeroId { get; }
 
-        public SwitchToHero(string heroId)
-        {
-            HeroId = heroId;
-        }
+    public SwitchToHero(string heroId)
+    {
+        HeroId = heroId;
     }
 }
