@@ -2,7 +2,6 @@
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System.Linq;
 using System.Runtime.Serialization;
@@ -14,8 +13,8 @@ namespace Coop.Tests.Server.Connections.States
     public class ClientRegistryTests : CoopTest
     {
         private readonly ClientRegistry clientStateOrchestrator;
-        private readonly NetPeer _playerId = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
-        private readonly NetPeer _differentPlayer = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
+        private readonly NetPeer _playerId = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        private readonly NetPeer _differentPlayer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
         public ClientRegistryTests(ITestOutputHelper output) : base(output)
         {
             clientStateOrchestrator = new ClientRegistry(StubNetworkMessageBroker);

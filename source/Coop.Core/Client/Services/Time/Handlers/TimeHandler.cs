@@ -30,6 +30,8 @@ namespace Coop.Core.Client.Services.Time.Handlers
         {
             networkMessageBroker.Unsubscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
             networkMessageBroker.Unsubscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
+
+            networkMessageBroker.Unsubscribe<NetworkEnableTimeControls>(Handle_NetworkEnableTimeControls);
         }
 
         internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChanged> obj)

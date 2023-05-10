@@ -4,6 +4,7 @@ using Coop.Core.Client.Messages;
 using GameInterface.Services.Heroes.Handlers;
 using System;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler
 {

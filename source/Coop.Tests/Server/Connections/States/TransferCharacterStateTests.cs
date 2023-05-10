@@ -1,28 +1,23 @@
-﻿using Common.Serialization;
-using Coop.Core.Client.Messages;
+﻿using Coop.Core.Client.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
-using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
 using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
-using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Tests.Server.Connections.States
 {
     public class TransferCharacterStateTests : CoopTest
     {
         private readonly IConnectionLogic _connectionLogic;
-        private readonly NetPeer _playerId = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
-        private readonly NetPeer _differentPlayer = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
+        private readonly NetPeer _playerId = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        private readonly NetPeer _differentPlayer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
 
         public TransferCharacterStateTests(ITestOutputHelper output) : base(output)
         {
@@ -126,8 +121,7 @@ namespace Coop.Tests.Server.Connections.States
             var message = new GameSaveDataPackaged(
                 transactionId,
                 Array.Empty<byte>(),
-                "TestCampaingId",
-                gameObjectGuids);
+                "TestCampaingId");
 
             StubMessageBroker.Publish(_playerId, message);
 
@@ -150,8 +144,7 @@ namespace Coop.Tests.Server.Connections.States
             var message = new GameSaveDataPackaged(
                 Guid.NewGuid(),
                 Array.Empty<byte>(),
-                "TestCampaingId",
-                default);
+                "TestCampaingId");
 
             StubMessageBroker.Publish(_playerId, message);
 

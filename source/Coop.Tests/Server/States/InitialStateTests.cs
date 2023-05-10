@@ -1,10 +1,10 @@
-﻿using GameInterface.Services.GameDebug.Messages;
-using Moq;
-using Xunit.Abstractions;
-using Xunit;
+﻿using Coop.Core.Server;
 using Coop.Core.Server.States;
-using GameInterface.Services.MobileParties.Messages;
-using Coop.Core.Server;
+using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.GameState.Messages;
+using Moq;
+using Xunit;
+using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.States
 {

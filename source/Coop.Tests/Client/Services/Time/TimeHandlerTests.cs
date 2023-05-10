@@ -22,7 +22,7 @@ namespace Coop.Tests.Client.Services.Time
             var handler = new TimeHandler(broker);
 
             // Assert
-            Assert.Equal(2, broker.Subscriptions.Count);
+            Assert.Equal(3, broker.Subscriptions.Count);
         }
 
         [Fact]

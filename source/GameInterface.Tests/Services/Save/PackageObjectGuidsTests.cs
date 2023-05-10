@@ -12,6 +12,7 @@ using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit;
+using GameInterface.Services.Entity;
 
 namespace GameInterface.Tests.Services.Save
 {
@@ -33,7 +34,6 @@ namespace GameInterface.Tests.Services.Save
         {
             // TODO Not transiant so it break with other tests
             var objectManager = _container.Resolve<IObjectManager>();
-            var controlledHeros = _container.Resolve<IControlledHeroRegistry>();
 
             for (int i = numHeroes; i < numControlledHeroes + numHeroes; i++)
             {
@@ -43,42 +43,8 @@ namespace GameInterface.Tests.Services.Save
                 objectManager.AddExisting(hero.StringId, hero);
 
                 // Ensure hero was registered
-                Assert.True(objectManager.TryGetId(hero, out string heroId));
-
-                controlledHeros.RegisterAsControlled(heroId);
+                Assert.True(objectManager.TryGetId(hero, out string _));
             }
-        }
-
-        [Fact]
-        public void ResolveObjectGuids()
-        {
-            AutoResetEvent autoResetEvent = new AutoResetEvent(false);
-
-            var partyRegistry = _container.Resolve<IMobilePartyRegistry>();
-            var heroRegistry = _container.Resolve<IHeroRegistry>();
-            var controlledHeros = _container.Resolve<IControlledHeroRegistry>();
-
-            SetupRegistries(2, 2, 2);
-
-            // Setup callback
-            ObjectGuidsPackaged payload = default;
-            _messageBroker.Subscribe<ObjectGuidsPackaged>((msg) =>
-            {
-                autoResetEvent.Set();
-                payload = msg.What;
-            });
-
-            // Execution
-            var transactionId = Guid.NewGuid();
-            _messageBroker.Publish(this, new PackageObjectGuids(transactionId));
-
-            // Verification
-            // Wait for callback with 1 sec timeout
-            Assert.True(autoResetEvent.WaitOne(TimeSpan.FromSeconds(1)));
-
-            Assert.Equal(transactionId, payload.TransactionID);
-
-            Assert.Equal(controlledHeros.ControlledHeros.Count, payload.GameObjectGuids.ControlledHeros.Length);
         }
     }
 }

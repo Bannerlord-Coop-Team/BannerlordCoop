@@ -22,7 +22,7 @@ namespace GameInterface.Tests
             // Assert
             Assert.Equal(0, myClass.MyFn());
 
-            Assert.Equal(1, original.Invoke(myClass, Array.Empty<object>()));
+            Assert.Equal(1, MyPatch.CallOriginal(myClass));
         }
     }
 
@@ -35,12 +35,29 @@ namespace GameInterface.Tests
         }
     }
 
-    [HarmonyPatch]
     public class MyPatch
     {
-        public static bool Prefix()
+        private static object _lock = new object();
+        private static MyClass? _allowedInstance;
+
+        public static bool Prefix(ref MyClass __instance)
         {
+            if(__instance == _allowedInstance)
+            {
+                return true;
+            }
             return false;
+        }
+        
+        public static int CallOriginal(MyClass instance)
+        {
+            lock (_lock)
+            {
+                _allowedInstance = instance;
+                int result = instance.MyFn();
+                _allowedInstance = null;
+                return result;
+            }
         }
     }
 
