@@ -30,9 +30,9 @@ jobs:
       - name: Build Solution
         run: |
           cd BannerlordCoop/source
-          dotnet build
+          dotnet build Coop.Core -c Release
           
       - name: Run Unit Tests
         run: |
           cd BannerlordCoop/source
-          dotnet test
+          dotnet test -c Release

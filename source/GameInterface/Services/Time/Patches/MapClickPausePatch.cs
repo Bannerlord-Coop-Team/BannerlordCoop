@@ -27,7 +27,7 @@ internal class MapClickPausePatch
         foreach(var instr in instructions)
         {
             if(instr.opcode == OpCodes.Callvirt &&
-                instr.operand == timeControlSetter)
+                instr.operand as MethodInfo == timeControlSetter)
             {
                 instr.opcode = OpCodes.Call;
                 instr.operand = deferFunction;
