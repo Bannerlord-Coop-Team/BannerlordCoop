@@ -2,7 +2,6 @@
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace Common.Messaging
@@ -20,20 +19,20 @@ namespace Common.Messaging
     {
         private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
         protected static MessageBroker _instance;
-        protected readonly Dictionary<Type, List<Delegate>> _subscribers;
+        protected readonly Dictionary<Type, ConcurrentList<WeakDelegate>> _subscribers;
         public static MessageBroker Instance => _instance;
 
         public MessageBroker()
         {
-            _subscribers = new Dictionary<Type, List<Delegate>>();
+            _subscribers = new Dictionary<Type, ConcurrentList<WeakDelegate>>();
         }
 
         public virtual void Publish<T>(object source, T message)
         {
-            if (message == null || source == null)
+            if (message == null)
                 return;
 
-            Logger.Verbose($"Publishing {message.GetType().Name} from {source.GetType().Name}");
+            Logger.Verbose($"Publishing {message.GetType().Name} from {source?.GetType().Name}");
 
             if (!_subscribers.ContainsKey(typeof(T)))
             {
@@ -43,17 +42,23 @@ namespace Common.Messaging
             var delegates = _subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);
-            foreach (var handler in delegates.Select
-            (item => item as Action<MessagePayload<T>>))
+            for(int i = 0; i < delegates.Count; i++)
             {
-                Task.Factory.StartNew(() => handler?.Invoke(payload));
+                var weakDelegate = delegates[i];
+                if (weakDelegate.IsAlive == false)
+                {
+                    delegates.RemoveAt(i--);
+                    continue;
+                }
+                
+                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
             }
         }
 
         public virtual void Subscribe<T>(Action<MessagePayload<T>> subscription)
         {
             var delegates = _subscribers.ContainsKey(typeof(T)) ?
-                            _subscribers[typeof(T)] : new List<Delegate>();
+                            _subscribers[typeof(T)] : new ConcurrentList<WeakDelegate>();
             if (!delegates.Contains(subscription))
             {
                 delegates.Add(subscription);
@@ -63,9 +68,10 @@ namespace Common.Messaging
 
         public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
         {
+            
             if (!_subscribers.ContainsKey(typeof(T))) return;
             var delegates = _subscribers[typeof(T)];
-            if (delegates.Contains(subscription))
+            if (delegates.Contains(new WeakDelegate(subscription)))
                 delegates.Remove(subscription);
             if (delegates.Count == 0)
                 _subscribers.Remove(typeof(T));

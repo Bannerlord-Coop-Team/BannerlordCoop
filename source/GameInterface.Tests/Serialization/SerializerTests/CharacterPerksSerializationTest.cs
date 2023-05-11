@@ -1,20 +1,31 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CharacterPerksSerializationTest
     {
+        IContainer container;
         public CharacterPerksSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -22,7 +33,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             CharacterPerks CharacterPerks = new CharacterPerks();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterPerksBinaryPackage package = new CharacterPerksBinaryPackage(CharacterPerks, factory);
 
             package.Pack();
@@ -37,18 +48,19 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void CharacterPerks_Full_Serialization()
         {
             CharacterPerks characterPerks = new CharacterPerks();
+            var objectManager = container.Resolve<IObjectManager>();
 
             characterPerks.StringId = "myCharacterPerks";
 
-            MBObjectManager.Instance.RegisterObject(characterPerks);
+            objectManager.AddExisting(characterPerks.StringId, characterPerks);
 
             PerkObject perk1 = new PerkObject("MyPerk");
             PerkObject perk2 = new PerkObject("MyPerk2");
             PerkObject perk3 = new PerkObject("MyPerk3");
 
-            MBObjectManager.Instance.RegisterObject(perk1);
-            MBObjectManager.Instance.RegisterObject(perk2);
-            MBObjectManager.Instance.RegisterObject(perk3);
+            objectManager.AddExisting(perk1.StringId, perk1);
+            objectManager.AddExisting(perk2.StringId, perk2);
+            objectManager.AddExisting(perk3.StringId, perk3);
 
             Dictionary<PerkObject, int> perks = new Dictionary<PerkObject, int>
             {
@@ -59,7 +71,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             _attributes.SetValue(characterPerks, perks);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterPerksBinaryPackage package = new CharacterPerksBinaryPackage(characterPerks, factory);
 
             package.Pack();
@@ -74,7 +86,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CharacterPerksBinaryPackage returnedPackage = (CharacterPerksBinaryPackage)obj;
 
-            CharacterPerks newCharacterPerks = returnedPackage.Unpack<CharacterPerks>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CharacterPerks newCharacterPerks = returnedPackage.Unpack<CharacterPerks>(deserializeFactory);
 
             Assert.Equal(characterPerks.StringId, characterPerks.StringId);
             Assert.Equal(characterPerks.Id, characterPerks.Id);

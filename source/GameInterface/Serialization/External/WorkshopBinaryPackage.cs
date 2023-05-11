@@ -15,7 +15,7 @@ namespace GameInterface.Serialization.External
         string townId;
         int workshopIndex;
 
-        public WorkshopBinaryPackage(Workshop obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public WorkshopBinaryPackage(Workshop obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -30,7 +30,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Town town = MBObjectManager.Instance.GetObject<Town>(townId);
+            Town town = ResolveId<Town>(townId);
 
             Object = town.Workshops[workshopIndex];
         }

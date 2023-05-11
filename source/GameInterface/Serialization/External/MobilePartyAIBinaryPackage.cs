@@ -1,5 +1,4 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
@@ -12,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class MobilePartyAIBinaryPackage : BinaryPackageBase<MobilePartyAi>
     {
-        public MobilePartyAIBinaryPackage(MobilePartyAi obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public MobilePartyAIBinaryPackage(MobilePartyAi obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -31,21 +30,13 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackFields(excludes);
         }
 
         private static readonly FieldInfo MobilePartyAi_lastTargetedParties = typeof(MobilePartyAi).GetField("_lastTargetedParties", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackFields();
 
             MobilePartyAi_lastTargetedParties.SetValue(Object, new List<MobileParty>());
         }

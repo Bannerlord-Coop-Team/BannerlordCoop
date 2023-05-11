@@ -1,12 +1,12 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.Internal;
-using GameInterface.Tests.Serialization;
 using System.Collections.Generic;
-using System.Globalization;
-using TaleWorlds.CampaignSystem;
+using Common.Serialization;
 using TaleWorlds.Library;
 using Xunit;
-using Xunit.Sdk;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Services.Modules;
 
 namespace GameInterface.Tests
 {
@@ -60,13 +60,23 @@ namespace GameInterface.Tests
 
     public class CompatibilityInfo_Test
     {
+        IContainer container; 
+        public CompatibilityInfo_Test()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void GameVersionEqualsOfficialModule()
         {
             CompatibilityInfo.ModuleProvider = new TestModuleProvider();
             var compatInfo = CompatibilityInfo.Get();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CompatibilityInfoBinaryPackage package = new CompatibilityInfoBinaryPackage(compatInfo, factory);
 
             Assert.Equal(2, compatInfo.Modules.Count);
@@ -109,7 +119,7 @@ namespace GameInterface.Tests
             CompatibilityInfo.ModuleProvider = new TestModuleProvider2();
             var compatInfo2 = CompatibilityInfo.Get();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CompatibilityInfoBinaryPackage package1 = new CompatibilityInfoBinaryPackage(compatInfo1, factory);
             CompatibilityInfoBinaryPackage package2 = new CompatibilityInfoBinaryPackage(compatInfo2, factory);
 
@@ -131,7 +141,7 @@ namespace GameInterface.Tests
             CompatibilityInfo.ModuleProvider = new TestModuleProvider2();
             var compatInfo2 = CompatibilityInfo.Get();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CompatibilityInfoBinaryPackage package1 = new CompatibilityInfoBinaryPackage(compatInfo1, factory);
             CompatibilityInfoBinaryPackage package2 = new CompatibilityInfoBinaryPackage(compatInfo2, factory);
 
@@ -153,8 +163,9 @@ namespace GameInterface.Tests
             CompatibilityInfoBinaryPackage returnedPackage1 = (CompatibilityInfoBinaryPackage)obj1;
             CompatibilityInfoBinaryPackage returnedPackage2 = (CompatibilityInfoBinaryPackage)obj2;
 
-            CompatibilityInfo ret1 = returnedPackage1.Unpack<CompatibilityInfo>();
-            CompatibilityInfo ret2 = returnedPackage2.Unpack<CompatibilityInfo>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CompatibilityInfo ret1 = returnedPackage1.Unpack<CompatibilityInfo>(deserializeFactory);
+            CompatibilityInfo ret2 = returnedPackage2.Unpack<CompatibilityInfo>(deserializeFactory);
 
             Assert.False(ret1 == ret2);
             Assert.Equal(ret1, compatInfo1);

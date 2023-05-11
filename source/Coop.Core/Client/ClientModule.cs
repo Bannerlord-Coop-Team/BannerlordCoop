@@ -14,6 +14,11 @@ namespace Coop.Core.Client
         {
             builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().SingleInstance();
             builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().SingleInstance();
+
+            foreach(var handlerType in HandlerCollector.Collect<ClientModule>())
+            {
+                builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            }
             base.Load(builder);
         }
     }

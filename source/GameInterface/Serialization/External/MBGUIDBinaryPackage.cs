@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     {
         uint GuidValue;
         
-        public MBGUIDBinaryPackage(MBGUID obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public MBGUIDBinaryPackage(MBGUID obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

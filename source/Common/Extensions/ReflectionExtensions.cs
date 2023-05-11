@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace Common.Extensions
@@ -17,8 +18,10 @@ namespace Common.Extensions
         /// </remarks>
         /// <param name="domain">Domain to get types from</param>
         /// <returns>Enumarable of all domain types</returns>
-        public static IEnumerable<Type> GetDomainTypes(this AppDomain domain)
+        public static IEnumerable<Type> GetDomainTypes(this AppDomain domain, string namespacePrefix = null)
         {
+            namespacePrefix = namespacePrefix == null ? string.Empty : namespacePrefix;
+
             List<Type> types = new List<Type>();
 
             Assembly[] assemblies = domain.GetAssemblies();
@@ -28,6 +31,9 @@ namespace Common.Extensions
                 {
                     foreach (Type type in _assembly.GetTypes())
                     {
+                        if (type.Namespace == null) continue;
+                        if (type.Namespace.StartsWith(namespacePrefix) == false) continue;
+
                         types.Add(type);
                     }
                 }
@@ -45,7 +51,7 @@ namespace Common.Extensions
         /// <returns>Array of all instance fields</returns>
         public static FieldInfo[] GetAllInstanceFields(this Type type, IEnumerable<string> excluding = null)
         {
-            if(excluding == null) return GetAllFieldsRecursive(type).ToArray();
+            if (excluding == null) return GetAllFieldsRecursive(type).ToArray();
 
             HashSet<string> excludes = new HashSet<string>(excluding);
 
@@ -59,7 +65,7 @@ namespace Common.Extensions
                 {
                     excludes.Remove(field.Name);
                 }
-                else if(field.IsLiteral == false)
+                else if (field.IsLiteral == false)
                 {
                     fields.Add(field);
                 }
@@ -86,7 +92,7 @@ namespace Common.Extensions
 
             List<FieldInfo> fields = new List<FieldInfo>(type.GetFields(AllInstanceFields));
 
-            if(type.BaseType != null)
+            if (type.BaseType != null)
             {
                 fields.AddRange(GetAllFieldsRecursive(type.BaseType));
             }
@@ -201,7 +207,7 @@ namespace Common.Extensions
         {
             if (property.SetMethod == null) return;
 
-            if(TryChooseRandomType(property.PropertyType, out object newObj))
+            if (TryChooseRandomType(property.PropertyType, out object newObj))
             {
                 property.SetValue(obj, newObj);
             }
@@ -231,4 +237,6 @@ namespace Common.Extensions
             return values.GetValue(random.Next(values.Length));
         }
     }
+
+    
 }

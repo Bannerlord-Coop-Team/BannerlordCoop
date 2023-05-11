@@ -1,0 +1,36 @@
+name: Build
+
+on: 
+  push:
+    branches:
+      - development
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    container:
+      image: hulkhan/bannerlordcoop:1.0.2
+      credentials:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+    steps:
+      - name: Checkout Repo
+        run: |
+          git clone https://github.com/${{ github.repository }}
+          cd BannerlordCoop
+          git checkout "${{ github.ref_name }}"
+
+      - name: Link Game Assemblies Folder
+        run: |
+          ln -s /home/mb2 BannerlordCoop
+          
+      - name: Build Solution
+        run: |
+          cd BannerlordCoop/source
+          dotnet build
+          
+      - name: Run Unit Tests
+        run: |
+          cd BannerlordCoop/source
+          dotnet test

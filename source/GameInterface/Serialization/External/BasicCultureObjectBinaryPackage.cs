@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     {
         public string stringId;
 
-        public BasicCultureObjectBinaryPackage(BasicCultureObject obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public BasicCultureObjectBinaryPackage(BasicCultureObject obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
 
         }
@@ -19,7 +19,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<BasicCultureObject>(stringId);
+            Object = ResolveId<BasicCultureObject>(stringId);
         }
     }
 }

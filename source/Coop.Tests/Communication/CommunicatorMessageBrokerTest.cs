@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using Autofac;
+using Common;
 using Common.Messaging;
 using Xunit;
 
@@ -18,8 +19,9 @@ namespace Coop.Tests.Communication
 
             communicator.Subscribe<ExampleIncomingMessage>(payload => { });
             
-            var subscribers = typeof(MessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
-                ?.GetValue(communicator) as Dictionary<Type, List<Delegate>>;
+            var subscribers = (Dictionary<Type, ConcurrentList<WeakDelegate>>)typeof(MessageBroker)
+                .GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(communicator);
 
             if (subscribers == null)
                 throw new Exception("Subscribers dictionary couldn't not be found.");
@@ -39,8 +41,9 @@ namespace Coop.Tests.Communication
             communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler);
             communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler2);
 
-            var subscribers = typeof(MessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
-                ?.GetValue(communicator) as Dictionary<Type, List<Delegate>>;
+            var subscribers = (Dictionary<Type, ConcurrentList<WeakDelegate>>)typeof(MessageBroker)
+                .GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(communicator);
 
             // Ensure subscribers dictionary was initialized
             Assert.NotNull(subscribers);
@@ -64,8 +67,9 @@ namespace Coop.Tests.Communication
             void DelegateHandler(MessagePayload<ExampleIncomingMessage> payload) { }
             communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler);
 
-            var subscribers = typeof(MessageBroker).GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
-                ?.GetValue(communicator) as Dictionary<Type, List<Delegate>>;
+            var subscribers = (Dictionary<Type, ConcurrentList<WeakDelegate>>)typeof(MessageBroker)
+                .GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
+                .GetValue(communicator);
 
             // Ensure subscribers dictionary was initialized
             Assert.NotNull(subscribers);

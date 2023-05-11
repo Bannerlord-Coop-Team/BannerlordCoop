@@ -1,21 +1,34 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class SkeletonScaleSerializationTest
     {
+        IContainer container;
+        public SkeletonScaleSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void SkeletonScale_Serialize()
         {
             SkeletonScale SkeletonScale = new SkeletonScale();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             SkeletonScaleBinaryPackage package = new SkeletonScaleBinaryPackage(SkeletonScale, factory);
 
             package.Pack();
@@ -43,7 +56,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             BoneNames.SetValue(SkeletonScale, new List<string> { "str1", "str2" });
             BoneIndices.SetValue(SkeletonScale, new sbyte[] { 1, 2, 3 });
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             SkeletonScaleBinaryPackage package = new SkeletonScaleBinaryPackage(SkeletonScale, factory);
 
             package.Pack();
@@ -58,7 +71,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             SkeletonScaleBinaryPackage returnedPackage = (SkeletonScaleBinaryPackage)obj;
 
-            SkeletonScale newSkeletonScale = returnedPackage.Unpack<SkeletonScale>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            SkeletonScale newSkeletonScale = returnedPackage.Unpack<SkeletonScale>(deserializeFactory);
 
             Assert.Equal(SkeletonScale.SkeletonModel, newSkeletonScale.SkeletonModel);
             Assert.Equal(SkeletonScale.MountSitBoneScale, newSkeletonScale.MountSitBoneScale);

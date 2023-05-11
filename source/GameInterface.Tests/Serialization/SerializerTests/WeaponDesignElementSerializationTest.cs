@@ -3,17 +3,30 @@ using GameInterface.Serialization.External;
 using TaleWorlds.Core;
 using Xunit;
 using System.Runtime.Serialization;
+using Autofac;
+using Common.Serialization;
+using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class WeaponDesignElementSerializationTest
     {
+        IContainer container;
+        public WeaponDesignElementSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void WeaponDesignElement_Serialize()
         {
             WeaponDesignElement weaponDesignElement = (WeaponDesignElement)FormatterServices.GetUninitializedObject(typeof(WeaponDesignElement));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WeaponDesignElementBinaryPackage package = new WeaponDesignElementBinaryPackage(weaponDesignElement, factory);
 
             package.Pack();
@@ -28,7 +41,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             WeaponDesignElement weaponDesignElement = (WeaponDesignElement)FormatterServices.GetUninitializedObject(typeof(WeaponDesignElement));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WeaponDesignElementBinaryPackage package = new WeaponDesignElementBinaryPackage(weaponDesignElement, factory);
 
             package.Pack();
@@ -43,7 +56,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             WeaponDesignElementBinaryPackage returnedPackage = (WeaponDesignElementBinaryPackage)obj;
 
-            WeaponDesignElement newWeaponDesignElement = returnedPackage.Unpack<WeaponDesignElement>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            WeaponDesignElement newWeaponDesignElement = returnedPackage.Unpack<WeaponDesignElement>(deserializeFactory);
 
             Assert.Equal(weaponDesignElement.ScaleFactor, newWeaponDesignElement.ScaleFactor);
             Assert.Equal(weaponDesignElement.ScalePercentage, newWeaponDesignElement.ScalePercentage);

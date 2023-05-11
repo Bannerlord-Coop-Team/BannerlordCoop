@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     public class HideoutBinaryPackage : BinaryPackageBase<Hideout>
     {
         private int Index;
-        public HideoutBinaryPackage(Hideout obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public HideoutBinaryPackage(Hideout obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

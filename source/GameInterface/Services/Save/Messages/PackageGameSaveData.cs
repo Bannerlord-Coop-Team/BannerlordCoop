@@ -1,32 +1,34 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Save;
 using System;
 
-namespace GameInterface.Services.GameState.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+public readonly struct PackageGameSaveData : ICommand
 {
-    public readonly struct PackageGameSaveData : ICommand
-    {
-        public int PeerId { get; }
+    public Guid TransactionID { get; }
 
-        public PackageGameSaveData(int peerId)
-        {
-            PeerId = peerId;
-        }
+    public PackageGameSaveData(Guid transactionID)
+    {
+        TransactionID = transactionID;
     }
+}
 
-    public readonly struct GameSaveDataPackaged : IEvent
+public readonly struct GameSaveDataPackaged : IResponse
+{
+    public Guid TransactionID { get; }
+    public byte[] GameSaveData { get; }
+    public string CampaignID { get; }
+
+    /// <summary>
+    /// GameSaveData will only be created internally as it requires game access
+    /// </summary>
+    public GameSaveDataPackaged(
+        Guid transactionID,
+        byte[] gameSaveData,
+        string campaignID)
     {
-        public int PeerId { get; }
-        public byte[] GameSaveData { get; }
-
-        /// <summary>
-        /// GameSaveData will only be created internally as it requires game access
-        /// </summary>
-        /// <param name="gameSaveData">Game Save Data</param>
-        public GameSaveDataPackaged(int peerId, byte[] gameSaveData)
-        {
-            PeerId = peerId;
-            GameSaveData = gameSaveData;
-        }
+        TransactionID = transactionID;
+        GameSaveData = gameSaveData;
+        CampaignID = campaignID;
     }
 }

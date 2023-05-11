@@ -2,6 +2,7 @@ using Common.Messaging;
 using Coop.Core.Client.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.MobileParties.Messages;
 
 namespace Coop.Core.Client.States
 {
@@ -56,10 +57,6 @@ namespace Coop.Core.Client.States
         }
 
         public override void EnterMissionState()
-        {
-        }
-
-        public override void ResolveNetworkGuids()
         {
         }
 

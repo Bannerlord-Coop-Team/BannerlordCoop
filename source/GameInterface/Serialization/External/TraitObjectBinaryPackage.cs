@@ -9,7 +9,7 @@ namespace GameInterface.Serialization.External
     {
         public string StringId;
 
-        public TraitObjectBinaryPackage(TraitObject obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public TraitObjectBinaryPackage(TraitObject obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
 
         }
@@ -19,7 +19,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<TraitObject>(StringId);
+            Object = ResolveId<TraitObject>(StringId);
         }
     }
 }

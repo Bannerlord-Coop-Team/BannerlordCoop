@@ -16,7 +16,7 @@ namespace Coop.Tests.Server.Connections.States
         private readonly NetPeer _differentPlayer = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
         public MissionStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(_playerId, NetworkMessageBroker);
+            _connectionLogic = new ConnectionLogic(_playerId, StubNetworkMessageBroker);
             _differentPlayer.SetId(_playerId.Id + 1);
         }
 
@@ -25,11 +25,11 @@ namespace Coop.Tests.Server.Connections.States
         {
             _connectionLogic.State = new CampaignState(_connectionLogic);
 
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             _connectionLogic.State.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
@@ -61,7 +61,7 @@ namespace Coop.Tests.Server.Connections.States
             _connectionLogic.State = new MissionState(_connectionLogic);
 
             // Publish hero resolved, this would be from game interface
-            NetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkPlayerCampaignEntered());
+            StubNetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkPlayerCampaignEntered());
 
             Assert.IsType<CampaignState>(_connectionLogic.State);
         }
@@ -72,7 +72,7 @@ namespace Coop.Tests.Server.Connections.States
             _connectionLogic.State = new MissionState(_connectionLogic);
 
             // Publish hero resolved, this would be from game interface
-            NetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkPlayerCampaignEntered());
+            StubNetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkPlayerCampaignEntered());
 
             Assert.IsType<MissionState>(_connectionLogic.State);
         }

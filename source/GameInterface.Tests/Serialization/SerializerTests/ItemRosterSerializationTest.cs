@@ -5,14 +5,24 @@ using GameInterface.Serialization.External;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using GameInterface.Tests.Bootstrap;
+using Autofac;
+using Common.Serialization;
+using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemRosterSerializationTest
     {
-        public ItemRosterSerializationTest() 
+        IContainer container;
+        public ItemRosterSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -20,7 +30,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             ItemRoster itemRoster = new ItemRoster();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemRosterBinaryPackage package = new ItemRosterBinaryPackage(itemRoster, factory);
 
             package.Pack();
@@ -38,7 +48,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             {
                 new ItemRosterElement(new EquipmentElement(itemobj), 1)
             };
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemRosterBinaryPackage package = new ItemRosterBinaryPackage(itemRoster, factory);
 
             package.Pack();
@@ -53,7 +63,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemRosterBinaryPackage returnedPackage = (ItemRosterBinaryPackage)obj;
 
-            ItemRoster newRoster = returnedPackage.Unpack<ItemRoster>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ItemRoster newRoster = returnedPackage.Unpack<ItemRoster>(deserializeFactory);
 
             Assert.Equal(itemRoster.Count, newRoster.Count);
             Assert.Equal(newRoster.ToString(), itemRoster.ToString());

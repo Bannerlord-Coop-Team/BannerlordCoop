@@ -1,43 +1,37 @@
-﻿using Common.Messaging;
-using Common.Serialization;
-using GameInterface.Serialization.External;
-using GameInterface.Serialization;
-using GameInterface.Services.CharacterCreation.Messages;
-using SandBox;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using GameInterface.Services.Heroes.Patches;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.ObjectSystem;
-using System.Reflection;
 
-namespace GameInterface.Services.Heroes.Interfaces
+namespace GameInterface.Services.Heroes.Interaces;
+
+internal interface ITimeControlInterface : IGameAbstraction
 {
-    internal interface ITimeControlInterface : IGameAbstraction
+    void PauseAndDisableTimeControls();
+    void EnableTimeControls();
+    void SetTimeControl(CampaignTimeControlMode newMode);
+}
+
+internal class TimeControlInterface : ITimeControlInterface
+{
+    internal static bool IsTimeLocked = true;
+
+    public void PauseAndDisableTimeControls()
     {
-        void PauseAndDisableTimeControls();
-        void EnableTimeControls();
+        if (Campaign.Current == null) return;
+
+        Campaign.Current.SetTimeControlModeLock(false);
+        Campaign.Current.TimeControlMode = CampaignTimeControlMode.Stop;
+        IsTimeLocked = true;
     }
 
-    internal class TimeControlInterface : ITimeControlInterface
+    public void EnableTimeControls()
     {
-        internal static bool TimeLock = false;
+        IsTimeLocked = false;
+    }
 
-        public void PauseAndDisableTimeControls()
-        {
-            if (Campaign.Current == null) return;
+    public void SetTimeControl(CampaignTimeControlMode newMode)
+    {
+        if (IsTimeLocked) return;
 
-            Campaign.Current.SetTimeControlModeLock(false);
-            Campaign.Current.TimeControlMode = CampaignTimeControlMode.Stop;
-            TimeLock = true;
-        }
-
-        public void EnableTimeControls()
-        {
-            TimeLock = false;
-        }
+        TimePatches.OverrideTimeControlMode(Campaign.Current, newMode);
     }
 }

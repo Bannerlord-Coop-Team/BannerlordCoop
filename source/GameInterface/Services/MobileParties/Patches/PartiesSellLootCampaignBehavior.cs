@@ -4,15 +4,14 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.MobileParties.Patches
+namespace GameInterface.Services.MobileParties.Patches;
+
+[HarmonyPatch(typeof(PartiesSellLootCampaignBehavior), "OnSettlementEntered")]
+internal class PartiesSellLootCampaignBehaviorPatch
 {
-    [HarmonyPatch(typeof(PartiesSellLootCampaignBehavior), "OnSettlementEntered")]
-    internal class PartiesSellLootCampaignBehaviorPatch
+    private static bool Prefix(ref MobileParty mobileParty, ref Settlement settlement, ref Hero hero)
     {
-        private static bool Prefix(ref MobileParty mobileParty, ref Settlement settlement, ref Hero hero)
-        {
-            // TODO only allow for server and broadcast when it happens
-            return true;
-        }
+        // TODO only allow for server and broadcast when it happens
+        return true;
     }
 }

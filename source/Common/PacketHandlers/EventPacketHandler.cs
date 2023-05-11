@@ -10,7 +10,9 @@ using System.Reflection;
 
 namespace Common.PacketHandlers
 {
-    public class EventPacketHandler : IPacketHandler
+    public interface IEventPacketHandler : IPacketHandler { }
+
+    public class EventPacketHandler : IEventPacketHandler
     {
         private readonly ILogger Logger = LogManager.GetLogger<EventPacketHandler>();
 
@@ -27,21 +29,26 @@ namespace Common.PacketHandlers
             _packetManager.RegisterPacketHandler(this);
         }
 
-        public void Dispose()
+        public virtual void Dispose()
         {
             _packetManager.RemovePacketHandler(this);
         }
 
-        private static readonly MethodInfo Publish = typeof(IMessageBroker).GetMethod(nameof(IMessageBroker.Publish));
-        public void HandlePacket(NetPeer peer, IPacket packet)
+        protected static readonly MethodInfo Publish = typeof(IMessageBroker).GetMethod(nameof(IMessageBroker.Publish));
+        public virtual void HandlePacket(NetPeer peer, IPacket packet)
         {
             EventPacket convertedPacket = (EventPacket)packet;
 
-            INetworkEvent @event = convertedPacket.Event;
+            INetworkEvent networkEvent = convertedPacket.Event;
 
-            Logger.Information("Received network event from {Peer} of {EventType}", peer, @event.GetType());
+            Logger.Information("Received network event from {Peer} of {EventType}", peer.EndPoint, networkEvent.GetType().Name);
 
-            Publish.MakeGenericMethod(@event.GetType()).Invoke(_messageBroker, new object[] { peer, @event });
+            PublishEvent(peer, networkEvent);
+        }
+
+        protected virtual void PublishEvent(NetPeer peer, INetworkEvent networkEvent) 
+        {
+            Publish.MakeGenericMethod(networkEvent.GetType()).Invoke(_messageBroker, new object[] { peer, networkEvent });
         }
     }
 

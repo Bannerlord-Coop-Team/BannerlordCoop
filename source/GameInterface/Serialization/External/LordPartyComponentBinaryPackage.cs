@@ -1,7 +1,5 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
@@ -13,7 +11,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class LordPartyComponentBinaryPackage : BinaryPackageBase<LordPartyComponent>
     {
-        public LordPartyComponentBinaryPackage(LordPartyComponent obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public LordPartyComponentBinaryPackage(LordPartyComponent obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -24,20 +22,12 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackFields(excludes);
         }
 
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackFields();
 
             // Resolves _warPartyComponentsCache for Kingdom
             Kingdom kingdom = Object.Clan?.Kingdom;

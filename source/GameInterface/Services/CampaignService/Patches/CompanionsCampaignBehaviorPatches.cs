@@ -1,16 +1,15 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.CampaignService.Patches
+namespace GameInterface.Services.CampaignService.Patches;
+
+[HarmonyPatch(typeof(CompanionsCampaignBehavior))]
+internal class CompanionsCampaignBehaviorPatches
 {
-    [HarmonyPatch(typeof(CompanionsCampaignBehavior))]
-    internal class CompanionsCampaignBehaviorPatches
+    [HarmonyPrefix]
+    [HarmonyPatch("CreateCompanionAndAddToSettlement")]
+    private static bool Prefix()
     {
-        [HarmonyPrefix]
-        [HarmonyPatch("CreateCompanionAndAddToSettlement")]
-        private static bool Prefix()
-        {
-            return false;
-        }
+        return false;
     }
 }

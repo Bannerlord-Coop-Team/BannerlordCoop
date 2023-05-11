@@ -1,14 +1,14 @@
 ﻿using Common.Messaging;
+using System;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+public readonly struct ResolveHeroNotFound : IResponse
 {
-    public readonly struct ResolveHeroNotFound : IEvent
-    {
-        public int PeerId { get; }
+    public Guid TransactionID { get; }
 
-        public ResolveHeroNotFound(int peerId)
-        {
-            PeerId = peerId;
-        }
+    public ResolveHeroNotFound(Guid transactionID)
+    {
+        TransactionID = transactionID;
     }
 }

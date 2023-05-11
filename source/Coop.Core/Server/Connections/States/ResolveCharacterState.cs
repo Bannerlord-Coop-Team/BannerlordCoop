@@ -27,21 +27,24 @@ namespace Coop.Core.Server.Connections.States
             ConnectionLogic.NetworkMessageBroker.Unsubscribe<ResolveHeroNotFound>(HeroNotFoundHandler);
         }
 
+        private Guid ReloveHeroTransactionId;
         private void ClientValidateHandler(MessagePayload<NetworkClientValidate> obj)
         {
             var playerId = obj.Who as NetPeer;
 
             if (playerId == ConnectionLogic.PlayerId)
             {
-                ConnectionLogic.NetworkMessageBroker.Publish(this, new ResolveDebugHero(playerId.Id, obj.What.PlayerId));
+                ReloveHeroTransactionId = Guid.NewGuid();
+                ConnectionLogic.NetworkMessageBroker.Publish(this, new ResolveDebugHero(ReloveHeroTransactionId, obj.What.PlayerId));
             }
         }
 
         private void ResolveHeroHandler(MessagePayload<HeroResolved> obj)
         {
-            if (obj.What.PeerId == ConnectionLogic.PlayerId.Id)
+            var transactionId = obj.What.TransactionID;
+            if (ReloveHeroTransactionId == transactionId)
             {
-                var validateMessage = new NetworkClientValidated(true, obj.What.HeroStringId);
+                var validateMessage = new NetworkClientValidated(true, obj.What.HeroId);
                 ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(validateMessage);
                 ConnectionLogic.TransferSave();
             }
@@ -49,7 +52,8 @@ namespace Coop.Core.Server.Connections.States
 
         private void HeroNotFoundHandler(MessagePayload<ResolveHeroNotFound> obj)
         {
-            if (obj.What.PeerId == ConnectionLogic.PlayerId.Id)
+            var transactionId = obj.What.TransactionID;
+            if (ReloveHeroTransactionId == transactionId)
             {
                 var validateMessage = new NetworkClientValidated(false, string.Empty);
                 ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(validateMessage);

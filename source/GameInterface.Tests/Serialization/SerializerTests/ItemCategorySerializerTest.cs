@@ -3,17 +3,33 @@ using GameInterface.Serialization;
 using TaleWorlds.Core;
 using Xunit;
 using System.Runtime.Serialization;
+using Autofac;
+using Common.Serialization;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemCategorySerializationTest
     {
+        IContainer container;
+        public ItemCategorySerializationTest()
+        {
+            GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void ItemCategory_Serialize()
         {
             ItemCategory testItemCategory = (ItemCategory)FormatterServices.GetUninitializedObject(typeof(ItemCategory));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemCategoryBinaryPackage package = new ItemCategoryBinaryPackage(testItemCategory, factory);
 
             package.Pack();
@@ -28,7 +44,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             ItemCategory testItemCategory = (ItemCategory)FormatterServices.GetUninitializedObject(typeof(ItemCategory));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemCategoryBinaryPackage package = new ItemCategoryBinaryPackage(testItemCategory, factory);
 
             package.Pack();

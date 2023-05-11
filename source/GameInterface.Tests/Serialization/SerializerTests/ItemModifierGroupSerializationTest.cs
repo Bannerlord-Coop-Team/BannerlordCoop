@@ -1,21 +1,35 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class ItemModifierGroupSerializationTest
     {
+        IContainer container;
+        public ItemModifierGroupSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void ItemModifierGroup_Serialize()
         {
             ItemModifierGroup ItemModifierGroup = new ItemModifierGroup();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemModifierGroupBinaryPackage package = new ItemModifierGroupBinaryPackage(ItemModifierGroup, factory);
 
             package.Pack();
@@ -39,7 +53,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             _itemModifiers.SetValue(ItemModifierGroup, _modifiers);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             ItemModifierGroupBinaryPackage package = new ItemModifierGroupBinaryPackage(ItemModifierGroup, factory);
 
             package.Pack();
@@ -54,7 +68,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             ItemModifierGroupBinaryPackage returnedPackage = (ItemModifierGroupBinaryPackage)obj;
 
-            ItemModifierGroup newItemModifierGroup = returnedPackage.Unpack<ItemModifierGroup>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            ItemModifierGroup newItemModifierGroup = returnedPackage.Unpack<ItemModifierGroup>(deserializeFactory);
 
             Assert.Equal(ItemModifierGroup.NoModifierLootScore, newItemModifierGroup.NoModifierLootScore);
             Assert.Equal(ItemModifierGroup.NoModifierProductionScore, newItemModifierGroup.NoModifierProductionScore);

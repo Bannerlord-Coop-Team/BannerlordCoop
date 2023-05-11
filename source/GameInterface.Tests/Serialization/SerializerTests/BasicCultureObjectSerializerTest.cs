@@ -3,17 +3,32 @@ using GameInterface.Serialization;
 using TaleWorlds.Core;
 using Xunit;
 using System.Runtime.Serialization;
+using Autofac;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
+using TaleWorlds.CampaignSystem;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BasicCultureObjectSerializationTest
     {
+        IContainer container;
+        public BasicCultureObjectSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void BasicCultureObject_Serialize()
         {
             BasicCultureObject testBasicCultureObject = (BasicCultureObject)FormatterServices.GetUninitializedObject(typeof(BasicCultureObject));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BasicCultureObjectBinaryPackage package = new BasicCultureObjectBinaryPackage(testBasicCultureObject, factory);
 
             package.Pack();
@@ -28,7 +43,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             BasicCultureObject testBasicCultureObject = (BasicCultureObject)FormatterServices.GetUninitializedObject(typeof(BasicCultureObject));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BasicCultureObjectBinaryPackage package = new BasicCultureObjectBinaryPackage(testBasicCultureObject, factory);
 
             package.Pack();

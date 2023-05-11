@@ -1,6 +1,4 @@
-﻿using Common.Extensions;
-using System;
-using System.Reflection;
+﻿using System;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Serialization.External
@@ -11,26 +9,18 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class TroopRosterElementBinaryPackage : BinaryPackageBase<TroopRosterElement>
     {
-        public TroopRosterElementBinaryPackage(TroopRosterElement obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public TroopRosterElementBinaryPackage(TroopRosterElement obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
-
+        
         protected override void PackInternal()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackFields();
         }
 
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackFields();
         }
     }
 }

@@ -2,11 +2,11 @@
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
-using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
+using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Tests.Client.States
 {
@@ -16,30 +16,30 @@ namespace Coop.Tests.Client.States
         public CharacterCreationStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, NetworkMessageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
             clientLogic.State = new CharacterCreationState(clientLogic);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
         public void HeroPackaged_Publishes_NetworkTransferedHero()
         {
             var networkTransferedHeroCount = 0;
-            NetworkMessageBroker.TestNetworkSubscribe<NetworkTransferedHero>((payload) =>
+            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkTransferedHero>((payload) =>
             {
                 networkTransferedHeroCount += 1;
             });
 
-            NetworkMessageBroker.Publish(this, new NewHeroPackaged());
+            StubNetworkMessageBroker.Publish(this, new NewHeroPackaged());
 
             Assert.Equal(1, networkTransferedHeroCount);
         }
@@ -47,7 +47,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void HeroPackaged_Transitions_ReceivingSavedDataState()
         {
-            NetworkMessageBroker.Publish(this, new NewHeroPackaged());
+            StubNetworkMessageBroker.Publish(this, new NewHeroPackaged());
 
             clientLogic.EnterMainMenu();
 
@@ -58,12 +58,12 @@ namespace Coop.Tests.Client.States
         public void CharacterCreationFinished_Publishes_PackageMainHero()
         {
             var packageMainHeroCount = 0;
-            NetworkMessageBroker.Subscribe<PackageMainHero>((payload) =>
+            StubNetworkMessageBroker.Subscribe<PackageMainHero>((payload) =>
             {
                 packageMainHeroCount += 1;
             });
 
-            NetworkMessageBroker.Publish(this, new CharacterCreationFinished());
+            StubNetworkMessageBroker.Publish(this, new CharacterCreationFinished());
 
             Assert.Equal(1, packageMainHeroCount);
         }
@@ -72,7 +72,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             var isEventPublished = false;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 isEventPublished = true;
             });
@@ -85,7 +85,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void EnterMainMenu_Transitions_MainMenuState()
         {
-            MessageBroker.Publish(this, new MainMenuEntered());
+            StubMessageBroker.Publish(this, new MainMenuEntered());
 
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
@@ -117,9 +117,6 @@ namespace Coop.Tests.Client.States
             Assert.IsType<CharacterCreationState>(clientLogic.State);
 
             clientLogic.EnterMissionState();
-            Assert.IsType<CharacterCreationState>(clientLogic.State);
-
-            clientLogic.ResolveNetworkGuids();
             Assert.IsType<CharacterCreationState>(clientLogic.State);
 
             clientLogic.ValidateModules();

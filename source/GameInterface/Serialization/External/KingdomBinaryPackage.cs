@@ -1,11 +1,8 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
 using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.External
@@ -33,7 +30,7 @@ namespace GameInterface.Serialization.External
         private string[] settlementIds;
         private string[] villageIds;
 
-        public KingdomBinaryPackage(Kingdom obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public KingdomBinaryPackage(Kingdom obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -54,11 +51,7 @@ namespace GameInterface.Serialization.External
         {
             stringId = Object.StringId;
 
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackFields(excludes);
 
             clanIds = PackIds(Object.Clans);
             fiefIds = PackIds(Object.Fiefs);
@@ -73,7 +66,7 @@ namespace GameInterface.Serialization.External
         {
             if(stringId != null)
             {
-                Kingdom kingdom = MBObjectManager.Instance.GetObject<Kingdom>(stringId);
+                Kingdom kingdom = ResolveId<Kingdom>(stringId);
                 if (kingdom != null)
                 {
                     Object = kingdom;
@@ -81,11 +74,7 @@ namespace GameInterface.Serialization.External
                 }
             }
 
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackFields();
 
             InitializeCachedLists.Invoke(Object, Array.Empty<object>());
 

@@ -1,5 +1,4 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -17,7 +16,7 @@ namespace GameInterface.Serialization.External
 
         private string faction1Id;
         private string faction2Id;
-        public StanceLinkBinaryPackage(StanceLink obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public StanceLinkBinaryPackage(StanceLink obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -29,11 +28,7 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackFields(excludes);
 
             faction1Id = Object.Faction1?.StringId;
             faction2Id = Object.Faction2?.StringId;
@@ -41,11 +36,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackFields();
 
             StanceLink_Faction1.SetValue(Object, ResolveId<Clan>(faction1Id));
             StanceLink_Faction2.SetValue(Object, ResolveId<Clan>(faction2Id));

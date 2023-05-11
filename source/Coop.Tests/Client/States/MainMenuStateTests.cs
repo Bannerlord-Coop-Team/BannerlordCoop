@@ -14,17 +14,17 @@ namespace Coop.Tests.Client.States
         public MainMenuStateTests(ITestOutputHelper output) : base(output)
         {
             var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, NetworkMessageBroker);
+            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
@@ -38,7 +38,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void Connect_ValidateModuleState()
         {
-            MessageBroker.Publish(this, new NetworkConnected());
+            StubMessageBroker.Publish(this, new NetworkConnected());
 
             Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
@@ -47,7 +47,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             var enterMainMenuCount = 0;
-            MessageBroker.Subscribe<EnterMainMenu>((payload) =>
+            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
             {
                 enterMainMenuCount += 1;
             });

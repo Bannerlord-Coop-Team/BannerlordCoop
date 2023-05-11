@@ -2,17 +2,30 @@
 using GameInterface.Serialization;
 using TaleWorlds.Core;
 using Xunit;
+using Autofac;
+using Common.Serialization;
+using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class SkillObjectSerializationTest
     {
+        IContainer container;
+        public SkillObjectSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void SkillObject_Serialize()
         {
             SkillObject testSkillObject = new SkillObject("Test");
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             SkillObjectBinaryPackage package = new SkillObjectBinaryPackage(testSkillObject, factory);
 
             package.Pack();
@@ -27,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             SkillObject testSkillObject = new SkillObject("Test");
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             SkillObjectBinaryPackage package = new SkillObjectBinaryPackage(testSkillObject, factory);
 
             package.Pack();

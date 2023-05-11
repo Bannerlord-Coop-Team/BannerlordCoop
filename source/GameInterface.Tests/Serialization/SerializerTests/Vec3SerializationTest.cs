@@ -1,18 +1,32 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using TaleWorlds.Library;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class Vec3SerializationTest
     {
+        IContainer container;
+        public Vec3SerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void Vec3_Serialize()
         {
             Vec3 vec3 = new Vec3(1,2,3);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             Vec3BinaryPackage package = new Vec3BinaryPackage(vec3, factory);
 
             package.Pack();
@@ -27,7 +41,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Vec3 vec3 = new Vec3(1, 2, 3, 4);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             Vec3BinaryPackage package = new Vec3BinaryPackage(vec3, factory);
 
             package.Pack();
@@ -42,7 +56,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Vec3BinaryPackage returnedPackage = (Vec3BinaryPackage)obj;
 
-            Vec3 newVec3 = returnedPackage.Unpack<Vec3>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Vec3 newVec3 = returnedPackage.Unpack<Vec3>(deserializeFactory);
 
             Assert.Equal(vec3.X, newVec3.X);
             Assert.Equal(vec3.Y, newVec3.Y);

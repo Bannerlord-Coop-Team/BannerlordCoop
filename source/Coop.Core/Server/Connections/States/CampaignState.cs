@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
 using LiteNetLib;
+using System;
 
 namespace Coop.Core.Server.Connections.States
 {
@@ -10,6 +11,8 @@ namespace Coop.Core.Server.Connections.States
         {
             ConnectionLogic.NetworkMessageBroker.Subscribe<NetworkPlayerMissionEntered>(PlayerMissionEnteredHandler);
         }
+
+        
 
         public override void Dispose()
         {

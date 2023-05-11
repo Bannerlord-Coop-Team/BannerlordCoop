@@ -12,7 +12,7 @@ namespace GameInterface.Serialization.External
     {
         public string StringId;
 
-        public CharacterAttributeBinaryPackage(CharacterAttribute obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public CharacterAttributeBinaryPackage(CharacterAttribute obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -23,7 +23,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Object = MBObjectManager.Instance.GetObject<CharacterAttribute>(StringId);
+            Object = ResolveId<CharacterAttribute>(StringId);
         }
     }
 }

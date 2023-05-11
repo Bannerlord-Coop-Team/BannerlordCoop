@@ -1,18 +1,31 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
 using TaleWorlds.Core;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class DynamicBodyPropertiesBinaryPackageSerializationTest
     {
+        IContainer container;
+        public DynamicBodyPropertiesBinaryPackageSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void DynamicBodyProperties_Serialize()
         {
             DynamicBodyProperties DynamicBodyProperties = new DynamicBodyProperties();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             DynamicBodyPropertiesBinaryPackage package = new DynamicBodyPropertiesBinaryPackage(DynamicBodyProperties, factory);
 
             package.Pack();
@@ -27,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             DynamicBodyProperties DynamicBodyProperties = new DynamicBodyProperties(37, 17, 43);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             DynamicBodyPropertiesBinaryPackage package = new DynamicBodyPropertiesBinaryPackage(DynamicBodyProperties, factory);
 
             package.Pack();
@@ -42,7 +55,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             DynamicBodyPropertiesBinaryPackage returnedPackage = (DynamicBodyPropertiesBinaryPackage)obj;
 
-            DynamicBodyProperties newStaticBodyProperties = returnedPackage.Unpack<DynamicBodyProperties>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            DynamicBodyProperties newStaticBodyProperties = returnedPackage.Unpack<DynamicBodyProperties>(deserializeFactory);
 
             Assert.Equal(DynamicBodyProperties.Age, newStaticBodyProperties.Age);
             Assert.Equal(DynamicBodyProperties.Weight, newStaticBodyProperties.Weight);

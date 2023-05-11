@@ -13,7 +13,7 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class TroopRosterBinaryPackage : BinaryPackageBase<TroopRoster>
     {
-        public TroopRosterBinaryPackage(TroopRoster obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public TroopRosterBinaryPackage(TroopRoster obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -27,11 +27,7 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes))
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackFields(excludes);
         }
 
         private static PropertyInfo OwnerParty = typeof(TroopRoster).GetProperty("OwnerParty", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -40,11 +36,7 @@ namespace GameInterface.Serialization.External
         private static MethodInfo MemberRosterNumberChanged = typeof(PartyBase).GetMethod("MemberRosterNumberChanged", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackFields();
 
             PartyBase ownerParty = (PartyBase)OwnerParty.GetValue(Object);
             Type delegateType = NumberChangedCallback.PropertyType;

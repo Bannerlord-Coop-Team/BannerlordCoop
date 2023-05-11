@@ -1,26 +1,25 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Modules.Messages;
 
-namespace GameInterface.Services.Modules.Interfaces
+namespace GameInterface.Services.Modules.Interfaces;
+
+internal interface IModuleInterface : IGameAbstraction
 {
-    internal interface IModuleInterface : IGameAbstraction
+    void ValidateModules();
+}
+
+internal class ModuleInterface : IModuleInterface
+{
+    private readonly IMessageBroker messageBroker;
+
+    public ModuleInterface(IMessageBroker messageBroker)
     {
-        void ValidateModules();
+        this.messageBroker = messageBroker;
     }
 
-    internal class ModuleInterface : IModuleInterface
+    public void ValidateModules()
     {
-        private readonly IMessageBroker messageBroker;
-
-        public ModuleInterface(IMessageBroker messageBroker)
-        {
-            this.messageBroker = messageBroker;
-        }
-
-        public void ValidateModules()
-        {
-            // TODO implement
-            messageBroker.Publish(this, new ModulesProcessed());
-        }
+        // TODO implement
+        messageBroker.Publish(this, new ModulesProcessed());
     }
 }

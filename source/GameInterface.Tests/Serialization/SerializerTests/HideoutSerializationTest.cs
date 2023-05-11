@@ -1,28 +1,40 @@
 ﻿using GameInterface.Serialization.External;
 using GameInterface.Serialization;
-using System.Collections.Generic;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
+using Autofac;
+using Common.Serialization;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class HideoutSerializationTest
     {
-        private static readonly PropertyInfo Campaign_Current = typeof(Campaign).GetProperty("Current");
+        IContainer container;
+        public HideoutSerializationTest()
+        {
+            GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         private static readonly FieldInfo Campaign_hideouts = typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
         [Fact]
         public void Hideout_Serialize()
         {
-            Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
             MBList<Hideout> allhideouts = new MBList<Hideout>();
             Hideout item = new Hideout();
             allhideouts.Add(item);
             Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             HideoutBinaryPackage package = new HideoutBinaryPackage(item, factory);
 
             package.Pack();
@@ -45,12 +57,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hideout_nextPossibleAttackTime.SetValue(hideout, new CampaignTime());
             Hideout_SceneName.SetValue(hideout, "something");
 
-            MBList<Hideout> allhideouts = new MBList<Hideout> { hideout };
+            MBList<Hideout> allhideouts = (MBList<Hideout>)Campaign_hideouts.GetValue(Campaign.Current) ?? new MBList<Hideout>();
+            
+            allhideouts.Add(hideout);
 
-            Campaign_Current.SetValue(null, FormatterServices.GetUninitializedObject(typeof(Campaign)));
             Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             HideoutBinaryPackage package = new HideoutBinaryPackage(hideout, factory);
 
             package.Pack();
@@ -65,7 +78,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             HideoutBinaryPackage returnedPackage = (HideoutBinaryPackage)obj;
 
-            Hideout newHideout = returnedPackage.Unpack<Hideout>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Hideout newHideout = returnedPackage.Unpack<Hideout>(deserializeFactory);
 
             Assert.Equal(hideout, newHideout);
             Assert.Equal(hideout.SceneName, newHideout.SceneName);

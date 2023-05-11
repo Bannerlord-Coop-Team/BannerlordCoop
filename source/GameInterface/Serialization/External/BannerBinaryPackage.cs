@@ -8,7 +8,7 @@ namespace GameInterface.Serialization.External
     {
         string bannerData;
 
-        public BannerBinaryPackage(Banner obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public BannerBinaryPackage(Banner obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 

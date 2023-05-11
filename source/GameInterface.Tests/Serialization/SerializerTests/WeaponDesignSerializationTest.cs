@@ -1,11 +1,14 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -13,9 +16,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     {
 
         private static readonly PropertyInfo BuildOrders = typeof(CraftingTemplate).GetProperty(nameof(CraftingTemplate.BuildOrders));
+        IContainer container;
         public WeaponDesignSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
@@ -38,7 +48,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             BuildOrders.SetValue(craftingTemplate, buildOrders);
             WeaponDesign WeaponDesign = new WeaponDesign(craftingTemplate, new TextObject("testValue"), elements);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WeaponDesignBinaryPackage package = new WeaponDesignBinaryPackage(WeaponDesign, factory);
 
             package.Pack();
@@ -68,7 +78,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             BuildOrders.SetValue(craftingTemplate, buildOrders);
             WeaponDesign WeaponDesign = new WeaponDesign(craftingTemplate, new TextObject("testValue"), elements);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             WeaponDesignBinaryPackage package = new WeaponDesignBinaryPackage(WeaponDesign, factory);
 
             package.Pack();
@@ -83,7 +93,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             WeaponDesignBinaryPackage returnedPackage = (WeaponDesignBinaryPackage)obj;
 
-            WeaponDesign newWeaponDesign = returnedPackage.Unpack<WeaponDesign>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            WeaponDesign newWeaponDesign = returnedPackage.Unpack<WeaponDesign>(deserializeFactory);
 
             Assert.Equal(WeaponDesign.CraftedWeaponLength, newWeaponDesign.CraftedWeaponLength);
             Assert.Equal(WeaponDesign.HolsterShiftAmount, newWeaponDesign.HolsterShiftAmount);

@@ -1,19 +1,33 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using System.Linq;
 using TaleWorlds.Core;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BannerSerializationTest
     {
+        IContainer container;
+        public BannerSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void Banner_Serialize()
         {
             Banner testBanner = new Banner();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BannerBinaryPackage package = new BannerBinaryPackage(testBanner, factory);
 
             package.Pack();
@@ -28,7 +42,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             Banner testBanner = new Banner();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BannerBinaryPackage package = new BannerBinaryPackage(testBanner, factory);
 
             package.Pack();
@@ -43,7 +57,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BannerBinaryPackage returnedPackage = (BannerBinaryPackage)obj;
 
-            Banner newBanner = returnedPackage.Unpack<Banner>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Banner newBanner = returnedPackage.Unpack<Banner>(deserializeFactory);
 
             foreach (var data in testBanner.BannerDataList.Zip(newBanner.BannerDataList, (bannerData, newBannerData) => new { bannerData, newBannerData }))
             {

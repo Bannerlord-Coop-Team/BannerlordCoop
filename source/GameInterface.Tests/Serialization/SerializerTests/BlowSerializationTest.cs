@@ -1,5 +1,8 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.MountAndBlade;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -15,12 +19,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
     /// </summary>
     public class BlowSerializationTest
     {
+        IContainer container;
+        public BlowSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void Blow_Serialize()
         {
             Blow blow = new Blow();
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BlowBinaryPackage package = new BlowBinaryPackage(blow, factory);
 
             package.Pack();
@@ -67,7 +81,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             blowWeaoponRecord.Weight = 0.5f;
             blow.WeaponRecord = blowWeaoponRecord;
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             BlowBinaryPackage package = new BlowBinaryPackage(blow, factory);
 
             package.Pack();
@@ -76,11 +90,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.NotEmpty(bytes);
 
-            var deserializedFactory = new BinaryPackageFactory();
+            var deserializedFactory = container.Resolve<IBinaryPackageFactory>();
             var blowBinaryPackage = BinaryFormatterSerializer.Deserialize<BlowBinaryPackage>(bytes);
             blowBinaryPackage.BinaryPackageFactory = deserializedFactory;
 
-            Blow deserializedBlow = blowBinaryPackage.Unpack<Blow>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            Blow deserializedBlow = blowBinaryPackage.Unpack<Blow>(deserializeFactory);
+
             Assert.Equal(deserializedBlow.AbsorbedByArmor, blow.AbsorbedByArmor);
             Assert.Equal(deserializedBlow.AttackerStunPeriod, blow.AttackerStunPeriod);
             Assert.Equal(deserializedBlow.AttackType, blow.AttackType);

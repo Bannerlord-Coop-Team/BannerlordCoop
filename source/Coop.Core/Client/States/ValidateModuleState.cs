@@ -36,7 +36,7 @@ namespace Coop.Core.Client.States
         {
             if (obj.What.HeroExists)
             {
-                Logic.HeroStringId = obj.What.HeroStringId;
+                Logic.ControlledHeroId = obj.What.HeroId;
                 Logic.LoadSavedData();
             }
             else
@@ -94,10 +94,6 @@ namespace Coop.Core.Client.States
         private void Handle(MessagePayload<CharacterCreationStarted> obj)
         {
             Logic.State = new CharacterCreationState(Logic);
-        }
-
-        public override void ResolveNetworkGuids()
-        {
         }
 
         public override void ValidateModules()

@@ -1,6 +1,9 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Runtime.Serialization;
+using Common.Serialization;
 using TaleWorlds.Core;
 using Xunit;
 
@@ -8,11 +11,21 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class SaddleComponentSerializationTest
     {
+        IContainer container;
+        public SaddleComponentSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void SaddleComponent_Serialize()
         {
             SaddleComponent saddleComponent = (SaddleComponent)FormatterServices.GetUninitializedObject(typeof(SaddleComponent));
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             SaddleComponentBinaryPackage package = new SaddleComponentBinaryPackage(saddleComponent, factory);
 
             package.Pack();
@@ -28,7 +41,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             SaddleComponent saddleComponent = (SaddleComponent)FormatterServices.GetUninitializedObject(typeof(SaddleComponent));
             saddleComponent.Item = new ItemObject("Test");
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             SaddleComponentBinaryPackage package = new SaddleComponentBinaryPackage(saddleComponent, factory);
 
             package.Pack();
@@ -43,7 +56,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             SaddleComponentBinaryPackage returnedPackage = (SaddleComponentBinaryPackage)obj;
 
-            SaddleComponent newSaddleComponent = returnedPackage.Unpack<SaddleComponent>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            SaddleComponent newSaddleComponent = returnedPackage.Unpack<SaddleComponent>(deserializeFactory);
 
             Assert.Equal(saddleComponent.Item.StringId, newSaddleComponent.Item.StringId);
             Assert.Equal(saddleComponent.ItemModifierGroup, newSaddleComponent.ItemModifierGroup);

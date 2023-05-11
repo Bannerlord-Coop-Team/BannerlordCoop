@@ -2,17 +2,30 @@
 using GameInterface.Serialization;
 using Xunit;
 using TaleWorlds.CampaignSystem;
+using Autofac;
+using Common.Serialization;
+using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class PolicyObjectSerializationTest
     {
+        IContainer container;
+        public PolicyObjectSerializationTest()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
+        }
+
         [Fact]
         public void PolicyObject_Serialize()
         {
             PolicyObject testPolicyObject = new PolicyObject("Test");
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             PolicyObjectBinaryPackage package = new PolicyObjectBinaryPackage(testPolicyObject, factory);
 
             package.Pack();
@@ -27,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             PolicyObject testPolicyObject = new PolicyObject("Test");
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             PolicyObjectBinaryPackage package = new PolicyObjectBinaryPackage(testPolicyObject, factory);
 
             package.Pack();

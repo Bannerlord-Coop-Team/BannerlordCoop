@@ -1,6 +1,10 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using Common;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -9,14 +13,22 @@ using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class CharacterObjectSerializationTest
     {
+        IContainer container;
         public CharacterObjectSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         private static readonly FieldInfo BasicCharacterObject_basicName = typeof(BasicCharacterObject).GetField("_basicName", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -28,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             BasicCharacterObject_basicName.SetValue(CharacterObject, new TextObject("Test Name"));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterObjectBinaryPackage package = new CharacterObjectBinaryPackage(CharacterObject, factory);
 
             package.Pack();
@@ -53,11 +65,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 new CharacterObject(),
             };
 
+            var objectManager = container.Resolve<IObjectManager>();
+
             for (int i = 0; i < characterMembers.Length; i++)
             {
                 var character = characterMembers[i];
                 character.StringId = $"Character_{i}";
-                MBObjectManager.Instance.RegisterObject(character);
+                objectManager.AddExisting(character.StringId, character);
             }
 
             CharacterObjectBinaryPackage.CharacterObject_battleEquipmentTemplate.SetValue(CharacterObject, characterMembers[0]);
@@ -65,7 +79,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             CharacterObjectBinaryPackage.CharacterObject_originCharacter.SetValue(CharacterObject, characterMembers[2]);
             CharacterObjectBinaryPackage.CharacterObject_UpgradeTargets.SetValue(CharacterObject, characterMembers);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
 
             byte[] bytes = BinaryFormatterSerializer.Serialize(factory.GetBinaryPackage(CharacterObject));
 
@@ -77,7 +91,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             CharacterObjectBinaryPackage returnedPackage = (CharacterObjectBinaryPackage)obj;
 
-            CharacterObject newCharacterObject = returnedPackage.Unpack<CharacterObject>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CharacterObject newCharacterObject = returnedPackage.Unpack<CharacterObject>(deserializeFactory);
 
             Assert.Same(characterMembers[0], CharacterObjectBinaryPackage.CharacterObject_battleEquipmentTemplate.GetValue(newCharacterObject));
             Assert.Same(characterMembers[1], CharacterObjectBinaryPackage.CharacterObject_civilianEquipmentTemplate.GetValue(newCharacterObject));
@@ -96,13 +111,21 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void CharacterObject_StringId_Serialization()
         {
-            CharacterObject CharacterObject = MBObjectManager.Instance.CreateObject<CharacterObject>();
+            // Setup
+            CharacterObject characterObject = new CharacterObject();
 
-            BasicCharacterObject_basicName.SetValue(CharacterObject, new TextObject("Test Name"));
+            // Register object with new string id
+            var objectManager = container.Resolve<IObjectManager>();
+            Assert.True(objectManager.AddNewObject(characterObject, out string newId));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
-            CharacterObjectBinaryPackage package = new CharacterObjectBinaryPackage(CharacterObject, factory);
+            characterObject.StringId = newId;
 
+            BasicCharacterObject_basicName.SetValue(characterObject, new TextObject("Test Name"));
+
+            var factory = container.Resolve<IBinaryPackageFactory>();
+            CharacterObjectBinaryPackage package = new CharacterObjectBinaryPackage(characterObject, factory);
+
+            // Execution
             package.Pack();
 
             byte[] bytes = BinaryFormatterSerializer.Serialize(package);
@@ -111,13 +134,15 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             object obj = BinaryFormatterSerializer.Deserialize(bytes);
 
+            // Verification
             Assert.IsType<CharacterObjectBinaryPackage>(obj);
 
             CharacterObjectBinaryPackage returnedPackage = (CharacterObjectBinaryPackage)obj;
 
-            CharacterObject newCharacterObject = returnedPackage.Unpack<CharacterObject>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            CharacterObject newCharacterObject = returnedPackage.Unpack<CharacterObject>(deserializeFactory);
 
-            Assert.Same(CharacterObject, newCharacterObject);
+            Assert.Same(characterObject, newCharacterObject);
         }
     }
 }

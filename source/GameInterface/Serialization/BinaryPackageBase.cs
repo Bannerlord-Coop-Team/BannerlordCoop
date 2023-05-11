@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
+using Common.Extensions;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization
@@ -10,8 +11,8 @@ namespace GameInterface.Serialization
     public interface IBinaryPackage
     {
         void Pack();
-        object Unpack();
-        T Unpack<T>();
+        object Unpack(IBinaryPackageFactory binaryPackageFactory);
+        T Unpack<T>(IBinaryPackageFactory binaryPackageFactory);
     }
 
     /// <summary>
@@ -29,31 +30,76 @@ namespace GameInterface.Serialization
         [NonSerialized]
         protected T Object;
 
-        public BinaryPackageFactory BinaryPackageFactory
+        [field: NonSerialized]
+        public IBinaryPackageFactory BinaryPackageFactory
         {
-            get { return _binaryPackageFactory; }
-            set { _binaryPackageFactory = value; }
+            get;
+            set;
         }
-        [NonSerialized]
-        private BinaryPackageFactory _binaryPackageFactory;
 
         protected Type ObjectType => typeof(T);
 
         /// <summary>
-        /// Dictionary of fields and their objects converted to BinaryPackages
+        /// Dictionary of field names and their objects converted to BinaryPackages
         /// </summary>
-        protected Dictionary<FieldInfo, IBinaryPackage> StoredFields = new Dictionary<FieldInfo, IBinaryPackage>();
+        protected Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
-        protected BinaryPackageBase(T obj, BinaryPackageFactory binaryPackageFactory)
+        protected BinaryPackageBase(T obj, IBinaryPackageFactory binaryPackageFactory)
         {
             if (obj == null) throw new ArgumentNullException();
 
             Object = obj;
             BinaryPackageFactory = binaryPackageFactory;
         }
-
+        
         protected abstract void PackInternal();
         protected abstract void UnpackInternal();
+
+        protected void PackFields()
+        {
+            // Iterate through all of the instance fields of the object's type
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First()))
+            {
+                // Get the value of the current field in the object
+                // Add a binary package of the field value to the StoredFields collection
+                object obj = field.GetValue(Object);
+                StoredFields.Add(field.Name, BinaryPackageFactory.GetBinaryPackage(obj));
+            }
+        }
+        
+        protected void PackFields(HashSet<string> excludes)
+        {
+            // Iterate through all of the instance fields of the object's type, excluding any fields that are specified in the Excludes collection
+            foreach (FieldInfo field in ObjectType.GetAllInstanceFields(excludes).GroupBy(o => o.Name).Select(g => g.First()))
+            {
+                // Get the value of the current field in the object
+                // Add a binary package of the field value to the StoredFields collection
+                object obj = field.GetValue(Object);
+                StoredFields.Add(field.Name, BinaryPackageFactory.GetBinaryPackage(obj));
+            }
+        }
+        
+        protected void UnpackFields()
+        {
+            var type = Object.GetType();
+            var fields = type.GetAllInstanceFields();
+
+            foreach (string fieldName in StoredFields.Keys)
+            {
+                var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+
+                if (type.IsValueType)
+                {
+                    object boxed = Object;
+                    field.SetValue(boxed, StoredFields[fieldName].Unpack(BinaryPackageFactory));
+                    Object = (T)boxed;
+                }
+                else
+                {
+                    field.SetValue(Object, StoredFields[fieldName].Unpack(BinaryPackageFactory));
+                }
+            }
+        }
 
         /// <summary>
         /// Packs data for an object.
@@ -69,9 +115,11 @@ namespace GameInterface.Serialization
         /// <returns>
         /// The object created from the stored data.
         /// </returns>
-        public object Unpack()
+        public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
             if (IsUnpacked) return Object;
+
+            BinaryPackageFactory = binaryPackageFactory;
 
             Object = CreateObject();
 
@@ -82,9 +130,9 @@ namespace GameInterface.Serialization
             return Object;
         }
 
-        public CastType Unpack<CastType>()
+        public CastType Unpack<CastType>(IBinaryPackageFactory binaryPackageFactory)
         {
-            return (CastType)Unpack();
+            return (CastType)Unpack(binaryPackageFactory);
         }
 
         protected static T CreateObject()
@@ -120,13 +168,15 @@ namespace GameInterface.Serialization
         /// The object corresponding to the specified string ID, 
         /// or null if the ID is null or the object cannot be found.
         /// </returns>
-        protected static OutT ResolveId<OutT>(string id) where OutT : MBObjectBase
+        protected OutT ResolveId<OutT>(string id) where OutT : MBObjectBase
         {
             // Return if id is null
             if (id == null) return null;
 
-            // Get the character object with the specified id
-            return MBObjectManager.Instance.GetObject<OutT>(id);
+            // Get the object with the specified id
+            if (BinaryPackageFactory.ObjectManager.TryGetObject(id, out OutT resolvedObj) == false) return null;
+
+            return resolvedObj;
         }
 
         /// <summary>
@@ -138,7 +188,7 @@ namespace GameInterface.Serialization
         /// The collection of objects corresponding to the specified string IDs. 
         /// An exception is thrown if any of the IDs cannot be resolved.
         /// </returns>
-        protected static IEnumerable<OutT> ResolveIds<OutT>(string[] ids) where OutT : MBObjectBase
+        protected IEnumerable<OutT> ResolveIds<OutT>(string[] ids) where OutT : MBObjectBase
         {
             // Convert ids to instances using the MBObjectManager
             IEnumerable<OutT> values = ids.Select(id => ResolveId<OutT>(id));

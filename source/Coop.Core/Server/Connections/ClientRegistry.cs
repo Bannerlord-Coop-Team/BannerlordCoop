@@ -2,7 +2,8 @@
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
-using GameInterface.Services.Time.Messages;
+using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
@@ -62,13 +63,18 @@ namespace Coop.Core.Server.Connections
             EnableTimeControls();
         }
 
+        private static HashSet<Type> loadingStates = new HashSet<Type>
+        {
+            typeof(TransferSaveState),
+            typeof(LoadingState),
+        };
         private void EnableTimeControls()
         {
             // Only re-enable if all connections are finished loading
-            if (ConnectionStates.Any(state => state.Value.State is LoadingState)) return;
+            if (ConnectionStates.Any(state => loadingStates.Contains(state.Value.State.GetType()))) return;
 
             _messageBroker.PublishNetworkEvent(new NetworkEnableTimeControls());
-            _messageBroker.Publish(this, new EnableGameTimeControls());
+            _messageBroker.Publish(this, new EnableGameTimeControls(Guid.Empty));
         }
     }
 }

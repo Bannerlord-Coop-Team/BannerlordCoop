@@ -1,12 +1,13 @@
 ﻿using Common;
 using Common.Logging;
+using Common.Serialization;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
 using Coop.UI;
-using Coop.UI.LoadGameUI;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -50,6 +51,8 @@ namespace Coop
         private bool isServer = false;
         public override void NoHarmonyInit() 
         {
+            AssemblyHellscape.CreateAssemblyBindingRedirects();
+
             var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
             
             if (args.Contains("/server"))
@@ -93,6 +96,8 @@ namespace Coop
             Logger.Verbose("Coop Mod Module Started");
         }
 
+        
+
         public override void NoHarmonyLoad()
         {
             Updateables.Add(GameLoopRunner.Instance);
@@ -109,9 +114,9 @@ namespace Coop
                                 BindingFlags.Instance | BindingFlags.NonPublic)
                             .SetValue(Module.CurrentModule, true);
 #else
-            ScreenManager.PushScreen(
-                ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                    new object[] { }));
+            //ScreenManager.PushScreen(
+            //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+            //        new object[] { }));
 #endif
             #region ButtonAssignment
             CoopCampaign =
@@ -133,9 +138,9 @@ namespace Coop
                             Coop.StartAsClient();
                         }
 #else
-                        ScreenManager.PushScreen(
-                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                                new object[] { }));
+                        //ScreenManager.PushScreen(
+                        //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                        //        new object[] { }));
 #endif
                     },
 
@@ -186,8 +191,8 @@ namespace Coop
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             Exception ex = (Exception)e.ExceptionObject;
-            Logger.Fatal(ex, "Unhandled exception");
-            Logger.Fatal(ex.StackTrace);
+            Logger?.Fatal(ex, "Unhandled exception");
+            Logger?.Fatal(ex.StackTrace);
             Serilog.Log.CloseAndFlush();
         }
 

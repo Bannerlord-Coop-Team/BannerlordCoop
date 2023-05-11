@@ -2,11 +2,12 @@
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
-using Coop.Core.Communication.Network;
+using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using LiteNetLib;
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 
@@ -14,16 +15,23 @@ namespace Coop.Core.Server
 {
     public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, IDisposable
     {
+        IEnumerable<NetPeer> ConnectedPeers { get; }
+        void AllowJoining();
     }
 
     public class CoopServer : CoopNetworkBase, ICoopServer
     {
         public override int Priority => 0;
 
+        public IEnumerable<NetPeer> ConnectedPeers => netManager.ConnectedPeerList;
+        public Guid ServerId { get; } = Guid.NewGuid();
+
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
-        private readonly IClientRegistry clientOrchestrator;
+        private readonly IClientRegistry clientRegistry;
         private readonly NetManager netManager;
+
+        private bool allowJoining = false;
 
         public CoopServer(
             INetworkConfiguration configuration, 
@@ -34,7 +42,7 @@ namespace Coop.Core.Server
             // Dependancy assignment
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
-            this.clientOrchestrator = clientOrchestrator;
+            this.clientRegistry = clientOrchestrator;
 
             // TODO add configuration
             netManager = new NetManager(this);
@@ -52,7 +60,15 @@ namespace Coop.Core.Server
 
         public void OnConnectionRequest(ConnectionRequest request)
         {
-            request.Accept();
+            if(allowJoining)
+            {
+                request.Accept();
+            }
+            else
+            {
+                request.Reject();
+            }
+            
         }
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -75,7 +91,7 @@ namespace Coop.Core.Server
 
         }
 
-        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
             packetManager.HandleRecieve(peer, packet);
@@ -122,6 +138,11 @@ namespace Coop.Core.Server
         public override void SendAllBut(NetPeer netPeer, IPacket packet)
         {
             SendAllBut(netManager, netPeer, packet);
+        }
+
+        public void AllowJoining()
+        {
+            allowJoining = true;
         }
     }
 }

@@ -1,5 +1,4 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using System.Collections.Generic;
@@ -14,7 +13,7 @@ namespace GameInterface.Serialization.External
     {
 
         private static readonly MethodInfo AddEventHandlers = typeof(Army).GetMethod("AddEventHandlers", BindingFlags.NonPublic | BindingFlags.Instance);
-        public ArmyBinaryPackage(Army obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public ArmyBinaryPackage(Army obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -26,20 +25,12 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
+            base.PackFields(excludes);
         }
 
         protected override void UnpackInternal()
         {
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackFields();
 
             // Resolves _hourlyTickEvent and _tickEvent
             AddEventHandlers.Invoke(Object, new object[0]);

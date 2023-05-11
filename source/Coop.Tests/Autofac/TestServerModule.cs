@@ -1,7 +1,5 @@
 ﻿using Autofac;
-using Coop.Core.Configuration;
 using Coop.Core.Server;
-using LiteNetLib;
 
 namespace Coop.Tests.Autofac
 {

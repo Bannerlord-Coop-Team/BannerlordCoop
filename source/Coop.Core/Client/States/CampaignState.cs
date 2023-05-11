@@ -1,10 +1,7 @@
 ﻿using Common.Messaging;
-using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.Time.Messages;
-using System;
 
 namespace Coop.Core.Client.States
 {
@@ -19,8 +16,13 @@ namespace Coop.Core.Client.States
 
             Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
             Logic.NetworkMessageBroker.Subscribe<MissionStateEntered>(Handle);
+            Logic.NetworkMessageBroker.Subscribe<AllGameObjectsRegistered>(Handle);
+        }
 
-            Logic.NetworkMessageBroker.Publish(this, new SwitchToHero(Logic.HeroStringId));
+        private void Handle(MessagePayload<AllGameObjectsRegistered> obj)
+        {
+            Logic.NetworkMessageBroker.Publish(this, new SwitchToHero(Logic.ControlledHeroId));
+            Logic.NetworkMessageBroker.PublishNetworkEvent(new NetworkPlayerCampaignEntered());
         }
 
         public override void Dispose()
@@ -29,6 +31,7 @@ namespace Coop.Core.Client.States
 
             Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
             Logic.NetworkMessageBroker.Unsubscribe<MissionStateEntered>(Handle);
+            Logic.NetworkMessageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle);
         }
 
         private void Handle(MessagePayload<NetworkDisableTimeControls> obj)
@@ -79,10 +82,6 @@ namespace Coop.Core.Client.States
         }
 
         public override void EnterCampaignState()
-        {
-        }
-
-        public override void ResolveNetworkGuids()
         {
         }
 

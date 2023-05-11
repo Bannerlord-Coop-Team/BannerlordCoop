@@ -18,7 +18,7 @@ namespace Coop.Tests.Server.Connections.States
 
         public LoadingStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(_playerId, NetworkMessageBroker);
+            _connectionLogic = new ConnectionLogic(_playerId, StubNetworkMessageBroker);
             _differentPlayer.SetId(_playerId.Id + 1);
         }
 
@@ -27,11 +27,11 @@ namespace Coop.Tests.Server.Connections.States
         {
             _connectionLogic.State = new CampaignState(_connectionLogic);
 
-            Assert.NotEqual(0, MessageBroker.GetTotalSubscribers());
+            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
 
             _connectionLogic.State.Dispose();
 
-            Assert.Equal(0, MessageBroker.GetTotalSubscribers());
+            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
         }
 
         [Fact]
@@ -63,13 +63,13 @@ namespace Coop.Tests.Server.Connections.States
             _connectionLogic.State = new LoadingState(_connectionLogic);
 
             var playerCampaignEnteredCount = 0;
-            NetworkMessageBroker.Subscribe<PlayerCampaignEntered>((payload) =>
+            StubNetworkMessageBroker.Subscribe<PlayerCampaignEntered>((payload) =>
             {
                 playerCampaignEnteredCount += 1;
             });
 
             // Publish hero resolved, this would be from game interface
-            NetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkPlayerCampaignEntered());
+            StubNetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkPlayerCampaignEntered());
 
             // A single message is sent
             Assert.Equal(1, playerCampaignEnteredCount);
@@ -83,13 +83,13 @@ namespace Coop.Tests.Server.Connections.States
             _connectionLogic.State = new LoadingState(_connectionLogic);
 
             var playerCampaignEnteredCount = 0;
-            NetworkMessageBroker.Subscribe<PlayerCampaignEntered>((payload) =>
+            StubNetworkMessageBroker.Subscribe<PlayerCampaignEntered>((payload) =>
             {
                 playerCampaignEnteredCount += 1;
             });
 
             // Publish hero resolved, this would be from game interface
-            NetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkPlayerCampaignEntered());
+            StubNetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkPlayerCampaignEntered());
 
             // No message is sent due to this logic is not responsible for this player
             Assert.Equal(0, playerCampaignEnteredCount);

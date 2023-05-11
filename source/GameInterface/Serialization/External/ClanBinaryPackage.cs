@@ -1,11 +1,8 @@
-﻿using Common.Extensions;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization.External
 {
@@ -25,7 +22,7 @@ namespace GameInterface.Serialization.External
         string[] companionsIds;
 
 
-        public ClanBinaryPackage(Clan obj, BinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
+        public ClanBinaryPackage(Clan obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
 
@@ -41,12 +38,8 @@ namespace GameInterface.Serialization.External
         {
             stringId = Object.StringId;
 
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
-            {
-                object obj = field.GetValue(Object);
-                StoredFields.Add(field, BinaryPackageFactory.GetBinaryPackage(obj));
-            }
-
+            base.PackFields();
+            
             supporterNotablesIds = PackIds((List<Hero>)Clan_supporterNotablesCache.GetValue(Object));
             lordsIds = PackIds((List<Hero>)Clan_lordsCache.GetValue(Object));
             heroesIds = PackIds((List<Hero>)Clan_heroesCache.GetValue(Object));
@@ -59,7 +52,7 @@ namespace GameInterface.Serialization.External
             // If the stringId already exists in the object manager use that object
             if (stringId != null)
             {
-                var newObject = MBObjectManager.Instance.GetObject<Clan>(stringId);
+                var newObject = ResolveId<Clan>(stringId);
                 if (newObject != null)
                 {
                     Object = newObject;
@@ -69,11 +62,7 @@ namespace GameInterface.Serialization.External
 
             Clan_InitMembers.Invoke(Object, new object[0]);
 
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack());
-            }
+            base.UnpackFields();
 
             // Unpack special cases
             Clan_supporterNotablesCache.SetValue(Object, ResolveIds<Hero>(supporterNotablesIds).ToMBList());

@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.MobileParties.Messages;
 
 namespace Coop.Core.Server.States
 {
@@ -8,15 +9,15 @@ namespace Coop.Core.Server.States
     {
         public InitialServerState(IServerLogic context, IMessageBroker messageBroker) : base(context, messageBroker)
         {
-            MessageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
+            MessageBroker.Subscribe<CampaignLoaded>(Handle_GameLoaded);
         }
 
         public override void Dispose()
         {
-            MessageBroker.Unsubscribe<GameLoaded>(Handle_GameLoaded);
+            MessageBroker.Unsubscribe<CampaignLoaded>(Handle_GameLoaded);
         }
 
-        private void Handle_GameLoaded(MessagePayload<GameLoaded> payload)
+        private void Handle_GameLoaded(MessagePayload<CampaignLoaded> payload)
         {
             // Start server when game is fully loaded
             Logic.NetworkServer.Start();

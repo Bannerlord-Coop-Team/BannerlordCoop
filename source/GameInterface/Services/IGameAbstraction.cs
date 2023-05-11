@@ -1,6 +1,5 @@
-﻿namespace GameInterface.Services
+﻿namespace GameInterface.Services;
+
+internal interface IGameAbstraction
 {
-    internal interface IGameAbstraction
-    {
-    }
 }

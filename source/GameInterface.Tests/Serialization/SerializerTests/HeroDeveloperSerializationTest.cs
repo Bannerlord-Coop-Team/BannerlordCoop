@@ -1,20 +1,31 @@
-﻿using GameInterface.Serialization;
+﻿using Autofac;
+using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Tests.Bootstrap.Modules;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.ObjectSystem;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class HeroDeveloperSerializationTest
     {
+        IContainer container;
         public HeroDeveloperSerializationTest()
         {
             GameBootStrap.Initialize();
+
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         private readonly static FieldInfo _totalXp = typeof(HeroDeveloper).GetField("_totalXp", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -26,7 +37,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             HeroDeveloper HeroDeveloper = (HeroDeveloper)FormatterServices.GetUninitializedObject(typeof(HeroDeveloper));
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             HeroDeveloperBinaryPackage package = new HeroDeveloperBinaryPackage(HeroDeveloper, factory);
 
             package.Pack();
@@ -40,10 +51,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void HeroDeveloper_Full_Serialization()
         {
             Hero hero = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
+            var objectManager = container.Resolve<IObjectManager>();
 
             hero.StringId = "myHero";
 
-            MBObjectManager.Instance.RegisterObject(hero);
+            objectManager.AddExisting(hero.StringId, hero);
 
             // Setup instance and fields
             HeroDeveloper HeroDeveloper = (HeroDeveloper)FormatterServices.GetUninitializedObject(typeof(HeroDeveloper));
@@ -53,7 +65,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             UnspentFocusPoints.SetValue(HeroDeveloper, 54);
             UnspentAttributePoints.SetValue(HeroDeveloper, 68);
 
-            BinaryPackageFactory factory = new BinaryPackageFactory();
+            var factory = container.Resolve<IBinaryPackageFactory>();
             HeroDeveloperBinaryPackage package = new HeroDeveloperBinaryPackage(HeroDeveloper, factory);
 
             package.Pack();
@@ -68,7 +80,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             HeroDeveloperBinaryPackage returnedPackage = (HeroDeveloperBinaryPackage)obj;
 
-            HeroDeveloper newHeroDeveloper = returnedPackage.Unpack<HeroDeveloper>();
+            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+            HeroDeveloper newHeroDeveloper = returnedPackage.Unpack<HeroDeveloper>(deserializeFactory);
 
             Assert.Equal(HeroDeveloper.TotalXp, newHeroDeveloper.TotalXp);
             Assert.Equal(HeroDeveloper.UnspentFocusPoints, newHeroDeveloper.UnspentFocusPoints);
