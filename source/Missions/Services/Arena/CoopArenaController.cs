@@ -156,6 +156,12 @@ namespace Missions.Services
 
         private void Handle_JoinInfo(MessagePayload<NetworkMissionJoinInfo> payload)
         {
+            if (Mission.Current == null)
+            {
+                Logger.Error("Attempted to spawn other clients before mission was ready");\
+                return;
+            }
+
             Logger.Debug("Received join request");
             NetPeer netPeer = (NetPeer)payload.Who;
 
