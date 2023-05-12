@@ -129,6 +129,7 @@ namespace Missions.Services
                     agent.Character.StringId, 
                     agent.Health);
 
+                if (agent.Health <= 0) continue;
 
                 aiAgentDatas.Add(aiAgentData);
             }
