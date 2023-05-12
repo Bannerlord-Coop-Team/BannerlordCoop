@@ -158,7 +158,7 @@ namespace Missions.Services
         {
             if (Mission.Current == null)
             {
-                Logger.Error("Attempted to spawn other clients before mission was ready");\
+                Logger.Error("Attempted to spawn other clients before mission was ready");
                 return;
             }
 
