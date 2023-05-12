@@ -30,7 +30,7 @@ namespace Missions.Services.Agents.Handlers
             this.networkMessageBroker = networkMessageBroker;
 
             networkMessageBroker.Subscribe<WeaponDropped>(WeaponDropSend);
-            networkMessageBroker.Subscribe<NetworkWeaponDropped>(WeaponDropRecieve);
+            networkMessageBroker.Subscribe<NetworkWeaponDropped>(WeaponDropReceive);
         }
 
         ~WeaponDropHandler()
@@ -41,7 +41,7 @@ namespace Missions.Services.Agents.Handlers
         public void Dispose()
         {
             networkMessageBroker.Unsubscribe<WeaponDropped>(WeaponDropSend);
-            networkMessageBroker.Unsubscribe<NetworkWeaponDropped>(WeaponDropRecieve);
+            networkMessageBroker.Unsubscribe<NetworkWeaponDropped>(WeaponDropReceive);
         }
 
         private void WeaponDropSend(MessagePayload<WeaponDropped> obj)
@@ -59,11 +59,17 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.PublishNetworkEvent(message);
         }
 
-        private void WeaponDropRecieve(MessagePayload<NetworkWeaponDropped> obj)
+        private void WeaponDropReceive(MessagePayload<NetworkWeaponDropped> obj)
         { 
             if(networkAgentRegistry.TryGetAgent(obj.What.AgentGuid, out Agent agent) == false)
             {
                 Logger.Warning("No agent found for {guid} in {class}", obj.What.AgentGuid, typeof(WeaponDropHandler));
+                return;
+            }
+
+            if (agent.GetWeaponEntityFromEquipmentSlot(obj.What.EquipmentIndex) == null)
+            {
+                Logger.Error($"Tried to drop a weapon from an empty slot ({obj.What.EquipmentIndex})");
                 return;
             }
 
