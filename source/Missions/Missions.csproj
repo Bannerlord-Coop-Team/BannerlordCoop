@@ -151,6 +151,7 @@
   <ItemGroup>
     <Compile Include="Services\Agents\Handlers\AgentDamageHandler.cs" />
     <Compile Include="Services\Agents\Handlers\AgentDeathHandler.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkAgentKilled.cs" />
     <Compile Include="Services\Agents\Handlers\ShieldDamageHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
     <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
