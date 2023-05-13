@@ -25,6 +25,11 @@ namespace Missions.Services.Missiles
         /// <param name="localIdx">Index of the from this clients perspective</param>
         /// <returns></returns>
         bool TryGetIndex(NetPeer peer, int peerIdx, out int localIdx);
+
+        /// <summary>
+        /// Amount of peers in registry
+        /// </summary>
+        int Length { get; }
     }
 
     /// <inheritdoc />
@@ -38,6 +43,8 @@ namespace Missions.Services.Missiles
             new ConcurrentDictionary<int, PeerMissileIndexMap>();
 
         private List<MessagePayload<PeerMissileAdded>> queuedMissiles = new List<MessagePayload<PeerMissileAdded>>();
+
+        public int Length => queuedMissiles.Count;
 
         public NetworkMissileRegistry(IMessageBroker messageBroker)
         {

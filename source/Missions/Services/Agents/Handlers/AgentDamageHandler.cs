@@ -12,6 +12,7 @@ using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Serilog;
 using System;
+using System.Reflection;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
@@ -44,7 +45,11 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.Subscribe<AgentDamaged>(AgentDamageCheckSend);
             networkMessageBroker.Subscribe<NetworkDamageAgent>(AgentDamageCheck);
             networkMessageBroker.Subscribe<NetworkAgentDamaged>(AgentDamageRecieve);
+            networkMessageBroker.Subscribe<NetworkAgentKilled>(Handle_NetworkAgentKilled);
         }
+
+        
+
         ~AgentDamageHandler()
         {
             Dispose();
@@ -54,6 +59,7 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.Unsubscribe<AgentDamaged>(AgentDamageCheckSend);
             networkMessageBroker.Unsubscribe<NetworkDamageAgent>(AgentDamageCheck);
             networkMessageBroker.Unsubscribe<NetworkAgentDamaged>(AgentDamageRecieve);
+            networkMessageBroker.Unsubscribe<NetworkAgentKilled>(Handle_NetworkAgentKilled);
         }
 
         private void AgentDamageCheckSend(MessagePayload<AgentDamaged> payload)
@@ -98,20 +104,42 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.PublishNetworkEvent(netPeer, message);
         }
 
+        private static readonly FieldInfo Blow_OwnerId = typeof(Blow).GetField(nameof(Blow.OwnerId));
         private void AgentDamageCheck(MessagePayload<NetworkDamageAgent> payload)
         {
-            if (networkAgentRegistry.TryGetAgent(payload.What.VictimAgentId, out Agent resolvedAgent) == false) return;
+            if (networkAgentRegistry.TryGetAgent(payload.What.VictimAgentId, out Agent victimAgent) == false) return;
+            if (networkAgentRegistry.TryGetAgent(payload.What.AttackerAgentId, out Agent attackingAgent) == false) return;
 
-            if (resolvedAgent.Health <= 0) return;
+            if (victimAgent.Health <= 0) return;
 
-            NetworkAgentDamaged message = new NetworkAgentDamaged(
+            var message = payload.What;
+
+            var blow = message.Blow;
+            blow.OwnerId = attackingAgent.Index;
+
+
+            NetworkAgentDamaged damageMessage = new NetworkAgentDamaged(
                 payload.What.AttackerAgentId,
                 payload.What.VictimAgentId,
                 payload.What.AttackCollisionData,
                 payload.What.Blow);
 
-            networkMessageBroker.PublishNetworkEventExcept((NetPeer)payload.Who, message);
-            AgentDamagePatch.OverrideAgentDamage(resolvedAgent, payload.What.Blow, payload.What.AttackCollisionData);
+            networkMessageBroker.PublishNetworkEvent(damageMessage);
+            victimAgent.RegisterBlow(blow, message.AttackCollisionData);
+
+            if(victimAgent.Health <= 0)
+            {
+
+
+                var killedMessage = new NetworkAgentKilled(
+                    payload.What.VictimAgentId,
+                    payload.What.AttackerAgentId,
+                    payload.What.Blow);
+
+                Logger.Verbose($"Sending agent killed for {victimAgent.Name}");
+
+                networkMessageBroker.PublishNetworkEvent(killedMessage);
+            }
         }
 
         private void AgentDamageRecieve(MessagePayload<NetworkAgentDamaged> payload)
@@ -147,33 +175,67 @@ namespace Missions.Services.Agents.Handlers
                 networkAgentRegistry.ControlledAgents.TryGetValue(agentDamaData.AttackerAgentId, out effectorAgent);
             }
 
-            if (effectedAgent == null) return;
-            if (effectorAgent == null) return;
+            if (effectedAgent == null)
+            {
+                Logger.Error("Could not find victim agent");
+                return;
+            }
+
+            if (effectorAgent == null)
+            {
+                Logger.Error("Could not find attacker agent");
+                return;
+            }
 
             // If agent is already dead return
-            if (effectedAgent.Health <= 0) return;
+            if (effectedAgent.Health <= 0)
+            {
+                Logger.Error("Attempted to damage agent that was already dead");
+                return;
+            }
 
             // extract the blow
-            Blow b = agentDamaData.Blow;
+            Blow blow = agentDamaData.Blow;
 
-            if (b.IsMissile)
+            if (blow.IsMissile)
             {
-                var peerIdx = b.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
-                networkMissileRegistry.TryGetIndex(netPeer, peerIdx, out int localIdx);
-                b.WeaponRecord.AffectorWeaponSlotOrMissileIndex = localIdx;
+                var peerIdx = blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
+
+                if(networkMissileRegistry.TryGetIndex(netPeer, peerIdx, out int localIdx) == false)
+                {
+                    Logger.Error($"Missile did not exist in registry, idx: {peerIdx}, number of peers: {networkMissileRegistry.Length}");
+                    return;
+                }
+                ;
+                blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = localIdx;
             }
 
             // assign the blow owner from our own index
-            b.OwnerId = effectorAgent.Index;
+            blow.OwnerId = effectorAgent.Index;
 
             // extract the collision data
             AttackCollisionData collisionData = agentDamaData.AttackCollisionData;
 
-            GameLoopRunner.RunOnMainThread(() =>
+            // register a blow on the effected agent
+            RegisterBlowPatch.RunOriginalRegisterBlow(effectedAgent, blow, collisionData);
+        }
+
+        private void Handle_NetworkAgentKilled(MessagePayload<NetworkAgentKilled> obj)
+        {
+            if(networkAgentRegistry.TryGetAgent(obj.What.VictimAgentId, out var agent) &&
+               networkAgentRegistry.TryGetAgent(obj.What.AttackingAgentId, out var attackingAgent))
             {
-                // register a blow on the effected agent
-                effectedAgent.RegisterBlow(b, collisionData);
-            });
+                if (agent.Health <= 0) return;
+
+                Logger.Verbose($"Handling agent killed for {agent.Name} by {attackingAgent.Name}");
+
+                Blow blow = obj.What.Blow;
+
+                blow.OwnerId = attackingAgent.Index;
+
+                Agent.KillInfo overrideKillInfo = blow.IsFallDamage ? Agent.KillInfo.Gravity : Agent.KillInfo.Invalid;
+                agent.Die(blow, overrideKillInfo);
+            }
         }
     }
 }
