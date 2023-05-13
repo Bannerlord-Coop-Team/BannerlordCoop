@@ -10,6 +10,7 @@ using Missions.Services.Missiles;
 using Missions.Services.Missiles.Handlers;
 using Missions.Services.Network;
 using Missions.Services.Network.Data;
+using Missions.Services.Network.Handlers;
 using Missions.Services.Network.Messages;
 using Serilog;
 using System;
@@ -54,6 +55,7 @@ namespace Missions.Services
             IShieldDamageHandler shieldDamageHandler,
             IAgentDamageHandler agentDamageHandler,
             IAgentDeathHandler agentDeathHandler,
+            IServerDisconnectHandler serverDisconnectHandler,
             INetworkMissileRegistry networkMissileRegistry)
         {
             this.networkMessageBroker = networkMessageBroker;
@@ -70,6 +72,7 @@ namespace Missions.Services
                 agentDamageHandler,
                 agentDeathHandler,
                 networkMissileRegistry,
+                serverDisconnectHandler,
             };
 
             playerId = Guid.NewGuid();
