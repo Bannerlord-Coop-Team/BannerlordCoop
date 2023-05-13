@@ -73,8 +73,7 @@ namespace Missions
             builder.RegisterType<ShieldDamageHandler>().As<IShieldDamageHandler>().InstancePerLifetimeScope();
             builder.RegisterType<AgentDamageHandler>().As<IAgentDamageHandler>().InstancePerLifetimeScope();
             builder.RegisterType<AgentDeathHandler>().As<IAgentDeathHandler>().InstancePerLifetimeScope();
-
-            builder.RegisterType<ServerDisconnectHandler>().As<IServerDisconnectHandler>().InstancePerLifetimeScope().AutoActivate();
+            builder.RegisterType<ServerDisconnectHandler>().As<IServerDisconnectHandler>().InstancePerLifetimeScope();
 
             base.Load(builder);
         }
