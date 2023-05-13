@@ -129,10 +129,14 @@ namespace Missions.Services.Agents.Handlers
 
             if(victimAgent.Health <= 0)
             {
+
+
                 var killedMessage = new NetworkAgentKilled(
                     payload.What.VictimAgentId,
                     payload.What.AttackerAgentId,
                     payload.What.Blow);
+
+                Logger.Verbose($"Sending agent killed for {victimAgent.Name}");
 
                 networkMessageBroker.PublishNetworkEvent(killedMessage);
             }
@@ -223,7 +227,11 @@ namespace Missions.Services.Agents.Handlers
             {
                 if (agent.Health <= 0) return;
 
+                Logger.Verbose($"Handling agent killed for {agent.Name} by {attackingAgent.Name}");
+
                 Blow blow = obj.What.Blow;
+
+                blow.OwnerId = attackingAgent.Index;
 
                 Agent.KillInfo overrideKillInfo = blow.IsFallDamage ? Agent.KillInfo.Gravity : Agent.KillInfo.Invalid;
                 agent.Die(blow, overrideKillInfo);
