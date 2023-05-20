@@ -37,12 +37,12 @@ namespace Coop.Core.Server
             INetworkConfiguration configuration, 
             IMessageBroker messageBroker,
             IPacketManager packetManager,
-            IClientRegistry clientOrchestrator) : base(configuration)
+            IClientRegistry clientRegistry) : base(configuration)
         {
             // Dependancy assignment
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
-            this.clientRegistry = clientOrchestrator;
+            this.clientRegistry = clientRegistry;
 
             // TODO add configuration
             netManager = new NetManager(this);

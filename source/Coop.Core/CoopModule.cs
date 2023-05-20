@@ -19,9 +19,7 @@ namespace Coop.Core
             #region Communication
             builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
             builder.RegisterType<EventPacketHandler>().AsSelf().SingleInstance().AutoActivate();
-            builder.RegisterType<NetworkMessageBroker>().As<INetworkMessageBroker>().As<IMessageBroker>()
-                .SingleInstance()
-                .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
+            builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance();
             #endregion
 
             #region GameInterface

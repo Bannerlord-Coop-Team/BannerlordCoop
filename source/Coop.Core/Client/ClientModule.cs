@@ -12,8 +12,8 @@ namespace Coop.Core.Client
     {
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().SingleInstance();
-            builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().SingleInstance();
+            builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
+            builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
 
             foreach(var handlerType in HandlerCollector.Collect<ClientModule>())
             {
