@@ -4,8 +4,10 @@ using System.Text;
 
 namespace Common.Messaging
 {
-    public interface IResponse : IEvent
+    /// <summary>
+    /// Response to a <see cref="ICommand"/>
+    /// </summary>
+    public interface IResponse : IMessage
     {
-        Guid TransactionID { get; }
     }
 }
