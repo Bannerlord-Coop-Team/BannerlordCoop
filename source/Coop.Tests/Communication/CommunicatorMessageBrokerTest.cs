@@ -19,7 +19,7 @@ namespace Coop.Tests.Communication
 
             communicator.Subscribe<ExampleIncomingMessage>(payload => { });
             
-            var subscribers = (Dictionary<Type, ConcurrentList<WeakDelegate>>)typeof(MessageBroker)
+            var subscribers = (Dictionary<Type, List<WeakDelegate>>)typeof(MessageBroker)
                 .GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
                 .GetValue(communicator);
 
@@ -41,7 +41,7 @@ namespace Coop.Tests.Communication
             communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler);
             communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler2);
 
-            var subscribers = (Dictionary<Type, ConcurrentList<WeakDelegate>>)typeof(MessageBroker)
+            var subscribers = (Dictionary<Type, List<WeakDelegate>>)typeof(MessageBroker)
                 .GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
                 .GetValue(communicator);
 
@@ -67,7 +67,7 @@ namespace Coop.Tests.Communication
             void DelegateHandler(MessagePayload<ExampleIncomingMessage> payload) { }
             communicator.Subscribe<ExampleIncomingMessage>(DelegateHandler);
 
-            var subscribers = (Dictionary<Type, ConcurrentList<WeakDelegate>>)typeof(MessageBroker)
+            var subscribers = (Dictionary<Type, List<WeakDelegate>>)typeof(MessageBroker)
                 .GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
                 .GetValue(communicator);
 
@@ -106,7 +106,7 @@ namespace Coop.Tests.Communication
         }
     }
 
-    internal readonly struct ExampleIncomingMessage
+    internal record ExampleIncomingMessage : IMessage
     {
         public int ExampleData { get; }
 

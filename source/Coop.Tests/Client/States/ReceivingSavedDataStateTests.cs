@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;
 using GameInterface.Services.GameState.Messages;
+using Common.Messaging;
 
 namespace Coop.Tests.Client.States
 {
@@ -16,204 +17,198 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         public ReceivingSavedDataStateTests(ITestOutputHelper output) : base(output)
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
-            clientLogic.State = new ReceivingSavedDataState(clientLogic);
+            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            // Setup
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            // Arrange
+            clientLogic.State = new ReceivingSavedDataState(clientLogic);
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
-            // Execution
+            // Act
             clientLogic.State.Dispose();
 
-            // Verification
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
-        public void NetworkGameSaveDataRecieved_Publishes_EnterMainMenuEvent()
+        public void NetworkGameSaveDataReceived_Publishes_EnterMainMenuEvent()
         {
-            // Setup
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var currentState = new ReceivingSavedDataState(clientLogic);
+            clientLogic.State = currentState;
 
-            // Execution
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkGameSaveDataReceived());
+            var gameSaveData = new byte[16];
+            var campaignId = "12345";
 
-            // Verification
-            Assert.True(isEventPublished);
+            var payload = new MessagePayload<NetworkGameSaveDataReceived>(
+                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null));
+
+            // Act
+            currentState.Handle_NetworkGameSaveDataReceived(payload);
+
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
         public void MainMenuEntered_Publishes_LoadGameSave()
         {
-            // Setup
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<LoadGameSave>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var currentState = new ReceivingSavedDataState(clientLogic);
+            clientLogic.State = currentState;
 
-            var gameObjectGuids = new GameObjectGuids(
-                new string[] { "Random STR" });
+            var gameSaveData = new byte[16];
+            var campaignId = "12345";
 
-            var networkMessage = new NetworkGameSaveDataReceived(
-                new byte[] { 1 },
-                "TestData",
-                gameObjectGuids);
+            var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
+                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null));
 
-            // Execution
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, networkMessage);
-            StubMessageBroker.Publish(this, new MainMenuEntered());
+            currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
 
-            // Verification
-            Assert.True(isEventPublished);
-        }
+            var mainMenuPayload = new MessagePayload<MainMenuEntered>(
+                this, new MainMenuEntered());
 
-        [Fact]
-        public void MainMenuEntered_Transitions_LoadingState()
-        {
-            // Setup
-            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
+            // Act
+            currentState.Handle_MainMenuEntered(mainMenuPayload);
 
-            var networkMessage = new NetworkGameSaveDataReceived(
-                new byte[] { 1 },
-                "TestData",
-                gameObjectGuids);
+            // Assert
+            Assert.Equal(2, MockMessageBroker.PublishedMessages.Count);
+            var message = MockMessageBroker.PublishedMessages[1];
+            var loadSaveMessage = Assert.IsType<LoadGameSave>(message);
+            Assert.Equal(gameSaveData, loadSaveMessage.SaveData);
 
-            // Execution
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, networkMessage);
-            StubMessageBroker.Publish(this, new MainMenuEntered());
-
-            // Verification
             Assert.IsType<LoadingState>(clientLogic.State);
         }
 
         [Fact]
         public void MainMenuEntered_Handles_DefaultData()
         {
-            // Setup
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<LoadGameSave>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var currentState = new ReceivingSavedDataState(clientLogic);
+            clientLogic.State = currentState;
 
-            // Execution
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, default(NetworkGameSaveDataReceived));
-            StubMessageBroker.Publish(this, new MainMenuEntered());
+            var campaignId = "12345";
 
-            // Verification
+            var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
+                this, new NetworkGameSaveDataReceived(default, campaignId, null));
+
+            currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
+
+            var mainMenuPayload = new MessagePayload<MainMenuEntered>(
+                this, new MainMenuEntered());
+
+            // Act
+            currentState.Handle_MainMenuEntered(mainMenuPayload);
+
+            // Assert
+            Assert.Single(MockMessageBroker.PublishedMessages);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
-            Assert.False(isEventPublished);
         }
 
         [Fact]
         public void MainMenuEntered_Handles_NullSaveData()
         {
-            // Setup
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<LoadGameSave>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var currentState = new ReceivingSavedDataState(clientLogic);
+            clientLogic.State = currentState;
 
-            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
+            var campaignId = "12345";
 
-            var networkMessage = new NetworkGameSaveDataReceived(
-                null,
-                "TestData",
-                gameObjectGuids);
+            var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
+                this, new NetworkGameSaveDataReceived(null, campaignId, null));
 
-            // Execution
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, networkMessage);
-            StubMessageBroker.Publish(this, new MainMenuEntered());
+            currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
 
-            // Verification
+            var mainMenuPayload = new MessagePayload<MainMenuEntered>(
+                this, new MainMenuEntered());
+
+            // Act
+            currentState.Handle_MainMenuEntered(mainMenuPayload);
+
+            // Assert
+            Assert.Single(MockMessageBroker.PublishedMessages);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
-            Assert.False(isEventPublished);
         }
 
         [Fact]
         public void MainMenuEntered_Handles_ZeroLenArray()
         {
-            // Setup
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<LoadGameSave>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var currentState = new ReceivingSavedDataState(clientLogic);
+            clientLogic.State = currentState;
 
-            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
+            var gameSaveData = Array.Empty<byte>();
+            var campaignId = "12345";
 
-            var networkMessage = new NetworkGameSaveDataReceived(
-                Array.Empty<byte>(),
-                "TestData",
-                gameObjectGuids);
+            var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
+                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null));
 
-            // Execution
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, networkMessage);
-            StubMessageBroker.Publish(this, new MainMenuEntered());
+            currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
 
-            // Verification
+            var mainMenuPayload = new MessagePayload<MainMenuEntered>(
+                this, new MainMenuEntered());
+
+            // Act
+            currentState.Handle_MainMenuEntered(mainMenuPayload);
+
+            // Assert
+            Assert.Single(MockMessageBroker.PublishedMessages);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
-            Assert.False(isEventPublished);
         }
 
         [Fact]
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
-            // Setup
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var currentState = new ReceivingSavedDataState(clientLogic);
+            clientLogic.State = currentState;
 
-            // Execution
+            // Act
             clientLogic.EnterMainMenu();
 
-            // Verification
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
         public void Disconnect_Publishes_EnterMainMenu()
         {
-            // Setup
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var currentState = new ReceivingSavedDataState(clientLogic);
+            clientLogic.State = currentState;
 
-            // Execution
+            // Act
             clientLogic.Disconnect();
 
-            // Verification
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
         public void Disconnect_Transitions_EnterMainMenu()
         {
-            // Execution
+            // Act
             clientLogic.Disconnect();
 
-            // Verification
+            // Assert
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
 
         [Fact]
         public void OtherStateMethods_DoNotAlterState()
         {
+            // Arrange
+            var currentState = new ReceivingSavedDataState(clientLogic);
+            clientLogic.State = currentState;
+
+            // Act
             clientLogic.Connect();
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
 

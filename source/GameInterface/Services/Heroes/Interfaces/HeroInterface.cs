@@ -14,7 +14,7 @@ namespace GameInterface.Services.Heroes.Interfaces;
 
 internal interface IHeroInterface : IGameAbstraction
 {
-    void PackageMainHero();
+    byte[] PackageMainHero();
     void ResolveHero(ResolveHero message);
     void SwitchMainHero(string heroId);
     Hero UnpackMainHero(byte[] bytes);
@@ -37,11 +37,10 @@ internal class HeroInterface : IHeroInterface
         this.messageBroker = messageBroker;
     }
 
-    public void PackageMainHero()
+    public byte[] PackageMainHero()
     {
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
-        byte[] bytes = BinaryFormatterSerializer.Serialize(package);
-        messageBroker.Publish(this, new NewHeroPackaged(bytes));
+        return BinaryFormatterSerializer.Serialize(package);
     }
 
     public Hero UnpackMainHero(byte[] bytes)
@@ -53,7 +52,7 @@ internal class HeroInterface : IHeroInterface
     public void ResolveHero(ResolveHero message)
     {
         // TODO implement
-        messageBroker.Publish(this, new ResolveDebugHero(message.TransactionID, message.PlayerId));
+        messageBroker.Publish(this, new ResolveDebugHero(message.PlayerId));
     }
 
     public void SwitchMainHero(string heroId)

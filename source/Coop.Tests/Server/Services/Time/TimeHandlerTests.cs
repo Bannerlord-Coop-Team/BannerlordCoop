@@ -2,77 +2,29 @@
 using Common.Network;
 using Coop.Core.Server.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
+using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
 using Xunit;
 
 namespace Coop.Tests.Server.Services.Time
 {
     public class TimeHandlerTests
     {
-        public class MockNetworkMessageBroker : INetworkMessageBroker
-        {
-            public List<Delegate> Subscriptions { get; } = new List<Delegate>();
-            public List<object> PublishedMessages { get; } = new List<object>();
-            public List<object> PublishedNetworkMessages { get; } = new List<object>();
-
-            public void Subscribe<T>(Action<MessagePayload<T>> handler)
-            {
-                Subscriptions.Add(handler);
-            }
-
-            public void Unsubscribe<T>(Action<MessagePayload<T>> handler)
-            {
-                Subscriptions.Remove(handler);
-            }
-
-            public void Publish<T>(object sender, T message)
-            {
-                PublishedMessages.Add(message);
-            }
-
-            public void PublishNetworkEvent(object message)
-            {
-                PublishedMessages.Add(message);
-            }
-
-            public void PublishNetworkEvent(INetworkEvent networkEvent)
-            {
-                PublishedNetworkMessages.Add(networkEvent);
-            }
-
-            public void PublishNetworkEvent(NetPeer peer, INetworkEvent networkEvent)
-            {
-                PublishNetworkEvent(networkEvent);
-            }
-
-            public void Dispose()
-            {
-            }
-        }
-
-        [Fact]
-        public void Constructor_SubscribesToMessageBroker()
-        {
-            // Arrange
-            var broker = new MockNetworkMessageBroker();
-
-            // Act
-            var handler = new TimeHandler(broker);
-
-            // Assert
-            Assert.Equal(2, broker.Subscriptions.Count);
-        }
-
         [Fact]
         public void Dispose_UnsubscribesFromMessageBroker()
         {
             // Arrange
-            var broker = new MockNetworkMessageBroker();
-            var handler = new TimeHandler(broker);
+            var broker = new MockMessageBroker();
+            var network = new MockNetwork();
+            var handler = new TimeHandler(broker, network);
+
+            Assert.NotEmpty(broker.Subscriptions);
 
             // Act
             handler.Dispose();
@@ -82,11 +34,12 @@ namespace Coop.Tests.Server.Services.Time
         }
 
         [Fact]
-        public void Handle_NetworkRequestTimeSpeedChange_PublishesSetTimeControlMode()
+        public void NetworkRequestTimeSpeedChange_Publishes_SetTimeControlMode()
         {
             // Arrange
-            var broker = new MockNetworkMessageBroker();
-            var handler = new TimeHandler(broker);
+            var broker = new MockMessageBroker();
+            var network = new MockNetwork();
+            var handler = new TimeHandler(broker, network);
             var payload = new NetworkRequestTimeSpeedChange(TimeControlEnum.Pause);
             var message = new MessagePayload<NetworkRequestTimeSpeedChange>(null, payload);
 
@@ -97,24 +50,30 @@ namespace Coop.Tests.Server.Services.Time
             Assert.Single(broker.PublishedMessages);
             Assert.IsType<SetTimeControlMode>(broker.PublishedMessages[0]);
             var setTimeControlMode = (SetTimeControlMode)broker.PublishedMessages[0];
-            Assert.Equal(Guid.Empty, setTimeControlMode.TransactionID);
             Assert.Equal(payload.NewControlMode, setTimeControlMode.NewTimeMode);
         }
 
         [Fact]
-        public void Handle_TimeSpeedChanged_PublishesNetworkTimeSpeedChanged()
+        public void TimeSpeedChanged_Publishes_NetworkTimeSpeedChanged()
         {
             // Arrange
-            var broker = new MockNetworkMessageBroker();
-            var handler = new TimeHandler(broker);
-            var message = new MessagePayload<TimeSpeedChanged>(null, new TimeSpeedChanged());
+            var broker = new MockMessageBroker();
+            var network = new MockNetwork();
+            var handler = new TimeHandler(broker, network);
+            var message = new MessagePayload<TimeSpeedChanged>(null, new TimeSpeedChanged(CampaignTimeControlMode.StoppablePlay));
+
+            network.CreatePeer();
 
             // Act
             handler.Handle_TimeSpeedChanged(message);
 
             // Assert
-            Assert.Single(broker.PublishedNetworkMessages);
-            Assert.IsType<NetworkTimeSpeedChanged>(broker.PublishedNetworkMessages[0]);
+            Assert.NotEmpty(network.Peers);
+            foreach(var peer in network.Peers)
+            {
+                var speedChangedMessage = Assert.Single(network.GetPeerMessages(peer));
+                Assert.IsType<NetworkTimeSpeedChanged>(speedChangedMessage);
+            }
         }
     }
 }

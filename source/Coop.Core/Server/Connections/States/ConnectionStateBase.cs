@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network;
 
 namespace Coop.Core.Server.Connections.States
 {
@@ -7,7 +8,7 @@ namespace Coop.Core.Server.Connections.States
     /// </summary>
     public abstract class ConnectionStateBase : IConnectionState
     {
-        public IConnectionLogic ConnectionLogic;
+        public IConnectionLogic ConnectionLogic { get; }
 
         public ConnectionStateBase(IConnectionLogic connectionLogic)
         {

@@ -1,6 +1,8 @@
-﻿namespace GameInterface.Services.Heroes.Messages;
+﻿using Common.Messaging;
 
-public readonly struct SwitchToHero
+namespace GameInterface.Services.Heroes.Messages;
+
+public record SwitchToHero : ICommand
 {
     public string HeroId { get; }
 

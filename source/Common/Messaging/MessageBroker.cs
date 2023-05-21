@@ -22,7 +22,17 @@ namespace Common.Messaging
         private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
         protected static MessageBroker _instance;
         protected readonly Dictionary<Type, List<WeakDelegate>> _subscribers;
-        public static MessageBroker Instance => _instance;
+        public static MessageBroker Instance { 
+            get
+            {
+                if( _instance == null)
+                {
+                    _instance = new MessageBroker();
+                }
+                return _instance;
+            } 
+        } 
+            
 
         public MessageBroker()
         {

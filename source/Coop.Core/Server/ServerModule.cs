@@ -19,7 +19,7 @@ namespace Coop.Core.Server
             builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
             builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
             builder.RegisterType<InitialServerState>().As<IServerState>();
-            builder.RegisterType<ClientRegistry>().As<IClientRegistry>().InstancePerLifetimeScope();
+            builder.RegisterType<ClientRegistry>().As<IClientRegistry>().InstancePerLifetimeScope().AutoActivate();
             builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
 
             foreach (var handlerType in HandlerCollector.Collect<ServerModule>())

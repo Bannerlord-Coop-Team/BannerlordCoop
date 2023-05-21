@@ -1,11 +1,9 @@
 ﻿using Common.Logging;
 using Common.LogicStates;
 using Common.Messaging;
-using Coop.Core.Client;
+using Common.Network;
 using Coop.Core.Server.States;
-using GameInterface;
 using Serilog;
-using Serilog.Core;
 
 namespace Coop.Core.Server
 {
@@ -22,7 +20,7 @@ namespace Coop.Core.Server
         /// <summary>
         /// Networking Server for Server-side
         /// </summary>
-        ICoopServer NetworkServer { get; }
+        INetwork Network { get; }
     }
 
     /// <inheritdoc cref="IServerLogic"/>
@@ -45,13 +43,18 @@ namespace Coop.Core.Server
 
         public IMessageBroker MessageBroker { get; }
 
-        public ICoopServer NetworkServer { get; }
+        public INetwork Network { get; }
 
-        public ServerLogic(IMessageBroker messageBroker, ICoopServer networkServer)
+        public ServerLogic(IMessageBroker messageBroker, INetwork networkServer)
         {
             State = new InitialServerState(this, messageBroker);
             MessageBroker = messageBroker;
-            NetworkServer = networkServer;
+            Network = networkServer;
+        }
+
+        public void Dispose()
+        {
+            State.Dispose();
         }
 
         public void Start()
@@ -62,12 +65,7 @@ namespace Coop.Core.Server
         public void Stop()
         {
             State.Stop();
-            NetworkServer.Stop();
-        }
-
-        public void Dispose()
-        {
-            State.Dispose();
+            Network.Stop();
         }
     }
 }

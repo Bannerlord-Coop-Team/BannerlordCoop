@@ -4,12 +4,12 @@ using ProtoBuf;
 namespace Coop.Core.Server.Connections.Messages
 {
     [ProtoContract]
-    public readonly struct NetworkEnableTimeControls : INetworkEvent
+    public record NetworkEnableTimeControls : ICommand
     {
     }
 
     [ProtoContract]
-    public readonly struct NetworkDisableTimeControls : INetworkEvent
+    public record NetworkDisableTimeControls : ICommand
     {
     }
 }

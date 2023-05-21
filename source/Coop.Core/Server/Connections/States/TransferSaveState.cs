@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using Coop.Core.Client.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Heroes.Messages;
@@ -8,42 +9,41 @@ namespace Coop.Core.Server.Connections.States
 {
     public class TransferSaveState : ConnectionStateBase
     {
-        private Guid PackageGameTransactionId;
+        private IMessageBroker messageBroker;
+        private INetwork network;
 
         public TransferSaveState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
-            ConnectionLogic.NetworkMessageBroker.Subscribe<GameSaveDataPackaged>(Handle);
+            network = ConnectionLogic.Network;
+            messageBroker = ConnectionLogic.MessageBroker;
 
-            ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(new NetworkDisableTimeControls());
+            messageBroker.Subscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
+
+            network.SendAll(new NetworkDisableTimeControls());
             // TODO will conflict with timemode changed event
-            ConnectionLogic.NetworkMessageBroker.Publish(this, new PauseAndDisableGameTimeControls());
-
-            PackageGameTransactionId = Guid.NewGuid();
-            ConnectionLogic.NetworkMessageBroker.Publish(this, new PackageGameSaveData(PackageGameTransactionId));
+            messageBroker.Publish(this, new PauseAndDisableGameTimeControls());
+            messageBroker.Publish(this, new PackageGameSaveData());
         }
 
         public override void Dispose()
         {
-            ConnectionLogic.NetworkMessageBroker.Unsubscribe<GameSaveDataPackaged>(Handle);
+            messageBroker.Unsubscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
         }
 
         
-        private void Handle(MessagePayload<GameSaveDataPackaged> obj)
+        internal void Handle_GameSaveDataPackaged(MessagePayload<GameSaveDataPackaged> obj)
         {
             var payload = obj.What;
-            if(PackageGameTransactionId == payload.TransactionID)
-            {
-                var peer = ConnectionLogic.PlayerId;
-                var networkEvent = new NetworkGameSaveDataReceived(
-                    payload.GameSaveData,
-                    payload.CampaignID,
-                    null); // TODO manage controlled objects
+            var peer = ConnectionLogic.Peer;
+            var networkEvent = new NetworkGameSaveDataReceived(
+                payload.GameSaveData,
+                payload.CampaignID,
+                null); // TODO manage controlled objects
 
-                ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(peer, networkEvent);
+            network.Send(peer, networkEvent);
 
-                ConnectionLogic.Load();
-            }
+            ConnectionLogic.Load();
         }
 
         public override void CreateCharacter()

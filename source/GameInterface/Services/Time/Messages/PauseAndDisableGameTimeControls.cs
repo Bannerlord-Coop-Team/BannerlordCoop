@@ -3,12 +3,6 @@ using System;
 
 namespace GameInterface.Services.Heroes.Messages;
 
-public readonly struct PauseAndDisableGameTimeControls : ICommand
+public record PauseAndDisableGameTimeControls : ICommand
 {
-    public Guid TransactionID { get; }
-
-    public PauseAndDisableGameTimeControls(Guid transactionID)
-    {
-        TransactionID = transactionID;
-    }
 }

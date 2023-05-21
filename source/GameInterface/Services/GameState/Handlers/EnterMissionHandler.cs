@@ -15,16 +15,16 @@ internal class EnterMissionHandler : IHandler
         this.gameStateInterface = gameStateInterface;
         this.messageBroker = messageBroker;
 
-        messageBroker.Subscribe<EnterMainMenu>(Handle);
+        messageBroker.Subscribe<EnterMainMenu>(Handle_EnterMainMenu);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<EnterMainMenu>(Handle);
+        messageBroker.Unsubscribe<EnterMainMenu>(Handle_EnterMainMenu);
     }
 
-    private void Handle(MessagePayload<EnterMainMenu> obj)
+    private void Handle_EnterMainMenu(MessagePayload<EnterMainMenu> obj)
     {
-        messageBroker.Publish(this, new EnterMissionState(obj.What.TransactionID));
+        messageBroker.Publish(this, new EnterMissionState());
     }
 }

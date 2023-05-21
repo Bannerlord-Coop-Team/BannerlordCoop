@@ -1,4 +1,5 @@
-﻿using Coop.Core.Client;
+﻿using Common.Messaging;
+using Coop.Core.Client;
 using Coop.Core.Client.States;
 using GameInterface.Services.GameState.Messages;
 using Moq;
@@ -13,82 +14,110 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         public MissionStateTests(ITestOutputHelper output) : base(output)
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
-            clientLogic.State = new MissionState(clientLogic);
+            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            // Arrange
+            clientLogic.State = new MissionState(clientLogic);
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
+            // Act
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void EnterCampaignState_Transitions_CampaignState()
         {
-            StubMessageBroker.Publish(this, new CampaignStateEntered());
+            // Arrange
+            var missionState = new MissionState(clientLogic);
+            clientLogic.State = missionState;
 
+            var payload = new MessagePayload<CampaignStateEntered>(
+                this, new CampaignStateEntered());
+
+            // Act
+            missionState.Handle_CampaignStateEntered(payload);
+
+            // Assert
             Assert.IsType<CampaignState>(clientLogic.State);
         }
 
         [Fact]
         public void EnterCampaignState_Publishes_EnterCampaignState()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterCampaignState>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var missionState = new MissionState(clientLogic);
+            clientLogic.State = missionState;
 
+            // Act
             clientLogic.EnterCampaignState();
 
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterCampaignState>(message);
         }
 
         [Fact]
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var missionState = new MissionState(clientLogic);
+            clientLogic.State = missionState;
 
+            // Act
             clientLogic.EnterMainMenu();
 
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
-        public void EnterMainMenu_Transitions_MainMenuState()
+        public void MainMenuEntered_Transitions_MainMenuState()
         {
-            StubMessageBroker.Publish(this, new MainMenuEntered());
+            // Arrange
+            var missionState = new MissionState(clientLogic);
+            clientLogic.State = missionState;
 
+            var payload = new MessagePayload<MainMenuEntered>(
+                this, new MainMenuEntered());
+
+            // Act
+            missionState.Handle_MainMenuEntered(payload);
+
+            // Assert
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
 
         [Fact]
         public void Disconnect_Publishes_EnterMainMenu()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var missionState = new MissionState(clientLogic);
+            clientLogic.State = missionState;
 
+            // Act
             clientLogic.Disconnect();
 
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
         public void OtherStateMethods_DoNotAlterState()
         {
+            // Arrange
+            var missionState = new MissionState(clientLogic);
+            clientLogic.State = missionState;
+
+            // Act
             clientLogic.Connect();
             Assert.IsType<MissionState>(clientLogic.State);
 

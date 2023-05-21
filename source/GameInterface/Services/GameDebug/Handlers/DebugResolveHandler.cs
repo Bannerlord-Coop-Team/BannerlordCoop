@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.UI.Messages;
 using System;
 
@@ -26,7 +27,8 @@ namespace GameInterface.Services.GameDebug.Handlers
 
         private void Handle(MessagePayload<ResolveDebugHero> obj)
         {
-            heroDebugInterface.ResolveHero(obj.What);
+            heroDebugInterface.TryResolveHero(obj.What, out string stringID);
+            messageBroker.Respond(obj.Who, new HeroResolved(stringID));
         }
     }
 }

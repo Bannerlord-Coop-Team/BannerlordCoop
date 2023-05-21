@@ -28,7 +28,6 @@ namespace Coop.Core.Server
 
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
-        private readonly IClientRegistry clientRegistry;
         private readonly NetManager netManager;
 
         private bool allowJoining = false;
@@ -36,13 +35,11 @@ namespace Coop.Core.Server
         public CoopServer(
             INetworkConfiguration configuration, 
             IMessageBroker messageBroker,
-            IPacketManager packetManager,
-            IClientRegistry clientRegistry) : base(configuration)
+            IPacketManager packetManager) : base(configuration)
         {
             // Dependancy assignment
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
-            this.clientRegistry = clientRegistry;
 
             // TODO add configuration
             netManager = new NetManager(this);

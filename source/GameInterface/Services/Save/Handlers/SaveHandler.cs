@@ -27,14 +27,12 @@ internal class SaveHandler : IHandler
 
     private void Handle(MessagePayload<PackageGameSaveData> obj)
     {
-        var transactionId = obj.What.TransactionID;
         var gameData = saveInterface.SaveCurrentGame();
 
         var packagedMessage = new GameSaveDataPackaged(
-            transactionId,
             gameData,
             Campaign.Current?.UniqueGameId);
 
-        messageBroker.Publish(this, packagedMessage);
+        messageBroker.Respond(obj.Who, packagedMessage);
     }
 }

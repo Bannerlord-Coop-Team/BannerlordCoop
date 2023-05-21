@@ -11,7 +11,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
 {
     internal interface IDebugHeroInterface : IGameAbstraction
     {
-        void ResolveHero(ResolveDebugHero message);
+        bool TryResolveHero(ResolveDebugHero message, out string stringId);
     }
 
     public class DebugHeroInterface : IDebugHeroInterface
@@ -33,15 +33,15 @@ namespace GameInterface.Services.GameDebug.Interfaces
             this.messageBroker = messageBroker;
         }
 
-        public void ResolveHero(ResolveDebugHero message)
+        public bool TryResolveHero(ResolveDebugHero message, out string stringId)
         {
-            if(PlayerIdMap.TryGetValue(message.PlayerId, out string stringId) == false)
+            if(PlayerIdMap.TryGetValue(message.PlayerId, out stringId) == false)
             {
                 Logger.Warning("Could not find {player} in {dict}", message.PlayerId, PlayerIdMap);
-                return;
+                return false;
             }
 
-            messageBroker.Publish(this, new HeroResolved(message.TransactionID, stringId));
+            return true;
         }
     }
 }

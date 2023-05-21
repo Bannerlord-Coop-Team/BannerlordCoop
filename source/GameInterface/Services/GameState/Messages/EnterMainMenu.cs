@@ -6,25 +6,13 @@ namespace GameInterface.Services.GameState.Messages;
 /// <summary>
 /// Goes to the main menu from any game state.
 /// </summary>
-public readonly struct EnterMainMenu : ICommand
+public record EnterMainMenu : ICommand
 {
-    public Guid TransactionID { get; }
-
-    public EnterMainMenu(Guid transactionID)
-    {
-        TransactionID = transactionID;
-    }
 }
 
 /// <summary>
-/// Reply to <seealso cref="EnterMainMenu"/>.
+/// Event when main menu is entered
 /// </summary>
-public readonly struct MainMenuEntered : IResponse
+public record MainMenuEntered : IEvent
 {
-    public Guid TransactionID { get; }
-
-    public MainMenuEntered(Guid transactionID)
-    {
-        TransactionID = transactionID;
-    }
 }

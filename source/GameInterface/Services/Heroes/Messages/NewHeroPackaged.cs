@@ -1,6 +1,8 @@
-﻿namespace GameInterface.Services.Heroes.Messages;
+﻿using Common.Messaging;
 
-public readonly struct NewHeroPackaged
+namespace GameInterface.Services.Heroes.Messages;
+
+public record NewHeroPackaged : IResponse 
 {
     public byte[] Package { get; }
 

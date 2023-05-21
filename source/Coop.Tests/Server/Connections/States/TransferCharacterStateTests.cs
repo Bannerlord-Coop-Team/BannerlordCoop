@@ -1,13 +1,11 @@
-﻿using Coop.Core.Client.Messages;
+﻿using Common.Messaging;
+using Coop.Core.Client.Messages;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
-using Coop.Tests.Extensions;
-using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
-using System;
-using System.Runtime.Serialization;
+using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -15,141 +13,103 @@ namespace Coop.Tests.Server.Connections.States
 {
     public class TransferCharacterStateTests : CoopTest
     {
-        private readonly IConnectionLogic _connectionLogic;
-        private readonly NetPeer _playerId = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
-        private readonly NetPeer _differentPlayer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        private readonly IConnectionLogic connectionLogic;
+        private readonly NetPeer playerPeer;
+        private readonly NetPeer differentPeer;
 
         public TransferCharacterStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(_playerId, StubNetworkMessageBroker);
-            _differentPlayer.SetId(_playerId.Id + 1);
+            playerPeer = MockNetwork.CreatePeer();
+            differentPeer = MockNetwork.CreatePeer();
+            connectionLogic = new ConnectionLogic(playerPeer, MockMessageBroker, MockNetwork);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            _connectionLogic.State = new CampaignState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new CampaignState(connectionLogic);
 
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
-            _connectionLogic.State.Dispose();
+            // Act
+            connectionLogic.State.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void LoadMethod_TransitionState_LoadingState()
         {
-            _connectionLogic.State = new TransferSaveState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new TransferSaveState(connectionLogic);
 
-            _connectionLogic.Load();
+            // Act
+            connectionLogic.Load();
 
-            Assert.IsType<LoadingState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new TransferSaveState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new TransferSaveState(connectionLogic);
 
-            _connectionLogic.CreateCharacter();
-            _connectionLogic.TransferSave();
-            _connectionLogic.EnterCampaign();
-            _connectionLogic.EnterMission();
+            // Act
+            connectionLogic.CreateCharacter();
+            connectionLogic.TransferSave();
+            connectionLogic.EnterCampaign();
+            connectionLogic.EnterMission();
 
-            Assert.IsType<TransferSaveState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<TransferSaveState>(connectionLogic.State);
         }
 
         [Fact]
         public void CreateCharacterState_EntryEvents()
         {
-            // Setup event callbacks
-            var networkDisableTimeControlsCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkDisableTimeControls>((payload) =>
+            // Act
+            connectionLogic.State = new TransferSaveState(connectionLogic);
+
+            // Assert
+            Assert.NotEmpty(MockNetwork.SentNetworkMessages);
+
+            foreach(var peer in MockNetwork.Peers)
             {
-                networkDisableTimeControlsCount += 1;
-            });
+                var message = Assert.Single(MockNetwork.GetPeerMessages(peer));
+                Assert.IsType<NetworkDisableTimeControls>(message);
+            }
 
-            var pauseAndDisableGameTimeControlsCount = 0;
-            StubNetworkMessageBroker.Subscribe<PauseAndDisableGameTimeControls>((payload) =>
-            {
-                pauseAndDisableGameTimeControlsCount += 1;
-            });
-
-            var packageGameSaveDataCount = 0;
-            StubNetworkMessageBroker.Subscribe<PackageGameSaveData>((payload) =>
-            {
-                packageGameSaveDataCount += 1;
-
-                // Verify new transaction id is generated
-                Assert.NotEqual(default, payload.What.TransactionID);
-            });
-
-            // Trigger state entry
-            _connectionLogic.State = new TransferSaveState(_connectionLogic);
-
-            // All events are called exactly once
-            Assert.Equal(1, networkDisableTimeControlsCount);
-            Assert.Equal(1, pauseAndDisableGameTimeControlsCount);
-            Assert.Equal(1, packageGameSaveDataCount);
+            Assert.IsType<PauseAndDisableGameTimeControls>(MockMessageBroker.PublishedMessages[0]);
+            Assert.IsType<PackageGameSaveData>(MockMessageBroker.PublishedMessages[1]);
         }
 
         [Fact]
         public void GameSaveDataPackaged_ValidTransactionId()
         {
-            Guid transactionId = default;
-            StubNetworkMessageBroker.Subscribe<PackageGameSaveData>((payload) =>
-            {
-                transactionId = payload.What.TransactionID;
-            });
+            // Arrange
+            var currentState = new TransferSaveState(connectionLogic);
+            connectionLogic.State = currentState;
 
-            _connectionLogic.State = new TransferSaveState(_connectionLogic);
+            byte[] data = new byte[1];
+            string campaignId = "12345";
 
-            // Ensure transaction id was generated
-            Assert.NotEqual(default, transactionId);
+            // Act
+            var payload = new MessagePayload<GameSaveDataPackaged>(
+                null, new GameSaveDataPackaged(data, campaignId));
+            currentState.Handle_GameSaveDataPackaged(payload);
 
-            var networkGameSaveDataRecievedCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkGameSaveDataReceived>((payload) =>
-            {
-                networkGameSaveDataRecievedCount += 1;
-            });
+            // Assert
+            Assert.Equal(2, MockNetwork.GetPeerMessages(playerPeer).Count());
+            var message = MockNetwork.GetPeerMessages(playerPeer).Last();
+            var castedMessage = Assert.IsType<NetworkGameSaveDataReceived>(message);
+            Assert.Equal(data, castedMessage.GameSaveData);
+            Assert.Equal(campaignId, castedMessage.CampaignID);
 
-            // Publish hero resolved, this would be from game interface
-            var gameObjectGuids = new GameObjectGuids(
-                new string[] { "Random STR" });
-
-            var message = new GameSaveDataPackaged(
-                transactionId,
-                Array.Empty<byte>(),
-                "TestCampaingId");
-
-            StubMessageBroker.Publish(_playerId, message);
-
-            Assert.Equal(1, networkGameSaveDataRecievedCount);
-            Assert.IsType<LoadingState>(_connectionLogic.State);
-        }
-
-        [Fact]
-        public void GameSaveDataPackaged_InvalidTransactionId()
-        {
-            _connectionLogic.State = new TransferSaveState(_connectionLogic);
-
-            var networkGameSaveDataRecievedCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkGameSaveDataReceived>((payload) =>
-            {
-                networkGameSaveDataRecievedCount += 1;
-            });
-
-            // Publish hero resolved, this would be from game interface
-            var message = new GameSaveDataPackaged(
-                Guid.NewGuid(),
-                Array.Empty<byte>(),
-                "TestCampaingId");
-
-            StubMessageBroker.Publish(_playerId, message);
-
-            Assert.Equal(0, networkGameSaveDataRecievedCount);
-            Assert.IsType<TransferSaveState>(_connectionLogic.State);
+            Assert.Single(MockNetwork.GetPeerMessages(differentPeer));
         }
     }
 }

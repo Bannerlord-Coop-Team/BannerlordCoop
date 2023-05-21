@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Network;
 using Coop.Core.Server;
 
 namespace Coop.Tests.Autofac
@@ -7,7 +8,7 @@ namespace Coop.Tests.Autofac
     {
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterType<CoopServer>().As<ICoopServer>().SingleInstance().PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
+            builder.RegisterType<CoopServer>().As<INetwork>().SingleInstance().PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);
             base.Load(builder);
         }
     }
