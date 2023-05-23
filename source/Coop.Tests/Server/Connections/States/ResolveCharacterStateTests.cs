@@ -6,6 +6,7 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
+using System.Linq;
 using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
@@ -14,203 +15,159 @@ namespace Coop.Tests.Server.Connections.States
 {
     public class ResolveCharacterStateTests : CoopTest
     {
-        private readonly IConnectionLogic _connectionLogic;
-        private readonly NetPeer _playerId = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
+        private readonly IConnectionLogic connectionLogic;
+        private readonly NetPeer playerPeer;
+        private readonly NetPeer differentPeer;
         public ResolveCharacterStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(_playerId, StubNetworkMessageBroker);
+            playerPeer = MockNetwork.CreatePeer();
+            differentPeer = MockNetwork.CreatePeer();
+            connectionLogic = new ConnectionLogic(playerPeer, MockMessageBroker, MockNetwork);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            _connectionLogic.State = new CampaignState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new CampaignState(connectionLogic);
 
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
-            _connectionLogic.State.Dispose();
+            // Act
+            connectionLogic.State.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void CreateCharacterMethod_TransitionState_CreateCharacterState()
         {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new ResolveCharacterState(connectionLogic);
 
-            _connectionLogic.CreateCharacter();
+            // Act
+            connectionLogic.CreateCharacter();
 
-            Assert.IsType<CreateCharacterState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<CreateCharacterState>(connectionLogic.State);
         }
 
         [Fact]
         public void TransferSaveMethod_TransitionState_TransferSaveState()
         {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new ResolveCharacterState(connectionLogic);
 
-            _connectionLogic.TransferSave();
+            // Act
+            connectionLogic.TransferSave();
 
-            Assert.IsType<TransferSaveState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<TransferSaveState>(connectionLogic.State);
         }
 
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new ResolveCharacterState(connectionLogic);
 
-            _connectionLogic.Load();
-            _connectionLogic.EnterCampaign();
-            _connectionLogic.EnterMission();
+            // Act
+            connectionLogic.Load();
+            connectionLogic.EnterCampaign();
+            connectionLogic.EnterMission();
 
-            Assert.IsType<ResolveCharacterState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<ResolveCharacterState>(connectionLogic.State);
         }
 
         [Fact]
         public void NetworkClientValidate_ValidPlayerId()
         {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
+            // Arrange
+            var currentState = new ResolveCharacterState(connectionLogic);
+            connectionLogic.State = currentState;
 
-            var resolveDebugHeroCount = 0;
-            StubMessageBroker.Subscribe<ResolveDebugHero>((payload) =>
-            {
-                resolveDebugHeroCount += 1;
-            });
+            string playerId = "MyPlayer";
 
-            StubNetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkClientValidate());
+            // Act
+            var payload = new MessagePayload<NetworkClientValidate>(
+                playerPeer, new NetworkClientValidate(playerId));
+            currentState.ClientValidateHandler(payload);
 
-            // A single message is sent
-            Assert.Equal(1, resolveDebugHeroCount);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<ResolveDebugHero>(message);
+
+            var castedMessage = (ResolveDebugHero)message;
+            Assert.Equal(playerId, castedMessage.PlayerId);
         }
 
         [Fact]
         public void NetworkClientValidate_InvalidPlayerId()
         {
-            var wrongPlayer = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
+            // Arrange
+            var currentState = new ResolveCharacterState(connectionLogic);
+            connectionLogic.State = currentState;
 
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
+            string playerId = "MyPlayer";
 
-            var resolveDebugHeroCount = 0;
-            StubMessageBroker.Subscribe<ResolveDebugHero>((payload) =>
-            {
-                resolveDebugHeroCount += 1;
-            });
+            // Act
+            var payload = new MessagePayload<NetworkClientValidate>(
+                differentPeer, new NetworkClientValidate(playerId));
+            currentState.ClientValidateHandler(payload);
 
-            StubNetworkMessageBroker.ReceiveNetworkEvent(wrongPlayer, new NetworkClientValidate());
-
-            // No message is sent due to this logic is not responsible for this player
-            Assert.Equal(0, resolveDebugHeroCount);
+            // Assert
+            Assert.Empty(MockMessageBroker.PublishedMessages);
         }
 
         [Fact]
-        public void ResolveHero_ValidTransactionId()
+        public void ResolveHero_Valid()
         {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
+            // Arrange
+            var currentState = new ResolveCharacterState(connectionLogic);
+            connectionLogic.State = currentState;
 
-            // Generate transaction id
-            Guid transactionId = default;
-            StubNetworkMessageBroker.Subscribe<ResolveDebugHero>((payload) =>
-            {
-                transactionId = payload.What.TransactionID;
-            });
+            string playerId = "MyPlayer";
 
-            StubNetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkClientValidate());
+            // Act
+            var payload = new MessagePayload<HeroResolved>(
+                playerPeer, new HeroResolved(playerId));
+            currentState.ResolveHeroHandler(payload);
 
-            // Ensure a transaction id was generated
-            Assert.NotEqual(default, transactionId);
+            // Assert
+            Assert.Equal(2, MockNetwork.GetPeerMessages(playerPeer).Count());
+            var message = MockNetwork.GetPeerMessages(playerPeer).First();
+            Assert.IsType<NetworkClientValidated>(message);
 
-            var networkClientValidatedCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkClientValidated>((msg) =>
-            {
-                networkClientValidatedCount += 1;
+            var castedMessage = (NetworkClientValidated)message;
+            Assert.Equal(playerId, castedMessage.HeroId);
+            Assert.True(castedMessage.HeroExists);
 
-                // Message should state hero exists
-                Assert.True(msg.What.HeroExists);
-            });
-
-            StubMessageBroker.Publish(this, new HeroResolved(transactionId, string.Empty));
-
-            // A single message is sent
-            Assert.Equal(1, networkClientValidatedCount);
-
-            Assert.IsType<TransferSaveState>(_connectionLogic.State);
+            Assert.Single(MockNetwork.GetPeerMessages(differentPeer));
         }
 
         [Fact]
-        public void ResolveHero_InvalidTransactionId()
+        public void HeroNotFound_Valid()
         {
-            var wrongPlayerId = _playerId.Id + 1;
+            // Arrange
+            var currentState = new ResolveCharacterState(connectionLogic);
+            connectionLogic.State = currentState;
 
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
+            // Act
+            var payload = new MessagePayload<ResolveHeroNotFound>(
+                playerPeer, new ResolveHeroNotFound());
+            currentState.HeroNotFoundHandler(payload);
 
-            var networkClientValidatedCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkClientValidated>((payload) =>
-            {
-                networkClientValidatedCount += 1;
-            });
+            // Assert
+            var message = Assert.Single(MockNetwork.GetPeerMessages(playerPeer));
+            Assert.IsType<NetworkClientValidated>(message);
 
-            StubMessageBroker.Publish(this, new HeroResolved(Guid.NewGuid(), string.Empty));
+            var castedMessage = (NetworkClientValidated)message;
+            Assert.Equal(string.Empty, castedMessage.HeroId);
+            Assert.False(castedMessage.HeroExists);
 
-            // No message is sent due to this logic is not responsible for this player
-            Assert.Equal(0, networkClientValidatedCount);
-
-            Assert.IsType<ResolveCharacterState>(_connectionLogic.State);
-        }
-
-        [Fact]
-        public void HeroNotFound_ValidTransactionId()
-        {
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
-
-            // Generate transaction id
-            Guid transactionId = default;
-            StubNetworkMessageBroker.Subscribe<ResolveDebugHero>((payload) =>
-            {
-                transactionId = payload.What.TransactionID;
-            });
-
-            StubNetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkClientValidate());
-
-            // Ensure a transaction id was generated
-            Assert.NotEqual(default, transactionId);
-
-            var networkClientValidatedCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkClientValidated>((payload) =>
-            {
-                networkClientValidatedCount += 1;
-
-                // Message should state hero does not exist
-                Assert.False(payload.What.HeroExists);
-            });
-
-            // Publish hero resolved, this would be from game interface
-            StubMessageBroker.Publish(_playerId, new ResolveHeroNotFound(transactionId));
-
-            // A single message is sent
-            Assert.Equal(1, networkClientValidatedCount);
-
-            Assert.IsType<CreateCharacterState>(_connectionLogic.State);
-        }
-
-        [Fact]
-        public void HeroNotFound_InvalidTransactionId()
-        {
-            var wrongPlayerId = _playerId.Id + 1;
-
-            _connectionLogic.State = new ResolveCharacterState(_connectionLogic);
-
-            var networkClientValidatedCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkClientValidated>((payload) =>
-            {
-                networkClientValidatedCount += 1;
-            });
-
-            // Publish hero resolved, this would be from game interface
-            StubMessageBroker.Publish(this, new ResolveHeroNotFound(Guid.NewGuid()));
-
-            // No message is sent due to this logic is not responsible for this player
-            Assert.Equal(0, networkClientValidatedCount);
-
-            Assert.IsType<ResolveCharacterState>(_connectionLogic.State);
+            Assert.False(MockNetwork.SentNetworkMessages.ContainsKey(differentPeer.Id));
         }
     }
 }

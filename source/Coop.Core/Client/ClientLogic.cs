@@ -22,8 +22,8 @@ namespace Coop.Core.Client
         /// <summary>
         /// Networking Client for Client-side
         /// </summary>
-        ICoopClient NetworkClient { get; }
-        INetworkMessageBroker NetworkMessageBroker { get; }
+        INetwork Network { get; }
+        IMessageBroker MessageBroker { get; }
         string ControlledHeroId { get; set; }
     }
 
@@ -31,8 +31,8 @@ namespace Coop.Core.Client
     public class ClientLogic : IClientLogic
     {
         private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
-        public ICoopClient NetworkClient { get; }
-        public INetworkMessageBroker NetworkMessageBroker { get; }
+        public INetwork Network { get; }
+        public IMessageBroker MessageBroker { get; }
         public string ControlledHeroId { get; set; }
         public IClientState State 
         {
@@ -48,12 +48,10 @@ namespace Coop.Core.Client
 
         private IClientState _state;
 
-        public ClientLogic(
-            ICoopClient networkClient,
-            INetworkMessageBroker messageBroker)
+        public ClientLogic(INetwork network, IMessageBroker messageBroker)
         {
-            NetworkClient = networkClient;
-            NetworkMessageBroker = messageBroker;
+            Network = network;
+            MessageBroker = messageBroker;
             State = new MainMenuState(this);
         }
 

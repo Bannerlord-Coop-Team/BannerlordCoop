@@ -2,6 +2,6 @@
 
 namespace GameInterface.Services.GameState.Messages;
 
-public readonly struct CampaignLoaded : IEvent
+public record CampaignLoaded : IEvent
 {
 }

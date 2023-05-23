@@ -7,8 +7,7 @@ namespace Common.Messaging
     /// <see cref="IEvent"/>
     /// </summary>
     /// <inheritdoc/>
-    public interface ICommand : IInternalMessage
+    public interface ICommand : IMessage
     {
-        Guid TransactionID { get; }
     }
 }

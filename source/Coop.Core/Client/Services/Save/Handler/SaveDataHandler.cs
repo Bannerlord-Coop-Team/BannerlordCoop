@@ -10,34 +10,32 @@ namespace Coop.Core.Client.Services.Save.Handler
 {
     internal class SaveDataHandler : IHandler
     {
-        private readonly INetworkMessageBroker networkMessageBroker;
+        private readonly IMessageBroker messageBroker;
         private NetworkGameSaveDataReceived saveDataMessage;
-        //private bool saveDataRecieve = false;
-        public SaveDataHandler(INetworkMessageBroker networkMessageBroker)
+        public SaveDataHandler(IMessageBroker messageBroker)
         {
-            this.networkMessageBroker = networkMessageBroker;
+            this.messageBroker = messageBroker;
 
-            networkMessageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
-            networkMessageBroker.Subscribe<CampaignLoaded>(Handle_CampaignLoaded);
+            messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+            messageBroker.Subscribe<CampaignLoaded>(Handle_CampaignLoaded);
         }
 
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
-            networkMessageBroker.Unsubscribe<CampaignLoaded>(Handle_CampaignLoaded);
+            messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+            messageBroker.Unsubscribe<CampaignLoaded>(Handle_CampaignLoaded);
         }
 
         private void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
         {
             saveDataMessage = obj.What;
-            //saveDataRecieve = true;
         }
 
         private void Handle_CampaignLoaded(MessagePayload<CampaignLoaded> obj)
         {
-            var message = new RegisterAllGameObjects(Guid.Empty);
+            var message = new RegisterAllGameObjects();
 
-            networkMessageBroker.Publish(this, message);
+            messageBroker.Publish(this, message);
         }
     }
 }

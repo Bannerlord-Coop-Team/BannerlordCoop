@@ -1,8 +1,8 @@
-﻿using Coop.Core.Client;
+﻿using Common.Messaging;
+using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
 using GameInterface.Services.GameState.Messages;
-using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -13,48 +13,66 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         public MainMenuStateTests(ITestOutputHelper output) : base(output)
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
+            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            // Arrange
+            clientLogic.State = new MainMenuState(clientLogic);
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
+            // Act
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void ValidateModulesMethod_Transitions_ValidateModuleState()
         {
+            // Arrange
+            clientLogic.State = new MainMenuState(clientLogic);
+
+            // Act
             clientLogic.State.ValidateModules();
 
+            // Assert
             Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
 
         [Fact]
         public void Connect_ValidateModuleState()
         {
-            StubMessageBroker.Publish(this, new NetworkConnected());
+            // Arrange
+            var mainMenuState = new MainMenuState(clientLogic);
+            clientLogic.State = mainMenuState;
 
+            var payload = new MessagePayload<NetworkConnected>(
+                this, new NetworkConnected());
+
+            // Act
+            mainMenuState.Handle_NetworkConnected(payload);
+
+            // Assert
             Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
 
         [Fact]
         public void Disconnect_Publishes_EnterMainMenu()
         {
-            var enterMainMenuCount = 0;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                enterMainMenuCount += 1;
-            });
+            // Arrange
+            var mainMenuState = new MainMenuState(clientLogic);
+            clientLogic.State = mainMenuState;
 
+            // Act
             clientLogic.Disconnect();
 
-            Assert.Equal(1, enterMainMenuCount);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]

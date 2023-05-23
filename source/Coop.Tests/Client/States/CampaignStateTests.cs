@@ -7,6 +7,7 @@ using Serilog;
 using Xunit;
 using Xunit.Abstractions;
 using GameInterface.Services.GameState.Messages;
+using Common.Messaging;
 
 namespace Coop.Tests.Client.States
 {
@@ -15,96 +16,127 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         public CampaignStateTests(ITestOutputHelper output) : base(output)
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
-            clientLogic.State = new CampaignState(clientLogic);
+            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
+            
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            // Arrange
+            clientLogic.State = new CampaignState(clientLogic);
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
+            // Act
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void NetworkDisableTimeControls_Publishes_PauseAndDisableGameTimeControls()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<PauseAndDisableGameTimeControls>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var campaignState = new CampaignState(clientLogic);
+            clientLogic.State = campaignState;
 
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkDisableTimeControls());
+            var payload = new MessagePayload<NetworkDisableTimeControls>(
+                this, new NetworkDisableTimeControls());
 
-            Assert.True(isEventPublished);
+            // Act
+            campaignState.Handle_NetworkDisableTimeControls(payload);
+
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<PauseAndDisableGameTimeControls>(message);
         }
 
         [Fact]
         public void EnterMissionState_Publishes_EnterMissionState()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMissionState>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var campaignState = new CampaignState(clientLogic);
+            clientLogic.State = campaignState;
 
+            // Act
             clientLogic.EnterMissionState();
 
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMissionState>(message);
         }
 
         [Fact]
-        public void MissionState_Transitions_MissionState()
+        public void MissionStateEntered_Transitions_MissionState()
         {
-            StubMessageBroker.Publish(this, new MissionStateEntered());
+            // Arrange
+            var campaignState = new CampaignState(clientLogic);
+            clientLogic.State = campaignState;
 
+            var payload = new MessagePayload<MissionStateEntered>(
+                this, new MissionStateEntered());
+
+            // Act
+            campaignState.Handle_MissionStateEntered(payload);
+
+            // Assert
             Assert.IsType<MissionState>(clientLogic.State);
         }
 
         [Fact]
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var campaignState = new CampaignState(clientLogic);
+            clientLogic.State = campaignState;
 
+            // Act
             clientLogic.EnterMainMenu();
 
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
         public void MainMenuEntered_Transitions_MainMenuState()
         {
-            StubMessageBroker.Publish(this, new MainMenuEntered());
+            // Arrange
+            var campaignState = new CampaignState(clientLogic);
+            clientLogic.State = campaignState;
 
+            var payload = new MessagePayload<MainMenuEntered>(
+                this, new MainMenuEntered());
+
+            // Act
+            campaignState.Handle_MainMenuEntered(payload);
+
+            // Assert
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
 
         [Fact]
         public void Disconnect_Publishes_EnterMainMenu()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var campaignState = new CampaignState(clientLogic);
+            clientLogic.State = campaignState;
 
+            // Act
             clientLogic.Disconnect();
 
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
         public void OtherStateMethods_DoNotAlterState()
         {
+            var campaignState = new CampaignState(clientLogic);
+            clientLogic.State = campaignState;
+
             clientLogic.Connect();
             Assert.IsType<CampaignState>(clientLogic.State);
 

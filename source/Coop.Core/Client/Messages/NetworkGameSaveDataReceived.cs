@@ -9,7 +9,7 @@ using GameInterface.Services.Heroes.Data;
 namespace Coop.Core.Client.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct NetworkGameSaveDataReceived : INetworkEvent
+    public record NetworkGameSaveDataReceived : IEvent
     {
         [ProtoMember(1)]
         public byte[] GameSaveData { get; }

@@ -4,30 +4,27 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Messages;
 
-public readonly struct RegisterNewPlayerHero : ICommand
+public record RegisterNewPlayerHero : ICommand
 {
-    public Guid TransactionID { get; }
-
     public byte[] Bytes { get; }
 
-    public RegisterNewPlayerHero(Guid transactionId, byte[] bytes)
+    public RegisterNewPlayerHero(byte[] bytes)
     {
-        TransactionID = transactionId;
         Bytes = bytes;
     }
 }
 
-public readonly struct NewPlayerHeroRegistered : IResponse
+public record NewPlayerHeroRegistered : IResponse
 {
-    public Guid TransactionID { get; }
     public string HeroStringId { get; }
     public string PartyStringId { get; }
     public string CharacterObjectStringId { get; }
     public string ClanStringId { get; }
 
-    public NewPlayerHeroRegistered(Guid transactionID, Hero hero)
+    public NewPlayerHeroRegistered(Hero hero)
     {
-        TransactionID = transactionID;
+        if (hero == null) return;
+
         HeroStringId = hero.StringId;
         PartyStringId = hero.PartyBelongedTo.StringId;
         CharacterObjectStringId = hero.CharacterObject.StringId;

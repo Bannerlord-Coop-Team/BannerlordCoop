@@ -28,6 +28,6 @@ internal class RegistryHandler
         heroRegistry.RegisterAllHeroes();
         partyRegistry.RegisterAllParties();
 
-        messageBroker.Publish(this, new AllGameObjectsRegistered(payload.TransactionID));
+        messageBroker.Respond(obj.Who, new AllGameObjectsRegistered());
     }
 }

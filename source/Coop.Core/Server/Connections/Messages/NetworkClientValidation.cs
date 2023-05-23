@@ -5,7 +5,7 @@ using System;
 namespace Coop.Core.Server.Connections.Messages
 {
     [ProtoContract]
-    public readonly struct NetworkClientValidate : INetworkEvent
+    public record NetworkClientValidate : ICommand
     {
         [ProtoMember(1)]
         public string PlayerId { get; }
@@ -17,7 +17,7 @@ namespace Coop.Core.Server.Connections.Messages
     }
 
     [ProtoContract]
-    public readonly struct NetworkClientValidated : INetworkEvent
+    public record NetworkClientValidated : IResponse
     {
         [ProtoMember(1)]
         public bool HeroExists { get; }

@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Heroes.Handlers;
 using GameInterface.Services.Heroes.Messages;
@@ -14,44 +15,41 @@ namespace Coop.Core.Server.Connections.States
     {
         private readonly ILogger Logger = LogManager.GetLogger<CreateCharacterState>();
 
+        private IMessageBroker messageBroker;
+        private INetwork network;
         public CreateCharacterState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
-            ConnectionLogic.NetworkMessageBroker.Subscribe<NetworkTransferedHero>(PlayerTransferedHeroHandler);
-            ConnectionLogic.NetworkMessageBroker.Subscribe<NewPlayerHeroRegistered>(PlayerHeroRegisteredHandler);
+            messageBroker = connectionLogic.MessageBroker;
+            network = connectionLogic.Network;
+
+            messageBroker.Subscribe<NetworkTransferedHero>(PlayerTransferedHeroHandler);
+            messageBroker.Subscribe<NewPlayerHeroRegistered>(PlayerHeroRegisteredHandler);
         }
 
         public override void Dispose()
         {
-            ConnectionLogic.NetworkMessageBroker.Unsubscribe<NetworkTransferedHero>(PlayerTransferedHeroHandler);
-            ConnectionLogic.NetworkMessageBroker.Unsubscribe<NewPlayerHeroRegistered>(PlayerHeroRegisteredHandler);
+            messageBroker.Unsubscribe<NetworkTransferedHero>(PlayerTransferedHeroHandler);
+            messageBroker.Unsubscribe<NewPlayerHeroRegistered>(PlayerHeroRegisteredHandler);
         }
-
-        private Guid RegisterPlayerTransactionId;
-        private void PlayerTransferedHeroHandler(MessagePayload<NetworkTransferedHero> obj)
+        internal void PlayerTransferedHeroHandler(MessagePayload<NetworkTransferedHero> obj)
         {
-            var peerId = ((NetPeer)obj.Who).Id;
-            
-            if(peerId == ConnectionLogic.PlayerId.Id)
-            {
-                RegisterPlayerTransactionId = Guid.NewGuid();
-                var registerCommand = new RegisterNewPlayerHero(RegisterPlayerTransactionId, obj.What.PlayerHero);
-                ConnectionLogic.NetworkMessageBroker.Publish(this, registerCommand);
-            }
+            var registerCommand = new RegisterNewPlayerHero(obj.What.PlayerHero);
+            messageBroker.Publish(this, registerCommand);
         }
-        private void PlayerHeroRegisteredHandler(MessagePayload<NewPlayerHeroRegistered> obj)
+        internal void PlayerHeroRegisteredHandler(MessagePayload<NewPlayerHeroRegistered> obj)
         {
-            var transactionId = obj.What.TransactionID;
+            var sendingPeer = (NetPeer)obj.Who;
+            if (sendingPeer != ConnectionLogic.Peer) return;
 
-            if (RegisterPlayerTransactionId == transactionId)
-            {
-                NetworkPlayerData playerData = new NetworkPlayerData(obj.What);
-                ConnectionLogic.NetworkMessageBroker.PublishNetworkEvent(playerData);
+            NetworkPlayerData playerData = new NetworkPlayerData(obj.What);
+            // Send newly create player to all clients
+            var peer = ConnectionLogic.Peer;
+            network.Send(peer, playerData);
 
-                ConnectionLogic.HeroStringId = obj.What.HeroStringId;
-                Logger.Information("Hero StringId: {stringId}", obj.What.HeroStringId);
-                ConnectionLogic.TransferSave();
-            }
+            ConnectionLogic.HeroStringId = obj.What.HeroStringId;
+            Logger.Information("Hero StringId: {stringId}", obj.What.HeroStringId);
+            ConnectionLogic.TransferSave();
         }
 
         public override void CreateCharacter()

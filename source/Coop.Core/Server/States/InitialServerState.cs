@@ -17,10 +17,10 @@ namespace Coop.Core.Server.States
             MessageBroker.Unsubscribe<CampaignLoaded>(Handle_GameLoaded);
         }
 
-        private void Handle_GameLoaded(MessagePayload<CampaignLoaded> payload)
+        internal void Handle_GameLoaded(MessagePayload<CampaignLoaded> payload)
         {
             // Start server when game is fully loaded
-            Logic.NetworkServer.Start();
+            Logic.Network.Start();
 
             // Remove server party
             MessageBroker.Publish(this, new RemoveMainParty());

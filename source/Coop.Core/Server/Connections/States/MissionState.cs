@@ -9,22 +9,20 @@ namespace Coop.Core.Server.Connections.States
         public MissionState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
-            ConnectionLogic.NetworkMessageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerTransitionsCampaignHandler);
+            ConnectionLogic.MessageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerTransitionsCampaignHandler);
         }
 
         public override void Dispose()
         {
-            ConnectionLogic.NetworkMessageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerTransitionsCampaignHandler);
+            ConnectionLogic.MessageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerTransitionsCampaignHandler);
         }
 
-        private void PlayerTransitionsCampaignHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
+        internal void PlayerTransitionsCampaignHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
         {
             var playerId = (NetPeer)obj.Who;
+            if (playerId != ConnectionLogic.Peer) return;
 
-            if (playerId == ConnectionLogic.PlayerId)
-            {
-                ConnectionLogic.EnterCampaign();
-            }
+            ConnectionLogic.EnterCampaign();
         }
 
         public override void CreateCharacter()

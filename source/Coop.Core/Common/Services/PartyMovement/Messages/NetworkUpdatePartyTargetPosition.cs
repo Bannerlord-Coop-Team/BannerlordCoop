@@ -6,7 +6,7 @@ using ProtoBuf;
 namespace Coop.Core.Common.Services.PartyMovement.Messages
 {
     [ProtoContract]
-    public readonly struct NetworkUpdatePartyTargetPosition : INetworkEvent
+    public readonly struct NetworkUpdatePartyTargetPosition : ICommand
     {
         [ProtoMember(1)]
         public TargetPositionData TargetPositionData { get; }

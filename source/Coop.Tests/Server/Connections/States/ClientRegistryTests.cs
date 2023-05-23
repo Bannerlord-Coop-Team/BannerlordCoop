@@ -1,4 +1,7 @@
-﻿using Coop.Core.Server.Connections;
+﻿using Autofac;
+using Common.Messaging;
+using Common.Network;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using GameInterface.Services.Heroes.Messages;
@@ -12,89 +15,107 @@ namespace Coop.Tests.Server.Connections.States
 {
     public class ClientRegistryTests : CoopTest
     {
-        private readonly ClientRegistry clientStateOrchestrator;
-        private readonly NetPeer _playerId = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
-        private readonly NetPeer _differentPlayer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
+        private readonly ClientRegistry clientRegistry;
+        private readonly NetPeer playerPeer;
+        private readonly NetPeer differentPlayer;
         public ClientRegistryTests(ITestOutputHelper output) : base(output)
         {
-            clientStateOrchestrator = new ClientRegistry(StubNetworkMessageBroker);
+            playerPeer = MockNetwork.CreatePeer();
+            differentPlayer = MockNetwork.CreatePeer();
+
+            ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterType<ConnectionLogic>().As<IConnectionLogic>();
+            builder.RegisterInstance(MockMessageBroker).As<IMessageBroker>();
+            builder.RegisterInstance(MockNetwork).As<INetwork>();
+
+            IContainer container = builder.Build();
+
+            clientRegistry = new ClientRegistry(MockMessageBroker, MockNetwork);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
-            clientStateOrchestrator.Dispose();
+            clientRegistry.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void PlayerDisconnected_RemovePlayer()
         {
-            StubMessageBroker.Publish(this, new PlayerConnected(_playerId));
-            StubMessageBroker.Publish(this, new PlayerDisconnected(_playerId, default(DisconnectInfo)));
+            // Arrange
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+            var disconnectPayload = new MessagePayload<PlayerDisconnected>(this, new PlayerDisconnected(playerPeer, default));
 
-            Assert.Empty(clientStateOrchestrator.ConnectionStates);
+            // Act
+            clientRegistry.PlayerJoiningHandler(connectPayload);
+            Assert.Single(clientRegistry.ConnectionStates);
+            clientRegistry.PlayerDisconnectedHandler(disconnectPayload);
+
+            // Assert
+            Assert.Empty(clientRegistry.ConnectionStates);
         }
 
         [Fact]
         public void PlayerPlayerConnected_AddsNewPlayer()
         {
-            StubMessageBroker.Publish(this, new PlayerConnected(_playerId));
+            // Arrange
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+            
+            // Act
+            clientRegistry.PlayerJoiningHandler(connectPayload);
 
-            Assert.Single(clientStateOrchestrator.ConnectionStates);
-            Assert.IsType<ResolveCharacterState>(clientStateOrchestrator.ConnectionStates.Single().Value.State);
+            // Assert
+            var connectionState = Assert.Single(clientRegistry.ConnectionStates).Value;
+            Assert.IsType<ResolveCharacterState>(connectionState.State);
         }
 
         [Fact]
         public void EnableTimeControls_PublishesEvents_NoLoaders()
         {
-            StubMessageBroker.Publish(this, new PlayerConnected(_playerId));
+            // Arrange
+            var payload = new MessagePayload<PlayerCampaignEntered>(
+                this, new PlayerCampaignEntered());
 
-            var networkEnableTimeControlMessageCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkEnableTimeControls>((_playerId) =>
+            // Act
+            clientRegistry.PlayerCampaignEnteredHandler(payload);
+
+            // Assert
+            Assert.NotEmpty(MockNetwork.Peers);
+            foreach (var peer in MockNetwork.Peers)
             {
-                networkEnableTimeControlMessageCount += 1;
-            });
+                var networkMessage = Assert.Single(MockNetwork.GetPeerMessages(peer));
+                Assert.IsType<NetworkEnableTimeControls>(networkMessage);
+            }
 
-            var enableTimeControlMessageCount = 0;
-            StubMessageBroker.Subscribe<EnableGameTimeControls>((_playerId) =>
-            {
-                enableTimeControlMessageCount += 1;
-            });
-
-            StubMessageBroker.Publish(_playerId, new PlayerCampaignEntered());
-
-            Assert.Equal(1, networkEnableTimeControlMessageCount);
-            Assert.Equal(1, enableTimeControlMessageCount);
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnableGameTimeControls>(message);
         }
 
         [Fact]
         public void EnableTimeControls_PublishesEvents_WithLoaders()
         {
-            StubMessageBroker.Publish(this, new PlayerConnected(_playerId));
+            // Arrange
+            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
+            clientRegistry.PlayerJoiningHandler(connectPayload);
 
-            IConnectionLogic logic = clientStateOrchestrator.ConnectionStates.Single().Value;
+            IConnectionLogic logic = clientRegistry.ConnectionStates.Single().Value;
             logic.State = new LoadingState(logic);
 
-            var networkEnableTimeControlMessageCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkEnableTimeControls>((_playerId) =>
-            {
-                networkEnableTimeControlMessageCount += 1;
-            });
+            var payload = new MessagePayload<PlayerCampaignEntered>(
+                this, new PlayerCampaignEntered());
 
-            var enableTimeControlMessageCount = 0;
-            StubMessageBroker.Subscribe<EnableGameTimeControls>((_playerId) =>
-            {
-                enableTimeControlMessageCount += 1;
-            });
+            // Act
+            clientRegistry.PlayerCampaignEnteredHandler(payload);
 
-            StubMessageBroker.Publish(_playerId, new PlayerCampaignEntered());
+            // Assert
+            Assert.NotEmpty(MockNetwork.Peers);
+            Assert.Empty(MockNetwork.SentNetworkMessages);
 
-            Assert.Equal(0, networkEnableTimeControlMessageCount);
-            Assert.Equal(0, enableTimeControlMessageCount);
+            Assert.Empty(MockMessageBroker.PublishedMessages);
         }
     }
 }

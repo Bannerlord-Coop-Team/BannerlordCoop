@@ -5,7 +5,7 @@ using ProtoBuf;
 namespace Coop.Core.Server.Connections.Messages
 {
     [ProtoContract]
-    public readonly struct NetworkPlayerData : INetworkEvent
+    public record NetworkPlayerData : IEvent
     {
         public NetworkPlayerData(NewPlayerHeroRegistered registrationData)
         {

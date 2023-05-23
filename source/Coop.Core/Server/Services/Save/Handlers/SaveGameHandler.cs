@@ -1,6 +1,7 @@
 ﻿// Ignore Spelling: Guids
 
 using Common.Messaging;
+using Common.Network;
 using Coop.Core.Server.Services.Save.Data;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
@@ -46,28 +47,22 @@ namespace Coop.Core.Server.Services.Save.Handlers
         }
 
         private string saveName;
-        private Guid packageObjectsTransactionId;
         private void Handle_GameSaved(MessagePayload<GameSaved> obj)
         {
             saveName = obj.What.SaveName;
-            packageObjectsTransactionId = Guid.NewGuid();
-
-            messageBroker.Publish(this, new PackageObjectGuids(packageObjectsTransactionId));
+            messageBroker.Publish(this, new PackageObjectGuids());
         }
 
         private void Handle_ObjectGuidsPackaged(MessagePayload<ObjectGuidsPackaged> obj)
         {
             var payload = obj.What;
-            if(packageObjectsTransactionId == payload.TransactionID)
+            CoopSession session = new CoopSession()
             {
-                CoopSession session = new CoopSession()
-                {
-                    UniqueGameId = payload.UniqueGameId,
-                    GameObjectGuids = payload.GameObjectGuids,
-                };
+                UniqueGameId = payload.UniqueGameId,
+                GameObjectGuids = payload.GameObjectGuids,
+            };
 
-                saveManager.SaveCoopSession(saveName, session);
-            }
+            saveManager.SaveCoopSession(saveName, session);
         }
 
         private ICoopSession savedSession;
@@ -84,10 +79,7 @@ namespace Coop.Core.Server.Services.Save.Handlers
             }
             else
             {
-                var message = new LoadExistingObjectGuids(
-                    Guid.Empty, /* Transaction Id not required */
-                    savedSession.GameObjectGuids);
-
+                var message = new LoadExistingObjectGuids(savedSession.GameObjectGuids);
                 messageBroker.Publish(this, message);
             }
         }

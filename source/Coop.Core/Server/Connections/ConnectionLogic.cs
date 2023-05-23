@@ -9,9 +9,10 @@ namespace Coop.Core.Server.Connections
 {
     public interface IConnectionLogic : IConnectionState
     {
-        NetPeer PlayerId { get; }
+        NetPeer Peer { get; }
         string HeroStringId { get; set; }
-        INetworkMessageBroker NetworkMessageBroker { get; }
+        IMessageBroker MessageBroker { get; }
+        INetwork Network { get; }
         IConnectionState State { get; set; }    
     }
 
@@ -19,10 +20,11 @@ namespace Coop.Core.Server.Connections
     {
         private readonly ILogger Logger = LogManager.GetLogger<ConnectionLogic>();
 
-        public NetPeer PlayerId { get; }
+        public NetPeer Peer { get; }
         public string HeroStringId { get; set; }
 
-        public INetworkMessageBroker NetworkMessageBroker { get; }
+        public IMessageBroker MessageBroker { get; }
+        public INetwork Network { get; }
 
         public IConnectionState State 
         {
@@ -37,10 +39,11 @@ namespace Coop.Core.Server.Connections
 
         private IConnectionState _state;
 
-        public ConnectionLogic(NetPeer playerId, INetworkMessageBroker messageBroker)
+        public ConnectionLogic(NetPeer playerId, IMessageBroker messageBroker, INetwork network)
         {
-            PlayerId = playerId;
-            NetworkMessageBroker = messageBroker;
+            Peer = playerId;
+            MessageBroker = messageBroker;
+            Network = network;
             State = new ResolveCharacterState(this);
         }
 

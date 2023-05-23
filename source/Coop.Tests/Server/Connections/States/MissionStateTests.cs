@@ -1,4 +1,5 @@
-﻿using Coop.Core.Server.Connections;
+﻿using Common.Messaging;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
@@ -11,70 +12,91 @@ namespace Coop.Tests.Server.Connections.States
 {
     public class MissionStateTests : CoopTest
     {
-        private readonly IConnectionLogic _connectionLogic;
-        private readonly NetPeer _playerId = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
-        private readonly NetPeer _differentPlayer = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
+        private readonly IConnectionLogic connectionLogic;
+        private readonly NetPeer playerPeer;
+        private readonly NetPeer differentPlayer;
         public MissionStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(_playerId, StubNetworkMessageBroker);
-            _differentPlayer.SetId(_playerId.Id + 1);
+            playerPeer = MockNetwork.CreatePeer();
+            differentPlayer = MockNetwork.CreatePeer();
+
+            connectionLogic = new ConnectionLogic(playerPeer, MockMessageBroker, MockNetwork);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            _connectionLogic.State = new CampaignState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new CampaignState(connectionLogic);
 
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
-            _connectionLogic.State.Dispose();
+            // Act
+            connectionLogic.State.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void EnterCampaignMethod_TransitionState_CampaignState()
         {
-            _connectionLogic.State = new MissionState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new MissionState(connectionLogic);
 
-            _connectionLogic.EnterCampaign();
+            // Act
+            connectionLogic.EnterCampaign();
 
-            Assert.IsType<CampaignState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<CampaignState>(connectionLogic.State);
         }
 
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new MissionState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new MissionState(connectionLogic);
 
-            _connectionLogic.CreateCharacter();
-            _connectionLogic.TransferSave();
-            _connectionLogic.Load();
-            _connectionLogic.EnterMission();
+            // Act
+            connectionLogic.CreateCharacter();
+            connectionLogic.TransferSave();
+            connectionLogic.Load();
+            connectionLogic.EnterMission();
 
-            Assert.IsType<MissionState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<MissionState>(connectionLogic.State);
         }
 
         [Fact]
         public void PlayerCampaignEntered_ValidPlayerId()
         {
-            _connectionLogic.State = new MissionState(_connectionLogic);
+            // Arrange
+            var currentState = new MissionState(connectionLogic);
+            connectionLogic.State = currentState;
 
-            // Publish hero resolved, this would be from game interface
-            StubNetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkPlayerCampaignEntered());
+            // Act
+            var payload = new MessagePayload<NetworkPlayerCampaignEntered>(
+                playerPeer, new NetworkPlayerCampaignEntered());
+            currentState.PlayerTransitionsCampaignHandler(payload);
 
-            Assert.IsType<CampaignState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<CampaignState>(connectionLogic.State);
         }
 
         [Fact]
         public void PlayerCampaignEntered_InvalidPlayerId()
         {
-            _connectionLogic.State = new MissionState(_connectionLogic);
+            // Arrange
+            var currentState = new MissionState(connectionLogic);
+            connectionLogic.State = currentState;
 
-            // Publish hero resolved, this would be from game interface
-            StubNetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkPlayerCampaignEntered());
+            // Act
+            var payload = new MessagePayload<NetworkPlayerCampaignEntered>(
+                differentPlayer, new NetworkPlayerCampaignEntered());
+            currentState.PlayerTransitionsCampaignHandler(payload);
 
-            Assert.IsType<MissionState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<MissionState>(connectionLogic.State);
         }
     }
 }

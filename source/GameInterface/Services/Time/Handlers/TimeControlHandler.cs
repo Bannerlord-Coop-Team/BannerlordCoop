@@ -45,6 +45,6 @@ internal class TimeControlHandler : IHandler
         CampaignTimeControlMode newTimeMode = (CampaignTimeControlMode)payload.NewTimeMode;
         timeControlInterface.SetTimeControl(newTimeMode);
 
-        messageBroker.Publish(this, new TimeControlModeSet(payload.TransactionID, payload.NewTimeMode));
+        messageBroker.Respond(obj.Who, new TimeControlModeSet(payload.NewTimeMode));
     }
 }

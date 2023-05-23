@@ -1,150 +1,192 @@
-﻿using Coop.Core.Client;
+﻿using Common.Messaging;
+using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
-using Coop.Core.Server.Connections.States;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Messages;
-using GameInterface.Services.Modules.Messages;
-using GameInterface.Services.Heroes.Messages;
-using LiteNetLib.Utils;
-using Moq;
-using System;
+using GameInterface.Services.GameState.Messages;
+using LiteNetLib;
 using Xunit;
 using Xunit.Abstractions;
-using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Tests.Client.States
 {
     public class ValidateModuleStateTests : CoopTest
     {
         private readonly IClientLogic clientLogic;
+        private readonly NetPeer serverPeer;
         public ValidateModuleStateTests(ITestOutputHelper output) : base(output)
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
-            clientLogic.State = new ValidateModuleState(clientLogic);
+            serverPeer = MockNetwork.CreatePeer();
+            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            // Arrange
+            clientLogic.State = new ValidateModuleState(clientLogic);
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
+            // Act
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void ValidateModuleState_EntryEvents()
         {
-            // Setup event callbacks
-            var networkClientValidateCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkClientValidate>((payload) =>
-            {
-                networkClientValidateCount += 1;
-            });
+            // Act
+            var validateState = new ValidateModuleState(clientLogic);
+            clientLogic.State = validateState;
 
-            // Trigger state entry
-            clientLogic.State = new ValidateModuleState(clientLogic);
+            // Assert
+            Assert.NotEmpty(MockNetwork.Peers);
 
-            // All events are called exactly once
-            Assert.Equal(1, networkClientValidateCount);
+            var message = Assert.Single(MockNetwork.GetPeerMessages(serverPeer));
+            Assert.IsType<NetworkClientValidate>(message);
         }
 
         [Fact]
-        public void NetworkClientValidated_Tranitions_ReceivingSavedDataState()
+        public void NetworkClientValidated_Transitions_ReceivingSavedDataState()
         {
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(true, string.Empty));
+            // Arrange
+            var validateState = new ValidateModuleState(clientLogic);
+            clientLogic.State = validateState;
 
+            var heroExists = true;
+            var payload = new MessagePayload<NetworkClientValidated>(
+                this, new NetworkClientValidated(heroExists, "12345"));
+
+            // Act
+            validateState.Handle_NetworkClientValidated(payload);
+
+            // Assert
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
         [Fact]
-        public void NetworkClientValidated_Tranitions_CharacterCreationState()
+        public void NetworkClientValidated_Publishes_StartCharacterCreation()
         {
-            var startCharacterCreationCount = 0;
-            StubMessageBroker.Subscribe<StartCharacterCreation>((payload) =>
-            {
-                startCharacterCreationCount += 1;
-            });
+            // Arrange
+            var validateState = new ValidateModuleState(clientLogic);
+            clientLogic.State = validateState;
 
-            StubNetworkMessageBroker.ReceiveNetworkEvent(null, new NetworkClientValidated(false, string.Empty));
+            var heroExists = false;
+            var payload = new MessagePayload<NetworkClientValidated>(
+                this, new NetworkClientValidated(heroExists, "12345"));
 
-            Assert.Equal(1, startCharacterCreationCount);
+            // Act
+            validateState.Handle_NetworkClientValidated(payload);
+
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<StartCharacterCreation>(message);
         }
 
         [Fact]
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
-            var enterMainMenuCount = 0;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                enterMainMenuCount += 1;
-            });
+            // Arrange
+            var validateState = new ValidateModuleState(clientLogic);
+            clientLogic.State = validateState;
 
+            // Act
             clientLogic.EnterMainMenu();
 
-            // All events are called exactly once
-            Assert.Equal(1, enterMainMenuCount);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
-        public void EnterMainMenu_Transitions_MainMenuState()
+        public void MainMenuEntered_Transitions_MainMenuState()
         {
-            StubMessageBroker.Publish(this, new MainMenuEntered());
+            // Arrange
+            var validateState = new ValidateModuleState(clientLogic);
+            clientLogic.State = validateState;
 
+            var payload = new MessagePayload<MainMenuEntered>(
+                this, new MainMenuEntered());
+
+            // Act
+            validateState.Handle_MainMenuEntered(payload);
+
+            // Assert
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
 
         [Fact]
         public void LoadSavedData_Transitions_ReceivingSavedDataState()
         {
+            // Arrange
+            var validateState = new ValidateModuleState(clientLogic);
+            clientLogic.State = validateState;
+
+            // Act
             clientLogic.LoadSavedData();
 
+            // Assert
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
         [Fact]
         public void Disconnect_Publishes_EnterMainMenu()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var validateState = new ValidateModuleState(clientLogic);
+            clientLogic.State = validateState;
 
+            // Act
             clientLogic.Disconnect();
 
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
         public void StartCharacterCreation_Publishes_StartCharacterCreation()
         {
-            var startCharacterCreationCount = 0;
-            StubMessageBroker.Subscribe<StartCharacterCreation>((payload) =>
-            {
-                startCharacterCreationCount += 1;
-            });
+            // Arrange
+            var validateState = new ValidateModuleState(clientLogic);
+            clientLogic.State = validateState;
 
+            // Act
             clientLogic.StartCharacterCreation();
 
-            // All events are called exactly once
-            Assert.Equal(1, startCharacterCreationCount);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<StartCharacterCreation>(message);
         }
 
         [Fact]
         public void CharacterCreationStarted_Transitions_CharacterCreationState()
         {
-            StubMessageBroker.Publish(this, new CharacterCreationStarted());
+            // Arrange
+            var validateState = new ValidateModuleState(clientLogic);
+            clientLogic.State = validateState;
 
+            var payload = new MessagePayload<CharacterCreationStarted>(
+                this, new CharacterCreationStarted());
+
+            // Act
+            validateState.Handle_CharacterCreationStarted(payload);
+
+            // Assert
             Assert.IsType<CharacterCreationState>(clientLogic.State);
         }
 
         [Fact]
         public void OtherStateMethods_DoNotAlterState()
         {
+            // Arrange
+            var validateState = new ValidateModuleState(clientLogic);
+            clientLogic.State = validateState;
+
+            // Act
             clientLogic.Connect();
             Assert.IsType<ValidateModuleState>(clientLogic.State);
 
