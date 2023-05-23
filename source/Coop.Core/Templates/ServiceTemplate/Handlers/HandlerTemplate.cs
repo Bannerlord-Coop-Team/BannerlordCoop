@@ -1,9 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Templates.ServiceTemplate.Messages;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Templates.ServiceTemplate.Handlers;
 
