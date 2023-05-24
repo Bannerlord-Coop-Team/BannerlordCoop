@@ -9,22 +9,22 @@ namespace Coop.Core.Server.Connections.States
         public LoadingState(IConnectionLogic connectionLogic)
             : base(connectionLogic)
         {
-            ConnectionLogic.NetworkMessageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
+            ConnectionLogic.MessageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         }
 
         public override void Dispose()
         {
-            ConnectionLogic.NetworkMessageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
+            ConnectionLogic.MessageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         }
 
-        private void PlayerCampaignEnteredHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
+        internal void PlayerCampaignEnteredHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
         {
             var playerId = (NetPeer)obj.Who;
 
-            if (playerId == ConnectionLogic.PlayerId)
+            if (playerId == ConnectionLogic.Peer)
             {
                 ConnectionLogic.EnterCampaign();
-                ConnectionLogic.NetworkMessageBroker.Publish(this, new PlayerCampaignEntered());
+                ConnectionLogic.MessageBroker.Publish(this, new PlayerCampaignEntered());
             }
         }
 

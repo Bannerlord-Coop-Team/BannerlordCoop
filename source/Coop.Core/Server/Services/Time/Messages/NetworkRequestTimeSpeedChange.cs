@@ -5,7 +5,7 @@ using ProtoBuf;
 namespace Coop.Core.Server.Services.Time.Messages
 {
     [ProtoContract]
-    public readonly struct NetworkRequestTimeSpeedChange : INetworkEvent
+    public record NetworkRequestTimeSpeedChange : ICommand
     {
         [ProtoMember(1)]
         public TimeControlEnum NewControlMode { get; }

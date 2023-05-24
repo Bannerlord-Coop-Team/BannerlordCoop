@@ -2,7 +2,7 @@
 
 namespace Coop.Core.Client.Messages
 {
-    public readonly struct NetworkConnected : IEvent
+    public record NetworkConnected : IEvent
     {
     }
 }

@@ -1,103 +1,104 @@
 ﻿using Common.Messaging;
-using Common.Util;
-using Coop.Core.Client.Messages;
+using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Modules.Messages;
-using System.Threading.Tasks;
 
-namespace Coop.Core.Client.States
+namespace Coop.Core.Client.States;
+
+/// <summary>
+/// State Logic Controller for the Validate Module Client State
+/// </summary>
+public class ValidateModuleState : ClientStateBase
 {
-    /// <summary>
-    /// State Logic Controller for the Validate Module Client State
-    /// </summary>
-    public class ValidateModuleState : ClientStateBase
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+    public ValidateModuleState(IClientLogic logic) : base(logic)
     {
-        public ValidateModuleState(IClientLogic logic) : base(logic)
-        {
-            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
-            Logic.NetworkMessageBroker.Subscribe<CharacterCreationStarted>(Handle);
-            Logic.NetworkMessageBroker.Subscribe<NetworkClientValidated>(Handle);
+        messageBroker = logic.MessageBroker;
+        network = logic.Network;
 
-            Logic.NetworkMessageBroker.PublishNetworkEvent(new NetworkClientValidate(DebugHeroInterface.Player1_Id));
+        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
+        messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
+
+        network.SendAll(new NetworkClientValidate(DebugHeroInterface.Player1_Id));
+    }
+
+    public override void Dispose()
+    {
+        Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        Logic.MessageBroker.Unsubscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
+        Logic.MessageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
+    }
+
+    internal void Handle_NetworkClientValidated(MessagePayload<NetworkClientValidated> obj)
+    {
+        if (obj.What.HeroExists)
+        {
+            Logic.ControlledHeroId = obj.What.HeroId;
+            Logic.LoadSavedData();
         }
-
-        public override void Dispose()
+        else
         {
-            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            Logic.NetworkMessageBroker.Unsubscribe<CharacterCreationStarted>(Handle);
-            Logic.NetworkMessageBroker.Unsubscribe<NetworkClientValidated>(Handle);
+            Logic.StartCharacterCreation();   
         }
+    }
 
-        private void Handle(MessagePayload<NetworkClientValidated> obj)
-        {
-            if (obj.What.HeroExists)
-            {
-                Logic.ControlledHeroId = obj.What.HeroId;
-                Logic.LoadSavedData();
-            }
-            else
-            {
-                Logic.StartCharacterCreation();   
-            }
-        }
+    internal void Handle_CharacterCreationStarted(MessagePayload<CharacterCreationStarted> obj)
+    {
+        Logic.State = new CharacterCreationState(Logic);
+    }
 
-        public override void EnterMainMenu()
-        {
-            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
-        }
+    internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
+    {
+        Logic.State = new MainMenuState(Logic);
+    }
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
-        {
-            Logic.State = new MainMenuState(Logic);
-        }
+    public override void EnterMainMenu()
+    {
+        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+    }
 
-        public override void LoadSavedData()
-        {
+    public override void LoadSavedData()
+    {
 #if DEBUG
-            Logic.NetworkMessageBroker.Publish(this, new LoadDebugGame());
-            Logic.State = new LoadingState(Logic);
+        Logic.NetworkMessageBroker.Publish(this, new LoadDebugGame());
+        Logic.State = new LoadingState(Logic);
 #else
-            Logic.State = new ReceivingSavedDataState(Logic);
+        Logic.State = new ReceivingSavedDataState(Logic);
 #endif
-        }
+    }
 
-        public override void Connect()
-        {
-        }
+    public override void Connect()
+    {
+    }
 
-        public override void Disconnect()
-        {
-            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
-        }
+    public override void Disconnect()
+    {
+        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+    }
 
-        public override void EnterCampaignState()
-        {
-        }
+    public override void EnterCampaignState()
+    {
+    }
 
-        public override void EnterMissionState()
-        {
-        }
+    public override void EnterMissionState()
+    {
+    }
 
-        public override void ExitGame()
-        {
-        }
+    public override void ExitGame()
+    {
+    }
 
-        public override void StartCharacterCreation()
-        {
-            Logic.NetworkMessageBroker.Publish(this, new StartCharacterCreation());
-        }
+    public override void StartCharacterCreation()
+    {
+        Logic.MessageBroker.Publish(this, new StartCharacterCreation());
+    }
 
-        private void Handle(MessagePayload<CharacterCreationStarted> obj)
-        {
-            Logic.State = new CharacterCreationState(Logic);
-        }
-
-        public override void ValidateModules()
-        {
-        }
+    public override void ValidateModules()
+    {
     }
 }

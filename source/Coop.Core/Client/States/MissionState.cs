@@ -10,34 +10,34 @@ namespace Coop.Core.Client.States
     {
         public MissionState(IClientLogic logic) : base(logic)
         {
-            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
-            Logic.NetworkMessageBroker.Subscribe<CampaignStateEntered>(Handle);
+            Logic.MessageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+            Logic.MessageBroker.Subscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
         }
 
         public override void Dispose()
         {
-            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
-            Logic.NetworkMessageBroker.Unsubscribe<CampaignStateEntered>(Handle);
+            Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+            Logic.MessageBroker.Unsubscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
         }
 
         public override void EnterCampaignState()
         {
-            Logic.NetworkMessageBroker.Publish(this, new EnterCampaignState());
+            Logic.MessageBroker.Publish(this, new EnterCampaignState());
         }
 
-        private void Handle(MessagePayload<CampaignStateEntered> obj)
+        internal void Handle_CampaignStateEntered(MessagePayload<CampaignStateEntered> obj)
         {
             Logic.State = new CampaignState(Logic);
         }
 
-        public override void EnterMainMenu()
-        {
-            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
-        }
-
-        private void Handle(MessagePayload<MainMenuEntered> obj)
+        internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
         {
             Logic.State = new MainMenuState(Logic);
+        }
+
+        public override void EnterMainMenu()
+        {
+            Logic.MessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void Connect()
@@ -46,7 +46,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+            Logic.MessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterMissionState()

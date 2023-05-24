@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Messages;
 
-public readonly struct TimeSpeedChanged : IEvent
+public record TimeSpeedChanged : IEvent
 {
     public TimeControlEnum NewControlMode { get; }
     public TimeSpeedChanged(CampaignTimeControlMode newControlMode)

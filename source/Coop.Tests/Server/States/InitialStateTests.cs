@@ -1,8 +1,11 @@
-﻿using Coop.Core.Server;
+﻿using Common.Messaging;
+using Common.Network;
+using Coop.Core.Server;
 using Coop.Core.Server.States;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using Moq;
+using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -17,47 +20,56 @@ namespace Coop.Tests.Server.States
         [Fact]
         public void InitialStateStart()
         {
+            // Arrange
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            Mock<ICoopServer> coopServer = new Mock<ICoopServer>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, StubMessageBroker);
+            Mock<INetwork> coopServer = new Mock<INetwork>();
+            IServerState currentState = new InitialServerState(serverLogic.Object, MockMessageBroker);
             serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
-            serverLogic.Setup(m => m.NetworkServer).Returns(coopServer.Object);
+            serverLogic.Setup(m => m.Network).Returns(coopServer.Object);
 
-            StubMessageBroker.Subscribe<LoadDebugGame>((payload) =>
-            {
-                StubMessageBroker.Publish(null, new CampaignLoaded());
-            });
-
+            // Act
             currentState.Start();
 
+            Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<LoadDebugGame>(MockMessageBroker.PublishedMessages.First());
+
+            var payload = new MessagePayload<CampaignLoaded>(null, new CampaignLoaded());
+            var initialState = Assert.IsType<InitialServerState>(currentState);
+            initialState.Handle_GameLoaded(payload);
+
+            // Assert
             Assert.IsType<ServerRunningState>(currentState);
         }
 
         [Fact]
         public void InitialStateStop()
         {
-
+            // Arrange
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, StubMessageBroker);
+            IServerState currentState = new InitialServerState(serverLogic.Object, MockMessageBroker);
             serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
 
+            // Act
             currentState.Stop();
 
+            // Assert
             Assert.IsType<InitialServerState>(currentState);
         }
 
         [Fact]
         public void InitialStateDispose()
         {
-
+            // Arrange
             Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, StubMessageBroker);
+            IServerState currentState = new InitialServerState(serverLogic.Object, MockMessageBroker);
 
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
+            // Act
             currentState.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
     }
 }

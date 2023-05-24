@@ -6,25 +6,13 @@ namespace GameInterface.Services.GameState.Messages;
 /// <summary>
 /// Goes to the mission state from any game state.
 /// </summary>
-public readonly struct EnterMissionState : ICommand
+public record EnterMissionState : ICommand
 {
-    public Guid TransactionID { get; }
-
-    public EnterMissionState(Guid transactionID)
-    {
-        TransactionID = transactionID;
-    }
 }
 
 /// <summary>
-/// Reply to <seealso cref="EnterMainMenu"/>.
+/// Mission state entered event
 /// </summary>
-public readonly struct MissionStateEntered : IResponse
+public record MissionStateEntered : IEvent
 {
-    public Guid TransactionID { get; }
-
-    public MissionStateEntered(Guid transactionID)
-    {
-        TransactionID = transactionID;
-    }
 }

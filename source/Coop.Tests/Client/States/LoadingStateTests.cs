@@ -1,6 +1,8 @@
-﻿using Coop.Core.Client;
+﻿using Common.Messaging;
+using Coop.Core.Client;
 using Coop.Core.Client.States;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Messages;
 using Moq;
 using Xunit;
 using Xunit.Abstractions;
@@ -12,68 +14,92 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         public LoadingStateTests(ITestOutputHelper output) : base(output)
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
-            clientLogic.State = new LoadingState(clientLogic);
+            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            // Arrange
+            clientLogic.State = new LoadingState(clientLogic);
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
-            clientLogic.State.Dispose();
+            // Act
+            clientLogic.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            clientLogic.State = new LoadingState(clientLogic);
 
+            // Act
             clientLogic.EnterMainMenu();
 
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
-        public void EnterMainMenu_Transitions_MainMenuState()
+        public void MainMenuEntered_Transitions_MainMenuState()
         {
-            StubMessageBroker.Publish(this, new MainMenuEntered());
+            // Arrange
+            var loadingState = new LoadingState(clientLogic);
+            clientLogic.State = loadingState;
 
+            var payload = new MessagePayload<MainMenuEntered>(
+                this, new MainMenuEntered());
+
+            // Act
+            loadingState.Handle_MainMenuEntered(payload);
+
+            // Assert
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
 
         [Fact]
-        public void GameLoaded_Transitions_CampaignState()
+        public void CampaignLoaded_Transitions_CampaignState()
         {
-            StubMessageBroker.Publish(this, new CampaignLoaded());
+            // Arrange
+            var loadingState = new LoadingState(clientLogic);
+            clientLogic.State = loadingState;
 
+            var payload = new MessagePayload<CampaignLoaded>(
+                this, new CampaignLoaded());
+
+            // Act
+            loadingState.Handle_CampaignLoaded(payload);
+
+            // Assert
             Assert.IsType<CampaignState>(clientLogic.State);
         }
 
         [Fact]
         public void Disconnect_Publishes_EnterMainMenu()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            clientLogic.State = new LoadingState(clientLogic);
 
+            // Act
             clientLogic.Disconnect();
 
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
         public void OtherStateMethods_DoNotAlterState()
         {
+            // Arrange
+            clientLogic.State = new LoadingState(clientLogic);
+
+            // Act
             clientLogic.Connect();
             Assert.IsType<LoadingState>(clientLogic.State);
 

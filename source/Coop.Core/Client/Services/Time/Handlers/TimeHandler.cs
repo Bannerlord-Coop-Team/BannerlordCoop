@@ -14,24 +14,25 @@ namespace Coop.Core.Client.Services.Time.Handlers
     {
         private static readonly ILogger Logger = LogManager.GetLogger<TimeHandler>();
 
-        private readonly INetworkMessageBroker networkMessageBroker;
+        private readonly IMessageBroker messageBroker;
+        private readonly INetwork network;
 
-        public TimeHandler(INetworkMessageBroker networkMessageBroker)
+        public TimeHandler(IMessageBroker messageBroker, INetwork network)
         {
-            this.networkMessageBroker = networkMessageBroker;
+            this.messageBroker = messageBroker;
+            this.network = network;
+            messageBroker.Subscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
+            messageBroker.Subscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
 
-            networkMessageBroker.Subscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
-            networkMessageBroker.Subscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
-
-            networkMessageBroker.Subscribe<NetworkEnableTimeControls>(Handle_NetworkEnableTimeControls);
+            messageBroker.Subscribe<NetworkEnableTimeControls>(Handle_NetworkEnableTimeControls);
         }
 
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
-            networkMessageBroker.Unsubscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
+            messageBroker.Unsubscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
+            messageBroker.Unsubscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
 
-            networkMessageBroker.Unsubscribe<NetworkEnableTimeControls>(Handle_NetworkEnableTimeControls);
+            messageBroker.Unsubscribe<NetworkEnableTimeControls>(Handle_NetworkEnableTimeControls);
         }
 
         internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChanged> obj)
@@ -41,7 +42,7 @@ namespace Coop.Core.Client.Services.Time.Handlers
             Logger.Verbose("Client changing time to {mode} from server", newMode);
 
             var payload = new NetworkRequestTimeSpeedChange(newMode);
-            networkMessageBroker.PublishNetworkEvent(payload);
+            network.SendAll(payload);
         }
 
         internal void Handle_NetworkTimeSpeedChanged(MessagePayload<NetworkTimeSpeedChanged> obj)
@@ -50,14 +51,12 @@ namespace Coop.Core.Client.Services.Time.Handlers
 
             Logger.Verbose("Client requesting time change to {mode}", newMode);
 
-            networkMessageBroker.Publish(this, new SetTimeControlMode(Guid.Empty, newMode));
-
-            
+            messageBroker.Publish(this, new SetTimeControlMode(newMode));
         }
 
         internal void Handle_NetworkEnableTimeControls(MessagePayload<NetworkEnableTimeControls> obj)
         {
-            networkMessageBroker.Publish(this, new EnableGameTimeControls());
+            messageBroker.Publish(this, new EnableGameTimeControls());
         }
     }
 }

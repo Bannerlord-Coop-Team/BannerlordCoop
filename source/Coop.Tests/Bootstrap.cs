@@ -1,7 +1,7 @@
 ﻿using Autofac;
+using Common.Network;
 using Coop.Core.Server;
 using Coop.Tests.Autofac;
-using System;
 
 namespace Coop.Tests
 {
@@ -10,7 +10,7 @@ namespace Coop.Tests
         internal static IContainer InitializeAsClient()
         {
             ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterType<CoopServer>().As<ICoopServer>();
+            builder.RegisterType<CoopServer>().As<INetwork>();
             builder.RegisterModule<TestClientModule>();
             return builder.Build();
         }

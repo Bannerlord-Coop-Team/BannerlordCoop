@@ -1,9 +1,11 @@
-﻿using Coop.Core.Server.Connections;
+﻿using Common.Messaging;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
+using System.Linq;
 using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
@@ -12,89 +14,100 @@ namespace Coop.Tests.Server.Connections.States
 {
     public class LoadingStateTests : CoopTest
     {
-        private readonly IConnectionLogic _connectionLogic;
-        private readonly NetPeer _playerId = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
-        private readonly NetPeer _differentPlayer = FormatterServices.GetUninitializedObject(typeof(NetPeer)) as NetPeer;
+        private readonly IConnectionLogic connectionLogic;
+        private readonly NetPeer playerPeer;
+        private readonly NetPeer differentPeer;
 
         public LoadingStateTests(ITestOutputHelper output) : base(output)
         {
-            _connectionLogic = new ConnectionLogic(_playerId, StubNetworkMessageBroker);
-            _differentPlayer.SetId(_playerId.Id + 1);
+            playerPeer = MockNetwork.CreatePeer();
+            differentPeer = MockNetwork.CreatePeer();
+
+            connectionLogic = new ConnectionLogic(playerPeer, MockMessageBroker, MockNetwork);
+            differentPeer.SetId(playerPeer.Id + 1);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            _connectionLogic.State = new CampaignState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new CampaignState(connectionLogic);
 
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
-            _connectionLogic.State.Dispose();
+            // Act
+            connectionLogic.State.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void EnterCampaignMethod_TransitionState_CampaignState()
         {
-            _connectionLogic.State = new LoadingState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new LoadingState(connectionLogic);
 
-            _connectionLogic.EnterCampaign();
+            // Act
+            connectionLogic.EnterCampaign();
 
-            Assert.IsType<CampaignState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<CampaignState>(connectionLogic.State);
         }
 
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            _connectionLogic.State = new LoadingState(_connectionLogic);
+            // Arrange
+            connectionLogic.State = new LoadingState(connectionLogic);
 
-            _connectionLogic.CreateCharacter();
-            _connectionLogic.TransferSave();
-            _connectionLogic.Load();
-            _connectionLogic.EnterMission();
+            // Act
+            connectionLogic.CreateCharacter();
+            connectionLogic.TransferSave();
+            connectionLogic.Load();
+            connectionLogic.EnterMission();
 
-            Assert.IsType<LoadingState>(_connectionLogic.State);
+            // Assert
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
 
         [Fact]
         public void PlayerCampaignEntered_ValidPlayerId()
         {
-            _connectionLogic.State = new LoadingState(_connectionLogic);
+            // Arrange
+            var currentState = new LoadingState(connectionLogic);
+            connectionLogic.State = currentState;
 
-            var playerCampaignEnteredCount = 0;
-            StubNetworkMessageBroker.Subscribe<PlayerCampaignEntered>((payload) =>
-            {
-                playerCampaignEnteredCount += 1;
-            });
+            // Act
+            var payload = new MessagePayload<NetworkPlayerCampaignEntered>(
+                playerPeer, new NetworkPlayerCampaignEntered());
+            currentState.PlayerCampaignEnteredHandler(payload);
 
-            // Publish hero resolved, this would be from game interface
-            StubNetworkMessageBroker.ReceiveNetworkEvent(_playerId, new NetworkPlayerCampaignEntered());
 
-            // A single message is sent
-            Assert.Equal(1, playerCampaignEnteredCount);
+            // Assert
+            Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<PlayerCampaignEntered>(MockMessageBroker.PublishedMessages.First());
 
-            Assert.IsType<CampaignState>(_connectionLogic.State);
+            Assert.IsType<CampaignState>(connectionLogic.State);
         }
 
         [Fact]
         public void PlayerCampaignEntered_InvalidPlayerId()
         {
-            _connectionLogic.State = new LoadingState(_connectionLogic);
+            // Arrange
+            var currentState = new LoadingState(connectionLogic);
+            connectionLogic.State = currentState;
 
-            var playerCampaignEnteredCount = 0;
-            StubNetworkMessageBroker.Subscribe<PlayerCampaignEntered>((payload) =>
-            {
-                playerCampaignEnteredCount += 1;
-            });
+            // Act
+            var payload = new MessagePayload<NetworkPlayerCampaignEntered>(
+                differentPeer, new NetworkPlayerCampaignEntered());
+            currentState.PlayerCampaignEnteredHandler(payload);
 
-            // Publish hero resolved, this would be from game interface
-            StubNetworkMessageBroker.ReceiveNetworkEvent(_differentPlayer, new NetworkPlayerCampaignEntered());
 
-            // No message is sent due to this logic is not responsible for this player
-            Assert.Equal(0, playerCampaignEnteredCount);
+            // Assert
+            Assert.Empty(MockMessageBroker.PublishedMessages);
 
-            Assert.IsType<LoadingState>(_connectionLogic.State);
+            Assert.IsType<LoadingState>(connectionLogic.State);
         }
     }
 }

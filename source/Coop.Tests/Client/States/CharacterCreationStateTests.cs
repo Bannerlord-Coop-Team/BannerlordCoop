@@ -1,106 +1,139 @@
-﻿using Coop.Core.Client;
+﻿using Common.Messaging;
+using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
-using Moq;
+using LiteNetLib;
 using Xunit;
 using Xunit.Abstractions;
-using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Tests.Client.States
 {
     public class CharacterCreationStateTests : CoopTest
     {
         private readonly IClientLogic clientLogic;
+        private readonly NetPeer serverPeer;
         public CharacterCreationStateTests(ITestOutputHelper output) : base(output)
         {
-            var mockCoopClient = new Mock<ICoopClient>();
-            clientLogic = new ClientLogic(mockCoopClient.Object, StubNetworkMessageBroker);
-            clientLogic.State = new CharacterCreationState(clientLogic);
+            serverPeer = MockNetwork.CreatePeer();
+            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            Assert.NotEqual(0, StubMessageBroker.GetTotalSubscribers());
+            clientLogic.State = new CharacterCreationState(clientLogic);
 
+            // Arrange
+            Assert.NotEmpty(MockMessageBroker.Subscriptions);
+
+            // Act
             clientLogic.State.Dispose();
 
-            Assert.Equal(0, StubMessageBroker.GetTotalSubscribers());
-        }
-
-        [Fact]
-        public void HeroPackaged_Publishes_NetworkTransferedHero()
-        {
-            var networkTransferedHeroCount = 0;
-            StubNetworkMessageBroker.TestNetworkSubscribe<NetworkTransferedHero>((payload) =>
-            {
-                networkTransferedHeroCount += 1;
-            });
-
-            StubNetworkMessageBroker.Publish(this, new NewHeroPackaged());
-
-            Assert.Equal(1, networkTransferedHeroCount);
+            // Assert
+            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void HeroPackaged_Transitions_ReceivingSavedDataState()
         {
-            StubNetworkMessageBroker.Publish(this, new NewHeroPackaged());
+            // Arrange
+            var characterCreationState = new CharacterCreationState(clientLogic);
+            clientLogic.State = characterCreationState;
 
-            clientLogic.EnterMainMenu();
+            var heroBytes = new byte[10];
+            var payload = new MessagePayload<NewHeroPackaged>(
+                this, new NewHeroPackaged(heroBytes));
+
+            // Act
+            characterCreationState.Handle_NewHeroPackaged(payload);
+
+            // Assert
+            Assert.NotEmpty(MockNetwork.Peers);
+            foreach(var peer in MockNetwork.Peers)
+            {
+                var message = Assert.Single(MockNetwork.GetPeerMessages(peer));
+                Assert.IsType<NetworkTransferedHero>(message);
+            }
 
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
+
         }
 
         [Fact]
         public void CharacterCreationFinished_Publishes_PackageMainHero()
         {
-            var packageMainHeroCount = 0;
-            StubNetworkMessageBroker.Subscribe<PackageMainHero>((payload) =>
-            {
-                packageMainHeroCount += 1;
-            });
+            // Arrange
+            var characterCreationState = new CharacterCreationState(clientLogic);
+            clientLogic.State = characterCreationState;
 
-            StubNetworkMessageBroker.Publish(this, new CharacterCreationFinished());
+            var payload = new MessagePayload<CharacterCreationFinished>(
+                this, new CharacterCreationFinished());
 
-            Assert.Equal(1, packageMainHeroCount);
+            // Act
+            characterCreationState.Handle_CharacterCreationFinished(payload);
+
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<PackageMainHero>(message);
         }
 
         [Fact]
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
-            var isEventPublished = false;
-            StubMessageBroker.Subscribe<EnterMainMenu>((payload) =>
-            {
-                isEventPublished = true;
-            });
+            // Arrange
+            var characterCreationState = new CharacterCreationState(clientLogic);
+            clientLogic.State = characterCreationState;
 
+            // Act
             clientLogic.EnterMainMenu();
 
-            Assert.True(isEventPublished);
+            // Assert
+            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.IsType<EnterMainMenu>(message);
         }
 
         [Fact]
-        public void EnterMainMenu_Transitions_MainMenuState()
+        public void MainMenuEntered_Transitions_MainMenuState()
         {
-            StubMessageBroker.Publish(this, new MainMenuEntered());
+            // Arrange
+            var characterCreationState = new CharacterCreationState(clientLogic);
+            clientLogic.State = characterCreationState;
 
+            var payload = new MessagePayload<MainMenuEntered>(
+                this, new MainMenuEntered());
+
+            // Act
+            characterCreationState.Handle_MainMenuEntered(payload);
+
+            // Assert
             Assert.IsType<MainMenuState>(clientLogic.State);
         }
 
         [Fact]
         public void LoadSavedData_Transitions_ReceivingSavedDataState()
         {
+            // Arrange
+            var characterCreationState = new CharacterCreationState(clientLogic);
+            clientLogic.State = characterCreationState;
+
+            // Act
             clientLogic.LoadSavedData();
 
+            // Assert
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
         [Fact]
         public void OtherStateMethods_DoNotAlterState()
         {
+            // Arrange
+            var characterCreationState = new CharacterCreationState(clientLogic);
+            clientLogic.State = characterCreationState;
+
+            // Act
             clientLogic.Connect();
             Assert.IsType<CharacterCreationState>(clientLogic.State);
 

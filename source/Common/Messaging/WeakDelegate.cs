@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace Common.Messaging
 {
@@ -9,6 +10,7 @@ namespace Common.Messaging
     public class WeakDelegate
     {
         public bool IsAlive => reference.IsAlive;
+        public object Instance => reference.Target;
 
         private WeakReference reference;
         private MethodInfo method;

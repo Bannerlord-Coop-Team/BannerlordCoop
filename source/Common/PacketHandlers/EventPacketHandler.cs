@@ -39,16 +39,16 @@ namespace Common.PacketHandlers
         {
             EventPacket convertedPacket = (EventPacket)packet;
 
-            INetworkEvent networkEvent = convertedPacket.Event;
+            IMessage networkEvent = convertedPacket.Event;
 
             Logger.Information("Received network event from {Peer} of {EventType}", peer.EndPoint, networkEvent.GetType().Name);
 
             PublishEvent(peer, networkEvent);
         }
 
-        protected virtual void PublishEvent(NetPeer peer, INetworkEvent networkEvent) 
+        protected virtual void PublishEvent(NetPeer peer, IMessage message) 
         {
-            Publish.MakeGenericMethod(networkEvent.GetType()).Invoke(_messageBroker, new object[] { peer, networkEvent });
+            Publish.MakeGenericMethod(message.GetType()).Invoke(_messageBroker, new object[] { peer, message });
         }
     }
 
@@ -59,29 +59,29 @@ namespace Common.PacketHandlers
 
         public PacketType PacketType => PacketType.Event;
 
-        public INetworkEvent Event
+        public IMessage Event
         {
             get
             {
-                return (INetworkEvent)ProtoBufSerializer.Deserialize(_event);
+                return (IMessage)ProtoBufSerializer.Deserialize(_message);
             }
             set
             {
-                _event = ProtoBufSerializer.Serialize(value);
+                _message = ProtoBufSerializer.Serialize(value);
             }
         }
 
         [ProtoMember(1)]
-        private byte[] _event;
+        private byte[] _message;
 
-        public EventPacket(INetworkEvent @event)
+        public EventPacket(IMessage message)
         {
-            if (RuntimeTypeModel.Default.IsDefined(@event.GetType()) == false)
+            if (RuntimeTypeModel.Default.IsDefined(message.GetType()) == false)
             {
-                throw new ArgumentException($"Type {@event.GetType().Name} is not serializable.");
+                throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
             }
 
-            Event = @event;
+            Event = message;
         }
     }
 }

@@ -2,7 +2,7 @@
 
 namespace GameInterface.Services.Heroes.Messages;
 
-public readonly struct GameSaved : IEvent
+public record GameSaved : IEvent
 {
     public string SaveName { get; }
 

@@ -18,38 +18,38 @@ namespace Coop.Core.Client.States
 
         public ReceivingSavedDataState(IClientLogic logic) : base(logic)
         {
-            Logic.NetworkMessageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle);
-            Logic.NetworkMessageBroker.Subscribe<MainMenuEntered>(Handle);
+            Logic.MessageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+            Logic.MessageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         }
 
         public override void Dispose()
         {
-            Logic.NetworkMessageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle);
-            Logic.NetworkMessageBroker.Unsubscribe<MainMenuEntered>(Handle);
+            Logic.MessageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+            Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         }
 
-        private void Handle(MessagePayload<NetworkGameSaveDataReceived> obj)
+        internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
         {
             saveDataMessage = obj.What;
             Logic.EnterMainMenu();
         }
 
-        private void Handle(MessagePayload<MainMenuEntered> obj)
+        internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
         {
             var saveData = saveDataMessage.GameSaveData;
 
             if (saveData == null) return;
             if (saveData.Length == 0) return;
 
-            var commandLoad = new LoadGameSave(Guid.NewGuid(), saveData);
-            Logic.NetworkMessageBroker.Publish(this, commandLoad);
+            var commandLoad = new LoadGameSave(saveData);
+            Logic.MessageBroker.Publish(this, commandLoad);
 
             Logic.LoadSavedData();
         }
 
         public override void EnterMainMenu()
         {
-            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+            Logic.MessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void Connect()
@@ -58,7 +58,7 @@ namespace Coop.Core.Client.States
 
         public override void Disconnect()
         {
-            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+            Logic.MessageBroker.Publish(this, new EnterMainMenu());
             Logic.State = new MainMenuState(Logic);
         }
 

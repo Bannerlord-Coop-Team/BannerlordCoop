@@ -2,7 +2,6 @@
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
-using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
@@ -21,13 +20,15 @@ namespace Coop.Core.Server.Connections
     /// <inheritdoc cref="IClientRegistry"/>
     public class ClientRegistry : IClientRegistry
     {
-        public IDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new Dictionary<NetPeer, IConnectionLogic>();
+        internal IDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new Dictionary<NetPeer, IConnectionLogic>();
 
-        private readonly INetworkMessageBroker _messageBroker;
+        private readonly IMessageBroker _messageBroker;
+        private readonly INetwork _network;
 
-        public ClientRegistry(INetworkMessageBroker messageBroker)
+        public ClientRegistry(IMessageBroker messageBroker, INetwork network)
         {
             _messageBroker = messageBroker;
+            _network = network;
             _messageBroker.Subscribe<PlayerConnected>(PlayerJoiningHandler);
             _messageBroker.Subscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
             _messageBroker.Subscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
@@ -40,14 +41,14 @@ namespace Coop.Core.Server.Connections
             _messageBroker.Unsubscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
         }
 
-        private void PlayerJoiningHandler(MessagePayload<PlayerConnected> obj)
+        internal void PlayerJoiningHandler(MessagePayload<PlayerConnected> obj)
         {
             var playerId = obj.What.PlayerId;
-            var connectionLogic = new ConnectionLogic(playerId, _messageBroker);
+            var connectionLogic = new ConnectionLogic(playerId, _messageBroker, _network);
             ConnectionStates.Add(playerId, connectionLogic);
         }
 
-        private void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)
+        internal void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)
         {
             var playerId = obj.What.PlayerId;
             
@@ -58,7 +59,7 @@ namespace Coop.Core.Server.Connections
             }
         }
 
-        private void PlayerCampaignEnteredHandler(MessagePayload<PlayerCampaignEntered> obj)
+        internal void PlayerCampaignEnteredHandler(MessagePayload<PlayerCampaignEntered> obj)
         {
             EnableTimeControls();
         }
@@ -73,8 +74,8 @@ namespace Coop.Core.Server.Connections
             // Only re-enable if all connections are finished loading
             if (ConnectionStates.Any(state => loadingStates.Contains(state.Value.State.GetType()))) return;
 
-            _messageBroker.PublishNetworkEvent(new NetworkEnableTimeControls());
-            _messageBroker.Publish(this, new EnableGameTimeControls(Guid.Empty));
+            _network.SendAll(new NetworkEnableTimeControls());
+            _messageBroker.Publish(this, new EnableGameTimeControls());
         }
     }
 }

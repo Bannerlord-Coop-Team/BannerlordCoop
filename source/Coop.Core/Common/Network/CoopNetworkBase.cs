@@ -1,10 +1,12 @@
-﻿using Common.Network;
+﻿using Common.Messaging;
+using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using System;
 using System.Linq;
+using System.Net.Sockets;
 
 namespace Coop.Core.Common.Network
 {
@@ -44,6 +46,24 @@ namespace Coop.Core.Common.Network
 
             // Send data
             netPeer.Send(writer.Data, packet.DeliveryMethod);
+        }
+
+        public void Send(NetPeer netPeer, IMessage message)
+        {
+            var eventPacket = new EventPacket(message);
+            Send(netPeer, eventPacket);
+        }
+
+        public void SendAll(IMessage message)
+        {
+            var eventPacket = new EventPacket(message);
+            SendAll(eventPacket);
+        }
+
+        public void SendAllBut(NetPeer excludedPeer, IMessage message)
+        {
+            var eventPacket = new EventPacket(message);
+            SendAllBut(excludedPeer, eventPacket);
         }
 
         public abstract void Start();

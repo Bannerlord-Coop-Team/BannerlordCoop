@@ -2,9 +2,11 @@
 using Coop.Core.Client.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
 using Coop.Tests.Mocks;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using Xunit;
 
@@ -13,24 +15,14 @@ namespace Coop.Tests.Client.Services.Time
     public class TimeHandlerTests
     {
         [Fact]
-        public void Constructor_SubscribesToMessageBroker()
+        public void Dispose_RemovesAllHandlers()
         {
             // Arrange
-            var broker = new MockNetworkMessageBroker();
+            var broker = new MockMessageBroker();
+            var network = new MockNetwork();
+            var handler = new TimeHandler(broker, network);
 
-            // Act
-            var handler = new TimeHandler(broker);
-
-            // Assert
-            Assert.Equal(3, broker.Subscriptions.Count);
-        }
-
-        [Fact]
-        public void Dispose_UnsubscribesFromMessageBroker()
-        {
-            // Arrange
-            var broker = new MockNetworkMessageBroker();
-            var handler = new TimeHandler(broker);
+            Assert.NotEmpty(broker.Subscriptions);
 
             // Act
             handler.Dispose();
@@ -40,30 +32,35 @@ namespace Coop.Tests.Client.Services.Time
         }
 
         [Fact]
-        public void Handle_TimeSpeedChanged_PublishesNetworkRequestTimeSpeedChange()
+        public void TimeSpeedChanged_Publishes_NetworkRequestTimeSpeedChange()
         {
             // Arrange
-            var broker = new MockNetworkMessageBroker();
-            var handler = new TimeHandler(broker);
+            var broker = new MockMessageBroker();
+            var network = new MockNetwork();
+            var handler = new TimeHandler(broker, network);
             var payload = new TimeSpeedChanged(CampaignTimeControlMode.StoppablePlay);
             var message = new MessagePayload<TimeSpeedChanged>(null, payload);
+
+            var peer = network.CreatePeer();
 
             // Act
             handler.Handle_TimeSpeedChanged(message);
 
             // Assert
-            Assert.Single(broker.PublishedNetworkMessages);
-            Assert.IsType<NetworkRequestTimeSpeedChange>(broker.PublishedNetworkMessages[0]);
-            var networkRequestTimeSpeedChange = (NetworkRequestTimeSpeedChange)broker.PublishedNetworkMessages[0];
+            var sentMessages = network.GetPeerMessages(peer);
+            Assert.Single(sentMessages);
+            Assert.IsType<NetworkRequestTimeSpeedChange>(sentMessages.First());
+            var networkRequestTimeSpeedChange = (NetworkRequestTimeSpeedChange)sentMessages.First();
             Assert.Equal(message.What.NewControlMode, networkRequestTimeSpeedChange.NewControlMode);
         }
 
         [Fact]
-        public void Handle_NetworkTimeSpeedChanged_PublishesSetTimeControlMode()
+        public void NetworkTimeSpeedChanged_Publishes_SetTimeControlMode()
         {
             // Arrange
-            var broker = new MockNetworkMessageBroker();
-            var handler = new TimeHandler(broker);
+            var broker = new MockMessageBroker();
+            var network = new MockNetwork();
+            var handler = new TimeHandler(broker, network);
             var payload = new NetworkTimeSpeedChanged(TimeControlEnum.Play_2x);
             var message = new MessagePayload<NetworkTimeSpeedChanged>(null, payload);
 
@@ -71,10 +68,8 @@ namespace Coop.Tests.Client.Services.Time
             handler.Handle_NetworkTimeSpeedChanged(message);
 
             // Assert
-            Assert.Single(broker.PublishedMessages);
-            Assert.IsType<SetTimeControlMode>(broker.PublishedMessages[0]);
-            var setTimeControlMode = (SetTimeControlMode)broker.PublishedMessages[0];
-            Assert.Equal(Guid.Empty, setTimeControlMode.TransactionID);
+            var timeControlMessage = Assert.Single(broker.PublishedMessages);
+            var setTimeControlMode = Assert.IsType<SetTimeControlMode>(timeControlMessage);
             Assert.Equal(payload.NewControlMode, setTimeControlMode.NewTimeMode);
         }
     }

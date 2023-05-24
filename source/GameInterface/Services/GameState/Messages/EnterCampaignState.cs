@@ -6,15 +6,13 @@ namespace GameInterface.Services.GameState.Messages;
 /// <summary>
 /// Goes to the map state from any game state.
 /// </summary>
-public readonly struct EnterCampaignState : ICommand
+public record EnterCampaignState : ICommand
 {
-    public Guid TransactionID => throw new NotImplementedException();
 }
 
 /// <summary>
-/// Reply to <seealso cref="EnterMainMenu"/>.
+/// Campaign map entered event
 /// </summary>
-public readonly struct CampaignStateEntered : IResponse
+public record CampaignStateEntered : IEvent
 {
-    public Guid TransactionID => throw new NotImplementedException();
 }

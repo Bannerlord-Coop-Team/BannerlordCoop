@@ -36,7 +36,8 @@ internal class NewHeroHandler : IHandler
     {
         try
         {
-            heroInterface.PackageMainHero();
+            byte[] bytes = heroInterface.PackageMainHero();
+            messageBroker.Publish(this, new NewHeroPackaged(bytes));
         }
         catch (Exception e)
         {
@@ -46,7 +47,6 @@ internal class NewHeroHandler : IHandler
 
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
     {
-        var transactionId = obj.What.TransactionID;
         byte[] bytes = obj.What.Bytes;
 
         try
@@ -55,9 +55,9 @@ internal class NewHeroHandler : IHandler
 
             Logger.Information("New Hero ID: {id}", hero.Id.InternalValue);
 
-            var registerMessage = new NewPlayerHeroRegistered(transactionId, hero);
+            var registerMessage = new NewPlayerHeroRegistered(hero);
 
-            messageBroker.Publish(this, registerMessage);
+            messageBroker.Respond(obj.Who, registerMessage);
         }
         catch(Exception e)
         {

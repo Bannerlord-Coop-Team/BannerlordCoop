@@ -13,27 +13,27 @@ namespace Coop.Core.Client.States
     {
         public MainMenuState(IClientLogic logic) : base(logic)
         {
-            Logic.NetworkMessageBroker.Subscribe<NetworkConnected>(Handle);
+            Logic.MessageBroker.Subscribe<NetworkConnected>(Handle_NetworkConnected);
         }
 
         public override void Dispose() 
         {
-            Logic.NetworkMessageBroker.Unsubscribe<NetworkConnected>(Handle);
+            Logic.MessageBroker.Unsubscribe<NetworkConnected>(Handle_NetworkConnected);
         }
 
         public override void Connect()
         {
-            Logic.NetworkClient.Start();
+            Logic.Network.Start();
         }
 
-        private void Handle(MessagePayload<NetworkConnected> obj)
+        internal void Handle_NetworkConnected(MessagePayload<NetworkConnected> obj)
         {
             Logic.ValidateModules();
         }
 
         public override void Disconnect()
         {
-            Logic.NetworkMessageBroker.Publish(this, new EnterMainMenu());
+            Logic.MessageBroker.Publish(this, new EnterMainMenu());
         }
 
         public override void EnterMainMenu()

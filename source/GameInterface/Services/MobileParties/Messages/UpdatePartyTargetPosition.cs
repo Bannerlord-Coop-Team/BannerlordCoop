@@ -8,11 +8,8 @@ public readonly struct UpdatePartyTargetPosition : ICommand
 {
     public TargetPositionData TargetPositionData { get; }
 
-    public Guid TransactionID { get; }
-
-    public UpdatePartyTargetPosition(Guid transactionId, TargetPositionData targetPositionData)
+    public UpdatePartyTargetPosition(TargetPositionData targetPositionData)
     {
-        TransactionID = transactionId;
         TargetPositionData = targetPositionData;
     }
 }

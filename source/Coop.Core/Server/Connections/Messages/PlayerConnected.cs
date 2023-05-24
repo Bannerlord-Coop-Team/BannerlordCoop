@@ -3,7 +3,7 @@ using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.Messages
 {
-    public readonly struct PlayerConnected : IEvent
+    public record PlayerConnected : IEvent
     {
         public NetPeer PlayerId { get; }
 

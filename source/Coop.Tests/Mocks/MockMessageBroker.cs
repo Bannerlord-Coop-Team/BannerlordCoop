@@ -9,7 +9,8 @@ namespace Coop.Tests.Mocks
     public class MockMessageBroker : IMessageBroker
     {
         public List<Delegate> Subscriptions { get; } = new List<Delegate>();
-        public List<object> PublishedMessages { get; } = new List<object>();
+        public List<IMessage> PublishedMessages { get; } = new List<IMessage>();
+        public List<IResponse> Responses { get; } = new List<IResponse>();
 
         public void Subscribe<T>(Action<MessagePayload<T>> handler)
         {
@@ -21,12 +22,11 @@ namespace Coop.Tests.Mocks
             Subscriptions.Remove(handler);
         }
 
-        public void Publish<T>(object sender, T message)
+        public void Publish<T>(object sender, T message) where T : IMessage
         {
             PublishedMessages.Add(message);
         }
-
-        public void PublishNetworkEvent(object message)
+        public void Respond<T>(object source, T message) where T : IResponse
         {
             PublishedMessages.Add(message);
         }
