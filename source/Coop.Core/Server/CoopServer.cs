@@ -57,14 +57,17 @@ namespace Coop.Core.Server
 
         public void OnConnectionRequest(ConnectionRequest request)
         {
-            if(allowJoining)
-            {
-                request.Accept();
-            }
-            else
-            {
-                request.Reject();
-            }
+            // TODO make sure server is ready for connection, ready as in loaded and all entities registered
+            request.Accept();
+
+            //if (allowJoining)
+            //{
+            //    request.Accept();
+            //}
+            //else
+            //{
+            //    request.Reject();
+            //}
             
         }
 
@@ -90,7 +93,12 @@ namespace Coop.Core.Server
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
         {
-            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
+            int lenght = reader.GetInt();
+            byte[] data = new byte[lenght];
+
+            reader.GetBytes(data, data.Length);
+
+            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(data);
             packetManager.HandleRecieve(peer, packet);
         }
 

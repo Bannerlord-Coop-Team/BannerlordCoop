@@ -4,11 +4,11 @@ using System;
 
 namespace GameInterface.Services.MobileParties.Messages;
 
-public readonly struct UpdatePartyTargetPosition : ICommand
+public record UpdatePartyTargetPosition : ICommand
 {
-    public TargetPositionData TargetPositionData { get; }
+    public PartyPositionData TargetPositionData { get; }
 
-    public UpdatePartyTargetPosition(TargetPositionData targetPositionData)
+    public UpdatePartyTargetPosition(PartyPositionData targetPositionData)
     {
         TargetPositionData = targetPositionData;
     }

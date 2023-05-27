@@ -4,15 +4,14 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Messages;
 
-public readonly struct ControlledPartyTargetPositionUpdated : IEvent
+public record ControlledPartyTargetPositionUpdated : IEvent
 {
-    public TargetPositionData TargetPositionData { get; }
+    public PartyPositionData TargetPositionData { get; }
 
     public ControlledPartyTargetPositionUpdated(string partyId, Vec2 targetPostion)
     {
-        TargetPositionData = new TargetPositionData(
+        TargetPositionData = new PartyPositionData(
             partyId, 
-            targetPostion.X, 
-            targetPostion.Y);
+            targetPostion);
     }
 }

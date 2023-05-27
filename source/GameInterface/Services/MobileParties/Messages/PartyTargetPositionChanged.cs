@@ -4,7 +4,7 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Messages;
 
-internal readonly struct PartyTargetPositionChanged : IEvent
+internal record PartyTargetPositionChanged : IEvent
 {
     public MobileParty Party { get; }
     public Vec2 NewTargetPosition { get; }

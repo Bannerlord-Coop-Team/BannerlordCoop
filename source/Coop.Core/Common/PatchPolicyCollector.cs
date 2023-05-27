@@ -2,10 +2,11 @@
 using Common.Messaging;
 using System;
 using System.Collections.Generic;
+using System.Text;
 
-namespace Coop.Core.Client
+namespace Coop.Core
 {
-    internal static class HandlerCollector
+    internal class PatchPolicyCollector
     {
         public static IEnumerable<Type> Collect<Module>()
         {
@@ -13,9 +14,9 @@ namespace Coop.Core.Client
 
             List<Type> types = new List<Type>();
 
-            foreach(Type t in AppDomain.CurrentDomain.GetDomainTypes(namespacePrefix)) 
+            foreach (Type t in AppDomain.CurrentDomain.GetDomainTypes(namespacePrefix))
             {
-                if(t.GetInterface(nameof(IHandler)) == null) continue;
+                if (t.GetInterface(nameof(IHandler)) == null) continue;
 
                 types.Add(t);
             }

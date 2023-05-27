@@ -5,6 +5,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client;
 using Coop.Core.Server;
+using GameInterface;
 using System;
 
 namespace Coop.Core
@@ -40,6 +41,9 @@ namespace Coop.Core
 
         public void StartAsServer()
         {
+            // TODO find a better way
+            ModInformation.IsServer = true;
+
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ServerModule>();
@@ -53,6 +57,9 @@ namespace Coop.Core
 
         public void StartAsClient()
         {
+            // TODO find a better way
+            ModInformation.IsServer = false;
+
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ClientModule>();
@@ -62,10 +69,6 @@ namespace Coop.Core
 
             var logic = _container.Resolve<ILogic>();
             logic.Start();
-
-            // TODO remove test code
-            //var messageBroker = _container.Resolve<IMessageBroker>();
-            //messageBroker.Publish(this, new NetworkConnected(false));
         }
     }
 }

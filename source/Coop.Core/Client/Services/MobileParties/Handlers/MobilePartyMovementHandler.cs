@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Common.Services.PartyMovement.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using System;
@@ -27,7 +28,8 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         // Outgoing
         private void Handle_ControlledPartyTargetPositionUpdated(MessagePayload<ControlledPartyTargetPositionUpdated> obj)
         {
-            network.SendAll(new NetworkUpdatePartyTargetPosition(obj));
+            var message = new NetworkRequestMobilePartyMovement(obj.What.TargetPositionData);
+            network.SendAll(message);
         }
 
         // Incoming

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Common.Services.PartyMovement.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using LiteNetLib;
@@ -17,29 +18,18 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<ControlledPartyTargetPositionUpdated>(Handle_ControlledPartyTargetPositionUpdated);
-            messageBroker.Subscribe<NetworkUpdatePartyTargetPosition>(Handle_NetworkUpdatePartyTargetPosition);
+            messageBroker.Subscribe<NetworkRequestMobilePartyMovement>(Handle_RequestMobilePartyMovement);
         }
         public void Dispose()
         {
-            messageBroker.Unsubscribe<ControlledPartyTargetPositionUpdated>(Handle_ControlledPartyTargetPositionUpdated);
-            messageBroker.Unsubscribe<NetworkUpdatePartyTargetPosition>(Handle_NetworkUpdatePartyTargetPosition);
+            messageBroker.Unsubscribe<NetworkRequestMobilePartyMovement>(Handle_RequestMobilePartyMovement);
         }
 
-        // Outgoing
-        private void Handle_ControlledPartyTargetPositionUpdated(MessagePayload<ControlledPartyTargetPositionUpdated> obj)
+        private void Handle_RequestMobilePartyMovement(MessagePayload<NetworkRequestMobilePartyMovement> obj)
         {
-            network.SendAll(new NetworkUpdatePartyTargetPosition(obj));
-        }
-
-        // Incoming
-        private void Handle_NetworkUpdatePartyTargetPosition(MessagePayload<NetworkUpdatePartyTargetPosition> obj)
-        {
-            NetPeer peer = obj.Who as NetPeer;
-
             var targetData = obj.What.TargetPositionData;
 
-            network.SendAllBut(peer, new NetworkUpdatePartyTargetPosition(targetData));
+            network.SendAll(new NetworkUpdatePartyTargetPosition(targetData));
 
             messageBroker.Publish(this, new UpdatePartyTargetPosition(targetData));
         }

@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.LogicStates;
 using Common.Network;
+using Coop.Core.Common;
 using LiteNetLib;
 
 namespace Coop.Core.Client

@@ -42,7 +42,8 @@ namespace Coop.Core.Common.Network
 
             // Serialize and put data in writer (with length is important on receive end)
             byte[] data = ProtoBufSerializer.Serialize(packet);
-            writer.PutBytesWithLength(data);
+            writer.Put(data.Length);
+            writer.Put(data, 0, data.Length);
 
             // Send data
             netPeer.Send(writer.Data, packet.DeliveryMethod);

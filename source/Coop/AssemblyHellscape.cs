@@ -1,11 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Reflection;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Coop
 {
@@ -18,6 +14,7 @@ namespace Coop
             "Microsoft.Bcl.AsyncInterfaces",
             "System.Threading.Tasks.Extensions",
             "System.Text.Json",
+            "System.Buffers",
         };
 
         private static readonly Dictionary<string, Assembly> LoadedRedirects = RedirectedAssemblies

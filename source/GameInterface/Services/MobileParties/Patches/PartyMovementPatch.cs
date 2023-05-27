@@ -15,15 +15,19 @@ internal class PartyMovementPatch
     [HarmonyPrefix]
     [HarmonyPatch("TargetPosition")]
     [HarmonyPatch(MethodType.Setter)]
-    private static void MovementPrefix(ref MobileParty __instance, ref Vec2 value)
+    private static bool TargetPositionPrefix(ref MobileParty __instance, ref Vec2 value)
     {
         if (AllowedChangeParty == __instance) 
         {
-            return;
+            return true;
         }
 
         var message = new PartyTargetPositionChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
+
+        if (ModInformation.IsClient) return false;
+
+        return true;
     }
 
     internal static readonly PropertyInfo MobileParty_TargetPosition = typeof(MobileParty).GetProperty(nameof(MobileParty.TargetPosition));

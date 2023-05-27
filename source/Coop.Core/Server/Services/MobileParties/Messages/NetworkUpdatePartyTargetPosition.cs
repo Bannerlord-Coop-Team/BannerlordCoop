@@ -6,10 +6,10 @@ using ProtoBuf;
 namespace Coop.Core.Common.Services.PartyMovement.Messages
 {
     [ProtoContract]
-    public readonly struct NetworkUpdatePartyTargetPosition : ICommand
+    public record NetworkUpdatePartyTargetPosition : ICommand
     {
         [ProtoMember(1)]
-        public TargetPositionData TargetPositionData { get; }
+        public PartyPositionData TargetPositionData { get; }
         public NetworkUpdatePartyTargetPosition(MessagePayload<ControlledPartyTargetPositionUpdated> obj)
         {
             var payload = obj.What;
@@ -17,7 +17,7 @@ namespace Coop.Core.Common.Services.PartyMovement.Messages
             TargetPositionData = payload.TargetPositionData;
         }
 
-        public NetworkUpdatePartyTargetPosition(TargetPositionData positionData)
+        public NetworkUpdatePartyTargetPosition(PartyPositionData positionData)
         {
             TargetPositionData = positionData;
         }

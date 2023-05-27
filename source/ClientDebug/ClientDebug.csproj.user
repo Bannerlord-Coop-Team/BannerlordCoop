@@ -6,4 +6,10 @@
     <StartProgram>..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
     <StartWorkingDirectory>..\..\..\..\mb2\bin\Win64_Shipping_Client\</StartWorkingDirectory>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
+    <StartAction>Program</StartAction>
+    <StartProgram>D:\Mod Development\BannerlordCoop\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
+    <StartWorkingDirectory>D:\Mod Development\BannerlordCoop\mb2\bin\Win64_Shipping_Client\</StartWorkingDirectory>
+    <StartArguments>/singleplayer /client _MODULES_%2aNative%2aSandBoxCore%2aCustomBattle%2aSandBox%2aStoryMode%2aCoop%2a_MODULES_</StartArguments>
+  </PropertyGroup>
 </Project>

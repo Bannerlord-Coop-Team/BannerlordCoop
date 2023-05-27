@@ -57,12 +57,6 @@ internal class MobilePartyMovementHandler : IHandler
     private void Handle_UpdatePartyTargetPosition(MessagePayload<UpdatePartyTargetPosition> obj)
     {
         var targetPositionData = obj.What.TargetPositionData;
-        if (controlledEntityRegistry.IsOwned(targetPositionData.PartyId))
-        {
-            Logger.Error("Recieved hero update on controlled hero. Incoming updates should not be controlled");
-            return;
-        }
-
 
         if (objectManager.TryGetObject(targetPositionData.PartyId, out MobileParty resolvedParty) == false)
         {
@@ -70,10 +64,9 @@ internal class MobilePartyMovementHandler : IHandler
             return;
         }
 
-        Vec2 vec2 = new Vec2(targetPositionData.TargetPositionX, targetPositionData.TargetPositionY);
+        Vec2 targetPos = targetPositionData.TargetPosition;
+        Logger.Debug($"Setting {resolvedParty.StringId} to {targetPos}");
 
-        Logger.Debug($"Setting {resolvedParty.StringId} to {vec2}");
-
-        PartyMovementPatch.SetTargetPositionOverride(resolvedParty, ref vec2);
+        PartyMovementPatch.SetTargetPositionOverride(resolvedParty, ref targetPos);
     }
 }
