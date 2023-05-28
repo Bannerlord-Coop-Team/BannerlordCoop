@@ -41,13 +41,13 @@ namespace Coop.Core
 
         public void StartAsServer()
         {
-            // TODO find a better way
-            ModInformation.IsServer = true;
-
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ServerModule>();
             _container = builder.Build();
+
+            // TODO find a better way
+            ModInformation.IsServer = true;
 
             updateable = _container.Resolve<INetwork>();
 

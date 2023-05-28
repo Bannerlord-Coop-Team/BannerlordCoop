@@ -5,6 +5,7 @@ using Common.Network;
 using Coop.Core.Server.Services.Save.Data;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using System;
 
 namespace Coop.Core.Server.Services.Save.Handlers
@@ -86,6 +87,8 @@ namespace Coop.Core.Server.Services.Save.Handlers
 
         private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
         {
+            // TODO: remove unused code
+            // messageBroker.Publish(this, new RegisterAllPartiesAsControlled(coopServer.ServerId));
             messageBroker.Publish(this, new EnableGameTimeControls());
             coopServer.AllowJoining();
         }

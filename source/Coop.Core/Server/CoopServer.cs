@@ -15,6 +15,7 @@ namespace Coop.Core.Server
 {
     public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, IDisposable
     {
+        public Guid ServerId { get; }
         IEnumerable<NetPeer> ConnectedPeers { get; }
         void AllowJoining();
     }
@@ -57,18 +58,14 @@ namespace Coop.Core.Server
 
         public void OnConnectionRequest(ConnectionRequest request)
         {
-            // TODO make sure server is ready for connection, ready as in loaded and all entities registered
-            request.Accept();
-
-            //if (allowJoining)
-            //{
-            //    request.Accept();
-            //}
-            //else
-            //{
-            //    request.Reject();
-            //}
-            
+            if (allowJoining)
+            {
+                request.Accept();
+            }
+            else
+            {
+                request.Reject();
+            }
         }
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)

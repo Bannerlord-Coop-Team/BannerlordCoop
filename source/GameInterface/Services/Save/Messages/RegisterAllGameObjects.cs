@@ -7,6 +7,6 @@ public record RegisterAllGameObjects : ICommand
 {
 }
 
-public record AllGameObjectsRegistered : IResponse
+public record AllGameObjectsRegistered : IEvent
 {
 }

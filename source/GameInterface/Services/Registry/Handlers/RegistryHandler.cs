@@ -34,6 +34,6 @@ internal class RegistryHandler : IHandler
         heroRegistry.RegisterAllHeroes();
         partyRegistry.RegisterAllParties();
 
-        messageBroker.Respond(obj.Who, new AllGameObjectsRegistered());
+        messageBroker.Publish(this, new AllGameObjectsRegistered());
     }
 }
