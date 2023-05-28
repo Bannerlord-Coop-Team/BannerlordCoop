@@ -38,15 +38,11 @@ namespace Coop.Core.Common.Network
 
         public virtual void Send(NetPeer netPeer, IPacket packet)
         {
-            NetDataWriter writer = new NetDataWriter();
-
-            // Serialize and put data in writer (with length is important on receive end)
+            // Serialize data
             byte[] data = ProtoBufSerializer.Serialize(packet);
-            writer.Put(data.Length);
-            writer.Put(data, 0, data.Length);
 
             // Send data
-            netPeer.Send(writer.Data, packet.DeliveryMethod);
+            netPeer.Send(data, packet.DeliveryMethod);
         }
 
         public void Send(NetPeer netPeer, IMessage message)
