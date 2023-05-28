@@ -4,7 +4,7 @@ using System;
 
 namespace Coop.Core.Server.Connections.Messages
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public record NetworkClientValidate : ICommand
     {
         [ProtoMember(1)]
@@ -16,7 +16,7 @@ namespace Coop.Core.Server.Connections.Messages
         }
     }
 
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public record NetworkClientValidated : IResponse
     {
         [ProtoMember(1)]
