@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Common.Network
+﻿namespace Common.Network
 {
     public interface INetworkConfiguration
     {
