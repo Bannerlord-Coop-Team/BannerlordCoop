@@ -4,7 +4,7 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Time.Messages
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public record NetworkRequestTimeSpeedChange : ICommand
     {
         [ProtoMember(1)]

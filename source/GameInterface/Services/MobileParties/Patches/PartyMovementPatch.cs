@@ -1,8 +1,11 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Utils;
 using HarmonyLib;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches;
@@ -17,7 +20,7 @@ internal class PartyMovementPatch
     [HarmonyPatch(MethodType.Setter)]
     private static bool TargetPositionPrefix(ref MobileParty __instance, ref Vec2 value)
     {
-        if (AllowedChangeParty == __instance) 
+        if (AllowedChangeParty == __instance)
         {
             return true;
         }
@@ -25,10 +28,9 @@ internal class PartyMovementPatch
         var message = new PartyTargetPositionChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
 
-        if (ModInformation.IsClient) return false;
-
-        return true;
+        return false;
     }
+
 
     internal static readonly PropertyInfo MobileParty_TargetPosition = typeof(MobileParty).GetProperty(nameof(MobileParty.TargetPosition));
     public static void SetTargetPositionOverride(MobileParty party, ref Vec2 position)

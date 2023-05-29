@@ -15,12 +15,21 @@ internal class MobilePartyControlHandler : IHandler
         _partyInterface = partyInterface;
 
         _messageBroker.Subscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
+        _messageBroker.Subscribe<SetInstanceOwnerId>(Handle_SetInstanceOwnerId);
     }
 
     private void Handle_RegisterAllPartiesAsControlled(MessagePayload<RegisterAllPartiesAsControlled> obj)
     {
         var ownerId = obj.What.OwnerId;
         _partyInterface.RegisterAllPartiesAsControlled(ownerId);
+    }
+    
+    // TODO: This does not belong here.
+    private void Handle_SetInstanceOwnerId(MessagePayload<SetInstanceOwnerId> obj)
+    {
+        var ownerId = obj.What.OwnerId;
+        _partyInterface.SetInstanceOwnerId(ownerId);
+        
     }
 
     public void Dispose()

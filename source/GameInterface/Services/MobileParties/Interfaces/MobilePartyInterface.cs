@@ -11,6 +11,7 @@ internal interface IMobilePartyInterface : IGameAbstraction
     void ManageNewParty(MobileParty party);
 
     void RegisterAllPartiesAsControlled(Guid ownerId);
+    void SetInstanceOwnerId(Guid ownerId);
 }
 
 internal class MobilePartyInterface : IMobilePartyInterface
@@ -44,5 +45,10 @@ internal class MobilePartyInterface : IMobilePartyInterface
         {
             _controlledEntityRegistery.RegisterAsControlled(ownerId, party.Key);
         }
+    }
+
+    public void SetInstanceOwnerId(Guid ownerId)
+    {
+        _controlledEntityRegistery.InstanceOwnerId = ownerId;
     }
 }
