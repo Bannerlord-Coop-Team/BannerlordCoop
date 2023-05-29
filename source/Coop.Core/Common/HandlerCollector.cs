@@ -2,15 +2,14 @@
 using Common.Messaging;
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 
 namespace Coop.Core.Common;
 
 internal static class HandlerCollector
 {
-    public static IEnumerable<Type> Collect<T>()
+    public static IEnumerable<Type> Collect<TModule>()
     {
-        string namespacePrefix = typeof(Module).Namespace;
+        string namespacePrefix = typeof(TModule).Namespace;
 
         List<Type> types = new List<Type>();
 
