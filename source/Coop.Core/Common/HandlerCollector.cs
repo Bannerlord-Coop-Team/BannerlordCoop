@@ -2,25 +2,25 @@
 using Common.Messaging;
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 
-namespace Coop.Core.Common;
-
-internal static class HandlerCollector
+namespace Coop.Core.Common
 {
-    public static IEnumerable<Type> Collect<T>()
+    internal static class HandlerCollector
     {
-        string namespacePrefix = typeof(Module).Namespace;
-
-        List<Type> types = new List<Type>();
-
-        foreach (Type t in AppDomain.CurrentDomain.GetDomainTypes(namespacePrefix))
+        public static IEnumerable<Type> Collect<TModule>()
         {
-            if (t.GetInterface(nameof(IHandler)) == null) continue;
+            string namespacePrefix = typeof(TModule).Namespace;
 
-            types.Add(t);
+            List<Type> types = new List<Type>();
+
+            foreach (Type t in AppDomain.CurrentDomain.GetDomainTypes(namespacePrefix))
+            {
+                if (t.GetInterface(nameof(IHandler)) == null) continue;
+
+                types.Add(t);
+            }
+
+            return types;
         }
-
-        return types;
     }
 }
