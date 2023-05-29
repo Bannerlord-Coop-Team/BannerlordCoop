@@ -59,7 +59,10 @@ namespace GameInterface.Services.MobileParties.Handlers
 
         public void Handle_MobilePartyCreated(MobileParty party)
         {
-            if (mobilePartyRegistry.RegisterParty(party) == false || party.IsAnyPlayerMainParty())
+            // not necessary - already exists in MBObjectManagerAdapater
+            // mobilePartyRegistry.RegisterParty(party);
+
+            if (party.IsAnyPlayerMainParty())
                 return;
 
             messageBroker.Publish(this, new MobilePartyCreated(party));
@@ -67,7 +70,9 @@ namespace GameInterface.Services.MobileParties.Handlers
 
         public void Handle_MobilePartyDestroyed(MobileParty party, PartyBase partyBase)
         {
-            if (mobilePartyRegistry.Remove(party) == false || party.IsAnyPlayerMainParty()) 
+            mobilePartyRegistry.Remove(party);
+
+            if (party.IsAnyPlayerMainParty()) 
                 return;
 
             messageBroker.Publish(this, new MobilePartyDestroyed(party, partyBase));
