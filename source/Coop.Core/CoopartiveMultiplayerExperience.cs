@@ -46,8 +46,8 @@ namespace Coop.Core
             builder.RegisterModule<ServerModule>();
             _container = builder.Build();
 
-            // TODO find a better way
-            ModInformation.IsServer = true;
+            var instanceInfo = _container.Resolve<ICoopInstanceInfo>();
+            ModContext.Current = instanceInfo;
 
             updateable = _container.Resolve<INetwork>();
 
@@ -57,13 +57,13 @@ namespace Coop.Core
 
         public void StartAsClient()
         {
-            // TODO find a better way
-            ModInformation.IsServer = false;
-
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ClientModule>();
             _container = builder.Build();
+
+            var instanceInfo = _container.Resolve<ICoopInstanceInfo>();
+            ModContext.Current = instanceInfo;
 
             updateable = _container.Resolve<INetwork>();
 

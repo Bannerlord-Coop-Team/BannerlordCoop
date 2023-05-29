@@ -88,7 +88,7 @@ namespace Coop.Core.Server.Services.Save.Handlers
         private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
         {
             // TODO: move RegisterAllPartiesAsControlled out of SaveGameHandler.
-            messageBroker.Publish(this, new SetInstanceOwnerId(coopServer.ServerId));
+            messageBroker.Publish(this, new RegisterOwnerId(coopServer.ServerId));
             messageBroker.Publish(this, new RegisterAllPartiesAsControlled(coopServer.ServerId));
             messageBroker.Publish(this, new EnableGameTimeControls());
             coopServer.AllowJoining();

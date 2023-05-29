@@ -12,6 +12,8 @@ namespace Coop.Core
     {
         protected override void Load(ContainerBuilder builder)
         {
+            builder.RegisterType<CoopInstanceInfo>().As<ICoopInstanceInfo>().SingleInstance();
+
             #region Network
             builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
             #endregion

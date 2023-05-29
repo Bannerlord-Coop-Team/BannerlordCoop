@@ -16,17 +16,20 @@ namespace Coop.Core.Client
 {
     public interface ICoopClient : INetwork, IUpdateable, INetEventListener
     {
+        Guid ClientId { get; }
     }
 
     public class CoopClient : CoopNetworkBase, ICoopClient
     {
         public override int Priority => 0;
         
-        
         private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
+
+        public Guid ClientId { get; } = Guid.NewGuid();
 
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
+        private readonly ICoopInstanceInfo instanceInfo;
         private readonly NetManager netManager;
 
         private bool isConnected = false;
@@ -35,13 +38,19 @@ namespace Coop.Core.Client
         public CoopClient(
             INetworkConfiguration config,
             IMessageBroker messageBroker,
-            IPacketManager packetManager) : base(config)
+            IPacketManager packetManager,
+            ICoopInstanceInfo instanceInfo) : base(config)
         {
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
+            this.instanceInfo = instanceInfo;
 
             // TODO add configuration
             netManager = new NetManager(this);
+
+            // Register instance info
+            instanceInfo.Id = ClientId;
+            instanceInfo.Role = NetworkRole.Client;
         }
 
         public void Disconnect()

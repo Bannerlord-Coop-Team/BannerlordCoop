@@ -19,6 +19,7 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
             messageBroker.Subscribe<NetworkRequestMobilePartyMovement>(Handle_RequestMobilePartyMovement);
+            messageBroker.Subscribe<ControlledPartyTargetPositionUpdated>(Handle_ControlledPartyTargetPositionUpdated);
         }
         public void Dispose()
         {
@@ -26,6 +27,15 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
         }
 
         private void Handle_RequestMobilePartyMovement(MessagePayload<NetworkRequestMobilePartyMovement> obj)
+        {
+            var targetData = obj.What.TargetPositionData;
+
+            network.SendAll(new NetworkUpdatePartyTargetPosition(targetData));
+
+            messageBroker.Publish(this, new UpdatePartyTargetPosition(targetData));
+        }
+
+        private void Handle_ControlledPartyTargetPositionUpdated(MessagePayload<ControlledPartyTargetPositionUpdated> obj)
         {
             var targetData = obj.What.TargetPositionData;
 

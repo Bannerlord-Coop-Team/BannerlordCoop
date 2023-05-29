@@ -15,7 +15,7 @@ namespace Coop.Mod.Extentions
 
         public static bool IsAnyPlayerMainParty(this MobileParty party)
         {
-            throw new NotImplementedException();
+            return party.LeaderHero != null && party.LeaderHero.IsHumanPlayerCharacter;
         }
     }
 }

@@ -6,11 +6,11 @@ using System.Text;
 namespace GameInterface.Services.MobileParties.Messages
 {
     // TODO: Find more descriptive name - or assign OwnerId in MobilePartyRegistry in another way.
-    public record SetInstanceOwnerId : IEvent
+    public record RegisterOwnerId : IEvent
     {
         public Guid OwnerId { get; set; }
 
-        public SetInstanceOwnerId(Guid ownerId)
+        public RegisterOwnerId(Guid ownerId)
         {
             this.OwnerId = ownerId;
         }
