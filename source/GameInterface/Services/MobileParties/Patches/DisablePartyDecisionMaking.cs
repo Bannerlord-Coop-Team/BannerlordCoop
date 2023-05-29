@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Coop.Mod.Extentions;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -11,6 +12,10 @@ static class DisablePartyDecisionMaking
     [HarmonyPatch(nameof(MobileParty.ShortTermBehavior), MethodType.Getter)]
     static void PostfixShortTermBehaviorGetter(MobileParty __instance, ref AiBehavior __result)
     {
+        if (__instance.IsAnyPlayerMainParty() ||
+            __instance.StringId == "TransferredParty") // temporary condition for debugging
+            return;
+
         // EncounterManager is currently crashing when handling encounters.
         // This should serve as temporary crash prevention until the issue is identified.
 
@@ -22,6 +27,10 @@ static class DisablePartyDecisionMaking
     [HarmonyPatch(nameof(MobileParty.DefaultBehavior), MethodType.Getter)]
     static void PostfixDefaultBehaviorGetter(MobileParty __instance, ref AiBehavior __result)
     {
+        if (__instance.IsAnyPlayerMainParty() ||
+            __instance.StringId == "TransferredParty") // temporary condition for debugging
+            return;
+
         // Prevent crash in MobileParties.GetBehaviors
         // You shouldn't have let me near the source code.
 
@@ -53,7 +62,7 @@ static class DisablePartyAiDecisionMaking
     [HarmonyPatch(nameof(MobilePartyAi.DoNotMakeNewDecisions), MethodType.Getter)]
     static void PostfixDoNotMakeNewDecisionsGetter(MobilePartyAi __instance, ref bool __result)
     {
-        // TODO allow decision making for controlled parties
+        // TODO allow decision making for controlled parties and sync
         __result = true;
     }
 
