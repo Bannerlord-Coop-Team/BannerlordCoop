@@ -1,9 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages;
-using GameInterface.Utils;
 using HarmonyLib;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -14,6 +12,22 @@ namespace GameInterface.Services.MobileParties.Patches;
 internal class PartyMovementPatch
 {
     private static MobileParty AllowedChangeParty;
+
+    [HarmonyPrefix]
+    [HarmonyPatch("TargetSettlement", MethodType.Setter)]
+    private static bool TargetSettlementPrefix(ref MobileParty __instance, ref Settlement value)
+    {
+        // TODO allow for controlled parties and add synchronisation
+        return false;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch("TargetParty", MethodType.Setter)]
+    private static bool TargetPartyPrefix(ref MobileParty __instance, ref MobileParty value)
+    {
+        // TODO allow for controlled parties and add synchronisation
+        return false;
+    }
 
     [HarmonyPrefix]
     [HarmonyPatch("TargetPosition")]

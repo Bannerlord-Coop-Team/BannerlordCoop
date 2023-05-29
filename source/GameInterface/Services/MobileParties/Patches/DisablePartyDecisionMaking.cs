@@ -4,8 +4,34 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
-[HarmonyPatch(typeof(MobilePartyAi))]
+[HarmonyPatch(typeof(MobileParty))]
 static class DisablePartyDecisionMaking
+{
+    [HarmonyPostfix]
+    [HarmonyPatch(nameof(MobileParty.ShortTermBehavior), MethodType.Getter)]
+    static void PostfixShortTermBehaviorGetter(MobileParty __instance, ref AiBehavior __result)
+    {
+        // EncounterManager is currently crashing when handling encounters.
+        // This should serve as temporary crash prevention until the issue is identified.
+
+        // TODO figure out what to do with this
+        __result = AiBehavior.None;
+    }
+    
+    [HarmonyPostfix]
+    [HarmonyPatch(nameof(MobileParty.DefaultBehavior), MethodType.Getter)]
+    static void PostfixDefaultBehaviorGetter(MobileParty __instance, ref AiBehavior __result)
+    {
+        // Prevent crash in MobileParties.GetBehaviors
+        // You shouldn't have let me near the source code.
+
+        // TODO figure out what to do with this
+        __result = AiBehavior.None;
+    }
+}
+
+[HarmonyPatch(typeof(MobilePartyAi))]
+static class DisablePartyAiDecisionMaking
 {
     static readonly AccessTools.FieldRef<MobilePartyAi, MobileParty> m_MobilePartyField =
         AccessTools.FieldRefAccess<MobilePartyAi, MobileParty>("_mobileParty");
@@ -21,6 +47,14 @@ static class DisablePartyDecisionMaking
         //    value = true;
         //}
         return true;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(nameof(MobilePartyAi.DoNotMakeNewDecisions), MethodType.Getter)]
+    static void PostfixDoNotMakeNewDecisionsGetter(MobilePartyAi __instance, ref bool __result)
+    {
+        // TODO allow decision making for controlled parties
+        __result = true;
     }
 
     [HarmonyPrefix]

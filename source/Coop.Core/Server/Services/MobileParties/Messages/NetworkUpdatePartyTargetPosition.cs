@@ -2,24 +2,35 @@
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages;
 using ProtoBuf;
+using TaleWorlds.Library;
 
 namespace Coop.Core.Common.Services.PartyMovement.Messages
 {
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     public record NetworkUpdatePartyTargetPosition : ICommand
     {
         [ProtoMember(1)]
-        public PartyPositionData TargetPositionData { get; }
-        public NetworkUpdatePartyTargetPosition(MessagePayload<ControlledPartyTargetPositionUpdated> obj)
-        {
-            var payload = obj.What;
+        public string PartyId { get; }
 
-            TargetPositionData = payload.TargetPositionData;
+        [ProtoMember(2)]
+        public float TargetX { get; }
+
+        [ProtoMember(3)]
+        public float TargetY { get; }
+
+        public PartyPositionData TargetPositionData
+        {
+            get => new PartyPositionData(PartyId, new Vec2(TargetX, TargetY));
         }
+
+        public NetworkUpdatePartyTargetPosition(MessagePayload<ControlledPartyTargetPositionUpdated> obj) 
+            : this(obj.What.TargetPositionData) { }
 
         public NetworkUpdatePartyTargetPosition(PartyPositionData positionData)
         {
-            TargetPositionData = positionData;
+            PartyId = positionData.PartyId;
+            TargetX = positionData.TargetPosition.X;
+            TargetY = positionData.TargetPosition.Y;
         }
     }
 }
