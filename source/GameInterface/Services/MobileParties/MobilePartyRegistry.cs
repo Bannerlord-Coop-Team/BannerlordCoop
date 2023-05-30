@@ -33,8 +33,6 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegi
 
     public void RegisterAllParties()
     {
-        RegisterPartyListeners();
-
         var objectManager = Campaign.Current?.CampaignObjectManager;
 
         if (objectManager == null)
@@ -47,23 +45,5 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegi
         {
             RegisterParty(party);
         }
-    }
-    public void RegisterPartyListeners()
-    {
-        CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, Handle_MobilePartyCreated);
-        CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, Handle_MobilePartyDestroyed);
-    }
-
-    public void Handle_MobilePartyCreated(MobileParty party)
-    {
-        if (RegisterParty(party) && !party.IsAnyPlayerMainParty())
-        {
-            
-        }
-    }
-
-    public void Handle_MobilePartyDestroyed(MobileParty party, PartyBase partyBase)
-    {
-
     }
 }

@@ -9,10 +9,10 @@ using Common.Logging;
 using Serilog;
 using Coop.Mod.Extentions;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.GameState.Messages;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
-    // TODO combine with ObjectManager service - this was created without knowledge of the existing system.
     internal class MobilePartyLifecycleHandler : IHandler
     {
         private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyLifecycleHandler>();
@@ -25,14 +25,12 @@ namespace GameInterface.Services.MobileParties.Handlers
             this.messageBroker = messageBroker;
             this.mobilePartyRegistry = mobilePartyRegistry;
 
-            messageBroker.Subscribe<RegisterAllGameObjects>(RegisterPartyListeners);
-            messageBroker.Subscribe<LoadExistingObjectGuids>(RegisterPartyListeners);
+            messageBroker.Subscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<RegisterAllGameObjects>(RegisterPartyListeners);
-            messageBroker.Unsubscribe<LoadExistingObjectGuids>(RegisterPartyListeners);
+            messageBroker.Unsubscribe<CampaignStateEntered>(Handle_CampaignStateEntered);;
 
             if (Campaign.Current == null)
                 return;
@@ -40,16 +38,11 @@ namespace GameInterface.Services.MobileParties.Handlers
             CampaignEvents.MobilePartyCreated.ClearListeners(this);
         }
 
-        public void RegisterPartyListeners(dynamic _)
-        {
-            RegisterPartyListeners();
-        }
-
         public void RegisterPartyListeners()
         {
             if (Campaign.Current == null)
             {
-                Logger.Verbose("Unable to register party lifecycle listeners, no active campaign");
+                Logger.Warning("Unable to register party lifecycle listeners, no active campaign");
                 return;
             }
 
@@ -57,10 +50,14 @@ namespace GameInterface.Services.MobileParties.Handlers
             CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, Handle_MobilePartyDestroyed);
         }
 
+        public void Handle_CampaignStateEntered(MessagePayload<CampaignStateEntered> obj)
+        {
+            RegisterPartyListeners();
+        }
+
         public void Handle_MobilePartyCreated(MobileParty party)
         {
-            // not necessary - already exists in MBObjectManagerAdapater
-            // mobilePartyRegistry.RegisterParty(party);
+            mobilePartyRegistry.RegisterParty(party);
 
             if (party.IsAnyPlayerMainParty())
                 return;
