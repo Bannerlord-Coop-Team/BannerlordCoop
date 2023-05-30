@@ -29,7 +29,6 @@ namespace Coop.Core.Client
 
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
-        private readonly ICoopInstanceInfo instanceInfo;
         private readonly NetManager netManager;
 
         private bool isConnected = false;
@@ -38,12 +37,10 @@ namespace Coop.Core.Client
         public CoopClient(
             INetworkConfiguration config,
             IMessageBroker messageBroker,
-            IPacketManager packetManager,
-            ICoopInstanceInfo instanceInfo) : base(config)
+            IPacketManager packetManager) : base(config)
         {
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
-            this.instanceInfo = instanceInfo;
 
             // TODO add configuration
             netManager = new NetManager(this);
@@ -52,10 +49,6 @@ namespace Coop.Core.Client
             // Increase disconnect timeout to prevent disconnect during debugging
             netManager.DisconnectTimeout = 300 * 1000;
 #endif
-
-            // Register instance info
-            instanceInfo.Id = ClientId;
-            instanceInfo.Role = NetworkRole.Client;
         }
 
         public void Disconnect()

@@ -46,9 +46,6 @@ namespace Coop.Core
             builder.RegisterModule<ServerModule>();
             _container = builder.Build();
 
-            var instanceInfo = _container.Resolve<ICoopInstanceInfo>();
-            ModContext.Current = instanceInfo;
-
             updateable = _container.Resolve<INetwork>();
 
             var logic = _container.Resolve<ILogic>();
@@ -61,9 +58,6 @@ namespace Coop.Core
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ClientModule>();
             _container = builder.Build();
-
-            var instanceInfo = _container.Resolve<ICoopInstanceInfo>();
-            ModContext.Current = instanceInfo;
 
             updateable = _container.Resolve<INetwork>();
 

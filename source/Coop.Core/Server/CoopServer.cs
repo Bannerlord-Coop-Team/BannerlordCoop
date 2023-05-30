@@ -29,7 +29,6 @@ namespace Coop.Core.Server
 
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
-        private readonly ICoopInstanceInfo instanceInfo;
         private readonly NetManager netManager;
 
         private bool allowJoining = false;
@@ -37,13 +36,11 @@ namespace Coop.Core.Server
         public CoopServer(
             INetworkConfiguration configuration, 
             IMessageBroker messageBroker,
-            IPacketManager packetManager,
-            ICoopInstanceInfo instanceInfo) : base(configuration)
+            IPacketManager packetManager) : base(configuration)
         {
             // Dependancy assignment
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
-            this.instanceInfo = instanceInfo;
 
             // TODO add configuration
             netManager = new NetManager(this);
@@ -56,10 +53,6 @@ namespace Coop.Core.Server
             // Netmanager initialization
             netManager.NatPunchEnabled = true;
             netManager.NatPunchModule.Init(this);
-
-            // Register instance info
-            instanceInfo.Id = ServerId;
-            instanceInfo.Role = NetworkRole.Server;
         }
 
         public void Dispose()
