@@ -7,11 +7,11 @@ namespace GameInterface.Services.MobileParties.Messages
 {
     public record RegisterInstanceId : IEvent
     {
-        public Guid OwnerId { get; set; }
+        public Guid InstanceId { get; set; }
 
-        public RegisterInstanceId(Guid ownerId)
+        public RegisterInstanceId(Guid instanceId)
         {
-            OwnerId = ownerId;
+            InstanceId = instanceId;
         }
     }
 }

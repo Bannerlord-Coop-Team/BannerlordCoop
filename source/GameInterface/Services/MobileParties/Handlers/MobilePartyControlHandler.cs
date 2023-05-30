@@ -67,7 +67,7 @@ internal class MobilePartyControlHandler : IHandler
 
     private void Handle_RegisterOwnerId(MessagePayload<RegisterInstanceId> obj)
     {
-        controlledEntityRegistery.InstanceOwnerId = obj.What.OwnerId;
+        controlledEntityRegistery.InstanceOwnerId = obj.What.InstanceId;
     }
 
 }
