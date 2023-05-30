@@ -1,4 +1,8 @@
-﻿namespace Common.Messaging
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace Common.Messaging
 {
     /// <summary>
     /// Response to a <see cref="ICommand"/>
