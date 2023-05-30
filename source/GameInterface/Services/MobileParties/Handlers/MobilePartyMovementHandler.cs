@@ -67,6 +67,6 @@ internal class MobilePartyMovementHandler : IHandler
         Vec2 targetPos = targetPositionData.TargetPosition;
         Logger.Debug($"Setting {resolvedParty.StringId} to {targetPos}");
 
-        PartyMovementPatch.SetTargetPositionOverride(resolvedParty, ref targetPos);
+        PartyMovementPatch.SetMoveGoToPointOverride(resolvedParty, ref targetPos);
     }
 }

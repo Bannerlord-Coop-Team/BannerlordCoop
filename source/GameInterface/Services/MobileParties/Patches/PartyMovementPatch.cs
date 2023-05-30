@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.Extentions;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using System.Reflection;
@@ -8,52 +9,84 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
-[HarmonyPatch(typeof(MobileParty))]
+[HarmonyPatch]
 internal class PartyMovementPatch
 {
-    private static MobileParty AllowedChangeParty;
+    private static MobilePartyAi AllowedChangePartyAi;
+
+    #region MobileParty
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(MobileParty), "TargetSettlement", MethodType.Setter)]
+    private static bool SetTargetSettlementPrefix(ref MobileParty __instance, ref Settlement value)
+    {
+        return AllowedChangePartyAi == __instance.Ai;
+    }
 
     [HarmonyPrefix]
-    [HarmonyPatch("TargetSettlement", MethodType.Setter)]
-    private static bool TargetSettlementPrefix(ref MobileParty __instance, ref Settlement value)
+    [HarmonyPatch(typeof(MobileParty), "TargetParty", MethodType.Setter)]
+    private static bool SetTargetPartyPrefix(ref MobileParty __instance, ref MobileParty value)
+    {
+        return AllowedChangePartyAi == __instance.Ai;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(MobileParty), "TargetPosition", MethodType.Setter)]
+    private static bool SetTargetPositionPrefix(ref MobileParty __instance, ref Vec2 value)
+    {
+        return AllowedChangePartyAi == __instance.Ai;
+    }
+    #endregion
+    #region MobilePartyAi
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(MobilePartyAi), "DefaultBehavior", MethodType.Setter)]
+    private static bool SetDefaultBehaviorPrefix(ref MobilePartyAi __instance, ref AiBehavior value)
+    {
+        if (AllowedChangePartyAi == __instance) 
+            return true;
+
+        value = AiBehavior.None;
+        return true;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(MobilePartyAi), "SetMoveGoToSettlement")]
+    private static bool SetMoveGoToSettlementPrefix(ref MobilePartyAi __instance, ref Settlement settlement)
     {
         // TODO allow for controlled parties and add synchronisation
         return false;
     }
 
     [HarmonyPrefix]
-    [HarmonyPatch("TargetParty", MethodType.Setter)]
-    private static bool TargetPartyPrefix(ref MobileParty __instance, ref MobileParty value)
+    [HarmonyPatch(typeof(MobilePartyAi), "SetMoveEngageParty")]
+    private static bool SetMoveEngagePartyPrefix(ref MobilePartyAi __instance, ref MobileParty party)
     {
         // TODO allow for controlled parties and add synchronisation
         return false;
     }
 
     [HarmonyPrefix]
-    [HarmonyPatch("TargetPosition")]
-    [HarmonyPatch(MethodType.Setter)]
-    private static bool TargetPositionPrefix(ref MobileParty __instance, ref Vec2 value)
+    [HarmonyPatch(typeof(MobilePartyAi), "SetMoveGoToPoint")]
+    private static bool SetMoveGoToPointPrefix(ref MobilePartyAi __instance, ref Vec2 point)
     {
-        if (AllowedChangeParty == __instance)
+        if (AllowedChangePartyAi == __instance)
         {
             return true;
         }
 
-        var message = new PartyTargetPositionChanged(__instance, value);
+        var message = new PartyTargetPositionChanged(__instance.GetMobileParty(), point);
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
     }
+    #endregion
 
-
-    internal static readonly PropertyInfo MobileParty_TargetPosition = typeof(MobileParty).GetProperty(nameof(MobileParty.TargetPosition));
-    public static void SetTargetPositionOverride(MobileParty party, ref Vec2 position)
+    public static void SetMoveGoToPointOverride(MobileParty party, ref Vec2 position)
     {
-        AllowedChangeParty = party;
-        lock (AllowedChangeParty)
+        AllowedChangePartyAi = party.Ai;
+        lock (AllowedChangePartyAi)
         {
-            MobileParty_TargetPosition.SetValue(party, position);
+            AllowedChangePartyAi.SetMoveGoToPoint(position);
         }
-        AllowedChangeParty = null;
+        AllowedChangePartyAi = null;
     }
 }
