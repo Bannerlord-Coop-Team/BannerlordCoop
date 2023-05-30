@@ -41,10 +41,9 @@ internal class PartyMovementPatch
     [HarmonyPatch(typeof(MobilePartyAi), "DefaultBehavior", MethodType.Setter)]
     private static bool SetDefaultBehaviorPrefix(ref MobilePartyAi __instance, ref AiBehavior value)
     {
-        if (AllowedChangePartyAi == __instance) 
-            return true;
+        if (AllowedChangePartyAi != __instance)
+            value = AiBehavior.None;
 
-        value = AiBehavior.None;
         return true;
     }
 
