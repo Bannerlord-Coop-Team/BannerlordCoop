@@ -13,6 +13,7 @@ using Missions.Services.Network;
 using Serilog;
 using System;
 using System.Reflection;
+using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
 
 namespace Missions.Services.Agents.Handlers
@@ -77,6 +78,8 @@ namespace Missions.Services.Agents.Handlers
                 return;
             };
 
+            Logger.Debug("Damage Check Sen to " + payload.What.VictimAgent.Name + " for: " + payload.What.Blow.InflictedDamage);
+
             // Handles friend fire event
             if (networkAgentRegistry.IsControlled(victimId))
             {
@@ -104,7 +107,6 @@ namespace Missions.Services.Agents.Handlers
             networkMessageBroker.PublishNetworkEvent(netPeer, message);
         }
 
-        private static readonly FieldInfo Blow_OwnerId = typeof(Blow).GetField(nameof(Blow.OwnerId));
         private void AgentDamageCheck(MessagePayload<NetworkDamageAgent> payload)
         {
             if (networkAgentRegistry.TryGetAgent(payload.What.VictimAgentId, out Agent victimAgent) == false) return;
@@ -125,12 +127,14 @@ namespace Missions.Services.Agents.Handlers
                 payload.What.Blow);
 
             networkMessageBroker.PublishNetworkEvent(damageMessage);
-            victimAgent.RegisterBlow(blow, message.AttackCollisionData);
 
-            if(victimAgent.Health <= 0)
+            GameLoopRunner.RunOnMainThread(() =>
             {
+                victimAgent.RegisterBlow(blow, message.AttackCollisionData);
+            }, true);
 
-
+            if (victimAgent.Health <= 0)
+            {
                 var killedMessage = new NetworkAgentKilled(
                     payload.What.VictimAgentId,
                     payload.What.AttackerAgentId,
@@ -234,7 +238,12 @@ namespace Missions.Services.Agents.Handlers
                 blow.OwnerId = attackingAgent.Index;
 
                 Agent.KillInfo overrideKillInfo = blow.IsFallDamage ? Agent.KillInfo.Gravity : Agent.KillInfo.Invalid;
-                agent.Die(blow, overrideKillInfo);
+
+                GameLoopRunner.RunOnMainThread(() =>
+                {
+                    agent.Die(blow, overrideKillInfo);
+                }, true);
+
             }
         }
     }

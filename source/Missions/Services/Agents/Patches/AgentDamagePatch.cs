@@ -17,15 +17,13 @@ namespace Missions.Services.Agents.Patches
     {
         private static bool Prefix(Agent attacker, Agent victim, Blow b, ref AttackCollisionData collisionData)
         {
-            if (NetworkAgentRegistry.Instance.IsControlled(attacker) == false) return false;
-
             // construct a agent damage data
             AgentDamaged agentDamageData = new AgentDamaged(attacker, victim, b, collisionData);
 
             // publish the event
             MessageBroker.Instance.Publish(attacker, agentDamageData);
 
-            return false;
+            return true;
         }
     }
 
@@ -36,6 +34,8 @@ namespace Missions.Services.Agents.Patches
 
         private static bool Prefix(ref Agent __instance)
         {
+            if (NetworkAgentRegistry.Instance.IsControlled(__instance) == false) return false;
+            
             if (__instance == _allowedInstance?.Instance) return true;
 
             return NetworkAgentRegistry.Instance.IsControlled(__instance);

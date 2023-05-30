@@ -132,6 +132,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\Modules\Native\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade.GauntletUI.Widgets">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.GauntletUI.Widgets.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade.View, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
     <Reference Include="TaleWorlds.ObjectSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
