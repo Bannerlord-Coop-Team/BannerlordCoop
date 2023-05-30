@@ -5,16 +5,20 @@ using GameInterface.Services.Heroes.Handlers;
 using System;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using Coop.Core.Server;
+using GameInterface.Services.MobileParties.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler
 {
     internal class SaveDataHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
+        private readonly ICoopClient coopClient;
         private NetworkGameSaveDataReceived saveDataMessage;
-        public SaveDataHandler(IMessageBroker messageBroker)
+        public SaveDataHandler(ICoopClient coopClient, IMessageBroker messageBroker)
         {
             this.messageBroker = messageBroker;
+            this.coopClient = coopClient;
 
             messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
             messageBroker.Subscribe<CampaignLoaded>(Handle_CampaignLoaded);
@@ -33,9 +37,8 @@ namespace Coop.Core.Client.Services.Save.Handler
 
         private void Handle_CampaignLoaded(MessagePayload<CampaignLoaded> obj)
         {
-            var message = new RegisterAllGameObjects();
-
-            messageBroker.Publish(this, message);
+            messageBroker.Publish(this, new RegisterInstanceId(coopClient.ClientId));
+            messageBroker.Publish(this, new RegisterAllGameObjects());
         }
     }
 }

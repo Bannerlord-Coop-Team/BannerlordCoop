@@ -37,9 +37,6 @@ internal class SwitchHeroHandler : IHandler
     {
         heroInterface.SwitchMainHero(obj.What.HeroId);
 
-        // TODO sus - this way of assigning owner id does not make any logical sense.
-        controlledEntityRegistery.InstanceOwnerId = Guid.NewGuid();
-
         if (!objectManager.TryGetObject(obj.What.HeroId, out Hero hero) ||
             !objectManager.TryGetId(hero.PartyBelongedTo, out string partyId))
         {

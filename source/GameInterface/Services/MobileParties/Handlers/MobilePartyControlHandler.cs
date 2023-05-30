@@ -29,7 +29,7 @@ internal class MobilePartyControlHandler : IHandler
         messageBroker.Subscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Subscribe<MobilePartyCreated>(Handle_MobilePartyCreated);
         messageBroker.Subscribe<MobilePartyDestroyed>(Handle_MobilePartyDestroyed);
-        messageBroker.Subscribe<RegisterOwnerId>(Handle_RegisterOwnerId);
+        messageBroker.Subscribe<RegisterInstanceId>(Handle_RegisterOwnerId);
     }
     public void Dispose()
     {
@@ -65,7 +65,7 @@ internal class MobilePartyControlHandler : IHandler
     }
 
 
-    private void Handle_RegisterOwnerId(MessagePayload<RegisterOwnerId> obj)
+    private void Handle_RegisterOwnerId(MessagePayload<RegisterInstanceId> obj)
     {
         controlledEntityRegistery.InstanceOwnerId = obj.What.OwnerId;
     }
