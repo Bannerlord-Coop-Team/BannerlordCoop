@@ -48,6 +48,11 @@ namespace Coop.Core.Client
             // TODO add configuration
             netManager = new NetManager(this);
 
+#if DEBUG
+            // Increase disconnect timeout to prevent disconnect during debugging
+            netManager.DisconnectTimeout = 300 * 1000;
+#endif
+
             // Register instance info
             instanceInfo.Id = ClientId;
             instanceInfo.Role = NetworkRole.Client;

@@ -48,6 +48,11 @@ namespace Coop.Core.Server
             // TODO add configuration
             netManager = new NetManager(this);
 
+#if DEBUG
+            // Increase disconnect timeout to prevent disconnect during debugging
+            netManager.DisconnectTimeout = 300 * 1000;
+#endif
+
             // Netmanager initialization
             netManager.NatPunchEnabled = true;
             netManager.NatPunchModule.Init(this);
