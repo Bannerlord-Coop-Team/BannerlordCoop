@@ -15,6 +15,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.MountAndBlade;
+using static TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks;
 
 namespace Missions.Services.Agents.Handlers
 {
@@ -78,17 +79,24 @@ namespace Missions.Services.Agents.Handlers
                 return;
             };
 
-            Logger.Debug("Damage Check Sen to " + payload.What.VictimAgent.Name + " for: " + payload.What.Blow.InflictedDamage);
+            Logger.Debug("Damage Check Sent to " + payload.What.VictimAgent.Name + " for: " + payload.What.Blow.InflictedDamage);
 
             // Handles friend fire event
             if (networkAgentRegistry.IsControlled(victimId))
             {
+
+                //GameLoopRunner.RunOnMainThread(() =>
+                //{
+                //    payload.What.VictimAgent.RegisterBlow(payload.What.Blow, payload.What.AttackCollisionData);
+                //}, true);
+
                 NetworkAgentDamaged friendlyFireMessage = new NetworkAgentDamaged(
                     attackerId,
                     victimId,
                     payload.What.AttackCollisionData,
                     payload.What.Blow);
                 networkMessageBroker.PublishNetworkEvent(friendlyFireMessage);
+
                 return;
             }
 
@@ -209,8 +217,8 @@ namespace Missions.Services.Agents.Handlers
                 {
                     Logger.Error($"Missile did not exist in registry, idx: {peerIdx}, number of peers: {networkMissileRegistry.Length}");
                     return;
-                }
-                ;
+                };
+
                 blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex = localIdx;
             }
 
@@ -219,6 +227,8 @@ namespace Missions.Services.Agents.Handlers
 
             // extract the collision data
             AttackCollisionData collisionData = agentDamaData.AttackCollisionData;
+
+            Logger.Information("Damage recieved to " + effectedAgent.Name + " for: " + blow.InflictedDamage);
 
             // register a blow on the effected agent
             RegisterBlowPatch.RunOriginalRegisterBlow(effectedAgent, blow, collisionData);
@@ -241,7 +251,10 @@ namespace Missions.Services.Agents.Handlers
 
                 GameLoopRunner.RunOnMainThread(() =>
                 {
-                    agent.Die(blow, overrideKillInfo);
+                    if (agent.Health > 0) //Skips previous health check at times for reasons unknown, thread stuff?
+                    {
+                        agent.Die(blow, overrideKillInfo);
+                    }
                 }, true);
 
             }

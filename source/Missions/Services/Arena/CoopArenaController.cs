@@ -313,6 +313,7 @@ namespace Missions.Services
             Agent agent = default;
             GameLoopRunner.RunOnMainThread(() =>
             {
+                if (Mission.Current == null) return; //This is required as the mission could get unloaded between recieving and processing of a join message
                 agent = Mission.Current.SpawnAgent(agentBuildData);
                 agent.FadeIn();
             }, true);
