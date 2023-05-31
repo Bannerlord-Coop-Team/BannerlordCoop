@@ -25,6 +25,8 @@ namespace Missions.Services.Agents.Patches
             // publish the event
             MessageBroker.Instance.Publish(attacker, agentDamageData);
 
+            if (NetworkAgentRegistry.Instance.IsControlled(victim)) return true;
+             
             return false;
         }
     }

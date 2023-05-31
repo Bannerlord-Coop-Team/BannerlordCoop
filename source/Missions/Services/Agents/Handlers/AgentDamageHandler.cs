@@ -84,12 +84,6 @@ namespace Missions.Services.Agents.Handlers
             // Handles friend fire event
             if (networkAgentRegistry.IsControlled(victimId))
             {
-
-                //GameLoopRunner.RunOnMainThread(() =>
-                //{
-                //    payload.What.VictimAgent.RegisterBlow(payload.What.Blow, payload.What.AttackCollisionData);
-                //}, true);
-
                 NetworkAgentDamaged friendlyFireMessage = new NetworkAgentDamaged(
                     attackerId,
                     victimId,
