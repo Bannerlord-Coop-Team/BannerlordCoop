@@ -10,6 +10,7 @@ using Missions.Services.Network.Messages;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Library;
@@ -44,6 +45,11 @@ namespace Missions.Services.Taverns
             messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
         }
 
+        public override void AfterStart()
+        {
+            _agentRegistry.RegisterControlledAgent(playerId, Agent.Main);
+        }
+
         private void Handle_PeerConnected(MessagePayload<PeerConnected> obj)
         {
             SendJoinInfo(obj.What.Peer);
@@ -76,6 +82,7 @@ namespace Missions.Services.Taverns
         public void Dispose()
         {
             _messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            _messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
         }
 
         protected override void OnEndMission()
