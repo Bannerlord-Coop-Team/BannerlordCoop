@@ -14,28 +14,17 @@ internal class PartyMovementPatch
 {
     private static MobilePartyAi AllowedChangePartyAi;
 
-    #region MobileParty
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(MobileParty), "TargetSettlement", MethodType.Setter)]
-    private static bool SetTargetSettlementPrefix(ref MobileParty __instance, ref Settlement value)
+    public static void SetMoveGoToPointOverride(MobileParty party, ref Vec2 position)
     {
-        return AllowedChangePartyAi == __instance.Ai;
+        AllowedChangePartyAi = party.Ai;
+        lock (AllowedChangePartyAi)
+        {
+            AllowedChangePartyAi.SetMoveGoToPoint(position);
+        }
+        AllowedChangePartyAi = null;
     }
 
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(MobileParty), "TargetParty", MethodType.Setter)]
-    private static bool SetTargetPartyPrefix(ref MobileParty __instance, ref MobileParty value)
-    {
-        return AllowedChangePartyAi == __instance.Ai;
-    }
 
-    [HarmonyPrefix]
-    [HarmonyPatch(typeof(MobileParty), "TargetPosition", MethodType.Setter)]
-    private static bool SetTargetPositionPrefix(ref MobileParty __instance, ref Vec2 value)
-    {
-        return AllowedChangePartyAi == __instance.Ai;
-    }
-    #endregion
     #region MobilePartyAi
     [HarmonyPrefix]
     [HarmonyPatch(typeof(MobilePartyAi), "DefaultBehavior", MethodType.Setter)]
@@ -79,13 +68,28 @@ internal class PartyMovementPatch
     }
     #endregion
 
-    public static void SetMoveGoToPointOverride(MobileParty party, ref Vec2 position)
+    // TODO these shouldn't be necessary after all of the
+    // MobilePartyAi movement methods have been patched
+    #region MobileParty
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(MobileParty), "TargetSettlement", MethodType.Setter)]
+    private static bool SetTargetSettlementPrefix(ref MobileParty __instance, ref Settlement value)
     {
-        AllowedChangePartyAi = party.Ai;
-        lock (AllowedChangePartyAi)
-        {
-            AllowedChangePartyAi.SetMoveGoToPoint(position);
-        }
-        AllowedChangePartyAi = null;
+        return AllowedChangePartyAi == __instance.Ai;
     }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(MobileParty), "TargetParty", MethodType.Setter)]
+    private static bool SetTargetPartyPrefix(ref MobileParty __instance, ref MobileParty value)
+    {
+        return AllowedChangePartyAi == __instance.Ai;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(MobileParty), "TargetPosition", MethodType.Setter)]
+    private static bool SetTargetPositionPrefix(ref MobileParty __instance, ref Vec2 value)
+    {
+        return AllowedChangePartyAi == __instance.Ai;
+    }
+    #endregion
 }

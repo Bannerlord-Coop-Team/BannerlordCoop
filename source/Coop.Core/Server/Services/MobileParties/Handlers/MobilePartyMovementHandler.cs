@@ -24,6 +24,7 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
         public void Dispose()
         {
             messageBroker.Unsubscribe<NetworkRequestMobilePartyMovement>(Handle_RequestMobilePartyMovement);
+            messageBroker.Unsubscribe<ControlledPartyTargetPositionUpdated>(Handle_ControlledPartyTargetPositionUpdated);
         }
 
         private void Handle_RequestMobilePartyMovement(MessagePayload<NetworkRequestMobilePartyMovement> obj)

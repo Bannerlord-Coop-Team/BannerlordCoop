@@ -9,20 +9,20 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
 {
     public class MobilePartyMovementHandler : IHandler
     {
-        private readonly IMessageBroker networkMessageBroker;
+        private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
-        public MobilePartyMovementHandler(IMessageBroker networkMessageBroker, INetwork network)
+        public MobilePartyMovementHandler(IMessageBroker messageBroker, INetwork network)
         {
-            this.networkMessageBroker = networkMessageBroker;
+            this.messageBroker = messageBroker;
             this.network = network;
-            networkMessageBroker.Subscribe<ControlledPartyTargetPositionUpdated>(Handle_ControlledPartyTargetPositionUpdated);
-            networkMessageBroker.Subscribe<NetworkUpdatePartyTargetPosition>(Handle_NetworkUpdatePartyTargetPosition);
+            messageBroker.Subscribe<ControlledPartyTargetPositionUpdated>(Handle_ControlledPartyTargetPositionUpdated);
+            messageBroker.Subscribe<NetworkUpdatePartyTargetPosition>(Handle_NetworkUpdatePartyTargetPosition);
         }
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<ControlledPartyTargetPositionUpdated>(Handle_ControlledPartyTargetPositionUpdated);
-            networkMessageBroker.Unsubscribe<NetworkUpdatePartyTargetPosition>(Handle_NetworkUpdatePartyTargetPosition);
+            messageBroker.Unsubscribe<ControlledPartyTargetPositionUpdated>(Handle_ControlledPartyTargetPositionUpdated);
+            messageBroker.Unsubscribe<NetworkUpdatePartyTargetPosition>(Handle_NetworkUpdatePartyTargetPosition);
         }
 
         // Outgoing
@@ -35,7 +35,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         // Incoming
         private void Handle_NetworkUpdatePartyTargetPosition(MessagePayload<NetworkUpdatePartyTargetPosition> obj)
         {
-            networkMessageBroker.Publish(this, new UpdatePartyTargetPosition(obj.What.TargetPositionData));
+            messageBroker.Publish(this, new UpdatePartyTargetPosition(obj.What.TargetPositionData));
         }
     }
 }
