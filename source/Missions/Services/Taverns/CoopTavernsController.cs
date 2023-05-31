@@ -5,9 +5,11 @@ using Common.Network;
 using LiteNetLib;
 using Missions.Services.BoardGames;
 using Missions.Services.Network;
+using Missions.Services.Network.Data;
 using Missions.Services.Network.Messages;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.AgentOrigins;
 using TaleWorlds.Library;
@@ -25,6 +27,8 @@ namespace Missions.Services.Taverns
 
         private readonly BoardGameManager _boardGameManager;
 
+        private readonly Guid playerId;
+
         public CoopTavernsController(LiteNetP2PClient client, 
             INetworkMessageBroker messageBroker, 
             INetworkAgentRegistry agentRegistry,
@@ -34,7 +38,39 @@ namespace Missions.Services.Taverns
             _agentRegistry = agentRegistry;
             _boardGameManager = boardGameManager;
 
+            playerId = Guid.NewGuid();
+
             messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
+        }
+
+        private void Handle_PeerConnected(MessagePayload<PeerConnected> obj)
+        {
+            SendJoinInfo(obj.What.Peer);
+        }
+
+        private void SendJoinInfo(NetPeer peer)
+        {
+            CharacterObject characterObject = CharacterObject.PlayerCharacter;
+
+            Logger.Debug("Sending join request");
+
+            bool isPlayerAlive = Agent.Main != null && Agent.Main.Health > 0;
+            Vec3 position = Agent.Main?.Position ?? default;
+            float health = Agent.Main?.Health ?? 0;
+
+            NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(
+                characterObject,
+                isPlayerAlive,
+                playerId,
+                position,
+                health,
+                null);
+
+            _messageBroker.PublishNetworkEvent(peer, request);
+            Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
+                characterObject.IsPlayerCharacter ? "Player" : "Agent",
+                characterObject.Name, request.PlayerId, peer.EndPoint);
         }
 
         public void Dispose()

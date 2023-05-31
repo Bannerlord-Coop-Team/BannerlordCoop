@@ -112,8 +112,6 @@ namespace Missions.Services
             SendJoinInfo(payload.What.Peer);
         }
 
-        
-
         private void SendJoinInfo(NetPeer peer)
         {
             CharacterObject characterObject = CharacterObject.PlayerCharacter;
