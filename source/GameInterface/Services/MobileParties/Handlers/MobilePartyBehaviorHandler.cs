@@ -5,28 +5,33 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using Serilog.Core;
 using System;
 using System.Collections.Generic;
+using System.Runtime.Serialization;
 using System.Text;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
     internal class MobilePartyBehaviorHandler : IHandler
     {
-        private readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorHandler>();
-
         private readonly IMessageBroker messageBroker;
         private readonly IControlledEntityRegistery controlledEntityRegistery;
+        private readonly IObjectManager objectManager;
 
         public MobilePartyBehaviorHandler(
             IMessageBroker messageBroker, 
-            IControlledEntityRegistery controlledEntityRegistery) 
+            IControlledEntityRegistery controlledEntityRegistery,
+            IObjectManager objectManager) 
         {
             this.messageBroker = messageBroker;
             this.controlledEntityRegistery = controlledEntityRegistery;
+            this.objectManager = objectManager;
 
             messageBroker.Subscribe<RequestTickInternal>(Handle_RequestTickInternal);
             messageBroker.Subscribe<PartyAiBehaviorChanged>(Handle_PartyAiBehaviorChanged);
@@ -69,8 +74,22 @@ namespace GameInterface.Services.MobileParties.Handlers
         public void Handle_UpdatePartyAiBehavior(MessagePayload<UpdatePartyAiBehavior> obj)
         {
             var data = obj.What.BehaviorUpdateData;
-            //Logger.Debug($"Setting {data.PartyId} behavior to {data.Behavior}");
-            PartyBehaviorPatch.SetAiBehavior(data);
+            IMapEntity targetMapEntity = null;
+
+            if (!objectManager.TryGetObject(data.PartyId, out MobileParty party) ||
+                (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity)))
+            {
+                return;
+            }
+
+            Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
+
+            PartyBehaviorPatch.SetAiBehavior(
+                party.Ai,
+                data.Behavior,
+                targetMapEntity,
+                targetPoint
+            );
         }
     }
 }

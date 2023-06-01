@@ -18,21 +18,12 @@ namespace GameInterface.Services.MobileParties.Patches
     [HarmonyPatch(typeof(MobilePartyAi))]
     static class PartyBehaviorPatch
     {
-        public static void SetAiBehavior(AiBehaviorUpdateData data)
+        public static void SetAiBehavior(
+            MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint)
         {
-            var objectManager = ServiceLocator.Resolve<IObjectManager>();
-
-            IMapEntity mapEntity = null;
-
-            if (!objectManager.TryGetObject(data.PartyId, out MobileParty party) || 
-                (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out mapEntity)))
-            {
-                return;
-            }
-
-            ReflectionUtils.InvokePrivateMethod(typeof(MobilePartyAi), "SetShortTermBehavior", party.Ai, new object[] { data.Behavior, mapEntity });
-            ReflectionUtils.SetPrivateField(typeof(MobilePartyAi), "BehaviorTarget", party.Ai, new Vec2(data.TargetPointX, data.TargetPointY));
-            ReflectionUtils.InvokePrivateMethod(typeof(MobilePartyAi), "UpdateBehavior", party.Ai);
+            ReflectionUtils.InvokePrivateMethod(typeof(MobilePartyAi), "SetShortTermBehavior", partyAi, new object[] { newBehavior, targetMapEntity });
+            ReflectionUtils.SetPrivateField(typeof(MobilePartyAi), "BehaviorTarget", partyAi, targetPoint);
+            ReflectionUtils.InvokePrivateMethod(typeof(MobilePartyAi), "UpdateBehavior", partyAi);
         }
 
         [HarmonyPrefix]
@@ -45,18 +36,18 @@ namespace GameInterface.Services.MobileParties.Patches
         {
             MobileParty party = __instance.GetMobileParty();
 
-            bool hasTarget = false;
-            string targetId = string.Empty;
+            bool hasTargetEntity = false;
+            string targetEntityId = string.Empty;
 
             if (targetPartyFigure != null)
             {
-                hasTarget = true;
-                targetId = targetPartyFigure.IsSettlement
+                hasTargetEntity = true;
+                targetEntityId = targetPartyFigure.IsSettlement
                     ? targetPartyFigure.Settlement.StringId
                     : targetPartyFigure.MobileParty.StringId;
             }
 
-            var data = new AiBehaviorUpdateData(party.StringId, newAiBehavior, hasTarget, targetId, bestTargetPoint);
+            var data = new AiBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint);
             MessageBroker.Instance.Publish(__instance, new PartyAiBehaviorChanged(party, data));
 
             return false;
