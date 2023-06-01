@@ -15,12 +15,12 @@ internal class SwitchHeroHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IMobilePartyRegistry partyRegistry;
     private readonly IObjectManager objectManager;
-    private readonly IControlledEntityRegistery controlledEntityRegistery;
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
 
-    public SwitchHeroHandler(IHeroInterface heroInterface, IControlledEntityRegistery controlledEntityRegistery, IMobilePartyRegistry partyRegistry, IObjectManager objectManager, IMessageBroker messageBroker)
+    public SwitchHeroHandler(IHeroInterface heroInterface, IControlledEntityRegistry controlledEntityRegistry, IMobilePartyRegistry partyRegistry, IObjectManager objectManager, IMessageBroker messageBroker)
     {
         this.heroInterface = heroInterface;
-        this.controlledEntityRegistery = controlledEntityRegistery;
+        this.controlledEntityRegistry = controlledEntityRegistry;
         this.partyRegistry = partyRegistry;
         this.objectManager = objectManager;
         this.messageBroker = messageBroker;
@@ -43,6 +43,6 @@ internal class SwitchHeroHandler : IHandler
             return;
         }
 
-        controlledEntityRegistery.RegisterAsControlled(controlledEntityRegistery.InstanceOwnerId, partyId);
+        controlledEntityRegistry.RegisterAsControlled(controlledEntityRegistry.InstanceOwnerId, partyId);
     }
 }

@@ -21,16 +21,16 @@ namespace GameInterface.Services.MobileParties.Handlers
     internal class MobilePartyBehaviorHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
-        private readonly IControlledEntityRegistery controlledEntityRegistery;
+        private readonly IControlledEntityRegistry controlledEntityRegistry;
         private readonly IObjectManager objectManager;
 
         public MobilePartyBehaviorHandler(
             IMessageBroker messageBroker, 
-            IControlledEntityRegistery controlledEntityRegistery,
+            IControlledEntityRegistry controlledEntityRegistry,
             IObjectManager objectManager) 
         {
             this.messageBroker = messageBroker;
-            this.controlledEntityRegistery = controlledEntityRegistery;
+            this.controlledEntityRegistry = controlledEntityRegistry;
             this.objectManager = objectManager;
 
             messageBroker.Subscribe<RequestTickInternal>(Handle_RequestTickInternal);
@@ -51,7 +51,7 @@ namespace GameInterface.Services.MobileParties.Handlers
             MobilePartyAi partyAi = obj.What.PartyAi;
             if (ModInformation.IsServer && partyAi.GetMobileParty().StringId == "TransferredParty") return;
 
-            if (!controlledEntityRegistery.IsOwned(partyAi.GetMobileParty().StringId))
+            if (!controlledEntityRegistry.IsOwned(partyAi.GetMobileParty().StringId))
             {
                 return;
             }
@@ -63,7 +63,7 @@ namespace GameInterface.Services.MobileParties.Handlers
         {
             MobileParty party = obj.What.Party;
 
-            if (controlledEntityRegistery.IsOwned(party.StringId) == false)
+            if (controlledEntityRegistry.IsOwned(party.StringId) == false)
                 return;
 
             AiBehaviorUpdateData data = obj.What.BehaviorUpdateData;

@@ -13,10 +13,4 @@ namespace GameInterface.Services.MobileParties.Messages;
 public readonly struct RegisterAllPartiesAsControlled : ICommand
 {
     public Guid TransactionID => Guid.Empty;
-    public Guid OwnerId { get; }
-
-    public RegisterAllPartiesAsControlled(Guid ownerId)
-    {
-        OwnerId = ownerId;
-    }
 }

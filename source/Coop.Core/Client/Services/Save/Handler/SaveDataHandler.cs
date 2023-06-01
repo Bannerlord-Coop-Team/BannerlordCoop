@@ -37,7 +37,7 @@ namespace Coop.Core.Client.Services.Save.Handler
 
         private void Handle_CampaignLoaded(MessagePayload<CampaignLoaded> obj)
         {
-            messageBroker.Publish(this, new RegisterInstanceId(coopClient.ClientId));
+            messageBroker.Publish(this, new SetRegistryOwnerId(coopClient.ClientId));
             messageBroker.Publish(this, new RegisterAllGameObjects());
         }
     }

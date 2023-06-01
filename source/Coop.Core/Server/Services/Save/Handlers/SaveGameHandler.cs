@@ -3,6 +3,7 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Services.Save.Data;
+using GameInterface.Services.Entity.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MobileParties.Messages;
@@ -87,8 +88,8 @@ namespace Coop.Core.Server.Services.Save.Handlers
 
         private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
         {
-            messageBroker.Publish(this, new RegisterInstanceId(coopServer.ServerId));
-            messageBroker.Publish(this, new RegisterAllPartiesAsControlled(coopServer.ServerId));
+            messageBroker.Publish(this, new SetRegistryOwnerId(coopServer.ServerId));
+            messageBroker.Publish(this, new RegisterAllPartiesAsControlled());
             messageBroker.Publish(this, new EnableGameTimeControls());
             coopServer.AllowJoining();
         }

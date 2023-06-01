@@ -8,7 +8,7 @@ namespace GameInterface.Extentions
     {
         public static bool IsControlled(this MBObjectBase obj)
         {
-            var controlledEntityRegistry = ServiceLocator.Resolve<IControlledEntityRegistery>();
+            var controlledEntityRegistry = ServiceLocator.Resolve<IControlledEntityRegistry>();
             return controlledEntityRegistry.IsOwned(obj.StringId);
         }
     }
