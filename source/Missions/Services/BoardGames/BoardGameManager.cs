@@ -60,10 +60,11 @@ namespace Missions.Services.BoardGames
             if (_agentRegistry.TryGetAgentId(sender, out Guid senderGuid) &&
                 _agentRegistry.TryGetAgentId(other, out Guid otherGuid))
             {
+                _agentRegistry.TryGetExternalController(other, out NetPeer otherPeer);
                 BoardGameChallengeRequest request = new BoardGameChallengeRequest(senderGuid, otherGuid);
                 // TODO associate a client id so we don't have to subscribe here
                 _networkMessageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
-                _networkMessageBroker.PublishNetworkEvent(request);
+                _networkMessageBroker.PublishNetworkEvent(otherPeer, request);
             }
             else
             {

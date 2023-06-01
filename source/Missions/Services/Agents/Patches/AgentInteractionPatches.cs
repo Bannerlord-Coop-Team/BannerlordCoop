@@ -24,6 +24,16 @@ namespace Missions.Services.Agents.Patches
             }
             
             ProcessSentencePatch.SetInteractedAgents(userAgent, agent);
+
+
+            //Temporary
+
+            AgentInteraction message = new AgentInteraction(userAgent, agent);
+            MessageBroker.Instance.Publish(userAgent, message);
+            return false;
+
+            //
+            
             return true;
 
         }
@@ -36,11 +46,11 @@ namespace Missions.Services.Agents.Patches
         private static Agent targetAgent;
         public static bool Prefix(ConversationSentenceOption conversationSentenceOption)
         {
-            if (conversationSentenceOption.Id == "lord_player_start_game" && targetAgent.IsNetworkAgent())
+            if (targetAgent.IsNetworkAgent())
             {
-                MissionConversationLogic.Current.ConversationManager.EndConversation();
-                AgentInteraction message = new AgentInteraction(requesterAgent, targetAgent);
-                MessageBroker.Instance.Publish(requesterAgent, message);
+                //MissionConversationLogic.Current.ConversationManager.EndConversation();
+                //AgentInteraction message = new AgentInteraction(requesterAgent, targetAgent);
+                //MessageBroker.Instance.Publish(requesterAgent, message);
                 return false;
             }
             return true;
