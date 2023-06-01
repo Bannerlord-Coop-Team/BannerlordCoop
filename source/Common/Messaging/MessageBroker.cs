@@ -54,18 +54,28 @@ namespace Common.Messaging
             var delegates = _subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);
+
+            List<int> indicesToRemove = new List<int>();
+
             for (int i = 0; i < delegates.Count; i++)
             {
                 // TODO this might be slow
                 var weakDelegate = delegates[i];
                 if (weakDelegate.IsAlive == false)
                 {
-                    // Remove dead delegates
-                    delegates.RemoveAt(i--);
+                    // Mark dead delegates for removal
+                    indicesToRemove.Add(i);
                     continue;
                 }
 
                 Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+            }
+
+            // Remove dead delegates. If combined with the previous loop
+            // it should be changed to iterate backwards over the delegates.
+            for (int i = indicesToRemove.Count - 1; i >= 0; i--)
+            {
+                delegates.RemoveAt(indicesToRemove[1]);
             }
         }
 
