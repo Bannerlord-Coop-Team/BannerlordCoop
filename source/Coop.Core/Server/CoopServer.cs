@@ -5,6 +5,7 @@ using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
@@ -41,6 +42,8 @@ namespace Coop.Core.Server
             // Dependancy assignment
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
+
+            ModInformation.IsServer = true;
 
             // TODO add configuration
             netManager = new NetManager(this);

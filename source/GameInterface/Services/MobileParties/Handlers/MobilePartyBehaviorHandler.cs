@@ -1,8 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
+using GameInterface.Extentions;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Patches;
+using Serilog;
+using Serilog.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -12,6 +16,8 @@ namespace GameInterface.Services.MobileParties.Handlers
 {
     internal class MobilePartyBehaviorHandler : IHandler
     {
+        private readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorHandler>();
+
         private readonly IMessageBroker messageBroker;
         private readonly IControlledEntityRegistery controlledEntityRegistery;
 
@@ -22,14 +28,30 @@ namespace GameInterface.Services.MobileParties.Handlers
             this.messageBroker = messageBroker;
             this.controlledEntityRegistery = controlledEntityRegistery;
 
+            messageBroker.Subscribe<RequestTickInternal>(Handle_RequestTickInternal);
             messageBroker.Subscribe<PartyAiBehaviorChanged>(Handle_PartyAiBehaviorChanged);
             messageBroker.Subscribe<UpdatePartyAiBehavior>(Handle_UpdatePartyAiBehavior);
         }
 
         public void Dispose()
         {
+            messageBroker.Subscribe<RequestTickInternal>(Handle_RequestTickInternal);
             messageBroker.Unsubscribe<PartyAiBehaviorChanged>(Handle_PartyAiBehaviorChanged);
             messageBroker.Unsubscribe<UpdatePartyAiBehavior>(Handle_UpdatePartyAiBehavior);
+        }
+
+        private void Handle_RequestTickInternal(MessagePayload<RequestTickInternal> obj)
+        {
+
+            MobilePartyAi partyAi = obj.What.PartyAi;
+            if (ModInformation.IsServer && partyAi.GetMobileParty().StringId == "TransferredParty") return;
+
+            if (!controlledEntityRegistery.IsOwned(partyAi.GetMobileParty().StringId))
+            {
+                return;
+            }
+
+            DisablePartyDecisionMaking.TickInternalOverride(partyAi);
         }
 
         public void Handle_PartyAiBehaviorChanged(MessagePayload<PartyAiBehaviorChanged> obj)
@@ -46,7 +68,9 @@ namespace GameInterface.Services.MobileParties.Handlers
 
         public void Handle_UpdatePartyAiBehavior(MessagePayload<UpdatePartyAiBehavior> obj)
         {
-            PartyBehaviorPatch.SetAiBehavior(obj.What.BehaviorUpdateData);
+            var data = obj.What.BehaviorUpdateData;
+            //Logger.Debug($"Setting {data.PartyId} behavior to {data.Behavior}");
+            PartyBehaviorPatch.SetAiBehavior(data);
         }
     }
 }

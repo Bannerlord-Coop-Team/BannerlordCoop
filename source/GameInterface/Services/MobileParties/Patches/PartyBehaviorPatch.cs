@@ -31,7 +31,7 @@ namespace GameInterface.Services.MobileParties.Patches
             }
 
             ReflectionUtils.InvokePrivateMethod(typeof(MobilePartyAi), "SetShortTermBehavior", party.Ai, new object[] { data.Behavior, mapEntity });
-            ReflectionUtils.SetPrivateField(typeof(MobilePartyAi), "BehaviorTarget", party.Ai, data.TargetPoint);
+            ReflectionUtils.SetPrivateField(typeof(MobilePartyAi), "BehaviorTarget", party.Ai, new Vec2(data.TargetPointX, data.TargetPointY));
             ReflectionUtils.InvokePrivateMethod(typeof(MobilePartyAi), "UpdateBehavior", party.Ai);
         }
 

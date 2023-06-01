@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -15,7 +16,12 @@ namespace Coop.Mod.Extentions
 
         public static bool IsAnyPlayerMainParty(this MobileParty party)
         {
-            return party.LeaderHero != null && party.LeaderHero.IsHumanPlayerCharacter;
+            // TODO remove this method and all references to it - use the MessageBroker system instead.
+            // TODO create player controlled party registry instead of hardcoding
+            List<string> debug_players = new List<string>();
+            debug_players.Add("player_party");
+            debug_players.Add("TransferredParty");
+            return debug_players.Contains(party.StringId);
         }
     }
 }

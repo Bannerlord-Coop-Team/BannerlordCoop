@@ -23,7 +23,10 @@ namespace GameInterface.Services.MobileParties.Data
         public string TargetId { get; }
 
         [ProtoMember(5)]
-        public Vec2 TargetPoint { get; }
+        public float TargetPointX { get; }
+
+        [ProtoMember(6)]
+        public float TargetPointY { get; }
 
         public AiBehaviorUpdateData(string partyId, AiBehavior aiBehavior, bool hasTarget, string targetId, Vec2 targetPoint)
         {
@@ -31,7 +34,8 @@ namespace GameInterface.Services.MobileParties.Data
             Behavior = aiBehavior;
             HasTarget = hasTarget;
             TargetId = targetId;
-            TargetPoint = targetPoint;
+            TargetPointX = targetPoint.X;
+            TargetPointY = targetPoint.Y;
         }
     }
 }

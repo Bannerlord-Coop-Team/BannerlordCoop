@@ -26,7 +26,7 @@ internal class PartyMovementPatch
 
 
     #region MobilePartyAi
-    [HarmonyPrefix]
+    /*[HarmonyPrefix]
     [HarmonyPatch(typeof(MobilePartyAi), "DefaultBehavior", MethodType.Setter)]
     private static bool SetDefaultBehaviorPrefix(ref MobilePartyAi __instance, ref AiBehavior value)
     {
@@ -34,9 +34,9 @@ internal class PartyMovementPatch
             value = AiBehavior.None;
 
         return true;
-    }
+    }*/
 
-    [HarmonyPrefix]
+    /*[HarmonyPrefix]
     [HarmonyPatch(typeof(MobilePartyAi), "SetMoveGoToSettlement")]
     private static bool SetMoveGoToSettlementPrefix(ref MobilePartyAi __instance, ref Settlement settlement)
     {
@@ -90,6 +90,6 @@ internal class PartyMovementPatch
     private static bool SetTargetPositionPrefix(ref MobileParty __instance, ref Vec2 value)
     {
         return AllowedChangePartyAi == __instance.Ai;
-    }
+    }*/
     #endregion
 }
