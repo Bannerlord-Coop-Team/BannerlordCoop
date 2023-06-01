@@ -15,18 +15,18 @@ internal class HeroRegistryHandler : IHandler
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
     private readonly IHeroRegistry heroRegistry;
-    private readonly IControlledEntityRegistery controlledEntityRegistery;
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
 
     public HeroRegistryHandler(
         IHeroInterface heroInterface,
         IMessageBroker messageBroker,
         IHeroRegistry heroRegistry,
-        IControlledEntityRegistery controlledEntityRegistery)
+        IControlledEntityRegistry controlledEntityRegistry)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
         this.heroRegistry = heroRegistry;
-        this.controlledEntityRegistery = controlledEntityRegistery;
+        this.controlledEntityRegistry = controlledEntityRegistry;
 
         messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
     }
@@ -44,13 +44,13 @@ internal class HeroRegistryHandler : IHandler
         if (heroRegistry.TryGetValue(previousHero, out string previousHeroId))
         {
             // TODO remove old
-            // controlledEntityRegistery.RemoveAsControlled(previousHeroId);
+            // controlledEntityRegistry.RemoveAsControlled(previousHeroId);
         }
 
         if (heroRegistry.TryGetValue(newHero, out string newHeroId))
         {
             // TODO register
-            // controlledEntityRegistery.RegisterAsControlled(newHeroId);
+            // controlledEntityRegistry.RegisterAsControlled(newHeroId);
         }
     }
 }

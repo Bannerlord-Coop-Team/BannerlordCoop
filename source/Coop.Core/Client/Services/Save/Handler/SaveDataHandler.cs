@@ -7,6 +7,7 @@ using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using Coop.Core.Server;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.Entity.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler
 {
@@ -37,7 +38,7 @@ namespace Coop.Core.Client.Services.Save.Handler
 
         private void Handle_CampaignLoaded(MessagePayload<CampaignLoaded> obj)
         {
-            messageBroker.Publish(this, new RegisterInstanceId(coopClient.ClientId));
+            messageBroker.Publish(this, new SetRegistryOwnerId(coopClient.ClientId));
             messageBroker.Publish(this, new RegisterAllGameObjects());
         }
     }

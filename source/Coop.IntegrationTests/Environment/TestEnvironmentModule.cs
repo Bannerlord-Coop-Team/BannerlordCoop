@@ -28,8 +28,8 @@ internal class TestEnvironmentModule : Module
                .As<IHeroRegistry>()
                .InstancePerLifetimeScope();
 
-        builder.RegisterType<ControlledEntityRegistery>()
-               .As<IControlledEntityRegistery>()
+        builder.RegisterType<ControlledEntityRegistry>()
+               .As<IControlledEntityRegistry>()
                .InstancePerLifetimeScope();
     }
 }

@@ -11,25 +11,24 @@ internal class MobilePartyControlHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IMobilePartyInterface partyInterface;
-    private readonly IControlledEntityRegistery controlledEntityRegistery;
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
 
     private bool controlPartiesByDefault = false;
 
-    private Guid ownerId => controlledEntityRegistery.InstanceOwnerId;
+    private Guid ownerId => controlledEntityRegistry.InstanceOwnerId;
 
     public MobilePartyControlHandler(
         IMessageBroker messageBroker, 
         IMobilePartyInterface partyInterface, 
-        IControlledEntityRegistery controlledEntityRegistery)
+        IControlledEntityRegistry controlledEntityRegistry)
     {
         this.messageBroker = messageBroker;
         this.partyInterface = partyInterface;
-        this.controlledEntityRegistery = controlledEntityRegistery;
+        this.controlledEntityRegistry = controlledEntityRegistry;
 
         messageBroker.Subscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Subscribe<MobilePartyCreated>(Handle_MobilePartyCreated);
         messageBroker.Subscribe<MobilePartyDestroyed>(Handle_MobilePartyDestroyed);
-        messageBroker.Subscribe<RegisterInstanceId>(Handle_RegisterOwnerId);
     }
     public void Dispose()
     {
@@ -38,9 +37,6 @@ internal class MobilePartyControlHandler : IHandler
 
     private void Handle_RegisterAllPartiesAsControlled(MessagePayload<RegisterAllPartiesAsControlled> obj)
     {
-        var ownerId = obj.What.OwnerId;
-
-        controlledEntityRegistery.InstanceOwnerId = ownerId;
         controlPartiesByDefault = true;
 
         partyInterface.RegisterAllPartiesAsControlled(ownerId);
@@ -51,23 +47,16 @@ internal class MobilePartyControlHandler : IHandler
         if (!controlPartiesByDefault) return;
 
         MobileParty party = obj.What.Party;
-        controlledEntityRegistery.RegisterAsControlled(ownerId, party.StringId);
+        controlledEntityRegistry.RegisterAsControlled(ownerId, party.StringId);
     }
 
     private void Handle_MobilePartyDestroyed(MessagePayload<MobilePartyDestroyed> obj)
     {
         MobileParty party = obj.What.Party;
 
-        if (!controlledEntityRegistery.TryGetControlledEntity(party.StringId, out var controlledEntity))
+        if (!controlledEntityRegistry.TryGetControlledEntity(party.StringId, out var controlledEntity))
             return;
 
-        controlledEntityRegistery.RemoveAsControlled(controlledEntity);
+        controlledEntityRegistry.RemoveAsControlled(controlledEntity);
     }
-
-
-    private void Handle_RegisterOwnerId(MessagePayload<RegisterInstanceId> obj)
-    {
-        controlledEntityRegistery.InstanceOwnerId = obj.What.InstanceId;
-    }
-
 }
