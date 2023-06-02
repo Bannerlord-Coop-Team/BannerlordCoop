@@ -1,9 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Client.Services.MobileParties.Messages
 {

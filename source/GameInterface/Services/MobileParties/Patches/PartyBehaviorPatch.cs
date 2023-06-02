@@ -4,13 +4,8 @@ using TaleWorlds.Library;
 using GameInterface.Extentions;
 using Common.Messaging;
 using TaleWorlds.CampaignSystem.Map;
-using TaleWorlds.CampaignSystem;
-using GameInterface.Services.ObjectManager;
-using TaleWorlds.CampaignSystem.Settlements;
-using ProtoBuf;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages;
-using System.Reflection;
 using GameInterface.Utils;
 
 namespace GameInterface.Services.MobileParties.Patches

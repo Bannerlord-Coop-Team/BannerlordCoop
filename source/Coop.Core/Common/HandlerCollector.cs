@@ -3,24 +3,23 @@ using Common.Messaging;
 using System;
 using System.Collections.Generic;
 
-namespace Coop.Core.Common
+namespace Coop.Core.Common;
+
+internal static class HandlerCollector
 {
-    internal static class HandlerCollector
+    public static IEnumerable<Type> Collect<TModule>()
     {
-        public static IEnumerable<Type> Collect<TModule>()
+        string namespacePrefix = typeof(TModule).Namespace;
+
+        List<Type> types = new List<Type>();
+
+        foreach (Type t in AppDomain.CurrentDomain.GetDomainTypes(namespacePrefix))
         {
-            string namespacePrefix = typeof(TModule).Namespace;
+            if (t.GetInterface(nameof(IHandler)) == null) continue;
 
-            List<Type> types = new List<Type>();
-
-            foreach (Type t in AppDomain.CurrentDomain.GetDomainTypes(namespacePrefix))
-            {
-                if (t.GetInterface(nameof(IHandler)) == null) continue;
-
-                types.Add(t);
-            }
-
-            return types;
+            types.Add(t);
         }
+
+        return types;
     }
 }

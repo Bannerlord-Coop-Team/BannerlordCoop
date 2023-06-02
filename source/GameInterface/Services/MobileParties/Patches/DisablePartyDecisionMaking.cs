@@ -1,14 +1,7 @@
-﻿using Coop.Mod.Extentions;
-using GameInterface.Extentions;
+﻿using GameInterface.Extentions;
 using HarmonyLib;
-using System.Collections.Generic;
-using System.Reflection.Emit;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using System.Linq;
-using TaleWorlds.Library;
 using Common.Messaging;
 using GameInterface.Utils;
 using GameInterface.Services.MobileParties.Messages;
