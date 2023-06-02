@@ -39,12 +39,10 @@ static class DisablePartyDecisionMaking
             return true;
         }
 
-        if (ModInformation.IsClient && !__instance.GetMobileParty().IsMainParty)
+        if (ModInformation.IsServer || __instance.GetMobileParty().IsMainParty)
         {
-            return false;
+            MessageBroker.Instance.Publish(__instance, new RequestTickInternal(__instance));
         }
-
-        MessageBroker.Instance.Publish(__instance, new RequestTickInternal(__instance));
 
         return false;
     }
@@ -53,7 +51,15 @@ static class DisablePartyDecisionMaking
     [HarmonyPatch(nameof(MobilePartyAi.DoNotMakeNewDecisions), MethodType.Getter)]
     static bool PrefixDoNotMakeNewDecisionsGetter(MobilePartyAi __instance, ref bool __result)
     {
-        MobileParty party = __instance.GetMobileParty();
+        if (ModInformation.IsClient)
+        {
+            // Disable decision making on clients, only the server can update the AI.
+            __result = true;
+            return false;
+        }
+
+        return true;
+        /*MobileParty party = __instance.GetMobileParty();
         if (party.IsAnyPlayerMainParty() || ModInformation.IsClient)
         {
             // Disable decision making for parties our client doesn't control. Decisions are made remote.
@@ -61,14 +67,14 @@ static class DisablePartyDecisionMaking
             return false;
         }
 
-        return true;
+        return true;*/
     }
 
     [HarmonyPrefix]
     [HarmonyPatch(typeof(SetPartyAiAction), "ApplyInternal", MethodType.Normal)]
     static bool Prefix(ref MobileParty owner)
     {
-        if (owner.IsAnyPlayerMainParty() || ModInformation.IsClient)
+        if (owner.Ai.DoNotMakeNewDecisions || ModInformation.IsClient)
         {
             return false;
         }

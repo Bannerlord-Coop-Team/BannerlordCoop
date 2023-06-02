@@ -59,18 +59,12 @@ namespace GameInterface.Services.MobileParties.Handlers
         {
             mobilePartyRegistry.RegisterParty(party);
 
-            if (party.IsAnyPlayerMainParty())
-                return;
-
             messageBroker.Publish(this, new MobilePartyCreated(party));
         }
 
         public void Handle_MobilePartyDestroyed(MobileParty party, PartyBase partyBase)
         {
             mobilePartyRegistry.Remove(party);
-
-            if (party.IsAnyPlayerMainParty()) 
-                return;
 
             messageBroker.Publish(this, new MobilePartyDestroyed(party, partyBase));
         }

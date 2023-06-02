@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Entity.Data;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.ObjectManager;
 using System;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -12,6 +14,7 @@ internal class MobilePartyControlHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IMobilePartyInterface partyInterface;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
+    private readonly IObjectManager objectManager;
 
     private bool controlPartiesByDefault = false;
 
@@ -20,19 +23,25 @@ internal class MobilePartyControlHandler : IHandler
     public MobilePartyControlHandler(
         IMessageBroker messageBroker, 
         IMobilePartyInterface partyInterface, 
-        IControlledEntityRegistry controlledEntityRegistry)
+        IControlledEntityRegistry controlledEntityRegistry,
+        IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.partyInterface = partyInterface;
         this.controlledEntityRegistry = controlledEntityRegistry;
+        this.objectManager = objectManager;
 
         messageBroker.Subscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
+        messageBroker.Subscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
         messageBroker.Subscribe<MobilePartyCreated>(Handle_MobilePartyCreated);
         messageBroker.Subscribe<MobilePartyDestroyed>(Handle_MobilePartyDestroyed);
     }
     public void Dispose()
     {
         messageBroker.Unsubscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
+        messageBroker.Unsubscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
+        messageBroker.Unsubscribe<MobilePartyCreated>(Handle_MobilePartyCreated);
+        messageBroker.Unsubscribe<MobilePartyDestroyed>(Handle_MobilePartyDestroyed);
     }
 
     private void Handle_RegisterAllPartiesAsControlled(MessagePayload<RegisterAllPartiesAsControlled> obj)
@@ -40,6 +49,25 @@ internal class MobilePartyControlHandler : IHandler
         controlPartiesByDefault = true;
 
         partyInterface.RegisterAllPartiesAsControlled(ownerId);
+    }
+
+    private void Handle_UpdateMobilePartyControl(MessagePayload<UpdateMobilePartyControl> obj)
+    {
+        string partyId = obj.What.PartyId;
+        PartyControlAction action = obj.What.Action;
+
+        if (action == PartyControlAction.Grant)
+        {
+            controlledEntityRegistry.RegisterAsControlled(ownerId, partyId);
+            return;
+        }
+
+        controlledEntityRegistry.RemoveAsControlled(new ControlledEntity(ownerId, partyId));
+
+        if (ModInformation.IsServer && objectManager.TryGetObject(partyId, out MobileParty party))
+        {
+            party.Ai.SetDoNotMakeNewDecisions(true);
+        }
     }
 
     private void Handle_MobilePartyCreated(MessagePayload<MobilePartyCreated> obj)

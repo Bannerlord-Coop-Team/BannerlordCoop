@@ -47,9 +47,7 @@ namespace GameInterface.Services.MobileParties.Handlers
 
         private void Handle_RequestTickInternal(MessagePayload<RequestTickInternal> obj)
         {
-
             MobilePartyAi partyAi = obj.What.PartyAi;
-            if (ModInformation.IsServer && partyAi.GetMobileParty().StringId == "TransferredParty") return;
 
             if (!controlledEntityRegistry.IsOwned(partyAi.GetMobileParty().StringId))
             {
