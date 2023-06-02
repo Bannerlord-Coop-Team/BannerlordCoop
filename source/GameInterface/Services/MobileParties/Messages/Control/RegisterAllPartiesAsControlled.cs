@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using System;
 
-namespace GameInterface.Services.MobileParties.Messages;
+namespace GameInterface.Services.MobileParties.Messages.Control;
 
 /// <summary>
 /// Registers all parties in the game as controlled

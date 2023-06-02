@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
 
-namespace GameInterface.Services.MobileParties.Messages
+namespace GameInterface.Services.MobileParties.Messages.Behavior
 {
     public record UpdatePartyAiBehavior : ICommand
     {

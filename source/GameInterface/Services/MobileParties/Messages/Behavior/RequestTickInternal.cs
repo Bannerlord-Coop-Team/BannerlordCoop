@@ -1,15 +1,15 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.MobileParties.Messages
+namespace GameInterface.Services.MobileParties.Messages.Behavior
 {
     internal record RequestTickInternal : IEvent
     {
         public MobilePartyAi PartyAi { get; }
 
-        public RequestTickInternal(MobilePartyAi partyAi) 
+        public RequestTickInternal(MobilePartyAi partyAi)
         {
-            this.PartyAi = partyAi;
+            PartyAi = partyAi;
         }
     }
 }

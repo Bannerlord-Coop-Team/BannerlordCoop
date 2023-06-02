@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages.Control;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;

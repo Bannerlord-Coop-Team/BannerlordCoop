@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
 
-namespace GameInterface.Services.MobileParties.Messages
+namespace GameInterface.Services.MobileParties.Messages.Control
 {
     public record UpdateMobilePartyControl : ICommand
     {

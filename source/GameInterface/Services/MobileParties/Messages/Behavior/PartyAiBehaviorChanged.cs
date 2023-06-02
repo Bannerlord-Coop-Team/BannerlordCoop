@@ -2,7 +2,7 @@
 using GameInterface.Services.MobileParties.Data;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.MobileParties.Messages
+namespace GameInterface.Services.MobileParties.Messages.Behavior
 {
     internal record PartyAiBehaviorChanged : IEvent
     {

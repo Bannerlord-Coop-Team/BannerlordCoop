@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using Common.Messaging;
 using GameInterface.Utils;
-using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 
 namespace GameInterface.Services.MobileParties.Patches;
 

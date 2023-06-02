@@ -6,7 +6,7 @@ using Coop.Core.Server.Services.Save.Data;
 using GameInterface.Services.Entity.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages.Control;
 using System;
 
 namespace Coop.Core.Server.Services.Save.Handlers
