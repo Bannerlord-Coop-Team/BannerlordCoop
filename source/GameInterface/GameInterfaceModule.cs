@@ -29,9 +29,5 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ControlledEntityRegistry>()
                .As<IControlledEntityRegistry>()
                .InstancePerLifetimeScope();
-
-        builder.RegisterBuildCallback(scope => {
-            ServiceLocator.SetContainer(scope);
-        });
     }
 }
