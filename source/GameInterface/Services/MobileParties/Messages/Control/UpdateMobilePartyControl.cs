@@ -6,18 +6,12 @@ namespace GameInterface.Services.MobileParties.Messages.Control
     {
         public string PartyId { get; }
 
-        public PartyControlAction Action { get; }
+        public bool IsRevocation { get; }
 
-        public UpdateMobilePartyControl(string partyId, PartyControlAction action)
+        public UpdateMobilePartyControl(string partyId, bool isRevocation = false)
         {
             PartyId = partyId;
-            Action = action;
+            IsRevocation = isRevocation;
         }
-    }
-
-    public enum PartyControlAction
-    {
-        Grant,
-        Revoke
     }
 }

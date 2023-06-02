@@ -28,7 +28,7 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
         {
             string partyId = obj.What.PartyId;
 
-            messageBroker.Publish(this, new UpdateMobilePartyControl(partyId, PartyControlAction.Revoke));
+            messageBroker.Publish(this, new UpdateMobilePartyControl(partyId, true));
 
             network.SendAll(new NetworkGrantPartyControl(partyId));
         }

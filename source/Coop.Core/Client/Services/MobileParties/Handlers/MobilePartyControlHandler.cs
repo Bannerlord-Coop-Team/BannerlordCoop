@@ -33,7 +33,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
 
         private void Handle(MessagePayload<NetworkGrantPartyControl> obj)
         {
-            messageBroker.Publish(this, new UpdateMobilePartyControl(obj.What.PartyId, PartyControlAction.Grant));
+            messageBroker.Publish(this, new UpdateMobilePartyControl(obj.What.PartyId));
         }
     }
 }

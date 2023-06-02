@@ -55,9 +55,8 @@ internal class MobilePartyControlHandler : IHandler
     private void Handle_UpdateMobilePartyControl(MessagePayload<UpdateMobilePartyControl> obj)
     {
         string partyId = obj.What.PartyId;
-        PartyControlAction action = obj.What.Action;
 
-        if (action == PartyControlAction.Grant)
+        if (obj.What.IsRevocation == false)
         {
             controlledEntityRegistry.RegisterAsControlled(ownerId, partyId);
             return;
