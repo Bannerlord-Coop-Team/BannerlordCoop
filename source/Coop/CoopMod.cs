@@ -147,6 +147,9 @@ namespace Coop
                     () => { return (false, new TextObject()); }
                 );
 
+            Module.CurrentModule.AddInitialStateOption(CoopCampaign);
+
+#if !DEBUG
             JoinCoopGame =
                 new InitialStateOption(
                   "Join Coop Game",
@@ -155,10 +158,6 @@ namespace Coop
                   JoinWindow,
               () => { return (false, new TextObject()); }
             );
-
-            Module.CurrentModule.AddInitialStateOption(CoopCampaign);
-
-#if !DEBUG
             Module.CurrentModule.AddInitialStateOption(JoinCoopGame);
 #endif
             #endregion

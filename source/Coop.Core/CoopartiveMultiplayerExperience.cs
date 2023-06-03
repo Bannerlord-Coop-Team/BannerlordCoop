@@ -5,6 +5,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client;
 using Coop.Core.Server;
+using GameInterface;
 using System;
 
 namespace Coop.Core
@@ -62,10 +63,6 @@ namespace Coop.Core
 
             var logic = _container.Resolve<ILogic>();
             logic.Start();
-
-            // TODO remove test code
-            //var messageBroker = _container.Resolve<IMessageBroker>();
-            //messageBroker.Publish(this, new NetworkConnected(false));
         }
     }
 }

@@ -19,14 +19,14 @@ internal class MobilePartyInterface : IMobilePartyInterface
     private static readonly MethodInfo AddMobileParty = typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic);
 
     private readonly IMobilePartyRegistry _partyRegistry;
-    private readonly IControlledEntityRegistery _controlledEntityRegistery;
+    private readonly IControlledEntityRegistry _controlledEntityRegistry;
 
     public MobilePartyInterface(
         IMobilePartyRegistry partyRegistry,
-        IControlledEntityRegistery controlledEntityRegistery)
+        IControlledEntityRegistry controlledEntityRegistry)
     {
         _partyRegistry = partyRegistry;
-        _controlledEntityRegistery = controlledEntityRegistery;
+        _controlledEntityRegistry = controlledEntityRegistry;
     }
 
     public void ManageNewParty(MobileParty party)
@@ -42,7 +42,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
     {
         foreach(var party in _partyRegistry)
         {
-            _controlledEntityRegistery.RegisterAsControlled(ownerId, party.Key);
+            _controlledEntityRegistry.RegisterAsControlled(ownerId, party.Key);
         }
     }
 }

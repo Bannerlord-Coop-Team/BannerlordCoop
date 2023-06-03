@@ -5,6 +5,7 @@ using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
@@ -15,6 +16,7 @@ namespace Coop.Core.Server
 {
     public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, IDisposable
     {
+        public Guid ServerId { get; }
         IEnumerable<NetPeer> ConnectedPeers { get; }
         void AllowJoining();
     }
@@ -41,8 +43,15 @@ namespace Coop.Core.Server
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
 
+            ModInformation.IsServer = true;
+
             // TODO add configuration
             netManager = new NetManager(this);
+
+#if DEBUG
+            // Increase disconnect timeout to prevent disconnect during debugging
+            netManager.DisconnectTimeout = 300 * 1000;
+#endif
 
             // Netmanager initialization
             netManager.NatPunchEnabled = true;
@@ -57,7 +66,7 @@ namespace Coop.Core.Server
 
         public void OnConnectionRequest(ConnectionRequest request)
         {
-            if(allowJoining)
+            if (allowJoining)
             {
                 request.Accept();
             }
@@ -65,7 +74,6 @@ namespace Coop.Core.Server
             {
                 request.Reject();
             }
-            
         }
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)

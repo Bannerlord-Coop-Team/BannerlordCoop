@@ -12,10 +12,5 @@ namespace Coop.Mod.Extentions
         {
             MobileParty_partyComponent.SetValue(party, component);
         }
-
-        public static bool IsAnyPlayerMainParty(this MobileParty party)
-        {
-            throw new NotImplementedException();
-        }
     }
 }

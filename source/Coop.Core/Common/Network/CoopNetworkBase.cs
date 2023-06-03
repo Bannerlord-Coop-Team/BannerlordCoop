@@ -5,6 +5,7 @@ using Common.Serialization;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net.Sockets;
 
@@ -22,7 +23,9 @@ namespace Coop.Core.Common.Network
 
         public virtual void SendAllBut(NetManager netManager, NetPeer netPeer, IPacket packet)
         {
-            foreach (NetPeer peer in netManager.ConnectedPeerList.Where(peer => peer != netPeer))
+            var peers = new List<NetPeer>();
+            netManager.GetPeersNonAlloc(peers, ConnectionState.Connected);
+            foreach (NetPeer peer in peers.Where(peer => peer != netPeer))
             {
                 Send(peer, packet);
             }
@@ -30,7 +33,9 @@ namespace Coop.Core.Common.Network
 
         protected virtual void SendAll(NetManager netManager, IPacket packet)
         {
-            foreach (NetPeer peer in netManager.ConnectedPeerList)
+            var peers = new List<NetPeer>();
+            netManager.GetPeersNonAlloc(peers, ConnectionState.Connected);
+            foreach (var peer in peers)
             {
                 Send(peer, packet);
             }

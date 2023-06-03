@@ -20,8 +20,8 @@ namespace Coop.Tests.Communication
             communicator.Subscribe<ExampleIncomingMessage>(payload => { });
             
             var subscribers = (Dictionary<Type, List<WeakDelegate>>)typeof(MessageBroker)
-                .GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)
-                .GetValue(communicator);
+                .GetField("_subscribers", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(communicator)!;
 
             if (subscribers == null)
                 throw new Exception("Subscribers dictionary couldn't not be found.");
