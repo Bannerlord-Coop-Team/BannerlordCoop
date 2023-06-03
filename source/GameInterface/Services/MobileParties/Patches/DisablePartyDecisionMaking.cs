@@ -1,24 +1,29 @@
-﻿using GameInterface.Extentions;
+﻿using Common.Messaging;
+using Common.Extensions;
+using GameInterface.Extentions;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
+using System;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using Common.Messaging;
-using GameInterface.Utils;
-using GameInterface.Services.MobileParties.Messages.Behavior;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
 [HarmonyPatch(typeof(MobilePartyAi))]
 static class DisablePartyDecisionMaking
 {
+    static object AllowLock = new object();
     static MobilePartyAi AllowedTickInternal;
-
+    static Action<MobilePartyAi> TickInternal = typeof(MobilePartyAi)
+        .GetMethod("TickInternal", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildDelegate<Action<MobilePartyAi>>();
     public static void TickInternalOverride(MobilePartyAi partyAi)
     {
         AllowedTickInternal = partyAi;
-        lock (AllowedTickInternal)
+        lock (AllowLock)
         {
-            ReflectionUtils.InvokePrivateMethod(typeof(MobilePartyAi), "TickInternal", partyAi);
+            TickInternal(partyAi);
         }
         AllowedTickInternal = null;
     }
