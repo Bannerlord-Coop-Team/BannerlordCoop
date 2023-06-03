@@ -1,9 +1,14 @@
 ﻿using ProtoBuf;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
+using GameInterface.Services.MobileParties.Handlers;
 
 namespace GameInterface.Services.MobileParties.Data
 {
+    /// <summary>
+    /// Contains the data used for <see cref="MobilePartyAi"/> behavior synchronisation.
+    /// </summary>
+    /// <seealso cref="MobilePartyBehaviorHandler"/>
     [ProtoContract(SkipConstructor = true)]
     public record AiBehaviorUpdateData
     {

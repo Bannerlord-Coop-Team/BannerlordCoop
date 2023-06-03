@@ -4,6 +4,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.MobileParties.Messages
 {
+    /// <summary>
+    /// Commands the update of a party's behavior on the campaign map.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkUpdatePartyAiBehavior : ICommand
     {

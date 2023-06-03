@@ -4,6 +4,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Client.Services.MobileParties.Messages
 {
+    /// <summary>
+    /// Requests change of party behavior on the campaign map.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkRequestMobilePartyAiBehavior : ICommand
     {

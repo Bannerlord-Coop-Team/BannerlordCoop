@@ -10,6 +10,9 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
+/// <summary>
+/// Disables decision making for parties that are not controlled locally.
+/// </summary>
 [HarmonyPatch(typeof(MobilePartyAi))]
 static class DisablePartyDecisionMaking
 {

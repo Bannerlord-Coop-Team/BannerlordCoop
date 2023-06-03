@@ -12,6 +12,15 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
+    /// <summary>
+    /// Handles synchronization of the <see cref="MobilePartyAi"/>'s behavior on the campaign map, which includes
+    /// target positions and entities used for updating movement.
+    /// </summary>
+    /// <remarks>
+    /// Important note: <see cref="MobilePartyAi"/> is also present in player-controlled parties, where it is 
+    /// responsible for pathfinding and movement.
+    /// </remarks>
+    /// <seealso cref="AiBehavior"/>
     internal class MobilePartyBehaviorHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
@@ -54,9 +63,11 @@ namespace GameInterface.Services.MobileParties.Handlers
             var data = obj.What.BehaviorUpdateData;
             IMapEntity targetMapEntity = null;
 
-            if (!objectManager.TryGetObject(data.PartyId, out MobileParty party)) return;
-            if (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity)) return;
+            if (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity)) 
+                return;
 
+            if (!objectManager.TryGetObject(data.PartyId, out MobileParty party)) 
+                return;
 
             Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
 

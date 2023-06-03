@@ -7,6 +7,11 @@ using GameInterface.Services.MobileParties.Messages.Control;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers
 {
+    /// <summary>
+    /// Handles client communication related to party behavior synchronisation.
+    /// </summary>
+    /// <seealso cref="Server.Services.MobileParties.Handlers.MobilePartyBehaviorHandler">Server's Handler</seealso>
+    /// <seealso cref="GameInterface.Services.MobileParties.Handlers.MobilePartyBehaviorHandler">Game Interface's Handler</seealso>
     public class MobilePartyBehaviorHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
