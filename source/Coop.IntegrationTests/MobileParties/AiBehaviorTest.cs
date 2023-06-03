@@ -12,6 +12,7 @@ public class AiBehaviorTest
 
     public AiBehaviorTest()
     {
+        // Creates a test environment with 1 server and 2 clients by default
         TestEnvironment = new TestEnvironment();
     }
 
