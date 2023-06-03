@@ -27,16 +27,16 @@ internal class MobilePartyMovementHandler : IHandler
         this.messageBroker = messageBroker;
 
         messageBroker.Subscribe<UpdatePartyTargetPosition>(Handle_UpdatePartyTargetPosition);
-        messageBroker.Subscribe<PartyTargetPositionChanged>(Handle_PartyTargetPositionChanged);
+        messageBroker.Subscribe<PartyTargetPositionAttempted>(Handle_PartyTargetPositionChanged);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<UpdatePartyTargetPosition>(Handle_UpdatePartyTargetPosition);
-        messageBroker.Unsubscribe<PartyTargetPositionChanged>(Handle_PartyTargetPositionChanged);
+        messageBroker.Unsubscribe<PartyTargetPositionAttempted>(Handle_PartyTargetPositionChanged);
     }
 
-    private void Handle_PartyTargetPositionChanged(MessagePayload<PartyTargetPositionChanged> obj)
+    private void Handle_PartyTargetPositionChanged(MessagePayload<PartyTargetPositionAttempted> obj)
     {
         var payload = obj.What;
 
@@ -67,6 +67,6 @@ internal class MobilePartyMovementHandler : IHandler
         Vec2 targetPos = targetPositionData.TargetPosition;
         Logger.Debug($"Setting {resolvedParty.StringId} to {targetPos}");
 
-        PartyMovementPatch.SetTargetPositionOverride(resolvedParty, ref targetPos);
+        PartyMovementPatch.SetTargetPositionOriginal(resolvedParty, ref targetPos);
     }
 }

@@ -8,7 +8,7 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.MobileParties.Patches;
 
 [HarmonyPatch(typeof(MobileParty))]
-internal class PartyMovementPatch
+internal static class PartyMovementPatch
 {
     private static MobileParty AllowedChangeParty;
 
@@ -22,16 +22,14 @@ internal class PartyMovementPatch
             return true;
         }
 
-        var message = new PartyTargetPositionChanged(__instance, value);
+        var message = new PartyTargetPositionAttempted(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
 
-        if (ModInformation.IsClient) return false;
-
-        return true;
+        return false;
     }
 
     internal static readonly PropertyInfo MobileParty_TargetPosition = typeof(MobileParty).GetProperty(nameof(MobileParty.TargetPosition));
-    public static void SetTargetPositionOverride(MobileParty party, ref Vec2 position)
+    public static void SetTargetPositionOriginal(MobileParty party, ref Vec2 position)
     {
         AllowedChangeParty = party;
         lock (AllowedChangeParty)
