@@ -111,14 +111,12 @@ namespace Missions.Services.Agents.Handlers
 
         private void AgentDamageCheck(MessagePayload<NetworkDamageAgent> payload)
         {
-            
             if (networkAgentRegistry.TryGetAgent(payload.What.AttackerAgentId, out Agent attackingAgent) == false) return;
 
             var message = payload.What;
 
             var blow = message.Blow;
             blow.OwnerId = attackingAgent.Index;
-
 
             NetworkAgentDamaged damageMessage = new NetworkAgentDamaged(
                 payload.What.AttackerAgentId,
@@ -127,6 +125,10 @@ namespace Missions.Services.Agents.Handlers
                 payload.What.Blow);
 
             networkMessageBroker.PublishNetworkEvent(damageMessage);
+
+            if (networkAgentRegistry.TryGetAgent(payload.What.VictimAgentId, out Agent victimAgent) == false) return;
+
+            if (victimAgent.Health <= 0) return;
 
             GameLoopRunner.RunOnMainThread(() =>
             {
