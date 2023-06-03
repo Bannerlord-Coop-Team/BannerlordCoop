@@ -1,11 +1,15 @@
 ﻿using Common.Messaging;
+using Coop.IntegrationTests.Environment.Instance;
 using LiteNetLib;
 
 namespace Coop.IntegrationTests.Environment;
 
-public class TestNetworkOrchestrator
+/// <summary>
+/// Network message router for simulating messages across the network
+/// </summary>
+internal class TestNetworkRouter
 {
-    private ServerInstance Server;
+    private ServerInstance? Server;
     private List<ClientInstance> Clients = new List<ClientInstance>();
     public void AddServer(ServerInstance instance)
     {

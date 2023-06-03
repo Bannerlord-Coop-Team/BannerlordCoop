@@ -6,13 +6,13 @@ using LiteNetLib;
 
 namespace Coop.IntegrationTests.Environment.Mock;
 
-public abstract class MockNetworkBase : INetwork
+internal abstract class MockNetworkBase : INetwork
 {
-    private readonly TestNetworkOrchestrator networkOrchestrator;
+    private readonly TestNetworkRouter networkOrchestrator;
 
     public static int InstanceCount = 0;
 
-    public MockNetworkBase(TestNetworkOrchestrator networkOrchestrator)
+    public MockNetworkBase(TestNetworkRouter networkOrchestrator)
     {
         this.networkOrchestrator = networkOrchestrator;
 

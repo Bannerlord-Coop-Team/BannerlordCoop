@@ -5,9 +5,9 @@ using System.Net.Sockets;
 
 namespace Coop.IntegrationTests.Environment.Mock;
 
-public class MockClient : MockNetworkBase, ICoopClient
+internal class MockClient : MockNetworkBase, ICoopClient
 {
-    public MockClient(TestNetworkOrchestrator networkOrchestrator) : base(networkOrchestrator)
+    public MockClient(TestNetworkRouter networkOrchestrator) : base(networkOrchestrator)
     {
     }
 

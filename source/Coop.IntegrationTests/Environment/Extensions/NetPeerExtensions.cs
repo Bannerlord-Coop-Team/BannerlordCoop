@@ -4,6 +4,9 @@ using System.Runtime.Serialization;
 
 namespace Coop.IntegrationTests.Environment.Extensions;
 
+/// <summary>
+/// Extensions for the NetPeer class
+/// </summary>
 internal static class NetPeerExtensions
 {
     private static readonly FieldInfo Id = typeof(NetPeer).GetField(nameof(NetPeer.Id))!;

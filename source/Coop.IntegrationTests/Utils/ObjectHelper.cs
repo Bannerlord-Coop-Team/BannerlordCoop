@@ -2,9 +2,9 @@
 
 namespace Coop.IntegrationTests.Utils;
 
-internal class Object
+internal class ObjectHelper
 {
-    public static T CreateUninitialized<T>()
+    public static T SkipConstructor<T>()
     {
         return (T)FormatterServices.GetUninitializedObject(typeof(T));
     }

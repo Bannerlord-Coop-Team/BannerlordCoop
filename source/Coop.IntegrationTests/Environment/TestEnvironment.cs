@@ -6,16 +6,24 @@ using Coop.Core.Server;
 using Coop.IntegrationTests.Environment.Mock;
 using Microsoft.Extensions.DependencyInjection;
 using Coop.Core.Server.Services.Save;
+using Coop.IntegrationTests.Environment.Instance;
 
 namespace Coop.IntegrationTests.Environment;
 
-public class TestEnvironment
+/// <summary>
+/// Environment for integration testing
+/// </summary>
+internal class TestEnvironment
 {
+    /// <summary>
+    /// Constructor for TestEnvironment
+    /// </summary>
+    /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
     public TestEnvironment(int numClients = 2)
     {
         Server = CreateServer();
 
-        List<InstanceEnvironment> clients = new List<InstanceEnvironment>();
+        List<EnvironmentInstance> clients = new List<EnvironmentInstance>();
         for (int i = 0; i < numClients; i++)
         {
             clients.Add(CreateClient());
@@ -24,14 +32,14 @@ public class TestEnvironment
         Clients = clients;
     }
 
-    public IEnumerable<InstanceEnvironment> Clients { get; }
-    public InstanceEnvironment Server { get; }
+    public IEnumerable<EnvironmentInstance> Clients { get; }
+    public EnvironmentInstance Server { get; }
 
     private List<IHandler> _handlers = new List<IHandler>();
 
-    private TestNetworkOrchestrator networkOrchestrator = new TestNetworkOrchestrator();
+    private TestNetworkRouter networkOrchestrator = new TestNetworkRouter();
 
-    public InstanceEnvironment CreateClient()
+    private EnvironmentInstance CreateClient()
     {
         var handlerTypes = HandlerCollector.Collect<ClientModule>();
         var serviceCollection = new ServiceCollection();
@@ -63,7 +71,7 @@ public class TestEnvironment
         return instance;
     }
 
-    public InstanceEnvironment CreateServer()
+    private EnvironmentInstance CreateServer()
     {
         var handlerTypes = HandlerCollector.Collect<ServerModule>();
         var serviceCollection = new ServiceCollection();
