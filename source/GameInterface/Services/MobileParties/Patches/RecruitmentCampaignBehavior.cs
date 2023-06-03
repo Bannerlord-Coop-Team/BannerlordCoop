@@ -5,12 +5,22 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
-[HarmonyPatch(typeof(RecruitmentCampaignBehavior), "CheckRecruiting")]
+[HarmonyPatch(typeof(RecruitmentCampaignBehavior))]
 internal class RecruitmentCampaignBehaviorPatch
 {
-    private static bool Prefix(ref MobileParty mobileParty, ref Settlement settlement)
+    [HarmonyPrefix]
+    [HarmonyPatch("CheckRecruiting")]
+    private static bool CheckRecruitingPrefix(ref MobileParty mobileParty, ref Settlement settlement)
     {
         // TODO only allow for server and broadcast when it happens
         return true;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch("HourlyTickParty")]
+    private static bool HourlyTickPartyPrefix(ref MobileParty mobileParty)
+    {
+        // TODO disable for player parties
+        return false;
     }
 }

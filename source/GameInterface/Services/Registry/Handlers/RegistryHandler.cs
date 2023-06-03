@@ -4,7 +4,7 @@ using GameInterface.Services.Heroes.Messages;
 
 namespace GameInterface.Services.Registry.Handlers;
 
-internal class RegistryHandler
+internal class RegistryHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IHeroRegistry heroRegistry;
@@ -18,7 +18,13 @@ internal class RegistryHandler
         this.messageBroker = messageBroker;
         this.heroRegistry = heroRegistry;
         this.partyRegistry = partyRegistry;
-        this.messageBroker.Subscribe<RegisterAllGameObjects>(Handle);
+        
+        messageBroker.Subscribe<RegisterAllGameObjects>(Handle);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<RegisterAllGameObjects>(Handle);
     }
 
     private void Handle(MessagePayload<RegisterAllGameObjects> obj)
@@ -28,6 +34,6 @@ internal class RegistryHandler
         heroRegistry.RegisterAllHeroes();
         partyRegistry.RegisterAllParties();
 
-        messageBroker.Respond(obj.Who, new AllGameObjectsRegistered());
+        messageBroker.Publish(this, new AllGameObjectsRegistered());
     }
 }

@@ -1,10 +1,12 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Entity.Data;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Registry;
 using Serilog;
+using System;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -15,18 +17,20 @@ internal class HeroRegistryHandler : IHandler
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
     private readonly IHeroRegistry heroRegistry;
-    private readonly IControlledEntityRegistery controlledEntityRegistery;
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
+
+    private Guid ownerId => controlledEntityRegistry.InstanceOwnerId;
 
     public HeroRegistryHandler(
         IHeroInterface heroInterface,
         IMessageBroker messageBroker,
         IHeroRegistry heroRegistry,
-        IControlledEntityRegistery controlledEntityRegistery)
+        IControlledEntityRegistry controlledEntityRegistry)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
         this.heroRegistry = heroRegistry;
-        this.controlledEntityRegistery = controlledEntityRegistery;
+        this.controlledEntityRegistry = controlledEntityRegistry;
 
         messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
     }
@@ -41,16 +45,11 @@ internal class HeroRegistryHandler : IHandler
         var previousHero = obj.What.PreviousHero;
         var newHero = obj.What.NewHero;
 
-        if (heroRegistry.TryGetValue(previousHero, out string previousHeroId))
+        if (controlledEntityRegistry.TryGetControlledEntity(previousHero.StringId, out ControlledEntity previousHeroEntity))
         {
-            // TODO remove old
-            // controlledEntityRegistery.RemoveAsControlled(previousHeroId);
+            controlledEntityRegistry.RemoveAsControlled(previousHeroEntity);
         }
 
-        if (heroRegistry.TryGetValue(newHero, out string newHeroId))
-        {
-            // TODO register
-            // controlledEntityRegistery.RegisterAsControlled(newHeroId);
-        }
+        controlledEntityRegistry.RegisterAsControlled(ownerId, newHero.StringId);
     }
 }

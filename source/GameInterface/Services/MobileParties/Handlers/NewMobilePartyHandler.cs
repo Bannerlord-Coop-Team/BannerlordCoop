@@ -31,6 +31,7 @@ internal class NewMobilePartyHandler : IHandler
         string stringId = obj.What.HeroStringId;
         var hero = Campaign.Current.CampaignObjectManager.AliveHeroes.Single(h => h.StringId == stringId);
         var party = Campaign.Current.CampaignObjectManager.MobileParties.Single(h => h.StringId == obj.What.PartyStringId);
+
         partyInterface.ManageNewParty(hero.PartyBelongedTo);
     }
 }

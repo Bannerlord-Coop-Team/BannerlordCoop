@@ -41,9 +41,6 @@ namespace Coop.Core
 
         public void StartAsServer()
         {
-            // TODO find a better way
-            ModInformation.IsServer = true;
-
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ServerModule>();
@@ -57,9 +54,6 @@ namespace Coop.Core
 
         public void StartAsClient()
         {
-            // TODO find a better way
-            ModInformation.IsServer = false;
-
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ClientModule>();

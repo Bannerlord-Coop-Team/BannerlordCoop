@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using System;
 
-namespace GameInterface.Services.MobileParties.Messages;
+namespace GameInterface.Services.MobileParties.Messages.Control;
 
 /// <summary>
 /// Registers all parties in the game as controlled
@@ -13,10 +13,4 @@ namespace GameInterface.Services.MobileParties.Messages;
 public readonly struct RegisterAllPartiesAsControlled : ICommand
 {
     public Guid TransactionID => Guid.Empty;
-    public Guid OwnerId { get; }
-
-    public RegisterAllPartiesAsControlled(Guid ownerId)
-    {
-        OwnerId = ownerId;
-    }
 }

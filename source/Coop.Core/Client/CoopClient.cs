@@ -16,14 +16,16 @@ namespace Coop.Core.Client
 {
     public interface ICoopClient : INetwork, IUpdateable, INetEventListener
     {
+        Guid ClientId { get; }
     }
 
     public class CoopClient : CoopNetworkBase, ICoopClient
     {
         public override int Priority => 0;
         
-        
         private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
+
+        public Guid ClientId { get; } = Guid.NewGuid();
 
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
@@ -42,6 +44,11 @@ namespace Coop.Core.Client
 
             // TODO add configuration
             netManager = new NetManager(this);
+
+#if DEBUG
+            // Increase disconnect timeout to prevent disconnect during debugging
+            netManager.DisconnectTimeout = 300 * 1000;
+#endif
         }
 
         public void Disconnect()
@@ -66,12 +73,7 @@ namespace Coop.Core.Client
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
         {
-            int lenght = reader.GetInt();
-            byte[] data = new byte[lenght];
-
-            reader.GetBytes(data, data.Length);
-
-            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(data);
+            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
             packetManager.HandleRecieve(peer, packet);
         }
 

@@ -1,7 +1,8 @@
-﻿namespace GameInterface;
-
-public static class ModInformation
+﻿namespace GameInterface
 {
-    public static bool IsServer = false;
-    public static bool IsClient => !IsServer;
+    public static class ModInformation
+    {
+        public static bool IsServer = false;
+        public static bool IsClient => !IsServer;
+    }
 }

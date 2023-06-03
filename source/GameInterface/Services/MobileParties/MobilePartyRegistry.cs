@@ -1,4 +1,5 @@
 ﻿using Common;
+using Coop.Mod.Extentions;
 using GameInterface.Services.Registry;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -7,11 +8,29 @@ namespace GameInterface.Services.MobileParties;
 
 internal interface IMobilePartyRegistry : IRegistry<MobileParty>
 {
+    bool RegisterParty(MobileParty party);
+    bool RemoveParty(MobileParty party);
     void RegisterAllParties();
 }
 
 internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegistry
 {
+    public bool RegisterParty(MobileParty party)
+    {
+        if (RegisterExistingObject(party.StringId, party) == false)
+        {
+            Logger.Warning("Unable to register party: {object}", party.Name);
+            return false;
+        }
+
+        return true;
+    }
+
+    public bool RemoveParty(MobileParty party)
+    {
+        return Remove(party.StringId);
+    }
+
     public void RegisterAllParties()
     {
         var objectManager = Campaign.Current?.CampaignObjectManager;
@@ -24,10 +43,7 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegi
 
         foreach (var party in objectManager.MobileParties)
         {
-            if(RegisterExistingObject(party.StringId, party) == false)
-            {
-                Logger.Warning("Unable to register party: {object}", party.Name);
-            }
+            RegisterParty(party);
         }
     }
 }

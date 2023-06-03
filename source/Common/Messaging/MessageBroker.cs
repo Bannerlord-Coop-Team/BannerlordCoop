@@ -10,7 +10,7 @@ namespace Common.Messaging
     {
         void Publish<T>(object source, T message) where T : IMessage;
 
-        void Respond<T>(object source, T message) where T : IResponse;
+        void Respond<T>(object target, T message) where T : IResponse;
 
         void Subscribe<T>(Action<MessagePayload<T>> subcription);
 
@@ -44,7 +44,7 @@ namespace Common.Messaging
             if (message == null)
                 return;
 
-            Logger.Verbose($"Publishing {message.GetType().Name} from {source?.GetType().Name}");
+            //Logger.Verbose($"Publishing {message.GetType().Name} from {source?.GetType().Name}");
 
             if (!_subscribers.ContainsKey(typeof(T)))
             {
@@ -69,12 +69,12 @@ namespace Common.Messaging
             }
         }
 
-        public void Respond<T>(object source, T message) where T : IResponse
+        public void Respond<T>(object target, T message) where T : IResponse
         {
             if (message == null)
                 return;
 
-            Logger.Verbose($"Responding {message.GetType().Name} to {source?.GetType().Name}");
+            Logger.Verbose($"Responding {message.GetType().Name} to {target?.GetType().Name}");
 
             if (!_subscribers.ContainsKey(typeof(T)))
             {
@@ -83,7 +83,7 @@ namespace Common.Messaging
 
             var delegates = _subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
-            var payload = new MessagePayload<T>(source, message);
+            var payload = new MessagePayload<T>(target, message);
             for (int i = 0; i < delegates.Count; i++)
             {
                 // TODO this might be slow
@@ -95,7 +95,7 @@ namespace Common.Messaging
                     continue;
                 }
 
-                if (weakDelegate.Instance == source)
+                if (weakDelegate.Instance == target)
                 {
                     Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
                     // Can only respond to one source, no longer need to loop if found

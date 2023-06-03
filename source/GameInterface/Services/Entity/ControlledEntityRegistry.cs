@@ -14,7 +14,7 @@ namespace GameInterface.Services.Entity;
 /// Stores ownership of game entities
 /// </summary>
 /// <remarks>A game entity is anything that can be updated by the client or server</remarks>
-internal interface IControlledEntityRegistery
+internal interface IControlledEntityRegistry
 {
     /// <summary>
     /// Owner id of the current client or server that instantiated this object.
@@ -74,9 +74,9 @@ internal interface IControlledEntityRegistery
     bool TryGetControlledEntity(string entityId, out ControlledEntity entity);
 }
 
-internal class ControlledEntityRegistery : IControlledEntityRegistery
+internal class ControlledEntityRegistry : IControlledEntityRegistry
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<ControlledEntityRegistery>();
+    private static readonly ILogger Logger = LogManager.GetLogger<ControlledEntityRegistry>();
 
     public Guid InstanceOwnerId { get; set; }
 

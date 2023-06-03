@@ -37,6 +37,11 @@ namespace Common.Extensions
             return action;
         }
 
+        public static TDelegate BuildDelegate<TDelegate>(this MethodInfo methodInfo) where TDelegate : Delegate
+        {
+            return (TDelegate)methodInfo.CreateDelegate(typeof(TDelegate));
+        }
+
         private static Type GetUnderlyingType(this MemberInfo member)
         {
             switch (member.MemberType)

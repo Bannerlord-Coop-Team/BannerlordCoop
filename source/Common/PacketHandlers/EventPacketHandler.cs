@@ -41,7 +41,7 @@ namespace Common.PacketHandlers
 
             IMessage networkEvent = convertedPacket.Event;
 
-            Logger.Information("Received network event from {Peer} of {EventType}", peer.EndPoint, networkEvent.GetType().Name);
+            //Logger.Information("Received network event from {Peer} of {EventType}", peer.EndPoint, networkEvent.GetType().Name);
 
             PublishEvent(peer, networkEvent);
         }
