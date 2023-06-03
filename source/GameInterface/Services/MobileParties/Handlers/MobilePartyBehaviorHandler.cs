@@ -27,28 +27,14 @@ namespace GameInterface.Services.MobileParties.Handlers
             this.controlledEntityRegistry = controlledEntityRegistry;
             this.objectManager = objectManager;
 
-            messageBroker.Subscribe<RequestTickInternal>(Handle_RequestTickInternal);
             messageBroker.Subscribe<PartyAiBehaviorChanged>(Handle_PartyAiBehaviorChanged);
             messageBroker.Subscribe<UpdatePartyAiBehavior>(Handle_UpdatePartyAiBehavior);
         }
 
         public void Dispose()
         {
-            messageBroker.Subscribe<RequestTickInternal>(Handle_RequestTickInternal);
             messageBroker.Unsubscribe<PartyAiBehaviorChanged>(Handle_PartyAiBehaviorChanged);
             messageBroker.Unsubscribe<UpdatePartyAiBehavior>(Handle_UpdatePartyAiBehavior);
-        }
-
-        private void Handle_RequestTickInternal(MessagePayload<RequestTickInternal> obj)
-        {
-            MobilePartyAi partyAi = obj.What.PartyAi;
-
-            if (!controlledEntityRegistry.IsOwned(partyAi.GetMobileParty().StringId))
-            {
-                return;
-            }
-
-            DisablePartyDecisionMaking.TickInternalOverride(partyAi);
         }
 
         public void Handle_PartyAiBehaviorChanged(MessagePayload<PartyAiBehaviorChanged> obj)
@@ -68,11 +54,9 @@ namespace GameInterface.Services.MobileParties.Handlers
             var data = obj.What.BehaviorUpdateData;
             IMapEntity targetMapEntity = null;
 
-            if (!objectManager.TryGetObject(data.PartyId, out MobileParty party) ||
-                (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity)))
-            {
-                return;
-            }
+            if (!objectManager.TryGetObject(data.PartyId, out MobileParty party)) return;
+            if (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity)) return;
+
 
             Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
 
