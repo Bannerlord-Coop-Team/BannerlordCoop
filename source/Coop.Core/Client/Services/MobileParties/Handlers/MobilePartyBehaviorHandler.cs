@@ -26,12 +26,12 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
             messageBroker.Unsubscribe<NetworkUpdatePartyAiBehavior>(Handle);
         }
 
-        private void Handle(MessagePayload<ControlledPartyAiBehaviorUpdated> obj)
+        internal void Handle(MessagePayload<ControlledPartyAiBehaviorUpdated> obj)
         {
             network.SendAll(new NetworkRequestMobilePartyAiBehavior(obj.What.BehaviorUpdateData));
         }
 
-        private void Handle(MessagePayload<NetworkUpdatePartyAiBehavior> obj)
+        internal void Handle(MessagePayload<NetworkUpdatePartyAiBehavior> obj)
         {
             messageBroker.Publish(this, new UpdatePartyAiBehavior(obj.What.BehaviorUpdateData));
         }
