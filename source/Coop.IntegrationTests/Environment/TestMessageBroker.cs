@@ -1,59 +1,41 @@
-﻿using Common.Logging;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+﻿using Common.Messaging;
+using System.Reflection;
+using System.Runtime.InteropServices;
 
-namespace Common.Messaging
+namespace Coop.IntegrationTests.Environment
 {
-    public interface IMessageBroker : IDisposable
+    public class TestMessageBroker : IMessageBroker
     {
-        void Publish<T>(object source, T message) where T : IMessage;
+        public readonly MessageCollection Messages = new MessageCollection();
 
-        void Respond<T>(object target, T message) where T : IResponse;
-
-        void Subscribe<T>(Action<MessagePayload<T>> subscription);
-
-        void Unsubscribe<T>(Action<MessagePayload<T>> subscription);
-    }
-
-    public class MessageBroker : IMessageBroker
-    {
-        private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
-        protected static MessageBroker _instance;
-        protected readonly Dictionary<Type, List<WeakDelegate>> _subscribers;
-        public static MessageBroker Instance { 
-            get
-            {
-                if( _instance == null)
-                {
-                    _instance = new MessageBroker();
-                }
-                return _instance;
-            } 
-        } 
-            
-
-        public MessageBroker()
+        private readonly Dictionary<Type, List<WeakDelegate>> _subscribers;
+        public TestMessageBroker()
         {
             _subscribers = new Dictionary<Type, List<WeakDelegate>>();
         }
 
+        private readonly ConstructorInfo ctor_payload = typeof(MessagePayload<>)
+                .GetConstructors().First();
+
         public virtual void Publish<T>(object source, T message) where T : IMessage
         {
+            Messages.Add(message);
+
             if (message == null)
                 return;
 
-            //Logger.Verbose($"Publishing {message.GetType().Name} from {source?.GetType().Name}");
-
-            if (!_subscribers.ContainsKey(typeof(T)))
+            Type messageType = message.GetType();
+            if (!_subscribers.ContainsKey(messageType))
             {
                 return;
             }
 
-            var delegates = _subscribers[typeof(T)];
+            var delegates = _subscribers[messageType];
             if (delegates == null || delegates.Count == 0) return;
-            var payload = new MessagePayload<T>(source, message);
+
+            Type t = typeof(MessagePayload<>).MakeGenericType(messageType);
+
+            object payload = Activator.CreateInstance(t, source, message)!;
             for (int i = 0; i < delegates.Count; i++)
             {
                 // TODO this might be slow
@@ -65,24 +47,28 @@ namespace Common.Messaging
                     continue;
                 }
 
-                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+                weakDelegate.Invoke(new object[] { payload });
             }
         }
 
         public void Respond<T>(object target, T message) where T : IResponse
         {
+            Messages.Add(message);
+
             if (message == null)
                 return;
 
-            Logger.Verbose($"Responding {message.GetType().Name} to {target?.GetType().Name}");
-
-            if (!_subscribers.ContainsKey(typeof(T)))
+            Type messageType = message.GetType();
+            if (!_subscribers.ContainsKey(messageType))
             {
                 return;
             }
 
-            var delegates = _subscribers[typeof(T)];
+            var delegates = _subscribers[messageType];
             if (delegates == null || delegates.Count == 0) return;
+
+            
+
             var payload = new MessagePayload<T>(target, message);
             for (int i = 0; i < delegates.Count; i++)
             {
@@ -97,7 +83,7 @@ namespace Common.Messaging
 
                 if (weakDelegate.Instance == target)
                 {
-                    Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+                    weakDelegate.Invoke(new object[] { payload });
                     // Can only respond to one source, no longer need to loop if found
                     return;
                 }
@@ -117,7 +103,6 @@ namespace Common.Messaging
 
         public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
         {
-            
             if (!_subscribers.ContainsKey(typeof(T))) return;
             var delegates = _subscribers[typeof(T)];
             if (delegates.Contains(new WeakDelegate(subscription)))
