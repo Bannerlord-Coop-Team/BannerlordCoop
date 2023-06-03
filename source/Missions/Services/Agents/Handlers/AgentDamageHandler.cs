@@ -111,10 +111,8 @@ namespace Missions.Services.Agents.Handlers
 
         private void AgentDamageCheck(MessagePayload<NetworkDamageAgent> payload)
         {
-            if (networkAgentRegistry.TryGetAgent(payload.What.VictimAgentId, out Agent victimAgent) == false) return;
+            
             if (networkAgentRegistry.TryGetAgent(payload.What.AttackerAgentId, out Agent attackingAgent) == false) return;
-
-            if (victimAgent.Health <= 0) return;
 
             var message = payload.What;
 
@@ -134,18 +132,6 @@ namespace Missions.Services.Agents.Handlers
             {
                 victimAgent.RegisterBlow(blow, message.AttackCollisionData);
             }, true);
-
-            if (victimAgent.Health <= 0)
-            {
-                var killedMessage = new NetworkAgentKilled(
-                    payload.What.VictimAgentId,
-                    payload.What.AttackerAgentId,
-                    payload.What.Blow);
-
-                Logger.Verbose($"Sending agent killed for {victimAgent.Name}");
-
-                networkMessageBroker.PublishNetworkEvent(killedMessage);
-            }
         }
 
         private void AgentDamageRecieve(MessagePayload<NetworkAgentDamaged> payload)
