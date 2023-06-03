@@ -10,6 +10,9 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
+/// <summary>
+/// Handles control of mobile party entities.
+/// </summary>
 internal class MobilePartyControlHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;

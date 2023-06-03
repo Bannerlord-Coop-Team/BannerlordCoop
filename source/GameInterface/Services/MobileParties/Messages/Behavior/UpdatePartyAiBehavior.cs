@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties.Messages.Behavior
 {
     /// <summary>
-    /// Updates <seealso cref="MobilePartyAi"/> behavior on the campaign map.
+    /// Updates <see cref="MobilePartyAi"/> behavior on the campaign map.
     /// </summary>
     /// <seealso cref="MobilePartyBehaviorHandler"/>
     public record UpdatePartyAiBehavior : ICommand
