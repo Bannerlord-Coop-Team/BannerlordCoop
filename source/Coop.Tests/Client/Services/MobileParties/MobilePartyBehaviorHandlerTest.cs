@@ -5,7 +5,6 @@ using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Tests.Mocks;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.MobileParties.Messages.Control;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;

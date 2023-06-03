@@ -12,6 +12,15 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
+    /// <summary>
+    /// Handles synchronization of the <see cref="MobilePartyAi"/>'s behavior on the campaign map, which includes
+    /// target positions and entities used for updating movement.
+    /// </summary>
+    /// <remarks>
+    /// Important note: <see cref="MobilePartyAi"/> is also present in player-controlled parties, where it is 
+    /// responsible for pathfinding and movement.
+    /// </remarks>
+    /// <seealso cref="AiBehavior"/>
     internal class MobilePartyBehaviorHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
@@ -27,28 +36,14 @@ namespace GameInterface.Services.MobileParties.Handlers
             this.controlledEntityRegistry = controlledEntityRegistry;
             this.objectManager = objectManager;
 
-            messageBroker.Subscribe<RequestTickInternal>(Handle_RequestTickInternal);
             messageBroker.Subscribe<PartyAiBehaviorChanged>(Handle_PartyAiBehaviorChanged);
             messageBroker.Subscribe<UpdatePartyAiBehavior>(Handle_UpdatePartyAiBehavior);
         }
 
         public void Dispose()
         {
-            messageBroker.Subscribe<RequestTickInternal>(Handle_RequestTickInternal);
             messageBroker.Unsubscribe<PartyAiBehaviorChanged>(Handle_PartyAiBehaviorChanged);
             messageBroker.Unsubscribe<UpdatePartyAiBehavior>(Handle_UpdatePartyAiBehavior);
-        }
-
-        private void Handle_RequestTickInternal(MessagePayload<RequestTickInternal> obj)
-        {
-            MobilePartyAi partyAi = obj.What.PartyAi;
-
-            if (!controlledEntityRegistry.IsOwned(partyAi.GetMobileParty().StringId))
-            {
-                return;
-            }
-
-            DisablePartyDecisionMaking.TickInternalOverride(partyAi);
         }
 
         public void Handle_PartyAiBehaviorChanged(MessagePayload<PartyAiBehaviorChanged> obj)
@@ -68,11 +63,11 @@ namespace GameInterface.Services.MobileParties.Handlers
             var data = obj.What.BehaviorUpdateData;
             IMapEntity targetMapEntity = null;
 
-            if (!objectManager.TryGetObject(data.PartyId, out MobileParty party) ||
-                (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity)))
-            {
+            if (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity)) 
                 return;
-            }
+
+            if (!objectManager.TryGetObject(data.PartyId, out MobileParty party)) 
+                return;
 
             Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
 

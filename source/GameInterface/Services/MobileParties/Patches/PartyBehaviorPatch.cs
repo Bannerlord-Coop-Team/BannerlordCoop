@@ -6,19 +6,27 @@ using Common.Messaging;
 using TaleWorlds.CampaignSystem.Map;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Utils;
+using Common.Extensions;
+using System.Reflection;
+using System;
 
 namespace GameInterface.Services.MobileParties.Patches
 {
+    /// <summary>
+    /// Handles changes in party behavior for the <see cref="MobilePartyAi"/> behavior synchronisation system.
+    /// </summary>
+    /// <seealso cref="MobilePartyBehaviorHandler"/>
     [HarmonyPatch(typeof(MobilePartyAi))]
     static class PartyBehaviorPatch
     {
         public static void SetAiBehavior(
             MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint)
         {
-            ReflectionUtils.InvokePrivateMethod(typeof(MobilePartyAi), "SetShortTermBehavior", partyAi, new object[] { newBehavior, targetMapEntity });
-            ReflectionUtils.SetPrivateField(typeof(MobilePartyAi), "BehaviorTarget", partyAi, targetPoint);
-            ReflectionUtils.InvokePrivateMethod(typeof(MobilePartyAi), "UpdateBehavior", partyAi);
+            SetShortTermBehavior(partyAi, newBehavior, targetMapEntity);
+            SetBehaviorTarget(partyAi, targetPoint);
+            UpdateBehavior(partyAi);
         }
 
         [HarmonyPrefix]
@@ -47,5 +55,17 @@ namespace GameInterface.Services.MobileParties.Patches
 
             return false;
         }
+
+        static readonly Action<MobilePartyAi, AiBehavior, IMapEntity> SetShortTermBehavior = typeof(MobilePartyAi)
+            .GetMethod("SetShortTermBehavior", BindingFlags.Instance | BindingFlags.NonPublic)
+            .BuildDelegate<Action<MobilePartyAi, AiBehavior, IMapEntity>>();
+
+        static readonly Action<MobilePartyAi, Vec2> SetBehaviorTarget = typeof(MobilePartyAi)
+            .GetField("BehaviorTarget", BindingFlags.Instance | BindingFlags.NonPublic)
+            .BuildUntypedSetter<MobilePartyAi, Vec2>();
+
+        static readonly Action<MobilePartyAi> UpdateBehavior = typeof(MobilePartyAi)
+            .GetMethod("UpdateBehavior", BindingFlags.Instance | BindingFlags.NonPublic)
+            .BuildDelegate<Action<MobilePartyAi>>();
     }
 }

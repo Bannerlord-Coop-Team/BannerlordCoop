@@ -6,6 +6,9 @@ using GameInterface.Services.MobileParties.Messages.Control;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers
 {
+    /// <summary>
+    /// Handles changes to control of mobile party entities.
+    /// </summary>
     public class MobilePartyControlHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;

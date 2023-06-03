@@ -8,6 +8,9 @@ using GameInterface.Services.GameState.Messages;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
+    /// <summary>
+    /// Listens to Bannerlord party lifecycle events and relays them to the <see cref="MessageBroker"/> system.
+    /// </summary>
     internal class MobilePartyLifecycleHandler : IHandler
     {
         private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyLifecycleHandler>();

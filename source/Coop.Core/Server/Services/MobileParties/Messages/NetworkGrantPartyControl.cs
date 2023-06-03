@@ -3,6 +3,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.MobileParties.Messages
 {
+    /// <summary>
+    /// Grants a client the control of a mobile party.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkGrantPartyControl : ICommand
     {
