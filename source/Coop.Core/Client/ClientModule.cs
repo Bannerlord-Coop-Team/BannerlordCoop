@@ -9,7 +9,7 @@ namespace Coop.Core.Client
     /// <summary>
     /// Client state DI container
     /// </summary>
-    internal class ClientModule : Module
+    public class ClientModule : Module
     {
         protected override void Load(ContainerBuilder builder)
         {

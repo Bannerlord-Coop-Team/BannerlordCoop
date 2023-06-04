@@ -12,7 +12,7 @@ namespace Common.Messaging
 
         void Respond<T>(object target, T message) where T : IResponse;
 
-        void Subscribe<T>(Action<MessagePayload<T>> subcription);
+        void Subscribe<T>(Action<MessagePayload<T>> subscription);
 
         void Unsubscribe<T>(Action<MessagePayload<T>> subscription);
     }

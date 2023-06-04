@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 namespace Coop.Core.Common;
 
-internal static class HandlerCollector
+public static class HandlerCollector
 {
     public static IEnumerable<Type> Collect<TModule>()
     {
