@@ -79,7 +79,7 @@ namespace Missions.Services.Agents.Handlers
                 return;
             };
 
-            Logger.Debug("Damage Check Sent to " + payload.What.VictimAgent.Name + " for: " + payload.What.Blow.InflictedDamage);
+            Logger.Debug("Damage Check Sent to " + victimId + " for: " + payload.What.Blow.InflictedDamage);
 
             // Handles friend fire event
             if (networkAgentRegistry.IsControlled(victimId))
@@ -123,6 +123,8 @@ namespace Missions.Services.Agents.Handlers
                 payload.What.VictimAgentId,
                 payload.What.AttackCollisionData,
                 payload.What.Blow);
+
+            Logger.Debug("Damage Check Sent to " + payload.What.VictimAgentId + " for: " + payload.What.Blow.InflictedDamage);
 
             networkMessageBroker.PublishNetworkEvent(damageMessage);
 
@@ -210,7 +212,7 @@ namespace Missions.Services.Agents.Handlers
             // extract the collision data
             AttackCollisionData collisionData = agentDamaData.AttackCollisionData;
 
-            Logger.Information("Damage recieved to " + effectedAgent.Name + " for: " + blow.InflictedDamage);
+            Logger.Information("Damage recieved to " + agentDamaData.VictimAgentId + " for: " + blow.InflictedDamage);
 
             // register a blow on the effected agent
             RegisterBlowPatch.RunOriginalRegisterBlow(effectedAgent, blow, collisionData);
