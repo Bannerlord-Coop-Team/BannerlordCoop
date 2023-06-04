@@ -15,7 +15,11 @@ namespace GameInterface.Services.Hideouts.Patches
         [HarmonyPatch(nameof(Hideout.IsSpotted), MethodType.Setter)]
         private static bool DisableIsSpotted(ref Hideout __instance)
         {
-            __instance.Owner.Settlement.IsVisible = false;
+            if (__instance?.Owner?.Settlement != null)
+            {
+                __instance.Owner.Settlement.IsVisible = false;
+            }
+            
             return false;
         }
     }
