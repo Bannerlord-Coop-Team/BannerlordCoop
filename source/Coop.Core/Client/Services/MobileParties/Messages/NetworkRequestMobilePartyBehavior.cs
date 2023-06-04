@@ -8,12 +8,12 @@ namespace Coop.Core.Client.Services.MobileParties.Messages
     /// Requests change of party behavior on the campaign map.
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record NetworkRequestMobilePartyAiBehavior : ICommand
+    public record NetworkRequestMobilePartyBehavior : ICommand
     {
         [ProtoMember(1)]
-        public AiBehaviorUpdateData BehaviorUpdateData { get; }
+        public PartyBehaviorUpdateData BehaviorUpdateData { get; }
 
-        public NetworkRequestMobilePartyAiBehavior(AiBehaviorUpdateData data)
+        public NetworkRequestMobilePartyBehavior(PartyBehaviorUpdateData data)
         {
             BehaviorUpdateData = data;
         }

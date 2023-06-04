@@ -20,24 +20,24 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<ControlledPartyAiBehaviorUpdated>(Handle);
-            messageBroker.Subscribe<NetworkUpdatePartyAiBehavior>(Handle);
+            messageBroker.Subscribe<ControlledPartyBehaviorUpdated>(Handle);
+            messageBroker.Subscribe<NetworkUpdatePartyBehavior>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<ControlledPartyAiBehaviorUpdated>(Handle);
-            messageBroker.Unsubscribe<NetworkUpdatePartyAiBehavior>(Handle);
+            messageBroker.Unsubscribe<ControlledPartyBehaviorUpdated>(Handle);
+            messageBroker.Unsubscribe<NetworkUpdatePartyBehavior>(Handle);
         }
 
-        internal void Handle(MessagePayload<ControlledPartyAiBehaviorUpdated> obj)
+        internal void Handle(MessagePayload<ControlledPartyBehaviorUpdated> obj)
         {
-            network.SendAll(new NetworkRequestMobilePartyAiBehavior(obj.What.BehaviorUpdateData));
+            network.SendAll(new NetworkRequestMobilePartyBehavior(obj.What.BehaviorUpdateData));
         }
 
-        internal void Handle(MessagePayload<NetworkUpdatePartyAiBehavior> obj)
+        internal void Handle(MessagePayload<NetworkUpdatePartyBehavior> obj)
         {
-            messageBroker.Publish(this, new UpdatePartyAiBehavior(obj.What.BehaviorUpdateData));
+            messageBroker.Publish(this, new UpdatePartyBehavior(obj.What.BehaviorUpdateData));
         }
     }
 }

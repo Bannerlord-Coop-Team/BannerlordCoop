@@ -47,9 +47,9 @@ namespace Coop.Tests.Client.Services.MobileParties
         public void ControlledPartyAiBehaviorUpdated_Publishes_NetworkRequestMobilePartyAiBehavior() 
         {
             // Arrange
-            var data = new AiBehaviorUpdateData("party", AiBehavior.GoToPoint, false, string.Empty, new Vec2(1, 2));
-            var payload = new ControlledPartyAiBehaviorUpdated(data);
-            var message = new MessagePayload<ControlledPartyAiBehaviorUpdated>(null, payload);
+            var data = new PartyBehaviorUpdateData("party", AiBehavior.GoToPoint, false, string.Empty, new Vec2(1, 2));
+            var payload = new ControlledPartyBehaviorUpdated(data);
+            var message = new MessagePayload<ControlledPartyBehaviorUpdated>(null, payload);
 
             var peer = network.CreatePeer();
 
@@ -59,9 +59,9 @@ namespace Coop.Tests.Client.Services.MobileParties
             // Assert
             var sentMessages = network.GetPeerMessages(peer);
             Assert.Single(sentMessages);
-            Assert.IsType<NetworkRequestMobilePartyAiBehavior>(sentMessages.First());
+            Assert.IsType<NetworkRequestMobilePartyBehavior>(sentMessages.First());
 
-            var networkRequestTimeSpeedChange = (NetworkRequestMobilePartyAiBehavior)sentMessages.First();
+            var networkRequestTimeSpeedChange = (NetworkRequestMobilePartyBehavior)sentMessages.First();
             Assert.Equal(message.What.BehaviorUpdateData, networkRequestTimeSpeedChange.BehaviorUpdateData);
         }
 
@@ -69,16 +69,16 @@ namespace Coop.Tests.Client.Services.MobileParties
         public void NetworkUpdatePartyAiBehavior_Publishes_UpdatePartyAiBehavior()
         {
             // Arrange
-            var data = new AiBehaviorUpdateData("party", AiBehavior.GoToPoint, false, string.Empty, new Vec2(1, 2));
-            var payload = new NetworkUpdatePartyAiBehavior(data);
-            var message = new MessagePayload<NetworkUpdatePartyAiBehavior>(null, payload);
+            var data = new PartyBehaviorUpdateData("party", AiBehavior.GoToPoint, false, string.Empty, new Vec2(1, 2));
+            var payload = new NetworkUpdatePartyBehavior(data);
+            var message = new MessagePayload<NetworkUpdatePartyBehavior>(null, payload);
 
             // Act
             handler.Handle(message);
 
             // Assert
             var updateBehaviorMessage = Assert.Single(broker.PublishedMessages);
-            var updatePartyAiBehavior = Assert.IsType<UpdatePartyAiBehavior>(updateBehaviorMessage);
+            var updatePartyAiBehavior = Assert.IsType<UpdatePartyBehavior>(updateBehaviorMessage);
             Assert.Equal(payload.BehaviorUpdateData, updatePartyAiBehavior.BehaviorUpdateData);
         }
     }

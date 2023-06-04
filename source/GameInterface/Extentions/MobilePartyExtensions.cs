@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GameInterface.Extentions;
+using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -12,5 +13,8 @@ namespace Coop.Mod.Extentions
         {
             MobileParty_partyComponent.SetValue(party, component);
         }
+
+        /// <inheritdoc cref="MobilePartyAiExtensions.IsControlled"/>
+        public static bool IsControlled(this MobileParty party) => party.Ai.IsControlled();
     }
 }

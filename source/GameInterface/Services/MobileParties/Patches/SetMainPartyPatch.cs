@@ -6,6 +6,10 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches
 {
+    /// <summary>
+    /// Publishes an event when a new main party is set.
+    /// Used to request control of the party.
+    /// </summary>
     [HarmonyPatch(typeof(Campaign), nameof(Campaign.MainParty), MethodType.Setter)]
     internal class SetMainPartyPatch
     {
