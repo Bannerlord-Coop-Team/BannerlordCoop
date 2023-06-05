@@ -16,9 +16,7 @@ internal class MainPartyInterface : IMainPartyInterface
         {
             if(MobileParty.MainParty != null)
             {
-                // TODO see if remove works again
-                MobileParty.MainParty.IsActive = false;
-                MobileParty.MainParty.IsVisible = false;
+                MobileParty.MainParty.RemoveParty();
             }
             
         }, bBlocking: false);
