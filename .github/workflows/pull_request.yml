@@ -1,19 +1,16 @@
-name: Build
+name: Build and Test
 
-on: 
+on:
   pull_request:
     types:
       [opened, synchronize]
     
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     
     container:
-      image: hulkhan/bannerlordcoop:1.0.2
-      credentials:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      image: garrettluskey/bannerlordcoop:v1.1.4
       
     steps:
       - name: Checkout Repo
@@ -31,7 +28,7 @@ jobs:
         run: |
           cd BannerlordCoop/source
           dotnet build Coop.Core -c Release
-          
+      
       - name: Run Unit Tests
         run: |
           cd BannerlordCoop/source

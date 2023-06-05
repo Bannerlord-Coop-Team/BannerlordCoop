@@ -1,4 +1,4 @@
-name: Build
+name: Build and Test
 
 on: 
   push:
@@ -9,10 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     
     container:
-      image: hulkhan/bannerlordcoop:1.0.2
-      credentials:
-        username: ${{ secrets.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      image: garrettluskey/bannerlordcoop:v1.1.4
       
     steps:
       - name: Checkout Repo
