@@ -3,7 +3,6 @@ using GameInterface.Extentions;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.MobileParties.Messages.Control;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Map;
@@ -14,7 +13,7 @@ namespace GameInterface.Services.MobileParties.Handlers
 {
     /// <summary>
     /// Handles synchronization of the <see cref="MobilePartyAi"/>'s behavior on the campaign map, which includes
-    /// target positions and entities used for updating movement.
+    /// target positions and target entities used for updating movement.
     /// </summary>
     /// <remarks>
     /// Important note: <see cref="MobilePartyAi"/> is also present in player-controlled parties, where it is 
@@ -36,29 +35,29 @@ namespace GameInterface.Services.MobileParties.Handlers
             this.controlledEntityRegistry = controlledEntityRegistry;
             this.objectManager = objectManager;
 
-            messageBroker.Subscribe<PartyAiBehaviorChanged>(Handle_PartyAiBehaviorChanged);
-            messageBroker.Subscribe<UpdatePartyAiBehavior>(Handle_UpdatePartyAiBehavior);
+            messageBroker.Subscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
+            messageBroker.Subscribe<UpdatePartyBehavior>(Handle_UpdatePartyBehavior);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<PartyAiBehaviorChanged>(Handle_PartyAiBehaviorChanged);
-            messageBroker.Unsubscribe<UpdatePartyAiBehavior>(Handle_UpdatePartyAiBehavior);
+            messageBroker.Unsubscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
+            messageBroker.Unsubscribe<UpdatePartyBehavior>(Handle_UpdatePartyBehavior);
         }
 
-        public void Handle_PartyAiBehaviorChanged(MessagePayload<PartyAiBehaviorChanged> obj)
+        public void Handle_PartyBehaviorChanged(MessagePayload<PartyBehaviorChangeAttempted> obj)
         {
             MobileParty party = obj.What.Party;
 
             if (controlledEntityRegistry.IsOwned(party.StringId) == false)
                 return;
 
-            AiBehaviorUpdateData data = obj.What.BehaviorUpdateData;
+            PartyBehaviorUpdateData data = obj.What.BehaviorUpdateData;
 
-            messageBroker.Publish(this, new ControlledPartyAiBehaviorUpdated(data));
+            messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
         }
 
-        public void Handle_UpdatePartyAiBehavior(MessagePayload<UpdatePartyAiBehavior> obj)
+        public void Handle_UpdatePartyBehavior(MessagePayload<UpdatePartyBehavior> obj)
         {
             var data = obj.What.BehaviorUpdateData;
             IMapEntity targetMapEntity = null;

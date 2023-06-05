@@ -6,15 +6,15 @@ using GameInterface.Services.MobileParties.Handlers;
 namespace GameInterface.Services.MobileParties.Messages.Behavior
 {
     /// <summary>
-    /// Indicates an internal request to change <see cref="MobilePartyAi"/> behavior.
+    /// The game has attempted to change party behavior.
     /// </summary>
     /// <seealso cref="MobilePartyBehaviorHandler"/>
-    internal record PartyAiBehaviorChanged : IEvent
+    internal record PartyBehaviorChangeAttempted : IEvent
     {
         public MobileParty Party { get; }
-        public AiBehaviorUpdateData BehaviorUpdateData { get; }
+        public PartyBehaviorUpdateData BehaviorUpdateData { get; }
 
-        public PartyAiBehaviorChanged(MobileParty party, AiBehaviorUpdateData behaviorUpdateData)
+        public PartyBehaviorChangeAttempted(MobileParty party, PartyBehaviorUpdateData behaviorUpdateData)
         {
             Party = party;
             BehaviorUpdateData = behaviorUpdateData;

@@ -10,7 +10,7 @@ namespace GameInterface.Services.MobileParties.Data
     /// </summary>
     /// <seealso cref="MobilePartyBehaviorHandler"/>
     [ProtoContract(SkipConstructor = true)]
-    public record AiBehaviorUpdateData
+    public record PartyBehaviorUpdateData
     {
         [ProtoMember(1)]
         public string PartyId { get; }
@@ -30,7 +30,7 @@ namespace GameInterface.Services.MobileParties.Data
         [ProtoMember(6)]
         public float TargetPointY { get; }
 
-        public AiBehaviorUpdateData(string partyId, AiBehavior aiBehavior, bool hasTarget, string targetId, Vec2 targetPoint)
+        public PartyBehaviorUpdateData(string partyId, AiBehavior aiBehavior, bool hasTarget, string targetId, Vec2 targetPoint)
         {
             PartyId = partyId;
             Behavior = aiBehavior;

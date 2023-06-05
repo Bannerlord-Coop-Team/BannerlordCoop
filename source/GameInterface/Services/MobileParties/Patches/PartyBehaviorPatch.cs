@@ -50,8 +50,8 @@ namespace GameInterface.Services.MobileParties.Patches
                     : targetPartyFigure.MobileParty.StringId;
             }
 
-            var data = new AiBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint);
-            MessageBroker.Instance.Publish(__instance, new PartyAiBehaviorChanged(party, data));
+            var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint);
+            MessageBroker.Instance.Publish(__instance, new PartyBehaviorChangeAttempted(party, data));
 
             return false;
         }

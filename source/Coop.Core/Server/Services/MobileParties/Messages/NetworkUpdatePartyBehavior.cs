@@ -8,12 +8,12 @@ namespace Coop.Core.Server.Services.MobileParties.Messages
     /// Commands the update of a party's behavior on the campaign map.
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record NetworkUpdatePartyAiBehavior : ICommand
+    public record NetworkUpdatePartyBehavior : ICommand
     {
         [ProtoMember(1)]
-        public AiBehaviorUpdateData BehaviorUpdateData { get; }
+        public PartyBehaviorUpdateData BehaviorUpdateData { get; }
 
-        public NetworkUpdatePartyAiBehavior(AiBehaviorUpdateData data)
+        public NetworkUpdatePartyBehavior(PartyBehaviorUpdateData data)
         {
             BehaviorUpdateData = data;
         }

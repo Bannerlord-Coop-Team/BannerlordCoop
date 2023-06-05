@@ -2,29 +2,28 @@
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Utils;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.MobileParties.Messages.Control;
 
 namespace Coop.IntegrationTests.MobileParties;
 
-public class AiBehaviorTest
+public class PartyBehaviorTest
 {
     internal TestEnvironment TestEnvironment { get; }
 
-    public AiBehaviorTest()
+    public PartyBehaviorTest()
     {
         // Creates a test environment with 1 server and 2 clients by default
         TestEnvironment = new TestEnvironment();
     }
 
     /// <summary>
-    /// Verify sending ControlledPartyAiBehaviorUpdated on one client
-    /// Triggers UpdatePartyAiBehavior on all other clients
+    /// Verify sending ControlledPartyBehaviorUpdated on one client
+    /// Triggers UpdatePartyBehavior on all other clients
     /// </summary>
     [Fact]
-    public void ControlledPartyAiBehaviorUpdated_Publishes_AllClients()
+    public void ControlledPartyBehaviorUpdated_Publishes_AllClients()
     {
         // Arrange
-        var message = ObjectHelper.SkipConstructor<ControlledPartyAiBehaviorUpdated>();
+        var message = ObjectHelper.SkipConstructor<ControlledPartyBehaviorUpdated>();
 
         var client1 = TestEnvironment.Clients.First();
 
@@ -34,7 +33,7 @@ public class AiBehaviorTest
         // Assert
         foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
         {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<UpdatePartyAiBehavior>());
+            Assert.Equal(1, client.InternalMessages.GetMessageCount<UpdatePartyBehavior>());
         }
     }
 }

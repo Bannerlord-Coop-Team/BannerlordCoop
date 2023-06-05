@@ -6,16 +6,17 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties.Messages.Behavior
 {
     /// <summary>
-    /// Represent an update in the <see cref="MobilePartyAi"/> behavior of a controlled party.
+    /// Updates <see cref="MobilePartyAi"/> behavior on the campaign map.
     /// </summary>
     /// <seealso cref="MobilePartyBehaviorHandler"/>
-    public record ControlledPartyAiBehaviorUpdated : IEvent
+    public record UpdatePartyBehavior : ICommand
     {
-        public AiBehaviorUpdateData BehaviorUpdateData { get; }
+        public PartyBehaviorUpdateData BehaviorUpdateData { get; }
 
-        public ControlledPartyAiBehaviorUpdated(AiBehaviorUpdateData behaviorUpdateData)
+        public UpdatePartyBehavior(PartyBehaviorUpdateData behaviorUpdateData)
         {
             BehaviorUpdateData = behaviorUpdateData;
         }
     }
+
 }

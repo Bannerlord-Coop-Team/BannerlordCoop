@@ -11,10 +11,10 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties.Patches;
 
 /// <summary>
-/// Disables decision making for parties that are not controlled locally.
+/// Prevents decision making for remotely controlled parties.
 /// </summary>
 [HarmonyPatch(typeof(MobilePartyAi))]
-static class DisablePartyDecisionMaking
+static class PartyDecisionMakingPatch
 {
     [HarmonyPrefix]
     [HarmonyPatch(nameof(MobilePartyAi.DoNotMakeNewDecisions), MethodType.Getter)]
@@ -34,13 +34,8 @@ static class DisablePartyDecisionMaking
     [HarmonyPatch("TickInternal")]
     static bool PrefixTickInternal(ref MobilePartyAi __instance)
     {
-        // Allow tick for client main parties
-        if (__instance.GetMobileParty().IsMainParty)
-            return true;
-
-        // Allow tick on server if not a player party
-        // DoNotMakeNewDecisions is always true on clients
-        if (__instance.DoNotMakeNewDecisions == false)
+        // Allow tick for controlled parties.
+        if (__instance.IsControlled())
             return true;
 
         return false;
