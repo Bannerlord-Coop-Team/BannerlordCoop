@@ -1,12 +1,12 @@
 name: Build and Test
 
-on: 
+on:
   pull_request:
     types:
       [opened, synchronize]
     
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     
     container:
@@ -28,7 +28,7 @@ jobs:
         run: |
           cd BannerlordCoop/source
           dotnet build Coop.Core -c Release
-          
+      
       - name: Run Unit Tests
         run: |
           cd BannerlordCoop/source
