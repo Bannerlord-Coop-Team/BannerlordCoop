@@ -18,6 +18,7 @@ $TemplateDir            = "${BaseDirWithoutQuotes}template"
 $UIMovieDir             = "${BaseDirWithoutQuotes}UIMovies"
 
 # create output directory structure
+Remove-Item $DeployDir -Recurse
 New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
 
 # read config

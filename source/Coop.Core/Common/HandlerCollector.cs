@@ -1,5 +1,6 @@
 ﻿using Common.Extensions;
 using Common.Messaging;
+using Common.PacketHandlers;
 using System;
 using System.Collections.Generic;
 
@@ -15,7 +16,8 @@ public static class HandlerCollector
 
         foreach (Type t in AppDomain.CurrentDomain.GetDomainTypes(namespacePrefix))
         {
-            if (t.GetInterface(nameof(IHandler)) == null) continue;
+            if (t.GetInterface(nameof(IHandler)) == null &&
+                t.GetInterface(nameof(IPacketHandler)) == null) continue;
 
             types.Add(t);
         }

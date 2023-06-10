@@ -2,6 +2,6 @@
 
 namespace GameInterface.Services.GameState.Messages;
 
-public record CampaignLoaded : IEvent
+public record CampaignReady : IEvent
 {
 }

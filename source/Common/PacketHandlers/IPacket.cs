@@ -11,6 +11,9 @@ namespace Common.PacketHandlers
         Test,
         Hero,
         Movement,
+        RequestMobilePartyBehavior,
+        UpdatePartyBehavior,
+
     }
 
     public interface IPacket

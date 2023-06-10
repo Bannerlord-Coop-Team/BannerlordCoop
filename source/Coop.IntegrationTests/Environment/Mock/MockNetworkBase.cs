@@ -9,13 +9,13 @@ namespace Coop.IntegrationTests.Environment.Mock;
 internal abstract class MockNetworkBase : INetwork
 {
     private readonly TestNetworkRouter networkOrchestrator;
-
+    private readonly IPacketManager packetManager;
     public static int InstanceCount = 0;
 
-    public MockNetworkBase(TestNetworkRouter networkOrchestrator)
+    public MockNetworkBase(TestNetworkRouter networkOrchestrator, IPacketManager packetManager)
     {
         this.networkOrchestrator = networkOrchestrator;
-
+        this.packetManager = packetManager;
         InstanceCount = Interlocked.Increment(ref InstanceCount);
 
         NetPeer = NetPeerExtensions.CreatePeer(InstanceCount);
@@ -28,10 +28,15 @@ internal abstract class MockNetworkBase : INetwork
     public NetPeer NetPeer { get; } = NetPeerExtensions.CreatePeer();
 
     public MessageCollection NetworkSentMessages { get; } = new MessageCollection();
+    public PacketCollection NetworkSentPackets { get; } = new PacketCollection();
+
+    public void ReceiveFromNetwork(NetPeer peer, IPacket packet) => packetManager.HandleRecieve(peer, packet);
 
     public void Send(NetPeer netPeer, IPacket packet)
     {
-        throw new NotImplementedException();
+        NetworkSentPackets.Add(packet);
+
+        networkOrchestrator.Send(NetPeer, netPeer, packet);
     }
 
     public void Send(NetPeer netPeer, IMessage message)
@@ -43,7 +48,9 @@ internal abstract class MockNetworkBase : INetwork
 
     public void SendAll(IPacket packet)
     {
-        throw new NotImplementedException();
+        NetworkSentPackets.Add(packet);
+
+        networkOrchestrator.SendAll(NetPeer, packet);
     }
 
     public void SendAll(IMessage message)
@@ -55,7 +62,9 @@ internal abstract class MockNetworkBase : INetwork
 
     public void SendAllBut(NetPeer excludedPeer, IPacket packet)
     {
-        throw new NotImplementedException();
+        NetworkSentPackets.Add(packet);
+
+        networkOrchestrator.SendAllBut(NetPeer, excludedPeer, packet);
     }
 
     public void SendAllBut(NetPeer excludedPeer, IMessage message)

@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Server.Services.MobileParties.Messages;
+using Coop.Core.Server.Services.MobileParties.Packets;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers
@@ -21,23 +20,16 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
             messageBroker.Subscribe<ControlledPartyBehaviorUpdated>(Handle);
-            messageBroker.Subscribe<NetworkUpdatePartyBehavior>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<ControlledPartyBehaviorUpdated>(Handle);
-            messageBroker.Unsubscribe<NetworkUpdatePartyBehavior>(Handle);
         }
 
         internal void Handle(MessagePayload<ControlledPartyBehaviorUpdated> obj)
         {
-            network.SendAll(new NetworkRequestMobilePartyBehavior(obj.What.BehaviorUpdateData));
-        }
-
-        internal void Handle(MessagePayload<NetworkUpdatePartyBehavior> obj)
-        {
-            messageBroker.Publish(this, new UpdatePartyBehavior(obj.What.BehaviorUpdateData));
+            network.SendAll(new RequestMobilePartyBehaviorPacket(obj.What.BehaviorUpdateData));
         }
     }
 }

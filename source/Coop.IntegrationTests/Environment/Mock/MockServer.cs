@@ -1,4 +1,5 @@
-﻿using Coop.Core.Server;
+﻿using Common.PacketHandlers;
+using Coop.Core.Server;
 using LiteNetLib;
 using System.Net;
 using System.Net.Sockets;
@@ -7,7 +8,8 @@ namespace Coop.IntegrationTests.Environment.Mock;
 
 internal class MockServer : MockNetworkBase, ICoopServer
 {
-    public MockServer(TestNetworkRouter networkOrchestrator) : base(networkOrchestrator)
+    public MockServer(TestNetworkRouter networkOrchestrator, IPacketManager packetManager) : 
+        base(networkOrchestrator, packetManager)
     {
     }
 

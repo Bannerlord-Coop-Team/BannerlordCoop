@@ -11,6 +11,7 @@ using GameInterface.Utils;
 using Common.Extensions;
 using System.Reflection;
 using System;
+using Common.Logging;
 
 namespace GameInterface.Services.MobileParties.Patches
 {
@@ -51,7 +52,8 @@ namespace GameInterface.Services.MobileParties.Patches
             }
 
             var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint);
-            MessageBroker.Instance.Publish(__instance, new PartyBehaviorChangeAttempted(party, data));
+            var message = new PartyBehaviorChangeAttempted(party, data);
+            MessageBroker.Instance.Publish(__instance, message);
 
             return false;
         }

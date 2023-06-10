@@ -29,7 +29,7 @@ namespace Coop.Core.Server.Services.Save.Handlers
             messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
             messageBroker.Subscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
             messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
-            messageBroker.Subscribe<CampaignLoaded>(Handle_CampaignLoaded);
+            messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
 
             messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
             messageBroker.Subscribe<ExistingObjectGuidsLoaded>(Handle_ExistingObjectGuidsLoaded);
@@ -42,7 +42,7 @@ namespace Coop.Core.Server.Services.Save.Handlers
             messageBroker.Unsubscribe<GameSaved>(Handle_GameSaved);
             messageBroker.Unsubscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
             messageBroker.Unsubscribe<GameLoaded>(Handle_GameLoaded);
-            messageBroker.Unsubscribe<CampaignLoaded>(Handle_CampaignLoaded);
+            messageBroker.Unsubscribe<CampaignReady>(Handle_CampaignLoaded);
 
             messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
             messageBroker.Unsubscribe<ExistingObjectGuidsLoaded>(Handle_ExistingObjectGuidsLoaded);
@@ -73,7 +73,7 @@ namespace Coop.Core.Server.Services.Save.Handlers
             savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
         }
 
-        private void Handle_CampaignLoaded(MessagePayload<CampaignLoaded> obj)
+        private void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
         {
             if (savedSession == null)
             {
