@@ -6,7 +6,7 @@ namespace GameInterface.Services.VillageService.Patches;
 /// <summary>
 /// Disables all functionality for Town
 /// </summary>
-[HarmonyPatch(typeof(Town))]
+[HarmonyPatch(typeof(Village))]
 internal class VillagePatches
 {
     [HarmonyPatch("DailyTick")]
