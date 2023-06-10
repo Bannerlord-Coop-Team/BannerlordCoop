@@ -5,6 +5,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Client.Services.MobileParties.Packets
 {
+    /// <summary>
+    /// Packet containing data to update party behavior
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record UpdatePartyBehaviorPacket : IPacket
     {

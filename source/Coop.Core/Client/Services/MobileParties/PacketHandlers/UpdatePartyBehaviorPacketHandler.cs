@@ -7,6 +7,9 @@ using LiteNetLib;
 
 namespace Coop.Core.Client.Services.MobileParties.PacketHandlers
 {
+    /// <summary>
+    /// Handles incoming <see cref="UpdatePartyBehaviorPacket"/> from server to client
+    /// </summary>
     internal class UpdatePartyBehaviorPacketHandler : IPacketHandler
     {
         public PacketType PacketType => PacketType.UpdatePartyBehavior;

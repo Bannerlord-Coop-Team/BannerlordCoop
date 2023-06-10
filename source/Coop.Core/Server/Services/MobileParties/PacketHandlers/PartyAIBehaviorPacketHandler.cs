@@ -8,6 +8,9 @@ using LiteNetLib;
 
 namespace Coop.Core.Server.Services.MobileParties.PacketHandlers
 {
+    /// <summary>
+    /// Handles incoming <see cref="RequestMobilePartyBehaviorPacket"/>
+    /// </summary>
     internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
     {
         public PacketType PacketType => PacketType.RequestMobilePartyBehavior;

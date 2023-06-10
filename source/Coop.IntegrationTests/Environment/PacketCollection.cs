@@ -3,6 +3,9 @@ using Common.PacketHandlers;
 
 namespace Coop.IntegrationTests.Environment;
 
+/// <summary>
+/// Collection of <see cref="IPacket"/>s
+/// </summary>
 internal class PacketCollection
 {
     public readonly List<IPacket> Packets = new List<IPacket>();
