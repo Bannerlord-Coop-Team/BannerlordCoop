@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.PacketHandlers;
 using Coop.IntegrationTests.Environment.Instance;
 using LiteNetLib;
 
@@ -9,7 +10,7 @@ namespace Coop.IntegrationTests.Environment;
 /// </summary>
 internal class TestNetworkRouter
 {
-    private ServerInstance? Server;
+    private ServerInstance Server;
     private List<ClientInstance> Clients = new List<ClientInstance>();
     public void AddServer(ServerInstance instance)
     {
@@ -62,6 +63,50 @@ internal class TestNetworkRouter
         {
             if (ignored == Server.NetPeer) return;
             Server.SendMessageInternal(sender, message);
+        }
+    }
+
+    public void Send(NetPeer sender, NetPeer receiver, IPacket message)
+    {
+        if (receiver == Server.NetPeer)
+        {
+            Server.SendPacketInternal(sender, message);
+        }
+        else
+        {
+            var receivingClient = Clients.Single(client => client.NetPeer == receiver);
+
+            receivingClient.SendPacketInternal(sender, message);
+        }
+    }
+    public void SendAll(NetPeer sender, IPacket message)
+    {
+        if (sender == Server.NetPeer)
+        {
+            foreach (var client in Clients)
+            {
+                client.SendPacketInternal(sender, message);
+            }
+        }
+        else
+        {
+            Server.SendPacketInternal(sender, message);
+        }
+    }
+
+    public void SendAllBut(NetPeer sender, NetPeer ignored, IPacket message)
+    {
+        if (sender == Server.NetPeer)
+        {
+            foreach (var client in Clients.Where(c => c.NetPeer != ignored))
+            {
+                client.SendPacketInternal(sender, message);
+            }
+        }
+        else
+        {
+            if (ignored == Server.NetPeer) return;
+            Server.SendPacketInternal(sender, message);
         }
     }
 }

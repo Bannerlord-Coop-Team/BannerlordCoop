@@ -4,6 +4,11 @@ using System;
 
 namespace Coop.Core.Server.Connections.Messages
 {
+    /// <summary>
+    /// Message from Client to Server for validating the client
+    /// Responsibilities
+    /// 1. Associate client with existing hero
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkClientValidate : ICommand
     {

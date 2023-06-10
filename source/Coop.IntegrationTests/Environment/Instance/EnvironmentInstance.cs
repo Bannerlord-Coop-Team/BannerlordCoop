@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Common.PacketHandlers;
 using Coop.IntegrationTests.Environment.Mock;
 using LiteNetLib;
 
@@ -25,5 +26,10 @@ internal abstract class EnvironmentInstance
     public void SendMessageInternal(object source, IMessage message)
     {
         messageBroker.Publish(source, message);
+    }
+
+    public void SendPacketInternal(NetPeer source, IPacket packet)
+    {
+        mockNetwork.ReceiveFromNetwork(source, packet);
     }
 }

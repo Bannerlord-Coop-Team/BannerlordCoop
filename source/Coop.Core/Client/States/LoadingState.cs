@@ -10,13 +10,13 @@ public class LoadingState : ClientStateBase
 {
     public LoadingState(IClientLogic logic) : base(logic)
     {
-        Logic.MessageBroker.Subscribe<CampaignLoaded>(Handle_CampaignLoaded);
+        Logic.MessageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
         Logic.MessageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     public override void Dispose()
     {
-        Logic.MessageBroker.Unsubscribe<CampaignLoaded>(Handle_CampaignLoaded);
+        Logic.MessageBroker.Unsubscribe<CampaignReady>(Handle_CampaignLoaded);
         Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
@@ -30,7 +30,7 @@ public class LoadingState : ClientStateBase
         Logic.State = new MainMenuState(Logic);
     }
 
-    internal void Handle_CampaignLoaded(MessagePayload<CampaignLoaded> obj)
+    internal void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
     {
         Logic.EnterCampaignState();
     }

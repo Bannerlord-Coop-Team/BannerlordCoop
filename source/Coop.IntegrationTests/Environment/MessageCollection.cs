@@ -2,6 +2,9 @@
 
 namespace Coop.IntegrationTests.Environment;
 
+/// <summary>
+/// Collection of <see cref="IMessage"/>s
+/// </summary>
 internal class MessageCollection
 {
     public readonly List<IMessage> Messages = new List<IMessage>();

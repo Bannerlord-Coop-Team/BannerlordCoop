@@ -69,8 +69,8 @@ namespace Coop.Tests.Client.States
             var loadingState = new LoadingState(clientLogic);
             clientLogic.State = loadingState;
 
-            var payload = new MessagePayload<CampaignLoaded>(
-                this, new CampaignLoaded());
+            var payload = new MessagePayload<CampaignReady>(
+                this, new CampaignReady());
 
             // Act
             loadingState.Handle_CampaignLoaded(payload);

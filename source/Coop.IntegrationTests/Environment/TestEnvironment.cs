@@ -7,6 +7,7 @@ using Coop.IntegrationTests.Environment.Mock;
 using Microsoft.Extensions.DependencyInjection;
 using Coop.Core.Server.Services.Save;
 using Coop.IntegrationTests.Environment.Instance;
+using Common.PacketHandlers;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -35,7 +36,7 @@ internal class TestEnvironment
     public IEnumerable<EnvironmentInstance> Clients { get; }
     public EnvironmentInstance Server { get; }
 
-    private List<IHandler> _handlers = new List<IHandler>();
+    private List<object> _handlers = new List<object>();
 
     private TestNetworkRouter networkOrchestrator = new TestNetworkRouter();
 
@@ -53,7 +54,8 @@ internal class TestEnvironment
         serviceCollection.AddScoped<INetwork, MockClient>(x => x.GetService<MockClient>()!);
         serviceCollection.AddScoped<ICoopClient, MockClient>(x => x.GetService<MockClient>()!);
         serviceCollection.AddScoped<IMessageBroker, TestMessageBroker>();
-        
+        serviceCollection.AddScoped<IPacketManager, PacketManager>();
+
         serviceCollection.AddScoped<ClientInstance>();
         serviceCollection.AddSingleton(networkOrchestrator);
 
@@ -61,7 +63,7 @@ internal class TestEnvironment
 
         foreach (var handlerType in handlerTypes)
         {
-            _handlers.Add((IHandler)serviceProvider.GetService(handlerType)!);
+            _handlers.Add(serviceProvider.GetService(handlerType)!);
         }
 
         var instance = serviceProvider.GetService<ClientInstance>()!;
@@ -85,6 +87,7 @@ internal class TestEnvironment
         serviceCollection.AddScoped<INetwork, MockServer>(x => x.GetService<MockServer>()!);
         serviceCollection.AddScoped<ICoopServer, MockServer>(x => x.GetService<MockServer>()!);
         serviceCollection.AddScoped<IMessageBroker, TestMessageBroker>();
+        serviceCollection.AddScoped<IPacketManager, PacketManager>();
         serviceCollection.AddScoped<ICoopSaveManager, CoopSaveManager>();
         serviceCollection.AddScoped<ServerInstance>();
         serviceCollection.AddSingleton(networkOrchestrator);
@@ -93,7 +96,7 @@ internal class TestEnvironment
 
         foreach (var handlerType in handlerTypes)
         {
-            _handlers.Add((IHandler)serviceProvider.GetService(handlerType)!);
+            _handlers.Add(serviceProvider.GetService(handlerType)!);
         }
 
         var instance = serviceProvider.GetService<ServerInstance>()!;
