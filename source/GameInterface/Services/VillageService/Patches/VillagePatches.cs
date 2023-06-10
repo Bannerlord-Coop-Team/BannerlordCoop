@@ -1,7 +1,4 @@
 ﻿using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.VillageService.Patches;
