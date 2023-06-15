@@ -64,12 +64,7 @@ public class ValidateModuleState : ClientStateBase
 
     public override void LoadSavedData()
     {
-#if DEBUG
-        Logic.MessageBroker.Publish(this, new LoadDebugGame());
-        Logic.State = new LoadingState(Logic);
-#else
         Logic.State = new ReceivingSavedDataState(Logic);
-#endif
     }
 
     public override void Connect()

@@ -73,7 +73,7 @@ namespace Coop
         {
             if (System.Diagnostics.Debugger.IsAttached)
             {
-                var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}";
+                var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
 
                 var filePostfix = isServer ? "server" : "client";
                 var filePath = $"Coop_{filePostfix}.log";

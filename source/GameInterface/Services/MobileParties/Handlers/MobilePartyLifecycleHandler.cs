@@ -5,6 +5,7 @@ using Common.Logging;
 using Serilog;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.GameState.Messages;
+using System;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
@@ -40,7 +41,7 @@ namespace GameInterface.Services.MobileParties.Handlers
         {
             if (Campaign.Current == null)
             {
-                Logger.Warning("Unable to register party lifecycle listeners, no active campaign");
+                Logger.Warning("Unable to register party life-cycle listeners, no active campaign");
                 return;
             }
 
@@ -58,6 +59,8 @@ namespace GameInterface.Services.MobileParties.Handlers
             mobilePartyRegistry.RegisterParty(party);
 
             messageBroker.Publish(this, new MobilePartyCreated(party));
+
+            Logger.Verbose("Created party from {callstack}", Environment.StackTrace);
         }
 
         public void Handle_MobilePartyDestroyed(MobileParty party, PartyBase partyBase)
@@ -65,6 +68,8 @@ namespace GameInterface.Services.MobileParties.Handlers
             mobilePartyRegistry.Remove(party);
 
             messageBroker.Publish(this, new MobilePartyDestroyed(party, partyBase));
+
+            Logger.Verbose("Destroyed party from {callstack}", Environment.StackTrace);
         }
     }
 }
