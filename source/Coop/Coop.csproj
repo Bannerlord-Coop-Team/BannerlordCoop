@@ -189,6 +189,10 @@
       <Project>{442b73f2-b103-4ef6-8b4b-a2f36f169515}</Project>
       <Name>Coop.Core</Name>
     </ProjectReference>
+    <ProjectReference Include="..\GameInterface\GameInterface.csproj">
+      <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
+      <Name>GameInterface</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

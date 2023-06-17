@@ -69,10 +69,5 @@ namespace GameInterface.Services.GameDebug.Interfaces
                 party.Party.Visuals.SetMapIconAsDirty();
             }
         }
-
-        private void LoadGameFromServer()
-        {
-            // TODO
-        }
     }
 }
