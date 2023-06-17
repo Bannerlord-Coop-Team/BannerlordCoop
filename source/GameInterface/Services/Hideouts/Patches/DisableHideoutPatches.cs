@@ -23,15 +23,4 @@ namespace GameInterface.Services.Hideouts.Patches
             return false;
         }
     }
-
-    [HarmonyPatch(typeof(HideoutCampaignBehavior))]
-    internal class DisableHideoutCampaignBehavior
-    {
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(HideoutCampaignBehavior.HourlyTickSettlement))]
-        private static bool DisableHourlyTickSettlement()
-        {
-            return false;
-        }
-    }
 }
