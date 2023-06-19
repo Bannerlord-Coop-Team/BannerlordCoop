@@ -22,33 +22,6 @@ namespace Coop.Tests.Server.Services.Save
         }
 
         [Fact]
-        public void SaveSessions()
-        {
-            var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });
-
-            ICoopSession sessionData = new CoopSession()
-            {
-                UniqueGameId = "TestId",
-                GameObjectGuids = gameObjectGuids,
-            };
-
-            string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
-
-            var options = new JsonSerializerOptions()
-            {
-                WriteIndented = true,
-            };
-
-            var fileIO = new JsonFileIO();
-
-            fileIO.WriteToFile(saveFile, sessionData);
-
-            string jsonString = JsonSerializer.Serialize(sessionData, options);
-
-            Assert.NotEmpty(jsonString);
-        }
-
-        [Fact]
         public void SaveLoadSessions()
         {
             var gameObjectGuids = new GameObjectGuids(new string[] { "Random STR" });

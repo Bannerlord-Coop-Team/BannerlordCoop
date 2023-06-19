@@ -4,6 +4,7 @@ using Common.Serialization;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
 using Coop.UI;
+using GameInterface;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -105,7 +106,7 @@ namespace Coop
 
             Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
             // Apply all patches via harmony
-            harmony.PatchAll();
+            harmony.PatchAll(typeof(GameInterface.GameInterface).Assembly);
 
             // Skip startup splash screen
 #if DEBUG
