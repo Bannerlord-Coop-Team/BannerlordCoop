@@ -1,18 +1,19 @@
 ﻿using Common.Messaging;
 using LiteNetLib;
-using System;
 
-namespace Coop.Core.Server.Connections.Messages
+namespace Coop.Core.Server.Connections.Messages;
+
+/// <summary>
+/// A player has disconnected
+/// </summary>
+public record PlayerDisconnected : IEvent
 {
-    public record PlayerDisconnected : IEvent
+    public PlayerDisconnected(NetPeer playerId, DisconnectInfo disconnectInfo)
     {
-        public PlayerDisconnected(NetPeer playerId, DisconnectInfo disconnectInfo)
-        {
-            PlayerId = playerId;
-            DisconnectInfo = disconnectInfo;
-        }
-
-        public NetPeer PlayerId { get; }
-        public DisconnectInfo DisconnectInfo { get; }
+        PlayerId = playerId;
+        DisconnectInfo = disconnectInfo;
     }
+
+    public NetPeer PlayerId { get; }
+    public DisconnectInfo DisconnectInfo { get; }
 }

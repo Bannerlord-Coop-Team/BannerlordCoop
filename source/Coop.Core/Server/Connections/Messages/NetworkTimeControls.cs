@@ -1,15 +1,20 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Connections.Messages
-{
-    [ProtoContract]
-    public record NetworkEnableTimeControls : ICommand
-    {
-    }
+namespace Coop.Core.Server.Connections.Messages;
 
-    [ProtoContract]
-    public record NetworkDisableTimeControls : ICommand
-    {
-    }
+/// <summary>
+/// Enables time controls on a client
+/// </summary>
+[ProtoContract]
+public record NetworkEnableTimeControls : ICommand
+{
+}
+
+/// <summary>
+/// Disables time controls on a client
+/// </summary>
+[ProtoContract]
+public record NetworkDisableTimeControls : ICommand
+{
 }
