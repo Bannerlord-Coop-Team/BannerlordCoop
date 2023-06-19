@@ -8,6 +8,9 @@ using GameInterface.Services.Heroes.Data;
 
 namespace Coop.Core.Client.Messages
 {
+    /// <summary>
+    /// Received Game save data from the network event
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkGameSaveDataReceived : IEvent
     {

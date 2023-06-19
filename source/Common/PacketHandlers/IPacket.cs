@@ -9,7 +9,6 @@ namespace Common.PacketHandlers
         Event,
         Example,
         Test,
-        Hero,
         Movement,
         RequestMobilePartyBehavior,
         UpdatePartyBehavior,

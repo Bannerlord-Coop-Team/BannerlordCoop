@@ -5,11 +5,12 @@ using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
-using Serilog.Core;
-using System;
 
 namespace Coop.Core.Client.Services.Time.Handlers
 {
+    /// <summary>
+    /// Handles time control for the client
+    /// </summary>
     public class TimeHandler : IHandler
     {
         private static readonly ILogger Logger = LogManager.GetLogger<TimeHandler>();
