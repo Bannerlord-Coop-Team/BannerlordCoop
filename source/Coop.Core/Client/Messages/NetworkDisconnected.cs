@@ -3,7 +3,10 @@ using LiteNetLib;
 
 namespace Coop.Core.Client.Messages
 {
-    public readonly struct NetworkDisconnected : IEvent
+    /// <summary>
+    /// Network disconnected event
+    /// </summary>
+    public record NetworkDisconnected : IEvent
     {
         public DisconnectInfo DisconnectInfo { get; }
 

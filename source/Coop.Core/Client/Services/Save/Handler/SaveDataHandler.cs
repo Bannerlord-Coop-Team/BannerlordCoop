@@ -1,14 +1,15 @@
 ﻿using Common.Messaging;
-using Common.Network;
 using Coop.Core.Client.Messages;
-using GameInterface.Services.Heroes.Handlers;
-using System;
+using GameInterface.Services.Entity.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.Entity.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler
 {
+    /// <summary>
+    /// Handles save data
+    /// </summary>
+    /// TODO update to work
     internal class SaveDataHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
