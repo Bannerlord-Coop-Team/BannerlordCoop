@@ -6,6 +6,9 @@ using System;
 
 namespace Coop.Core.Server.States;
 
+/// <summary>
+/// State representing the server is in the campaign and running
+/// </summary>
 public class ServerRunningState : ServerStateBase
 {
     public ServerRunningState(IServerLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)

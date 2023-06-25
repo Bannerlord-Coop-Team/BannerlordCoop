@@ -3,40 +3,42 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
 
-namespace Coop.Core.Server.States
+namespace Coop.Core.Server.States;
+
+/// <summary>
+/// State represting the server has just started
+/// </summary>
+public class InitialServerState : ServerStateBase
 {
-    public class InitialServerState : ServerStateBase
+    public InitialServerState(IServerLogic context, IMessageBroker messageBroker) : base(context, messageBroker)
     {
-        public InitialServerState(IServerLogic context, IMessageBroker messageBroker) : base(context, messageBroker)
-        {
-            MessageBroker.Subscribe<CampaignReady>(Handle_GameLoaded);
-        }
+        MessageBroker.Subscribe<CampaignReady>(Handle_GameLoaded);
+    }
 
-        public override void Dispose()
-        {
-            MessageBroker.Unsubscribe<CampaignReady>(Handle_GameLoaded);
-        }
+    public override void Dispose()
+    {
+        MessageBroker.Unsubscribe<CampaignReady>(Handle_GameLoaded);
+    }
 
-        internal void Handle_GameLoaded(MessagePayload<CampaignReady> payload)
-        {
-            // Start server when game is fully loaded
-            Logic.Network.Start();
+    internal void Handle_GameLoaded(MessagePayload<CampaignReady> payload)
+    {
+        // Start server when game is fully loaded
+        Logic.Network.Start();
 
-            // Remove server party
-            MessageBroker.Publish(this, new RemoveMainParty());
+        // Remove server party
+        MessageBroker.Publish(this, new RemoveMainParty());
 
-            // Change to server running state
-            Logic.State = new ServerRunningState(Logic, MessageBroker);
-        }
+        // Change to server running state
+        Logic.State = new ServerRunningState(Logic, MessageBroker);
+    }
 
-        public override void Start()
-        {
-            // TODO use UI screen
-            MessageBroker.Publish(this, new LoadDebugGame());
-        }
+    public override void Start()
+    {
+        // TODO use UI screen
+        MessageBroker.Publish(this, new LoadDebugGame());
+    }
 
-        public override void Stop()
-        {
-        }
+    public override void Stop()
+    {
     }
 }

@@ -1,15 +1,17 @@
 ﻿using Common.Messaging;
 using LiteNetLib;
 
-namespace Coop.Core.Server.Connections.Messages
-{
-    public record PlayerConnected : IEvent
-    {
-        public NetPeer PlayerId { get; }
+namespace Coop.Core.Server.Connections.Messages;
 
-        public PlayerConnected(NetPeer playerId)
-        {
-            PlayerId = playerId;
-        }
+/// <summary>
+/// A player has connected
+/// </summary>
+public record PlayerConnected : IEvent
+{
+    public NetPeer PlayerId { get; }
+
+    public PlayerConnected(NetPeer playerId)
+    {
+        PlayerId = playerId;
     }
 }

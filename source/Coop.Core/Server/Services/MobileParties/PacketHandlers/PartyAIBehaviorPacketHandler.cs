@@ -6,44 +6,43 @@ using Coop.Core.Server.Services.MobileParties.Packets;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using LiteNetLib;
 
-namespace Coop.Core.Server.Services.MobileParties.PacketHandlers
+namespace Coop.Core.Server.Services.MobileParties.PacketHandlers;
+
+/// <summary>
+/// Handles incoming <see cref="RequestMobilePartyBehaviorPacket"/>
+/// </summary>
+internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
 {
-    /// <summary>
-    /// Handles incoming <see cref="RequestMobilePartyBehaviorPacket"/>
-    /// </summary>
-    internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
+    public PacketType PacketType => PacketType.RequestMobilePartyBehavior;
+
+    private readonly IPacketManager packetManager;
+    private readonly INetwork network;
+    private readonly IMessageBroker messageBroker;
+
+    public RequestMobilePartyBehaviorPacketHandler(
+        IPacketManager packetManager,
+        INetwork network,
+        IMessageBroker messageBroker)
     {
-        public PacketType PacketType => PacketType.RequestMobilePartyBehavior;
+        this.packetManager = packetManager;
+        this.network = network;
+        this.messageBroker = messageBroker;
+        packetManager.RegisterPacketHandler(this);
+    }
 
-        private readonly IPacketManager packetManager;
-        private readonly INetwork network;
-        private readonly IMessageBroker messageBroker;
+    public void Dispose()
+    {
+        packetManager.RemovePacketHandler(this);
+    }
 
-        public RequestMobilePartyBehaviorPacketHandler(
-            IPacketManager packetManager,
-            INetwork network,
-            IMessageBroker messageBroker)
-        {
-            this.packetManager = packetManager;
-            this.network = network;
-            this.messageBroker = messageBroker;
-            packetManager.RegisterPacketHandler(this);
-        }
+    public void HandlePacket(NetPeer peer, IPacket packet)
+    {
+        RequestMobilePartyBehaviorPacket convertedPacket = (RequestMobilePartyBehaviorPacket)packet;
 
-        public void Dispose()
-        {
-            packetManager.RemovePacketHandler(this);
-        }
+        var data = convertedPacket.BehaviorUpdateData;
 
-        public void HandlePacket(NetPeer peer, IPacket packet)
-        {
-            RequestMobilePartyBehaviorPacket convertedPacket = (RequestMobilePartyBehaviorPacket)packet;
+        network.SendAll(new UpdatePartyBehaviorPacket(data));
 
-            var data = convertedPacket.BehaviorUpdateData;
-
-            network.SendAll(new UpdatePartyBehaviorPacket(data));
-
-            messageBroker.Publish(this, new UpdatePartyBehavior(data));
-        }
+        messageBroker.Publish(this, new UpdatePartyBehavior(data));
     }
 }

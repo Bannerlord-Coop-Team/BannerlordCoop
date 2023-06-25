@@ -2,17 +2,19 @@
 using GameInterface.Services.Heroes.Enum;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Services.Time.Messages
-{
-    [ProtoContract(SkipConstructor = true)]
-    public record NetworkRequestTimeSpeedChange : ICommand
-    {
-        [ProtoMember(1)]
-        public TimeControlEnum NewControlMode { get; }
+namespace Coop.Core.Server.Services.Time.Messages;
 
-        public NetworkRequestTimeSpeedChange(TimeControlEnum newControlMode)
-        {
-            NewControlMode = newControlMode;
-        }
+/// <summary>
+/// Request time speed change command from a client
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+public record NetworkRequestTimeSpeedChange : ICommand
+{
+    [ProtoMember(1)]
+    public TimeControlEnum NewControlMode { get; }
+
+    public NetworkRequestTimeSpeedChange(TimeControlEnum newControlMode)
+    {
+        NewControlMode = newControlMode;
     }
 }
