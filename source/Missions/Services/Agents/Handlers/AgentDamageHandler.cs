@@ -14,6 +14,7 @@ using Serilog;
 using System;
 using System.Reflection;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using static TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks;
 
@@ -126,16 +127,35 @@ namespace Missions.Services.Agents.Handlers
 
             Logger.Debug("Damage Check Sent to " + payload.What.VictimAgentId + " for: " + payload.What.Blow.InflictedDamage);
 
-            networkMessageBroker.PublishNetworkEvent(damageMessage);
-
             if (networkAgentRegistry.TryGetAgent(payload.What.VictimAgentId, out Agent victimAgent) == false) return;
-
-            if (victimAgent.Health <= 0) return;
 
             GameLoopRunner.RunOnMainThread(() =>
             {
-                victimAgent.RegisterBlow(blow, message.AttackCollisionData);
+                try
+                {
+                    victimAgent.RegisterBlow(blow, message.AttackCollisionData);
+                }
+                catch(Exception e)
+                {
+                    victimAgent.Health -= blow.InflictedDamage;
+                    Logger.Error("Exception on victimAgent register blow, most likely related to missile index " + e.Message);
+                }
             }, true);
+
+            if (victimAgent.Health <= 0)
+            {
+                var killedMessage = new NetworkAgentKilled(
+                    payload.What.VictimAgentId,
+                    payload.What.AttackerAgentId,
+                    payload.What.Blow);
+
+                Logger.Verbose($"Sending agent killed for {victimAgent.Name}");
+
+                networkMessageBroker.PublishNetworkEvent(killedMessage);
+                return;
+            }
+
+            networkMessageBroker.PublishNetworkEvent(damageMessage);
         }
 
         private void AgentDamageRecieve(MessagePayload<NetworkAgentDamaged> payload)
@@ -235,12 +255,8 @@ namespace Missions.Services.Agents.Handlers
 
                 GameLoopRunner.RunOnMainThread(() =>
                 {
-                    if (agent.Health > 0) //Skips previous health check at times for reasons unknown, thread stuff?
-                    {
-                        agent.Die(blow, overrideKillInfo);
-                    }
+                    agent.Die(blow, overrideKillInfo);
                 }, true);
-
             }
         }
     }
