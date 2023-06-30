@@ -125,7 +125,7 @@ namespace Missions.Services.Agents.Handlers
                 payload.What.AttackCollisionData,
                 payload.What.Blow);
 
-            Logger.Debug("Damage Check Sent to " + payload.What.VictimAgentId + " for: " + payload.What.Blow.InflictedDamage);
+            Logger.Debug("Damage Check Recieved from " + payload.What.AttackerAgentId + " for: " + payload.What.Blow.InflictedDamage);
 
             if (networkAgentRegistry.TryGetAgent(payload.What.VictimAgentId, out Agent victimAgent) == false) return;
 
