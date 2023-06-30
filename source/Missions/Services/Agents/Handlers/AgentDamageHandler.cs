@@ -213,22 +213,15 @@ namespace Missions.Services.Agents.Handlers
             // extract the blow
             Blow blow = agentDamaData.Blow;
 
-            if (blow.IsMissile)
+
+
+            if (blow.IsMissile && !NetworkAgentRegistry.Instance.IsControlled(effectorAgent))
             {
                 var peerIdx = blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
 
                 if(networkMissileRegistry.TryGetIndex(netPeer, peerIdx, out int localIdx) == false)
                 {
                     Logger.Error($"Missile did not exist in registry, idx: {peerIdx}, number of peers: {networkMissileRegistry.Length}");
-                    effectedAgent.Health -= blow.InflictedDamage;
-                    Logger.Information("Agent health is now: " + effectedAgent.Health);
-                    if (effectedAgent.Health <= 0)
-                    {
-                        GameLoopRunner.RunOnMainThread(() =>
-                        {
-                            effectedAgent.Die(blow);
-                        }, true);
-                    }
                     return;
                 };
 
