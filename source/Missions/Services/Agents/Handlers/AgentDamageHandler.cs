@@ -221,6 +221,8 @@ namespace Missions.Services.Agents.Handlers
                 {
                     Logger.Error($"Missile did not exist in registry, idx: {peerIdx}, number of peers: {networkMissileRegistry.Length}");
                     effectedAgent.Health -= blow.InflictedDamage;
+                    Logger.Information("Agent health is now: " + effectedAgent.Health);
+                    if (effectedAgent.Health <= 0) effectedAgent.Die(blow, Agent.KillInfo.Invalid); 
                     return;
                 };
 
