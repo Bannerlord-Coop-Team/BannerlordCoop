@@ -151,8 +151,8 @@ namespace Missions.Services.Agents.Handlers
 
                 Logger.Verbose($"Sending agent killed for {victimAgent.Name}");
 
-                networkMessageBroker.PublishNetworkEvent(killedMessage);
-                return;
+                //networkMessageBroker.PublishNetworkEvent(killedMessage);
+                //return;
             }
 
             networkMessageBroker.PublishNetworkEvent(damageMessage);
