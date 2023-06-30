@@ -141,6 +141,8 @@ namespace Missions.Services
             Vec3 position = Agent.Main?.Position ?? default;
             float health = Agent.Main?.Health ?? 0;
 
+            Logger.Information("Spawned own character " + Agent.Main.Name + " with health: " + Agent.Main.Health);
+
             NetworkMissionJoinInfo request = new NetworkMissionJoinInfo(
                 characterObject, 
                 isPlayerAlive, 
@@ -188,7 +190,7 @@ namespace Missions.Services
 
                 newAgent.Health = joinInfo.PlayerHealth;
 
-                Logger.Information("Spawned " + newAgent.Health + " with health: " + newAgent.Health);
+                Logger.Information("Spawned " + newAgent.Name + " with health: " + newAgent.Health);
 
                 agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
             }
