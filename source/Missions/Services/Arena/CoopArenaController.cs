@@ -188,6 +188,8 @@ namespace Missions.Services
 
                 newAgent.Health = joinInfo.PlayerHealth;
 
+                Logger.Information("Spawned " + newAgent.Health + " with health: " + newAgent.Health);
+
                 agentRegistry.RegisterNetworkControlledAgent(netPeer, joinInfo.PlayerId, newAgent);
             }
 
