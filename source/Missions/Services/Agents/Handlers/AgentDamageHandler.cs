@@ -220,6 +220,7 @@ namespace Missions.Services.Agents.Handlers
                 if(networkMissileRegistry.TryGetIndex(netPeer, peerIdx, out int localIdx) == false)
                 {
                     Logger.Error($"Missile did not exist in registry, idx: {peerIdx}, number of peers: {networkMissileRegistry.Length}");
+                    effectedAgent.Health -= blow.InflictedDamage;
                     return;
                 };
 
