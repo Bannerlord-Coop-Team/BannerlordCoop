@@ -1,30 +1,25 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Time.Enum;
+using GameInterface.Services.Heroes.Enum;
 using System;
 
-namespace GameInterface.Services.Time.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+public record SetTimeControlMode : ICommand
 {
-    public readonly struct SetTimeControlMode : ICommand
-    {
-        public TimeControlEnum NewTimeMode { get; }
-        public Guid TransactionID { get; }
+    public TimeControlEnum NewTimeMode { get; }
 
-        public SetTimeControlMode(Guid transactionID, TimeControlEnum newTimeMode)
-        {
-            TransactionID = transactionID;
-            NewTimeMode = newTimeMode;
-        }
+    public SetTimeControlMode(TimeControlEnum newTimeMode)
+    {
+        NewTimeMode = newTimeMode;
     }
+}
 
-    public readonly struct TimeControlModeSet : IResponse
+public record TimeControlModeSet : IResponse
+{
+    public TimeControlEnum NewTimeMode { get; }
+
+    public TimeControlModeSet(TimeControlEnum newTimeMode)
     {
-        public TimeControlEnum NewTimeMode { get; }
-        public Guid TransactionID { get; }
-
-        public TimeControlModeSet(Guid transactionID, TimeControlEnum newTimeMode)
-        {
-            TransactionID = transactionID;
-            NewTimeMode = newTimeMode;
-        }
+        NewTimeMode = newTimeMode;
     }
 }

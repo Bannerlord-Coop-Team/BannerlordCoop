@@ -1,16 +1,12 @@
 ﻿using Common.Messaging;
-using System;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+public record HeroResolved : IResponse
 {
-    public readonly struct HeroResolved : IResponse
+    public string HeroId { get; }
+    public HeroResolved(string heroId)
     {
-        public Guid TransactionID { get; }
-        public Guid HeroId { get; }
-        public HeroResolved(Guid transactionID, Guid heroId)
-        {
-            TransactionID = transactionID;
-            HeroId = heroId;
-        }
+        HeroId = heroId;
     }
 }

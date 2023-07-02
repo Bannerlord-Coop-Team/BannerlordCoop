@@ -28,19 +28,22 @@ namespace Missions.Services.Missiles.Handlers
     /// <inheritdoc/>
     public class MissileHandler : IMissileHandler
     {
-        readonly INetworkMessageBroker networkMessageBroker;
+        readonly INetwork network;
+        readonly IMessageBroker messageBroker;
         readonly INetworkAgentRegistry networkAgentRegistry;
         readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
 
         public MissileHandler(
-            INetworkMessageBroker networkMessageBroker,
+            INetwork network,
+            IMessageBroker messageBroker,
             INetworkAgentRegistry networkAgentRegistry)
         {
-            this.networkMessageBroker = networkMessageBroker;
+            this.network = network;
+            this.messageBroker = messageBroker;
             this.networkAgentRegistry = networkAgentRegistry;
 
-            networkMessageBroker.Subscribe<AgentShoot>(AgentShootSend);
-            networkMessageBroker.Subscribe<NetworkAgentShoot>(AgentShootRecieve);
+            messageBroker.Subscribe<AgentShoot>(AgentShootSend);
+            messageBroker.Subscribe<NetworkAgentShoot>(AgentShootRecieve);
         }
 
         ~MissileHandler()
@@ -50,8 +53,8 @@ namespace Missions.Services.Missiles.Handlers
 
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<AgentShoot>(AgentShootSend);
-            networkMessageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootRecieve);
+            messageBroker.Unsubscribe<AgentShoot>(AgentShootSend);
+            messageBroker.Unsubscribe<NetworkAgentShoot>(AgentShootRecieve);
         }
 
         private readonly static MethodInfo AddMissileSingleUsageAux = typeof(Mission).GetMethod("AddMissileSingleUsageAux", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -154,7 +157,7 @@ namespace Missions.Services.Missiles.Handlers
             
             missiles.Add(num, missile);
 
-            networkMessageBroker.Publish(this, new PeerMissileAdded(peer, shot.MissileIndex, num));
+            messageBroker.Publish(this, new PeerMissileAdded(peer, shot.MissileIndex, num));
         }
 
         private void AgentShootSend(MessagePayload<AgentShoot> payload)
@@ -194,7 +197,7 @@ namespace Missions.Services.Missiles.Handlers
                     payload.What.Speed,
                     singleUse);
 
-                networkMessageBroker.PublishNetworkEvent(message);
+                network.SendAll(message);
             }
         }
     }

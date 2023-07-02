@@ -10,7 +10,7 @@ namespace Missions.Services.Missiles.Message
     /// External event for agent missiles
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public class NetworkAgentShoot : INetworkEvent
+    public class NetworkAgentShoot : ICommand
     {
         [ProtoMember(1)]
         public Guid AgentGuid { get; }

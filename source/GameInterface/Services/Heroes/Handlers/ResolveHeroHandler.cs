@@ -4,28 +4,32 @@ using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
 
-namespace GameInterface.Services.Heroes.Handlers
+namespace GameInterface.Services.Heroes.Handlers;
+
+internal class ResolveHeroHandler : IHandler
 {
-    internal class ResolveHeroHandler : IHandler
+    private static readonly ILogger Logger = LogManager.GetLogger<NewHeroHandler>();
+
+    private readonly IHeroInterface heroInterface;
+    private readonly IMessageBroker messageBroker;
+
+    public ResolveHeroHandler(
+        IHeroInterface heroInterface,
+        IMessageBroker messageBroker)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<NewHeroHandler>();
+        this.heroInterface = heroInterface;
+        this.messageBroker = messageBroker;
 
-        private readonly IHeroInterface heroInterface;
-        private readonly IMessageBroker messageBroker;
+        messageBroker.Subscribe<ResolveHero>(Handle);
+    }
 
-        public ResolveHeroHandler(
-            IHeroInterface heroInterface,
-            IMessageBroker messageBroker)
-        {
-            this.heroInterface = heroInterface;
-            this.messageBroker = messageBroker;
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<ResolveHero>(Handle);
+    }
 
-            messageBroker.Subscribe<ResolveHero>(Handle);
-        }
-
-        private void Handle(MessagePayload<ResolveHero> obj)
-        {
-            heroInterface.ResolveHero(obj.What);
-        }
+    private void Handle(MessagePayload<ResolveHero> obj)
+    {
+        heroInterface.ResolveHero(obj.What);
     }
 }

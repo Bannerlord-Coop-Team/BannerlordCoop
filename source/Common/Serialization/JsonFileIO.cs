@@ -67,13 +67,16 @@ namespace Common.Serialization
             }
 
             string jsonText = JsonSerializer.Serialize(obj, JsonOptions);
-            File.WriteAllText(filePath, jsonText, Encoding);
+
+            using StreamWriter writeStream = new(filePath, false, Encoding);
+            writeStream.Write(jsonText);
         }
 
         /// <inheritdoc/>
         public T ReadFromFile<T>(string filePath)
         {
-            string jsonText = File.ReadAllText(filePath, Encoding);
+            using StreamReader readStream = new(filePath, Encoding);
+            var jsonText = readStream.ReadToEnd();
             return JsonSerializer.Deserialize<T>(jsonText);
         }
     }

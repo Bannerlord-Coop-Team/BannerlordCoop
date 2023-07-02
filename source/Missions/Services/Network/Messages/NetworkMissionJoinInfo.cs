@@ -13,7 +13,7 @@ namespace Missions.Services.Network.Messages
     /// External event for Join Info in Mission
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public class NetworkMissionJoinInfo : INetworkEvent
+    public class NetworkMissionJoinInfo : IEvent
     {
         [ProtoMember(1)]
         public readonly Guid PlayerId;

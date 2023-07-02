@@ -19,16 +19,16 @@ namespace Missions.Services.Agents.Handlers
     public class AgentDeathHandler : IAgentDeathHandler
     {
         private readonly INetworkAgentRegistry agentRegistry;
-        private readonly INetworkMessageBroker networkMessageBroker;
+        private readonly IMessageBroker messageBroker;
         
         public AgentDeathHandler(
             INetworkAgentRegistry agentRegistry,
-            INetworkMessageBroker networkMessageBroker)
+            IMessageBroker messageBroker)
         {
             this.agentRegistry = agentRegistry;
-            this.networkMessageBroker = networkMessageBroker;
+            this.messageBroker = messageBroker;
 
-            this.networkMessageBroker.Subscribe<AgentDied>(Handle);
+            this.messageBroker.Subscribe<AgentDied>(Handle);
         }
         
         ~AgentDeathHandler()
@@ -38,7 +38,7 @@ namespace Missions.Services.Agents.Handlers
 
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<AgentDied>(Handle);
+            messageBroker.Unsubscribe<AgentDied>(Handle);
         }
 
         private void Handle(MessagePayload<AgentDied> obj)

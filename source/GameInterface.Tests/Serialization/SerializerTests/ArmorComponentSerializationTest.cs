@@ -1,15 +1,16 @@
-﻿using Autofac;
-using Autofac.Features.OwnedInstances;
+using System;
+using System.Linq;
+using System.Reflection;
+using Autofac;
 using Common.Extensions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
-using System.Runtime.Serialization;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 using Xunit;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -81,9 +82,36 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
             ArmorComponent newArmorComponent = returnedPackage.Unpack<ArmorComponent>(deserializeFactory);
 
-            foreach (var property in typeof(ArmorComponent).GetProperties())
+            CompareRecursive(ArmorComponent, newArmorComponent, typeof(ArmorComponent));
+        }
+
+        private void CompareRecursive(object? expected, object? actual, Type type)
+        {
+            if (expected == null && actual == null)
             {
-                Assert.Equal(property.GetValue(ArmorComponent), property.GetValue(newArmorComponent));
+                return;
+            }
+            foreach (var property in type.GetProperties().Where(p => p.GetIndexParameters().Length == 0))
+            {
+                if (property.PropertyType.IsPrimitive || property.PropertyType == typeof(string))
+                {
+                    object? expectedValue;
+                    object? actualValue;
+                    try
+                    {
+                        expectedValue = property.GetValue(expected);
+                        actualValue = property.GetValue(actual);
+                    }
+                    catch (TargetInvocationException ex) when (ex.InnerException is NullReferenceException)
+                    {
+                        continue;
+                    }
+                    Assert.Equal(expectedValue, actualValue);
+                }
+                else
+                {
+                    CompareRecursive(property.GetValue(expected), property.GetValue(actual), property.PropertyType);
+                }
             }
         }
     }

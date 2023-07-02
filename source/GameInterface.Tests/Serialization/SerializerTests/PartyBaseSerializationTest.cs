@@ -4,8 +4,8 @@ using GameInterface.Serialization.External;
 using GameInterface.Serialization;
 using TaleWorlds.CampaignSystem.Party;
 using Autofac;
+using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
-using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

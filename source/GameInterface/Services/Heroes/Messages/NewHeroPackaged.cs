@@ -1,12 +1,13 @@
-﻿namespace GameInterface.Services.CharacterCreation.Messages
-{
-    public readonly struct NewHeroPackaged
-    {
-        public byte[] Package { get; }
+﻿using Common.Messaging;
 
-        public NewHeroPackaged(byte[] package)
-        {
-            Package = package;
-        }
+namespace GameInterface.Services.Heroes.Messages;
+
+public record NewHeroPackaged : IResponse 
+{
+    public byte[] Package { get; }
+
+    public NewHeroPackaged(byte[] package)
+    {
+        Package = package;
     }
 }

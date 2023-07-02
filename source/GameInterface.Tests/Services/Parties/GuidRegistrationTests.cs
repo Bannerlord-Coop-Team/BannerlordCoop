@@ -4,6 +4,7 @@ using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Extensions;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
@@ -21,6 +22,7 @@ namespace GameInterface.Tests.Services.Parties
 
         readonly IContainer _container;
         readonly IMessageBroker _messageBroker;
+        readonly Harmony harmony;
         public GuidRegistrationTests()
         {
             ContainerBuilder builder = new ContainerBuilder();
@@ -29,6 +31,9 @@ namespace GameInterface.Tests.Services.Parties
             _container = builder.Build();
 
             _messageBroker = _container.Resolve<IMessageBroker>();
+
+            harmony = new Harmony("com.Coop.GameInterface");
+            harmony.PatchAll(typeof(GameInterface).Assembly);
         }
 
 

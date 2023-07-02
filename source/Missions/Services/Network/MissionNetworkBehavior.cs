@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Missions.Services.Agents.Handlers;
@@ -16,20 +17,20 @@ namespace Missions.Services.Network
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
         private readonly LiteNetP2PClient client;
 
-        private readonly INetworkMessageBroker networkMessageBroker;
+        private readonly IMessageBroker messageBroker;
         private readonly INetworkAgentRegistry agentRegistry;
 
         private readonly IDisposable[] disposables;
 
         public CoopMissionNetworkBehavior(
             LiteNetP2PClient client,
-            INetworkMessageBroker messageBroker,
+            IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry,
             IAgentMovementHandler movementHandler,
             IEventPacketHandler eventPacketHandler)
         {
             this.client = client;
-            networkMessageBroker = messageBroker;
+            this.messageBroker = messageBroker;
             this.agentRegistry = agentRegistry;
 
             disposables = new IDisposable[]
@@ -73,7 +74,7 @@ namespace Missions.Services.Network
 
         public override void OnAgentDeleted(Agent affectedAgent)
         {
-            networkMessageBroker.Publish(this, new AgentDeleted(affectedAgent));
+            messageBroker.Publish(this, new AgentDeleted(affectedAgent));
 
             base.OnAgentDeleted(affectedAgent);
         }

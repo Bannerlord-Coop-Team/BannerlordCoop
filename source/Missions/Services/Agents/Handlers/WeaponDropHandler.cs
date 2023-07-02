@@ -21,16 +21,21 @@ namespace Missions.Services.Agents.Handlers
     public class WeaponDropHandler : IWeaponDropHandler
     {
         readonly INetworkAgentRegistry networkAgentRegistry;
-        readonly INetworkMessageBroker networkMessageBroker;
+        readonly INetwork network;
+        readonly IMessageBroker messageBroker;
         readonly static ILogger Logger = LogManager.GetLogger<WeaponDropHandler>();
 
-        public WeaponDropHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker)
+        public WeaponDropHandler(
+            INetworkAgentRegistry networkAgentRegistry,
+            IMessageBroker messageBroker,
+            INetwork network)
         {
             this.networkAgentRegistry = networkAgentRegistry;
-            this.networkMessageBroker = networkMessageBroker;
+            this.messageBroker = messageBroker;
 
-            networkMessageBroker.Subscribe<WeaponDropped>(WeaponDropSend);
-            networkMessageBroker.Subscribe<NetworkWeaponDropped>(WeaponDropReceive);
+            messageBroker.Subscribe<WeaponDropped>(WeaponDropSend);
+            messageBroker.Subscribe<NetworkWeaponDropped>(WeaponDropReceive);
+            this.network = network;
         }
 
         ~WeaponDropHandler()
@@ -40,8 +45,8 @@ namespace Missions.Services.Agents.Handlers
 
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<WeaponDropped>(WeaponDropSend);
-            networkMessageBroker.Unsubscribe<NetworkWeaponDropped>(WeaponDropReceive);
+            messageBroker.Unsubscribe<WeaponDropped>(WeaponDropSend);
+            messageBroker.Unsubscribe<NetworkWeaponDropped>(WeaponDropReceive);
         }
 
         private void WeaponDropSend(MessagePayload<WeaponDropped> obj)
@@ -56,7 +61,7 @@ namespace Missions.Services.Agents.Handlers
 
             NetworkWeaponDropped message = new NetworkWeaponDropped(agentId, obj.What.EquipmentIndex);
 
-            networkMessageBroker.PublishNetworkEvent(message);
+            network.SendAll(message);
         }
 
         private void WeaponDropReceive(MessagePayload<NetworkWeaponDropped> obj)

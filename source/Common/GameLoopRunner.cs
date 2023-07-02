@@ -9,8 +9,8 @@ namespace Common
         private static readonly Lazy<GameLoopRunner> m_Instance =
             new Lazy<GameLoopRunner>(() => new GameLoopRunner());
 
-        private readonly List<(Action, EventWaitHandle)> m_Queue =
-            new List<(Action, EventWaitHandle)>();
+        private readonly Queue<(Action, EventWaitHandle)> m_Queue =
+            new Queue<(Action, EventWaitHandle)>();
 
         private readonly object m_QueueLock = new object();
         private int m_GameLoopThreadId;
@@ -31,10 +31,13 @@ namespace Common
             }
 
             List<(Action, EventWaitHandle)> toBeRun = new List<(Action, EventWaitHandle)>();
+
             lock (m_Queue)
             {
-                toBeRun.AddRange(m_Queue);
-                m_Queue.Clear();
+                while(m_Queue.Count > 0)
+                {
+                    toBeRun.Add(m_Queue.Dequeue());
+                }
             }
 
             foreach ((Action, EventWaitHandle) task in toBeRun)
@@ -58,7 +61,7 @@ namespace Common
                     null;
                 lock (Instance.m_QueueLock)
                 {
-                    Instance.m_Queue.Add((action, ewh));
+                    Instance.m_Queue.Enqueue((action, ewh));
                 }
 
                 ewh?.WaitOne();

@@ -48,7 +48,7 @@ namespace Missions.Services.Missiles.Patches
                     speed,
                     addRigidBody,
                     __result);
-                NetworkMessageBroker.Instance.Publish(shooterAgent, message);
+                MessageBroker.Instance.Publish(shooterAgent, message);
             }
         }
     }
@@ -84,7 +84,7 @@ namespace Missions.Services.Missiles.Patches
                     speed,
                     addRigidBody,
                     __result);
-                NetworkMessageBroker.Instance.Publish(shooterAgent, message);
+                MessageBroker.Instance.Publish(shooterAgent, message);
             }
         }
     }

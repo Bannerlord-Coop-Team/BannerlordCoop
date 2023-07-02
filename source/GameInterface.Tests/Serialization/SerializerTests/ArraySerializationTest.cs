@@ -4,6 +4,7 @@ using GameInterface.Serialization.Native;
 using Autofac;
 using GameInterface.Tests.Bootstrap.Modules;
 using GameInterface.Tests.Bootstrap;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

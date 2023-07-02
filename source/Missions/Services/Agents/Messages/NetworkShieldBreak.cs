@@ -13,7 +13,7 @@ namespace Missions.Services.Agents.Messages
     /// External event for agent shield breaks
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct NetworkShieldBreak : INetworkEvent
+    public readonly struct NetworkShieldBreak : IEvent
     {
         [ProtoMember(1)]
         public Guid AgentGuid { get; }

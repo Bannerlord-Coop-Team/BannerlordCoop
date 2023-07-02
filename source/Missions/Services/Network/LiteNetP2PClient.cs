@@ -45,11 +45,9 @@ namespace Missions.Services.Network
         
         public LiteNetP2PClient(
             NetworkConfiguration config,
-            INetworkMessageBroker messageBroker,
+            IMessageBroker messageBroker,
             IPacketManager packetManager)
         {
-            NetworkMessageBroker.Instance.Network = this;
-
             PacketManager = packetManager;
             networkConfig = config;
             this.messageBroker = messageBroker;
@@ -165,17 +163,8 @@ namespace Missions.Services.Network
 
         public void Send(NetPeer netPeer, IPacket packet)
         {
-            NetDataWriter writer = new NetDataWriter();
-
-            try
-            {
-                writer.PutBytesWithLength(ProtoBufSerializer.Serialize(packet));
-                netPeer.Send(writer, packet.DeliveryMethod);
-            }
-            catch(Exception ex)
-            {
-                Logger.Error("Serialization failed: {ErrMessage}", ex.Message);
-            }
+            byte[] data = ProtoBufSerializer.Serialize(packet);
+            netPeer.Send(data, packet.DeliveryMethod);
         }
 
         public void SendAllBut(NetPeer netPeer, IPacket packet)
@@ -188,9 +177,8 @@ namespace Missions.Services.Network
 
         public void SendAll(IPacket packet)
         {
-            NetDataWriter writer = new NetDataWriter();
-            writer.PutBytesWithLength(ProtoBufSerializer.Serialize(packet));
-            netManager.SendToAll(writer, packet.DeliveryMethod);
+            byte[] data = ProtoBufSerializer.Serialize(packet);
+            netManager.SendToAll(data, packet.DeliveryMethod);
         }
 
         public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
@@ -249,14 +237,6 @@ namespace Missions.Services.Network
             Logger.Error("Network error {socketError} sending to {endpoint}", socketError, endPoint);
         }
 
-        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
-        {
-            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
-            batchLogger.Log(packet.PacketType);
-
-            PacketManager.HandleRecieve(peer, packet);
-        }
-
         public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
         {
 
@@ -283,6 +263,32 @@ namespace Missions.Services.Network
                     "this means there is an issue with the server");
                 request.Reject();
             }
+        }
+
+        public void Send(NetPeer netPeer, IMessage message)
+        {
+            var eventPacket = new EventPacket(message);
+            Send(netPeer, eventPacket);
+        }
+
+        public void SendAll(IMessage message)
+        {
+            var eventPacket = new EventPacket(message);
+            SendAll(eventPacket);
+        }
+
+        public void SendAllBut(NetPeer excludedPeer, IMessage message)
+        {
+            var eventPacket = new EventPacket(message);
+            SendAllBut(excludedPeer, eventPacket);
+        }
+
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+        {
+            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
+            batchLogger.Log(packet.PacketType);
+
+            PacketManager.HandleRecieve(peer, packet);
         }
     }
 }

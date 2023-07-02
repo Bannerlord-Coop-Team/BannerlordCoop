@@ -1,16 +1,22 @@
-﻿using Common.PacketHandlers;
+﻿using Common.Messaging;
+using Common.PacketHandlers;
 using LiteNetLib;
 
-namespace Common.Network
-{
-    public interface INetwork : IUpdateable
-    {
-        INetworkConfiguration Configuration { get; }
+namespace Common.Network;
 
-        void Send(NetPeer netPeer, IPacket packet);
-        void SendAll(IPacket packet);
-        void SendAllBut(NetPeer netPeer, IPacket packet);
-        void Start();
-        void Stop();
-    }
+/// <summary>
+/// Manages basic network functionality
+/// </summary>
+public interface INetwork : IUpdateable
+{
+    INetworkConfiguration Configuration { get; }
+
+    void Send(NetPeer netPeer, IPacket packet);
+    void SendAll(IPacket packet);
+    void SendAllBut(NetPeer excludedPeer, IPacket packet);
+    void Send(NetPeer netPeer, IMessage message);
+    void SendAll(IMessage message);
+    void SendAllBut(NetPeer excludedPeer, IMessage message);
+    void Start();
+    void Stop();
 }

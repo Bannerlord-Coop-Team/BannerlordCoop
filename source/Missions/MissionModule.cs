@@ -21,12 +21,6 @@ namespace Missions
     {
         protected override void Load(ContainerBuilder builder)
         {
-            // TODO find how to make this not disgusting
-            if (NetworkMessageBroker.Instance == null)
-            {
-                // Creates new singleton
-                new NetworkMessageBroker();
-            }
 
             builder.RegisterModule<GameInterfaceModule>();
 
@@ -47,8 +41,7 @@ namespace Missions
             builder.RegisterType<CoopMissionNetworkBehavior>().AsSelf();
             
             // Singletons
-            builder.RegisterInstance(NetworkMessageBroker.Instance)
-                .As<INetworkMessageBroker>()
+            builder.RegisterInstance(MessageBroker.Instance)
                 .As<IMessageBroker>()
                 .SingleInstance()
                 .PropertiesAutowired(PropertyWiringOptions.AllowCircularDependencies);

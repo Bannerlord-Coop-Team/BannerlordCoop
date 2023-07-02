@@ -1,16 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
+﻿using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Time.Enum
+namespace GameInterface.Services.Heroes.Enum;
+
+public enum TimeControlEnum
 {
-    public enum TimeControlEnum
-    {
-        Pause = CampaignTimeControlMode.Stop,
-        Play_1x = CampaignTimeControlMode.StoppablePlay,
-        Play_2x = CampaignTimeControlMode.StoppableFastForward,
-    }
+    Pause = CampaignTimeControlMode.Stop,
+    Play_1x = CampaignTimeControlMode.StoppablePlay,
+    Play_2x = CampaignTimeControlMode.StoppableFastForward,
 }

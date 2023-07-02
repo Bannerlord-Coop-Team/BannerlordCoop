@@ -1,6 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
-using GameInterface.Services.Heroes;
+using GameInterface.Services.Registry;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Extensions;
 using System;

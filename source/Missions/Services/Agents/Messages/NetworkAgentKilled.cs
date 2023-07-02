@@ -6,7 +6,7 @@ using TaleWorlds.MountAndBlade;
 namespace Missions.Services.Agents.Messages
 {
     [ProtoContract]
-    public readonly struct NetworkAgentKilled : INetworkEvent
+    public readonly struct NetworkAgentKilled : IEvent
     {
         public NetworkAgentKilled(Guid victimAgentId, Guid attackingAgent, Blow blow)
         {
