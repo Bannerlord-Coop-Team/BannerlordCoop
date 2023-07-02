@@ -3,6 +3,7 @@ using Common.Messaging;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace Coop.Tests.Mocks
 {
@@ -22,9 +23,11 @@ namespace Coop.Tests.Mocks
             Subscriptions.Remove(handler);
         }
 
-        public void Publish<T>(object sender, T message) where T : IMessage
+        public IEnumerable<Task> Publish<T>(object sender, T message) where T : IMessage
         {
             PublishedMessages.Add(message);
+
+            return Array.Empty<Task>();
         }
         public void Respond<T>(object source, T message) where T : IResponse
         {
