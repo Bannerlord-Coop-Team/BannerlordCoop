@@ -7,15 +7,14 @@ namespace Common.Serialization
     [ProtoContract]
     internal readonly struct ProtoMessageWrapper
     {
-        public Type Type { get => Type.GetType(typeString); }
         [ProtoMember(1)]
-        private readonly string typeString;
+        public Type Type { get; }
         [ProtoMember(2)]
         public byte[] ContractData { get; }
 
         public ProtoMessageWrapper(Type type, byte[] contractData)
         {
-            typeString = type.AssemblyQualifiedName;
+            Type = type;
             ContractData = contractData;
         }
     }

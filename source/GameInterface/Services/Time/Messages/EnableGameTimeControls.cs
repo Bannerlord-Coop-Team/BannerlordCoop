@@ -1,15 +1,8 @@
 ﻿using Common.Messaging;
 using System;
 
-namespace GameInterface.Services.Time.Messages
-{
-    public readonly struct EnableGameTimeControls : ICommand
-    {
-        public Guid TransactionID { get; }
+namespace GameInterface.Services.Heroes.Messages;
 
-        public EnableGameTimeControls(Guid transactionID)
-        {
-            TransactionID = transactionID;
-        }
-    }
+public record EnableGameTimeControls : ICommand
+{
 }

@@ -12,6 +12,7 @@ using GameInterface.Tests.Bootstrap;
 using TaleWorlds.Library;
 using Autofac;
 using GameInterface.Tests.Bootstrap.Modules;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -60,6 +61,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             MBList<Hideout> allhideouts = (MBList<Hideout>)Campaign_hideouts.GetValue(Campaign.Current) ?? new MBList<Hideout>();
 
             allhideouts.Add(hideout);
+
+            Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
 
             MobileParty mobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
             PartyBase party = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));

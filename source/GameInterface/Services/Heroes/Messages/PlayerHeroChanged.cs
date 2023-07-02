@@ -1,16 +1,16 @@
-﻿using TaleWorlds.CampaignSystem;
+﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+public readonly struct PlayerHeroChanged : IEvent
 {
-    public readonly struct PlayerHeroChanged
-    {
-        public Hero PreviousHero { get; }
-        public Hero NewHero { get; }
+    public Hero PreviousHero { get; }
+    public Hero NewHero { get; }
 
-        public PlayerHeroChanged(Hero previousHero, Hero newHero)
-        {
-            PreviousHero = previousHero;
-            NewHero = newHero;
-        }
+    public PlayerHeroChanged(Hero previousHero, Hero newHero)
+    {
+        PreviousHero = previousHero;
+        NewHero = newHero;
     }
 }

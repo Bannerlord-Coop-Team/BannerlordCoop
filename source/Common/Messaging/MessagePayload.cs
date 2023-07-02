@@ -5,7 +5,7 @@ namespace Common.Messaging
 {
     [Serializable]
     [ProtoContract(SkipConstructor = true)]
-    public struct MessagePayload<T>
+    public record MessagePayload<T>
     {
         public object Who { get; set; }
         [ProtoMember(1)]

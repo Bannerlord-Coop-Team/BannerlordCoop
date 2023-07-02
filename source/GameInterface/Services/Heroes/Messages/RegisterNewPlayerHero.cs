@@ -1,39 +1,33 @@
 ﻿using Common.Messaging;
 using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.Heroes.Interfaces
+namespace GameInterface.Services.Heroes.Messages;
+
+public record RegisterNewPlayerHero : ICommand
 {
-    public readonly struct RegisterNewPlayerHero : ICommand
+    public byte[] Bytes { get; }
+
+    public RegisterNewPlayerHero(byte[] bytes)
     {
-        public Guid TransactionID { get; }
-
-        public byte[] Bytes { get; }
-
-        public RegisterNewPlayerHero(Guid transactionId, byte[] bytes)
-        {
-            TransactionID = transactionId;
-            Bytes = bytes;
-        }
+        Bytes = bytes;
     }
+}
 
-    public readonly struct NewPlayerHeroRegistered : IResponse
+public record NewPlayerHeroRegistered : IResponse
+{
+    public string HeroStringId { get; }
+    public string PartyStringId { get; }
+    public string CharacterObjectStringId { get; }
+    public string ClanStringId { get; }
+
+    public NewPlayerHeroRegistered(Hero hero)
     {
-        public Guid TransactionID { get; }
-        public string HeroStringId { get; }
-        public string PartyStringId { get; }
-        public string CharacterObjectStringId { get; }
-        public string ClanStringId { get; }
+        if (hero == null) return;
 
-        public NewPlayerHeroRegistered(Guid transactionID, Hero hero)
-        {
-            TransactionID = transactionID;
-            HeroStringId = hero.StringId;
-            PartyStringId = hero.PartyBelongedTo.StringId;
-            CharacterObjectStringId = hero.CharacterObject.StringId;
-            ClanStringId = hero.Clan.StringId;
-        }
+        HeroStringId = hero.StringId;
+        PartyStringId = hero.PartyBelongedTo.StringId;
+        CharacterObjectStringId = hero.CharacterObject.StringId;
+        ClanStringId = hero.Clan.StringId;
     }
 }

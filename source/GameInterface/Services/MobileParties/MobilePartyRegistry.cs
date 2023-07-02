@@ -1,44 +1,49 @@
 ﻿using Common;
-using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages;
-using Microsoft.Win32;
-using System.Collections.Generic;
-using System;
+using Coop.Mod.Extentions;
+using GameInterface.Services.Registry;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
-using Common.Logging;
-using GameInterface.Services.Heroes;
-using Serilog;
-using System.Collections;
-using GameInterface.Services.Registry;
 
-namespace GameInterface.Services.MobileParties
+namespace GameInterface.Services.MobileParties;
+
+internal interface IMobilePartyRegistry : IRegistry<MobileParty>
 {
-    internal interface IMobilePartyRegistry : IRegistry<MobileParty>
+    bool RegisterParty(MobileParty party);
+    bool RemoveParty(MobileParty party);
+    void RegisterAllParties();
+}
+
+internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegistry
+{
+    public bool RegisterParty(MobileParty party)
     {
-        void RegisterAllParties();
+        if (RegisterExistingObject(party.StringId, party) == false)
+        {
+            Logger.Warning("Unable to register party: {object}", party.Name);
+            return false;
+        }
+
+        return true;
     }
 
-    internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegistry
+    public bool RemoveParty(MobileParty party)
     {
-        public void RegisterAllParties()
+        return Remove(party.StringId);
+    }
+
+    public void RegisterAllParties()
+    {
+        var objectManager = Campaign.Current?.CampaignObjectManager;
+
+        if (objectManager == null)
         {
-            var objectManager = Campaign.Current?.CampaignObjectManager;
+            Logger.Error("Unable to register objects when CampaignObjectManager is null");
+            return;
+        }
 
-            if (objectManager == null)
-            {
-                Logger.Error("Unable to register objects when CampaignObjectManager is null");
-                return;
-            }
-
-            foreach (var party in objectManager.MobileParties)
-            {
-                if(RegisterExistingObject(party.StringId, party) == false)
-                {
-                    Logger.Warning("Unable to register party: {object}", party.Name);
-                }
-            }
+        foreach (var party in objectManager.MobileParties)
+        {
+            RegisterParty(party);
         }
     }
 }

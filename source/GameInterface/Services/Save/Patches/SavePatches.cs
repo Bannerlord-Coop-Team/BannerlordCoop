@@ -1,16 +1,15 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Save.Messages;
+using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using TaleWorlds.Core;
 
-namespace Coop.Mod.Patch.World
+namespace GameInterface.Services.Heroes.Patches;
+
+[HarmonyPatch(typeof(Game), "Save")]
+class SavePatches
 {
-    [HarmonyPatch(typeof(Game), "Save")]
-    class SavePatches
+    static void Prefix(Game __instance, ref string saveName)
     {
-        static void Prefix(Game __instance, ref string saveName)
-        {
-            MessageBroker.Instance.Publish(__instance, new GameSaved(saveName));
-        }
+        MessageBroker.Instance.Publish(__instance, new GameSaved(saveName));
     }
 }

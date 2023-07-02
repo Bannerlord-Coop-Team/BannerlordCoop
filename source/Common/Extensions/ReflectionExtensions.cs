@@ -18,8 +18,10 @@ namespace Common.Extensions
         /// </remarks>
         /// <param name="domain">Domain to get types from</param>
         /// <returns>Enumarable of all domain types</returns>
-        public static IEnumerable<Type> GetDomainTypes(this AppDomain domain)
+        public static IEnumerable<Type> GetDomainTypes(this AppDomain domain, string namespacePrefix = null)
         {
+            namespacePrefix = namespacePrefix == null ? string.Empty : namespacePrefix;
+
             List<Type> types = new List<Type>();
 
             Assembly[] assemblies = domain.GetAssemblies();
@@ -29,6 +31,9 @@ namespace Common.Extensions
                 {
                     foreach (Type type in _assembly.GetTypes())
                     {
+                        if (type.Namespace == null) continue;
+                        if (type.Namespace.StartsWith(namespacePrefix) == false) continue;
+
                         types.Add(type);
                     }
                 }
@@ -233,58 +238,5 @@ namespace Common.Extensions
         }
     }
 
-    public static class FastInvoke
-    {
-
-        public static Func<T, ReturnType> BuildUntypedGetter<T, ReturnType>(this MemberInfo memberInfo)
-        {
-            var targetType = memberInfo.DeclaringType;
-            var exInstance = Expression.Parameter(targetType, "t");
-            var exResult = Expression.Parameter(typeof(ReturnType), "r");
-
-            var exMemberAccess = Expression.MakeMemberAccess(exInstance, memberInfo);       // t.PropertyName
-            var exConvertToObject = Expression.Convert(exMemberAccess, typeof(object));     // Convert(t.PropertyName, typeof(object))
-            var lambda = Expression.Lambda<Func<T, ReturnType>>(exConvertToObject, exInstance, exResult);
-
-            var action = lambda.Compile();
-            return action;
-        }
-
-        public static Action<T, object> BuildUntypedSetter<T>(this MemberInfo memberInfo)
-        {
-            var targetType = memberInfo.DeclaringType;
-            var exInstance = Expression.Parameter(targetType, "t");
-
-            var exMemberAccess = Expression.MakeMemberAccess(exInstance, memberInfo);
-
-            // t.PropertValue(Convert(p))
-            var exValue = Expression.Parameter(typeof(object), "p");
-            var exConvertedValue = Expression.Convert(exValue, GetUnderlyingType(memberInfo));
-            var exBody = Expression.Assign(exMemberAccess, exConvertedValue);
-
-            var lambda = Expression.Lambda<Action<T, object>>(exBody, exInstance, exValue);
-            var action = lambda.Compile();
-            return action;
-        }
-
-        private static Type GetUnderlyingType(this MemberInfo member)
-        {
-            switch (member.MemberType)
-            {
-                case MemberTypes.Event:
-                    return ((EventInfo)member).EventHandlerType;
-                case MemberTypes.Field:
-                    return ((FieldInfo)member).FieldType;
-                case MemberTypes.Method:
-                    return ((MethodInfo)member).ReturnType;
-                case MemberTypes.Property:
-                    return ((PropertyInfo)member).PropertyType;
-                default:
-                    throw new ArgumentException
-                    (
-                     "Input MemberInfo must be if type EventInfo, FieldInfo, MethodInfo, or PropertyInfo"
-                    );
-            }
-        }
-    }
+    
 }

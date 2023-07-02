@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using Xunit;
 using GameInterface.Serialization.Native;
 using Autofac;
+using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
-using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

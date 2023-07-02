@@ -68,11 +68,6 @@ namespace Missions.Services.Arena
             return result;
         }
 
-        public RandomEquipmentGenerator()
-        {
-            
-        }
-
         /// <summary>
         /// Creates random equipment for characters
         /// </summary>

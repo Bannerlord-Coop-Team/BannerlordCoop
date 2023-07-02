@@ -12,7 +12,7 @@ namespace Missions.Services.Agents.Messages
     /// External event for agent weapon pickups
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public class NetworkWeaponPickedup : INetworkEvent
+    public class NetworkWeaponPickedup : IEvent
     {   
         [ProtoMember(1)]
         public Guid AgentId { get; }

@@ -18,7 +18,7 @@ namespace Missions.Services.Network
     {
         private static readonly ILogger Logger = LogManager.GetLogger<EventQueueManager>();
 
-        Dictionary<NetPeer, ConcurrentQueue<INetworkEvent>> Queues = new Dictionary<NetPeer, ConcurrentQueue<INetworkEvent>>();
+        Dictionary<NetPeer, ConcurrentQueue<IMessage>> Queues = new Dictionary<NetPeer, ConcurrentQueue<IMessage>>();
 
         Dictionary<NetPeer, bool> ReadyPeers = new Dictionary<NetPeer, bool>();
 
@@ -58,6 +58,7 @@ namespace Missions.Services.Network
             {
                 if (Queues[peer].TryDequeue(out var message))
                 {
+                    // TODO wait for event task to finish before starting next
                     PublishEvent(peer, message);
                 }
             }
@@ -75,7 +76,7 @@ namespace Missions.Services.Network
             }
 
             ReadyPeers.Add(peer, false);
-            Queues.Add(peer, new ConcurrentQueue<INetworkEvent>());
+            Queues.Add(peer, new ConcurrentQueue<IMessage>());
         }
 
         private void Handle_PeerDisconnect(MessagePayload<PeerDisconnected> obj)

@@ -1,6 +1,7 @@
 ﻿using Common.Extensions;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 
@@ -15,43 +16,45 @@ namespace GameInterface.Serialization.Native
         private object Object;
         [NonSerialized]
         private bool IsUnpacked = false;
+        
+        private Dictionary<string, IBinaryPackage> StoredFields = new Dictionary<string, IBinaryPackage>();
 
-        private Dictionary<FieldInfo, IBinaryPackage> StoredFields = new Dictionary<FieldInfo, IBinaryPackage>();
-
-        private Type ObjectType;
+        private string ObjectType;
+        protected Type T => Type.GetType(ObjectType);
 
         public KeyValuePairBinaryPackage(object kvp, IBinaryPackageFactory binaryPackageFactory)
         {
-            ObjectType = kvp.GetType();
+            ObjectType = kvp.GetType().AssemblyQualifiedName;
+            var type = Type.GetType(ObjectType);
             Object = kvp;
             this.binaryPackageFactory = binaryPackageFactory;
 
-            if (ObjectType.GetGenericTypeDefinition() != typeof(KeyValuePair<,>)) throw new Exception(
+            if (type.GetGenericTypeDefinition() != typeof(KeyValuePair<,>)) throw new Exception(
                 $"{ObjectType} is not {typeof(KeyValuePair<,>)}");
         }
 
         public void Pack()
         {
-            foreach (FieldInfo field in ObjectType.GetAllInstanceFields())
+            // Iterate through all of the instance fields of the object's type
+            var fields = Type.GetType(ObjectType).GetAllInstanceFields().GroupBy(o => o.Name).Select(g => g.First());
+            foreach (FieldInfo field in fields)
             {
+                // Get the value of the current field in the object
+                // Add a binary package of the field value to the StoredFields collection
                 object obj = field.GetValue(Object);
-                StoredFields.Add(field, binaryPackageFactory.GetBinaryPackage(obj));
+                StoredFields.Add(field.Name, binaryPackageFactory.GetBinaryPackage(obj));
             }
         }
 
         public object Unpack(IBinaryPackageFactory binaryPackageFactory)
         {
             if (IsUnpacked) return Object;
-
+            var type = Type.GetType(ObjectType);
             this.binaryPackageFactory = binaryPackageFactory;
+            
+            Object = FormatterServices.GetUninitializedObject(type);
 
-            Object = FormatterServices.GetUninitializedObject(ObjectType);
-
-            TypedReference reference = __makeref(Object);
-            foreach (FieldInfo field in StoredFields.Keys)
-            {
-                field.SetValueDirect(reference, StoredFields[field].Unpack(binaryPackageFactory));
-            }
+            UnpackInternal();
 
             return Object;
         }
@@ -59,6 +62,18 @@ namespace GameInterface.Serialization.Native
         public T Unpack<T>(IBinaryPackageFactory binaryPackageFactory)
         {
             return (T)Unpack(binaryPackageFactory);
+        }
+        
+        private void UnpackInternal()
+        {
+            var type = Object.GetType();
+            var fields = type.GetAllInstanceFields();
+
+            foreach (string fieldName in StoredFields.Keys)
+            {
+                var field = fields.FirstOrDefault(f => f.Name.Equals(fieldName));
+                field.SetValue((object)Object, StoredFields[fieldName].Unpack(binaryPackageFactory));
+            }
         }
     }
 }

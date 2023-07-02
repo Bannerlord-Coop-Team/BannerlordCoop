@@ -29,15 +29,20 @@ namespace Missions.Services.Agents.Handlers
     public class WeaponPickupHandler : IWeaponPickupHandler
     {
         readonly INetworkAgentRegistry networkAgentRegistry;
-        readonly INetworkMessageBroker networkMessageBroker;
+        readonly INetwork network;
+        readonly IMessageBroker messageBroker;
         readonly static ILogger Logger = LogManager.GetLogger<WeaponPickupHandler>();
-        public WeaponPickupHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker)
+        public WeaponPickupHandler(
+            INetworkAgentRegistry networkAgentRegistry,
+            INetwork network,
+            IMessageBroker messageBroker)
         {
             this.networkAgentRegistry = networkAgentRegistry;
-            this.networkMessageBroker = networkMessageBroker;
+            this.network = network;
+            this.messageBroker = messageBroker;
 
-            networkMessageBroker.Subscribe<WeaponPickedup>(WeaponPickupSend);
-            networkMessageBroker.Subscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
+            messageBroker.Subscribe<WeaponPickedup>(WeaponPickupSend);
+            messageBroker.Subscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
 
         }
         ~WeaponPickupHandler()
@@ -47,8 +52,8 @@ namespace Missions.Services.Agents.Handlers
 
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<WeaponPickedup>(WeaponPickupSend);
-            networkMessageBroker.Unsubscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
+            messageBroker.Unsubscribe<WeaponPickedup>(WeaponPickupSend);
+            messageBroker.Unsubscribe<NetworkWeaponPickedup>(WeaponPickupReceive);
         }
 
         private void WeaponPickupSend(MessagePayload<WeaponPickedup> obj)
@@ -70,7 +75,7 @@ namespace Missions.Services.Agents.Handlers
                 payload.WeaponModifier,
                 payload.Banner);
 
-            networkMessageBroker.PublishNetworkEvent(message);
+            network.SendAll(message);
         }
         private void WeaponPickupReceive(MessagePayload<NetworkWeaponPickedup> obj)
         {

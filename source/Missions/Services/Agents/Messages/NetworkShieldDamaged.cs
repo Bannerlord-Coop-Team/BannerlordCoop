@@ -9,7 +9,7 @@ namespace Missions.Services.Agents.Messages
     /// Event for agent shield damage
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct NetworkShieldDamaged : INetworkEvent
+    public readonly struct NetworkShieldDamaged : IEvent
     {
         [ProtoMember(1)]
         public Guid AgentGuid { get; }

@@ -1,11 +1,12 @@
-﻿using LiteNetLib;
+﻿using Common.Messaging;
+using LiteNetLib;
 
 namespace Missions.Services.Missiles.Message
 {
     /// <summary>
     /// Missile added event originating from a network event
     /// </summary>
-    public readonly struct PeerMissileAdded
+    public readonly struct PeerMissileAdded : IEvent
     {
         public NetPeer Peer { get; }
         public int PeerMissileId { get; }

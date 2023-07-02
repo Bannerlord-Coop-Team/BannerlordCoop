@@ -23,18 +23,21 @@ namespace Missions.Services.Taverns
         private static readonly ILogger Logger = LogManager.GetLogger<CoopArenaController>();
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly INetworkMessageBroker _messageBroker;
+        private readonly INetwork network;
+        private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
         private readonly BoardGameManager _boardGameManager;
 
         private readonly Guid playerId;
 
-        public CoopTavernsController(LiteNetP2PClient client, 
-            INetworkMessageBroker messageBroker, 
+        public CoopTavernsController(
+            INetwork network,
+            IMessageBroker messageBroker, 
             INetworkAgentRegistry agentRegistry,
             BoardGameManager boardGameManager)
         {
+            this.network = network;
             _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
             _boardGameManager = boardGameManager;
@@ -73,7 +76,7 @@ namespace Missions.Services.Taverns
                 health,
                 null);
 
-            _messageBroker.PublishNetworkEvent(peer, request);
+            network.Send(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
                 characterObject.Name, request.PlayerId, peer.EndPoint);

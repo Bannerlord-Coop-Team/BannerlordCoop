@@ -96,11 +96,6 @@ namespace IntroServer.Server
         {
         }
 
-        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, DeliveryMethod deliveryMethod)
-        {
-            // TODO create packet forwarding for strict nat
-        }
-
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
         {
             _logger.LogError("OnNetworkError({endPoint}, {socketError}).", endPoint, socketError);
@@ -175,6 +170,11 @@ namespace IntroServer.Server
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
             _logger.LogTrace("Nat Introduction succeeded for {Peer}", targetEndPoint);
+        }
+
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+        {
+            // TODO create packet forwarding for strict nat
         }
     }
 }

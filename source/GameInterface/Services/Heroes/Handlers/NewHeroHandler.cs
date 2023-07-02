@@ -6,57 +6,62 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Handlers
+namespace GameInterface.Services.Heroes.Handlers;
+
+internal class NewHeroHandler : IHandler
 {
-    internal class NewHeroHandler : IHandler
+    private static readonly ILogger Logger = LogManager.GetLogger<NewHeroHandler>();
+
+    private readonly IHeroInterface heroInterface;
+    private readonly IMessageBroker messageBroker;
+
+    public NewHeroHandler(
+        IHeroInterface heroInterface,
+        IMessageBroker messageBroker)
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<NewHeroHandler>();
+        this.heroInterface = heroInterface;
+        this.messageBroker = messageBroker;
 
-        private readonly IHeroInterface heroInterface;
-        private readonly IMessageBroker messageBroker;
+        messageBroker.Subscribe<PackageMainHero>(Handle);
+        messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
+    }
 
-        public NewHeroHandler(
-            IHeroInterface heroInterface,
-            IMessageBroker messageBroker)
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<PackageMainHero>(Handle);
+        messageBroker.Unsubscribe<RegisterNewPlayerHero>(Handle);
+    }
+
+    private void Handle(MessagePayload<PackageMainHero> obj)
+    {
+        try
         {
-            this.heroInterface = heroInterface;
-            this.messageBroker = messageBroker;
-
-            messageBroker.Subscribe<PackageMainHero>(Handle);
-            messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
+            byte[] bytes = heroInterface.PackageMainHero();
+            messageBroker.Publish(this, new NewHeroPackaged(bytes));
         }
-
-        private void Handle(MessagePayload<PackageMainHero> obj)
+        catch (Exception e)
         {
-            try
-            {
-                heroInterface.PackageMainHero();
-            }
-            catch (Exception e)
-            {
-                Logger.Error("Error while packing new Hero: {error}", e.Message);
-            }
+            Logger.Error("Error while packing new Hero: {error}", e.Message);
         }
+    }
 
-        private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
+    private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
+    {
+        byte[] bytes = obj.What.Bytes;
+
+        try
         {
-            var transactionId = obj.What.TransactionID;
-            byte[] bytes = obj.What.Bytes;
+            Hero hero = heroInterface.UnpackMainHero(bytes);
 
-            try
-            {
-                Hero hero = heroInterface.UnpackMainHero(bytes);
+            Logger.Information("New Hero ID: {id}", hero.Id.InternalValue);
 
-                Logger.Information("New Hero ID: {id}", hero.Id.InternalValue);
+            var registerMessage = new NewPlayerHeroRegistered(hero);
 
-                var registerMessage = new NewPlayerHeroRegistered(transactionId, hero);
-
-                messageBroker.Publish(this, registerMessage);
-            }
-            catch(Exception e)
-            {
-                Logger.Error("Error while unpacking new Hero: {error}", e.Message);
-            }
+            messageBroker.Respond(obj.Who, registerMessage);
+        }
+        catch(Exception e)
+        {
+            Logger.Error("Error while unpacking new Hero: {error}", e.Message);
         }
     }
 }

@@ -2,10 +2,10 @@
 using GameInterface.Serialization;
 using TaleWorlds.Core;
 using Xunit;
-using TaleWorlds.ObjectSystem;
 using System.Reflection;
 using GameInterface.Tests.Bootstrap;
 using Autofac;
+using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
 using GameInterface.Services.ObjectManager;
 

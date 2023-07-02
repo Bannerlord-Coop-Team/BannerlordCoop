@@ -1,11 +1,8 @@
-﻿namespace GameInterface.Services.GameDebug.Messages
+﻿using Common.Messaging;
+
+namespace GameInterface.Services.GameDebug.Messages
 {
-    public readonly struct LoadDebugGame
-    {
-
-    }
-
-    public readonly struct DebugGameStarted
+    public readonly struct LoadDebugGame : ICommand
     {
 
     }

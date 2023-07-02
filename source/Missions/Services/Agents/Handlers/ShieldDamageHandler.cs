@@ -22,17 +22,22 @@ namespace Missions.Services.Agents.Handlers
     /// <inheritdoc/>
     public class ShieldDamageHandler : IShieldDamageHandler
     {
-        readonly INetworkAgentRegistry networkAgentRegistry;
-        readonly INetworkMessageBroker networkMessageBroker;
+        private readonly INetworkAgentRegistry networkAgentRegistry;
+        private readonly INetwork network;
+        private readonly IMessageBroker messageBroker;
         readonly static ILogger Logger = LogManager.GetLogger<ShieldDamageHandler>();
 
-        public ShieldDamageHandler(INetworkAgentRegistry networkAgentRegistry, INetworkMessageBroker networkMessageBroker)
+        public ShieldDamageHandler(
+            INetworkAgentRegistry networkAgentRegistry,
+            INetwork network,
+            IMessageBroker messageBroker)
         {
             this.networkAgentRegistry = networkAgentRegistry;
-            this.networkMessageBroker = networkMessageBroker;
+            this.network = network;
+            this.messageBroker = messageBroker;
 
-            networkMessageBroker.Subscribe<ShieldDamaged>(ShieldDamageSend);
-            networkMessageBroker.Subscribe<NetworkShieldDamaged>(ShieldDamageReceive);
+            messageBroker.Subscribe<ShieldDamaged>(ShieldDamageSend);
+            messageBroker.Subscribe<NetworkShieldDamaged>(ShieldDamageReceive);
         }
         ~ShieldDamageHandler()
         {
@@ -41,8 +46,8 @@ namespace Missions.Services.Agents.Handlers
 
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<ShieldDamaged>(ShieldDamageSend);
-            networkMessageBroker.Unsubscribe<NetworkShieldDamaged>(ShieldDamageReceive);
+            messageBroker.Unsubscribe<ShieldDamaged>(ShieldDamageSend);
+            messageBroker.Unsubscribe<NetworkShieldDamaged>(ShieldDamageReceive);
         }
 
         private void ShieldDamageSend(MessagePayload<ShieldDamaged> payload)
@@ -50,7 +55,7 @@ namespace Missions.Services.Agents.Handlers
 
             if (networkAgentRegistry.TryGetAgentId(payload.What.Agent, out Guid agentId) == false) return;
             NetworkShieldDamaged message = new NetworkShieldDamaged(agentId, payload.What.EquipmentIndex, payload.What.InflictedDamage);
-            networkMessageBroker.PublishNetworkEvent(message);
+            network.SendAll(message);
         }
         private static readonly MethodInfo OnShieldDamaged = typeof(Agent).GetMethod("OnShieldDamaged", BindingFlags.NonPublic | BindingFlags.Instance);
         private void ShieldDamageReceive(MessagePayload<NetworkShieldDamaged> payload)
@@ -67,7 +72,6 @@ namespace Missions.Services.Agents.Handlers
                 return;
             }
             OnShieldDamaged.Invoke(agent, new object[] { payload.What.EquipmentIndex, payload.What.InflictedDamage });
-
         }
     }
 }

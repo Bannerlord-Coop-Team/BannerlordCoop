@@ -33,36 +33,36 @@ namespace Missions.Services.Agents.Handlers
         private readonly static ILogger Logger = LogManager.GetLogger<AgentDamageHandler>();
 
         private readonly INetworkAgentRegistry networkAgentRegistry;
-        private readonly INetworkMessageBroker networkMessageBroker;
+        private readonly INetwork network;
+        private readonly IMessageBroker messageBroker;
         private readonly INetworkMissileRegistry networkMissileRegistry;
 
         public AgentDamageHandler(
             INetworkAgentRegistry networkAgentRegistry,
-            INetworkMessageBroker networkMessageBroker,
+            INetwork network,
+            IMessageBroker messageBroker,
             INetworkMissileRegistry networkMissileRegistry) 
         {
             this.networkAgentRegistry = networkAgentRegistry;
-            this.networkMessageBroker = networkMessageBroker;
+            this.network = network;
+            this.messageBroker = messageBroker;
             this.networkMissileRegistry = networkMissileRegistry;
 
-            networkMessageBroker.Subscribe<AgentDamaged>(AgentDamageCheckSend);
-            networkMessageBroker.Subscribe<NetworkDamageAgent>(AgentDamageCheck);
-            networkMessageBroker.Subscribe<NetworkAgentDamaged>(AgentDamageRecieve);
-            networkMessageBroker.Subscribe<NetworkAgentKilled>(Handle_NetworkAgentKilled);
+            messageBroker.Subscribe<AgentDamaged>(AgentDamageCheckSend);
+            messageBroker.Subscribe<NetworkDamageAgent>(AgentDamageCheck);
+            messageBroker.Subscribe<NetworkAgentDamaged>(AgentDamageRecieve);
+            messageBroker.Subscribe<NetworkAgentKilled>(Handle_NetworkAgentKilled);
         }
 
         
 
-        ~AgentDamageHandler()
-        {
-            Dispose();
-        }
+        ~AgentDamageHandler() => Dispose();
         public void Dispose()
         {
-            networkMessageBroker.Unsubscribe<AgentDamaged>(AgentDamageCheckSend);
-            networkMessageBroker.Unsubscribe<NetworkDamageAgent>(AgentDamageCheck);
-            networkMessageBroker.Unsubscribe<NetworkAgentDamaged>(AgentDamageRecieve);
-            networkMessageBroker.Unsubscribe<NetworkAgentKilled>(Handle_NetworkAgentKilled);
+            messageBroker.Unsubscribe<AgentDamaged>(AgentDamageCheckSend);
+            messageBroker.Unsubscribe<NetworkDamageAgent>(AgentDamageCheck);
+            messageBroker.Unsubscribe<NetworkAgentDamaged>(AgentDamageRecieve);
+            messageBroker.Unsubscribe<NetworkAgentKilled>(Handle_NetworkAgentKilled);
         }
 
         private void AgentDamageCheckSend(MessagePayload<AgentDamaged> payload)
@@ -90,7 +90,7 @@ namespace Missions.Services.Agents.Handlers
                     victimId,
                     payload.What.AttackCollisionData,
                     payload.What.Blow);
-                networkMessageBroker.PublishNetworkEvent(friendlyFireMessage);
+                network.SendAll(friendlyFireMessage);
 
                 return;
             }
@@ -107,7 +107,7 @@ namespace Missions.Services.Agents.Handlers
                 payload.What.AttackCollisionData, 
                 payload.What.Blow);
 
-            networkMessageBroker.PublishNetworkEvent(netPeer, message);
+            network.Send(netPeer, message);
         }
 
         private void AgentDamageCheck(MessagePayload<NetworkDamageAgent> payload)
@@ -155,7 +155,7 @@ namespace Missions.Services.Agents.Handlers
                 //return;
             }
 
-            networkMessageBroker.PublishNetworkEvent(damageMessage);
+            network.SendAll(damageMessage);
         }
 
         private void AgentDamageRecieve(MessagePayload<NetworkAgentDamaged> payload)

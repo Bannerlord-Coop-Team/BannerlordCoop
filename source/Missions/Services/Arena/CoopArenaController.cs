@@ -34,7 +34,8 @@ namespace Missions.Services
 
         public override MissionBehaviorType BehaviorType => MissionBehaviorType.Other;
 
-        private readonly INetworkMessageBroker networkMessageBroker;
+        private readonly INetwork network;
+        private readonly IMessageBroker messageBroker;
         private readonly INetworkAgentRegistry agentRegistry;
         private readonly IRandomEquipmentGenerator equipmentGenerator;
         private readonly IBinaryPackageFactory packageFactory;
@@ -45,7 +46,8 @@ namespace Missions.Services
         private readonly Guid playerId;
 
         public CoopArenaController(
-            INetworkMessageBroker networkMessageBroker,
+            INetwork network,
+            IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry, 
             IRandomEquipmentGenerator equipmentGenerator,
             IBinaryPackageFactory packageFactory,
@@ -58,7 +60,8 @@ namespace Missions.Services
             IServerDisconnectHandler serverDisconnectHandler,
             INetworkMissileRegistry networkMissileRegistry)
         {
-            this.networkMessageBroker = networkMessageBroker;
+            this.network = network;
+            this.messageBroker = messageBroker;
             this.agentRegistry = agentRegistry;
             this.equipmentGenerator = equipmentGenerator;
             this.packageFactory = packageFactory;
@@ -77,8 +80,8 @@ namespace Missions.Services
 
             playerId = Guid.NewGuid();
 
-            this.networkMessageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            this.networkMessageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
+            messageBroker.Subscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
         }
 
         ~CoopArenaController()
@@ -95,8 +98,8 @@ namespace Missions.Services
                 handler.Dispose();
             }
 
-            networkMessageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
-            networkMessageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
+            messageBroker.Unsubscribe<NetworkMissionJoinInfo>(Handle_JoinInfo);
+            messageBroker.Unsubscribe<PeerConnected>(Handle_PeerConnected);
         }
 
         public override void AfterStart()
@@ -151,7 +154,7 @@ namespace Missions.Services
                 health, 
                 aiAgentDatas.ToArray());
 
-            networkMessageBroker.PublishNetworkEvent(peer, request);
+            network.Send(peer, request);
             Logger.Information("Sent {AgentType} Join Request for {AgentName}({PlayerID}) to {Peer}",
                 characterObject.IsPlayerCharacter ? "Player" : "Agent",
                 characterObject.Name, request.PlayerId, peer.EndPoint);
@@ -201,7 +204,7 @@ namespace Missions.Services
                 SpawnAIAgent(netPeer, aiAgentData);
             }
 
-            networkMessageBroker.Publish(this, new PeerReady(netPeer));
+            messageBroker.Publish(this, new PeerReady(netPeer));
         }
 
         private void SpawnAIAgent(

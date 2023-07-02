@@ -1,31 +1,20 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Save.Data;
+using GameInterface.Services.Heroes.Data;
 using System;
-using System.Collections.Generic;
 
-namespace GameInterface.Services.Save.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+public record LoadExistingObjectGuids : ICommand
 {
-    public readonly struct LoadExistingObjectGuids : ICommand
+    public GameObjectGuids GameObjectGuids { get; }
+
+    public LoadExistingObjectGuids(
+        GameObjectGuids gameObjectGuids)
     {
-        public Guid TransactionID { get; }
-        public GameObjectGuids GameObjectGuids { get; }
-
-        public LoadExistingObjectGuids(
-            Guid transactionID,
-            GameObjectGuids gameObjectGuids)
-        {
-            TransactionID = transactionID;
-            GameObjectGuids = gameObjectGuids;
-        }
+        GameObjectGuids = gameObjectGuids;
     }
+}
 
-    public readonly struct ExistingObjectGuidsLoaded : IResponse
-    {
-        public Guid TransactionID { get; }
-
-        public ExistingObjectGuidsLoaded(Guid transactionID)
-        {
-            TransactionID = transactionID;
-        }
-    }
+public record ExistingObjectGuidsLoaded : IResponse
+{
 }

@@ -1,8 +1,9 @@
-﻿using LiteNetLib;
+﻿using Common.Messaging;
+using LiteNetLib;
 
 namespace Missions.Services.Network.Messages
 {
-    public readonly struct PeerConnected
+    public readonly struct PeerConnected : IEvent
     {
         public NetPeer Peer { get; }
 

@@ -21,30 +21,31 @@ namespace Missions.Services.BoardGames
     {
         private readonly ILogger m_Logger = LogManager.GetLogger<BoardGameManager>();
 
-        private readonly LiteNetP2PClient _P2PClient;
+        private readonly INetwork network;
         
-        private readonly INetworkMessageBroker _networkMessageBroker;
+        private readonly IMessageBroker _messageBroker;
         private readonly INetworkAgentRegistry _agentRegistry;
 
         private BoardGameLogic BoardGameLogic;
 
-        public BoardGameManager(LiteNetP2PClient P2PClient, 
-            INetworkMessageBroker messageBroker, 
+        public BoardGameManager(
+            INetwork network,
+            IMessageBroker messageBroker, 
             INetworkAgentRegistry agentRegistry)
         {
-            _P2PClient = P2PClient;
-            _networkMessageBroker = messageBroker;
+            this.network = network;
+            _messageBroker = messageBroker;
             _agentRegistry = agentRegistry;
 
-            _networkMessageBroker.Subscribe<AgentInteraction>(Handle_OnAgentInteraction);
-            _networkMessageBroker.Subscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
+            _messageBroker.Subscribe<AgentInteraction>(Handle_OnAgentInteraction);
+            _messageBroker.Subscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
         }
 
         public void Dispose()
         {
-            _networkMessageBroker.Unsubscribe<AgentInteraction>(Handle_OnAgentInteraction);
-            _networkMessageBroker.Unsubscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
-            _networkMessageBroker.Unsubscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
+            _messageBroker.Unsubscribe<AgentInteraction>(Handle_OnAgentInteraction);
+            _messageBroker.Unsubscribe<BoardGameChallengeRequest>(Handle_ChallengeRequest);
+            _messageBroker.Unsubscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
         }
 
         private void Handle_OnAgentInteraction(MessagePayload<AgentInteraction> payload)
@@ -63,8 +64,8 @@ namespace Missions.Services.BoardGames
                 _agentRegistry.TryGetExternalController(other, out NetPeer otherPeer);
                 BoardGameChallengeRequest request = new BoardGameChallengeRequest(senderGuid, otherGuid);
                 // TODO associate a client id so we don't have to subscribe here
-                _networkMessageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
-                _networkMessageBroker.PublishNetworkEvent(otherPeer, request);
+                _messageBroker.Subscribe<BoardGameChallengeResponse>(Handle_ChallengeResponse);
+                network.Send(otherPeer, request);
             }
             else
             {
@@ -98,7 +99,7 @@ namespace Missions.Services.BoardGames
             Guid gameId = Guid.NewGuid();
 
             BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, true, gameId);
-            _networkMessageBroker.PublishNetworkEvent(netPeer, response);
+            network.Send(netPeer, response);
 
             //Has to do same thing as if (accepted) in Handle_ChallengeResponse
             if (_agentRegistry.TryGetAgent(other, out Agent opponent))
@@ -110,7 +111,7 @@ namespace Missions.Services.BoardGames
         private void DenyGameRequest(Guid sender, Guid other, NetPeer netPeer)
         {
             BoardGameChallengeResponse response = new BoardGameChallengeResponse(sender, other, false, Guid.Empty);
-            _networkMessageBroker.PublishNetworkEvent(netPeer, response);
+            network.Send(netPeer, response);
         }
 
         private void Handle_ChallengeResponse(MessagePayload<BoardGameChallengeResponse> payload)
@@ -133,7 +134,7 @@ namespace Missions.Services.BoardGames
         {
             MissionBoardGameLogic boardGameLogic = Mission.Current.GetMissionBehavior<MissionBoardGameLogic>();
             CultureObject.BoardGameType gameType = Settlement.CurrentSettlement.Culture.BoardGame;
-            BoardGameLogic = new BoardGameLogic(_P2PClient, _networkMessageBroker, gameId, boardGameLogic, gameType);
+            BoardGameLogic = new BoardGameLogic(network, _messageBroker, gameId, boardGameLogic, gameType);
             BoardGameLogic.StartGame(startFirst, opposingAgent);
         }
     }

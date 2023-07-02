@@ -3,19 +3,18 @@ using GameInterface.Services.GameState.Messages;
 using HarmonyLib;
 using TaleWorlds.MountAndBlade;
 
-namespace GameInterface.Services.GameState.Patches
+namespace GameInterface.Services.GameState.Patches;
+
+internal class MainMenuPatch
 {
-    internal class MainMenuPatch
+    [HarmonyPatch(typeof(InitialState))]
+    class MainMenuEnteredPatch
     {
-        [HarmonyPatch(typeof(InitialState))]
-        class MainMenuEnteredPatch
+        [HarmonyPostfix]
+        [HarmonyPatch("OnActivate")]
+        static void OnActivate(ref InitialState __instance)
         {
-            [HarmonyPostfix]
-            [HarmonyPatch("OnActivate")]
-            static void OnActivate(ref InitialState __instance)
-            {
-                MessageBroker.Instance.Publish(__instance, new MainMenuEntered());
-            }
+            MessageBroker.Instance.Publish(__instance, new MainMenuEntered());
         }
     }
 }

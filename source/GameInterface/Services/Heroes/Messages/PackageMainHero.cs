@@ -1,10 +1,8 @@
 ﻿using Common.Messaging;
 using System;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+public record PackageMainHero : ICommand
 {
-    public readonly struct PackageMainHero : ICommand
-    {
-        public Guid TransactionID => throw new NotImplementedException();
-    }
 }

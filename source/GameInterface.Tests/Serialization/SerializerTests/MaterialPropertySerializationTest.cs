@@ -6,6 +6,7 @@ using GameInterface.Tests.Bootstrap;
 using System;
 using Xunit;
 using static TaleWorlds.Core.HorseComponent;
+using Common.Serialization;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

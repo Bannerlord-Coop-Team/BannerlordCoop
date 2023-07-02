@@ -1,14 +1,13 @@
 ﻿using Common.Messaging;
 
-namespace GameInterface.Services.Save.Messages
-{
-    public readonly struct GameSaved : IEvent
-    {
-        public string SaveName { get; }
+namespace GameInterface.Services.Heroes.Messages;
 
-        public GameSaved(string saveName)
-        {
-            SaveName = saveName;
-        }
+public record GameSaved : IEvent
+{
+    public string SaveName { get; }
+
+    public GameSaved(string saveName)
+    {
+        SaveName = saveName;
     }
 }

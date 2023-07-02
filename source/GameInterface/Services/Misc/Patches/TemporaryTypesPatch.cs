@@ -1,17 +1,16 @@
 ﻿using HarmonyLib;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.Misc.Patches
+namespace GameInterface.Services.Misc.Patches;
+
+/// <summary>
+/// Fixes a bug with TemporaryTypes
+/// </summary>
+[HarmonyPatch(typeof(MBObjectManager), "RemoveTemporaryTypes")]
+class TemporaryTypesPatch
 {
-    /// <summary>
-    /// Fixes a bug with TemporaryTypes
-    /// </summary>
-    [HarmonyPatch(typeof(MBObjectManager), "RemoveTemporaryTypes")]
-    class TemporaryTypesPatch
+    static bool Prefix()
     {
-        static bool Prefix()
-        {
-            return false;
-        }
+        return false;
     }
 }

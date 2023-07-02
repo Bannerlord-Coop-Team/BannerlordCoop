@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
-using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.MobileParties.Messages;
 
 namespace GameInterface.Services.GameDebug.Handlers
 {
@@ -16,6 +16,11 @@ namespace GameInterface.Services.GameDebug.Handlers
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<CharacterCreationStarted>(Handle);
+        }
+
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<CharacterCreationStarted>(Handle);
         }
 
         private void Handle(MessagePayload<CharacterCreationStarted> obj)

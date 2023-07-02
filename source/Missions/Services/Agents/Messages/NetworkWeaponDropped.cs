@@ -9,7 +9,7 @@ namespace Missions.Services.Agents.Messages
     /// External event for agent weapon drops
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct NetworkWeaponDropped : INetworkEvent
+    public readonly struct NetworkWeaponDropped : IEvent
     {
         [ProtoMember(1)]
         public Guid AgentGuid { get; }

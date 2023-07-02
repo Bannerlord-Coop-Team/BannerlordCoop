@@ -3,6 +3,7 @@ using GameInterface.Serialization;
 using TaleWorlds.Core;
 using Xunit;
 using Autofac;
+using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
