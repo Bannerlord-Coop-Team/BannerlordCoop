@@ -72,7 +72,7 @@ namespace Common.Messaging
                 tasks.Add(invokeTask);
             }
 
-            return tasks.ToArray();
+            return tasks;
         }
 
         public void Respond<T>(object target, T message) where T : IResponse
