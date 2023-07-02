@@ -8,7 +8,7 @@ namespace Common.Messaging
 {
     public interface IMessageBroker : IDisposable
     {
-        void Publish<T>(object source, T message) where T : IMessage;
+        IEnumerable<Task> Publish<T>(object source, T message) where T : IMessage;
 
         void Respond<T>(object target, T message) where T : IResponse;
 
@@ -39,20 +39,22 @@ namespace Common.Messaging
             _subscribers = new Dictionary<Type, List<WeakDelegate>>();
         }
 
-        public virtual void Publish<T>(object source, T message) where T : IMessage
+        public virtual IEnumerable<Task> Publish<T>(object source, T message) where T : IMessage
         {
             if (message == null)
-                return;
+                return Array.Empty<Task>();
 
             // Logger.Verbose($"Publishing {message.GetType().Name} from {source?.GetType().Name}");
 
             if (!_subscribers.ContainsKey(typeof(T)))
             {
-                return;
+                return Array.Empty<Task>();
             }
 
+            List<Task> tasks = new List<Task>();
+
             var delegates = _subscribers[typeof(T)];
-            if (delegates == null || delegates.Count == 0) return;
+            if (delegates == null || delegates.Count == 0) return Array.Empty<Task>();
             var payload = new MessagePayload<T>(source, message);
             for (int i = 0; i < delegates.Count; i++)
             {
@@ -65,8 +67,12 @@ namespace Common.Messaging
                     continue;
                 }
 
-                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+                Task invokeTask = Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+
+                tasks.Add(invokeTask);
             }
+
+            return tasks;
         }
 
         public void Respond<T>(object target, T message) where T : IResponse

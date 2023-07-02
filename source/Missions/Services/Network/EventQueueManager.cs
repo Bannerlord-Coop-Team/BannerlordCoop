@@ -7,6 +7,8 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace Missions.Services.Network
 {
@@ -58,7 +60,6 @@ namespace Missions.Services.Network
             {
                 if (Queues[peer].TryDequeue(out var message))
                 {
-                    // TODO wait for event task to finish before starting next
                     PublishEvent(peer, message);
                 }
             }
