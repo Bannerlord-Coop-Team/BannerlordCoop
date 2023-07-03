@@ -10,43 +10,50 @@ using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Control;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
 /// Disables all map encounters/events
 /// </summary>
-[HarmonyPatch(typeof(EncounterManager))]
-internal class EncounterManagerPatches
+[HarmonyPatch(typeof(EnterSettlementAction))]
+public class EncounterManagerPatches
 {
     private static AllowedInstance<MobileParty> _allowedInstance;
 
-    [HarmonyPatch("StartPartyEncounter")]
-    [HarmonyPrefix]
-    private static bool StartPartyEncounterPrefix() => false;
+    //[HarmonyPatch("StartPartyEncounter")]
+    //[HarmonyPrefix]
+    //private static bool StartPartyEncounterPrefix() => false;
 
-    [HarmonyPatch("StartSettlementEncounter")]
+    [HarmonyPatch("ApplyForParty")]
     [HarmonyPrefix]
-    private static bool StartSettlementEncounterPrefix(MobileParty attackerParty, Settlement settlement) 
+    private static bool ApplyForPartyPrefix(MobileParty mobileParty, Settlement settlement) 
     {
-        if (attackerParty != MobileParty.MainParty) return false;
+        if (_allowedInstance?.Instance == mobileParty) return true;
 
-        if (_allowedInstance?.Instance == attackerParty) return true;
+        if (mobileParty != MobileParty.MainParty) return false;
 
-        MessageBroker.Instance.Publish(attackerParty, new SettlementEntered(settlement.StringId, attackerParty.Id.ToString()));
+        MessageBroker.Instance.Publish(mobileParty, new SettlementEntered(settlement.StringId, mobileParty.Id.ToString()));
 
         return false;
     }
 
-    public static void RunOriginalStartSettlementEncounter(MobileParty attackerParty, Settlement settlement)
+    public static void RunOriginalStartSettlementEncounter(MobileParty mobileParty, Settlement settlement)
     {
-
-        using (_allowedInstance = new AllowedInstance<MobileParty>(attackerParty))
+        using (_allowedInstance = new AllowedInstance<MobileParty>(mobileParty))
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
-                EncounterManager.StartSettlementEncounter(attackerParty, settlement);
+                EnterSettlementAction.ApplyForParty(mobileParty, settlement);
             }, true);
         }
     }
+}
+
+public class PlayerEncounterPatches
+{
+    //[HarmonyPatch("LeaveSettlement")]
+    //[HarmonyPrefix]
+    //private static bool LeaveSettlementPrefix()
 }
