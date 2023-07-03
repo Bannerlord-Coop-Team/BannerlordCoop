@@ -39,12 +39,25 @@ namespace Common.Messaging
             _subscribers = new Dictionary<Type, List<WeakDelegate>>();
         }
 
+        private static readonly HashSet<string> omit = new HashSet<string>
+        {
+            "PartyBehaviorChangeAttempted",
+            "UpdatePartyBehavior",
+            "ControlledPartyBehaviorUpdated",
+        };
+
         public virtual IEnumerable<Task> Publish<T>(object source, T message) where T : IMessage
         {
             if (message == null)
                 return Array.Empty<Task>();
 
-            // Logger.Verbose($"Publishing {message.GetType().Name} from {source?.GetType().Name}");
+            var msgType = message.GetType().Name;
+
+            if (omit.Contains(msgType) == false)
+            {
+                Logger.Verbose($"Publishing {message.GetType().Name} from {source?.GetType().Name}");
+            }
+            
 
             if (!_subscribers.ContainsKey(typeof(T)))
             {
