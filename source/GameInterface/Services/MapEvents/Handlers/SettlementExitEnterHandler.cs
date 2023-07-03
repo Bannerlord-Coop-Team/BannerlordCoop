@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.MapEvents.Patches;
 using Serilog.Core;
 using System;
 using System.Collections.Generic;
@@ -37,9 +38,10 @@ namespace GameInterface.Services.MapEvents.Handlers
         private void Handle(MessagePayload<SettlementEnterAllowed> obj)
         {
             MobileParty mobileParty = null;
+            MBGUID guid = new MBGUID((uint)int.Parse(obj.What.PartyId));
             foreach (MobileParty party in MobileParty.All)
             {
-                if (party.StringId == obj.What.StringId)
+                if (party.Id == guid)
                 {
                     mobileParty = party;
                 }
@@ -48,7 +50,7 @@ namespace GameInterface.Services.MapEvents.Handlers
 
             Settlement settlement = Settlement.Find(obj.What.StringId);
 
-            EncounterManager.StartSettlementEncounter(mobileParty, settlement);
+            EncounterManagerPatches.RunOriginalStartSettlementEncounter(mobileParty, settlement);
         }
     }
 }

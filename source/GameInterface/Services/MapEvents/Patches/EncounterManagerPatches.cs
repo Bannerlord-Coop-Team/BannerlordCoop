@@ -9,6 +9,7 @@ using TaleWorlds.MountAndBlade;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Control;
 using Newtonsoft.Json.Linq;
+using TaleWorlds.CampaignSystem.GameMenus;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -30,7 +31,9 @@ internal class EncounterManagerPatches
     {
         if (attackerParty != MobileParty.MainParty) return false;
 
-        MessageBroker.Instance.Publish(attackerParty, new SettlementEntered(settlement.StringId, attackerParty.StringId));
+        if (_allowedInstance?.Instance == attackerParty) return true;
+
+        MessageBroker.Instance.Publish(attackerParty, new SettlementEntered(settlement.StringId, attackerParty.Id.ToString()));
 
         return false;
     }
