@@ -49,7 +49,7 @@ namespace Coop.Core.Server.Services.MapEvents
 
             Settlement settlement = Settlement.Find(obj.What.StringId);
 
-            EncounterManagerPatches.RunOriginalStartSettlementEncounter(mobileParty, settlement);
+            EncounterManagerPatches.RunOriginalEnterSettlement(mobileParty, settlement);
 
             network.SendAll(new SettlementEnterAllowed(obj.What.StringId, obj.What.PartyId));
         }

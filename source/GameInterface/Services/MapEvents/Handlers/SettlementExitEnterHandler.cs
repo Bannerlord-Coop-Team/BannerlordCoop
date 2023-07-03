@@ -50,7 +50,7 @@ namespace GameInterface.Services.MapEvents.Handlers
 
             Settlement settlement = Settlement.Find(obj.What.StringId);
 
-            EncounterManagerPatches.RunOriginalStartSettlementEncounter(mobileParty, settlement);
+            EncounterManagerPatches.RunOriginalEnterSettlement(mobileParty, settlement);
         }
     }
 }
