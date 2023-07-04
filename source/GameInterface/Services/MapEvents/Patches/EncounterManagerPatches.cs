@@ -20,9 +20,7 @@ namespace GameInterface.Services.MapEvents.Patches;
 /// </summary>
 public class EncounterManagerPatches
 {
-    private static AllowedInstance<Settlement> _allowedInstance;
-    private static MobileParty _party;
-    private static Settlement _settlement;
+    private static AllowedInstance<MobileParty> _allowedInstance;
 
 
     //[HarmonyPatch("StartPartyEncounter")]
@@ -33,17 +31,16 @@ public class EncounterManagerPatches
     [HarmonyPrefix]
     private static bool EnterSettlementPrefix() 
     {
-        if (_allowedInstance?.Instance != null) return true;
+        if (_allowedInstance?.Instance == MobileParty.MainParty) return true;
 
-        MessageBroker.Instance.Publish(MobileParty.MainParty, new SettlementEntered(MobileParty.MainParty.TargetSettlement.StringId, MobileParty.MainParty.Id.ToString()));
+        MessageBroker.Instance.Publish(MobileParty.MainParty, new SettlementEntered(MobileParty.MainParty.TargetSettlement.StringId, MobileParty.MainParty.StringId));
 
         return false;
     }
-
-    public static void RunOriginalEnterSettlement(MobileParty attackerParty, Settlement settlement)
+    public static void RunOriginalEnterSettlement()
     {
 
-        using (_allowedInstance = new AllowedInstance<Settlement>(settlement))
+        using (_allowedInstance = new AllowedInstance<MobileParty>(MobileParty.MainParty))
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
@@ -51,4 +48,47 @@ public class EncounterManagerPatches
             }, true);
         }
     }
+
+    [HarmonyPatch(typeof(PlayerEncounter), "LeaveSettlement")]
+    [HarmonyPrefix]
+    private static bool LeaveSettlementPrefix()
+    {
+        if (_allowedInstance?.Instance == MobileParty.MainParty) return true;
+
+        MessageBroker.Instance.Publish(MobileParty.MainParty, new SettlementLeft(MobileParty.MainParty.CurrentSettlement.StringId, MobileParty.MainParty.StringId));
+
+        return false;
+    }
+    public static void RunOriginalLeaveSettlement()
+    {
+
+        using (_allowedInstance = new AllowedInstance<MobileParty>(MobileParty.MainParty))
+        {
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                PlayerEncounter.LeaveSettlement();
+            }, true);
+        }
+    }
+
+    [HarmonyPatch(typeof(LeaveSettlementAction), "ApplyForParty")]
+    [HarmonyPrefix]
+    private static bool LeaveSettlementActionPrefix(MobileParty mobileParty)
+    {
+        //if (_allowedInstance?.Instance == mobileParty) return true;
+
+        return true;
+    }
+
+    public static void RunOriginalLeaveSettlementAction(MobileParty mobileParty)
+    {
+        using (_allowedInstance = new AllowedInstance<MobileParty>(mobileParty))
+        {
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                LeaveSettlementAction.ApplyForParty(mobileParty);
+            }, true);
+        }
+    }
+
 }

@@ -19,16 +19,23 @@ namespace Coop.Core.Client.Services.MapEvents.Handlers
             this.network = network;
 
             messageBroker.Subscribe<SettlementEntered>(Handle);
+            messageBroker.Subscribe<SettlementLeft>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<SettlementEntered>(Handle);
+            messageBroker.Unsubscribe<SettlementLeft>(Handle);
         }
 
         private void Handle(MessagePayload<SettlementEntered> obj)
         {
             network.SendAll(new SettlementEnterRequest(obj.What.StringId, obj.What.PartyId));
+        }
+
+        private void Handle(MessagePayload<SettlementLeft> obj)
+        {
+            network.SendAll(new SettlementLeaveRequest(obj.What.StringId, obj.What.PartyId));
         }
     }
 }

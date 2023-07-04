@@ -1,15 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MapEvents.Messages;
+using Coop.Core.Server.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
-using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.ObjectManager;
+using LiteNetLib;
+using Serilog;
 
 namespace Coop.Core.Server.Services.MapEvents
 {
@@ -20,38 +17,43 @@ namespace Coop.Core.Server.Services.MapEvents
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
+        private readonly ILogger Logger = LogManager.GetLogger<SettlementExitEnterHandler>();
 
         public SettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.network = network;
-
             messageBroker.Subscribe<SettlementEnterRequest>(Handle);
+            messageBroker.Subscribe<SettlementLeaveRequest>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<SettlementEnterRequest>(Handle);
+            messageBroker.Unsubscribe<SettlementLeaveRequest>(Handle);
         }
 
         private void Handle(MessagePayload<SettlementEnterRequest> obj)
         {
-            MobileParty mobileParty = null;
-            MBGUID guid = new MBGUID((uint)int.Parse(obj.What.PartyId));
-            foreach (MobileParty party in MobileParty.All)
-            {
-                if (party.Id == guid)
-                {
-                    mobileParty = party;
-                }
+            PartyEnteredSettlement partyEnteredSettlement = new PartyEnteredSettlement(obj.What.StringId, obj.What.PartyId);
 
-            }
+            network.Send(obj.Who as NetPeer, new SettlementEnterAllowed(obj.What.StringId, obj.What.PartyId));
 
-            Settlement settlement = Settlement.Find(obj.What.StringId);
+            network.SendAllBut(obj.Who as NetPeer, partyEnteredSettlement);
 
-            EncounterManagerPatches.RunOriginalEnterSettlement(mobileParty, settlement);
+            messageBroker.Publish(this, partyEnteredSettlement);
+        }
 
-            network.SendAll(new SettlementEnterAllowed(obj.What.StringId, obj.What.PartyId));
+        private void Handle(MessagePayload<SettlementLeaveRequest> obj)
+        {
+            var request = obj.What;
+
+            PartyLeftSettlement partyLeftSettlement = new PartyLeftSettlement(request.StringId, request.PartyId);
+
+            network.Send(obj.Who as NetPeer, new SettlementLeaveAllowed(request.StringId, request.PartyId));
+
+            network.SendAllBut(obj.Who as NetPeer, partyLeftSettlement);
+
+            messageBroker.Publish(this, partyLeftSettlement);
         }
     }
 }
