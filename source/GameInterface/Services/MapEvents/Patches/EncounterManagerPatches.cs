@@ -51,7 +51,7 @@ public class EncounterManagerPatches
 
     [HarmonyPatch(typeof(PlayerEncounter), "LeaveSettlement")]
     [HarmonyPrefix]
-    private static bool LeaveSettlementPrefix()
+    public static bool LeaveSettlementPrefix()
     {
         if (_allowedInstance?.Instance == MobileParty.MainParty) return true;
 
@@ -73,11 +73,11 @@ public class EncounterManagerPatches
 
     [HarmonyPatch(typeof(LeaveSettlementAction), "ApplyForParty")]
     [HarmonyPrefix]
-    private static bool LeaveSettlementActionPrefix(MobileParty mobileParty)
+    public static bool LeaveSettlementActionPrefix(MobileParty mobileParty)
     {
-        //if (_allowedInstance?.Instance == mobileParty) return true;
+        if (_allowedInstance?.Instance == mobileParty) return true;
 
-        return true;
+        return false;
     }
 
     public static void RunOriginalLeaveSettlementAction(MobileParty mobileParty)

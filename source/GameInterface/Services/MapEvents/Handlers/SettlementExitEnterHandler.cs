@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Services.MapEvents;
@@ -56,12 +57,18 @@ namespace GameInterface.Services.MapEvents.Handlers
 
         private void Handle(MessagePayload<SettlementLeaveAllowed> obj)
         {
-            if (objectManager.TryGetObject(obj.What.PartyId, out Settlement settlement) == false)
+            if (objectManager.TryGetObject(obj.What.StringId, out Settlement settlement) == false)
             {
                 Logger.Error("Could not handle SettlementEnterAllowed, SettlementId not found: {id}", obj.What.StringId);
                 return;
             }
-            MobileParty.MainParty.CurrentSettlement = settlement;
+            if (objectManager.TryGetObject(obj.What.PartyId, out MobileParty mobileParty) == false)
+            {
+                Logger.Error("Could not handle SettlementEnterAllowed, PartyId not found: {id}", obj.What.PartyId);
+                return;
+            }
+
+            mobileParty.CurrentSettlement = settlement;
             EncounterManagerPatches.RunOriginalLeaveSettlement();
         }
 
@@ -73,11 +80,12 @@ namespace GameInterface.Services.MapEvents.Handlers
                 return;
             }
 
-            if (objectManager.TryGetObject(obj.What.PartyId, out Settlement settlement) == false)
+            if (objectManager.TryGetObject(obj.What.StringId, out Settlement settlement) == false)
             {
                 Logger.Error("Could not handle SettlementEnterAllowed, SettlementId not found: {id}", obj.What.StringId);
                 return;
             }
+
             mobileParty.CurrentSettlement = settlement;
             EnterSettlementAction.ApplyForParty(mobileParty, settlement);
         }
@@ -89,7 +97,14 @@ namespace GameInterface.Services.MapEvents.Handlers
                 return;
             }
 
-            LeaveSettlementAction.ApplyForParty(mobileParty);
+            if (objectManager.TryGetObject(obj.What.StringId, out Settlement settlement) == false)
+            {
+                Logger.Error("Could not handle SettlementEnterAllowed, PartyId not found: {id}", obj.What.PartyId);
+                return;
+            }
+            
+            mobileParty.CurrentSettlement = settlement;
+            EncounterManagerPatches.RunOriginalLeaveSettlementAction(mobileParty);
         }
     }
 }
