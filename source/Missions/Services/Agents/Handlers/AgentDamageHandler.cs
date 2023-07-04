@@ -215,7 +215,7 @@ namespace Missions.Services.Agents.Handlers
 
 
 
-            if (blow.IsMissile && !NetworkAgentRegistry.Instance.IsControlled(effectorAgent))
+            if (blow.IsMissile && !networkAgentRegistry.IsControlled(effectorAgent))
             {
                 var peerIdx = blow.WeaponRecord.AffectorWeaponSlotOrMissileIndex;
 
