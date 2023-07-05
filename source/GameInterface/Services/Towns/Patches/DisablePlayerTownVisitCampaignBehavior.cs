@@ -163,7 +163,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_ui_recruit_volunteers_on_consequence")]
     static bool DisableTroopRecruitment()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
