@@ -73,7 +73,7 @@ public class ClientRegistry : IClientRegistry
     private void EnableTimeControls()
     {
         // Only re-enable if all connections are finished loading
-        //if (ConnectionStates.Any(state => loadingStates.Contains(state.Value.State.GetType()))) return;
+        if (ConnectionStates.Any(state => loadingStates.Contains(state.Value.State.GetType()))) return;
 
         _network.SendAll(new NetworkEnableTimeControls());
         _messageBroker.Publish(this, new EnableGameTimeControls());
