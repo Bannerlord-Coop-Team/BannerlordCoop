@@ -16,16 +16,12 @@ using TaleWorlds.CampaignSystem.Encounters;
 namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
-/// Patches leaving settlement to remove any leaves from null settlement
+/// Disables party encounters
 /// </summary>
 
-[HarmonyPatch(typeof(LeaveSettlementAction), nameof(LeaveSettlementAction.ApplyForParty))]
-public class LeaveSettlementPatch
+public class StartPatchEncounterPatch
 {
-    static bool Prefix(MobileParty mobileParty)
-    {
-        if(mobileParty.StringId != "TransferredParty") { return true; }
-        if(mobileParty.CurrentSettlement == null) { return false; }
-        return true;
-    }
+    [HarmonyPatch("StartPartyEncounter")]
+    [HarmonyPrefix]
+    private static bool StartPartyEncounterPrefix() => false;
 }
