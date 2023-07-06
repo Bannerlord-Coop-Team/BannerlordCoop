@@ -218,5 +218,7 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Services\Encounters\Patches\" />
+    <Folder Include="Services\MapEvents\Handlers\" />
+    <Folder Include="Services\MapEvents\Patches\" />
   </ItemGroup>
 </Project>

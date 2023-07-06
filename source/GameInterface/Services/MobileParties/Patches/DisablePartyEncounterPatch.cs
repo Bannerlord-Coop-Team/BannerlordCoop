@@ -13,13 +13,13 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 
-namespace GameInterface.Services.MapEvents.Patches;
+namespace GameInterface.Services.MobileParties.Patches;
 
 /// <summary>
 /// Disables party encounters
 /// </summary>
 
-public class StartPatchEncounterPatch
+public class DisablePartyEncounterPatch
 {
     [HarmonyPatch("StartPartyEncounter")]
     [HarmonyPrefix]

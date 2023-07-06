@@ -4,20 +4,20 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Coop.Core.Client.Services.MobileParties.Messages
+namespace Coop.Core.Server.Services.MobileParties.Messages
 {
     /// <summary>
-    /// Request entry to a settlement.
+    /// Event fired when the local player enters a settlement.
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record NetworkSettlementEnterRequest : ICommand
+    public record SettlementEntered : IEvent
     {
         [ProtoMember(1)]
         public string SettlementId;
         [ProtoMember(2)]
         public string PartyId;
 
-        public NetworkSettlementEnterRequest(string settlementId, string partyId)
+        public SettlementEntered(string settlementId, string partyId)
         {
             SettlementId = settlementId;
             PartyId = partyId;

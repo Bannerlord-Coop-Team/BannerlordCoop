@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -11,7 +12,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Map.MapBar;
 
-namespace GameInterface.Services.MapEvents.Handlers
+namespace GameInterface.Services.MobileParties.Handlers
 {
     /// <summary>
     /// Handles changes to parties for settlement entry and exit.
@@ -19,24 +20,22 @@ namespace GameInterface.Services.MapEvents.Handlers
     public class SettlementExitEnterHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
-        private readonly INetwork network;
         private readonly IObjectManager objectManager;
         private readonly ILogger Logger = LogManager.GetLogger<SettlementExitEnterHandler>();
 
-        public SettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+        public SettlementExitEnterHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
-            this.network = network;
             this.objectManager = objectManager;
-            messageBroker.Subscribe<PartyEnteredSettlement>(Handle);
+            messageBroker.Subscribe<NetworkPartyEnteredSettlement>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<PartyEnteredSettlement>(Handle);
+            messageBroker.Unsubscribe<NetworkPartyEnteredSettlement>(Handle);
         }
 
-        private void Handle(MessagePayload<PartyEnteredSettlement> obj)
+        private void Handle(MessagePayload<NetworkPartyEnteredSettlement> obj)
         {
             if (objectManager.TryGetObject(obj.What.PartyId, out MobileParty mobileParty) == false)
             {
@@ -44,9 +43,9 @@ namespace GameInterface.Services.MapEvents.Handlers
                 return;
             }
 
-            if (objectManager.TryGetObject(obj.What.StringId, out Settlement settlement) == false)
+            if (objectManager.TryGetObject(obj.What.SettlementId, out Settlement settlement) == false)
             {
-                Logger.Error("Could not handle PartyEnteredSettlement, SettlementId not found: {id}", obj.What.StringId);
+                Logger.Error("Could not handle PartyEnteredSettlement, SettlementId not found: {id}", obj.What.SettlementId);
                 return;
             }
 

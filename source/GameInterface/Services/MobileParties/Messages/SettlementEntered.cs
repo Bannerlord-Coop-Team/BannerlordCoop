@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace GameInterface.Services.MapEvents
+namespace GameInterface.Services.MobileParties.Messages
 {
     /// <summary>
     /// Event fired when the local player enters a settlement.
@@ -13,13 +13,13 @@ namespace GameInterface.Services.MapEvents
     public record SettlementEntered : IEvent
     {
         [ProtoMember(1)]
-        public string StringId;
+        public string SettlementId;
         [ProtoMember(2)]
         public string PartyId;
 
-        public SettlementEntered(string stringId, string partyId)
+        public SettlementEntered(string settlementId, string partyId)
         {
-            StringId = stringId;
+            SettlementId = settlementId;
             PartyId = partyId;
         }
     }

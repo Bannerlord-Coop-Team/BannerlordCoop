@@ -13,7 +13,7 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 
-namespace GameInterface.Services.MapEvents.Patches;
+namespace GameInterface.Services.MobileParties.Patches;
 
 /// <summary>
 /// Patches leaving settlement to remove any leaves from null settlement
@@ -24,8 +24,8 @@ public class LeaveSettlementPatch
 {
     static bool Prefix(MobileParty mobileParty)
     {
-        if(mobileParty.StringId != "TransferredParty") { return true; }
-        if(mobileParty.CurrentSettlement == null) { return false; }
+        //if(mobileParty.StringId != "TransferredParty") { return true; }
+        if (mobileParty.CurrentSettlement == null) { return false; }
         return true;
     }
 }
