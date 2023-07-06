@@ -54,7 +54,7 @@ namespace Common.Tests.Utils
 
     public class TestObject
     {
-        static AllowedInstance<TestObject>? allowedInstance;
+        static AllowedInstance<TestObject> allowedInstance = new AllowedInstance<TestObject>();
 
         public int SomeInt { get; private set; }
 
@@ -73,8 +73,9 @@ namespace Common.Tests.Utils
 
         public static void OverrideInt(TestObject obj, int value)
         {
-            using (allowedInstance = new AllowedInstance<TestObject>(obj))
+            using (allowedInstance)
             {
+                allowedInstance.Instance = obj;
                 UpdateSomeInt(obj, value);
             }
         }
