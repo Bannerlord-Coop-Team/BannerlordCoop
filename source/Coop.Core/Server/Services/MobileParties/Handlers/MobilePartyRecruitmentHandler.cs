@@ -20,20 +20,37 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
             messageBroker.Subscribe<NetworkRecruitRequest>(Handle);
+            messageBroker.Subscribe<NetworkPartyRecruitUnit>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<NetworkRecruitRequest>(Handle);
+            messageBroker.Unsubscribe<NetworkPartyRecruitUnit>(Handle);
         }
 
         internal void Handle(MessagePayload<NetworkRecruitRequest> obj)
         {
             var payload = obj.What;
 
-            MessageBroker.Instance.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId));
+            messageBroker.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId));
 
             network.SendAllBut(obj.Who as NetPeer, new NetworkUnitRecruited(payload.CharacterId, payload.Amount, payload.PartyId));
+        }
+
+        private void Handle(MessagePayload<NetworkPartyRecruitUnit> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new PartyRecruitedUnit(
+                payload.PartyId, 
+                payload.SettlementId, 
+                payload.HeroId, 
+                payload.CharacterId, 
+                payload.Amount,
+                payload.BitCode,
+                payload.RecruitingDetail
+                ));
         }
     }
 }
