@@ -10,11 +10,10 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches
 {
+    [HarmonyPatch(typeof(PlayerEncounter), "EnterSettlement")]
     public class EnterSettlementPatch
     {
-        [HarmonyPatch(typeof(PlayerEncounter), "EnterSettlement")]
-        [HarmonyPrefix]
-        private static bool EnterSettlementPrefix()
+        static bool Prefix()
         {
             MessageBroker.Instance.Publish(MobileParty.MainParty, new SettlementEntered(MobileParty.MainParty.TargetSettlement.StringId, MobileParty.MainParty.StringId));
 

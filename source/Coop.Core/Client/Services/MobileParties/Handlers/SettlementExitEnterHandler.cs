@@ -1,15 +1,12 @@
-﻿using Common.Logging;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents;
-using LiteNetLib;
-using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Coop.Core.Server.Services.MapEvents
+namespace Coop.Core.Client.Services.MapEvents.Handlers
 {
     /// <summary>
     /// Handles changes to parties for settlement entry and exit.
@@ -18,27 +15,23 @@ namespace Coop.Core.Server.Services.MapEvents
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
-        private readonly ILogger Logger = LogManager.GetLogger<SettlementExitEnterHandler>();
 
         public SettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<SettlementEnterRequest>(Handle);
+
+            messageBroker.Subscribe<SettlementEntered>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<SettlementEnterRequest>(Handle);
+            messageBroker.Unsubscribe<SettlementEntered>(Handle);
         }
 
-        private void Handle(MessagePayload<SettlementEnterRequest> obj)
+        private void Handle(MessagePayload<SettlementEntered> obj)
         {
-            PartyEnteredSettlement partyEnteredSettlement = new PartyEnteredSettlement(obj.What.StringId, obj.What.PartyId);
-
-            network.SendAllBut(obj.Who as NetPeer, partyEnteredSettlement);
-
-            messageBroker.Publish(this, partyEnteredSettlement);
+            network.SendAll(new SettlementEnterRequest(obj.What.StringId, obj.What.PartyId));
         }
     }
 }

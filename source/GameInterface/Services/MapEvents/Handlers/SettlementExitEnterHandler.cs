@@ -9,6 +9,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Map.MapBar;
 
 namespace GameInterface.Services.MapEvents.Handlers
 {
