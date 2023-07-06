@@ -90,6 +90,7 @@
   <ItemGroup>
     <Folder Include="Client\Services\MapEvents\Handlers\" />
     <Folder Include="Client\Services\MapEvents\Messages\" />
+    <Folder Include="Server\Services\Clans\Messages\" />
     <Folder Include="Server\Services\MapEvents\Messages\" />
   </ItemGroup>
 </Project>
