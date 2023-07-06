@@ -23,6 +23,11 @@ public class AllowedInstance<T> : IDisposable where T : class
 
     ~AllowedInstance() => Dispose();
 
+    public bool IsAllowed(T instance)
+    {
+        return ReferenceEquals(_instance, instance);
+    }
+
     public void Dispose()
     {
         _instance = null;

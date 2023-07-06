@@ -65,7 +65,7 @@ namespace Common.Tests.Utils
 
         public static void UpdateSomeInt(TestObject obj, int value)
         {
-            if (obj == allowedInstance?.Instance)
+            if (allowedInstance.IsAllowed(obj))
             {
                 obj.SomeInt = value;
             }
