@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
@@ -27,15 +28,15 @@ namespace GameInterface.Services.MobileParties.Handlers
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-            messageBroker.Subscribe<NetworkPartyEnteredSettlement>(Handle);
+            messageBroker.Subscribe<PartySettlementEnter>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<NetworkPartyEnteredSettlement>(Handle);
+            messageBroker.Unsubscribe<PartySettlementEnter>(Handle);
         }
 
-        private void Handle(MessagePayload<NetworkPartyEnteredSettlement> obj)
+        private void Handle(MessagePayload<PartySettlementEnter> obj)
         {
             if (objectManager.TryGetObject(obj.What.PartyId, out MobileParty mobileParty) == false)
             {
@@ -49,7 +50,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                 return;
             }
 
-            EnterSettlementAction.ApplyForParty(mobileParty, settlement);
+            EnterSettlementActionPatches.OverrideApplyForParty(mobileParty, settlement);
         }
     }
 }

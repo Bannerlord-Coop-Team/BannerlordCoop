@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using System;
 using System.Collections.Generic;
@@ -22,16 +23,25 @@ namespace Coop.Core.Client.Services.MapEvents.Handlers
             this.network = network;
 
             messageBroker.Subscribe<SettlementEntered>(Handle);
+            messageBroker.Subscribe<NetworkSettlementEnter>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<SettlementEntered>(Handle);
+            messageBroker.Unsubscribe<NetworkSettlementEnter>(Handle);
         }
 
         private void Handle(MessagePayload<SettlementEntered> obj)
         {
             network.SendAll(new NetworkSettlementEnterRequest(obj.What.SettlementId, obj.What.PartyId));
+        }
+        private void Handle(MessagePayload<NetworkSettlementEnter> obj)
+        {
+            var payload = obj.What;
+
+            var message = new PartySettlementEnter(payload.SettlementId, payload.PartyId);
+            messageBroker.Publish(this, message);
         }
     }
 }

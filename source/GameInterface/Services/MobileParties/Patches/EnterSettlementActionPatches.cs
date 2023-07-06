@@ -1,4 +1,6 @@
-﻿using Common.Util;
+﻿using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -13,14 +15,16 @@ namespace GameInterface.Services.MobileParties.Patches
 
         [HarmonyPrefix]
         [HarmonyPatch(nameof(EnterSettlementAction.ApplyForParty))]
-        private static bool ApplyForPartyPrefix(ref MobileParty mobileParty)
+        private static bool ApplyForPartyPrefix(ref MobileParty mobileParty, ref Settlement settlement)
         {
             if(allowedInstance?.Instance == mobileParty) return true;
+
+            MessageBroker.Instance.Publish(mobileParty, new SettlementEntered(settlement.StringId, mobileParty.StringId));
 
             return false;
         }
 
-        public static void OverrideApplyForParty(ref MobileParty mobileParty, ref Settlement settlement)
+        public static void OverrideApplyForParty(MobileParty mobileParty, Settlement settlement)
         {
             using (allowedInstance)
             {

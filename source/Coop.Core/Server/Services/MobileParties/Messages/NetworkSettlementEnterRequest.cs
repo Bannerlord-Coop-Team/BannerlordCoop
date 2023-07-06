@@ -1,20 +1,23 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using System;
+using System.Collections.Generic;
+using System.Text;
 
-namespace GameInterface.Services.MobileParties.Messages
+namespace Coop.Core.Server.Services.MobileParties.Messages
 {
     /// <summary>
-    /// Allow entry to a settlement.
+    /// Request entry to a settlement.
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record NetworkPartyEnteredSettlement : ICommand
+    public record NetworkSettlementEnterRequest : ICommand
     {
         [ProtoMember(1)]
         public string SettlementId;
         [ProtoMember(2)]
         public string PartyId;
 
-        public NetworkPartyEnteredSettlement(string settlementId, string partyId)
+        public NetworkSettlementEnterRequest(string settlementId, string partyId)
         {
             SettlementId = settlementId;
             PartyId = partyId;

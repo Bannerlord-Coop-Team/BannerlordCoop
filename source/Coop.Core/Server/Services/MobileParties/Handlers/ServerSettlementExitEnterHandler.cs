@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using LiteNetLib;
 using Serilog;
@@ -31,11 +32,15 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
 
         private void Handle(MessagePayload<NetworkSettlementEnterRequest> obj)
         {
-            NetworkPartyEnteredSettlement partyEnteredSettlement = new NetworkPartyEnteredSettlement(obj.What.SettlementId, obj.What.PartyId);
+            var payload = obj.What;
 
-            network.SendAllBut(obj.Who as NetPeer, partyEnteredSettlement);
+            NetworkSettlementEnter partyEnteredSettlement = new NetworkSettlementEnter(payload.SettlementId, payload.PartyId);
 
-            messageBroker.Publish(this, partyEnteredSettlement);
+            network.SendAll(partyEnteredSettlement);
+
+            PartySettlementEnter partySettlementEnter = new PartySettlementEnter(payload.SettlementId, payload.PartyId);
+
+            messageBroker.Publish(this, partySettlementEnter);
         }
     }
 }
