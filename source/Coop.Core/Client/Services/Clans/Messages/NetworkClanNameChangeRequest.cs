@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem;
 namespace Coop.Core.Client.Services.Clans.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public record ClanNameChangeRequest : ICommand
+    public record NetworkClanNameChangeRequest : ICommand
     {
         [ProtoMember(1)]
         public string ClanId { get; }
@@ -15,7 +15,7 @@ namespace Coop.Core.Client.Services.Clans.Messages
         [ProtoMember(3)]
         public string InformalName { get; }
 
-        public ClanNameChangeRequest(string clan, string name, string informalName)
+        public NetworkClanNameChangeRequest(string clan, string name, string informalName)
         {
             ClanId = clan;
             Name = name;

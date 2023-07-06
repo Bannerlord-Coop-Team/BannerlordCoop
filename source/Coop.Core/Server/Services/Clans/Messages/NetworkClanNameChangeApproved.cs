@@ -1,12 +1,10 @@
 ﻿using Common.Messaging;
-using Common.PacketHandlers;
 using ProtoBuf;
-using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Clans.Messages
+namespace Coop.Core.Server.Services.Clans.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public record ClanNameChangeApproved : ICommand
+    public record NetworkClanNameChangeApproved : ICommand
     {
         [ProtoMember(1)]
         public string ClanId { get; }
@@ -15,7 +13,7 @@ namespace GameInterface.Services.Clans.Messages
         [ProtoMember(3)]
         public string InformalName { get; }
 
-        public ClanNameChangeApproved(string clanId, string name, string informalName)
+        public NetworkClanNameChangeApproved(string clanId, string name, string informalName)
         {
             ClanId = clanId;
             Name = name;

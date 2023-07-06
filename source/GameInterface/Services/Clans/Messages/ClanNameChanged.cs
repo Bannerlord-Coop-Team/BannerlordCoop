@@ -7,15 +7,15 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Messages
 {
-    public record ClanNameChange : IEvent
+    public record ClanNameChanged : IEvent
     {
-        public Clan Clan { get; }
+        public string ClanId { get; }
         public string Name { get; }
         public string InformalName { get; }
 
-        public ClanNameChange(Clan clan, string name, string informalName)
+        public ClanNameChanged(string clanId, string name, string informalName)
         {
-            Clan = clan;
+            ClanId = clanId;
             Name = name;
             InformalName = informalName;
         }
