@@ -35,6 +35,14 @@
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Services\Encounters\**" />
+    <Compile Remove="Services\MapEvents\**" />
+    <EmbeddedResource Remove="Services\Encounters\**" />
+    <EmbeddedResource Remove="Services\MapEvents\**" />
+    <None Remove="Services\Encounters\**" />
+    <None Remove="Services\MapEvents\**" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
@@ -215,10 +223,5 @@
     <PackageReference Include="Autofac" Version="7.0.1" />
     <PackageReference Include="Bannerlord.Lib.Harmony" Version="2.2.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Services\Encounters\Patches\" />
-    <Folder Include="Services\MapEvents\Handlers\" />
-    <Folder Include="Services\MapEvents\Patches\" />
   </ItemGroup>
 </Project>

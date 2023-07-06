@@ -1,23 +1,21 @@
 ﻿using Common.Messaging;
-using Common.Util;
-using Common;
+using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.MobileParties.Messages;
 
 namespace GameInterface.Services.MobileParties.Patches
 {
     /// <summary>
-    /// Patch when the local player enters a settlement.
+    /// Patches for when the local player enters or leaves a settlement.
     /// </summary>
-    [HarmonyPatch(typeof(PlayerEncounter), "EnterSettlement")]
-    public class EnterSettlementPatch
+    [HarmonyPatch(typeof(PlayerEncounter))]
+    public class PlayerEncounterPatches
     {
-        static bool Prefix()
+        [HarmonyPrefix]
+        [HarmonyPatch(nameof(PlayerEncounter.EnterSettlement))]
+        static bool EnterSettlementPrefix()
         {
             var message = new SettlementEntered(MobileParty.MainParty.TargetSettlement.StringId, MobileParty.MainParty.StringId);
             MessageBroker.Instance.Publish(MobileParty.MainParty, message);

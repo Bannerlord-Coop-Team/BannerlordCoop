@@ -1,17 +1,6 @@
-﻿using Common.Util;
-using Common;
-using HarmonyLib;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade;
-using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages.Control;
-using Newtonsoft.Json.Linq;
-using TaleWorlds.CampaignSystem.GameMenus;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -19,9 +8,11 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// Patches leaving settlement to remove any leaves from null settlement
 /// </summary>
 
-[HarmonyPatch(typeof(LeaveSettlementAction), nameof(LeaveSettlementAction.ApplyForParty))]
+[HarmonyPatch(typeof(LeaveSettlementAction))]
 public class LeaveSettlementPatch
 {
+    [HarmonyPrefix]
+    [HarmonyPatch(nameof(LeaveSettlementAction.ApplyForParty))]
     static bool Prefix(MobileParty mobileParty)
     {
         //if(mobileParty.StringId != "TransferredParty") { return true; }
