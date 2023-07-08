@@ -16,7 +16,7 @@ using static TaleWorlds.CampaignSystem.Settlements.Village;
 namespace GameInterface.Services.Villages.Handlers
 {
     /// <summary>
-    /// Handles changes to parties for settlement entry and exit.
+    /// Handles changes to village states
     /// </summary>
     public class VillageHandler : IHandler
     {

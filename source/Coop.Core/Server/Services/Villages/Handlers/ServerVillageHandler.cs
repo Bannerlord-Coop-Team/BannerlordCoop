@@ -15,7 +15,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace Coop.Core.Server.Services.Villages.Handlers
 {
     /// <summary>
-    /// Handles changes to parties for settlement entry and exit.
+    /// Handles changes to village states
     /// </summary>
     public class ServerVillageHandler : IHandler
     {
