@@ -33,16 +33,12 @@ namespace Coop.Core.Client.Services.Clans.Handler
             this.network = network;
             this.objectManager = objectManager;
             messageBroker.Subscribe<ClanNameChange>(Handle);
-            messageBroker.Subscribe<ClanLeaveKingdom>(Handle);
-            messageBroker.Subscribe<NetworkClanLeaveKingdomApproved>(Handle);
             messageBroker.Subscribe<NetworkClanNameChangeApproved>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<ClanNameChange>(Handle);
-            messageBroker.Unsubscribe<ClanLeaveKingdom>(Handle);
-            messageBroker.Unsubscribe<NetworkClanLeaveKingdomApproved>(Handle);
             messageBroker.Unsubscribe<NetworkClanNameChangeApproved>(Handle);
         }
 
@@ -58,21 +54,6 @@ namespace Coop.Core.Client.Services.Clans.Handler
             var payload = obj.What;
 
             messageBroker.Publish(this, new ClanNameChanged(payload.ClanId, payload.Name, payload.InformalName));
-
-        }
-
-        private void Handle(MessagePayload<ClanLeaveKingdom> obj)
-        {
-            var payload = obj.What;
-
-            network.SendAll(new NetworkClanLeaveKingdomRequest(payload.Clan.StringId, payload.GiveBackFiefs));
-        }
-
-        private void Handle(MessagePayload<NetworkClanLeaveKingdomApproved> obj)
-        {
-            var payload = obj.What;
-
-            messageBroker.Publish(this, new ClanLeftKingdom(payload.ClanId, payload.GiveBackFiefs));
 
         }
     }

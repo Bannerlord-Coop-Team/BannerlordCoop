@@ -31,13 +31,11 @@ namespace GameInterface.Services.Clans.Handlers
             this.network = network;
             this.objectManager = objectManager;
             messageBroker.Subscribe<ClanNameChanged>(Handle);
-            messageBroker.Subscribe<ClanLeftKingdom>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<ClanNameChanged>(Handle);
-            messageBroker.Unsubscribe<ClanLeftKingdom>(Handle);
         }
 
         private void Handle(MessagePayload<ClanNameChanged> obj)
@@ -47,14 +45,6 @@ namespace GameInterface.Services.Clans.Handlers
             Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
 
             ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
-        }
-        private void Handle(MessagePayload<ClanLeftKingdom> obj)
-        {
-            var payload = obj.What;
-
-            Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
-
-            ClanLeaveKingdomPatch.RunOriginalClanLeaveKingdom(clan, payload.GiveBackFiefs);
         }
     }
 }
