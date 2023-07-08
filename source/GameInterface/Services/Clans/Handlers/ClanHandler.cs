@@ -1,7 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.Clans.Messages;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.ObjectManager;
@@ -10,7 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Handlers

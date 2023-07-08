@@ -1,18 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.Clans.Messages;
-using GameInterface.Services.Clans.Messages;
-using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Localization;
 using static TaleWorlds.CampaignSystem.Actions.ChangeKingdomAction;
 
 namespace GameInterface.Services.Kingdoms.Handler
@@ -29,11 +22,15 @@ namespace GameInterface.Services.Kingdoms.Handler
         {
             this.messageBroker = messageBroker;
             messageBroker.Subscribe<UpdatedKingdomRelation>(Handle);
+            messageBroker.Subscribe<PolicyAdded>(Handle);
+            messageBroker.Subscribe<PolicyRemoved>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<UpdatedKingdomRelation>(Handle);
+            messageBroker.Unsubscribe<PolicyAdded>(Handle);
+            messageBroker.Unsubscribe<PolicyRemoved>(Handle);
         }
 
         private void Handle(MessagePayload<UpdatedKingdomRelation> obj)
@@ -45,6 +42,27 @@ namespace GameInterface.Services.Kingdoms.Handler
 
             ChangeKingdomActionPatch.RunOriginalApplyInternal(clan, kingdom, (ChangeKingdomActionDetail)payload.ChangeKingdomActionDetail,
                 payload.awardMultiplier, payload.byRebellion, payload.showNotification);
+        }
+        private void Handle(MessagePayload<PolicyAdded> obj)
+        {
+            var payload = obj.What;
+
+            PolicyObject policy = new PolicyObject(payload.PolicyId);
+            Kingdom kingdom = Kingdom.All.Find(x => x.StringId == payload.KingdomId);
+
+            KingdomAddPolicyPatch.RunOriginalAddPolicy(policy, kingdom);
+
+        }
+
+        private void Handle(MessagePayload<PolicyRemoved> obj)
+        {
+            var payload = obj.What;
+
+            PolicyObject policy = new PolicyObject(payload.PolicyId);
+            Kingdom kingdom = Kingdom.All.Find(x => x.StringId == payload.KingdomId);
+
+            KingdomRemovePolicyPatch.RunOriginalRemovePolicy(policy, kingdom);
+
         }
     }
 }

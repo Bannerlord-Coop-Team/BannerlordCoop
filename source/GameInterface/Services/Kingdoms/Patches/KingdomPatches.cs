@@ -23,19 +23,5 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             return false;
         }
-
-        [HarmonyPatch("AddPolicy")]
-        [HarmonyPrefix]
-        public static bool AddPolicyPrefix()
-        {
-            return false;
-        }
-
-        [HarmonyPatch("RemovePolicy")]
-        [HarmonyPrefix]
-        public static bool RemovePolicyPrefix()
-        {
-            return false;
-        }
     }
 }
