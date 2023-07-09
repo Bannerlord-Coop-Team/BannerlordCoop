@@ -46,7 +46,7 @@ namespace GameInterface.Services.Villages.Handlers
                 return;
             }
 
-            Village village = Village.All.Find(x => x.StringId == obj.What.PartyId);
+            Village village = Village.All.Find(x => x.StringId == obj.What.VillageId);
 
             ChangeVillageStatePatch.RunOriginalApplyInternal(village, (VillageStates)obj.What.NewState, mobileParty);
         }
