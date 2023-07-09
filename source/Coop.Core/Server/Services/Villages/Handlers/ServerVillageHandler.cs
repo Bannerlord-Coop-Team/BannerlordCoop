@@ -5,12 +5,6 @@ using Coop.Core.Server.Services.Villages.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.Core.Server.Services.Villages.Handlers
 {
