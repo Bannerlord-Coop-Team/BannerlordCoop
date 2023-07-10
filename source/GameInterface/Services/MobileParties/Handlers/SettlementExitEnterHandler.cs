@@ -1,16 +1,9 @@
-﻿using Common.Extensions;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
-using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using System.Reflection;
-using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
@@ -30,6 +23,7 @@ internal class SettlementExitEnterHandler : IHandler
     {
         this.messageBroker = messageBroker;
         this.partyInterface = partyInterface;
+
         messageBroker.Subscribe<PartyEnterSettlement>(Handle);
         messageBroker.Subscribe<PartyLeaveSettlement>(Handle);
         messageBroker.Subscribe<StartSettlementEncounter>(Handle);
@@ -50,9 +44,6 @@ internal class SettlementExitEnterHandler : IHandler
 
         partyInterface.EnterSettlement(payload.PartyId, payload.SettlementId);
     }
-
-
-    
 
     private void Handle(MessagePayload<PartyLeaveSettlement> obj)
     {

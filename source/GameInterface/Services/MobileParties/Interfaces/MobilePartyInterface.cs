@@ -14,6 +14,9 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Interfaces;
 
+/// <summary>
+/// Abstracts interacting with the MobileParty class in game
+/// </summary>
 internal interface IMobilePartyInterface : IGameAbstraction
 {
     /// <summary>
@@ -176,7 +179,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
-                LeaveSettlementPatch.OverrideApplyForParty(mobileParty);
+                LeaveSettlementActionPatches.OverrideApplyForParty(mobileParty);
             }, false);
         }
     }

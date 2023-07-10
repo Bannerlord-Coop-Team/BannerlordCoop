@@ -25,9 +25,9 @@ internal class PlayerLeaveSettlementPatch
 
     public static void OverrideLeaveConsequence()
     {
-        using (LeaveSettlementPatch.AllowedInstance)
+        using (LeaveSettlementActionPatches.AllowedInstance)
         {
-            LeaveSettlementPatch.AllowedInstance.Instance = MobileParty.MainParty;
+            LeaveSettlementActionPatches.AllowedInstance.Instance = MobileParty.MainParty;
             PlayerEncounter.LeaveSettlement();
             PlayerEncounter.Finish(true);
             Campaign.Current.SaveHandler.SignalAutoSave();

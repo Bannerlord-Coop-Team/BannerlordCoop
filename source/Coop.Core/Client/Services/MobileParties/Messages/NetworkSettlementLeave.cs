@@ -4,7 +4,8 @@ using ProtoBuf;
 namespace Coop.Core.Client.Services.MobileParties.Messages;
 
 /// <summary>
-/// Command a party to leave a settlement.
+/// Message from the server commanding a party to enter a settlement.
+/// For all parties except the player party
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public record NetworkSettlementLeave : ICommand

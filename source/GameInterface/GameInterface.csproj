@@ -35,14 +35,6 @@
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="Services\Encounters\**" />
-    <Compile Remove="Services\MapEvents\**" />
-    <EmbeddedResource Remove="Services\Encounters\**" />
-    <EmbeddedResource Remove="Services\MapEvents\**" />
-    <None Remove="Services\Encounters\**" />
-    <None Remove="Services\MapEvents\**" />
-  </ItemGroup>
-  <ItemGroup>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>

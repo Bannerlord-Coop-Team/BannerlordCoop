@@ -1,11 +1,11 @@
 ﻿using Common.Messaging;
-using Coop.Core.Client.Services.MapEvents.Handlers;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Services.MobileParties.Messages;
+namespace Coop.Core.Client.Services.MobileParties.Messages;
 
 /// <summary>
-/// Commands the clients to have a party leave a settlement
+/// Message from the server commanding a party to leave a settlement.
+/// For all parties except the player party
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal record NetworkPartyLeaveSettlement : ICommand

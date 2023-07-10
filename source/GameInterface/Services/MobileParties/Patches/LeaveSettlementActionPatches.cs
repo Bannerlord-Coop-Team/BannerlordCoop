@@ -12,7 +12,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// </summary>
 
 [HarmonyPatch(typeof(LeaveSettlementAction))]
-public class LeaveSettlementPatch
+public class LeaveSettlementActionPatches
 {
     public static readonly AllowedInstance<MobileParty> AllowedInstance = new AllowedInstance<MobileParty>();
 

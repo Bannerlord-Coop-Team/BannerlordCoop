@@ -1,18 +1,20 @@
 ﻿using Common.Messaging;
 
-namespace GameInterface.Services.MobileParties.Patches
-{
-    public record StartSettlementEncounterAttempted : IEvent
-    {
-        public string PartyId { get; }
-        public string SettlementId { get; }
+namespace GameInterface.Services.MobileParties.Messages.Behavior;
 
-        public StartSettlementEncounterAttempted(
-            string partyId,
-            string settlementId)
-        {
-            PartyId = partyId;
-            SettlementId = settlementId;
-        }
+/// <summary>
+/// Triggered when a player attempts to enter a settlement
+/// </summary>
+public record StartSettlementEncounterAttempted : IEvent
+{
+    public string PartyId { get; }
+    public string SettlementId { get; }
+
+    public StartSettlementEncounterAttempted(
+        string partyId,
+        string settlementId)
+    {
+        PartyId = partyId;
+        SettlementId = settlementId;
     }
 }

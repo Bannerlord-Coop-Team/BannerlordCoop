@@ -1,11 +1,12 @@
 ﻿using Common.Messaging;
-using Coop.Core.Server.Services.MobileParties.Messages;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Services.MobileParties.Handlers
+namespace Coop.Core.Client.Services.MobileParties.Messages;
+
+/// <summary>
+/// Ends the current settlement encounter for the player
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+internal class NetworkEndSettlementEncounter : ICommand
 {
-    [ProtoContract(SkipConstructor = true)]
-    internal class NetworkEndSettlementEncounter : ICommand
-    {
-    }
 }

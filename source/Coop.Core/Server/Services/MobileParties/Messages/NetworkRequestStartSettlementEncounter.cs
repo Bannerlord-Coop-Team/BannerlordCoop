@@ -3,6 +3,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.MobileParties.Messages;
 
+/// <summary>
+/// Message from the client requesting a settlement encounter to start
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal record NetworkRequestStartSettlementEncounter : ICommand
 {

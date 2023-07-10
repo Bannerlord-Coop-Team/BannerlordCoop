@@ -1,18 +1,20 @@
 ﻿using Common.Messaging;
 
-namespace GameInterface.Services.MobileParties.Patches
-{
-    public record StartSettlementEncounter : ICommand
-    {
-        public string PartyId { get; }
-        public string SettlementId { get; }
+namespace GameInterface.Services.MobileParties.Messages.Behavior;
 
-        public StartSettlementEncounter(
-            string attackerPartyId,
-            string settlementId)
-        {
-            PartyId = attackerPartyId;
-            SettlementId = settlementId;
-        }
+/// <summary>
+/// Starts a player encounter with a settlement with the current player
+/// </summary>
+public record StartSettlementEncounter : ICommand
+{
+    public string PartyId { get; }
+    public string SettlementId { get; }
+
+    public StartSettlementEncounter(
+        string attackerPartyId,
+        string settlementId)
+    {
+        PartyId = attackerPartyId;
+        SettlementId = settlementId;
     }
 }
