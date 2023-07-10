@@ -16,13 +16,6 @@ internal class VillagePatches
         return false;
     }
 
-    [HarmonyPatch(nameof(Village.VillageState), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool VillageStatePrefix()
-    {
-        return false;
-    }
-
     [HarmonyPatch(nameof(Village.Hearth), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool HearthPrefix()
