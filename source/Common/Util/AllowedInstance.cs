@@ -11,18 +11,26 @@ namespace Common.Util;
 public class AllowedInstance<T> : IDisposable where T : class
 {
     private readonly static SemaphoreSlim _sem = new SemaphoreSlim(1);
-    public T Instance { get; private set; }
-    public AllowedInstance(T instance)
+    public T Instance
     {
-        _sem.Wait();
-        Instance = instance;
+        get => _instance;
+        set {
+            _sem.Wait();
+            _instance = value;
+        }
     }
+    private T _instance;
 
     ~AllowedInstance() => Dispose();
 
+    public bool IsAllowed(T instance)
+    {
+        return ReferenceEquals(_instance, instance);
+    }
+
     public void Dispose()
     {
+        _instance = null;
         _sem.Release();
-        Instance = null;
     }
 }
