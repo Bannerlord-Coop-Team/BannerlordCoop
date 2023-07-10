@@ -48,11 +48,6 @@
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="Client\Services\MobileParties\Messages - Copy\**" />
-    <EmbeddedResource Remove="Client\Services\MobileParties\Messages - Copy\**" />
-    <None Remove="Client\Services\MobileParties\Messages - Copy\**" />
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="Autofac" Version="7.0.1" />
   </ItemGroup>
   <ItemGroup>
