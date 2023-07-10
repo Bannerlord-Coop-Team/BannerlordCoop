@@ -22,7 +22,7 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
             return;
         }
 
-        IEnumerable<Hero> heroes = campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes);
+        var heroes = campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes).ToArray();
         foreach (var hero in heroes)
         {
             if (RegisterExistingObject(hero.StringId, hero) == false)
