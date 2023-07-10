@@ -8,6 +8,10 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
+/// <summary>
+/// Patches for player pressing the leave settlement button.
+/// Allows calling the functionality separately from the button press.
+/// </summary>
 [HarmonyPatch(typeof(PlayerTownVisitCampaignBehavior))]
 internal class PlayerLeaveSettlementPatch
 {
