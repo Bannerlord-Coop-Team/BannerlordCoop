@@ -12,7 +12,7 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
         [ProtoMember(2)]
         public string PartyId;
 
-        public NetworkStartSettlementEncounter(NetworkRequestSettlementEncounter payload)
+        public NetworkStartSettlementEncounter(NetworkRequestStartSettlementEncounter payload)
         {
             SettlementId = payload.SettlementId;
             PartyId = payload.PartyId;

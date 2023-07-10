@@ -1,4 +1,7 @@
-﻿using HarmonyLib;
+﻿using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.MobileParties.Messages.Behavior;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -11,12 +14,29 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(LeaveSettlementAction))]
 public class LeaveSettlementPatch
 {
+    public static readonly AllowedInstance<MobileParty> AllowedInstance = new AllowedInstance<MobileParty>();
+
     [HarmonyPrefix]
     [HarmonyPatch(nameof(LeaveSettlementAction.ApplyForParty))]
-    static bool Prefix(MobileParty mobileParty)
+    private static bool Prefix(MobileParty mobileParty)
     {
-        //if(mobileParty.StringId != "TransferredParty") { return true; }
-        if (mobileParty.CurrentSettlement == null) { return false; }
-        return true;
+        if(AllowedInstance.IsAllowed(mobileParty)) return true;
+
+        var message = new PartyLeaveSettlementAttempted(mobileParty.StringId);
+        MessageBroker.Instance.Publish(mobileParty, message);
+
+        return false;
+    }
+
+    private static object _lock = new object();
+    public static void OverrideApplyForParty(MobileParty party)
+    {
+        using(AllowedInstance)
+        {
+            AllowedInstance.Instance = party;
+
+            if (party.CurrentSettlement is null) return;
+            LeaveSettlementAction.ApplyForParty(party);
+        }
     }
 }

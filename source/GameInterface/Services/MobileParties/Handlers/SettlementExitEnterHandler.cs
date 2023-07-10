@@ -1,7 +1,8 @@
 ﻿using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Interfaces;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -16,100 +17,59 @@ namespace GameInterface.Services.MobileParties.Handlers;
 /// <summary>
 /// Handles changes to parties for settlement entry and exit.
 /// </summary>
-public class SettlementExitEnterHandler : IHandler
+internal class SettlementExitEnterHandler : IHandler
 {
-    private readonly IMessageBroker messageBroker;
-    private readonly IObjectManager objectManager;
-    private readonly ILogger Logger = LogManager.GetLogger<SettlementExitEnterHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<SettlementExitEnterHandler>();
 
-    public SettlementExitEnterHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    private readonly IMessageBroker messageBroker;
+    private readonly IMobilePartyInterface partyInterface;
+
+    public SettlementExitEnterHandler(
+        IMessageBroker messageBroker,
+        IMobilePartyInterface partyInterface)
     {
         this.messageBroker = messageBroker;
-        this.objectManager = objectManager;
-        messageBroker.Subscribe<PartySettlementEnter>(Handle);
+        this.partyInterface = partyInterface;
+        messageBroker.Subscribe<PartyEnterSettlement>(Handle);
+        messageBroker.Subscribe<PartyLeaveSettlement>(Handle);
         messageBroker.Subscribe<StartSettlementEncounter>(Handle);
+        messageBroker.Subscribe<EndSettlementEncounter>(Handle);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<PartySettlementEnter>(Handle);
+        messageBroker.Unsubscribe<PartyEnterSettlement>(Handle);
+        messageBroker.Unsubscribe<PartyLeaveSettlement>(Handle);
         messageBroker.Unsubscribe<StartSettlementEncounter>(Handle);
+        messageBroker.Unsubscribe<EndSettlementEncounter>(Handle);
     }
 
-    private void Handle(MessagePayload<PartySettlementEnter> obj)
+    private void Handle(MessagePayload<PartyEnterSettlement> obj)
     {
         var payload = obj.What;
 
-        if (objectManager.TryGetObject(payload.PartyId, out MobileParty mobileParty) == false)
-        {
-            Logger.Error("Could not handle {messageName}, PartyId not found: {id}",
-                nameof(PartySettlementEnter),
-                payload.PartyId);
-            return;
-        }
-
-        if (objectManager.TryGetObject(payload.SettlementId, out Settlement settlement) == false)
-        {
-            Logger.Error("Could not handle {messageName}, SettlementId not found: {id}",
-                nameof(PartySettlementEnter),
-                payload.SettlementId);
-            return;
-        }
-
-        EnterSettlementActionPatches.OverrideApplyForParty(mobileParty, settlement);
+        partyInterface.EnterSettlement(payload.PartyId, payload.SettlementId);
     }
 
-    static MethodInfo InitMethod => typeof(PlayerEncounter).GetMethod(
-        "Init",
-        BindingFlags.NonPublic | BindingFlags.Instance,
-        null,
-        new Type[] { typeof(PartyBase), typeof(PartyBase), typeof(Settlement) },
-        null);
-    static Action<PlayerEncounter, PartyBase, PartyBase, Settlement> Init =
-        InitMethod.BuildDelegate<Action<PlayerEncounter, PartyBase, PartyBase, Settlement>>();
 
-    private static object _lock = new object();
+    
+
+    private void Handle(MessagePayload<PartyLeaveSettlement> obj)
+    {
+        var payload = obj.What;
+
+        partyInterface.LeaveSettlement(payload.PartyId);
+    }
+
     private void Handle(MessagePayload<StartSettlementEncounter> obj)
     {
-        
-
         var payload = obj.What;
 
-        if (objectManager.TryGetObject(payload.AttackerPartyId, out MobileParty mobileParty) == false)
-        {
-            Logger.Error("Could not handle {messageName}, PartyId not found: {id}",
-                nameof(StartSettlementEncounter),
-                payload.AttackerPartyId);
-            return;
-        }
+        partyInterface.StartPlayerSettlementEncounter(payload.PartyId, payload.SettlementId);
+    }
 
-        if (objectManager.TryGetObject(payload.SettlementId, out Settlement settlement) == false)
-        {
-            Logger.Error("Could not handle {messageName}, SettlementId not found: {id}",
-                nameof(StartSettlementEncounter),
-                payload.SettlementId);
-            return;
-        }
-
-        var settlementParty = settlement.Party;
-        if (settlementParty is null)
-        {
-            Logger.Error("Could not handle {messageName}, Settlement {settlementName} did not have a party value",
-                nameof(StartSettlementEncounter),
-                settlement.Name);
-            return;
-        }
-
-        lock (_lock)
-        {
-            if (PlayerEncounter.Current is not null) return;
-            PlayerEncounter.Start();
-
-            using (EnterSettlementActionPatches.AllowedInstance)
-            {
-                EnterSettlementActionPatches.AllowedInstance.Instance = mobileParty;
-                Init.Invoke(PlayerEncounter.Current, mobileParty.Party, settlementParty, settlement);
-            }
-        }
+    private void Handle(MessagePayload<EndSettlementEncounter> obj)
+    {
+        partyInterface.EndPlayerSettlementEncounter();
     }
 }

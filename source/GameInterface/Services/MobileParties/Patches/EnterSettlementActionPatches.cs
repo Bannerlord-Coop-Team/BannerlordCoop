@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -15,12 +16,12 @@ namespace GameInterface.Services.MobileParties.Patches
 
         [HarmonyPrefix]
         [HarmonyPatch(nameof(EnterSettlementAction.ApplyForParty))]
-        private static bool ApplyForPartyPrefix(ref MobileParty mobileParty)
+        private static bool ApplyForPartyPrefix(ref MobileParty mobileParty, ref Settlement settlement)
         {
-            // Only run if server
-            if (ModInformation.IsServer) return true;
-            // Run if commanded by server
             if (AllowedInstance.IsAllowed(mobileParty)) return true;
+
+            var message = new PartyEnterSettlementAttempted(mobileParty.StringId, settlement.StringId);
+            MessageBroker.Instance.Publish(mobileParty, message);
 
             return false;
         }
