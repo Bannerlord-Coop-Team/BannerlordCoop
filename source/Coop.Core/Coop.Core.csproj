@@ -48,17 +48,6 @@
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="Client\Services\MapEvents\**" />
-    <Compile Remove="Client\Services\MobileParties\Messages - Copy\**" />
-    <Compile Remove="Server\Services\MapEvents\**" />
-    <EmbeddedResource Remove="Client\Services\MapEvents\**" />
-    <EmbeddedResource Remove="Client\Services\MobileParties\Messages - Copy\**" />
-    <EmbeddedResource Remove="Server\Services\MapEvents\**" />
-    <None Remove="Client\Services\MapEvents\**" />
-    <None Remove="Client\Services\MobileParties\Messages - Copy\**" />
-    <None Remove="Server\Services\MapEvents\**" />
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="Autofac" Version="7.0.1" />
   </ItemGroup>
   <ItemGroup>
