@@ -2,6 +2,9 @@
 
 namespace GameInterface.Services.MobileParties.Messages
 {
+    /// <summary>
+    /// Event to tell GameInterface to handle unit being recruited
+    /// </summary>
     public record UnitRecruitGranted : IEvent
     {
         public string CharacterId { get; }

@@ -2,6 +2,9 @@
 
 namespace GameInterface.Services.MobileParties.Messages
 {
+    /// <summary>
+    /// Sent when another party recruits a unit
+    /// </summary>
     public record NetworkPartyRecruitUnit : IEvent
     {
         public string PartyId { get; }

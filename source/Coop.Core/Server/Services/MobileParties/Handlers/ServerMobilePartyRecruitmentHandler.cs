@@ -10,12 +10,15 @@ using System.Text;
 
 namespace Coop.Core.Server.Services.MobileParties.Handlers
 {
-    public class MobilePartyRecruitmentHandler : IHandler
+    /// <summary>
+    /// Handles all mobile party recruitment routing on server
+    /// </summary>
+    public class ServerMobilePartyRecruitmentHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
-        public MobilePartyRecruitmentHandler(IMessageBroker messageBroker, INetwork network)
+        public ServerMobilePartyRecruitmentHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.network = network;

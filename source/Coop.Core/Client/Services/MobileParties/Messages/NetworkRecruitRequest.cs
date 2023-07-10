@@ -6,6 +6,9 @@ using System.Text;
 
 namespace Coop.Core.Client.Services.MobileParties.Messages
 {
+    /// <summary>
+    /// Request to recruit troops from client
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkRecruitRequest : ICommand
     {

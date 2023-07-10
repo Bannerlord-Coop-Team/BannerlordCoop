@@ -2,6 +2,9 @@
 
 namespace GameInterface.Services.MobileParties.Messages
 {
+    /// <summary>
+    /// Event when party recruit has been approved by server
+    /// </summary>
     public record PartyRecruitGranted : IEvent
     {
         public string PartyId { get; }

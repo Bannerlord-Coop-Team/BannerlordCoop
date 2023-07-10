@@ -2,6 +2,9 @@
 
 namespace GameInterface.Services.MobileParties.Messages
 {
+    /// <summary>
+    /// Event when party has recruited unit, sent from server to clients
+    /// </summary>
     public record PartyRecruitedUnit : ICommand
     {
         public string PartyId { get; }

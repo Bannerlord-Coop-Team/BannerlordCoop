@@ -31,7 +31,7 @@ namespace GameInterface.Services.MobileParties.Patches
         public static bool Prefix(MobileParty side1Party, Settlement settlement, Hero individual, 
             CharacterObject troop, int number, int bitCode, RecruitingDetail detail)
         {
-            if (!args.Contains("/server")) { return false; }
+            if (ModInformation.IsServer == false) { return false; }
 
             MessageBroker.Instance.Publish(side1Party, new NetworkPartyRecruitUnit(
                 side1Party.StringId, 

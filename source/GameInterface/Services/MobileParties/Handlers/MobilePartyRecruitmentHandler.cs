@@ -17,18 +17,19 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
+    /// <summary>
+    /// Handles all mobile party recruitment in game
+    /// </summary>
     public class MobilePartyRecruitmentHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
-        private readonly INetwork network;
         private readonly IObjectManager objectManager;
         private readonly ILogger Logger = LogManager.GetLogger<MobilePartyRecruitmentHandler>();
         private RecruitmentCampaignBehavior recruitmentCampaignBehavior;
 
-        public MobilePartyRecruitmentHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+        public MobilePartyRecruitmentHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
-            this.network = network;
             this.objectManager = objectManager;
 
             messageBroker.Subscribe<UnitRecruitGranted>(Handle);
@@ -43,7 +44,7 @@ namespace GameInterface.Services.MobileParties.Handlers
         }
 
         //A Player Recruited Unit
-        internal void Handle(MessagePayload<UnitRecruitGranted> obj)
+        private void Handle(MessagePayload<UnitRecruitGranted> obj)
         {
             recruitmentCampaignBehavior ??= Campaign.Current.CampaignBehaviorManager.GetBehavior<RecruitmentCampaignBehavior>();
 
@@ -67,17 +68,17 @@ namespace GameInterface.Services.MobileParties.Handlers
 
             if (objectManager.TryGetObject(payload.PartyId, out MobileParty mobileParty) == false)
             {
-                Logger.Error("Could not handle PartyRecruitGranted, PartyId not found: {id}", payload.PartyId);
+                Logger.Error("Could not handle {PartyRecruitGranted}, PartyId not found: {id}", nameof(PartyRecruitGranted), payload.PartyId);
                 return;
             }
             if (objectManager.TryGetObject(payload.SettlementId, out Settlement settlement) == false && payload.SettlementId != null)
             {
-                Logger.Error("Could not handle PartyRecruitGranted, Settlement not found: {id}", payload.SettlementId);
+                Logger.Error("Could not handle {PartyRecruitGranted}, Settlement not found: {id}", nameof(PartyRecruitGranted), payload.SettlementId);
                 return;
             }
             if (objectManager.TryGetObject(payload.HeroId, out Hero hero) == false && payload.HeroId != null)
             {
-                Logger.Error("Could not handle PartyRecruitGranted, HeroId not found: {id}", payload.HeroId);
+                Logger.Error("Could not handle {PartyRecruitGranted}, HeroId not found: {id}", nameof(PartyRecruitGranted), payload.HeroId);
                 return;
             }
 
