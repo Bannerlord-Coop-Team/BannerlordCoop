@@ -16,13 +16,6 @@ namespace GameInterface.Services.Towns.Patches
             return false;
         }
 
-        [HarmonyPatch(nameof(Town.OwnerClan), MethodType.Setter)]
-        [HarmonyPrefix]
-        private static bool OwnerClanPrefix()
-        {
-            return false;
-        }
-
         [HarmonyPatch(nameof(Town.Security), MethodType.Setter)]
         [HarmonyPrefix]
         private static bool SecurityPrefix()
