@@ -23,13 +23,13 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
             messageBroker.Subscribe<NetworkRecruitRequest>(Handle);
-            messageBroker.Subscribe<NetworkPartyRecruitUnit>(Handle);
+            messageBroker.Subscribe<PartyRecruitUnit>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<NetworkRecruitRequest>(Handle);
-            messageBroker.Unsubscribe<NetworkPartyRecruitUnit>(Handle);
+            messageBroker.Unsubscribe<PartyRecruitUnit>(Handle);
         }
 
         internal void Handle(MessagePayload<NetworkRecruitRequest> obj)
@@ -41,11 +41,11 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
             network.SendAllBut(obj.Who as NetPeer, new NetworkUnitRecruited(payload.CharacterId, payload.Amount, payload.PartyId));
         }
 
-        private void Handle(MessagePayload<NetworkPartyRecruitUnit> obj)
+        private void Handle(MessagePayload<PartyRecruitUnit> obj)
         {
             var payload = obj.What;
 
-            network.SendAll(new PartyRecruitedUnit(
+            network.SendAll(new NetworkPartyRecruitedUnit(
                 payload.PartyId, 
                 payload.SettlementId, 
                 payload.HeroId, 

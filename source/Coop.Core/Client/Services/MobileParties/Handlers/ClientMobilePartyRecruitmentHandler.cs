@@ -31,7 +31,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         {
             messageBroker.Unsubscribe<OnUnitRecruited>(Handle);
             messageBroker.Unsubscribe<NetworkUnitRecruited>(Handle);
-            messageBroker.Unsubscribe<PartyRecruitedUnit>(Handle);
+            messageBroker.Unsubscribe<NetworkPartyRecruitedUnit>(Handle);
         }
 
         private void Handle(MessagePayload<NetworkUnitRecruited> obj)
@@ -48,7 +48,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
             network.SendAll(new NetworkRecruitRequest(payload.CharacterId, payload.Amount, payload.PartyId));
         }
 
-        private void Handle(MessagePayload<PartyRecruitedUnit> obj)
+        private void Handle(MessagePayload<NetworkPartyRecruitedUnit> obj)
         {
             var payload = obj.What;
 

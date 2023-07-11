@@ -3,9 +3,9 @@
 namespace GameInterface.Services.MobileParties.Messages
 {
     /// <summary>
-    /// Event when party recruit has been approved by server
+    /// Sent when another party recruits a unit
     /// </summary>
-    public record PartyRecruitGranted : IEvent
+    public record PartyRecruitUnit : IEvent
     {
         public string PartyId { get; }
         public string SettlementId { get; }
@@ -15,7 +15,7 @@ namespace GameInterface.Services.MobileParties.Messages
         public int BitCode { get; }
         public int RecruitingDetail { get; }
 
-        public PartyRecruitGranted(string partyId, string settlementId, string heroId, string characterId, int amount, int bitCode, int recruitingDetail)
+        public PartyRecruitUnit(string partyId, string settlementId, string heroId, string characterId, int amount, int bitCode, int recruitingDetail)
         {
             PartyId = partyId;
             SettlementId = settlementId;
