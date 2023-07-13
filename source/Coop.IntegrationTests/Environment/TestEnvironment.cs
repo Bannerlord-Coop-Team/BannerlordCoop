@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Coop.Core.Server.Services.Save;
 using Coop.IntegrationTests.Environment.Instance;
 using Common.PacketHandlers;
+using GameInterface.Services.ObjectManager;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -45,19 +46,21 @@ internal class TestEnvironment
         var handlerTypes = HandlerCollector.Collect<ClientModule>();
         var serviceCollection = new ServiceCollection();
 
+        AddSharedDependencies(serviceCollection);
+
         foreach (var handlerType in handlerTypes)
         {
             serviceCollection.AddScoped(handlerType);
         }
 
+        
+
         serviceCollection.AddScoped<MockClient>();
         serviceCollection.AddScoped<INetwork, MockClient>(x => x.GetService<MockClient>()!);
         serviceCollection.AddScoped<ICoopClient, MockClient>(x => x.GetService<MockClient>()!);
-        serviceCollection.AddScoped<IMessageBroker, TestMessageBroker>();
-        serviceCollection.AddScoped<IPacketManager, PacketManager>();
+        
 
         serviceCollection.AddScoped<ClientInstance>();
-        serviceCollection.AddSingleton(networkOrchestrator);
 
         var serviceProvider = serviceCollection.BuildServiceProvider();
 
@@ -78,6 +81,8 @@ internal class TestEnvironment
         var handlerTypes = HandlerCollector.Collect<ServerModule>();
         var serviceCollection = new ServiceCollection();
 
+        AddSharedDependencies(serviceCollection);
+
         foreach (var handlerType in handlerTypes)
         {
             serviceCollection.AddScoped(handlerType);
@@ -86,11 +91,8 @@ internal class TestEnvironment
         serviceCollection.AddScoped<MockServer>();
         serviceCollection.AddScoped<INetwork, MockServer>(x => x.GetService<MockServer>()!);
         serviceCollection.AddScoped<ICoopServer, MockServer>(x => x.GetService<MockServer>()!);
-        serviceCollection.AddScoped<IMessageBroker, TestMessageBroker>();
-        serviceCollection.AddScoped<IPacketManager, PacketManager>();
-        serviceCollection.AddScoped<ICoopSaveManager, CoopSaveManager>();
         serviceCollection.AddScoped<ServerInstance>();
-        serviceCollection.AddSingleton(networkOrchestrator);
+        
 
         var serviceProvider = serviceCollection.BuildServiceProvider();
 
@@ -104,6 +106,18 @@ internal class TestEnvironment
         networkOrchestrator.AddServer(instance);
 
         return instance;
+    }
+
+    private IServiceCollection AddSharedDependencies(IServiceCollection services)
+    {
+        services.AddSingleton(networkOrchestrator);
+
+        services.AddScoped<IMessageBroker, TestMessageBroker>();
+        services.AddScoped<IPacketManager, PacketManager>();
+        services.AddScoped<IObjectManager, MockObjectManager>();
+        services.AddScoped<ICoopSaveManager, CoopSaveManager>();
+
+        return services;
     }
 }
 
