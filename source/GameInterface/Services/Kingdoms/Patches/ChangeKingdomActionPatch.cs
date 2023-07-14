@@ -34,6 +34,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             {
                 GameLoopRunner.RunOnMainThread(() =>
                 {
+                    _allowedInstance.Instance = clan;
                     _applyInternal.Invoke(null, new object[] { clan, newKingdom, detail, awardMultiplier, byRebellion, showNotification });
                 }, true);
             }

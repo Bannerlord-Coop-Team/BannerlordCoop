@@ -25,6 +25,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             using (_allowedInstance)
             {
+                _allowedInstance.Instance = kingdom;
                 GameLoopRunner.RunOnMainThread(() =>
                 {
                     kingdom.RemovePolicy(policy);
