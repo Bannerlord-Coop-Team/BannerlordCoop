@@ -6,6 +6,9 @@ using System.Text;
 
 namespace Coop.Core.Server.Services.Villages.Messages
 {
+    /// <summary>
+    /// Change village state approved by server
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record ChangeVillageStateApproved : ICommand
     {

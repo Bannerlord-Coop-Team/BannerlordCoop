@@ -1,8 +1,11 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.Villages.Messages
+namespace Coop.Core.Client.Services.Villages.Messages
 {
+    /// <summary>
+    /// Request to change village state from client to server
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record ChangeVillageStateRequest : ICommand
     {

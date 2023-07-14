@@ -2,6 +2,9 @@
 
 namespace GameInterface.Services.Villages.Messages
 {
+    /// <summary>
+    /// Local event from game interface that village state has been changed
+    /// </summary>
     public record ChangeVillageState : IEvent
     {
         public string VillageId { get; }

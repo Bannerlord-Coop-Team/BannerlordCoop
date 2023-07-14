@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Villages.Messages;
@@ -14,12 +15,13 @@ namespace GameInterface.Services.Villages.Patches
     [HarmonyPatch(typeof(ChangeVillageStateAction), "ApplyInternal")]
     public class ChangeVillageStatePatch
     {
-        private static AllowedInstance<Village> _allowedInstance;
-        private static readonly MethodInfo _applyInternal = typeof(ChangeVillageStateAction).GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static);
+        private static AllowedInstance<Village> _allowedInstance = new AllowedInstance<Village>();
+        private static MethodInfo _applyInternal => typeof(ChangeVillageStateAction).GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static);
+        private static readonly Action<Village, Village.VillageStates, MobileParty> ApplyInternalDelegate = _applyInternal.BuildDelegate<Action<Village, Village.VillageStates, MobileParty>>();
 
         public static bool Prefix(Village village, Village.VillageStates newState, MobileParty raiderParty)
         {
-            if (village == _allowedInstance?.Instance) return true;
+            if (_allowedInstance.IsAllowed(village)) return true;
 
             MessageBroker.Instance.Publish(village, new ChangeVillageState(village.StringId, Convert.ToInt32(newState), raiderParty.StringId));
 
@@ -28,11 +30,12 @@ namespace GameInterface.Services.Villages.Patches
 
         public static void RunOriginalApplyInternal(Village village, Village.VillageStates newState, MobileParty raiderParty)
         {
-            using (_allowedInstance = new AllowedInstance<Village>(village))
+            using (_allowedInstance)
             {
                 GameLoopRunner.RunOnMainThread(() =>
                 {
-                    _applyInternal.Invoke(null, new object[] { village, newState, raiderParty });
+                    _allowedInstance.Instance = village;
+                    ApplyInternalDelegate(village, newState, raiderParty);
                 }, true);
             }
         }
