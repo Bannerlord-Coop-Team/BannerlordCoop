@@ -153,7 +153,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_ui_village_buy_good_on_consequence")]
     static bool DisableVillageBuyGoods()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -173,6 +173,6 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_keep_open_stash_on_consequence")]
     static bool DisableTownStash()
     {
-        return false;
+        return true;
     }
 }
