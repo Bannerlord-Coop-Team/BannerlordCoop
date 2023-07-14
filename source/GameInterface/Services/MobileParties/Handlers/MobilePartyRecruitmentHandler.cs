@@ -78,13 +78,18 @@ namespace GameInterface.Services.MobileParties.Handlers
                 Logger.Error("Could not handle {PartyRecruitGranted}, HeroId not found: {id}", nameof(PartyRecruitedUnit), payload.HeroId);
                 return;
             }
+            if (objectManager.TryGetObject(payload.CharacterId, out CharacterObject character) == false)
+            {
+                Logger.Error("Could not handle {PartyRecruitGranted}, CharacterId not found: {id}", nameof(PartyRecruitedUnit), payload.CharacterId);
+                return;
+            }
 
             recruit_ApplyInternal.Invoke(recruitmentCampaignBehavior, new object[]
             {
                 mobileParty,
                 settlement,
                 hero,
-                CharacterObject.Find(payload.CharacterId),
+                character,
                 payload.Amount,
                 payload.BitCode,
                 payload.RecruitingDetail
