@@ -29,8 +29,6 @@ internal class RegistryHandler : IHandler
 
     private void Handle(MessagePayload<RegisterAllGameObjects> obj)
     {
-        var payload = obj.What;
-
         heroRegistry.RegisterAllHeroes();
         partyRegistry.RegisterAllParties();
 

@@ -41,7 +41,9 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegi
             return;
         }
 
-        foreach (var party in objectManager.MobileParties)
+        var parties = objectManager.MobileParties.ToArray();
+
+        foreach (var party in parties)
         {
             RegisterParty(party);
         }
