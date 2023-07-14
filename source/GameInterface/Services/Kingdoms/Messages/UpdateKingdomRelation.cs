@@ -3,7 +3,10 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
-    public record UpdateKingdomRelation : IEvent
+    /// <summary>
+    /// Local event when a kingdom relation is updated from game interface
+    /// </summary>
+    public record UpdateKingdomRelation : ICommand
     {
         public Clan Clan { get; }
         public Kingdom Kingdom { get; }

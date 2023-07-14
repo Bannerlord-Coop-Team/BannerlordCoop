@@ -3,6 +3,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Kingdoms.Messages
 {
+    /// <summary>
+    /// Add policy has been approved by server
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkAddPolicyApproved : ICommand
     {

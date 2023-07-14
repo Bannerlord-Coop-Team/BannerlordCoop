@@ -4,8 +4,10 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
-    [ProtoContract(SkipConstructor = true)]
-    public record UpdatedKingdomRelation : IEvent
+    /// <summary>
+    /// Local event to let game interface know of Kingdom update
+    /// </summary>
+    public record KingdomRelationUpdated : IEvent
     {
         public string ClanId { get; }
         public string KingdomId { get; }
@@ -14,7 +16,7 @@ namespace GameInterface.Services.Kingdoms.Messages
         public bool byRebellion { get; }
         public bool showNotification { get; }
 
-        public UpdatedKingdomRelation(string clanId, string kingdomId, int changeKingdomActionDetail, 
+        public KingdomRelationUpdated(string clanId, string kingdomId, int changeKingdomActionDetail, 
             int awardMultiplier, bool byRebellion, bool showNotification)
         {
             ClanId = clanId;

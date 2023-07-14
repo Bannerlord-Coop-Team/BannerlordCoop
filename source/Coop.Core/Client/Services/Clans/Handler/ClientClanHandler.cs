@@ -1,18 +1,10 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.MapEvents.Handlers;
-using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using GameInterface.Services.Clans.Messages;
 using Coop.Core.Client.Services.Clans.Messages;
-using TaleWorlds.CampaignSystem;
-using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem.Party;
 using Coop.Core.Server.Services.Clans.Messages;
 
 namespace Coop.Core.Client.Services.Clans.Handler
@@ -24,14 +16,12 @@ namespace Coop.Core.Client.Services.Clans.Handler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
-        private readonly IObjectManager objectManager;
         private readonly ILogger Logger = LogManager.GetLogger<ClientClanHandler>();
 
-        public ClientClanHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+        public ClientClanHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            this.objectManager = objectManager;
             messageBroker.Subscribe<ClanNameChange>(Handle);
             messageBroker.Subscribe<NetworkClanNameChangeApproved>(Handle);
         }

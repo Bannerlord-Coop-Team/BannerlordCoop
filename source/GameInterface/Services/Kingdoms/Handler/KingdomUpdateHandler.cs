@@ -6,6 +6,8 @@ using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using static TaleWorlds.CampaignSystem.Actions.ChangeKingdomAction;
 
 namespace GameInterface.Services.Kingdoms.Handler
@@ -17,28 +19,38 @@ namespace GameInterface.Services.Kingdoms.Handler
     {
         private readonly IMessageBroker messageBroker;
         private readonly ILogger Logger = LogManager.GetLogger<KingdomUpdateHandler>();
+        private readonly IObjectManager objectManager;
 
         public KingdomUpdateHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
-            messageBroker.Subscribe<UpdatedKingdomRelation>(Handle);
+            this.objectManager = objectManager;
+            messageBroker.Subscribe<KingdomRelationUpdated>(Handle);
             messageBroker.Subscribe<PolicyAdded>(Handle);
             messageBroker.Subscribe<PolicyRemoved>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<UpdatedKingdomRelation>(Handle);
+            messageBroker.Unsubscribe<KingdomRelationUpdated>(Handle);
             messageBroker.Unsubscribe<PolicyAdded>(Handle);
             messageBroker.Unsubscribe<PolicyRemoved>(Handle);
         }
 
-        private void Handle(MessagePayload<UpdatedKingdomRelation> obj)
+        private void Handle(MessagePayload<KingdomRelationUpdated> obj)
         {
             var payload = obj.What;
 
-            Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
-            Kingdom kingdom = Kingdom.All.Find(x => x.StringId == payload.KingdomId);
+            if (objectManager.TryGetObject(payload.ClanId, out Clan clan) == false)
+            {
+                Logger.Error("PartyId not found: {id}", payload.ClanId);
+                return;
+            }
+
+            if (objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom) == false)
+            {
+                Logger.Information("KingdomId not found: {id}", payload.KingdomId);
+            }
 
             ChangeKingdomActionPatch.RunOriginalApplyInternal(clan, kingdom, (ChangeKingdomActionDetail)payload.ChangeKingdomActionDetail,
                 payload.awardMultiplier, payload.byRebellion, payload.showNotification);
@@ -48,7 +60,12 @@ namespace GameInterface.Services.Kingdoms.Handler
             var payload = obj.What;
 
             PolicyObject policy = new PolicyObject(payload.PolicyId);
-            Kingdom kingdom = Kingdom.All.Find(x => x.StringId == payload.KingdomId);
+
+            if (objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom) == false)
+            {
+                Logger.Information("KingdomId not found: {id}", payload.KingdomId);
+                return;
+            }
 
             KingdomAddPolicyPatch.RunOriginalAddPolicy(policy, kingdom);
 
@@ -59,7 +76,12 @@ namespace GameInterface.Services.Kingdoms.Handler
             var payload = obj.What;
 
             PolicyObject policy = new PolicyObject(payload.PolicyId);
-            Kingdom kingdom = Kingdom.All.Find(x => x.StringId == payload.KingdomId);
+
+            if (objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom) == false)
+            {
+                Logger.Information("KingdomId not found: {id}", payload.KingdomId);
+                return;
+            }
 
             KingdomRemovePolicyPatch.RunOriginalRemovePolicy(policy, kingdom);
 

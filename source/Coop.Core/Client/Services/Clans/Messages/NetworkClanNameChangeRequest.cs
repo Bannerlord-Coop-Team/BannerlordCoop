@@ -5,6 +5,9 @@ using TaleWorlds.CampaignSystem;
 
 namespace Coop.Core.Client.Services.Clans.Messages
 {
+    /// <summary>
+    /// Request from client to server to change clan name
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkClanNameChangeRequest : ICommand
     {

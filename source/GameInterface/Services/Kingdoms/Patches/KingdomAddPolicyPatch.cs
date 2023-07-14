@@ -11,11 +11,11 @@ namespace GameInterface.Services.Kingdoms.Patches
     [HarmonyPatch(typeof(Kingdom), nameof(Kingdom.AddPolicy))]
     public class KingdomAddPolicyPatch
     {
-        private static AllowedInstance<Kingdom> _allowedInstance;
+        private readonly static AllowedInstance<Kingdom> _allowedInstance = new AllowedInstance<Kingdom>();
 
         public static bool Prefix(Kingdom __instance, PolicyObject policy)
         {
-            if (__instance == _allowedInstance?.Instance) return true;
+            if (_allowedInstance.IsAllowed(__instance)) return true;
 
             MessageBroker.Instance.Publish(__instance, new AddPolicy(policy.StringId, __instance.StringId));
 
@@ -24,7 +24,7 @@ namespace GameInterface.Services.Kingdoms.Patches
 
         public static void RunOriginalAddPolicy(PolicyObject policy, Kingdom kingdom)
         {
-            using (_allowedInstance = new AllowedInstance<Kingdom>(kingdom))
+            using (_allowedInstance)
             {
                 GameLoopRunner.RunOnMainThread(() =>
                 {

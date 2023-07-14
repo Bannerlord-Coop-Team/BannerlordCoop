@@ -3,6 +3,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Clans.Messages
 {
+    /// <summary>
+    /// Clan name change is approved by server
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkClanNameChangeApproved : ICommand
     {

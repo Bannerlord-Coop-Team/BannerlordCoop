@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
@@ -6,6 +7,7 @@ using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -16,25 +18,18 @@ namespace GameInterface.Services.Clans.Patches
     [HarmonyPatch(typeof(Clan), nameof(Clan.ChangeClanName))]
     public class ClanNameChangePatch
     {
-        private static AllowedInstance<Clan> _allowedInstance;
+        private static MethodInfo Clan_Name => typeof(Clan).GetProperty(nameof(Clan.Name)).GetSetMethod();
+        private static readonly Action<Clan, TextObject> Clan_Name_Setter = Clan_Name.BuildDelegate<Action<Clan, TextObject>>();
 
         static bool Prefix(ref Clan __instance, TextObject name, TextObject informalName)
-        {
-            if (__instance == _allowedInstance?.Instance) return true;
-            
+        {            
             MessageBroker.Instance.Publish(__instance, new ClanNameChange(__instance, name.ToString(), informalName.ToString()));
 
             return false;
         }
         public static void RunOriginalChangeClanName(Clan clan, TextObject name, TextObject informalName)
         {
-            using (_allowedInstance = new AllowedInstance<Clan>(clan))
-            {
-                GameLoopRunner.RunOnMainThread(() =>
-                {
-                    clan.ChangeClanName(name, informalName);
-                }, true);
-            }
+            Clan_Name_Setter(clan, name);
         }
     }
 }

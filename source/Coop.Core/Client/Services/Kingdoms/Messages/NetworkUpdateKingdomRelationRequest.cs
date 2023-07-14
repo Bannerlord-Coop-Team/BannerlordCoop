@@ -4,6 +4,9 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
+    /// <summary>
+    /// Request from client to server to update kingdom relation
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkUpdateKingdomRelationRequest : ICommand
     {

@@ -3,7 +3,10 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
-    public record RemovePolicy : IEvent
+    /// <summary>
+    /// Event when a policy is removed from game interface
+    /// </summary>
+    public record RemovePolicy : ICommand
     {
         public string PolicyId { get; }
         public string KingdomId { get; }

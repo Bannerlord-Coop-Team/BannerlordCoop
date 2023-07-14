@@ -58,7 +58,7 @@ namespace Coop.Core.Client.Services.Kingdoms.Handlers
         {
             var payload = obj.What;
 
-            var message = new UpdatedKingdomRelation(payload.ClanId, payload.KingdomId, payload.ChangeKingdomActionDetail,
+            var message = new KingdomRelationUpdated(payload.ClanId, payload.KingdomId, payload.ChangeKingdomActionDetail,
                 payload.awardMultiplier, payload.byRebellion, payload.showNotification);
 
             messageBroker.Publish(this, message);

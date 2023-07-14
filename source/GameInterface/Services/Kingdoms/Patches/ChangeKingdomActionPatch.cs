@@ -14,13 +14,13 @@ namespace GameInterface.Services.Kingdoms.Patches
     [HarmonyPatch(typeof(ChangeKingdomAction), "ApplyInternal")]
     public class ChangeKingdomActionPatch
     {
-        private static AllowedInstance<Clan> _allowedInstance;
+        private readonly static AllowedInstance<Clan> _allowedInstance = new AllowedInstance<Clan>();
         private static readonly MethodInfo _applyInternal = typeof(ChangeKingdomAction).GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static);
 
         public static bool Prefix(Clan clan, Kingdom newKingdom, ChangeKingdomActionDetail detail, 
             int awardMultiplier = 0, bool byRebellion = false, bool showNotification = true)
         {
-            if (clan == _allowedInstance?.Instance) return true;
+            if (_allowedInstance.IsAllowed(clan)) return true;
 
             MessageBroker.Instance.Publish(clan, new UpdateKingdomRelation(clan, newKingdom, Convert.ToInt32(detail), awardMultiplier, byRebellion, showNotification));
 
@@ -30,7 +30,7 @@ namespace GameInterface.Services.Kingdoms.Patches
         public static void RunOriginalApplyInternal(Clan clan, Kingdom newKingdom, ChangeKingdomActionDetail detail,
             int awardMultiplier = 0, bool byRebellion = false, bool showNotification = true)
         {
-            using (_allowedInstance = new AllowedInstance<Clan>(clan))
+            using (_allowedInstance)
             {
                 GameLoopRunner.RunOnMainThread(() =>
                 {

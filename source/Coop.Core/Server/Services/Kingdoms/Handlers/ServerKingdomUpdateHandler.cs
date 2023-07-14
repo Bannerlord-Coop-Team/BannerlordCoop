@@ -14,7 +14,7 @@ using TaleWorlds.CampaignSystem;
 namespace Coop.Core.Server.Services.Kingdoms.Handlers
 {
     /// <summary>
-    /// Handles all changes to kingdoms.
+    /// Handles all changes to kingdoms.UpdateKingdomRelation
     /// </summary>
     public class ServerKingdomUpdateHandler : IHandler
     {
@@ -44,7 +44,7 @@ namespace Coop.Core.Server.Services.Kingdoms.Handlers
         {
             var payload = obj.What;
 
-            var message = new UpdatedKingdomRelation(payload.ClanId, payload.KingdomId, payload.ChangeKingdomActionDetail,
+            var message = new KingdomRelationUpdated(payload.ClanId, payload.KingdomId, payload.ChangeKingdomActionDetail,
                 payload.awardMultiplier, payload.byRebellion, payload.showNotification);
 
             messageBroker.Publish(this, message);

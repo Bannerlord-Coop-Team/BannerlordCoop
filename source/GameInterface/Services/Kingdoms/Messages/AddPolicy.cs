@@ -3,7 +3,10 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
-    public record AddPolicy : IEvent
+    /// <summary>
+    /// Fires when game interface adds a policy
+    /// </summary>
+    public record AddPolicy : ICommand
     {
         public string PolicyId { get; }
         public string KingdomId { get; }
