@@ -21,6 +21,11 @@ namespace Common.Serialization
 
     public class ProtoBufSerializer
     {
+        public static T Deserialize<T>(byte[] data)
+        {
+            return (T)Deserialize(data);
+        }
+
         public static object Deserialize(byte[] data)
         {
             using(var ms = new MemoryStream(data))

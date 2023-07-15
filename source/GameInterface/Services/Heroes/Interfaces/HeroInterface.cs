@@ -1,11 +1,9 @@
 ﻿using Common.Logging;
-using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
-using GameInterface.Services.GameDebug.Messages;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Registry;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -15,9 +13,9 @@ namespace GameInterface.Services.Heroes.Interfaces;
 internal interface IHeroInterface : IGameAbstraction
 {
     byte[] PackageMainHero();
-    void ResolveHero(ResolveHero message);
+    bool TryResolveHero(string controllerId, out string heroId);
     void SwitchMainHero(string heroId);
-    Hero UnpackMainHero(byte[] bytes);
+    Hero UnpackMainHero(string controllerId, byte[] bytes);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -25,16 +23,16 @@ internal class HeroInterface : IHeroInterface
     private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
     private readonly IObjectManager objectManager;
     private readonly IBinaryPackageFactory binaryPackageFactory;
-    private readonly IMessageBroker messageBroker;
+    private readonly IHeroRegistry heroRegistry;
 
     public HeroInterface(
         IObjectManager objectManager,
         IBinaryPackageFactory binaryPackageFactory,
-        IMessageBroker messageBroker)
+        IHeroRegistry heroRegistry)
     {
         this.objectManager = objectManager;
         this.binaryPackageFactory = binaryPackageFactory;
-        this.messageBroker = messageBroker;
+        this.heroRegistry = heroRegistry;
     }
 
     public byte[] PackageMainHero()
@@ -43,17 +41,17 @@ internal class HeroInterface : IHeroInterface
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public Hero UnpackMainHero(byte[] bytes)
+    public Hero UnpackMainHero(string controllerId, byte[] bytes)
     {
         HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
-        return package.Unpack<Hero>(binaryPackageFactory);
+        var hero = package.Unpack<Hero>(binaryPackageFactory);
+
+        heroRegistry.TryRegisterHeroController(controllerId, hero.StringId);
+
+        return hero;
     }
 
-    public void ResolveHero(ResolveHero message)
-    {
-        // TODO implement
-        messageBroker.Publish(this, new ResolveDebugHero(message.PlayerId));
-    }
+    public bool TryResolveHero(string controllerId, out string heroId) => heroRegistry.TryGetControlledHero(controllerId, out heroId);
 
     public void SwitchMainHero(string heroId)
     {

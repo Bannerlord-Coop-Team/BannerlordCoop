@@ -1,12 +1,16 @@
-﻿using Common;
+﻿using Autofac.Features.OwnedInstances;
+using Common;
 using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Entity.Data;
+using ProtoBuf;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Entity;
 
@@ -68,17 +72,24 @@ internal interface IControlledEntityRegistry
     /// <param name="entity">Resolved entity</param>
     /// <returns>True if the entity is registered, otherwise False</returns>
     bool TryGetControlledEntity(string entityId, out ControlledEntity entity);
+    /// <summary>
+    /// Attempts to retrieve all controlled entities using the given controller Id
+    /// </summary>
+    /// <param name="controllerId">Controller to find entities for</param>
+    /// <param name="controlledEntities">Enumerable of controlled entities</param>
+    /// <returns>True if the controller has controlled entities, otherwise False</returns>
+    bool TryGetControlledEntities(string controllerId, out IEnumerable<ControlledEntity> controlledEntities);
 }
 
+[ProtoContract]
 internal class ControlledEntityRegistry : IControlledEntityRegistry
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ControlledEntityRegistry>();
 
-    public string InstanceOwnerId { get; set; }
-
-    private ConcurrentDictionary<string, HashSet<ControlledEntity>> controlledEntities = new ConcurrentDictionary<string, HashSet<ControlledEntity>>();
-
-    private ConcurrentDictionary<string, ControlledEntity> controllerIdLookup = new ConcurrentDictionary<string, ControlledEntity>();
+    [ProtoMember(1)]
+    private readonly ConcurrentDictionary<string, HashSet<ControlledEntity>> controlledEntities = new ConcurrentDictionary<string, HashSet<ControlledEntity>>();
+    [ProtoMember(2)]
+    private readonly ConcurrentDictionary<string, ControlledEntity> controllerIdLookup = new ConcurrentDictionary<string, ControlledEntity>();
 
     public IReadOnlyDictionary<string, IReadOnlySet<ControlledEntity>> PackageControlledEntities()
     {
@@ -151,4 +162,44 @@ internal class ControlledEntityRegistry : IControlledEntityRegistry
     }
 
     public bool TryGetControlledEntity(string entityId, out ControlledEntity entity) => controllerIdLookup.TryGetValue(entityId, out entity);
+
+    public bool TryGetControlledEntities(string controllerId, out IEnumerable<ControlledEntity> controlledEntities)
+    {
+        var result = this.controlledEntities.TryGetValue(controllerId, out var controlledEntitiesHashset);
+
+        controlledEntities = controlledEntitiesHashset;
+
+        if (result == false) return false;
+        
+        if (controlledEntitiesHashset.IsEmpty()) return false;
+
+        return true;
+    }
+
+    public override bool Equals(object obj)
+    {
+        if (obj is not ControlledEntityRegistry entityRegistry) return false;
+
+        if (controlledEntities.Count != entityRegistry.controlledEntities.Count) return false;
+
+        foreach(var key in controlledEntities.Keys)
+        {
+            if (!entityRegistry.controlledEntities.ContainsKey(key)) return false;
+
+            if (controlledEntities[key].SequenceEqual(entityRegistry.controlledEntities[key]) == false) return false;
+        }
+
+        if (controllerIdLookup.Count != entityRegistry.controllerIdLookup.Count) return false;
+
+        foreach (var key in controllerIdLookup.Keys)
+        {
+            if (!entityRegistry.controllerIdLookup.ContainsKey(key)) return false;
+
+            if (controllerIdLookup[key].Equals(entityRegistry.controllerIdLookup[key]) == false) return false;
+        }
+
+        return true;
+    }
+
+    public override int GetHashCode() => base.GetHashCode();
 }

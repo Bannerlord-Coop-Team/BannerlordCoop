@@ -1,9 +1,11 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
+using Serilog;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -13,6 +15,8 @@ namespace Coop.Core.Server.Connections.States;
 /// </summary>
 public class ResolveCharacterState : ConnectionStateBase
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ResolveCharacterState>();
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     public ResolveCharacterState(IConnectionLogic connectionLogic) 
@@ -35,10 +39,10 @@ public class ResolveCharacterState : ConnectionStateBase
 
     internal void ClientValidateHandler(MessagePayload<NetworkClientValidate> obj)
     {
-        var playerId = obj.Who as NetPeer;
-        if (playerId != ConnectionLogic.Peer) return;
+        var peer = obj.Who as NetPeer;
+        if (peer != ConnectionLogic.Peer) return;
 
-        ConnectionLogic.MessageBroker.Publish(this, new ResolveDebugHero(obj.What.PlayerId));
+        ConnectionLogic.MessageBroker.Publish(this, new ResolveHero(obj.What.PlayerId));
     }
 
     internal void ResolveHeroHandler(MessagePayload<HeroResolved> obj)

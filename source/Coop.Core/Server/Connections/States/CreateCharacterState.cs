@@ -34,7 +34,9 @@ public class CreateCharacterState : ConnectionStateBase
     }
     internal void PlayerTransferedHeroHandler(MessagePayload<NetworkTransferedHero> obj)
     {
-        var registerCommand = new RegisterNewPlayerHero(obj.What.PlayerHero);
+        var controllerId = obj.What.PlayerId;
+        var data = obj.What.PlayerHero;
+        var registerCommand = new RegisterNewPlayerHero(controllerId, data);
         messageBroker.Publish(this, registerCommand);
     }
     internal void PlayerHeroRegisteredHandler(MessagePayload<NewPlayerHeroRegistered> obj)

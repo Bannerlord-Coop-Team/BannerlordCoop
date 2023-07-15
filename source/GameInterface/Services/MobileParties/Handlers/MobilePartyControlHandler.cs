@@ -63,14 +63,18 @@ internal class MobilePartyControlHandler : IHandler
         if (obj.What.IsRevocation == false)
         {
             controlledEntityRegistry.RegisterAsControlled(ownerId, partyId);
-            return;
+            messageBroker.Publish(this, new PartyControllerRegistered(ownerId, partyId));
         }
-
-        controlledEntityRegistry.RemoveAsControlled(new ControlledEntity(ownerId, partyId));
+        else
+        {
+            controlledEntityRegistry.RemoveAsControlled(new ControlledEntity(ownerId, partyId));
+            messageBroker.Publish(this, new PartyControllerRemoved(ownerId, partyId));
+        }
 
         if (ModInformation.IsServer && objectManager.TryGetObject(partyId, out MobileParty party))
         {
-            party.Ai.SetDoNotMakeNewDecisions(true);
+            bool aiDisabled = obj.What.IsRevocation ? false : true;
+            party.Ai.SetDoNotMakeNewDecisions(aiDisabled);
         }
     }
 

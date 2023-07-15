@@ -97,9 +97,9 @@ namespace Coop.Tests.Server.Connections.States
 
             // Assert
             var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<ResolveDebugHero>(message);
+            Assert.IsType<ResolveHero>(message);
 
-            var castedMessage = (ResolveDebugHero)message;
+            var castedMessage = (ResolveHero)message;
             Assert.Equal(playerId, castedMessage.PlayerId);
         }
 

@@ -17,13 +17,14 @@ public record NetworkPlayerData : IEvent
         CharacterObjectStringId = registrationData.CharacterObjectStringId;
         ClanStringId = registrationData.ClanStringId;
     }
-
     [ProtoMember(1)]
-    public string HeroStringId { get; }
+    public string PlayerId { get; }
     [ProtoMember(2)]
-    public string PartyStringId { get; }
+    public string HeroStringId { get; }
     [ProtoMember(3)]
-    public string CharacterObjectStringId { get; }
+    public string PartyStringId { get; }
     [ProtoMember(4)]
+    public string CharacterObjectStringId { get; }
+    [ProtoMember(5)]
     public string ClanStringId { get; }
 }

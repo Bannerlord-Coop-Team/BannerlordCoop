@@ -48,10 +48,11 @@ internal class NewHeroHandler : IHandler
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
     {
         byte[] bytes = obj.What.Bytes;
+        var controllerId = obj.What.ControllerId;
 
         try
         {
-            Hero hero = heroInterface.UnpackMainHero(bytes);
+            Hero hero = heroInterface.UnpackMainHero(controllerId, bytes);
 
             Logger.Information("New Hero ID: {id}", hero.Id.InternalValue);
 

@@ -32,7 +32,10 @@ public class CharacterCreationState : ClientStateBase
 
     internal void Handle_NewHeroPackaged(MessagePayload<NewHeroPackaged> obj)
     {
-        network.SendAll(new NetworkTransferedHero(obj.What.Package));
+        var playerId = Logic.ControllerIdProvider.ControllerId;
+        var data = obj.What.Package;
+
+        network.SendAll(new NetworkTransferedHero(playerId, data));
 
         Logic.LoadSavedData();
     }

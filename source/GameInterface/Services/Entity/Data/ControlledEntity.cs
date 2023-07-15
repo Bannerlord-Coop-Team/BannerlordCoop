@@ -42,4 +42,13 @@ public class ControlledEntity
         OwnerId = ownerId;
         EntityId = entityId;
     }
+
+    public override bool Equals(object obj)
+    {
+        if (obj is not ControlledEntity controlledEntity) return false;
+
+        return OwnerId == controlledEntity.OwnerId && EntityId == controlledEntity.EntityId;
+    }
+
+    public override int GetHashCode() => base.GetHashCode();
 }

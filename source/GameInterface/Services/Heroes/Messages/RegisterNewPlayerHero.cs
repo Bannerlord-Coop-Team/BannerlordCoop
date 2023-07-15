@@ -6,10 +6,12 @@ namespace GameInterface.Services.Heroes.Messages;
 
 public record RegisterNewPlayerHero : ICommand
 {
+    public string ControllerId { get; }
     public byte[] Bytes { get; }
 
-    public RegisterNewPlayerHero(byte[] bytes)
+    public RegisterNewPlayerHero(string controllerId, byte[] bytes)
     {
+        ControllerId = controllerId;
         Bytes = bytes;
     }
 }
