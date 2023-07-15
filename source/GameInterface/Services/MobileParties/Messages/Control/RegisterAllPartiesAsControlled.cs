@@ -12,4 +12,10 @@ namespace GameInterface.Services.MobileParties.Messages.Control;
 /// </remarks>
 public record RegisterAllPartiesAsControlled : ICommand
 {
+    public string OwnerId { get; }
+
+    public RegisterAllPartiesAsControlled(string ownerId)
+    {
+        OwnerId = ownerId;
+    }
 }

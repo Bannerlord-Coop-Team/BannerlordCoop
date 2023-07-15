@@ -45,20 +45,21 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly FieldInfo Campaign_hideouts = typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-        private static readonly PropertyInfo PartyComponent_MobileParty = typeof(PartyComponent).GetProperty(nameof(PartyComponent.MobileParty));
-        private static readonly PropertyInfo BanditPartyComponent_Hideout = typeof(BanditPartyComponent).GetProperty(nameof(BanditPartyComponent.Hideout));
-        private static readonly PropertyInfo BanditPartyComponent_IsBossParty = typeof(BanditPartyComponent).GetProperty(nameof(BanditPartyComponent.IsBossParty));
-        private static readonly PropertyInfo PartyBase_MobileParty = typeof(PartyBase).GetProperty(nameof(PartyBase.MobileParty));
-        private static readonly FieldInfo MobileParty_actualClan = typeof(MobileParty).GetField("_actualClan", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly PropertyInfo MobileParty_Party = typeof(MobileParty).GetProperty(nameof(MobileParty.Party));
+        private static readonly FieldInfo Campaign_hideouts = typeof(Campaign).GetField("_hideouts", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public)!;
+        private static readonly PropertyInfo PartyComponent_MobileParty = typeof(PartyComponent).GetProperty(nameof(PartyComponent.MobileParty))!;
+        private static readonly PropertyInfo BanditPartyComponent_Hideout = typeof(BanditPartyComponent).GetProperty(nameof(BanditPartyComponent.Hideout))!;
+        private static readonly PropertyInfo BanditPartyComponent_IsBossParty = typeof(BanditPartyComponent).GetProperty(nameof(BanditPartyComponent.IsBossParty))!;
+        private static readonly PropertyInfo PartyBase_MobileParty = typeof(PartyBase).GetProperty(nameof(PartyBase.MobileParty))!;
+        private static readonly FieldInfo MobileParty_actualClan = typeof(MobileParty).GetField("_actualClan", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        private static readonly PropertyInfo MobileParty_Party = typeof(MobileParty).GetProperty(nameof(MobileParty.Party))!;
 
         [Fact]
         public void BanditPartyComponent_Full_Serialization()
         {
             Hideout hideout = (Hideout)FormatterServices.GetUninitializedObject(typeof(Hideout));
 
-            MBList<Hideout> allhideouts = (MBList<Hideout>)Campaign_hideouts.GetValue(Campaign.Current) ?? new MBList<Hideout>();
+            // TODO make atomic to not interfere with other tests that use Hideout.All
+            MBList<Hideout> allhideouts = (MBList<Hideout>?)Campaign_hideouts.GetValue(Campaign.Current) ?? new MBList<Hideout>();
 
             allhideouts.Add(hideout);
 

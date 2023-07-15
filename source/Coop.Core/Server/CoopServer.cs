@@ -18,7 +18,7 @@ namespace Coop.Core.Server;
 /// </summary>
 public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, IDisposable
 {
-    public Guid ServerId { get; }
+    public string ServerId { get; }
     IEnumerable<NetPeer> ConnectedPeers { get; }
     void AllowJoining();
 }
@@ -29,7 +29,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override int Priority => 0;
 
     public IEnumerable<NetPeer> ConnectedPeers => netManager.ConnectedPeerList;
-    public Guid ServerId { get; } = Guid.NewGuid();
+    public string ServerId { get; } = "Server";
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;

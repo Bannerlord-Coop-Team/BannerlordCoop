@@ -3,6 +3,7 @@ using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
 using GameInterface.Services.GameState.Messages;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -13,7 +14,7 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         public MainMenuStateTests(ITestOutputHelper output) : base(output)
         {
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
+            clientLogic = ServiceProvider.GetService<IClientLogic>()!;
         }
 
         [Fact]

@@ -2,6 +2,7 @@
 using Coop.Core.Client;
 using Coop.Core.Client.States;
 using GameInterface.Services.GameState.Messages;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using Serilog;
 using Xunit;
@@ -14,7 +15,7 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         public MissionStateTests(ITestOutputHelper output) : base(output)
         {
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
+            clientLogic = ServiceProvider.GetService<IClientLogic>()!;
         }
 
         [Fact]

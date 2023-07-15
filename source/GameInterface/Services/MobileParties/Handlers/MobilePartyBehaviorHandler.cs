@@ -25,16 +25,18 @@ namespace GameInterface.Services.MobileParties.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IControlledEntityRegistry controlledEntityRegistry;
         private readonly IObjectManager objectManager;
+        private readonly IControllerIdProvider controllerIdProvider;
 
         public MobilePartyBehaviorHandler(
             IMessageBroker messageBroker, 
             IControlledEntityRegistry controlledEntityRegistry,
-            IObjectManager objectManager) 
+            IObjectManager objectManager,
+            IControllerIdProvider controllerIdProvider) 
         {
             this.messageBroker = messageBroker;
             this.controlledEntityRegistry = controlledEntityRegistry;
             this.objectManager = objectManager;
-
+            this.controllerIdProvider = controllerIdProvider;
             messageBroker.Subscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
             messageBroker.Subscribe<UpdatePartyBehavior>(Handle_UpdatePartyBehavior);
         }
@@ -49,7 +51,7 @@ namespace GameInterface.Services.MobileParties.Handlers
         {
             MobileParty party = obj.What.Party;
 
-            if (controlledEntityRegistry.IsOwned(party.StringId) == false)
+            if (controlledEntityRegistry.IsControlledBy(controllerIdProvider.ControllerId, party.StringId) == false)
                 return;
 
             PartyBehaviorUpdateData data = obj.What.BehaviorUpdateData;

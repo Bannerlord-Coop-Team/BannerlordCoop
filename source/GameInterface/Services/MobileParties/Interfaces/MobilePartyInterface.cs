@@ -43,7 +43,7 @@ internal interface IMobilePartyInterface : IGameAbstraction
     /// Registers all parties in the game as controlled by <paramref name="ownerId"/>.
     /// </summary>
     /// <param name="ownerId">Owner to assign all parties</param>
-    void RegisterAllPartiesAsControlled(Guid ownerId);
+    void RegisterAllPartiesAsControlled(string ownerId);
     /// <summary>
     /// Forces party to enter settlement, bypasses patch skip rules
     /// </summary>
@@ -83,7 +83,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
         PartyBase_OnFinishLoadState.Invoke(party.Party, null);
     }
 
-    public void RegisterAllPartiesAsControlled(Guid ownerId)
+    public void RegisterAllPartiesAsControlled(string ownerId)
     {
         foreach(var party in partyRegistry)
         {

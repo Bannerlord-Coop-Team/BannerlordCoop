@@ -3,6 +3,7 @@ using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.States;
+using GameInterface.Services.Entity;
 using Serilog;
 
 namespace Coop.Core.Server;

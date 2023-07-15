@@ -8,7 +8,7 @@ namespace Common.Messaging
 {
     public interface IMessageBroker : IDisposable
     {
-        IEnumerable<Task> Publish<T>(object source, T message) where T : IMessage;
+        Task[] Publish<T>(object source, T message) where T : IMessage;
 
         void Respond<T>(object target, T message) where T : IResponse;
 
@@ -46,7 +46,7 @@ namespace Common.Messaging
             "ControlledPartyBehaviorUpdated",
         };
 
-        public virtual IEnumerable<Task> Publish<T>(object source, T message) where T : IMessage
+        public virtual Task[] Publish<T>(object source, T message) where T : IMessage
         {
             if (message == null)
                 return Array.Empty<Task>();
@@ -85,7 +85,7 @@ namespace Common.Messaging
                 tasks.Add(invokeTask);
             }
 
-            return tasks;
+            return tasks.ToArray();
         }
 
         public void Respond<T>(object target, T message) where T : IResponse

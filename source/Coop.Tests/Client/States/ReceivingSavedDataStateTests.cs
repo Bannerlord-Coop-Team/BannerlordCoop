@@ -9,6 +9,7 @@ using Xunit;
 using Xunit.Abstractions;
 using GameInterface.Services.GameState.Messages;
 using Common.Messaging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Coop.Tests.Client.States
 {
@@ -17,7 +18,7 @@ namespace Coop.Tests.Client.States
         private readonly IClientLogic clientLogic;
         public ReceivingSavedDataStateTests(ITestOutputHelper output) : base(output)
         {
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
+            clientLogic = ServiceProvider.GetService<IClientLogic>()!;
         }
 
         [Fact]

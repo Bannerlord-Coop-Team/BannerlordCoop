@@ -17,15 +17,10 @@ namespace GameInterface.Services.Entity;
 internal interface IControlledEntityRegistry
 {
     /// <summary>
-    /// Owner id of the current client or server that instantiated this object.
-    /// </summary>
-    Guid InstanceOwnerId { get; set; }
-
-    /// <summary>
     /// Packages an immutable dictionary of controlled entities
     /// </summary>
     /// <returns>Immutable dictionary of controlled entities</returns>
-    IReadOnlyDictionary<Guid, IReadOnlySet<ControlledEntity>> PackageControlledEntities();
+    IReadOnlyDictionary<string, IReadOnlySet<ControlledEntity>> PackageControlledEntities();
 
     /// <summary>
     /// Registers an Enumerable of entities with the registry
@@ -36,28 +31,29 @@ internal interface IControlledEntityRegistry
     /// <summary>
     /// Determines if the given entity string id is owned by the calling server or client
     /// </summary>
+    /// <param name="controllerId">Owner to check if entity is owned by</param>
     /// <param name="entityId">Entity to check ownership</param>
     /// <returns>True if entity <see cref="OwnershipId"/> matches entity controller, otherwise False</returns>
-    bool IsOwned(string entityId);
+    bool IsControlledBy(string controllerId, string entityId);
 
     /// <summary>
     /// Registers a controlled relationship between the owner and entity
     /// </summary>
-    /// <param name="ownerId">Id of owner</param>
+    /// <param name="controllerId">Id of owner</param>
     /// <param name="entityId">Id of entity</param>
     /// <remarks>Normally the StringId from <see cref="MBObjectBase"/></remarks>
     /// <returns>True if registration was successful, otherwise False</returns>
-    bool RegisterAsControlled(Guid ownerId, string entityId);
+    bool RegisterAsControlled(string controllerId, string entityId);
 
     /// <summary>
     /// Registers a controlled relationship between the owner and entity
     /// </summary>
-    /// <param name="ownerId">Id of owner</param>
+    /// <param name="controllerId">Id of owner</param>
     /// <param name="entityId">Id of entity</param>
     /// <param name="newEntity">Newly created controlled entity</param>
     /// <remarks>Normally the StringId from <see cref="MBObjectBase"/></remarks>
     /// <returns>True if registration was successful, otherwise False</returns>
-    bool RegisterAsControlled(Guid ownerId, string entityId, out ControlledEntity newEntity);
+    bool RegisterAsControlled(string controllerId, string entityId, out ControlledEntity newEntity);
 
     /// <summary>
     /// Removes entity as controlled
@@ -78,18 +74,18 @@ internal class ControlledEntityRegistry : IControlledEntityRegistry
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ControlledEntityRegistry>();
 
-    public Guid InstanceOwnerId { get; set; }
+    public string InstanceOwnerId { get; set; }
 
-    private ConcurrentDictionary<Guid, HashSet<ControlledEntity>> controlledEntities = new ConcurrentDictionary<Guid, HashSet<ControlledEntity>>();
+    private ConcurrentDictionary<string, HashSet<ControlledEntity>> controlledEntities = new ConcurrentDictionary<string, HashSet<ControlledEntity>>();
 
     private ConcurrentDictionary<string, ControlledEntity> controllerIdLookup = new ConcurrentDictionary<string, ControlledEntity>();
 
-    public IReadOnlyDictionary<Guid, IReadOnlySet<ControlledEntity>> PackageControlledEntities()
+    public IReadOnlyDictionary<string, IReadOnlySet<ControlledEntity>> PackageControlledEntities()
     {
         // Make dictionary immutable
         var readonlyListDict = controlledEntities.ToDictionary(k => k.Key, k => k.Value.AsReadOnly() as IReadOnlySet<ControlledEntity>);
 
-        return new ReadOnlyDictionary<Guid, IReadOnlySet<ControlledEntity>>(readonlyListDict);
+        return new ReadOnlyDictionary<string, IReadOnlySet<ControlledEntity>>(readonlyListDict);
     }
 
     public void RegisterExistingEntities(IEnumerable<ControlledEntity> entityIds)
@@ -103,15 +99,15 @@ internal class ControlledEntityRegistry : IControlledEntityRegistry
         }
     }
 
-    public bool IsOwned(string entityId)
+    public bool IsControlledBy(string ownerId, string entityId)
     {
         if(controllerIdLookup.TryGetValue(entityId, out var entity) == false) return false;
 
-        return entity.OwnerId == InstanceOwnerId;
+        return entity.OwnerId == ownerId;
     }
 
-    public bool RegisterAsControlled(Guid ownerId, string entityId) => RegisterAsControlled(ownerId, entityId, out var _);
-    public bool RegisterAsControlled(Guid ownerId, string entityId, out ControlledEntity newEntity)
+    public bool RegisterAsControlled(string ownerId, string entityId) => RegisterAsControlled(ownerId, entityId, out var _);
+    public bool RegisterAsControlled(string ownerId, string entityId, out ControlledEntity newEntity)
     {
         newEntity = null;
 

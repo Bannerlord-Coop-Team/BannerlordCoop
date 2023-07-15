@@ -19,22 +19,23 @@ internal class MobilePartyControlHandler : IHandler
     private readonly IMobilePartyInterface partyInterface;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IObjectManager objectManager;
-
+    private readonly IControllerIdProvider controllerIdProvider;
     private bool controlPartiesByDefault = false;
 
-    private Guid ownerId => controlledEntityRegistry.InstanceOwnerId;
+    private string ownerId => controllerIdProvider.ControllerId;
 
     public MobilePartyControlHandler(
         IMessageBroker messageBroker, 
         IMobilePartyInterface partyInterface, 
         IControlledEntityRegistry controlledEntityRegistry,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IControllerIdProvider controllerIdProvider)
     {
         this.messageBroker = messageBroker;
         this.partyInterface = partyInterface;
         this.controlledEntityRegistry = controlledEntityRegistry;
         this.objectManager = objectManager;
-
+        this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Subscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
         messageBroker.Subscribe<MobilePartyCreated>(Handle_MobilePartyCreated);

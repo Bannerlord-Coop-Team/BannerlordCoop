@@ -18,7 +18,7 @@ namespace Coop.Tests.Stubs
             return total;
         }
 
-        public override IEnumerable<Task> Publish<T>(object? source, T message)
+        public override Task[] Publish<T>(object? source, T message)
         {
             if (!_subscribers.ContainsKey(typeof(T)))
             {

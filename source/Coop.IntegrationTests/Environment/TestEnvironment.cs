@@ -9,6 +9,7 @@ using Coop.Core.Server.Services.Save;
 using Coop.IntegrationTests.Environment.Instance;
 using Common.PacketHandlers;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Entity;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -116,6 +117,7 @@ internal class TestEnvironment
         services.AddScoped<IPacketManager, PacketManager>();
         services.AddScoped<IObjectManager, MockObjectManager>();
         services.AddScoped<ICoopSaveManager, CoopSaveManager>();
+        services.AddScoped<IControllerIdProvider, ControllerIdProvider>();
 
         return services;
     }
