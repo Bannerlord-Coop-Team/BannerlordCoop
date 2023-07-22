@@ -1,16 +1,18 @@
 ﻿using Common.Messaging;
-using System;
+using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Messages;
 
 public record RegisterNewPlayerHero : ICommand
 {
+    public NetPeer SendingPeer { get; }
     public string ControllerId { get; }
     public byte[] Bytes { get; }
 
-    public RegisterNewPlayerHero(string controllerId, byte[] bytes)
+    public RegisterNewPlayerHero(NetPeer sendingPeer, string controllerId, byte[] bytes)
     {
+        SendingPeer = sendingPeer;
         ControllerId = controllerId;
         Bytes = bytes;
     }
@@ -18,15 +20,17 @@ public record RegisterNewPlayerHero : ICommand
 
 public record NewPlayerHeroRegistered : IResponse
 {
+    public NetPeer SendingPeer { get; }
     public string HeroStringId { get; }
     public string PartyStringId { get; }
     public string CharacterObjectStringId { get; }
     public string ClanStringId { get; }
 
-    public NewPlayerHeroRegistered(Hero hero)
+    public NewPlayerHeroRegistered(NetPeer sendingPeer, Hero hero)
     {
         if (hero == null) return;
 
+        SendingPeer = sendingPeer;
         HeroStringId = hero.StringId;
         PartyStringId = hero.PartyBelongedTo.StringId;
         CharacterObjectStringId = hero.CharacterObject.StringId;

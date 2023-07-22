@@ -19,6 +19,6 @@ internal class MainPartyInterface : IMainPartyInterface
                 MobileParty.MainParty.RemoveParty();
             }
             
-        }, bBlocking: false);
+        }, blocking: false);
     }
 }

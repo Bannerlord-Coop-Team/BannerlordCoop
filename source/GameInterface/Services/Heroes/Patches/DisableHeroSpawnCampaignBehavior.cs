@@ -9,6 +9,6 @@ namespace GameInterface.Services.Heroes.Patches;
 [HarmonyPatch(typeof(HeroSpawnCampaignBehavior))]
 internal class DisableHeroSpawnCampaignBehavior
 {
-    [HarmonyPatch(nameof(HeroSpawnCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => true;
+    //[HarmonyPatch(nameof(HeroSpawnCampaignBehavior.RegisterEvents))]
+    //static bool Prefix() => true;
 }

@@ -91,7 +91,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             var payload = new MessagePayload<NewPlayerHeroRegistered>(
-                playerPeer, new NewPlayerHeroRegistered(default));
+                playerPeer, new NewPlayerHeroRegistered(default, default));
             currentState.PlayerHeroRegisteredHandler(payload);
 
             // Assert

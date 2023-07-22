@@ -19,7 +19,7 @@ namespace Common
         /// </summary>
         /// <param name="obj">Object to register with new <see cref="ObjectId"/></param>
         /// <returns>True if registration was successful, otherwise false</returns>
-        bool RegisterNewObject(T obj);
+        bool RegisterNewObject(T obj, out string id);
 
         /// <summary>
         /// Register an object with an existing <see cref="ObjectId"/>
@@ -28,8 +28,6 @@ namespace Common
         /// <param name="obj">Object to register with <see cref="ObjectId"/></param>
         /// <returns>True if registration was successful, otherwise false</returns>
         bool RegisterExistingObject(string id, T obj);
-
-
 
         /// <summary>
         /// Remove a registered object from the registry.
@@ -63,6 +61,4 @@ namespace Common
         /// <returns>True if retrieval was successful, otherwise false</returns>
         bool TryGetValue(string id, out T obj);
     }
-
-    
 }

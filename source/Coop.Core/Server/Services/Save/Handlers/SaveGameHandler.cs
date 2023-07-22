@@ -1,6 +1,4 @@
-﻿// Ignore Spelling: Guids
-
-using Common.Messaging;
+﻿using Common.Messaging;
 using Coop.Core.Server.Services.Save.Data;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
@@ -92,12 +90,10 @@ internal class SaveGameHandler : IHandler
         controllerIdProvider.SetControllerId(coopServer.ServerId);
         messageBroker.Publish(this, new RegisterAllPartiesAsControlled(coopServer.ServerId));
         messageBroker.Publish(this, new EnableGameTimeControls());
-        coopServer.AllowJoining();
     }
 
     private void Handle_ExistingObjectGuidsLoaded(MessagePayload<ExistingObjectGuidsLoaded> obj)
     {
         messageBroker.Publish(this, new EnableGameTimeControls());
-        coopServer.AllowJoining();
     }
 }

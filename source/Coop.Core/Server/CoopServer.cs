@@ -5,6 +5,7 @@ using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface;
+using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
@@ -20,7 +21,6 @@ public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, I
 {
     public string ServerId { get; }
     IEnumerable<NetPeer> ConnectedPeers { get; }
-    void AllowJoining();
 }
 
 /// <inheritdoc cref="ICoopServer"/>
@@ -45,6 +45,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
+
+        messageBroker.Subscribe<GameTimeControlsEnabled>(Handle_GameTimeControlsEnabled);
 
         ModInformation.IsServer = true;
 
@@ -148,7 +150,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         SendAllBut(netManager, netPeer, packet);
     }
 
-    public void AllowJoining()
+    private void Handle_GameTimeControlsEnabled(MessagePayload<GameTimeControlsEnabled> obj)
     {
         allowJoining = true;
     }

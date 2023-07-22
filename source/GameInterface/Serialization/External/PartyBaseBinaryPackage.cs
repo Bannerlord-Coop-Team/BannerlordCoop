@@ -42,6 +42,9 @@ namespace GameInterface.Serialization.External
             
             IPartyVisual partyVisual = Campaign.Current?.VisualCreator?.CreatePartyVisual();
             PartyBase_Visual.SetValue(Object, partyVisual);
+
+            Object.Visuals.OnStartup(Object);
+            Object.Visuals.SetMapIconAsDirty();
         }
     }
 }

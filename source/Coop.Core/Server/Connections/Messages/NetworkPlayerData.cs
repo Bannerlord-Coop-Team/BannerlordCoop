@@ -7,7 +7,7 @@ namespace Coop.Core.Server.Connections.Messages;
 /// <summary>
 /// A new player has been created event containing that player's data
 /// </summary>
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 public record NetworkPlayerData : IEvent
 {
     public NetworkPlayerData(NewPlayerHeroRegistered registrationData)

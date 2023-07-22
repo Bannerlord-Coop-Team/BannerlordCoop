@@ -1,12 +1,16 @@
-﻿using Common.Logging;
+﻿using Common.Extensions;
+using Common.Logging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Registry;
 using Serilog;
+using System;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -16,6 +20,7 @@ internal interface IHeroInterface : IGameAbstraction
     bool TryResolveHero(string controllerId, out string heroId);
     void SwitchMainHero(string heroId);
     Hero UnpackMainHero(string controllerId, byte[] bytes);
+    void HandleNewHero(Hero hero);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -37,6 +42,9 @@ internal class HeroInterface : IHeroInterface
 
     public byte[] PackageMainHero()
     {
+        Hero.MainHero.StringId = string.Empty;
+        Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
+
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
         return BinaryFormatterSerializer.Serialize(package);
     }
@@ -65,5 +73,32 @@ internal class HeroInterface : IHeroInterface
         {
             Logger.Warning("Could not find hero with id of: {guid}", heroId);
         }
+    }
+
+    private const string PlayerHeroStringIdPrefix = "PlayerHero";
+    private const string PlayerPartyStringIdPrefix = "PlayerParty";
+    private static readonly Action<CampaignObjectManager, Hero> CampaignObjectManager_AddHero = typeof(CampaignObjectManager)
+        .GetMethod("AddHero", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildDelegate<Action<CampaignObjectManager, Hero>>();
+    private static readonly Action<CampaignObjectManager, MobileParty> CampaignObjectManager_AddMobileParty = typeof(CampaignObjectManager)
+        .GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
+    public void HandleNewHero(Hero hero)
+    {
+        hero.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(PlayerHeroStringIdPrefix);
+        hero.PartyBelongedTo.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>(PlayerPartyStringIdPrefix);
+
+        objectManager.AddNewObject(hero, out string heroId);
+        objectManager.AddNewObject(hero.PartyBelongedTo, out string _);
+
+        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+        if (campaignObjectManager == null)
+        {
+            Logger.Error("{type} was null when trying to register a {managedType}", typeof(CampaignObjectManager), typeof(Hero));
+            return;
+        }
+
+        CampaignObjectManager_AddHero(campaignObjectManager, hero);
+        CampaignObjectManager_AddMobileParty(campaignObjectManager, hero.PartyBelongedTo);
     }
 }

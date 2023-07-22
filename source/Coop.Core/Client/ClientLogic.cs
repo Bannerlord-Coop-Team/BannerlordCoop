@@ -1,10 +1,10 @@
-﻿using Autofac;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.States;
 using GameInterface.Services.Entity;
+using HarmonyLib;
 using Serilog;
 
 namespace Coop.Core.Client;
@@ -37,6 +37,8 @@ public class ClientLogic : IClientLogic
     public IMessageBroker MessageBroker { get; }
     public IControllerIdProvider ControllerIdProvider { get; }
     public string ControlledHeroId { get; set; }
+
+    private readonly Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
     public IClientState State 
     {
         get { return _state; }
@@ -62,6 +64,9 @@ public class ClientLogic : IClientLogic
         MessageBroker = messageBroker;
         ControllerIdProvider = controllerIdProvider;
         State = new MainMenuState(this);
+
+        // Apply all patches via harmony
+        harmony.PatchAll(typeof(GameInterface.GameInterface).Assembly);
     }
 
     public void Start()
@@ -74,7 +79,11 @@ public class ClientLogic : IClientLogic
         Disconnect();
     }
 
-    public void Dispose() => State.Dispose();
+    public void Dispose()
+    {
+        harmony.UnpatchAll();
+        State.Dispose();
+    }
 
     public void Connect() => State.Connect();
 

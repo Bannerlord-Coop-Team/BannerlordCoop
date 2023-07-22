@@ -1,23 +1,29 @@
-﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Interfaces;
-using System.Linq;
-using TaleWorlds.CampaignSystem;
+﻿using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MobileParties.Interfaces;
+using GameInterface.Services.ObjectManager;
+using Serilog;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
 internal class NewMobilePartyHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<NewMobilePartyHandler>();
+
     private readonly IMobilePartyInterface partyInterface;
     private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
 
     public NewMobilePartyHandler(
         IMobilePartyInterface partyInterface,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        IObjectManager objectManager)
     {
         this.partyInterface = partyInterface;
         this.messageBroker = messageBroker;
-
+        this.objectManager = objectManager;
         messageBroker.Subscribe<NewPlayerHeroRegistered>(Handle);
     }
 
@@ -28,10 +34,12 @@ internal class NewMobilePartyHandler : IHandler
 
     private void Handle(MessagePayload<NewPlayerHeroRegistered> obj)
     {
-        string stringId = obj.What.HeroStringId;
-        var hero = Campaign.Current.CampaignObjectManager.AliveHeroes.Single(h => h.StringId == stringId);
-        var party = Campaign.Current.CampaignObjectManager.MobileParties.Single(h => h.StringId == obj.What.PartyStringId);
+        if (objectManager.TryGetObject(obj.What.PartyStringId, out MobileParty party) == false)
+        {
+            Logger.Error("Could not find {objType} with string id {stringId}", typeof(MobileParty), obj.What.PartyStringId);
+            return;
+        }
 
-        partyInterface.ManageNewParty(hero.PartyBelongedTo);
+        partyInterface.ManageNewParty(party);
     }
 }

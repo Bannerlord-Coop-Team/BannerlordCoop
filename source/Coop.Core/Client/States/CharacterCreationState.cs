@@ -4,6 +4,7 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using System;
 
 namespace Coop.Core.Client.States;
 
@@ -21,6 +22,7 @@ public class CharacterCreationState : ClientStateBase
         messageBroker.Subscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Subscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
     }
 
     public override void Dispose()
@@ -28,6 +30,12 @@ public class CharacterCreationState : ClientStateBase
         messageBroker.Unsubscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Unsubscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Unsubscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
+    }
+
+    internal void Handle_CharacterCreationFinished(MessagePayload<CharacterCreationFinished> obj)
+    {
+        messageBroker.Publish(this, new PackageMainHero());
     }
 
     internal void Handle_NewHeroPackaged(MessagePayload<NewHeroPackaged> obj)
@@ -36,13 +44,13 @@ public class CharacterCreationState : ClientStateBase
         var data = obj.What.Package;
 
         network.SendAll(new NetworkTransferedHero(playerId, data));
-
-        Logic.LoadSavedData();
     }
 
-    internal void Handle_CharacterCreationFinished(MessagePayload<CharacterCreationFinished> obj)
+    private void Handle_NetworkPlayerData(MessagePayload<NetworkPlayerData> obj)
     {
-        messageBroker.Publish(this, new PackageMainHero());
+        Logic.ControlledHeroId = obj.What.HeroStringId;
+
+        Logic.LoadSavedData();
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)

@@ -97,9 +97,7 @@ namespace Coop
             Updateables.Add(GameLoopRunner.Instance);
             Updateables.Add(Coop);
 
-            Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
-            // Apply all patches via harmony
-            harmony.PatchAll(typeof(GameInterface.GameInterface).Assembly);
+            
 
             // Skip startup splash screen
 #if DEBUG
@@ -192,6 +190,11 @@ namespace Coop
         internal static void JoinWindow()
         {
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopConnectionUI>());
+        }
+
+        public override void OnAfterGameInitializationFinished(Game game, object starterObject)
+        {
+            base.OnAfterGameInitializationFinished(game, starterObject);
         }
     }
 }

@@ -3,6 +3,7 @@ using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using HarmonyLib;
 
 namespace Coop.Core.Client.States;
 
@@ -23,6 +24,8 @@ public class CampaignState : ClientStateBase
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<MissionStateEntered>(Handle_MissionStateEntered);
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+
+        Logic.MessageBroker.Publish(this, new RegisterAllGameObjects());
     }
 
     internal void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
@@ -56,14 +59,10 @@ public class CampaignState : ClientStateBase
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
 
-    
-
     public override void EnterMissionState()
     {
         messageBroker.Publish(this, new EnterMissionState());
     }
-
-    
 
     public override void EnterMainMenu()
     {

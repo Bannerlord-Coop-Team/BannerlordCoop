@@ -34,14 +34,15 @@ public class CreateCharacterState : ConnectionStateBase
     }
     internal void PlayerTransferedHeroHandler(MessagePayload<NetworkTransferedHero> obj)
     {
+        var netPeer = obj.Who as NetPeer;
         var controllerId = obj.What.PlayerId;
         var data = obj.What.PlayerHero;
-        var registerCommand = new RegisterNewPlayerHero(controllerId, data);
+        var registerCommand = new RegisterNewPlayerHero(netPeer, controllerId, data);
         messageBroker.Publish(this, registerCommand);
     }
     internal void PlayerHeroRegisteredHandler(MessagePayload<NewPlayerHeroRegistered> obj)
     {
-        var sendingPeer = (NetPeer)obj.Who;
+        var sendingPeer = obj.What.SendingPeer;
         if (sendingPeer != ConnectionLogic.Peer) return;
 
         NetworkPlayerData playerData = new NetworkPlayerData(obj.What);

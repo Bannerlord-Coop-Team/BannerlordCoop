@@ -1,9 +1,13 @@
 ﻿using Common;
+using Common.Extensions;
 using ProtoBuf;
+using System;
 using System.Collections.Concurrent;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Registry;
 
@@ -123,5 +127,27 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
         if (heroControllerExtension.TryGetValue(hero, out var resolvedControllerId) == false) return false;
 
         return resolvedControllerId == controllerId;
+    }
+
+    private const string HeroStringIdPrefix = "CoopHero";
+    public override bool RegisterNewObject(Hero obj, out string id)
+    {
+        id = null;
+
+        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+
+        if (campaignObjectManager == null) return false;
+
+        var newId = campaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
+
+        if (objIds.ContainsKey(newId)) return false;
+
+        obj.StringId = newId;
+
+        objIds.Add(newId, obj);
+
+        id = newId;
+
+        return true;
     }
 }

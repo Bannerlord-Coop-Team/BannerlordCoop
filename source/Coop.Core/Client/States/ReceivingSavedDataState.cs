@@ -31,7 +31,7 @@ public class ReceivingSavedDataState : ClientStateBase
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
-        var saveData = saveDataMessage.GameSaveData;
+        var saveData = saveDataMessage?.GameSaveData;
 
         if (saveData == null) return;
         if (saveData.Length == 0) return;

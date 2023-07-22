@@ -20,24 +20,16 @@ namespace Coop.Core.Client.Services.Save.Handler
             this.coopClient = coopClient;
 
             messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
-            messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
-            messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
-            messageBroker.Unsubscribe<CampaignReady>(Handle_CampaignLoaded);
         }
 
         private void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
         {
             saveDataMessage = obj.What;
-        }
-
-        private void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
-        {
-            messageBroker.Publish(this, new RegisterAllGameObjects());
         }
     }
 }

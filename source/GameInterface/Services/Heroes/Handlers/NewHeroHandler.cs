@@ -1,10 +1,14 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -14,14 +18,16 @@ internal class NewHeroHandler : IHandler
 
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
 
     public NewHeroHandler(
         IHeroInterface heroInterface,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        IObjectManager objectManager)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
-
+        this.objectManager = objectManager;
         messageBroker.Subscribe<PackageMainHero>(Handle);
         messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
     }
@@ -45,18 +51,27 @@ internal class NewHeroHandler : IHandler
         }
     }
 
+    
+
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
     {
         byte[] bytes = obj.What.Bytes;
         var controllerId = obj.What.ControllerId;
+        var sendingPeer = obj.What.SendingPeer;
 
         try
         {
-            Hero hero = heroInterface.UnpackMainHero(controllerId, bytes);
+            Hero hero = null;
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                hero = heroInterface.UnpackMainHero(controllerId, bytes);
+            }, blocking: true);
 
-            Logger.Information("New Hero ID: {id}", hero.Id.InternalValue);
+            heroInterface.HandleNewHero(hero);
 
-            var registerMessage = new NewPlayerHeroRegistered(hero);
+            Logger.Debug("New Hero ID: {id}", hero.StringId);
+
+            var registerMessage = new NewPlayerHeroRegistered(sendingPeer, hero);
 
             messageBroker.Respond(obj.Who, registerMessage);
         }

@@ -2,12 +2,9 @@
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
-using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
-using System;
 using System.Linq;
-using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
 
