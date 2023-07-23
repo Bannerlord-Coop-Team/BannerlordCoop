@@ -2,8 +2,10 @@
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.Entity.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.PlatformId.Messages;
 using System;
 
 namespace Coop.Core.Client.States;
@@ -49,6 +51,11 @@ public class CharacterCreationState : ClientStateBase
     private void Handle_NetworkPlayerData(MessagePayload<NetworkPlayerData> obj)
     {
         Logic.ControlledHeroId = obj.What.HeroStringId;
+
+        var controllerId = Logic.ControllerIdProvider.ControllerId;
+
+        messageBroker.Publish(this, new AddControlledEntity(controllerId, obj.What.HeroStringId));
+        messageBroker.Publish(this, new AddControlledEntity(controllerId, obj.What.PartyStringId));
 
         Logic.LoadSavedData();
     }

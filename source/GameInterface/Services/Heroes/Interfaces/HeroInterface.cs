@@ -100,5 +100,8 @@ internal class HeroInterface : IHeroInterface
 
         CampaignObjectManager_AddHero(campaignObjectManager, hero);
         CampaignObjectManager_AddMobileParty(campaignObjectManager, hero.PartyBelongedTo);
+
+        hero.PartyBelongedTo.IsVisible = true;
+        hero.PartyBelongedTo.Party.Visuals.SetMapIconAsDirty();
     }
 }
