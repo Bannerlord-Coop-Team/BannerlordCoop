@@ -6,6 +6,7 @@ using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -18,15 +19,15 @@ namespace Coop.Tests.Client.States
         public CharacterCreationStateTests(ITestOutputHelper output) : base(output)
         {
             serverPeer = MockNetwork.CreatePeer();
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
+            clientLogic = ServiceProvider.GetService<IClientLogic>()!;
         }
 
         [Fact]
         public void Dispose_RemovesAllHandlers()
         {
-            clientLogic.State = new CharacterCreationState(clientLogic);
-
             // Arrange
+            clientLogic.State = new CharacterCreationState(clientLogic);
+            
             Assert.NotEmpty(MockMessageBroker.Subscriptions);
 
             // Act

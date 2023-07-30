@@ -18,20 +18,20 @@ internal class HeroRegistryHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IHeroRegistry heroRegistry;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
-
-    private Guid ownerId => controlledEntityRegistry.InstanceOwnerId;
+    private readonly IControllerIdProvider controllerIdProvider;
 
     public HeroRegistryHandler(
         IHeroInterface heroInterface,
         IMessageBroker messageBroker,
         IHeroRegistry heroRegistry,
-        IControlledEntityRegistry controlledEntityRegistry)
+        IControlledEntityRegistry controlledEntityRegistry,
+        IControllerIdProvider controllerIdProvider)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
         this.heroRegistry = heroRegistry;
         this.controlledEntityRegistry = controlledEntityRegistry;
-
+        this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
     }
 
@@ -50,6 +50,6 @@ internal class HeroRegistryHandler : IHandler
             controlledEntityRegistry.RemoveAsControlled(previousHeroEntity);
         }
 
-        controlledEntityRegistry.RegisterAsControlled(ownerId, newHero.StringId);
+        controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, newHero.StringId);
     }
 }

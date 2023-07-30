@@ -19,7 +19,6 @@ namespace Coop.Core.Client;
 /// </summary>
 public interface ICoopClient : INetwork, IUpdateable, INetEventListener
 {
-    Guid ClientId { get; }
 }
 
 /// <inheritdoc cref="ICoopClient"/>
@@ -28,8 +27,6 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     public override int Priority => 0;
     
     private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
-
-    public Guid ClientId { get; } = Guid.NewGuid();
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;

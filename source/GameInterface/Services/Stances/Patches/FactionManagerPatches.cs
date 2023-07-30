@@ -29,5 +29,26 @@ namespace GameInterface.Services.Stances.Patches
         {
             return false;
         }
+
+        [HarmonyPatch("DeclareAlliance")]
+        [HarmonyPrefix]
+        private static bool DeclareAlliancePrefix()
+        {
+            return false;
+        }
+
+        [HarmonyPatch("DeclareWar")]
+        [HarmonyPrefix]
+        private static bool DeclareWarPrefix()
+        {
+            return false;
+        }
+
+        [HarmonyPatch("SetNeutral")]
+        [HarmonyPrefix]
+        private static bool SetNeutralPrefix()
+        {
+            return false;
+        }
     }
 }

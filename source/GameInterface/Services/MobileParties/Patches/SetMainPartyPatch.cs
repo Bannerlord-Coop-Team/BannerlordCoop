@@ -16,6 +16,7 @@ namespace GameInterface.Services.MobileParties.Patches
         private static bool Prefix(ref Campaign __instance, ref MobileParty value)
         {
             if (value?.StringId == null) return true;
+            if (Campaign.Current?.MainParty == null) return true;
 
             MessageBroker.Instance.Publish(__instance, new MainPartyChanged(value.StringId));
             return true;

@@ -6,6 +6,7 @@ using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using LiteNetLib;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -18,7 +19,7 @@ namespace Coop.Tests.Client.States
         public ValidateModuleStateTests(ITestOutputHelper output) : base(output)
         {
             serverPeer = MockNetwork.CreatePeer();
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
+            clientLogic = ServiceProvider.GetService<IClientLogic>()!;
         }
 
         [Fact]

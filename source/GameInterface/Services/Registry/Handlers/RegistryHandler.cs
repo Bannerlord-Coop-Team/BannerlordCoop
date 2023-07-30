@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Heroes.Messages;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Registry.Handlers;
 
@@ -29,6 +30,8 @@ internal class RegistryHandler : IHandler
 
     private void Handle(MessagePayload<RegisterAllGameObjects> obj)
     {
+        var campaign = Campaign.Current;
+
         heroRegistry.RegisterAllHeroes();
         partyRegistry.RegisterAllParties();
 

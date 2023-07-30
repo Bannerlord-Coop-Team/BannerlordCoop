@@ -23,7 +23,7 @@ namespace Coop.Tests.Mocks
             Subscriptions.Remove(handler);
         }
 
-        public IEnumerable<Task> Publish<T>(object sender, T message) where T : IMessage
+        public Task[] Publish<T>(object sender, T message) where T : IMessage
         {
             PublishedMessages.Add(message);
 

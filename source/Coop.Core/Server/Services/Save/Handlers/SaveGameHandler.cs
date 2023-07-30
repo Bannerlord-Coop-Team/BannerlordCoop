@@ -1,8 +1,6 @@
-﻿// Ignore Spelling: Guids
-
-using Common.Messaging;
+﻿using Common.Messaging;
 using Coop.Core.Server.Services.Save.Data;
-using GameInterface.Services.Entity.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MobileParties.Messages.Control;
@@ -17,16 +15,18 @@ internal class SaveGameHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly ICoopSaveManager saveManager;
     private readonly ICoopServer coopServer;
+    private readonly IControllerIdProvider controllerIdProvider;
 
     public SaveGameHandler(
         IMessageBroker messageBroker,
         ICoopSaveManager saveManager,
-        ICoopServer coopServer) 
+        ICoopServer coopServer,
+        IControllerIdProvider controllerIdProvider) 
     {
         this.messageBroker = messageBroker;
         this.saveManager = saveManager;
         this.coopServer = coopServer;
-
+        this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
         messageBroker.Subscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
         messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
@@ -87,15 +87,12 @@ internal class SaveGameHandler : IHandler
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
-        messageBroker.Publish(this, new SetRegistryOwnerId(coopServer.ServerId));
-        messageBroker.Publish(this, new RegisterAllPartiesAsControlled());
+        messageBroker.Publish(this, new RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId));
         messageBroker.Publish(this, new EnableGameTimeControls());
-        coopServer.AllowJoining();
     }
 
     private void Handle_ExistingObjectGuidsLoaded(MessagePayload<ExistingObjectGuidsLoaded> obj)
     {
         messageBroker.Publish(this, new EnableGameTimeControls());
-        coopServer.AllowJoining();
     }
 }

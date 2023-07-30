@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
@@ -34,12 +35,22 @@ public class CreateCharacterState : ConnectionStateBase
     }
     internal void PlayerTransferedHeroHandler(MessagePayload<NetworkTransferedHero> obj)
     {
-        var registerCommand = new RegisterNewPlayerHero(obj.What.PlayerHero);
+        var netPeer = obj.Who as NetPeer;
+
+        if (netPeer != ConnectionLogic.Peer) return;
+
+        var controllerId = obj.What.PlayerId;
+        var data = obj.What.PlayerHero;
+        var registerCommand = new RegisterNewPlayerHero(netPeer, controllerId, data);
         messageBroker.Publish(this, registerCommand);
+
+        var forwardMessage = new NetworkNewPartyCreated(controllerId, data);
+
+        network.SendAllBut(netPeer, forwardMessage);
     }
     internal void PlayerHeroRegisteredHandler(MessagePayload<NewPlayerHeroRegistered> obj)
     {
-        var sendingPeer = (NetPeer)obj.Who;
+        var sendingPeer = obj.What.SendingPeer;
         if (sendingPeer != ConnectionLogic.Peer) return;
 
         NetworkPlayerData playerData = new NetworkPlayerData(obj.What);

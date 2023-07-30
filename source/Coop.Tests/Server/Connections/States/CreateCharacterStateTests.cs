@@ -73,7 +73,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             var payload = new MessagePayload<NetworkTransferedHero>(
-                playerPeer, new NetworkTransferedHero(Array.Empty<byte>()));
+                playerPeer, new NetworkTransferedHero(null, Array.Empty<byte>()));
             currentState.PlayerTransferedHeroHandler(payload);
 
             // Assert
@@ -91,7 +91,7 @@ namespace Coop.Tests.Server.Connections.States
 
             // Act
             var payload = new MessagePayload<NewPlayerHeroRegistered>(
-                playerPeer, new NewPlayerHeroRegistered(default));
+                playerPeer, new NewPlayerHeroRegistered(default, default));
             currentState.PlayerHeroRegisteredHandler(payload);
 
             // Assert

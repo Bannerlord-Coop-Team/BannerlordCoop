@@ -16,7 +16,7 @@ internal class TestMessageBroker : IMessageBroker
         _subscribers = new Dictionary<Type, List<WeakDelegate>>();
     }
 
-    public virtual IEnumerable<Task> Publish<T>(object source, T message) where T : IMessage
+    public virtual Task[] Publish<T>(object source, T message) where T : IMessage
     {
         Messages.Add(message);
 

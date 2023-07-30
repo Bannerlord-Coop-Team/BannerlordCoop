@@ -3,6 +3,7 @@ using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.States;
+using HarmonyLib;
 using Serilog;
 
 namespace Coop.Core.Server;
@@ -45,16 +46,23 @@ public class ServerLogic : IServerLogic
 
     public INetwork Network { get; }
 
+    private readonly Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
+
     public ServerLogic(IMessageBroker messageBroker, INetwork networkServer)
     {
         State = new InitialServerState(this, messageBroker);
         MessageBroker = messageBroker;
         Network = networkServer;
+
+        // Apply all patches via harmony
+        harmony.PatchAll(typeof(GameInterface.GameInterface).Assembly);
     }
 
     public void Dispose()
     {
         State.Dispose();
+
+        harmony.UnpatchAll();
     }
 
     public void Start()

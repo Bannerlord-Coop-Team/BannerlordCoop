@@ -30,6 +30,15 @@ internal class ResolveHeroHandler : IHandler
 
     private void Handle(MessagePayload<ResolveHero> obj)
     {
-        heroInterface.ResolveHero(obj.What);
+        var controllerId = obj.What.PlayerId;
+
+        if (heroInterface.TryResolveHero(controllerId, out string heroId))
+        {
+            messageBroker.Publish(this, new HeroResolved(heroId));
+        }
+        else
+        {
+            messageBroker.Publish(this, new ResolveHeroNotFound());
+        }
     }
 }

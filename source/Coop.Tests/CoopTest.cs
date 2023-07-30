@@ -1,22 +1,41 @@
-﻿using Common.Messaging;
-using Common.Network;
+﻿using Autofac;
 using Coop.Tests.Mocks;
-using Coop.Tests.Stubs;
+using GameInterface.Services.Entity;
 using Xunit.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
+using Common.Messaging;
+using Common.Network;
+using Coop.Core.Client;
+using Coop.Core.Server;
 
 namespace Coop.Tests
 {
     public class CoopTest
     {
-        public readonly MockMessageBroker MockMessageBroker;
-        public readonly MockNetwork MockNetwork;
-        public readonly ITestOutputHelper Output;
+        public MockMessageBroker MockMessageBroker { get; }
+        public MockNetwork MockNetwork { get; }
+        public ITestOutputHelper Output { get; }
+        public ServiceProvider ServiceProvider { get; }
 
         public CoopTest(ITestOutputHelper output)
         {
             Output = output;
-            MockMessageBroker = new MockMessageBroker();
-            MockNetwork = new MockNetwork();
+
+            var serviceCollection = new ServiceCollection();
+
+            serviceCollection.AddScoped<MockMessageBroker>();
+            serviceCollection.AddScoped<IMessageBroker, MockMessageBroker>(x => x.GetService<MockMessageBroker>()!);
+            serviceCollection.AddScoped<MockNetwork>();
+            serviceCollection.AddScoped<INetwork, MockNetwork>(x => x.GetService<MockNetwork>()!);
+            serviceCollection.AddScoped<IControllerIdProvider, ControllerIdProvider>();
+
+            serviceCollection.AddScoped<IClientLogic, ClientLogic>();
+            serviceCollection.AddScoped<IServerLogic, ServerLogic>();
+
+            ServiceProvider = serviceCollection.BuildServiceProvider();
+
+            MockMessageBroker = ServiceProvider.GetService<MockMessageBroker>()!;
+            MockNetwork = ServiceProvider.GetService<MockNetwork>()!;
         }
     }
 }

@@ -8,7 +8,7 @@ namespace Common.Messaging
 {
     public interface IMessageBroker : IDisposable
     {
-        IEnumerable<Task> Publish<T>(object source, T message) where T : IMessage;
+        void Publish<T>(object source, T message) where T : IMessage;
 
         void Respond<T>(object target, T message) where T : IResponse;
 
@@ -44,12 +44,18 @@ namespace Common.Messaging
             "PartyBehaviorChangeAttempted",
             "UpdatePartyBehavior",
             "ControlledPartyBehaviorUpdated",
+            "PartyEnterSettlementAttempted",
+            "PartyLeaveSettlementAttempted",
+            "NetworkPartyEnterSettlement",
+            "NetworkPartyLeaveSettlement",
+            "PartyEnterSettlement",
+            "PartyLeaveSettlement",
         };
 
-        public virtual IEnumerable<Task> Publish<T>(object source, T message) where T : IMessage
+        public virtual void Publish<T>(object source, T message) where T : IMessage
         {
             if (message == null)
-                return Array.Empty<Task>();
+                return;
 
             var msgType = message.GetType().Name;
 
@@ -61,13 +67,11 @@ namespace Common.Messaging
 
             if (!_subscribers.ContainsKey(typeof(T)))
             {
-                return Array.Empty<Task>();
+                return;
             }
 
-            List<Task> tasks = new List<Task>();
-
             var delegates = _subscribers[typeof(T)];
-            if (delegates == null || delegates.Count == 0) return Array.Empty<Task>();
+            if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);
             for (int i = 0; i < delegates.Count; i++)
             {
@@ -80,12 +84,8 @@ namespace Common.Messaging
                     continue;
                 }
 
-                Task invokeTask = Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
-
-                tasks.Add(invokeTask);
+                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
             }
-
-            return tasks;
         }
 
         public void Respond<T>(object target, T message) where T : IResponse

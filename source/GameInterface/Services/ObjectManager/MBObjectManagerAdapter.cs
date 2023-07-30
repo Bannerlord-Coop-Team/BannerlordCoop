@@ -75,16 +75,14 @@ internal class MBObjectManagerAdapter : IObjectManager
 
         if (obj is MobileParty party)
         {
-            var result = partyRegistry.RegisterNewObject(party);
-            newId = party.StringId;
+            var result = partyRegistry.RegisterNewObject(party, out newId);
 
             return result;
         }
 
         if (obj is Hero hero)
         {
-            var result = heroRegistry.RegisterNewObject(hero);
-            newId = hero.StringId;
+            var result = heroRegistry.RegisterNewObject(hero, out newId);
 
             return result;
         }
@@ -156,6 +154,9 @@ internal class MBObjectManagerAdapter : IObjectManager
         return true;
     }
 
+
+    private static readonly Type PartyType = typeof(MobileParty);
+    private static readonly Type HeroType = typeof(Hero);
     public bool TryGetObject(string id, out object obj)
     {
         obj = default;
