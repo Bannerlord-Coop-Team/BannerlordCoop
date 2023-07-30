@@ -1,9 +1,12 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
+using LiteNetLib;
+using System;
 
 namespace Coop.Core.Client.States;
 
@@ -20,6 +23,7 @@ public class CampaignState : ClientStateBase
         network = logic.Network;
         
         messageBroker.Subscribe<NetworkDisableTimeControls>(Handle_NetworkDisableTimeControls);
+        messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<MissionStateEntered>(Handle_MissionStateEntered);
@@ -28,8 +32,26 @@ public class CampaignState : ClientStateBase
         Logic.MessageBroker.Publish(this, new RegisterAllGameObjects());
     }
 
+    public override void Dispose()
+    {
+        messageBroker.Unsubscribe<NetworkDisableTimeControls>(Handle_NetworkDisableTimeControls);
+        messageBroker.Unsubscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
+
+        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Unsubscribe<MissionStateEntered>(Handle_MissionStateEntered);
+        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+    }
+
+    private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
+    {
+        var message = new RegisterNewPlayerHero((NetPeer)obj.Who, obj.What.PlayerId, obj.What.PlayerHero);
+        messageBroker.Publish(this, message);
+    }
+
     internal void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
+        InstantiateDeferredHeroes();
+
         messageBroker.Publish(this, new SwitchToHero(Logic.ControlledHeroId));
         network.SendAll(new NetworkPlayerCampaignEntered());
     }
@@ -50,13 +72,17 @@ public class CampaignState : ClientStateBase
         Logic.State = new MainMenuState(Logic);
     }
 
-    public override void Dispose()
-    {
-        messageBroker.Unsubscribe<NetworkDisableTimeControls>(Handle_NetworkDisableTimeControls);
+    
 
-        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Unsubscribe<MissionStateEntered>(Handle_MissionStateEntered);
-        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+    private void InstantiateDeferredHeroes()
+    {
+        foreach(var newHero in Logic.DeferredHeroRepository.GetAllDeferredHeroes())
+        {
+            var message = new RegisterNewPlayerHero(newHero.NetPeer, newHero.ControllerId, newHero.HeroData);
+            messageBroker.Publish(this, message);
+        }
+
+        Logic.DeferredHeroRepository.Clear();
     }
 
     public override void EnterMissionState()

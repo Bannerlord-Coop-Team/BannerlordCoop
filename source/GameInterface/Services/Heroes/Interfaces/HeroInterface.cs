@@ -1,4 +1,5 @@
-﻿using Common.Extensions;
+﻿using Common;
+using Common.Extensions;
 using Common.Logging;
 using Common.Serialization;
 using GameInterface.Serialization;
@@ -20,7 +21,6 @@ internal interface IHeroInterface : IGameAbstraction
     bool TryResolveHero(string controllerId, out string heroId);
     void SwitchMainHero(string heroId);
     Hero UnpackMainHero(string controllerId, byte[] bytes);
-    void HandleNewHero(Hero hero);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -51,10 +51,24 @@ internal class HeroInterface : IHeroInterface
 
     public Hero UnpackMainHero(string controllerId, byte[] bytes)
     {
+        Hero hero = null;
+
+        GameLoopRunner.RunOnMainThread(() => {
+            hero = UnpackMainHeroInternal(controllerId, bytes);
+        },
+        blocking: true);
+
+        return hero;
+    }
+
+    private Hero UnpackMainHeroInternal(string controllerId, byte[] bytes)
+    {
         HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
         var hero = package.Unpack<Hero>(binaryPackageFactory);
 
         heroRegistry.TryRegisterHeroController(controllerId, hero.StringId);
+
+        SetupNewHero(hero);
 
         return hero;
     }
@@ -83,11 +97,17 @@ internal class HeroInterface : IHeroInterface
     private static readonly Action<CampaignObjectManager, MobileParty> CampaignObjectManager_AddMobileParty = typeof(CampaignObjectManager)
         .GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
         .BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
-    public void HandleNewHero(Hero hero)
+    private void SetupNewHero(Hero hero)
     {
         hero.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(PlayerHeroStringIdPrefix);
         hero.PartyBelongedTo.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>(PlayerPartyStringIdPrefix);
 
+        SetupHeroWithObjectManagers(hero);
+        SetupNewParty(hero);
+    }
+
+    private void SetupHeroWithObjectManagers(Hero hero)
+    {
         objectManager.AddNewObject(hero, out string heroId);
         objectManager.AddNewObject(hero.PartyBelongedTo, out string _);
 
@@ -100,7 +120,10 @@ internal class HeroInterface : IHeroInterface
 
         CampaignObjectManager_AddHero(campaignObjectManager, hero);
         CampaignObjectManager_AddMobileParty(campaignObjectManager, hero.PartyBelongedTo);
+    }
 
+    private void SetupNewParty(Hero hero)
+    {
         hero.PartyBelongedTo.IsVisible = true;
         hero.PartyBelongedTo.Party.Visuals.SetMapIconAsDirty();
     }

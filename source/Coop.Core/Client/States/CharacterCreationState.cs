@@ -5,8 +5,6 @@ using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.PlatformId.Messages;
-using System;
 
 namespace Coop.Core.Client.States;
 
@@ -21,6 +19,7 @@ public class CharacterCreationState : ClientStateBase
     {
         messageBroker = logic.MessageBroker;
         network = logic.Network;
+
         messageBroker.Subscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);

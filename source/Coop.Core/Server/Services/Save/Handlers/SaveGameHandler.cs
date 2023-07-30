@@ -87,8 +87,7 @@ internal class SaveGameHandler : IHandler
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
-        controllerIdProvider.SetControllerId(coopServer.ServerId);
-        messageBroker.Publish(this, new RegisterAllPartiesAsControlled(coopServer.ServerId));
+        messageBroker.Publish(this, new RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId));
         messageBroker.Publish(this, new EnableGameTimeControls());
     }
 

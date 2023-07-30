@@ -1,14 +1,10 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
-using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -19,7 +15,6 @@ internal class NewHeroHandler : IHandler
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
-
     public NewHeroHandler(
         IHeroInterface heroInterface,
         IMessageBroker messageBroker,
@@ -61,13 +56,7 @@ internal class NewHeroHandler : IHandler
 
         try
         {
-            Hero hero = null;
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                hero = heroInterface.UnpackMainHero(controllerId, bytes);
-            }, blocking: true);
-
-            heroInterface.HandleNewHero(hero);
+            var hero = heroInterface.UnpackMainHero(controllerId, bytes);
 
             Logger.Debug("New Hero ID: {id}", hero.StringId);
 
@@ -75,9 +64,9 @@ internal class NewHeroHandler : IHandler
 
             messageBroker.Respond(obj.Who, registerMessage);
         }
-        catch(Exception e)
+        catch (Exception e)
         {
-            Logger.Error("Error while unpacking new Hero: {error}", e.Message);
+            Logger.Error("Error while unpacking new Hero: {error}", e);
         }
     }
 }

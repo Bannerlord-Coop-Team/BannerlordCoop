@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.LogicStates;
 using Common.Network;
+using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Save;

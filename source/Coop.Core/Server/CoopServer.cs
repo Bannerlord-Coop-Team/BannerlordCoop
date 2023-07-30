@@ -5,6 +5,7 @@ using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
@@ -19,20 +20,21 @@ namespace Coop.Core.Server;
 /// </summary>
 public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, IDisposable
 {
-    public string ServerId { get; }
     IEnumerable<NetPeer> ConnectedPeers { get; }
 }
 
 /// <inheritdoc cref="ICoopServer"/>
 public class CoopServer : CoopNetworkBase, ICoopServer
 {
+    public const string ServerControllerId = "Server";
+
     public override int Priority => 0;
 
     public IEnumerable<NetPeer> ConnectedPeers => netManager.ConnectedPeerList;
-    public string ServerId { get; } = "Server";
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
+    private readonly IControllerIdProvider controllerIdProvider;
     private readonly NetManager netManager;
 
     private bool allowJoining = false;
@@ -40,12 +42,13 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public CoopServer(
         INetworkConfiguration configuration, 
         IMessageBroker messageBroker,
-        IPacketManager packetManager) : base(configuration)
+        IPacketManager packetManager,
+        IControllerIdProvider controllerIdProvider) : base(configuration)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
-
+        this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<GameTimeControlsEnabled>(Handle_GameTimeControlsEnabled);
 
         ModInformation.IsServer = true;
@@ -61,6 +64,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
         netManager.NatPunchModule.Init(this);
+
+        controllerIdProvider.SetControllerId(ServerControllerId);
     }
 
     public void Dispose()

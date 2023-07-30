@@ -23,7 +23,12 @@ public class ValidateModuleState : ClientStateBase
         messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
 
+#if DEBUG
+        logic.ControllerIdProvider.SetControllerFromProgramArgs();
+#else
         logic.ControllerIdProvider.SetControllerAsPlatformId();
+#endif
+
 
         network.SendAll(new NetworkClientValidate(logic.ControllerIdProvider.ControllerId));
     }
