@@ -4,7 +4,10 @@ using Common.Network;
 using Common.PacketHandlers;
 using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Common.Configuration;
+using Coop.Core.Surrogates;
 using GameInterface;
+using ProtoBuf.Meta;
+using TaleWorlds.Library;
 
 namespace Coop.Core
 {
@@ -12,6 +15,8 @@ namespace Coop.Core
     {
         protected override void Load(ContainerBuilder builder)
         {
+            SurrogateCollection.AssignSurrogates();
+
             #region Network
             builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
             #endregion

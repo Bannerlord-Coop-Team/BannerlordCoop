@@ -1,9 +1,12 @@
 ﻿using Common;
 using Common.Extensions;
 using Common.Logging;
+using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Entity.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Registry;
 using Serilog;
@@ -12,6 +15,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.DotNet;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -20,7 +24,7 @@ internal interface IHeroInterface : IGameAbstraction
     byte[] PackageMainHero();
     bool TryResolveHero(string controllerId, out string heroId);
     void SwitchMainHero(string heroId);
-    Hero UnpackMainHero(string controllerId, byte[] bytes);
+    Hero UnpackMainHero(byte[] bytes);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -49,24 +53,22 @@ internal class HeroInterface : IHeroInterface
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public Hero UnpackMainHero(string controllerId, byte[] bytes)
+    public Hero UnpackMainHero(byte[] bytes)
     {
         Hero hero = null;
 
         GameLoopRunner.RunOnMainThread(() => {
-            hero = UnpackMainHeroInternal(controllerId, bytes);
+            hero = UnpackMainHeroInternal(bytes);
         },
         blocking: true);
 
         return hero;
     }
 
-    private Hero UnpackMainHeroInternal(string controllerId, byte[] bytes)
+    private Hero UnpackMainHeroInternal(byte[] bytes)
     {
         HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
         var hero = package.Unpack<Hero>(binaryPackageFactory);
-
-        heroRegistry.TryRegisterHeroController(controllerId, hero.StringId);
 
         SetupNewHero(hero);
 
@@ -89,27 +91,22 @@ internal class HeroInterface : IHeroInterface
         }
     }
 
-    private const string PlayerHeroStringIdPrefix = "PlayerHero";
-    private const string PlayerPartyStringIdPrefix = "PlayerParty";
-    private static readonly Action<CampaignObjectManager, Hero> CampaignObjectManager_AddHero = typeof(CampaignObjectManager)
-        .GetMethod("AddHero", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildDelegate<Action<CampaignObjectManager, Hero>>();
-    private static readonly Action<CampaignObjectManager, MobileParty> CampaignObjectManager_AddMobileParty = typeof(CampaignObjectManager)
-        .GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
     private void SetupNewHero(Hero hero)
     {
-        hero.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(PlayerHeroStringIdPrefix);
-        hero.PartyBelongedTo.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>(PlayerPartyStringIdPrefix);
-
         SetupHeroWithObjectManagers(hero);
         SetupNewParty(hero);
     }
 
+    private static readonly Action<CampaignObjectManager, Hero> CampaignObjectManager_AddHero = typeof(CampaignObjectManager)
+    .GetMethod("AddHero", BindingFlags.Instance | BindingFlags.NonPublic)
+    .BuildDelegate<Action<CampaignObjectManager, Hero>>();
+    private static readonly Action<CampaignObjectManager, MobileParty> CampaignObjectManager_AddMobileParty = typeof(CampaignObjectManager)
+        .GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
     private void SetupHeroWithObjectManagers(Hero hero)
     {
         objectManager.AddNewObject(hero, out string heroId);
-        objectManager.AddNewObject(hero.PartyBelongedTo, out string _);
+        objectManager.AddNewObject(hero.PartyBelongedTo, out string partyId);
 
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
         if (campaignObjectManager == null)

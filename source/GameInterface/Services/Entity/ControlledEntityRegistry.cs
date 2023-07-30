@@ -18,7 +18,7 @@ namespace GameInterface.Services.Entity;
 /// Stores ownership of game entities
 /// </summary>
 /// <remarks>A game entity is anything that can be updated by the client or server</remarks>
-internal interface IControlledEntityRegistry
+public interface IControlledEntityRegistry
 {
     /// <summary>
     /// Packages an immutable dictionary of controlled entities

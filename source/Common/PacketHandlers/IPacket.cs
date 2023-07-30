@@ -10,8 +10,8 @@ namespace Common.PacketHandlers
         Example,
         Test,
         Movement,
-        RequestMobilePartyBehavior,
-        UpdatePartyBehavior,
+        RequestMobilePartyMovement,
+        UpdateMobilePartyMovement,
 
     }
 

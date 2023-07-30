@@ -51,12 +51,11 @@ internal class NewHeroHandler : IHandler
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
     {
         byte[] bytes = obj.What.Bytes;
-        var controllerId = obj.What.ControllerId;
         var sendingPeer = obj.What.SendingPeer;
 
         try
         {
-            var hero = heroInterface.UnpackMainHero(controllerId, bytes);
+            var hero = heroInterface.UnpackMainHero(bytes);
 
             Logger.Debug("New Hero ID: {id}", hero.StringId);
 

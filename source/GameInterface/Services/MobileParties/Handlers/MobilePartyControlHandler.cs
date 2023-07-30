@@ -59,16 +59,17 @@ internal class MobilePartyControlHandler : IHandler
     private void Handle_UpdateMobilePartyControl(MessagePayload<UpdateMobilePartyControl> obj)
     {
         string partyId = obj.What.PartyId;
+        var controllerId = obj.What.ControllerId;
 
         if (obj.What.IsRevocation == false)
         {
-            controlledEntityRegistry.RegisterAsControlled(ownerId, partyId);
-            messageBroker.Publish(this, new PartyControllerRegistered(ownerId, partyId));
+            controlledEntityRegistry.RegisterAsControlled(controllerId, partyId);
+            messageBroker.Publish(this, new RegisterPartyController(controllerId, partyId));
         }
         else
         {
-            controlledEntityRegistry.RemoveAsControlled(new ControlledEntity(ownerId, partyId));
-            messageBroker.Publish(this, new PartyControllerRemoved(ownerId, partyId));
+            controlledEntityRegistry.RemoveAsControlled(new ControlledEntity(controllerId, partyId));
+            messageBroker.Publish(this, new PartyControllerRemoved(controllerId, partyId));
         }
 
         if (ModInformation.IsServer && objectManager.TryGetObject(partyId, out MobileParty party))

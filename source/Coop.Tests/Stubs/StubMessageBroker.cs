@@ -18,14 +18,14 @@ namespace Coop.Tests.Stubs
             return total;
         }
 
-        public override Task[] Publish<T>(object? source, T message)
+        public override void Publish<T>(object? source, T message)
         {
             if (!_subscribers.ContainsKey(typeof(T)))
             {
-                return Array.Empty<Task>();
+                return;
             }
             var delegates = _subscribers[typeof(T)];
-            if (delegates == null || delegates.Count == 0) return Array.Empty<Task>();
+            if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);
             for (int i = 0; i < delegates.Count; i++)
             {
@@ -39,7 +39,7 @@ namespace Coop.Tests.Stubs
                 weakDelegate.Invoke(new object[] { payload });
             }
 
-            return Array.Empty<Task>();
+            return;
         }
     }
 }

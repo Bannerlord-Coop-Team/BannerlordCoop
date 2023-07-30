@@ -2,23 +2,23 @@
 using Common.Network;
 using Common.PacketHandlers;
 using Coop.Core.Client.Services.MobileParties.Packets;
-using GameInterface.Services.MobileParties.Messages.Behavior;
+using Coop.Core.Server.Services.MobileParties.Messages;
 using LiteNetLib;
 
 namespace Coop.Core.Client.Services.MobileParties.PacketHandlers
 {
     /// <summary>
-    /// Handles incoming <see cref="UpdatePartyBehaviorPacket"/> from server to client
+    /// Handles incoming <see cref="UpdatePartyMovementPacket"/> from server to client
     /// </summary>
-    internal class UpdatePartyBehaviorPacketHandler : IPacketHandler
+    internal class UpdatePartyMovementHandler : IPacketHandler
     {
-        public PacketType PacketType => PacketType.UpdatePartyBehavior;
+        public PacketType PacketType => PacketType.UpdateMobilePartyMovement;
 
         private readonly IPacketManager packetManager;
         private readonly INetwork network;
         private readonly IMessageBroker messageBroker;
 
-        public UpdatePartyBehaviorPacketHandler(
+        public UpdatePartyMovementHandler(
             IPacketManager packetManager,
             INetwork network,
             IMessageBroker messageBroker)
@@ -36,9 +36,9 @@ namespace Coop.Core.Client.Services.MobileParties.PacketHandlers
 
         public void HandlePacket(NetPeer peer, IPacket packet)
         {
-            UpdatePartyBehaviorPacket convertedPacket = (UpdatePartyBehaviorPacket)packet;
+            UpdatePartyMovementPacket convertedPacket = (UpdatePartyMovementPacket)packet;
 
-            messageBroker.Publish(this, new UpdatePartyBehavior(convertedPacket.BehaviorUpdateData));
+            messageBroker.Publish(this, new NetworkUpdatePartyMovement(convertedPacket.MovementData));
         }
     }
 }
