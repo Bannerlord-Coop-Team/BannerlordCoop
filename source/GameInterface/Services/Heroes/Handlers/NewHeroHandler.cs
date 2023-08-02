@@ -46,8 +46,6 @@ internal class NewHeroHandler : IHandler
         }
     }
 
-    
-
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
     {
         byte[] bytes = obj.What.Bytes;

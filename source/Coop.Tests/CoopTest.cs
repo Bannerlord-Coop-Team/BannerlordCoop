@@ -7,6 +7,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client;
 using Coop.Core.Server;
+using Coop.Core.Client.Services.Heroes.Data;
 
 namespace Coop.Tests
 {
@@ -28,6 +29,7 @@ namespace Coop.Tests
             serviceCollection.AddScoped<MockNetwork>();
             serviceCollection.AddScoped<INetwork, MockNetwork>(x => x.GetService<MockNetwork>()!);
             serviceCollection.AddScoped<IControllerIdProvider, ControllerIdProvider>();
+            serviceCollection.AddScoped<IDeferredHeroRepository, DeferredHeroRepository>();
 
             serviceCollection.AddScoped<IClientLogic, ClientLogic>();
             serviceCollection.AddScoped<IServerLogic, ServerLogic>();

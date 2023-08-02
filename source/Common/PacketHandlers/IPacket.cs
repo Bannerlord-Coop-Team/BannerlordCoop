@@ -12,7 +12,8 @@ namespace Common.PacketHandlers
         Movement,
         RequestMobilePartyMovement,
         UpdateMobilePartyMovement,
-
+        RequestUpdatePartyBehavior,
+        UpdatePartyBehavior,
     }
 
     public interface IPacket

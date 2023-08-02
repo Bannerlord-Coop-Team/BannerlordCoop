@@ -118,6 +118,7 @@ internal class TestEnvironment
         services.AddScoped<IObjectManager, MockObjectManager>();
         services.AddScoped<ICoopSaveManager, CoopSaveManager>();
         services.AddScoped<IControllerIdProvider, ControllerIdProvider>();
+        services.AddScoped<IControlledEntityRegistry, MockControlledEntityRegistry>();
 
         return services;
     }

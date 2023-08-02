@@ -53,6 +53,8 @@ public class LoadingState : ClientStateBase
     public override void EnterCampaignState()
     {
         Logic.State = new CampaignState(Logic);
+
+        Logic.MessageBroker.Publish(this, new RegisterAllGameObjects());
     }
 
     public override void EnterMissionState()

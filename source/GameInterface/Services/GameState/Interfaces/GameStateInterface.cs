@@ -37,6 +37,11 @@ internal class GameStateInterface : IGameStateInterface
     {
         if (saveData == null) throw new ArgumentNullException($"Received save data was null");
 
+        if (GameStateManager.Current == null)
+        {
+            GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
+        }
+
         ISaveDriver driver = new CoopInMemSaveDriver(saveData);
         LoadResult loadResult = SaveManager.Load("", driver, loadAsLateInitialize: true);
         MBGameManager.StartNewGame(new SandBoxGameManager(loadResult));

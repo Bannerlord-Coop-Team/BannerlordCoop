@@ -1,8 +1,7 @@
 ﻿using Common.PacketHandlers;
-using Coop.Core.Common.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Data;
 using LiteNetLib;
 using ProtoBuf;
-using TaleWorlds.Library;
 
 namespace Coop.Core.Client.Services.MobileParties.Packets
 {
@@ -10,17 +9,18 @@ namespace Coop.Core.Client.Services.MobileParties.Packets
     /// Packet containing data to update party behavior
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record UpdatePartyMovementPacket : IPacket
+    public record UpdatePartyBehaviorPacket : IPacket
     {
         [ProtoMember(1)]
-        public MobilePartyMovementData MovementData { get; }
+        public PartyBehaviorUpdateData BehaviorUpdateData { get; }
 
-        public PacketType PacketType => PacketType.UpdateMobilePartyMovement;
+        public PacketType PacketType => PacketType.UpdatePartyBehavior;
 
         public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableUnordered;
-        public UpdatePartyMovementPacket(MobilePartyMovementData movementData)
+
+        public UpdatePartyBehaviorPacket(PartyBehaviorUpdateData behaviorUpdateData)
         {
-            MovementData = movementData;
+            BehaviorUpdateData = behaviorUpdateData;
         }
     }
 }

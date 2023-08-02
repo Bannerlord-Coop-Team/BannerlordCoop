@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Serilog;
+using System;
 using System.Linq;
 using TaleWorlds.Engine;
 using TaleWorlds.PlatformService;
@@ -22,11 +23,18 @@ public class ControllerIdProvider : IControllerIdProvider
 
     public void SetControllerFromProgramArgs()
     {
-        var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
+        try
+        {
+            var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
 
-        var platformArgIndex = args.FindIndex(x => x.ToLower() == "/platformid");
+            var platformArgIndex = args.FindIndex(x => x.ToLower() == "/platformid");
 
-        ControllerId = args[platformArgIndex + 1];
+            ControllerId = args[platformArgIndex + 1];
+        }
+        catch(Exception ex)
+        {
+            SetAsDefault();
+        }        
     }
 
     public void SetControllerAsPlatformId()
@@ -44,5 +52,10 @@ public class ControllerIdProvider : IControllerIdProvider
     public void SetControllerId(string controllerId)
     {
         ControllerId = controllerId;
+    }
+
+    public void SetAsDefault()
+    {
+        ControllerId = "DefaultId";
     }
 }

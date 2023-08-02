@@ -40,8 +40,6 @@ public class ClientLogic : IClientLogic
     public IControllerIdProvider ControllerIdProvider { get; }
     public IDeferredHeroRepository DeferredHeroRepository { get; }
     public string ControlledHeroId { get; set; }
-
-    private readonly Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
     public IClientState State 
     {
         get { return _state; }
@@ -53,8 +51,6 @@ public class ClientLogic : IClientLogic
             _state = value;
         } 
     }
-
-    
 
     private IClientState _state;
 
@@ -69,9 +65,6 @@ public class ClientLogic : IClientLogic
         ControllerIdProvider = controllerIdProvider;
         DeferredHeroRepository = deferredHeroRepo;
         State = new MainMenuState(this);
-
-        // Apply all patches via harmony
-        harmony.PatchAll(typeof(GameInterface.GameInterface).Assembly);
     }
 
     public void Start()
@@ -84,11 +77,7 @@ public class ClientLogic : IClientLogic
         Disconnect();
     }
 
-    public void Dispose()
-    {
-        harmony.UnpatchAll();
-        State.Dispose();
-    }
+    public void Dispose() => State.Dispose();
 
     public void Connect() => State.Connect();
 

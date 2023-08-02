@@ -31,37 +31,6 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void EnterMainMenu_Publishes_EnterMainMenuEvent()
-        {
-            // Arrange
-            clientLogic.State = new LoadingState(clientLogic);
-
-            // Act
-            clientLogic.EnterMainMenu();
-
-            // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<EnterMainMenu>(message);
-        }
-
-        [Fact]
-        public void MainMenuEntered_Transitions_MainMenuState()
-        {
-            // Arrange
-            var loadingState = new LoadingState(clientLogic);
-            clientLogic.State = loadingState;
-
-            var payload = new MessagePayload<MainMenuEntered>(
-                this, new MainMenuEntered());
-
-            // Act
-            loadingState.Handle_MainMenuEntered(payload);
-
-            // Assert
-            Assert.IsType<MainMenuState>(clientLogic.State);
-        }
-
-        [Fact]
         public void CampaignLoaded_Transitions_CampaignState()
         {
             // Arrange
@@ -109,6 +78,9 @@ namespace Coop.Tests.Client.States
             Assert.IsType<LoadingState>(clientLogic.State);
 
             clientLogic.LoadSavedData();
+            Assert.IsType<LoadingState>(clientLogic.State);
+
+            clientLogic.EnterMainMenu();
             Assert.IsType<LoadingState>(clientLogic.State);
 
             clientLogic.StartCharacterCreation();

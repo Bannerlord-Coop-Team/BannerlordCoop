@@ -5,13 +5,29 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client;
 using Coop.Core.Server;
+using Coop.Core.Surrogates;
 using GameInterface;
+using HarmonyLib;
 using System;
 
 namespace Coop.Core
 {
     public class CoopartiveMultiplayerExperience : IUpdateable
     {
+        private const string HarmonyId = "com.TaleWorlds.MountAndBlade.Bannerlord.Coop";
+        private readonly Harmony harmony = new Harmony(HarmonyId);
+
+        public CoopartiveMultiplayerExperience()
+        {
+            harmony.PatchAll(typeof(GameInterface.GameInterface).Assembly);
+            SurrogateCollection.AssignSurrogates();
+        }
+
+        ~CoopartiveMultiplayerExperience()
+        {
+            harmony.UnpatchAll(HarmonyId);
+        }
+
         public static UpdateableList Updateables { get; } = new UpdateableList();
 
         private IContainer _container;

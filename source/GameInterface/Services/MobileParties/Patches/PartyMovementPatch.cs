@@ -13,16 +13,16 @@ namespace GameInterface.Services.MobileParties.Patches
     [HarmonyPatch(typeof(MobileParty))]
     static class PartyMovementPatch
     {
-        [HarmonyPrefix]
-        [HarmonyPatch("TargetPosition", MethodType.Setter)]
-        private static bool SetTargetPositionPrefix(ref MobileParty __instance, ref Vec2 value)
-        {
-            if (value == get_targetPosition(__instance)) return false;
+        //[HarmonyPrefix]
+        //[HarmonyPatch("TargetPosition", MethodType.Setter)]
+        //private static bool SetTargetPositionPrefix(ref MobileParty __instance, ref Vec2 value)
+        //{
+        //    if (value == get_targetPosition(__instance)) return false;
 
-            MessageBroker.Instance.Publish(__instance, new TargetPositionUpdateAttempted(__instance.StringId, value));
+        //    MessageBroker.Instance.Publish(__instance, new TargetPositionUpdateAttempted(__instance.StringId, value));
             
-            return false;
-        }
+        //    return false;
+        //}
 
         public static void SetTargetPosition(MobileParty party, Vec2 newVal)
         {

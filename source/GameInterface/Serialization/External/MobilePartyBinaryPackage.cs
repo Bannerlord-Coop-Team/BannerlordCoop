@@ -17,6 +17,7 @@ namespace GameInterface.Serialization.External
         public static PropertyInfo MobileParty_Engineer => typeof(MobileParty).GetProperty("Engineer", BindingFlags.NonPublic | BindingFlags.Instance);
         public static PropertyInfo MobileParty_Quartermaster => typeof(MobileParty).GetProperty("Quartermaster", BindingFlags.NonPublic | BindingFlags.Instance);
         public static PropertyInfo MobileParty_Surgeon => typeof(MobileParty).GetProperty("Surgeon", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static MethodInfo MobileParty_OnFinishLoadState => typeof(MobileParty).GetMethod("OnFinishLoadState", BindingFlags.Instance | BindingFlags.NonPublic);
 
         private string stringId = string.Empty;
 
@@ -93,6 +94,9 @@ namespace GameInterface.Serialization.External
             MobileParty_Engineer     .SetValue(Object, ResolveId<Hero>(engineerId));
             MobileParty_Quartermaster.SetValue(Object, ResolveId<Hero>(quartermasterId));
             MobileParty_Surgeon      .SetValue(Object, ResolveId<Hero>(surgeonId));
+
+
+            MobileParty_OnFinishLoadState.Invoke(Object, Array.Empty<string>());
         }
     }
 }

@@ -15,8 +15,6 @@ namespace Coop.Core
     {
         protected override void Load(ContainerBuilder builder)
         {
-            SurrogateCollection.AssignSurrogates();
-
             #region Network
             builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
             #endregion

@@ -69,7 +69,7 @@ internal class MobilePartyControlHandler : IHandler
         else
         {
             controlledEntityRegistry.RemoveAsControlled(new ControlledEntity(controllerId, partyId));
-            messageBroker.Publish(this, new PartyControllerRemoved(controllerId, partyId));
+            messageBroker.Publish(this, new RemovePartyController(controllerId, partyId));
         }
 
         if (ModInformation.IsServer && objectManager.TryGetObject(partyId, out MobileParty party))

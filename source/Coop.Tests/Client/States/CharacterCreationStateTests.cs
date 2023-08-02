@@ -38,29 +38,21 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void HeroPackaged_Transitions_ReceivingSavedDataState()
+        public void NewPlayerHeroRegistered_Transitions_ReceivingSavedDataState()
         {
             // Arrange
             var characterCreationState = new CharacterCreationState(clientLogic);
             clientLogic.State = characterCreationState;
 
-            var heroBytes = new byte[10];
-            var payload = new MessagePayload<NewHeroPackaged>(
-                this, new NewHeroPackaged(heroBytes));
+            var playerHeroRegistered = new NewPlayerHeroRegistered(null, null);
+            var payload = new MessagePayload<NetworkPlayerData>(
+                this, new NetworkPlayerData(playerHeroRegistered));
 
             // Act
-            characterCreationState.Handle_NewHeroPackaged(payload);
+            characterCreationState.Handle_NetworkPlayerData(payload);
 
             // Assert
-            Assert.NotEmpty(MockNetwork.Peers);
-            foreach(var peer in MockNetwork.Peers)
-            {
-                var message = Assert.Single(MockNetwork.GetPeerMessages(peer));
-                Assert.IsType<NetworkTransferedHero>(message);
-            }
-
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
-
         }
 
         [Fact]

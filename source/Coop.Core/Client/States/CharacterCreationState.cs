@@ -47,7 +47,7 @@ public class CharacterCreationState : ClientStateBase
         network.SendAll(new NetworkTransferedHero(playerId, data));
     }
 
-    private void Handle_NetworkPlayerData(MessagePayload<NetworkPlayerData> obj)
+    internal void Handle_NetworkPlayerData(MessagePayload<NetworkPlayerData> obj)
     {
         Logic.ControlledHeroId = obj.What.HeroStringId;
 

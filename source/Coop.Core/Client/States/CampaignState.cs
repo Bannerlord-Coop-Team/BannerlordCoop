@@ -28,8 +28,6 @@ public class CampaignState : ClientStateBase
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<MissionStateEntered>(Handle_MissionStateEntered);
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
-
-        Logic.MessageBroker.Publish(this, new RegisterAllGameObjects());
     }
 
     public override void Dispose()

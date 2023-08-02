@@ -2,12 +2,12 @@
 
 namespace GameInterface.Services.MobileParties.Messages.Control;
 
-public record PartyControllerRemoved : IEvent
+public record RemovePartyController : ICommand
 {
     public string OwnerId { get; }
     public string PartyId { get; }
 
-    public PartyControllerRemoved(string ownerId, string partyId)
+    public RemovePartyController(string ownerId, string partyId)
     {
         OwnerId = ownerId;
         PartyId = partyId;

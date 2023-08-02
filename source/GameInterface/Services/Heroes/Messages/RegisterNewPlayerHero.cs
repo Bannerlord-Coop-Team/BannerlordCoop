@@ -28,9 +28,10 @@ public record NewPlayerHeroRegistered : IResponse
 
     public NewPlayerHeroRegistered(NetPeer sendingPeer, Hero hero)
     {
+        SendingPeer = sendingPeer;
+
         if (hero == null) return;
 
-        SendingPeer = sendingPeer;
         HeroStringId = hero.StringId;
         PartyStringId = hero.PartyBelongedTo.StringId;
         CharacterObjectStringId = hero.CharacterObject.StringId;
