@@ -6,7 +6,7 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 /// <summary>
 /// New party added on the server
 /// </summary>
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 internal class NetworkNewPartyCreated : IEvent
 {
     [ProtoMember(1)]
