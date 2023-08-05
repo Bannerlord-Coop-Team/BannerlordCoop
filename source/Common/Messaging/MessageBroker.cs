@@ -57,11 +57,12 @@ namespace Common.Messaging
             if (message == null)
                 return;
 
-            var msgType = message.GetType().Name;
+            var msgType = message.GetType();
+            var msgName = msgType.Name;
 
-            if (omit.Contains(msgType) == false)
+            if (omit.Contains(msgName) == false)
             {
-                Logger.Verbose($"Publishing {message.GetType().Name} from {source?.GetType().Name}");
+                Logger.Verbose("Publishing {msgName} from {sourceName}", msgName, source?.GetType().Name);
             }
             
 
