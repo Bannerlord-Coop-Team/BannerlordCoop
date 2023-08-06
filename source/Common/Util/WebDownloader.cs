@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Net;
-using System.Text;
 
-#if DEBUG
 namespace Common.Util
 {
     public class WebDownloader
@@ -21,4 +18,3 @@ namespace Common.Util
         }
     }
 }
-#endif

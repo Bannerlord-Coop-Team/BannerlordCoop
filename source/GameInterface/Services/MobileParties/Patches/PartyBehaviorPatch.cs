@@ -20,12 +20,20 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(MobilePartyAi))]
 static class PartyBehaviorPatch
 {
-    public static void SetAiBehavior(
-        MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint)
+    static readonly Func<MobilePartyAi, bool> DefaultBehaviorNeedsUpdate = typeof(MobilePartyAi)
+        .GetField("DefaultBehaviorNeedsUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildUntypedGetter<MobilePartyAi, bool>();
+
+    /// <summary>
+    /// This prevents the tick method being called without the need for an update
+    /// Likely speeds the game up quite a bit lmao
+    /// </summary>
+    [HarmonyPrefix]
+    [HarmonyPatch("Tick")]
+    private static bool TickPrefix(ref MobilePartyAi __instance)
     {
-        SetShortTermBehavior(partyAi, newBehavior, targetMapEntity);
-        SetBehaviorTarget(partyAi, targetPoint);
-        UpdateBehavior(partyAi);
+        // Allows ticking if default behavior needs update
+        return DefaultBehaviorNeedsUpdate(__instance);
     }
 
     [HarmonyPrefix]
@@ -54,6 +62,14 @@ static class PartyBehaviorPatch
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
+    }
+
+    public static void SetAiBehavior(
+        MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint)
+    {
+        SetShortTermBehavior(partyAi, newBehavior, targetMapEntity);
+        SetBehaviorTarget(partyAi, targetPoint);
+        UpdateBehavior(partyAi);
     }
 
     static readonly Action<MobilePartyAi, AiBehavior, IMapEntity> SetShortTermBehavior = typeof(MobilePartyAi)
