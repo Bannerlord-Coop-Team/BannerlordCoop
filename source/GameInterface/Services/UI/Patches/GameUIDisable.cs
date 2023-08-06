@@ -5,7 +5,7 @@ using TaleWorlds.Core;
 namespace GameInterface.Services.UI.Patches
 {
     [HarmonyPatch(typeof(GameStateManager))]
-    internal class NavigationPatches
+    internal class GameUIDisable
     {
         [HarmonyPatch("PushState")]
         [HarmonyPrefix]
