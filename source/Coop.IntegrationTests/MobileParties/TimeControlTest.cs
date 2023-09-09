@@ -20,11 +20,11 @@ public class TimeControlTest
     }
 
     /// <summary>
-    /// Verify sending ControlledPartyBehaviorUpdated on one client
-    /// Triggers UpdatePartyBehavior on all other clients
+    /// Verify sending TimeSpeedChanged on one client
+    /// Triggers SetTimeControlMode on all other clients
     /// </summary>
     [Fact]
-    public void ControlledPartyBehaviorUpdated_Publishes_AllClients()
+    public void SetTimeControlMode_Publishes_AllClients()
     {
         // Arrange
         var message = new TimeSpeedChanged(CampaignTimeControlMode.StoppablePlay);
