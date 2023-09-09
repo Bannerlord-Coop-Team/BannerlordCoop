@@ -57,10 +57,15 @@ namespace Coop.Core
 
         public void StartAsServer()
         {
+            var containerProvider = new ContainerProvider();
+
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ServerModule>();
+            builder.RegisterInstance(containerProvider).As<IContainerProvider>().InstancePerLifetimeScope();
             _container = builder.Build();
+
+            containerProvider.SetProvider(_container);
 
             updateable = _container.Resolve<INetwork>();
 
@@ -70,10 +75,15 @@ namespace Coop.Core
 
         public void StartAsClient()
         {
+            var containerProvider = new ContainerProvider();
+
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ClientModule>();
+            builder.RegisterInstance(containerProvider).As<IContainerProvider>().InstancePerLifetimeScope();
             _container = builder.Build();
+
+            containerProvider.SetProvider(_container);
 
             updateable = _container.Resolve<INetwork>();
 

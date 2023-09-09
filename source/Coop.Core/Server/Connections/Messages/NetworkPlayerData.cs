@@ -12,10 +12,14 @@ public record NetworkPlayerData : IEvent
 {
     public NetworkPlayerData(NewPlayerHeroRegistered registrationData)
     {
-        HeroStringId = registrationData.HeroStringId;
-        PartyStringId = registrationData.PartyStringId;
-        CharacterObjectStringId = registrationData.CharacterObjectStringId;
-        ClanStringId = registrationData.ClanStringId;
+        var playerData = registrationData.NewPlayerData;
+
+        if (playerData == null) return;
+
+        HeroStringId = playerData.HeroStringId;
+        PartyStringId = playerData.PartyStringId;
+        CharacterObjectStringId = playerData.CharacterObjectStringId;
+        ClanStringId = playerData.ClanStringId;
     }
     [ProtoMember(1)]
     public string PlayerId { get; }

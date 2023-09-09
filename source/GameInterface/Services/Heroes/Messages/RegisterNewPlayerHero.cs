@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Heroes.Data;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.MountAndBlade.Diamond;
 
 namespace GameInterface.Services.Heroes.Messages;
 
@@ -21,20 +23,12 @@ public record RegisterNewPlayerHero : ICommand
 public record NewPlayerHeroRegistered : IResponse
 {
     public NetPeer SendingPeer { get; }
-    public string HeroStringId { get; }
-    public string PartyStringId { get; }
-    public string CharacterObjectStringId { get; }
-    public string ClanStringId { get; }
+    public NewPlayerData NewPlayerData { get; }
 
-    public NewPlayerHeroRegistered(NetPeer sendingPeer, Hero hero)
+    public NewPlayerHeroRegistered(NetPeer sendingPeer, NewPlayerData playerData)
     {
         SendingPeer = sendingPeer;
 
-        if (hero == null) return;
-
-        HeroStringId = hero.StringId;
-        PartyStringId = hero.PartyBelongedTo.StringId;
-        CharacterObjectStringId = hero.CharacterObject.StringId;
-        ClanStringId = hero.Clan.StringId;
+        NewPlayerData = playerData;
     }
 }

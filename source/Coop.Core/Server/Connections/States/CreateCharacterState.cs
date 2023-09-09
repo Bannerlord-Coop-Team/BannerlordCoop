@@ -18,11 +18,14 @@ public class CreateCharacterState : ConnectionStateBase
 
     private IMessageBroker messageBroker;
     private INetwork network;
-    public CreateCharacterState(IConnectionLogic connectionLogic)
+    public CreateCharacterState(
+        IConnectionLogic connectionLogic,
+        IMessageBroker messageBroker,
+        INetwork network)
         : base(connectionLogic)
     {
-        messageBroker = connectionLogic.MessageBroker;
-        network = connectionLogic.Network;
+        this.messageBroker = messageBroker;
+        this.network = network;
 
         messageBroker.Subscribe<NetworkTransferedHero>(PlayerTransferedHeroHandler);
         messageBroker.Subscribe<NewPlayerHeroRegistered>(PlayerHeroRegisteredHandler);
@@ -58,8 +61,9 @@ public class CreateCharacterState : ConnectionStateBase
         var peer = ConnectionLogic.Peer;
         network.Send(peer, playerData);
 
-        ConnectionLogic.HeroStringId = obj.What.HeroStringId;
-        Logger.Information("Hero StringId: {stringId}", obj.What.HeroStringId);
+        var newPlayerData = obj.What.NewPlayerData;
+
+        Logger.Information("Hero StringId: {stringId}", newPlayerData?.HeroStringId);
         ConnectionLogic.TransferSave();
     }
 
@@ -81,6 +85,6 @@ public class CreateCharacterState : ConnectionStateBase
 
     public override void TransferSave()
     {
-        ConnectionLogic.State = new TransferSaveState(ConnectionLogic);
+        ConnectionLogic.SetState<TransferSaveState>();
     }
 }

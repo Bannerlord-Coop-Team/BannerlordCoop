@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using Serilog;
@@ -19,11 +18,13 @@ public class ResolveCharacterState : ConnectionStateBase
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    public ResolveCharacterState(IConnectionLogic connectionLogic) 
+    public ResolveCharacterState(IConnectionLogic connectionLogic,
+        IMessageBroker messageBroker,
+        INetwork network) 
         : base(connectionLogic)
     {
-        messageBroker = connectionLogic.MessageBroker;
-        network = connectionLogic.Network;
+        this.messageBroker = messageBroker;
+        this.network = network;
 
         messageBroker.Subscribe<NetworkClientValidate>(ClientValidateHandler);
         messageBroker.Subscribe<HeroResolved>(ResolveHeroHandler);
@@ -32,9 +33,9 @@ public class ResolveCharacterState : ConnectionStateBase
 
     public override void Dispose()
     {
-        ConnectionLogic.MessageBroker.Unsubscribe<NetworkClientValidate>(ClientValidateHandler);
-        ConnectionLogic.MessageBroker.Unsubscribe<HeroResolved>(ResolveHeroHandler);
-        ConnectionLogic.MessageBroker.Unsubscribe<ResolveHeroNotFound>(HeroNotFoundHandler);
+        messageBroker.Unsubscribe<NetworkClientValidate>(ClientValidateHandler);
+        messageBroker.Unsubscribe<HeroResolved>(ResolveHeroHandler);
+        messageBroker.Unsubscribe<ResolveHeroNotFound>(HeroNotFoundHandler);
     }
 
     internal void ClientValidateHandler(MessagePayload<NetworkClientValidate> obj)
@@ -42,14 +43,14 @@ public class ResolveCharacterState : ConnectionStateBase
         var peer = obj.Who as NetPeer;
         if (peer != ConnectionLogic.Peer) return;
 
-        ConnectionLogic.MessageBroker.Publish(this, new ResolveHero(obj.What.PlayerId));
+        messageBroker.Publish(this, new ResolveHero(obj.What.PlayerId));
     }
 
     internal void ResolveHeroHandler(MessagePayload<HeroResolved> obj)
     {
         var validateMessage = new NetworkClientValidated(true, obj.What.HeroId);
         var playerPeer = ConnectionLogic.Peer;
-        ConnectionLogic.Network.Send(playerPeer, validateMessage);
+        network.Send(playerPeer, validateMessage);
         ConnectionLogic.TransferSave();
     }
 
@@ -57,7 +58,7 @@ public class ResolveCharacterState : ConnectionStateBase
     {
         var validateMessage = new NetworkClientValidated(false, string.Empty);
         var playerPeer = ConnectionLogic.Peer;
-        ConnectionLogic.Network.Send(playerPeer, validateMessage);
+        network.Send(playerPeer, validateMessage);
         ConnectionLogic.CreateCharacter();
     }
 
@@ -72,12 +73,12 @@ public class ResolveCharacterState : ConnectionStateBase
 
     public override void CreateCharacter()
     {
-        ConnectionLogic.State = new CreateCharacterState(ConnectionLogic);
+        ConnectionLogic.SetState<CreateCharacterState>();
     }
 
     public override void TransferSave()
     {
-        ConnectionLogic.State = new TransferSaveState(ConnectionLogic);
+        ConnectionLogic.SetState<TransferSaveState>();
     }
 
     public override void Load()

@@ -13,10 +13,8 @@ namespace Coop.Core.Server.Connections;
 public interface IConnectionLogic : IConnectionState
 {
     NetPeer Peer { get; }
-    string HeroStringId { get; set; }
-    IMessageBroker MessageBroker { get; }
-    INetwork Network { get; }
-    IConnectionState State { get; set; }    
+    IConnectionState State { get; }
+    TState SetState<TState>() where TState : IConnectionState;
 }
 
 /// <inheritdoc cref="IConnectionLogic"/>
@@ -25,14 +23,11 @@ public class ConnectionLogic : IConnectionLogic
     private readonly ILogger Logger = LogManager.GetLogger<ConnectionLogic>();
 
     public NetPeer Peer { get; }
-    public string HeroStringId { get; set; }
-
-    public IMessageBroker MessageBroker { get; }
-    public INetwork Network { get; }
+    public IStateFactory StateFactory { get; }
 
     public IConnectionState State 
     {
-        get { return _state; }
+        get => _state;
         set
         {
             Logger.Debug("Connection is changing to {state} State", value.GetType().Name);
@@ -43,12 +38,18 @@ public class ConnectionLogic : IConnectionLogic
 
     private IConnectionState _state;
 
-    public ConnectionLogic(NetPeer playerId, IMessageBroker messageBroker, INetwork network)
+    public ConnectionLogic(NetPeer playerId, IStateFactory stateFactory)
     {
         Peer = playerId;
-        MessageBroker = messageBroker;
-        Network = network;
-        State = new ResolveCharacterState(this);
+        StateFactory = stateFactory;
+        SetState<ResolveCharacterState>();
+    }
+
+    public TState SetState<TState>() where TState : IConnectionState
+    {
+        TState newState = StateFactory.CreateConnectionState<TState>(this);
+        State = newState;
+        return newState;
     }
 
     public void Dispose() => State.Dispose();

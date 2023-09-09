@@ -53,11 +53,11 @@ internal class NewHeroHandler : IHandler
 
         try
         {
-            var hero = heroInterface.UnpackMainHero(bytes);
+            var playerData = heroInterface.UnpackHero(bytes);
 
-            Logger.Debug("New Hero ID: {id}", hero.StringId);
+            Logger.Debug("New Hero ID: {id}", playerData.HeroStringId);
 
-            var registerMessage = new NewPlayerHeroRegistered(sendingPeer, hero);
+            var registerMessage = new NewPlayerHeroRegistered(sendingPeer, playerData);
 
             messageBroker.Respond(obj.Who, registerMessage);
         }

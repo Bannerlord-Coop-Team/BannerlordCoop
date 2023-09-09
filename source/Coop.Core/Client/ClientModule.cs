@@ -1,8 +1,12 @@
 ﻿using Autofac;
 using Common.LogicStates;
+using Common.Messaging;
 using Common.Network;
+using Common.PacketHandlers;
+using Coop.Core.Client.States;
 using Coop.Core.Common;
 using LiteNetLib;
+using System.Linq;
 
 namespace Coop.Core.Client;
 
@@ -16,10 +20,19 @@ public class ClientModule : Module
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
 
-        foreach(var handlerType in HandlerCollector.Collect<ClientModule>())
+        RegisterAllTypesWithInterface<IHandler>(builder);
+        RegisterAllTypesWithInterface<IPacketHandler>(builder);
+
+        RegisterAllTypesWithInterface<IClientState>(builder);
+
+        base.Load(builder);
+    }
+
+    private void RegisterAllTypesWithInterface<TInterface>(ContainerBuilder builder)
+    {
+        foreach (var handlerType in TypeCollector.Collect<ClientModule, TInterface>())
         {
             builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope().AutoActivate();
         }
-        base.Load(builder);
     }
 }

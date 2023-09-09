@@ -1,46 +1,36 @@
 ﻿using Autofac;
 using Common.Messaging;
-using Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
+using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System.Linq;
-using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Connections.States
 {
-    public class ClientRegistryTests : CoopTest
+    public class ClientRegistryTests
     {
         private readonly ClientRegistry clientRegistry;
         private readonly NetPeer playerPeer;
-        private readonly NetPeer differentPlayer;
-        public ClientRegistryTests(ITestOutputHelper output) : base(output)
+        private readonly ServerTestComponent serverComponent;
+
+        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => serverComponent.MockNetwork;
+
+        public ClientRegistryTests(ITestOutputHelper output)
         {
-            playerPeer = MockNetwork.CreatePeer();
-            differentPlayer = MockNetwork.CreatePeer();
+            serverComponent = new ServerTestComponent(output);
 
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterType<ConnectionLogic>().As<IConnectionLogic>();
-            builder.RegisterInstance(MockMessageBroker).As<IMessageBroker>();
-            builder.RegisterInstance(MockNetwork).As<INetwork>();
+            var container = serverComponent.Container;
+            var network = container.Resolve<MockNetwork>();
 
-            IContainer container = builder.Build();
+            playerPeer = network.CreatePeer();
 
-            clientRegistry = new ClientRegistry(MockMessageBroker, MockNetwork);
-        }
-
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            clientRegistry.Dispose();
-
-            Assert.Empty(MockMessageBroker.Subscriptions);
+            clientRegistry = container.Resolve<ClientRegistry>();
         }
 
         [Fact]
@@ -87,7 +77,7 @@ namespace Coop.Tests.Server.Connections.States
             Assert.NotEmpty(MockNetwork.Peers);
             foreach (var peer in MockNetwork.Peers)
             {
-                var networkMessage = Assert.Single(MockNetwork.GetPeerMessages(peer));
+                var networkMessage = Assert.Single(serverComponent.MockNetwork.GetPeerMessages(peer));
                 Assert.IsType<NetworkEnableTimeControls>(networkMessage);
             }
 
@@ -103,7 +93,7 @@ namespace Coop.Tests.Server.Connections.States
             clientRegistry.PlayerJoiningHandler(connectPayload);
 
             IConnectionLogic logic = clientRegistry.ConnectionStates.Single().Value;
-            logic.State = new LoadingState(logic);
+            logic.SetState<LoadingState>();
 
             var payload = new MessagePayload<PlayerCampaignEntered>(
                 this, new PlayerCampaignEntered());

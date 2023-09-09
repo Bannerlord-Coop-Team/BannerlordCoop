@@ -1,12 +1,10 @@
 ﻿using Common;
 using Common.Extensions;
 using Common.Logging;
-using Common.Messaging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
-using GameInterface.Services.Entity;
-using GameInterface.Services.Entity.Messages;
+using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Registry;
 using Serilog;
@@ -15,16 +13,20 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.DotNet;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
-internal interface IHeroInterface : IGameAbstraction
+public interface IHeroInterface : IGameAbstraction
 {
     byte[] PackageMainHero();
     bool TryResolveHero(string controllerId, out string heroId);
     void SwitchMainHero(string heroId);
-    Hero UnpackMainHero(byte[] bytes);
+    /// <summary>
+    /// Unpacks and properly constructs hero in the game
+    /// </summary>
+    /// <param name="bytes">Hero as bytes</param>
+    /// <returns>Hero string identifier</returns>
+    NewPlayerData UnpackHero(byte[] bytes);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -53,7 +55,7 @@ internal class HeroInterface : IHeroInterface
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public Hero UnpackMainHero(byte[] bytes)
+    public NewPlayerData UnpackHero(byte[] bytes)
     {
         Hero hero = null;
 
@@ -62,7 +64,14 @@ internal class HeroInterface : IHeroInterface
         },
         blocking: true);
 
-        return hero;
+        var playerData = new NewPlayerData() {
+            HeroStringId = hero.StringId,
+            PartyStringId = hero.PartyBelongedTo.StringId,
+            CharacterObjectStringId = hero.CharacterObject.StringId,
+            ClanStringId = hero.Clan.StringId
+        };
+
+        return playerData;
     }
 
     private Hero UnpackMainHeroInternal(byte[] bytes)

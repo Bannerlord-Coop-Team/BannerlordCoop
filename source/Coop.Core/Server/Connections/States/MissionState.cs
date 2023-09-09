@@ -9,15 +9,18 @@ namespace Coop.Core.Server.Connections.States;
 /// </summary>
 public class MissionState : ConnectionStateBase
 {
-    public MissionState(IConnectionLogic connectionLogic)
+    private readonly IMessageBroker messageBroker;
+
+    public MissionState(IConnectionLogic connectionLogic, IMessageBroker messageBroker)
         : base(connectionLogic)
     {
-        ConnectionLogic.MessageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerTransitionsCampaignHandler);
+        this.messageBroker = messageBroker;
+        messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerTransitionsCampaignHandler);
     }
 
     public override void Dispose()
     {
-        ConnectionLogic.MessageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerTransitionsCampaignHandler);
+        messageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerTransitionsCampaignHandler);
     }
 
     internal void PlayerTransitionsCampaignHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
@@ -42,7 +45,7 @@ public class MissionState : ConnectionStateBase
 
     public override void EnterCampaign()
     {
-        ConnectionLogic.State = new CampaignState(ConnectionLogic);
+        ConnectionLogic.SetState<CampaignState>();
     }
 
     public override void EnterMission()
