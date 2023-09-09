@@ -9,13 +9,11 @@ namespace GameInterface.Services.Heroes.Messages;
 public record RegisterNewPlayerHero : ICommand
 {
     public NetPeer SendingPeer { get; }
-    public string ControllerId { get; }
     public byte[] Bytes { get; }
 
-    public RegisterNewPlayerHero(NetPeer sendingPeer, string controllerId, byte[] bytes)
+    public RegisterNewPlayerHero(NetPeer sendingPeer, byte[] bytes)
     {
         SendingPeer = sendingPeer;
-        ControllerId = controllerId;
         Bytes = bytes;
     }
 }

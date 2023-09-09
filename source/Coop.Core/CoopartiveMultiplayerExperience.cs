@@ -62,7 +62,7 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ServerModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().InstancePerLifetimeScope();
+            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
             _container = builder.Build();
 
             containerProvider.SetProvider(_container);
@@ -80,7 +80,7 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ClientModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().InstancePerLifetimeScope();
+            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
             _container = builder.Build();
 
             containerProvider.SetProvider(_container);

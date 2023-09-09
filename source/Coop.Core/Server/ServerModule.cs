@@ -27,8 +27,8 @@ public class ServerModule : Module
         builder.RegisterType<InitialServerState>().As<IServerState>();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
 
-        RegisterAllTypesWithInterface<IHandler>(builder);
-        RegisterAllTypesWithInterface<IPacketHandler>(builder);
+        RegisterAllTypesWithInterface<IHandler>(builder, autoInstantiate: true);
+        RegisterAllTypesWithInterface<IPacketHandler>(builder, autoInstantiate: true);
 
         RegisterAllTypesWithInterface<IServerState>(builder);
 
@@ -37,11 +37,16 @@ public class ServerModule : Module
         base.Load(builder);
     }
 
-    private void RegisterAllTypesWithInterface<TInterface>(ContainerBuilder builder)
+    private void RegisterAllTypesWithInterface<TInterface>(ContainerBuilder builder, bool autoInstantiate = false)
     {
         foreach (var handlerType in TypeCollector.Collect<ServerModule, TInterface>())
         {
-            builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            var handlerBuilder = builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope();
+
+            if (autoInstantiate)
+            {
+                handlerBuilder.AutoActivate();
+            }
         }
     }
 }

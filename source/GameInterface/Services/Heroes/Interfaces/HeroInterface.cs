@@ -65,6 +65,7 @@ internal class HeroInterface : IHeroInterface
         blocking: true);
 
         var playerData = new NewPlayerData() {
+            HeroData = bytes,
             HeroStringId = hero.StringId,
             PartyStringId = hero.PartyBelongedTo.StringId,
             CharacterObjectStringId = hero.CharacterObject.StringId,

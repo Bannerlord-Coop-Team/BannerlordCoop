@@ -17,22 +17,27 @@ public class ClientModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
-        builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
-        builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().SingleInstance();
+        builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().SingleInstance();
 
-        RegisterAllTypesWithInterface<IHandler>(builder);
-        RegisterAllTypesWithInterface<IPacketHandler>(builder);
+        RegisterAllTypesWithInterface<IHandler>(builder, autoInstantiate: true);
+        RegisterAllTypesWithInterface<IPacketHandler>(builder, autoInstantiate: true);
 
         RegisterAllTypesWithInterface<IClientState>(builder);
 
         base.Load(builder);
     }
 
-    private void RegisterAllTypesWithInterface<TInterface>(ContainerBuilder builder)
+    private void RegisterAllTypesWithInterface<TInterface>(ContainerBuilder builder, bool autoInstantiate = false)
     {
         foreach (var handlerType in TypeCollector.Collect<ClientModule, TInterface>())
         {
-            builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope().AutoActivate();
+            var handlerBuilder = builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope();
+
+            if (autoInstantiate)
+            {
+                handlerBuilder.AutoActivate();
+            }
         }
     }
 }

@@ -16,6 +16,7 @@ public record NetworkPlayerData : IEvent
 
         if (playerData == null) return;
 
+        HeroData = playerData.HeroData;
         HeroStringId = playerData.HeroStringId;
         PartyStringId = playerData.PartyStringId;
         CharacterObjectStringId = playerData.CharacterObjectStringId;
@@ -23,6 +24,7 @@ public record NetworkPlayerData : IEvent
     }
     [ProtoMember(1)]
     public string PlayerId { get; }
+    
     [ProtoMember(2)]
     public string HeroStringId { get; }
     [ProtoMember(3)]
@@ -31,4 +33,6 @@ public record NetworkPlayerData : IEvent
     public string CharacterObjectStringId { get; }
     [ProtoMember(5)]
     public string ClanStringId { get; }
+    [ProtoMember(6)]
+    public byte[] HeroData { get; }
 }

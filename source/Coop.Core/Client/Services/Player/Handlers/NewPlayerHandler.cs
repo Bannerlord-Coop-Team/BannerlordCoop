@@ -11,12 +11,10 @@ namespace Coop.Core.Client.Services.Player.Handlers;
 internal class NewPlayerHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
-    private readonly IControllerIdProvider controllerIdProvider;
 
-    public NewPlayerHandler(IMessageBroker messageBroker, IControllerIdProvider controllerIdProvider)
+    public NewPlayerHandler(IMessageBroker messageBroker)
     {
         this.messageBroker = messageBroker;
-        this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<NetworkNewPlayerData>(Handle);
     }
 
@@ -29,8 +27,7 @@ internal class NewPlayerHandler : IHandler
     {
         byte[] heroData = obj.What.HeroData;
         var peer = obj.Who as NetPeer;
-        var controllerId = controllerIdProvider.ControllerId;
 
-        messageBroker.Publish(this, new RegisterNewPlayerHero(peer, controllerId, heroData));
+        messageBroker.Publish(this, new RegisterNewPlayerHero(peer, heroData));
     }
 }
