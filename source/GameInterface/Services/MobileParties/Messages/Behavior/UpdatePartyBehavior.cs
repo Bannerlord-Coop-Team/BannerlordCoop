@@ -18,5 +18,4 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior
             BehaviorUpdateData = behaviorUpdateData;
         }
     }
-
 }

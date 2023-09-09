@@ -9,6 +9,9 @@ using Coop.Core.Server.Services.Save;
 using Coop.IntegrationTests.Environment.Instance;
 using Common.PacketHandlers;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Interfaces;
+using Coop.Core.Server.Services.MobileParties.PacketHandlers;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -43,7 +46,9 @@ internal class TestEnvironment
 
     private EnvironmentInstance CreateClient()
     {
-        var handlerTypes = HandlerCollector.Collect<ClientModule>();
+        var handlerTypes = TypeCollector.Collect<ClientModule, IHandler>();
+        handlerTypes = handlerTypes.Concat(TypeCollector.Collect<ClientModule, IPacketHandler>());
+
         var serviceCollection = new ServiceCollection();
 
         AddSharedDependencies(serviceCollection);
@@ -53,12 +58,10 @@ internal class TestEnvironment
             serviceCollection.AddScoped(handlerType);
         }
 
-        
-
         serviceCollection.AddScoped<MockClient>();
         serviceCollection.AddScoped<INetwork, MockClient>(x => x.GetService<MockClient>()!);
         serviceCollection.AddScoped<ICoopClient, MockClient>(x => x.GetService<MockClient>()!);
-        
+
 
         serviceCollection.AddScoped<ClientInstance>();
 
@@ -78,7 +81,9 @@ internal class TestEnvironment
 
     private EnvironmentInstance CreateServer()
     {
-        var handlerTypes = HandlerCollector.Collect<ServerModule>();
+        var handlerTypes = TypeCollector.Collect<ServerModule, IHandler>();
+        handlerTypes = handlerTypes.Concat(TypeCollector.Collect<ServerModule, IPacketHandler>());
+
         var serviceCollection = new ServiceCollection();
 
         AddSharedDependencies(serviceCollection);
@@ -116,6 +121,8 @@ internal class TestEnvironment
         services.AddScoped<IPacketManager, PacketManager>();
         services.AddScoped<IObjectManager, MockObjectManager>();
         services.AddScoped<ICoopSaveManager, CoopSaveManager>();
+        services.AddScoped<IControllerIdProvider, ControllerIdProvider>();
+        services.AddScoped<IControlledEntityRegistry, MockControlledEntityRegistry>();
 
         return services;
     }

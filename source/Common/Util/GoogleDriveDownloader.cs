@@ -7,6 +7,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
+#if DEBUG
 namespace Common.Util
 {
     // TODO remove before release
@@ -338,3 +339,4 @@ namespace Common.Util
         }
     }
 }
+#endif

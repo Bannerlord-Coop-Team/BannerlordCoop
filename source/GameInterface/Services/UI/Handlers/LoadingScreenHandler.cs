@@ -31,7 +31,7 @@ internal class LoadingScreenHandler : IHandler
         GameLoopRunner.RunOnMainThread(() =>
         {
             LoadingWindow.EnableGlobalLoadingWindow();
-        }, bBlocking: false);
+        }, blocking: false);
     }
 
     private void Handle(MessagePayload<EndLoadingScreen> obj)
@@ -39,6 +39,6 @@ internal class LoadingScreenHandler : IHandler
         GameLoopRunner.RunOnMainThread(() =>
         {
             LoadingWindow.DisableGlobalLoadingWindow();
-        }, bBlocking: false);
+        }, blocking: false);
     }
 }

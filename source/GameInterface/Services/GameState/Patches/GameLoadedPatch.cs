@@ -6,17 +6,17 @@ using SandBox;
 using SandBox.View.Map;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.GameState.Patches;
 
-[HarmonyPatch(typeof(Campaign))]
+[HarmonyPatch(typeof(MBGameManager))]
 internal class GameLoadedPatch
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<SandBoxGameManager>();
-
     [HarmonyPostfix]
-    [HarmonyPatch("OnSessionStart")]
-    static void OnGameLoaded(ref MapScreen __instance)
+    [HarmonyPatch("OnAfterGameInitializationFinished")]
+    static void OnGameLoaded(ref MBGameManager __instance)
     {
         MessageBroker.Instance.Publish(__instance, new CampaignReady());
     }

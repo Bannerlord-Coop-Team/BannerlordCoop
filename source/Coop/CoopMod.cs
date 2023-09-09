@@ -1,14 +1,11 @@
 ﻿using Common;
 using Common.Logging;
-using Common.Serialization;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
 using Coop.UI;
-using GameInterface;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -25,10 +22,6 @@ namespace Coop
 {
     internal class CoopMod : NoHarmonyLoader
     {
-        // Test Symbols
-        public static readonly bool TESTING_ENABLED = true;
-        // -------------
-
         public static UpdateableList Updateables { get; } = new UpdateableList();
 
         public static CoopartiveMultiplayerExperience Coop = new CoopartiveMultiplayerExperience();
@@ -104,9 +97,7 @@ namespace Coop
             Updateables.Add(GameLoopRunner.Instance);
             Updateables.Add(Coop);
 
-            Harmony harmony = new Harmony("com.TaleWorlds.MountAndBlade.Bannerlord.Coop");
-            // Apply all patches via harmony
-            harmony.PatchAll(typeof(GameInterface.GameInterface).Assembly);
+            
 
             // Skip startup splash screen
 #if DEBUG
@@ -196,19 +187,14 @@ namespace Coop
             Serilog.Log.CloseAndFlush();
         }
 
-        internal static bool DisableIntroVideo = true;
-
-        internal static bool EnableTalkToOtherLordsInAnArmy = true;
-
-        internal static bool RecordFirstChanceExceptions = true;
-
-        internal static bool DontGroupThirdPartyMenuOptions = true;
-
-        internal static bool QuartermasterIsClanWide = true;
-
         internal static void JoinWindow()
         {
             ScreenManager.PushScreen(ViewCreatorManager.CreateScreenView<CoopConnectionUI>());
+        }
+
+        public override void OnAfterGameInitializationFinished(Game game, object starterObject)
+        {
+            base.OnAfterGameInitializationFinished(game, starterObject);
         }
     }
 }

@@ -19,22 +19,23 @@ internal class MobilePartyControlHandler : IHandler
     private readonly IMobilePartyInterface partyInterface;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IObjectManager objectManager;
-
+    private readonly IControllerIdProvider controllerIdProvider;
     private bool controlPartiesByDefault = false;
 
-    private Guid ownerId => controlledEntityRegistry.InstanceOwnerId;
+    private string ownerId => controllerIdProvider.ControllerId;
 
     public MobilePartyControlHandler(
         IMessageBroker messageBroker, 
         IMobilePartyInterface partyInterface, 
         IControlledEntityRegistry controlledEntityRegistry,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        IControllerIdProvider controllerIdProvider)
     {
         this.messageBroker = messageBroker;
         this.partyInterface = partyInterface;
         this.controlledEntityRegistry = controlledEntityRegistry;
         this.objectManager = objectManager;
-
+        this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Subscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
         messageBroker.Subscribe<MobilePartyCreated>(Handle_MobilePartyCreated);
@@ -58,18 +59,23 @@ internal class MobilePartyControlHandler : IHandler
     private void Handle_UpdateMobilePartyControl(MessagePayload<UpdateMobilePartyControl> obj)
     {
         string partyId = obj.What.PartyId;
+        var controllerId = obj.What.ControllerId;
 
         if (obj.What.IsRevocation == false)
         {
-            controlledEntityRegistry.RegisterAsControlled(ownerId, partyId);
-            return;
+            controlledEntityRegistry.RegisterAsControlled(controllerId, partyId);
+            messageBroker.Publish(this, new RegisterPartyController(controllerId, partyId));
         }
-
-        controlledEntityRegistry.RemoveAsControlled(new ControlledEntity(ownerId, partyId));
+        else
+        {
+            controlledEntityRegistry.RemoveAsControlled(new ControlledEntity(controllerId, partyId));
+            messageBroker.Publish(this, new RemovePartyController(controllerId, partyId));
+        }
 
         if (ModInformation.IsServer && objectManager.TryGetObject(partyId, out MobileParty party))
         {
-            party.Ai.SetDoNotMakeNewDecisions(true);
+            bool aiDisabled = obj.What.IsRevocation ? false : true;
+            party.Ai.SetDoNotMakeNewDecisions(aiDisabled);
         }
     }
 

@@ -15,11 +15,11 @@ public class TransferSaveState : ConnectionStateBase
     private IMessageBroker messageBroker;
     private INetwork network;
 
-    public TransferSaveState(IConnectionLogic connectionLogic)
+    public TransferSaveState(IConnectionLogic connectionLogic, IMessageBroker messageBroker, INetwork network)
         : base(connectionLogic)
     {
-        network = ConnectionLogic.Network;
-        messageBroker = ConnectionLogic.MessageBroker;
+        this.network = network;
+        this.messageBroker = messageBroker;
 
         messageBroker.Subscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
 
@@ -63,7 +63,7 @@ public class TransferSaveState : ConnectionStateBase
 
     public override void Load()
     {
-        ConnectionLogic.State = new LoadingState(ConnectionLogic);
+        ConnectionLogic.SetState<LoadingState>();
     }
 
     public override void TransferSave()

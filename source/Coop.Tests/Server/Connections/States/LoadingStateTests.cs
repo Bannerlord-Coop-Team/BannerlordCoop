@@ -1,52 +1,47 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
-using GameInterface.Services.Heroes.Messages;
+using Coop.Tests.Mocks;
 using LiteNetLib;
 using System.Linq;
-using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Connections.States
 {
-    public class LoadingStateTests : CoopTest
+    public class LoadingStateTests
     {
         private readonly IConnectionLogic connectionLogic;
         private readonly NetPeer playerPeer;
         private readonly NetPeer differentPeer;
+        private readonly ServerTestComponent serverComponent;
 
-        public LoadingStateTests(ITestOutputHelper output) : base(output)
+        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => serverComponent.MockNetwork;
+
+        public LoadingStateTests(ITestOutputHelper output)
         {
-            playerPeer = MockNetwork.CreatePeer();
-            differentPeer = MockNetwork.CreatePeer();
+            serverComponent = new ServerTestComponent(output);
 
-            connectionLogic = new ConnectionLogic(playerPeer, MockMessageBroker, MockNetwork);
+            var container = serverComponent.Container;
+
+            var network = container.Resolve<MockNetwork>();
+
+            playerPeer = network.CreatePeer();
+            differentPeer = network.CreatePeer();
+            connectionLogic = container.Resolve<ConnectionLogic>(new NamedParameter("playerId", playerPeer));
+
             differentPeer.SetId(playerPeer.Id + 1);
-        }
-
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            // Arrange
-            connectionLogic.State = new CampaignState(connectionLogic);
-
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            connectionLogic.State.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void EnterCampaignMethod_TransitionState_CampaignState()
         {
             // Arrange
-            connectionLogic.State = new LoadingState(connectionLogic);
+            connectionLogic.SetState<LoadingState>();
 
             // Act
             connectionLogic.EnterCampaign();
@@ -59,7 +54,7 @@ namespace Coop.Tests.Server.Connections.States
         public void UnusedStatesMethods_DoNothing()
         {
             // Arrange
-            connectionLogic.State = new LoadingState(connectionLogic);
+            connectionLogic.SetState<LoadingState>();
 
             // Act
             connectionLogic.CreateCharacter();
@@ -75,8 +70,7 @@ namespace Coop.Tests.Server.Connections.States
         public void PlayerCampaignEntered_ValidPlayerId()
         {
             // Arrange
-            var currentState = new LoadingState(connectionLogic);
-            connectionLogic.State = currentState;
+            var currentState = connectionLogic.SetState<LoadingState>();
 
             // Act
             var payload = new MessagePayload<NetworkPlayerCampaignEntered>(
@@ -95,8 +89,7 @@ namespace Coop.Tests.Server.Connections.States
         public void PlayerCampaignEntered_InvalidPlayerId()
         {
             // Arrange
-            var currentState = new LoadingState(connectionLogic);
-            connectionLogic.State = currentState;
+            var currentState = connectionLogic.SetState<LoadingState>();
 
             // Act
             var payload = new MessagePayload<NetworkPlayerCampaignEntered>(

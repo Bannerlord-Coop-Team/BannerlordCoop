@@ -18,7 +18,7 @@ static class PartyDecisionMakingPatch
 {
     [HarmonyPrefix]
     [HarmonyPatch(nameof(MobilePartyAi.DoNotMakeNewDecisions), MethodType.Getter)]
-    static bool PrefixDoNotMakeNewDecisionsGetter(MobilePartyAi __instance, ref bool __result)
+    static bool PrefixDoNotMakeNewDecisionsGetter(ref bool __result)
     {
         if (ModInformation.IsClient)
         {
@@ -28,17 +28,6 @@ static class PartyDecisionMakingPatch
         }
 
         return true;
-    }
-
-    [HarmonyPrefix]
-    [HarmonyPatch("TickInternal")]
-    static bool PrefixTickInternal(ref MobilePartyAi __instance)
-    {
-        // Allow tick for controlled parties.
-        if (__instance.IsControlled())
-            return true;
-
-        return false;
     }
 
     [HarmonyPrefix]

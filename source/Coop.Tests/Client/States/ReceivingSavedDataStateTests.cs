@@ -1,37 +1,30 @@
-﻿using Coop.Core.Client;
+﻿using Autofac;
+using Common.Messaging;
+using Coop.Core.Client;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
-using GameInterface.Services.Heroes.Data;
-using Moq;
+using Coop.Tests.Mocks;
+using GameInterface.Services.GameState.Messages;
 using System;
-using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;
-using GameInterface.Services.GameState.Messages;
-using Common.Messaging;
 
 namespace Coop.Tests.Client.States
 {
-    public class ReceivingSavedDataStateTests : CoopTest
+    public class ReceivingSavedDataStateTests
     {
         private readonly IClientLogic clientLogic;
-        public ReceivingSavedDataStateTests(ITestOutputHelper output) : base(output)
+        private readonly ClientTestComponent clientComponent;
+
+        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => clientComponent.MockNetwork;
+
+        public ReceivingSavedDataStateTests(ITestOutputHelper output)
         {
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
-        }
+            clientComponent = new ClientTestComponent(output);
+            var container = clientComponent.Container;
 
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            // Arrange
-            clientLogic.State = new ReceivingSavedDataState(clientLogic);
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            clientLogic.State.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
+            clientLogic = container.Resolve<IClientLogic>()!;
         }
 
         [Fact]

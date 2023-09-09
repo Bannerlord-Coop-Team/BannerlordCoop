@@ -9,15 +9,19 @@ namespace Coop.Core.Server.Connections.States;
 /// </summary>
 public class LoadingState : ConnectionStateBase
 {
-    public LoadingState(IConnectionLogic connectionLogic)
+    private readonly IMessageBroker messageBroker;
+
+    public LoadingState(IConnectionLogic connectionLogic, IMessageBroker messageBroker)
         : base(connectionLogic)
     {
-        ConnectionLogic.MessageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
+        this.messageBroker = messageBroker;
+
+        messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
     }
 
     public override void Dispose()
     {
-        ConnectionLogic.MessageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
+        messageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
     }
 
     internal void PlayerCampaignEnteredHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
@@ -27,7 +31,7 @@ public class LoadingState : ConnectionStateBase
         if (playerId == ConnectionLogic.Peer)
         {
             ConnectionLogic.EnterCampaign();
-            ConnectionLogic.MessageBroker.Publish(this, new PlayerCampaignEntered());
+            messageBroker.Publish(this, new PlayerCampaignEntered());
         }
     }
 
@@ -45,7 +49,7 @@ public class LoadingState : ConnectionStateBase
 
     public override void EnterCampaign()
     {
-        ConnectionLogic.State = new CampaignState(ConnectionLogic);
+        ConnectionLogic.SetState<CampaignState>();
     }
 
     public override void EnterMission()

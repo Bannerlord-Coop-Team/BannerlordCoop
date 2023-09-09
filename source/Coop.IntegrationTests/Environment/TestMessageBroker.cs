@@ -16,21 +16,21 @@ internal class TestMessageBroker : IMessageBroker
         _subscribers = new Dictionary<Type, List<WeakDelegate>>();
     }
 
-    public virtual IEnumerable<Task> Publish<T>(object source, T message) where T : IMessage
+    public virtual void Publish<T>(object source, T message) where T : IMessage
     {
         Messages.Add(message);
 
         if (message == null)
-            return Array.Empty<Task>();
+            return;
 
         Type messageType = message.GetType();
         if (!_subscribers.ContainsKey(messageType))
         {
-            return Array.Empty<Task>();
+            return;
         }
 
         var delegates = _subscribers[messageType];
-        if (delegates == null || delegates.Count == 0) return Array.Empty<Task>();
+        if (delegates == null || delegates.Count == 0) return;
 
         Type t = typeof(MessagePayload<>).MakeGenericType(messageType);
 
@@ -49,9 +49,6 @@ internal class TestMessageBroker : IMessageBroker
 
             weakDelegate.Invoke(new object[] { payload });
         }
-
-        // TODO maybe implement?? not needed atm since this only runs as synchronous
-        return Array.Empty<Task>();
     }
 
     public void Respond<T>(object target, T message) where T : IResponse

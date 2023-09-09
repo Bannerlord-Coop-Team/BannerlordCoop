@@ -1,10 +1,8 @@
 ﻿// Ignore Spelling: Guids
 
 using Common.Messaging;
-using ProtoBuf;
-using System.Collections.Generic;
-using System;
 using GameInterface.Services.Heroes.Data;
+using ProtoBuf;
 
 namespace Coop.Core.Client.Messages
 {
