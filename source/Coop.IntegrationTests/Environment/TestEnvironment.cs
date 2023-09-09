@@ -1,17 +1,15 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.PacketHandlers;
 using Coop.Core.Client;
 using Coop.Core.Common;
 using Coop.Core.Server;
-using Coop.IntegrationTests.Environment.Mock;
-using Microsoft.Extensions.DependencyInjection;
 using Coop.Core.Server.Services.Save;
 using Coop.IntegrationTests.Environment.Instance;
-using Common.PacketHandlers;
-using GameInterface.Services.ObjectManager;
+using Coop.IntegrationTests.Environment.Mock;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Heroes.Interfaces;
-using Coop.Core.Server.Services.MobileParties.PacketHandlers;
+using GameInterface.Services.ObjectManager;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Coop.IntegrationTests.Environment;
 
