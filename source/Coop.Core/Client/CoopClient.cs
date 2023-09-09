@@ -111,12 +111,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         netManager.Start();
         
-#if DEBUG
-        string server = "bannerlordcoop.duckdns.org";
-        serverPeer = netManager.Connect(server, Configuration.Port, Configuration.Token);
-#else
         serverPeer = netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
-#endif
     }
 
     public override void Stop()
