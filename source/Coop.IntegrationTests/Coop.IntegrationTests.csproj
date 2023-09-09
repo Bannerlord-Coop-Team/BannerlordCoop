@@ -27,4 +27,10 @@
     <ProjectReference Include="..\Coop.Core\Coop.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="TaleWorlds.CampaignSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>
