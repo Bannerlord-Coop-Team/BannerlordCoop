@@ -41,12 +41,16 @@ namespace GameInterface.Services.UI.Patches
             // Finds the index where disableMethod is called
             int idx = instrs.FindIndex(instr => instr.opcode == OpCodes.Callvirt && instr.operand as MethodInfo == disableMethod);
 
+            if (idx < 0) return instructions;
+
             instrs.RemoveRange(idx - preOffset, callOffset);
 
             var enableMethod = typeof(GameStateManager).GetMethod(nameof(GameStateManager.UnregisterActiveStateDisableRequest));
 
             // Finds the index where enableMethod is called
             idx = instrs.FindIndex(instr => instr.opcode == OpCodes.Callvirt && instr.operand as MethodInfo == enableMethod);
+
+            if (idx < 0) return instructions;
 
             instrs.RemoveRange(idx - preOffset, callOffset);
 
