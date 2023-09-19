@@ -14,7 +14,7 @@ internal class MainPartyInterface : IMainPartyInterface
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
-            if(MobileParty.MainParty != null)
+            if(MobileParty.MainParty?.ActualClan != null)
             {
                 MobileParty.MainParty.RemoveParty();
             }
