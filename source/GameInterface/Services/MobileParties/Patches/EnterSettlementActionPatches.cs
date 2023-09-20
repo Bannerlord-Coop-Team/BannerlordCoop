@@ -21,11 +21,6 @@ namespace GameInterface.Services.MobileParties.Patches
         {
             if (mobileParty.IsAllowed()) return true;
 
-            if (mobileParty.StringId == null)
-            {
-                ;
-            }
-
             var message = new PartyEnterSettlementAttempted(settlement.StringId, mobileParty.StringId);
             MessageBroker.Instance.Publish(mobileParty, message);
 

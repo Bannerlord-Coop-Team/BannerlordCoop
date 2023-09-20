@@ -9,6 +9,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches;
@@ -20,9 +21,13 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(MobilePartyAi))]
 static class PartyBehaviorPatch
 {
-    static readonly Func<MobilePartyAi, bool> DefaultBehaviorNeedsUpdate = typeof(MobilePartyAi)
+    static readonly Func<MobilePartyAi, bool> get_DefaultBehaviorNeedsUpdate = typeof(MobilePartyAi)
         .GetField("DefaultBehaviorNeedsUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
         .BuildUntypedGetter<MobilePartyAi, bool>();
+
+    static readonly Func<MobilePartyAi, MobileParty> _mobileParty = typeof(MobilePartyAi)
+        .GetField("_mobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildUntypedGetter<MobilePartyAi, MobileParty>();
 
     /// <summary>
     /// This prevents the tick method being called without the need for an update
@@ -33,7 +38,7 @@ static class PartyBehaviorPatch
     private static bool TickPrefix(ref MobilePartyAi __instance)
     {
         // Allows ticking if default behavior needs update
-        return DefaultBehaviorNeedsUpdate(__instance);
+        return get_DefaultBehaviorNeedsUpdate(__instance);
     }
 
     [HarmonyPrefix]
@@ -67,9 +72,36 @@ static class PartyBehaviorPatch
     public static void SetAiBehavior(
         MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint)
     {
+        DefaultBehavior(partyAi, newBehavior);
+
+        var mobileParty = _mobileParty(partyAi);
+
+        if (typeof(Settlement).IsAssignableFrom(targetMapEntity?.GetType()))
+        {
+            TargetSettlement(mobileParty, (Settlement)targetMapEntity);
+            TargetParty(mobileParty, null);
+        }
+
+        else if (typeof(MobileParty).IsAssignableFrom(targetMapEntity?.GetType()))
+        {
+            TargetSettlement(mobileParty, null);
+            TargetParty(mobileParty, (MobileParty)targetMapEntity);
+        }
+
+        TargetPosition(mobileParty, targetPoint);
+
         SetShortTermBehavior(partyAi, newBehavior, targetMapEntity);
         SetBehaviorTarget(partyAi, targetPoint);
         UpdateBehavior(partyAi);
+
+        if (ModInformation.IsServer)
+        {
+            ;
+        }
+        else
+        {
+            ;
+        }
     }
 
     static readonly Action<MobilePartyAi, AiBehavior, IMapEntity> SetShortTermBehavior = typeof(MobilePartyAi)
@@ -83,4 +115,20 @@ static class PartyBehaviorPatch
     static readonly Action<MobilePartyAi> UpdateBehavior = typeof(MobilePartyAi)
         .GetMethod("UpdateBehavior", BindingFlags.Instance | BindingFlags.NonPublic)
         .BuildDelegate<Action<MobilePartyAi>>();
+
+    static readonly Action<MobilePartyAi, AiBehavior> DefaultBehavior = typeof(MobilePartyAi)
+        .GetProperty(nameof(MobilePartyAi.DefaultBehavior)).GetSetMethod(true)
+        .BuildDelegate<Action<MobilePartyAi, AiBehavior>>();
+
+    static readonly Action<MobileParty, Settlement> TargetSettlement = typeof(MobileParty)
+        .GetProperty(nameof(MobileParty.TargetSettlement)).GetSetMethod(true)
+        .BuildDelegate<Action<MobileParty, Settlement>>();
+
+    static readonly Action<MobileParty, MobileParty> TargetParty = typeof(MobileParty)
+        .GetProperty(nameof(MobileParty.TargetParty)).GetSetMethod(true)
+        .BuildDelegate<Action<MobileParty, MobileParty>>();
+
+    static readonly Action<MobileParty, Vec2> TargetPosition = typeof(MobileParty)
+        .GetProperty(nameof(MobileParty.TargetPosition)).GetSetMethod(true)
+        .BuildDelegate < Action <MobileParty, Vec2>>();
 }

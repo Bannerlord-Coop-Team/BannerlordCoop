@@ -139,7 +139,15 @@ internal class HeroInterface : IHeroInterface
 
     private void SetupNewParty(Hero hero)
     {
-        hero.PartyBelongedTo.IsVisible = true;
-        hero.PartyBelongedTo.Party.Visuals.SetMapIconAsDirty();
+        var party = hero.PartyBelongedTo;
+        party.IsVisible = true;
+        party.Party.Visuals.SetMapIconAsDirty();
+
+        typeof(MobileParty).GetMethod("RecoverPositionsForNavMeshUpdate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party, null);
+        typeof(MobileParty).GetProperty("CurrentNavigationFace").SetValue(
+            party,
+            Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D));
+
+        typeof(MobilePartyAi).GetMethod("OnGameInitialized", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party.Ai, null);
     }
 }
