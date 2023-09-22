@@ -10,7 +10,6 @@ namespace GameInterface.Services.LoadingScreen.Handlers;
 /// Handler for the CoopLoadingScreen
 /// </summary>
 /// <remarks>
-/// Don't create any instances.
 /// To show the loading screen, just use 
 /// MessageBroker.Instance.Publish(this, new ShowLoadingScreen()); 
 /// To hide it, use
