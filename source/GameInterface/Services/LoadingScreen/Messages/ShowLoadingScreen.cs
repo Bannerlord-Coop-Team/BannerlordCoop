@@ -4,13 +4,8 @@ using GameInterface.Services.LoadingScreen.Handlers;
 namespace GameInterface.Services.LoadingScreen.Messages;
 
 /// <summary>
-/// ShowLoadingScreen to publish with broker
+/// Displays the loading screen
 /// </summary>
-public class ShowLoadingScreen : ICommand
+public record ShowLoadingScreen : ICommand
 {
-    //The game's loading screen controls are too unstable, this is the only way I got it to work after trying many different approaches.
-    public ShowLoadingScreen()
-    {
-        var loadingScreenHandler = new CoopLoadingScreenHandler(MessageBroker.Instance);
-    }
 }

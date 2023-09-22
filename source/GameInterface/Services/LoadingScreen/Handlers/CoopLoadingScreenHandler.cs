@@ -31,14 +31,13 @@ public class CoopLoadingScreenHandler : IHandler
 
     private void Handle(MessagePayload<ShowLoadingScreen> payload)
     {
+        loadingScreen.Initialize();
         loadingScreen.EnableLoadingWindow();
-        this.Dispose(); //This is necessary to prevent creation of multiple gauntlet layers
     }
 
     private void Handle(MessagePayload<HideLoadingScreen> payload)
     {
         loadingScreen.DisableLoadingWindow();
-        this.Dispose(); //This is necessary to prevent creation of multiple gauntlet layers
     }
 
     public void Dispose()

@@ -17,6 +17,8 @@ public interface ICoopLoadingScreen
     void EnableLoadingWindow();
 
     void DisableLoadingWindow();
+
+    void Initialize();
 }
 
 /// <summary>
@@ -24,28 +26,39 @@ public interface ICoopLoadingScreen
 /// </summary>
 internal class CoopLoadingScreen : GlobalLayer, ICoopLoadingScreen
 {
-
     private static CoopLoadingScreen _instance;
 
-    
-    private CoopLoadingScreen()
+    private GauntletLayer _gauntletLayer;
+
+    private CoopLoadingWindowVM _loadingWindowViewModel;
+
+    private SpriteCategory _sploadingCategory;
+
+    private SpriteCategory _mpLoadingCategory;
+
+    private SpriteCategory _mpBackgroundCategory;
+
+    private bool _isMultiplayer;
+
+    private bool _isInitialized = false;
+
+    private bool _isActive = false;
+
+    void ICoopLoadingScreen.EnableLoadingWindow()
     {
-        this._sploadingCategory = UIResourceManager.SpriteData.SpriteCategories["ui_loading"];
-        this._sploadingCategory.InitializePartialLoad();
-        this._loadingWindowViewModel = new CoopLoadingWindowVM(new Action<bool, int>(this.HandleSPPartialLoading));
-        this._loadingWindowViewModel.Enabled = false;
-        this._loadingWindowViewModel.SetTotalGenericImageCount(this._sploadingCategory.SpriteSheetCount);
-        bool shouldClear = true;
-        this._gauntletLayer = new GauntletLayer(100003, "GauntletLayer", shouldClear);
-        this._gauntletLayer.LoadMovie("LoadingWindow", this._loadingWindowViewModel);
-        base.Layer = this._gauntletLayer;
+        if (!_isActive)
+        {
+            this._loadingWindowViewModel.Enabled = true;
+            ScreenManager.AddGlobalLayer(this, false);
+            _isActive = true;
+        }
     }
 
     public static CoopLoadingScreen Instance
     {
         get
         {
-            if (_instance == null)
+            if(_instance == null)
             {
                 _instance = new CoopLoadingScreen();
             }
@@ -53,17 +66,31 @@ internal class CoopLoadingScreen : GlobalLayer, ICoopLoadingScreen
         }
     }
 
-    void ICoopLoadingScreen.EnableLoadingWindow()
-    {
-        this._loadingWindowViewModel.Enabled = true;
-        ScreenManager.AddGlobalLayer(this, false);
-    }
-
     void ICoopLoadingScreen.DisableLoadingWindow()
     {
-        this._loadingWindowViewModel.Enabled = false;
-        ScreenManager.RemoveGlobalLayer(this);
-        
+        if (_isActive)
+        {
+            this._loadingWindowViewModel.Enabled = false;
+            ScreenManager.RemoveGlobalLayer(this);
+            _isActive = false;
+        }
+    }
+
+    public void Initialize()
+    {
+        if (!_isInitialized)
+        {
+            this._sploadingCategory = UIResourceManager.SpriteData.SpriteCategories["ui_loading"];
+            this._sploadingCategory.InitializePartialLoad();
+            this._loadingWindowViewModel = new CoopLoadingWindowVM(new Action<bool, int>(this.HandleSPPartialLoading));
+            this._loadingWindowViewModel.Enabled = false;
+            this._loadingWindowViewModel.SetTotalGenericImageCount(this._sploadingCategory.SpriteSheetCount);
+            bool shouldClear = true;
+            this._gauntletLayer = new GauntletLayer(100003, "GauntletLayer", shouldClear);
+            this._gauntletLayer.LoadMovie("LoadingWindow", this._loadingWindowViewModel);
+            base.Layer = this._gauntletLayer;
+            _isInitialized = true;
+        }
     }
 
     public void SetCurrentModeIsMultiplayer(bool isMultiplayer)
@@ -108,18 +135,6 @@ internal class CoopLoadingScreen : GlobalLayer, ICoopLoadingScreen
             return;
         }
     }
-
-    private GauntletLayer _gauntletLayer;
-
-    private CoopLoadingWindowVM _loadingWindowViewModel;
-
-    private SpriteCategory _sploadingCategory;
-
-    private SpriteCategory _mpLoadingCategory;
-
-    private SpriteCategory _mpBackgroundCategory;
-
-    private bool _isMultiplayer;
 }
 
 public class CoopLoadingWindowVM : ViewModel
