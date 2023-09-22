@@ -8,23 +8,10 @@ using TaleWorlds.ScreenSystem;
 using TaleWorlds.TwoDimension;
 
 namespace GameInterface.Services.LoadingScreen.Interfaces;
-
-/// <summary>
-/// Interface for CoopLoadingScreen
-/// </summary>
-public interface ICoopLoadingScreen
-{ 
-    void EnableLoadingWindow();
-
-    void DisableLoadingWindow();
-
-    void Initialize();
-}
-
 /// <summary>
 /// Class to create and destroy loading screen
 /// </summary>
-internal class CoopLoadingScreen : GlobalLayer, ICoopLoadingScreen
+internal class CoopLoadingScreen : GlobalLayer
 {
     private static CoopLoadingScreen _instance;
 
@@ -44,7 +31,7 @@ internal class CoopLoadingScreen : GlobalLayer, ICoopLoadingScreen
 
     private bool _isActive = false;
 
-    void ICoopLoadingScreen.EnableLoadingWindow()
+    public void EnableLoadingWindow()
     {
         if (!_isActive)
         {
@@ -66,7 +53,7 @@ internal class CoopLoadingScreen : GlobalLayer, ICoopLoadingScreen
         }
     }
 
-    void ICoopLoadingScreen.DisableLoadingWindow()
+    public void DisableLoadingWindow()
     {
         if (_isActive)
         {

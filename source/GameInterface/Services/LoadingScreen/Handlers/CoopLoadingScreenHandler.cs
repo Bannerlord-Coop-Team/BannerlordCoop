@@ -17,7 +17,7 @@ namespace GameInterface.Services.LoadingScreen.Handlers;
 /// </remarks>
 public class CoopLoadingScreenHandler : IHandler
 {
-    private readonly ICoopLoadingScreen loadingScreen = CoopLoadingScreen.Instance;
+    private readonly CoopLoadingScreen loadingScreen = CoopLoadingScreen.Instance;
     private readonly IMessageBroker messageBroker;
 
     public CoopLoadingScreenHandler(IMessageBroker messageBroker)
