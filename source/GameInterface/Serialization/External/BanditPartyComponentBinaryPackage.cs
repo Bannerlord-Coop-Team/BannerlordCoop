@@ -26,15 +26,23 @@ namespace GameInterface.Serialization.External
         {
             base.UnpackFields();
 
-            // Resolves _warPartyComponentsCache for Kingdom
-            Kingdom kingdom = Object.Clan.Kingdom;
-            if (kingdom != null)
+            try
             {
-                List<WarPartyComponent> kingdomComponents = (List<WarPartyComponent>)KingdomBinaryPackage.Kingdom_WarPartyComponents.GetValue(kingdom);
-                if (kingdomComponents.Contains(Object) == false)
+                Kingdom kingdom = Object.Clan.Kingdom;
+                // Resolves _warPartyComponentsCache for Kingdom
+
+                if (kingdom != null)
                 {
-                    kingdomComponents.Add(Object);
+                    List<WarPartyComponent> kingdomComponents = (List<WarPartyComponent>)KingdomBinaryPackage.Kingdom_WarPartyComponents.GetValue(kingdom);
+                    if (kingdomComponents.Contains(Object) == false)
+                    {
+                        kingdomComponents.Add(Object);
+                    }
                 }
+            }
+            catch (NullReferenceException)
+            {
+                return;
             }
         }
     }

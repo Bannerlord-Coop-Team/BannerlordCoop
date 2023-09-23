@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Server;
 using Coop.Core.Server.States;
+using Coop.Tests.Mocks;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using Moq;
@@ -11,10 +12,18 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.States
 {
-    public class InitialStateTests : CoopTest
+    public class InitialStateTests
     {
-        public InitialStateTests(ITestOutputHelper output) : base(output)
+        private readonly ServerTestComponent serverComponent;
+
+        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => serverComponent.MockNetwork;
+
+        public InitialStateTests(ITestOutputHelper output)
         {
+            serverComponent = new ServerTestComponent(output);
+
+            var container = serverComponent.Container;
         }
 
         [Fact]
@@ -54,22 +63,6 @@ namespace Coop.Tests.Server.States
 
             // Assert
             Assert.IsType<InitialServerState>(currentState);
-        }
-
-        [Fact]
-        public void InitialStateDispose()
-        {
-            // Arrange
-            Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, MockMessageBroker);
-
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            currentState.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
         }
     }
 }

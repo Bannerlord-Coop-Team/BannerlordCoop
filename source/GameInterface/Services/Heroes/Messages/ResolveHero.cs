@@ -3,14 +3,12 @@ using System;
 
 namespace GameInterface.Services.Heroes.Messages;
 
-public readonly struct ResolveHero : ICommand
+public record ResolveHero : ICommand
 {
-    public Guid TransactionID { get; }
     public string PlayerId { get; }
 
-    public ResolveHero(Guid transactionId, string playerId)
+    public ResolveHero(string playerId)
     {
-        TransactionID = transactionId;
         PlayerId = playerId;
     }
 }

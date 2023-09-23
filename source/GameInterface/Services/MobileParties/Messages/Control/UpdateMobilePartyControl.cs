@@ -7,6 +7,7 @@ namespace GameInterface.Services.MobileParties.Messages.Control
     /// </summary>
     public record UpdateMobilePartyControl : ICommand
     {
+        public string ControllerId { get; }
         public string PartyId { get; }
 
         /// <summary>
@@ -15,8 +16,9 @@ namespace GameInterface.Services.MobileParties.Messages.Control
         public bool IsRevocation { get; }
 
         /// <param name="isRevocation">Indicates whether control is being revoked (true) or granted (false).</param>
-        public UpdateMobilePartyControl(string partyId, bool isRevocation = false)
+        public UpdateMobilePartyControl(string controllerId, string partyId, bool isRevocation = false)
         {
+            ControllerId = controllerId;
             PartyId = partyId;
             IsRevocation = isRevocation;
         }

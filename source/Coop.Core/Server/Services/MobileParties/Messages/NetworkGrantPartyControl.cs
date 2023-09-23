@@ -10,10 +10,13 @@ namespace Coop.Core.Server.Services.MobileParties.Messages;
 public record NetworkGrantPartyControl : ICommand
 {
     [ProtoMember(1)]
+    public string ControllerId { get; }
+    [ProtoMember(2)]
     public string PartyId;
 
-    public NetworkGrantPartyControl(string partyId)
+    public NetworkGrantPartyControl(string controllerId, string partyId)
     {
+        ControllerId = controllerId;
         PartyId = partyId;
     }
 }

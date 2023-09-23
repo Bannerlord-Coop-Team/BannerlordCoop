@@ -11,7 +11,7 @@ namespace Coop.Core.Server.Services.MobileParties.Packets;
 [ProtoContract(SkipConstructor = true)]
 public record RequestMobilePartyBehaviorPacket : IPacket
 {
-    public PacketType PacketType => PacketType.RequestMobilePartyBehavior;
+    public PacketType PacketType => PacketType.RequestUpdatePartyBehavior;
     public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableUnordered;
     [ProtoMember(1)]
     public PartyBehaviorUpdateData BehaviorUpdateData { get; }

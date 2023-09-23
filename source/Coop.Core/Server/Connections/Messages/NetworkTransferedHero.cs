@@ -10,10 +10,14 @@ namespace Coop.Core.Server.Connections.Messages;
 public record NetworkTransferedHero : IEvent
 {
     [ProtoMember(1)]
+    public string PlayerId { get; }
+
+    [ProtoMember(2)]
     public byte[] PlayerHero { get; }
 
-    public NetworkTransferedHero(byte[] playerHero)
+    public NetworkTransferedHero(string playerId, byte[] playerHero)
     {
+        PlayerId = playerId;
         PlayerHero = playerHero;
     }
 }

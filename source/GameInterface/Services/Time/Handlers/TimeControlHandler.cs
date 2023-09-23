@@ -37,6 +37,7 @@ internal class TimeControlHandler : IHandler
     private void Handle(MessagePayload<EnableGameTimeControls> obj)
     {
         timeControlInterface.EnableTimeControls();
+        messageBroker.Publish(this, new GameTimeControlsEnabled());
     }
 
     private void Handle(MessagePayload<SetTimeControlMode> obj)

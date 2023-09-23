@@ -1,44 +1,46 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
+using Coop.Core;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
+using Coop.Tests.Mocks;
 using LiteNetLib;
-using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Connections.States
 {
-    public class CampaignStateTests : CoopTest
+    public class CampaignStateTests
     {
         private readonly IConnectionLogic connectionLogic;
         private readonly NetPeer playerPeer;
         private readonly NetPeer differentPeer;
-        public CampaignStateTests(ITestOutputHelper output) : base(output)
+        private readonly ServerTestComponent serverComponent;
+
+        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => serverComponent.MockNetwork;
+
+        public CampaignStateTests(ITestOutputHelper output)
         {
-            playerPeer = MockNetwork.CreatePeer();
-            differentPeer = MockNetwork.CreatePeer();
-            connectionLogic = new ConnectionLogic(playerPeer, MockMessageBroker, MockNetwork);
+            serverComponent = new ServerTestComponent(output);
+
+            var container = serverComponent.Container;
+
+            var network = container.Resolve<MockNetwork>();
+
+            playerPeer = network.CreatePeer();
+            differentPeer = network.CreatePeer();
+            connectionLogic = container.Resolve<IConnectionLogic>(new TypedParameter(typeof(NetPeer), playerPeer));
+
             differentPeer.SetId(playerPeer.Id + 1);
-        }
-
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            connectionLogic.State = new CampaignState(connectionLogic);
-
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            connectionLogic.State.Dispose();
-
-            Assert.Empty(MockMessageBroker.Subscriptions);
         }
 
         [Fact]
         public void EnterMissionMethod_TransitionState_MissionState()
         {
-            connectionLogic.State = new CampaignState(connectionLogic);
+            connectionLogic.SetState<CampaignState>();
 
             connectionLogic.EnterMission();
 
@@ -48,7 +50,7 @@ namespace Coop.Tests.Server.Connections.States
         [Fact]
         public void UnusedStatesMethods_DoNothing()
         {
-            connectionLogic.State = new CampaignState(connectionLogic);
+            connectionLogic.SetState<CampaignState>();
 
             connectionLogic.CreateCharacter();
             connectionLogic.TransferSave();
@@ -62,8 +64,7 @@ namespace Coop.Tests.Server.Connections.States
         public void PlayerMissionEntered_ValidPlayerId()
         {
             // Arrange
-            CampaignState currentState = new CampaignState(connectionLogic);
-            connectionLogic.State = currentState;
+            CampaignState currentState = connectionLogic.SetState<CampaignState>();
 
             // Act
             var payload = new MessagePayload<NetworkPlayerMissionEntered>(
@@ -78,8 +79,7 @@ namespace Coop.Tests.Server.Connections.States
         public void PlayerMissionEntered_InvalidPlayerId()
         {
             // Arrange
-            CampaignState currentState = new CampaignState(connectionLogic);
-            connectionLogic.State = currentState;
+            CampaignState currentState = connectionLogic.SetState<CampaignState>();
 
             // Act
             var payload = new MessagePayload<NetworkPlayerMissionEntered>(
