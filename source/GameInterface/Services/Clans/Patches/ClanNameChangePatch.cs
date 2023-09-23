@@ -25,6 +25,7 @@ namespace GameInterface.Services.Clans.Patches
         }
         public static void RunOriginalChangeClanName(Clan clan, TextObject name, TextObject informalName)
         {
+            if (clan == null) return;
             Clan_Name_Setter(clan, name);
         }
     }
