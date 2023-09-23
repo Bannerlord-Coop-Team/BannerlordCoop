@@ -2,7 +2,10 @@
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Client.States;
+using GameInterface.Services.Entity;
+using HarmonyLib;
 using Serilog;
 
 namespace Coop.Core.Client;
@@ -23,6 +26,9 @@ public interface IClientLogic : ILogic, IClientState
     INetwork Network { get; }
     IMessageBroker MessageBroker { get; }
     string ControlledHeroId { get; set; }
+
+    IControllerIdProvider ControllerIdProvider { get; }
+    IDeferredHeroRepository DeferredHeroRepository { get; }
 }
 
 /// <inheritdoc cref="IClientLogic"/>
@@ -31,6 +37,8 @@ public class ClientLogic : IClientLogic
     private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
     public INetwork Network { get; }
     public IMessageBroker MessageBroker { get; }
+    public IControllerIdProvider ControllerIdProvider { get; }
+    public IDeferredHeroRepository DeferredHeroRepository { get; }
     public string ControlledHeroId { get; set; }
     public IClientState State 
     {
@@ -46,10 +54,16 @@ public class ClientLogic : IClientLogic
 
     private IClientState _state;
 
-    public ClientLogic(INetwork network, IMessageBroker messageBroker)
+    public ClientLogic(
+        INetwork network,
+        IMessageBroker messageBroker,
+        IControllerIdProvider controllerIdProvider,
+        IDeferredHeroRepository deferredHeroRepo)
     {
         Network = network;
         MessageBroker = messageBroker;
+        ControllerIdProvider = controllerIdProvider;
+        DeferredHeroRepository = deferredHeroRepo;
         State = new MainMenuState(this);
     }
 

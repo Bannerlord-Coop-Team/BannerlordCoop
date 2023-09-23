@@ -28,7 +28,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coop", "Coop\Coop.csproj", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientDebug", "ClientDebug\ClientDebug.csproj", "{470498AB-91E4-419A-9E59-5E9E97264D99}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Coop.IntegrationTests", "Coop.IntegrationTests\Coop.IntegrationTests.csproj", "{DF3D47B3-487A-48AE-A10B-FDCE9D46D782}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coop.IntegrationTests", "Coop.IntegrationTests\Coop.IntegrationTests.csproj", "{DF3D47B3-487A-48AE-A10B-FDCE9D46D782}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientDebug2", "ClientDebug 2\ClientDebug2.csproj", "{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -126,6 +128,14 @@ Global
 		{DF3D47B3-487A-48AE-A10B-FDCE9D46D782}.Release|Any CPU.Build.0 = Release|Any CPU
 		{DF3D47B3-487A-48AE-A10B-FDCE9D46D782}.Release|x64.ActiveCfg = Release|Any CPU
 		{DF3D47B3-487A-48AE-A10B-FDCE9D46D782}.Release|x64.Build.0 = Release|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Debug|x64.Build.0 = Debug|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Release|x64.ActiveCfg = Release|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

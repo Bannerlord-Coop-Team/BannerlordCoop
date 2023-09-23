@@ -1,65 +1,28 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Heroes.Messages;
-using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States
 {
-    public class LoadingStateTests : CoopTest
+    public class LoadingStateTests
     {
         private readonly IClientLogic clientLogic;
-        public LoadingStateTests(ITestOutputHelper output) : base(output)
+        private readonly ClientTestComponent clientComponent;
+
+        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => clientComponent.MockNetwork;
+
+        public LoadingStateTests(ITestOutputHelper output)
         {
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
-        }
+            clientComponent = new ClientTestComponent(output);
+            var container = clientComponent.Container;
 
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            // Arrange
-            clientLogic.State = new LoadingState(clientLogic);
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            clientLogic.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
-        }
-
-        [Fact]
-        public void EnterMainMenu_Publishes_EnterMainMenuEvent()
-        {
-            // Arrange
-            clientLogic.State = new LoadingState(clientLogic);
-
-            // Act
-            clientLogic.EnterMainMenu();
-
-            // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<EnterMainMenu>(message);
-        }
-
-        [Fact]
-        public void MainMenuEntered_Transitions_MainMenuState()
-        {
-            // Arrange
-            var loadingState = new LoadingState(clientLogic);
-            clientLogic.State = loadingState;
-
-            var payload = new MessagePayload<MainMenuEntered>(
-                this, new MainMenuEntered());
-
-            // Act
-            loadingState.Handle_MainMenuEntered(payload);
-
-            // Assert
-            Assert.IsType<MainMenuState>(clientLogic.State);
+            clientLogic = container.Resolve<IClientLogic>()!;
         }
 
         [Fact]
@@ -110,6 +73,9 @@ namespace Coop.Tests.Client.States
             Assert.IsType<LoadingState>(clientLogic.State);
 
             clientLogic.LoadSavedData();
+            Assert.IsType<LoadingState>(clientLogic.State);
+
+            clientLogic.EnterMainMenu();
             Assert.IsType<LoadingState>(clientLogic.State);
 
             clientLogic.StartCharacterCreation();

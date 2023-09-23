@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Core.Client.States;
 
@@ -11,23 +12,16 @@ public class LoadingState : ClientStateBase
     public LoadingState(IClientLogic logic) : base(logic)
     {
         Logic.MessageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
-        Logic.MessageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     public override void Dispose()
     {
         Logic.MessageBroker.Unsubscribe<CampaignReady>(Handle_CampaignLoaded);
-        Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     public override void EnterMainMenu()
     {
         Logic.MessageBroker.Publish(this, new EnterMainMenu());
-    }
-
-    internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
-    {
-        Logic.State = new MainMenuState(Logic);
     }
 
     internal void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
@@ -59,6 +53,8 @@ public class LoadingState : ClientStateBase
     public override void EnterCampaignState()
     {
         Logic.State = new CampaignState(Logic);
+
+        Logic.MessageBroker.Publish(this, new RegisterAllGameObjects());
     }
 
     public override void EnterMissionState()

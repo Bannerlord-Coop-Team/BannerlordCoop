@@ -1,6 +1,8 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
+using Coop.Core.Client.Services.MobileParties.Messages;
 using GameInterface.Services.GameState.Messages;
+using LiteNetLib;
 
 namespace Coop.Core.Client.States;
 
@@ -10,17 +12,18 @@ namespace Coop.Core.Client.States;
 public class ReceivingSavedDataState : ClientStateBase
 {
     private NetworkGameSaveDataReceived saveDataMessage = default;
-
     public ReceivingSavedDataState(IClientLogic logic) : base(logic)
     {
         Logic.MessageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         Logic.MessageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        Logic.MessageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
     }
 
     public override void Dispose()
     {
         Logic.MessageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        Logic.MessageBroker.Unsubscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
     }
 
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
@@ -31,7 +34,7 @@ public class ReceivingSavedDataState : ClientStateBase
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
-        var saveData = saveDataMessage.GameSaveData;
+        var saveData = saveDataMessage?.GameSaveData;
 
         if (saveData == null) return;
         if (saveData.Length == 0) return;
@@ -40,6 +43,12 @@ public class ReceivingSavedDataState : ClientStateBase
         Logic.MessageBroker.Publish(this, commandLoad);
 
         Logic.LoadSavedData();
+    }
+
+    private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
+    {
+        var peer = (NetPeer)obj.Who;
+        Logic.DeferredHeroRepository.AddDeferredHero(peer, obj.What.PlayerId, obj.What.PlayerHero);
     }
 
     public override void EnterMainMenu()

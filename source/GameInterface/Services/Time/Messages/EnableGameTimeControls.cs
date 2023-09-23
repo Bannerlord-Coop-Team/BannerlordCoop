@@ -6,3 +6,7 @@ namespace GameInterface.Services.Heroes.Messages;
 public record EnableGameTimeControls : ICommand
 {
 }
+
+public record GameTimeControlsEnabled : IEvent
+{
+}

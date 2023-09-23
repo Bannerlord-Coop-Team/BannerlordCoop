@@ -13,10 +13,11 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class MobilePartyBinaryPackage : BinaryPackageBase<MobileParty>
     {
-        public static readonly PropertyInfo MobileParty_Scout = typeof(MobileParty).GetProperty("Scout", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly PropertyInfo MobileParty_Engineer = typeof(MobileParty).GetProperty("Engineer", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly PropertyInfo MobileParty_Quartermaster = typeof(MobileParty).GetProperty("Quartermaster", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly PropertyInfo MobileParty_Surgeon = typeof(MobileParty).GetProperty("Surgeon", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static PropertyInfo MobileParty_Scout => typeof(MobileParty).GetProperty("Scout", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static PropertyInfo MobileParty_Engineer => typeof(MobileParty).GetProperty("Engineer", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static PropertyInfo MobileParty_Quartermaster => typeof(MobileParty).GetProperty("Quartermaster", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static PropertyInfo MobileParty_Surgeon => typeof(MobileParty).GetProperty("Surgeon", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static MethodInfo MobileParty_OnFinishLoadState => typeof(MobileParty).GetMethod("OnFinishLoadState", BindingFlags.Instance | BindingFlags.NonPublic);
 
         private string stringId = string.Empty;
 
@@ -76,17 +77,16 @@ namespace GameInterface.Serialization.External
         }
 
 
-        private static readonly MethodInfo MobileParty_InitCached = typeof(MobileParty).GetMethod("InitCached", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static MethodInfo MobileParty_InitCached => typeof(MobileParty).GetMethod("InitCached", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
-            MobileParty mobileParty = ResolveId<MobileParty>(stringId);
-            if(mobileParty != null)
+            if(string.IsNullOrEmpty(stringId) == false)
             {
-                Object = mobileParty;
+                Object = ResolveId<MobileParty>(stringId);
                 return;
             }
 
-            MobileParty_InitCached.Invoke(Object, new object[0]);
+            MobileParty_InitCached.Invoke(Object, Array.Empty<string>());
 
             base.UnpackFields();
 
@@ -94,6 +94,9 @@ namespace GameInterface.Serialization.External
             MobileParty_Engineer     .SetValue(Object, ResolveId<Hero>(engineerId));
             MobileParty_Quartermaster.SetValue(Object, ResolveId<Hero>(quartermasterId));
             MobileParty_Surgeon      .SetValue(Object, ResolveId<Hero>(surgeonId));
+
+
+            MobileParty_OnFinishLoadState.Invoke(Object, Array.Empty<string>());
         }
     }
 }

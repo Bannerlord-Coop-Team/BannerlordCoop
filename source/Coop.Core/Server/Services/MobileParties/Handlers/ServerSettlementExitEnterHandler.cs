@@ -66,7 +66,7 @@ public class ServerSettlementExitEnterHandler : IHandler
         // slightly differently from ai or other clients parties
         network.Send(peer, new NetworkEndSettlementEncounter());
 
-        var networkMessage = new NetworkSettlementLeave(payload.PartyId);
+        var networkMessage = new NetworkPartyLeaveSettlement(payload.PartyId);
 
         network.SendAllBut(peer, networkMessage);
 

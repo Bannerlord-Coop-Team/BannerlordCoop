@@ -2,7 +2,6 @@
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
-using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 
@@ -18,13 +17,20 @@ public class ValidateModuleState : ClientStateBase
     public ValidateModuleState(IClientLogic logic) : base(logic)
     {
         messageBroker = logic.MessageBroker;
-        network = logic.Network;
+        network = logic.Network; 
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
 
-        network.SendAll(new NetworkClientValidate(DebugHeroInterface.Player1_Id));
+#if DEBUG
+        logic.ControllerIdProvider.SetControllerFromProgramArgs();
+#else
+        logic.ControllerIdProvider.SetControllerAsPlatformId();
+#endif
+
+
+        network.SendAll(new NetworkClientValidate(logic.ControllerIdProvider.ControllerId));
     }
 
     public override void Dispose()
