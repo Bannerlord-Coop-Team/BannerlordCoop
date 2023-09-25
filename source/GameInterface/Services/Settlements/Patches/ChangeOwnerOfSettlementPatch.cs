@@ -29,7 +29,7 @@ namespace GameInterface.Services.Settlements.Patches
             if (AllowedInstance.IsAllowed(settlement)) return true;
 
             MessageBroker.Instance.Publish(settlement, 
-                new LocalSettlementOwnershipChange(settlement.StringId, newOwner.StringId, capturerHero.StringId, Convert.ToInt32(detail)));
+                new LocalSettlementOwnershipChange(settlement.StringId, newOwner?.StringId, capturerHero?.StringId, Convert.ToInt32(detail)));
 
             return false;
         }
