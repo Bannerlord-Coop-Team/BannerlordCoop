@@ -46,7 +46,7 @@ namespace GameInterface.Services.Settlements.Handlers
                 return;
             }
 
-            if (objectManager.TryGetObject(payload.CapturerId, out Hero capturer) == false)
+            if (objectManager.TryGetObject(payload.CapturerId, out Hero capturer) == false && payload.CapturerId != null)
             {
                 return;
             }
