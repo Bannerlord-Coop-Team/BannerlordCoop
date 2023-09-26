@@ -3,6 +3,7 @@ using Common.Logging;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
 using Coop.UI;
+using Coop.UI.LoadGameUI;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -97,7 +98,7 @@ namespace Coop
             Updateables.Add(GameLoopRunner.Instance);
             Updateables.Add(Coop);
 
-            
+
 
             // Skip startup splash screen
 #if DEBUG
@@ -105,20 +106,16 @@ namespace Coop
                                 "_splashScreenPlayed",
                                 BindingFlags.Instance | BindingFlags.NonPublic)
                             .SetValue(Module.CurrentModule, true);
-#else
-            //ScreenManager.PushScreen(
-            //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-            //        new object[] { }));
 #endif
             #region ButtonAssignment
-            CoopCampaign =
-                new InitialStateOption(
+
+#if DEBUG
+            CoopCampaign = new InitialStateOption(
                     "CoOp Campaign",
                     new TextObject(isServer ? "Host Co-op Campaign" : "Join Co-op Campaign"),
                     9990,
                     () =>
                     {
-#if DEBUG
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
                         if (isServer)
@@ -129,15 +126,23 @@ namespace Coop
                         {
                             Coop.StartAsClient();
                         }
-#else
-                        //ScreenManager.PushScreen(
-                        //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                        //        new object[] { }));
-#endif
                     },
-
                     () => { return (false, new TextObject()); }
                 );
+#else
+            CoopCampaign = new InitialStateOption(
+                    "CoOp Campaign",
+                    new TextObject("Host Co-op Campaign"),
+                    9990,
+                    () =>
+                    {
+                        ScreenManager.PushScreen(
+                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                                new object[] { }));
+                    },
+                    () => { return (false, new TextObject()); }
+                );
+#endif
 
             Module.CurrentModule.AddInitialStateOption(CoopCampaign);
 

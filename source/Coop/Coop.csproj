@@ -142,6 +142,7 @@
     <Reference Include="TaleWorlds.GauntletUI.Data">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.Data.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.InputSystem, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null" />
     <Reference Include="TaleWorlds.Library">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
     </Reference>
@@ -162,6 +163,10 @@
     </Reference>
     <Reference Include="TaleWorlds.ScreenSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.TwoDimension, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>

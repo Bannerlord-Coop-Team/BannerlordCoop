@@ -1,0 +1,24 @@
+<Tasks>
+    <CreateItem/>
+    <UpdateItem>
+        <ModuleFolder Value="D:\Mod Development\BannerlordCoop\mb2\Modules\Coop"/>
+        <!-- A direct path of your module -->
+        <ItemDescription Value="Coop Pre-Alpha 0.1"/>
+        <!-- A description that will be displayed on Steam Workshop, can be edited via the Steam UI -->
+        <Tags> 
+            <!-- You can use the following tags: -->
+            <!-- Type: Graphical Enhancement, Map Pack, Partial Conversion, Sound, Total Conversion, Troops, UI, Utility, Weapons and Armour -->
+            <!-- Setting: Native, Antiquity, Dark Ages, Medieval, Musket Era, Modern, Sci-Fi, Fantasy, Oriental, Apocalypse, Other -->
+            <!-- Game Mode: Singleplayer, Multiplayer -->
+            <!-- Compatible Version: e1.9.0, v1.0.0,... The currently available versions can be found at the Steam Workshop "Browse by Tag" section -->
+            <Tag Value="Partial Conversion" />
+            <Tag Value="Native" />
+            <Tag Value="Singleplayer" />
+            <Tag Value="v1.1.6" />
+        </Tags>
+        <Image Value="C:\Users\My\Downloads\mystic_knight_stick_figure_by_wrpigeek_dvg1be-fullview.jpg"/>
+        <!-- Determines the featured image displayed on Steam Workshop, a direct path to it must be inserted here (the image should be smaller than 1 MB) -->
+        <Visibility Value="Private"/>
+        <!-- Determines visibility on Steam Workshop. Can be: Public, FriendsOnly, Private -->
+    </UpdateItem>
+</Tasks>
