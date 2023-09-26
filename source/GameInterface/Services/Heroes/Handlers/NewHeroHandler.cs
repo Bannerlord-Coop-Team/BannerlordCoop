@@ -2,9 +2,9 @@
 using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -14,14 +14,15 @@ internal class NewHeroHandler : IHandler
 
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
-
+    private readonly IObjectManager objectManager;
     public NewHeroHandler(
         IHeroInterface heroInterface,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        IObjectManager objectManager)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
-
+        this.objectManager = objectManager;
         messageBroker.Subscribe<PackageMainHero>(Handle);
         messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
     }
@@ -48,20 +49,21 @@ internal class NewHeroHandler : IHandler
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
     {
         byte[] bytes = obj.What.Bytes;
+        var sendingPeer = obj.What.SendingPeer;
 
         try
         {
-            Hero hero = heroInterface.UnpackMainHero(bytes);
+            var playerData = heroInterface.UnpackHero(bytes);
 
-            Logger.Information("New Hero ID: {id}", hero.Id.InternalValue);
+            Logger.Debug("New Hero ID: {id}", playerData.HeroStringId);
 
-            var registerMessage = new NewPlayerHeroRegistered(hero);
+            var registerMessage = new NewPlayerHeroRegistered(sendingPeer, playerData);
 
             messageBroker.Respond(obj.Who, registerMessage);
         }
-        catch(Exception e)
+        catch (Exception e)
         {
-            Logger.Error("Error while unpacking new Hero: {error}", e.Message);
+            Logger.Error("Error while unpacking new Hero: {error}", e);
         }
     }
 }

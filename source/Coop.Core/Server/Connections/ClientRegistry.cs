@@ -23,30 +23,35 @@ public class ClientRegistry : IClientRegistry
 {
     internal IDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new Dictionary<NetPeer, IConnectionLogic>();
 
-    private readonly IMessageBroker _messageBroker;
-    private readonly INetwork _network;
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+    private readonly IConnectionLogicFactory connectionLogicFactory;
 
-    public ClientRegistry(IMessageBroker messageBroker, INetwork network)
+    public ClientRegistry(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IConnectionLogicFactory connectionLogicFactory)
     {
-        _messageBroker = messageBroker;
-        _network = network;
-        _messageBroker.Subscribe<PlayerConnected>(PlayerJoiningHandler);
-        _messageBroker.Subscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
-        _messageBroker.Subscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
+        this.messageBroker = messageBroker;
+        this.network = network;
+        this.connectionLogicFactory = connectionLogicFactory;
+        this.messageBroker.Subscribe<PlayerConnected>(PlayerJoiningHandler);
+        this.messageBroker.Subscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
+        this.messageBroker.Subscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
     }
 
     public void Dispose()
     {
-        _messageBroker.Unsubscribe<PlayerConnected>(PlayerJoiningHandler);
-        _messageBroker.Unsubscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
-        _messageBroker.Unsubscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
+        messageBroker.Unsubscribe<PlayerConnected>(PlayerJoiningHandler);
+        messageBroker.Unsubscribe<PlayerDisconnected>(PlayerDisconnectedHandler);
+        messageBroker.Unsubscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
     }
 
     internal void PlayerJoiningHandler(MessagePayload<PlayerConnected> obj)
     {
-        var playerId = obj.What.PlayerId;
-        var connectionLogic = new ConnectionLogic(playerId, _messageBroker, _network);
-        ConnectionStates.Add(playerId, connectionLogic);
+        var playerPeer = obj.What.PlayerPeer;
+        var connectionLogic = connectionLogicFactory.CreateLogic(playerPeer);
+        ConnectionStates.Add(playerPeer, connectionLogic);
     }
 
     internal void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)
@@ -75,7 +80,7 @@ public class ClientRegistry : IClientRegistry
         // Only re-enable if all connections are finished loading
         if (ConnectionStates.Any(state => loadingStates.Contains(state.Value.State.GetType()))) return;
 
-        _network.SendAll(new NetworkEnableTimeControls());
-        _messageBroker.Publish(this, new EnableGameTimeControls());
+        network.SendAll(new NetworkEnableTimeControls());
+        messageBroker.Publish(this, new EnableGameTimeControls());
     }
 }

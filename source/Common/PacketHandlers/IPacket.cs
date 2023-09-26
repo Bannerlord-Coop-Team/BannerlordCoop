@@ -10,9 +10,10 @@ namespace Common.PacketHandlers
         Example,
         Test,
         Movement,
-        RequestMobilePartyBehavior,
+        RequestMobilePartyMovement,
+        UpdateMobilePartyMovement,
+        RequestUpdatePartyBehavior,
         UpdatePartyBehavior,
-
     }
 
     public interface IPacket

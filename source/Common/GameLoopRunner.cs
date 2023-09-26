@@ -48,7 +48,7 @@ namespace Common
         }
         public int Priority { get; } = UpdatePriority.MainLoop.GameLoopRunner;
 
-        public static void RunOnMainThread(Action action, bool bBlocking = false)
+        public static void RunOnMainThread(Action action, bool blocking = false)
         {
             if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
             {
@@ -56,7 +56,7 @@ namespace Common
             }
             else
             {
-                EventWaitHandle ewh = bBlocking ?
+                EventWaitHandle ewh = blocking ?
                     new EventWaitHandle(false, EventResetMode.ManualReset) :
                     null;
                 lock (Instance.m_QueueLock)

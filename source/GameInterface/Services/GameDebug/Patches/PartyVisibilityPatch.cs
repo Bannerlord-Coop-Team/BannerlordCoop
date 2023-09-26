@@ -32,11 +32,15 @@ namespace GameInterface.Services.GameDebug.Patches
             return false;
         }
 
-        [HarmonyPrefix]
+        [HarmonyPostfix]
         [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Getter)]
-        private static bool IsVisibleGetter()
+        private static void IsVisibleGetter(ref bool __result)
         {
-            return AllPartiesVisible == false;
+            if (AllPartiesVisible)
+            {
+                __result = true;
+                return;
+            }
         }
     }
 }

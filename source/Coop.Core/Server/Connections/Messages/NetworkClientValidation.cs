@@ -1,5 +1,7 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using ProtoBuf;
+using Serilog;
 
 namespace Coop.Core.Server.Connections.Messages;
 
@@ -11,11 +13,18 @@ namespace Coop.Core.Server.Connections.Messages;
 [ProtoContract(SkipConstructor = true)]
 public record NetworkClientValidate : ICommand
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<NetworkClientValidate>();
+
     [ProtoMember(1)]
     public string PlayerId { get; }
 
     public NetworkClientValidate(string playerId)
     {
+        if (string.IsNullOrEmpty(playerId))
+        {
+            Logger.Error("Controller Id was not set properly before validation has started");
+        }
+
         PlayerId = playerId;
     }
 }

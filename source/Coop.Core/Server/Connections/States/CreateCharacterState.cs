@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
@@ -17,11 +18,14 @@ public class CreateCharacterState : ConnectionStateBase
 
     private IMessageBroker messageBroker;
     private INetwork network;
-    public CreateCharacterState(IConnectionLogic connectionLogic)
+    public CreateCharacterState(
+        IConnectionLogic connectionLogic,
+        IMessageBroker messageBroker,
+        INetwork network)
         : base(connectionLogic)
     {
-        messageBroker = connectionLogic.MessageBroker;
-        network = connectionLogic.Network;
+        this.messageBroker = messageBroker;
+        this.network = network;
 
         messageBroker.Subscribe<NetworkTransferedHero>(PlayerTransferedHeroHandler);
         messageBroker.Subscribe<NewPlayerHeroRegistered>(PlayerHeroRegisteredHandler);
@@ -34,12 +38,22 @@ public class CreateCharacterState : ConnectionStateBase
     }
     internal void PlayerTransferedHeroHandler(MessagePayload<NetworkTransferedHero> obj)
     {
-        var registerCommand = new RegisterNewPlayerHero(obj.What.PlayerHero);
+        var netPeer = obj.Who as NetPeer;
+
+        if (netPeer != ConnectionLogic.Peer) return;
+
+        var controllerId = obj.What.PlayerId;
+        var data = obj.What.PlayerHero;
+        var registerCommand = new RegisterNewPlayerHero(netPeer, data);
         messageBroker.Publish(this, registerCommand);
+
+        var forwardMessage = new NetworkNewPartyCreated(controllerId, data);
+
+        network.SendAllBut(netPeer, forwardMessage);
     }
     internal void PlayerHeroRegisteredHandler(MessagePayload<NewPlayerHeroRegistered> obj)
     {
-        var sendingPeer = (NetPeer)obj.Who;
+        var sendingPeer = obj.What.SendingPeer;
         if (sendingPeer != ConnectionLogic.Peer) return;
 
         NetworkPlayerData playerData = new NetworkPlayerData(obj.What);
@@ -47,8 +61,9 @@ public class CreateCharacterState : ConnectionStateBase
         var peer = ConnectionLogic.Peer;
         network.Send(peer, playerData);
 
-        ConnectionLogic.HeroStringId = obj.What.HeroStringId;
-        Logger.Information("Hero StringId: {stringId}", obj.What.HeroStringId);
+        var newPlayerData = obj.What.NewPlayerData;
+
+        Logger.Information("Hero StringId: {stringId}", newPlayerData?.HeroStringId);
         ConnectionLogic.TransferSave();
     }
 
@@ -70,6 +85,6 @@ public class CreateCharacterState : ConnectionStateBase
 
     public override void TransferSave()
     {
-        ConnectionLogic.State = new TransferSaveState(ConnectionLogic);
+        ConnectionLogic.SetState<TransferSaveState>();
     }
 }

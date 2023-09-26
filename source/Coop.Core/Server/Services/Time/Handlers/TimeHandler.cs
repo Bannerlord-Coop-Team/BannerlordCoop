@@ -38,6 +38,7 @@ public class TimeHandler : IHandler
         Logger.Verbose("Server changing time to {mode} from client", newMode);
 
         _messageBroker.Publish(this, new SetTimeControlMode(newMode));
+        _network.SendAll(new NetworkTimeSpeedChanged(newMode));
     }
 
     internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChanged> obj)

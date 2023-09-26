@@ -43,8 +43,9 @@ namespace GameInterface.Services.GameDebug.Interfaces
         {
             Logger.Information("Downloading save file to: {savePath}", FullSavePath);
 
-            GoogleDriveDownloader saveDownloader = new GoogleDriveDownloader();
-            saveDownloader.DownloadFile("https://drive.google.com/file/d/10lZ8E7JdbOMuh29PZggsoCU_-blAs6wd/view?usp=share_link", FullSavePath);
+            WebDownloader webDownloader = new WebDownloader();
+            // TODO maybe uncomment for debugging
+            //webDownloader.DownloadFile("https://coop.theodor.dev/MP.sav", FullSavePath);
 
             Logger.Information("Downloaded save file.");
 

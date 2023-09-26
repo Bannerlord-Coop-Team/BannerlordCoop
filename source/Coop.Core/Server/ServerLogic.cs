@@ -27,6 +27,7 @@ public interface IServerLogic : ILogic, IServerState
 public class ServerLogic : IServerLogic
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ServerLogic>();
+    private readonly IStateFactory stateFactory;
 
     public IServerState State
     {
@@ -41,24 +42,21 @@ public class ServerLogic : IServerLogic
     }
     private IServerState _state;
 
-    public IMessageBroker MessageBroker { get; }
-
     public INetwork Network { get; }
 
-    public ServerLogic(IMessageBroker messageBroker, INetwork networkServer)
+    
+
+    public ServerLogic(INetwork network, IStateFactory stateFactory)
     {
-        State = new InitialServerState(this, messageBroker);
-        MessageBroker = messageBroker;
-        Network = networkServer;
+        Network = network;
+        this.stateFactory = stateFactory;
     }
 
-    public void Dispose()
-    {
-        State.Dispose();
-    }
+    public void Dispose() => State.Dispose();
 
     public void Start()
     {
+        State = stateFactory.CreateServerState<InitialServerState>();
         State.Start();
     }
 

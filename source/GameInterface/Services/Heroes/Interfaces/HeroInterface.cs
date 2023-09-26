@@ -1,23 +1,32 @@
-﻿using Common.Logging;
-using Common.Messaging;
+﻿using Common;
+using Common.Extensions;
+using Common.Logging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
-using GameInterface.Services.GameDebug.Messages;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Registry;
 using Serilog;
+using System;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
-internal interface IHeroInterface : IGameAbstraction
+public interface IHeroInterface : IGameAbstraction
 {
     byte[] PackageMainHero();
-    void ResolveHero(ResolveHero message);
+    bool TryResolveHero(string controllerId, out string heroId);
     void SwitchMainHero(string heroId);
-    Hero UnpackMainHero(byte[] bytes);
+    /// <summary>
+    /// Unpacks and properly constructs hero in the game
+    /// </summary>
+    /// <param name="bytes">Hero as bytes</param>
+    /// <returns>Hero string identifier</returns>
+    NewPlayerData UnpackHero(byte[] bytes);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -25,35 +34,58 @@ internal class HeroInterface : IHeroInterface
     private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
     private readonly IObjectManager objectManager;
     private readonly IBinaryPackageFactory binaryPackageFactory;
-    private readonly IMessageBroker messageBroker;
+    private readonly IHeroRegistry heroRegistry;
 
     public HeroInterface(
         IObjectManager objectManager,
         IBinaryPackageFactory binaryPackageFactory,
-        IMessageBroker messageBroker)
+        IHeroRegistry heroRegistry)
     {
         this.objectManager = objectManager;
         this.binaryPackageFactory = binaryPackageFactory;
-        this.messageBroker = messageBroker;
+        this.heroRegistry = heroRegistry;
     }
 
     public byte[] PackageMainHero()
     {
+        Hero.MainHero.StringId = string.Empty;
+        Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
+
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public Hero UnpackMainHero(byte[] bytes)
+    public NewPlayerData UnpackHero(byte[] bytes)
     {
-        HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
-        return package.Unpack<Hero>(binaryPackageFactory);
+        Hero hero = null;
+
+        GameLoopRunner.RunOnMainThread(() => {
+            hero = UnpackMainHeroInternal(bytes);
+        },
+        blocking: true);
+
+        var playerData = new NewPlayerData() {
+            HeroData = bytes,
+            HeroStringId = hero.StringId,
+            PartyStringId = hero.PartyBelongedTo.StringId,
+            CharacterObjectStringId = hero.CharacterObject.StringId,
+            ClanStringId = hero.Clan.StringId
+        };
+
+        return playerData;
     }
 
-    public void ResolveHero(ResolveHero message)
+    private Hero UnpackMainHeroInternal(byte[] bytes)
     {
-        // TODO implement
-        messageBroker.Publish(this, new ResolveDebugHero(message.PlayerId));
+        HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
+        var hero = package.Unpack<Hero>(binaryPackageFactory);
+
+        SetupNewHero(hero);
+
+        return hero;
     }
+
+    public bool TryResolveHero(string controllerId, out string heroId) => heroRegistry.TryGetControlledHero(controllerId, out heroId);
 
     public void SwitchMainHero(string heroId)
     {
@@ -67,5 +99,55 @@ internal class HeroInterface : IHeroInterface
         {
             Logger.Warning("Could not find hero with id of: {guid}", heroId);
         }
+    }
+
+    private void SetupNewHero(Hero hero)
+    {
+        SetupHeroWithObjectManagers(hero);
+        SetupNewParty(hero);
+    }
+
+    private static readonly Action<CampaignObjectManager, Hero> CampaignObjectManager_AddHero = typeof(CampaignObjectManager)
+    .GetMethod("AddHero", BindingFlags.Instance | BindingFlags.NonPublic)
+    .BuildDelegate<Action<CampaignObjectManager, Hero>>();
+    private static readonly Action<CampaignObjectManager, MobileParty> CampaignObjectManager_AddMobileParty = typeof(CampaignObjectManager)
+        .GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
+    private void SetupHeroWithObjectManagers(Hero hero)
+    {
+        objectManager.AddNewObject(hero, out string heroId);
+        objectManager.AddNewObject(hero.PartyBelongedTo, out string partyId);
+
+        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+        if (campaignObjectManager == null)
+        {
+            Logger.Error("{type} was null when trying to register a {managedType}", typeof(CampaignObjectManager), typeof(Hero));
+            return;
+        }
+
+        CampaignObjectManager_AddHero(campaignObjectManager, hero);
+
+        var party = hero.PartyBelongedTo;
+
+        CampaignObjectManager_AddMobileParty(campaignObjectManager, party);
+
+        var partyBase = party.Party;
+
+        partyBase.Visuals.OnStartup(partyBase);
+        partyBase.Visuals.SetMapIconAsDirty();
+    }
+
+    private void SetupNewParty(Hero hero)
+    {
+        var party = hero.PartyBelongedTo;
+        party.IsVisible = true;
+        party.Party.Visuals.SetMapIconAsDirty();
+
+        typeof(MobileParty).GetMethod("RecoverPositionsForNavMeshUpdate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party, null);
+        typeof(MobileParty).GetProperty("CurrentNavigationFace").SetValue(
+            party,
+            Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D));
+
+        typeof(MobilePartyAi).GetMethod("OnGameInitialized", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party.Ai, null);
     }
 }

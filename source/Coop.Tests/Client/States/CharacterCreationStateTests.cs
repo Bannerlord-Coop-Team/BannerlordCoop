@@ -1,7 +1,9 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Tests.Mocks;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
@@ -11,55 +13,40 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States
 {
-    public class CharacterCreationStateTests : CoopTest
+    public class CharacterCreationStateTests
     {
         private readonly IClientLogic clientLogic;
         private readonly NetPeer serverPeer;
-        public CharacterCreationStateTests(ITestOutputHelper output) : base(output)
+        private readonly ClientTestComponent clientComponent;
+
+        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => clientComponent.MockNetwork;
+
+        public CharacterCreationStateTests(ITestOutputHelper output)
         {
+            clientComponent = new ClientTestComponent(output);
+            var container = clientComponent.Container;
+
             serverPeer = MockNetwork.CreatePeer();
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
+            clientLogic = container.Resolve<IClientLogic>()!;
         }
 
         [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            clientLogic.State = new CharacterCreationState(clientLogic);
-
-            // Arrange
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            clientLogic.State.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
-        }
-
-        [Fact]
-        public void HeroPackaged_Transitions_ReceivingSavedDataState()
+        public void NewPlayerHeroRegistered_Transitions_ReceivingSavedDataState()
         {
             // Arrange
             var characterCreationState = new CharacterCreationState(clientLogic);
             clientLogic.State = characterCreationState;
 
-            var heroBytes = new byte[10];
-            var payload = new MessagePayload<NewHeroPackaged>(
-                this, new NewHeroPackaged(heroBytes));
+            var playerHeroRegistered = new NewPlayerHeroRegistered(null, null);
+            var payload = new MessagePayload<NetworkPlayerData>(
+                this, new NetworkPlayerData(playerHeroRegistered));
 
             // Act
-            characterCreationState.Handle_NewHeroPackaged(payload);
+            characterCreationState.Handle_NetworkPlayerData(payload);
 
             // Assert
-            Assert.NotEmpty(MockNetwork.Peers);
-            foreach(var peer in MockNetwork.Peers)
-            {
-                var message = Assert.Single(MockNetwork.GetPeerMessages(peer));
-                Assert.IsType<NetworkTransferedHero>(message);
-            }
-
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
-
         }
 
         [Fact]

@@ -13,12 +13,12 @@ namespace GameInterface.Services.MobileParties.Patches
     [HarmonyPatch(typeof(Campaign), nameof(Campaign.MainParty), MethodType.Setter)]
     internal class SetMainPartyPatch
     {
-        private static bool Prefix(ref Campaign __instance, ref MobileParty value)
+        private static void Prefix(ref Campaign __instance, ref MobileParty value)
         {
-            if (value?.StringId == null) return true;
+            if (value?.StringId == null) return;
+            if (Campaign.Current?.MainParty == null) return;
 
             MessageBroker.Instance.Publish(__instance, new MainPartyChanged(value.StringId));
-            return true;
         }
     }
 }
