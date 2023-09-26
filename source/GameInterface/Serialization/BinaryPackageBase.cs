@@ -190,6 +190,8 @@ namespace GameInterface.Serialization
         /// </returns>
         protected IEnumerable<OutT> ResolveIds<OutT>(string[] ids) where OutT : MBObjectBase
         {
+            if (ids == null) return Array.Empty<OutT>();
+
             // Convert ids to instances using the MBObjectManager
             IEnumerable<OutT> values = ids.Select(id => ResolveId<OutT>(id));
 
