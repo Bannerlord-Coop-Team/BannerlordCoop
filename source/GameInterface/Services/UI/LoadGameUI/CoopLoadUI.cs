@@ -15,6 +15,8 @@ using TaleWorlds.ScreenSystem;
 using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.InputSystem;
 using TaleWorlds.TwoDimension;
+using Common.Messaging;
+using GameInterface.Services.UI.Messages;
 
 namespace Coop.UI.LoadGameUI
 {
@@ -41,84 +43,86 @@ namespace Coop.UI.LoadGameUI
 
 		public new void ExecuteSaveLoad()
 		{
-			LoadResult saveGameData = MBSaveLoad.LoadSaveGameData(Save.Name);
-			if (saveGameData != null)
-			{
-				if (saveGameData.MetaData.GetModules().Length > 0)
-				{
-					InformationManager.ShowInquiry(new InquiryData(new TextObject("{=kJtNMYum}Module mismatch", null).ToString(), new TextObject("{=lh0so0uX}Do you want to load the saved game with different modules?", null).ToString(), true, true, new TextObject("{=aeouhelq}Yes", null).ToString(), new TextObject("{=8OkPHu4f}No", null).ToString(), delegate ()
-					{
-						StartGame(saveGameData);
-					}, null, ""), false);
-					return;
-				}
-				StartGame(saveGameData);
-			}
-		}
+            if (Game.Current != null)
+            {
+                ScreenManager.PopScreen();
+                GameStateManager.Current.CleanStates(0);
+                GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
+            }
 
-		private void StartGame(LoadResult loadResult)
-		{
-			if (Game.Current != null)
-			{
-				ScreenManager.PopScreen();
-				GameStateManager.Current.CleanStates(0);
-				GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
-			}
-
-			// TODO Send as event
-			//MBGameManager.StartNewGame(CoopServer.Instance.CreateGameManager(loadResult));
-		}
-
+            MessageBroker.Instance.Publish(this, new HostSave(Save.Name));
+        }
 	}
 
 	class CoopLoadUI : SaveLoadVM
 	{
 		private new SelectedGameVM CurrentSelectedSave;
-		public CoopLoadUI() : base(false, false)
-		{
-			//GetSavedGames().Clear();
-			//SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles();
-			//for (int i = 0; i < saveFiles.Length; i++)
-			//{
-			//	SelectedGameVM item = new SelectedGameVM(saveFiles[i], IsSaving, new Action<SavedGameVM>(OnDeleteSavedGame), new Action<SavedGameVM>(OnSaveSelection), new Action(OnCancelLoadSave), new Action(ExecuteDone));
-			//	GetSavedGames().Add(item);
-			//}
-			//OnSaveSelection(GetSavedGames().FirstOrDefault());
-			//RefreshValues();
-		}
-
-		private void OnSaveSelection(SavedGameVM saveGame)
-		{
-			SelectedGameVM save = (SelectedGameVM)saveGame;
-			if (save != CurrentSelectedSave)
-			{
-				if (CurrentSelectedSave != null)
-				{
-					CurrentSelectedSave.IsSelected = false;
-				}
-				CurrentSelectedSave = save;
-				if (CurrentSelectedSave != null)
-				{
-					CurrentSelectedSave.IsSelected = true;
-				}
-				IsActionEnabled = CurrentSelectedSave != null;
-			}
-		}
-
-		public new void ExecuteLoadSave()
-		{
-            if (!IsBusyWithAnAction && CurrentSelectedSave != null && !CurrentSelectedSave.IsCorrupted)
+        public CoopLoadUI() : base(false, false)
+        {
+            GetSavedGames().Clear();
+            SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles();
+            for (int i = 0; i < saveFiles.Length; i++)
             {
-                CurrentSelectedSave.ExecuteSaveLoad();
-                this.IsBusyWithAnAction = true;
+                SelectedGameVM item = new SelectedGameVM(saveFiles[i], IsSaving, new Action<SavedGameVM>(OnDeleteSavedGame), new Action<SavedGameVM>(OnSaveSelection), new Action(OnCancelLoadSave), new Action(ExecuteDone));
+                GetSavedGames().Add(item);
+            }
+            OnSaveSelection(GetSavedGames().FirstOrDefault());
+            RefreshValues();
+        }
+
+        private void OnSaveSelection(SavedGameVM saveGame)
+        {
+            SelectedGameVM save = (SelectedGameVM)saveGame;
+            if (save != CurrentSelectedSave)
+            {
+                if (CurrentSelectedSave != null)
+                {
+                    CurrentSelectedSave.IsSelected = false;
+                }
+                CurrentSelectedSave = save;
+                if (CurrentSelectedSave != null)
+                {
+                    CurrentSelectedSave.IsSelected = true;
+                }
+                IsActionEnabled = CurrentSelectedSave != null;
             }
         }
 
-		private MBBindingList<SavedGameVM> GetSavedGames() => SaveGroups.FirstOrDefault().SavedGamesList;
+        public new void ExecuteLoadSave()
+        {
+            SelectedGameVM currentSelectedSave = CurrentSelectedSave;
+            if (currentSelectedSave == null)
+            {
+                return;
+            }
+            currentSelectedSave.ExecuteSaveLoad();
+        }
 
+        private new void ExecuteDone()
+        {
+            ScreenManager.PopScreen();
+        }
+
+        private void OnCancelLoadSave()
+        {
+        }
+
+        private void OnDeleteSavedGame(SavedGameVM savedGame)
+        {
+            string titleText = new TextObject("{=QHV8aeEg}Delete Save", null).ToString();
+            string text = new TextObject("{=HH2mZq8J}Are you sure you want to delete this save game?", null).ToString();
+            InformationManager.ShowInquiry(new InquiryData(titleText, text, true, true, new TextObject("{=aeouhelq}Yes", null).ToString(), new TextObject("{=8OkPHu4f}No", null).ToString(), delegate ()
+            {
+                MBSaveLoad.DeleteSaveGame(savedGame.Save.Name);
+                GetSavedGames().Remove(savedGame);
+                OnSaveSelection(GetSavedGames().FirstOrDefault());
+            }, null, ""), false);
+        }
+
+        private MBBindingList<SavedGameVM> GetSavedGames() => SaveGroups.FirstOrDefault().SavedGamesList;
 	}
 
-	class CoopLoadScreen : SaveLoadScreen
+	public class CoopLoadScreen : SaveLoadScreen
 	{
 		public CoopLoadScreen() : base(false)
 		{
@@ -129,7 +133,7 @@ namespace Coop.UI.LoadGameUI
 	public class CoopLoadGameGauntletScreen : ScreenBase
 	{
         private GauntletLayer _gauntletLayer;
-        private SaveLoadVM _dataSource;
+        private CoopLoadUI _dataSource;
         private SpriteCategory _spriteCategory;
 
         public CoopLoadGameGauntletScreen() { }
@@ -165,21 +169,19 @@ namespace Coop.UI.LoadGameUI
             base.OnFrameTick(dt);
             if (!_dataSource.IsBusyWithAnAction)
             {
-                CoopLoadUI convertedDataSource = (CoopLoadUI)_dataSource;
-
                 if (_gauntletLayer.Input.IsHotKeyReleased("Exit"))
                 {
-                    convertedDataSource.ExecuteDone();
+                    _dataSource.ExecuteDone();
                     return;
                 }
                 if (_gauntletLayer.Input.IsHotKeyPressed("Confirm") && !_gauntletLayer.IsFocusedOnInput())
                 {
-                    convertedDataSource.ExecuteLoadSave();
+                    _dataSource.ExecuteLoadSave();
                     return;
                 }
                 if (_gauntletLayer.Input.IsHotKeyPressed("Delete") && !_gauntletLayer.IsFocusedOnInput())
                 {
-                    convertedDataSource.DeleteSelectedSave();
+                    _dataSource.DeleteSelectedSave();
 					return;
                 }
             }

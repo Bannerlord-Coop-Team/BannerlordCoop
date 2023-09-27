@@ -174,10 +174,6 @@
     <Compile Include="CoopMod.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="UI\CharacterCreationUI\CharacterCreationUI.cs" />
-    <Compile Include="UI\CoopConnectionUI.cs" />
-    <Compile Include="UI\CoopConnectMenuVM.cs" />
-    <Compile Include="UI\LoadGameUI\CoopLoadUI.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

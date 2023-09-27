@@ -1,6 +1,12 @@
 ﻿using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
+using System.Net;
+using Common.Messaging;
+using GameInterface.Services.UI.Messages;
+using System.Linq;
+using Common.Network;
+using TaleWorlds.MountAndBlade;
 
 namespace Coop.UI
 {
@@ -15,9 +21,9 @@ namespace Coop.UI
         public string PortText => "Port:";
         public string PasswordText => "Password:";
 
-        public string connectIP;
+        public string connectIP = "bannerlordcoop.duckdns.org";
 
-        public string connectPort;
+        public string connectPort = "4200";
 
         public string connectPassword = "";
 
@@ -63,10 +69,7 @@ namespace Coop.UI
 
         public void ActionConnect()
         {
-            // TODO create config from values
-
             int port;
-            System.Net.IPAddress ip;
 
             //Connect to IP
             if (!int.TryParse(connectPort, out port))
@@ -75,16 +78,19 @@ namespace Coop.UI
                 return;
             }
 
-            if (!System.Net.IPAddress.TryParse(connectIP, out ip))
+            IPHostEntry hostEntry  = Dns.GetHostEntry(connectIP);
+
+            if (hostEntry.AddressList.Length <= 0)
             {
-                InformationManager.DisplayMessage(new InformationMessage("ERROR: The ip is not formatted correctly"));
+                InformationManager.DisplayMessage(new InformationMessage("ERROR: The connection address is invalid"));
                 return;
             }
 
-            InformationManager.DisplayMessage(new InformationMessage("Trying to connect to " + ip.ToString() + ":" + port.ToString()));
+            IPAddress ip = hostEntry.AddressList.First();
 
-            // TODO Send connect message
+            ScreenManager.PopScreen();
 
+            MessageBroker.Instance.Publish(this, new ConnectWithIP(ip, port));
         }
 
         public void ActionCancel()
