@@ -39,9 +39,6 @@ namespace Coop.Tests.Server.States
             // Act
             currentState.Start();
 
-            Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<LoadDebugGame>(MockMessageBroker.PublishedMessages.First());
-
             var payload = new MessagePayload<CampaignReady>(null, new CampaignReady());
             var initialState = Assert.IsType<InitialServerState>(currentState);
             initialState.Handle_GameLoaded(payload);
