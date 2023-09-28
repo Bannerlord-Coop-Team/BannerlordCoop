@@ -44,7 +44,7 @@ public class CreateCharacterState : ConnectionStateBase
 
         var controllerId = obj.What.PlayerId;
         var data = obj.What.PlayerHero;
-        var registerCommand = new RegisterNewPlayerHero(netPeer, data);
+        var registerCommand = new RegisterNewPlayerHero(netPeer, controllerId, data);
         messageBroker.Publish(this, registerCommand);
 
         var forwardMessage = new NetworkNewPartyCreated(controllerId, data);

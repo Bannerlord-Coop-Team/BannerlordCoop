@@ -34,7 +34,9 @@ public class InitialServerState : ServerStateBase
 
     public override void Start()
     {
-        // TODO integrate ui screen
+#if DEBUG
+        MessageBroker.Publish(this, new LoadDebugGame());
+#endif
     }
 
     public override void Stop()

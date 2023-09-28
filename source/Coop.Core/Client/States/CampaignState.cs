@@ -42,7 +42,7 @@ public class CampaignState : ClientStateBase
 
     private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
     {
-        var message = new RegisterNewPlayerHero((NetPeer)obj.Who, obj.What.PlayerHero);
+        var message = new RegisterNewPlayerHero((NetPeer)obj.Who, obj.What.PlayerId, obj.What.PlayerHero);
         messageBroker.Publish(this, message);
     }
 
@@ -76,7 +76,7 @@ public class CampaignState : ClientStateBase
     {
         foreach(var newHero in Logic.DeferredHeroRepository.GetAllDeferredHeroes())
         {
-            var message = new RegisterNewPlayerHero(newHero.NetPeer, newHero.HeroData);
+            var message = new RegisterNewPlayerHero(newHero.NetPeer, newHero.ControllerId, newHero.HeroData);
             messageBroker.Publish(this, message);
         }
 

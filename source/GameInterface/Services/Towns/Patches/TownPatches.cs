@@ -23,9 +23,7 @@ namespace GameInterface.Services.Towns.Patches
     [HarmonyPatch(typeof(DefaultSettlementProsperityModel))]
     internal class DefaultSettlementProsperityModelPatches
     {
-        private static readonly MethodInfo CalculateProsperityChange = typeof(DefaultSettlementProsperityModel).GetMethod("CalculateProsperityChangeInternal", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        [HarmonyPatch(nameof(CalculateProsperityChange))]
+        [HarmonyPatch(nameof(DefaultSettlementProsperityModel.CalculateProsperityChange))]
         [HarmonyPrefix]
         private static bool CalculateProsperityChangePatch()
         {

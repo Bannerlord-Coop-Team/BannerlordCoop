@@ -28,6 +28,7 @@ public class ReceivingSavedDataState : ClientStateBase
 
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
     {
+        // TODO existing party does not switch correctly
         saveDataMessage = obj.What;
         Logic.EnterMainMenu();
     }

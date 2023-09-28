@@ -9,7 +9,7 @@ namespace Coop.Core.Common.Configuration;
 public class NetworkConfiguration : INetworkConfiguration
 {
 #if DEBUG
-    public string Address => "localhost";
+    public string Address { get; set; } =  "localhost";
 #else
     public string Address { get; set; } = "bannerlordcoop.duckdns.org";
 #endif
