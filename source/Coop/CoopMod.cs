@@ -25,8 +25,7 @@ namespace Coop
     {
         public static UpdateableList Updateables { get; } = new UpdateableList();
 
-        public static CoopartiveMultiplayerExperience Coop = new CoopartiveMultiplayerExperience();
-
+        public static CoopartiveMultiplayerExperience Coop;
 
         public static InitialStateOption CoopCampaign;
 
@@ -95,6 +94,8 @@ namespace Coop
 
         public override void NoHarmonyLoad()
         {
+            Coop  = new CoopartiveMultiplayerExperience();
+
             Updateables.Add(GameLoopRunner.Instance);
             Updateables.Add(Coop);
 
