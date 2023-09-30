@@ -84,7 +84,6 @@ namespace Coop.Core
             Updateables.UpdateAll(deltaTime);
         }
 
-        private ILifetimeScope _scope;
         public void StartAsServer()
         {
             _container?.Dispose();
