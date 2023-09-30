@@ -45,6 +45,8 @@ internal class TimePatches
 
     public static void OverrideTimeControlMode(Campaign campaign, CampaignTimeControlMode value)
     {
+        if (campaign == null) return;
+
         _setTimeControlMode(campaign, value);
     }
 }
