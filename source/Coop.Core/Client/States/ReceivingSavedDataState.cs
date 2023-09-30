@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Messages;
+using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using GameInterface.Services.GameState.Messages;
 using LiteNetLib;
@@ -12,18 +13,24 @@ namespace Coop.Core.Client.States;
 public class ReceivingSavedDataState : ClientStateBase
 {
     private NetworkGameSaveDataReceived saveDataMessage = default;
-    public ReceivingSavedDataState(IClientLogic logic) : base(logic)
+    private readonly IMessageBroker messageBroker;
+    private readonly IDeferredHeroRepository deferredHeroRepo;
+
+    public ReceivingSavedDataState(IClientLogic logic, IMessageBroker messageBroker, IDeferredHeroRepository deferredHeroRepo) : base(logic)
     {
-        Logic.MessageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
-        Logic.MessageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        Logic.MessageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
+        this.messageBroker = messageBroker;
+        this.deferredHeroRepo = deferredHeroRepo;
+        messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
+        
     }
 
     public override void Dispose()
     {
-        Logic.MessageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
-        Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        Logic.MessageBroker.Unsubscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
+        messageBroker.Unsubscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
+        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Unsubscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
     }
 
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
@@ -41,7 +48,7 @@ public class ReceivingSavedDataState : ClientStateBase
         if (saveData.Length == 0) return;
 
         var commandLoad = new LoadGameSave(saveData);
-        Logic.MessageBroker.Publish(this, commandLoad);
+        messageBroker.Publish(this, commandLoad);
 
         Logic.LoadSavedData();
     }
@@ -49,12 +56,12 @@ public class ReceivingSavedDataState : ClientStateBase
     private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
     {
         var peer = (NetPeer)obj.Who;
-        Logic.DeferredHeroRepository.AddDeferredHero(peer, obj.What.PlayerId, obj.What.PlayerHero);
+        deferredHeroRepo.AddDeferredHero(peer, obj.What.PlayerId, obj.What.PlayerHero);
     }
 
     public override void EnterMainMenu()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     public override void Connect()
@@ -63,8 +70,9 @@ public class ReceivingSavedDataState : ClientStateBase
 
     public override void Disconnect()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
-        Logic.State = new MainMenuState(Logic);
+        messageBroker.Publish(this, new EnterMainMenu());
+
+        Logic.SetState<MainMenuState>();
     }
 
     public override void ExitGame()
@@ -73,7 +81,7 @@ public class ReceivingSavedDataState : ClientStateBase
 
     public override void LoadSavedData()
     {
-        Logic.State = new LoadingState(Logic);
+        Logic.SetState<LoadingState>();
     }
 
     public override void StartCharacterCreation()

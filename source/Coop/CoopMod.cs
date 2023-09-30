@@ -64,26 +64,23 @@ namespace Coop
 
         private void SetupLogging()
         {
-            if (System.Diagnostics.Debugger.IsAttached)
+            var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
+
+            var filePostfix = isServer ? "server" : "client";
+            var filePath = $"Coop_{filePostfix}.log";
+
+            try
             {
-                var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
-
-                var filePostfix = isServer ? "server" : "client";
-                var filePath = $"Coop_{filePostfix}.log";
-
-                try
-                {
-                    // Clear old filepath
-                    File.Delete(filePath);
-                } 
-                catch(IOException) { }
-
-                LogManager.Configuration
-                    .Enrich.WithProcessId()
-                    .WriteTo.Debug(outputTemplate: outputTemplate)
-                    .WriteTo.File(filePath, outputTemplate: outputTemplate)
-                    .MinimumLevel.Verbose();
+                // Clear old filepath
+                File.Delete(filePath);
             }
+            catch (IOException) { }
+
+            LogManager.Configuration
+                .Enrich.WithProcessId()
+                .WriteTo.Debug(outputTemplate: outputTemplate)
+                .WriteTo.File(filePath, outputTemplate: outputTemplate)
+                .MinimumLevel.Verbose();
 
             Logger = LogManager.GetLogger<CoopMod>();
             Logger.Verbose("Coop Mod Module Started");

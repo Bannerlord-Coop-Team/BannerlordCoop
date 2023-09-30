@@ -8,36 +8,40 @@ namespace Coop.Core.Client.States;
 /// </summary>
 public class MissionState : ClientStateBase
 {
-    public MissionState(IClientLogic logic) : base(logic)
+    private readonly IMessageBroker messageBroker;
+
+    public MissionState(IClientLogic logic, IMessageBroker messageBroker) : base(logic)
     {
-        Logic.MessageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        Logic.MessageBroker.Subscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
+        this.messageBroker = messageBroker;
+
+        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Subscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
     }
 
     public override void Dispose()
     {
-        Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        Logic.MessageBroker.Unsubscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
+        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Unsubscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
     }
 
     public override void EnterCampaignState()
     {
-        Logic.MessageBroker.Publish(this, new EnterCampaignState());
+        messageBroker.Publish(this, new EnterCampaignState());
     }
 
     internal void Handle_CampaignStateEntered(MessagePayload<CampaignStateEntered> obj)
     {
-        Logic.State = new CampaignState(Logic);
+        Logic.SetState<CampaignState>();
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
-        Logic.State = new MainMenuState(Logic);
+        Logic.SetState<MainMenuState>();
     }
 
     public override void EnterMainMenu()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     public override void Connect()
@@ -46,7 +50,7 @@ public class MissionState : ClientStateBase
 
     public override void Disconnect()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     public override void EnterMissionState()

@@ -78,14 +78,14 @@ namespace Common.Messaging
             {
                 // TODO this might be slow
                 var weakDelegate = delegates[i];
-                if (weakDelegate.IsAlive == false)
+                if (weakDelegate?.IsAlive == false)
                 {
                     // Remove dead delegates
                     delegates.RemoveAt(i--);
                     continue;
                 }
 
-                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+                Task.Factory.StartNew(() => weakDelegate?.Invoke(new object[] { payload }));
             }
         }
 

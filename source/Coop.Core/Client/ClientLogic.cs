@@ -1,11 +1,6 @@
 ﻿using Common.Logging;
 using Common.LogicStates;
-using Common.Messaging;
-using Common.Network;
-using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Client.States;
-using GameInterface.Services.Entity;
-using HarmonyLib;
 using Serilog;
 
 namespace Coop.Core.Client;
@@ -15,30 +10,21 @@ namespace Coop.Core.Client;
 /// </summary>
 public interface IClientLogic : ILogic, IClientState
 {
+    string ControlledHeroId { get; set; }
+
     /// <summary>
     /// Client-side state
     /// </summary>
-    IClientState State { get; set; }
-
-    /// <summary>
-    /// Networking Client for Client-side
-    /// </summary>
-    INetwork Network { get; }
-    IMessageBroker MessageBroker { get; }
-    string ControlledHeroId { get; set; }
-
-    IControllerIdProvider ControllerIdProvider { get; }
-    IDeferredHeroRepository DeferredHeroRepository { get; }
+    IClientState State { get; }
+    
+    TState SetState<TState>() where TState : IClientState;
 }
 
 /// <inheritdoc cref="IClientLogic"/>
 public class ClientLogic : IClientLogic
 {
     private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
-    public INetwork Network { get; }
-    public IMessageBroker MessageBroker { get; }
-    public IControllerIdProvider ControllerIdProvider { get; }
-    public IDeferredHeroRepository DeferredHeroRepository { get; }
+    public IStateFactory StateFactory { get; }
     public string ControlledHeroId { get; set; }
     public IClientState State 
     {
@@ -54,17 +40,10 @@ public class ClientLogic : IClientLogic
 
     private IClientState _state;
 
-    public ClientLogic(
-        INetwork network,
-        IMessageBroker messageBroker,
-        IControllerIdProvider controllerIdProvider,
-        IDeferredHeroRepository deferredHeroRepo)
+    public ClientLogic(IStateFactory stateFactory)
     {
-        Network = network;
-        MessageBroker = messageBroker;
-        ControllerIdProvider = controllerIdProvider;
-        DeferredHeroRepository = deferredHeroRepo;
-        State = new MainMenuState(this);
+        StateFactory = stateFactory;
+        SetState<MainMenuState>();
     }
 
     public void Start()
@@ -75,6 +54,13 @@ public class ClientLogic : IClientLogic
     public void Stop()
     {
         Disconnect();
+    }
+
+    public TState SetState<TState>() where TState : IClientState
+    {
+        TState newState = StateFactory.CreateClientState<TState>(this);
+        State = newState;
+        return newState;
     }
 
     public void Dispose() => State.Dispose();

@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 
@@ -14,30 +15,32 @@ public class ValidateModuleState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    public ValidateModuleState(IClientLogic logic) : base(logic)
-    {
-        messageBroker = logic.MessageBroker;
-        network = logic.Network; 
+    private readonly IControllerIdProvider controllerIdProvider;
 
+    public ValidateModuleState(IClientLogic logic, IMessageBroker messageBroker, INetwork network, IControllerIdProvider controllerIdProvider) : base(logic)
+    {
+        this.messageBroker = messageBroker;
+        this.network = network;
+        this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
 
 #if DEBUG
-        logic.ControllerIdProvider.SetControllerFromProgramArgs();
+        controllerIdProvider.SetControllerFromProgramArgs();
 #else
-        logic.ControllerIdProvider.SetControllerAsPlatformId();
+        controllerIdProvider.SetControllerAsPlatformId();
 #endif
 
 
-        network.SendAll(new NetworkClientValidate(logic.ControllerIdProvider.ControllerId));
+        network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
     }
 
     public override void Dispose()
     {
-        Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        Logic.MessageBroker.Unsubscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
-        Logic.MessageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
+        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Unsubscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
+        messageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
     }
 
     internal void Handle_NetworkClientValidated(MessagePayload<NetworkClientValidated> obj)
@@ -55,22 +58,22 @@ public class ValidateModuleState : ClientStateBase
 
     internal void Handle_CharacterCreationStarted(MessagePayload<CharacterCreationStarted> obj)
     {
-        Logic.State = new CharacterCreationState(Logic);
+        Logic.SetState<CharacterCreationState>();
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
-        Logic.State = new MainMenuState(Logic);
+        Logic.SetState<MainMenuState>();
     }
 
     public override void EnterMainMenu()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     public override void LoadSavedData()
     {
-        Logic.State = new ReceivingSavedDataState(Logic);
+        Logic.SetState<ReceivingSavedDataState>();
     }
 
     public override void Connect()
@@ -79,7 +82,7 @@ public class ValidateModuleState : ClientStateBase
 
     public override void Disconnect()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     public override void EnterCampaignState()
@@ -96,7 +99,7 @@ public class ValidateModuleState : ClientStateBase
 
     public override void StartCharacterCreation()
     {
-        Logic.MessageBroker.Publish(this, new StartCharacterCreation());
+        messageBroker.Publish(this, new StartCharacterCreation());
     }
 
     public override void ValidateModules()
