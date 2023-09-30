@@ -9,7 +9,7 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Heroes.Patches;
 
 [HarmonyPatch(typeof(MapScreen))]
-internal class DisableMapClickTimeChagne
+internal class DisableMapClickTimeChange
 {
     private static void SetTimeControlModeDeference(Campaign _, CampaignTimeControlMode _2)
     {
@@ -22,7 +22,7 @@ internal class DisableMapClickTimeChagne
         List<CodeInstruction> instrs = instructions.ToList();
 
         MethodInfo timeControlSetter = typeof(Campaign).GetProperty(nameof(Campaign.TimeControlMode)).GetSetMethod();
-        MethodInfo deferFunction = typeof(DisableMapClickTimeChagne).GetMethod("SetTimeControlModeDeference", BindingFlags.Static | BindingFlags.NonPublic);
+        MethodInfo deferFunction = typeof(DisableMapClickTimeChange).GetMethod("SetTimeControlModeDeference", BindingFlags.Static | BindingFlags.NonPublic);
 
         foreach (var instr in instructions)
         {

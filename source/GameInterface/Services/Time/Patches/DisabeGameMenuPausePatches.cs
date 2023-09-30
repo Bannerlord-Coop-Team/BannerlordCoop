@@ -40,7 +40,7 @@ internal static class DisabeGameMenuPausePatches
         List<CodeInstruction> instrs = instructions.ToList();
 
         MethodInfo timeControlSetter = typeof(Campaign).GetProperty(nameof(Campaign.TimeControlMode)).GetSetMethod();
-        MethodInfo deferFunction = typeof(DisableMapClickTimeChagne).GetMethod("SetTimeControlModeDeference", BindingFlags.Static | BindingFlags.NonPublic);
+        MethodInfo deferFunction = typeof(DisableMapClickTimeChange).GetMethod("SetTimeControlModeDeference", BindingFlags.Static | BindingFlags.NonPublic);
 
         foreach (var instr in instructions)
         {

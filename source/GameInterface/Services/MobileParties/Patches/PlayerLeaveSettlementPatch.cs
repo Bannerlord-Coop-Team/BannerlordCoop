@@ -32,7 +32,6 @@ internal class PlayerLeaveSettlementPatch
         using (LeaveSettlementActionPatches.AllowedInstance)
         {
             LeaveSettlementActionPatches.AllowedInstance.Instance = MobileParty.MainParty;
-            PlayerEncounter.LeaveSettlement();
             PlayerEncounter.Finish(true);
             Campaign.Current.SaveHandler.SignalAutoSave();
         }

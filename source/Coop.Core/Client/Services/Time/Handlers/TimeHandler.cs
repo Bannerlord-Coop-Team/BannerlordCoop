@@ -22,17 +22,17 @@ namespace Coop.Core.Client.Services.Time.Handlers
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
+            messageBroker.Subscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
             messageBroker.Subscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
+            messageBroker.Unsubscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
             messageBroker.Unsubscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
         }
 
-        internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChanged> obj)
+        internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
         {
             var newMode = obj.What.NewControlMode;
 

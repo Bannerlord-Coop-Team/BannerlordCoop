@@ -60,7 +60,7 @@ namespace Coop.Tests.Server.Services.Time
             var broker = new MockMessageBroker();
             var network = new MockNetwork();
             var handler = new TimeHandler(broker, network);
-            var message = new MessagePayload<TimeSpeedChanged>(null, new TimeSpeedChanged(CampaignTimeControlMode.StoppablePlay));
+            var message = new MessagePayload<AttemptedTimeSpeedChanged>(null, new AttemptedTimeSpeedChanged(CampaignTimeControlMode.StoppablePlay));
 
             network.CreatePeer();
 

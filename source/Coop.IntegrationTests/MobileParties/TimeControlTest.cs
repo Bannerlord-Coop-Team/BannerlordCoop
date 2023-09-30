@@ -27,7 +27,7 @@ public class TimeControlTest
     public void SetTimeControlMode_Publishes_AllClients()
     {
         // Arrange
-        var message = new TimeSpeedChanged(CampaignTimeControlMode.StoppablePlay);
+        var message = new AttemptedTimeSpeedChanged(CampaignTimeControlMode.StoppablePlay);
         var client1 = TestEnvironment.Clients.First();
 
         // Act

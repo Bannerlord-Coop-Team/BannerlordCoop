@@ -26,13 +26,13 @@ public class TimeHandler : IHandler
         _messageBroker = messageBroker;
         _network = network;
         _clientRegistry = clientRegistry;
-        _messageBroker.Subscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
+        _messageBroker.Subscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
         _messageBroker.Subscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
     }
 
     public void Dispose()
     {
-        _messageBroker.Unsubscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
+        _messageBroker.Unsubscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
         _messageBroker.Unsubscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
     }
 
@@ -49,13 +49,20 @@ public class TimeHandler : IHandler
         SetTimeMode(newMode);
     }
 
-    internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChanged> obj)
+    internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
     {
+        if (_clientRegistry.PlayersLoading)
+        {
+            Logger.Information("Players are currently loading, unable to change time");
+            return;
+        }
+
         var newMode = obj.What.NewControlMode;
 
         Logger.Verbose("Server sending time change to {mode} to client", newMode);
 
         _network.SendAll(new NetworkTimeSpeedChanged(newMode));
+        SetTimeMode(newMode);
     }
 
     public void SetTimeMode(TimeControlEnum timeMode)

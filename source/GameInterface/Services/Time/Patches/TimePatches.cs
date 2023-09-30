@@ -27,8 +27,7 @@ internal class TimePatches
         if (__instance.TimeControlModeLock == false &&
             value != _getTimeControlMode(__instance))
         {
-            MessageBroker.Instance.Publish(__instance, new TimeSpeedChanged(value));
-            _setTimeControlMode(__instance, value);
+            MessageBroker.Instance.Publish(__instance, new AttemptedTimeSpeedChanged(value));
         }
 
         return false;
