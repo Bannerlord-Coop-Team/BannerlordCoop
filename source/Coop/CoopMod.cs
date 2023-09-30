@@ -2,9 +2,7 @@
 using Common.Logging;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
-using Coop.UI;
-using Coop.UI.LoadGameUI;
-using HarmonyLib;
+using GameInterface.Services.UI;
 using Serilog;
 using System;
 using System.IO;

@@ -1,14 +1,11 @@
-﻿using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.ScreenSystem;
-using System.Net;
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.UI.Messages;
 using System.Linq;
-using Common.Network;
-using TaleWorlds.MountAndBlade;
+using System.Net;
+using TaleWorlds.Library;
+using TaleWorlds.ScreenSystem;
 
-namespace Coop.UI
+namespace GameInterface.Services.UI
 {
     internal class CoopConnectMenuVM : ViewModel
     {
@@ -78,7 +75,7 @@ namespace Coop.UI
                 return;
             }
 
-            IPHostEntry hostEntry  = Dns.GetHostEntry(connectIP);
+            IPHostEntry hostEntry = Dns.GetHostEntry(connectIP);
 
             if (hostEntry.AddressList.Length <= 0)
             {

@@ -2,7 +2,7 @@
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.ScreenSystem;
 
-namespace Coop.UI
+namespace GameInterface.Services.UI
 {
     public class CoopConnectionUI : ScreenBase
     {
