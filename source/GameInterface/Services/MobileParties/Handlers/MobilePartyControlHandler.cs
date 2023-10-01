@@ -95,7 +95,7 @@ internal class MobilePartyControlHandler : IHandler
 
         PartyNameplatesVM partyNameplatesVM = (PartyNameplatesVM)cameraView.GetType().GetField("_dataSource", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(cameraView);
 
-        OnPartyVisibilityChanged.Invoke(partyNameplatesVM, new object[] { party });
+        OnPartyVisibilityChanged.Invoke(partyNameplatesVM, new object[] { party.Party });
     }
 
     private void Handle_MobilePartyDestroyed(MessagePayload<MobilePartyDestroyed> obj)
