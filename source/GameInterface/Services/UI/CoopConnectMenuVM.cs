@@ -85,8 +85,6 @@ namespace GameInterface.Services.UI
 
             IPAddress ip = hostEntry.AddressList.First();
 
-            ScreenManager.PopScreen();
-
             MessageBroker.Instance.Publish(this, new ConnectWithIP(ip, port));
         }
 
