@@ -24,7 +24,6 @@ public class ServerModule : Module
 
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
-        builder.RegisterType<InitialServerState>().As<IServerState>();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
 
         RegisterAllTypesWithInterface<IHandler>(builder, autoInstantiate: true);

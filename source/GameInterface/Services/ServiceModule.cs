@@ -16,7 +16,7 @@ internal class ServiceModule : Module
     {
         foreach (var type in GetHandlers())
         {
-            builder.RegisterType(type).AsSelf().SingleInstance().AutoActivate();
+            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
         }
 
         foreach (var type in GetInterfaces())
@@ -29,7 +29,7 @@ internal class ServiceModule : Module
             {
                 Logger.Verbose("Registering {type} GameInterface Service", type.Name);
 
-                builder.RegisterType(type).As(interfaceToRegister).SingleInstance();
+                builder.RegisterType(type).As(interfaceToRegister).InstancePerLifetimeScope();
             }
             else
             {

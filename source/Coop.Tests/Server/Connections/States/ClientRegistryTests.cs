@@ -18,9 +18,6 @@ namespace Coop.Tests.Server.Connections.States
         private readonly NetPeer playerPeer;
         private readonly ServerTestComponent serverComponent;
 
-        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => serverComponent.MockNetwork;
-
         public ClientRegistryTests(ITestOutputHelper output)
         {
             serverComponent = new ServerTestComponent(output);
@@ -61,51 +58,6 @@ namespace Coop.Tests.Server.Connections.States
             // Assert
             var connectionState = Assert.Single(clientRegistry.ConnectionStates).Value;
             Assert.IsType<ResolveCharacterState>(connectionState.State);
-        }
-
-        [Fact]
-        public void EnableTimeControls_PublishesEvents_NoLoaders()
-        {
-            // Arrange
-            var payload = new MessagePayload<PlayerCampaignEntered>(
-                this, new PlayerCampaignEntered());
-
-            // Act
-            clientRegistry.PlayerCampaignEnteredHandler(payload);
-
-            // Assert
-            Assert.NotEmpty(MockNetwork.Peers);
-            foreach (var peer in MockNetwork.Peers)
-            {
-                var networkMessage = Assert.Single(serverComponent.MockNetwork.GetPeerMessages(peer));
-                Assert.IsType<NetworkEnableTimeControls>(networkMessage);
-            }
-
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<EnableGameTimeControls>(message);
-        }
-
-        [Fact]
-        public void EnableTimeControls_PublishesEvents_WithLoaders()
-        {
-            // Arrange
-            var connectPayload = new MessagePayload<PlayerConnected>(this, new PlayerConnected(playerPeer));
-            clientRegistry.PlayerJoiningHandler(connectPayload);
-
-            IConnectionLogic logic = clientRegistry.ConnectionStates.Single().Value;
-            logic.SetState<LoadingState>();
-
-            var payload = new MessagePayload<PlayerCampaignEntered>(
-                this, new PlayerCampaignEntered());
-
-            // Act
-            clientRegistry.PlayerCampaignEnteredHandler(payload);
-
-            // Assert
-            Assert.NotEmpty(MockNetwork.Peers);
-            Assert.Empty(MockNetwork.SentNetworkMessages);
-
-            Assert.Empty(MockMessageBroker.PublishedMessages);
         }
     }
 }

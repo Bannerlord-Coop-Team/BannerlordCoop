@@ -12,13 +12,14 @@ internal class MainPartyInterface : IMainPartyInterface
 {
     public void RemoveMainParty()
     {
-        GameLoopRunner.RunOnMainThread(() =>
+        GameLoopRunner.RunOnMainThread(RemoveMainPartyInternal, blocking: false);
+    }
+
+    private void RemoveMainPartyInternal()
+    {
+        if (MobileParty.MainParty?.ActualClan != null)
         {
-            if(MobileParty.MainParty?.ActualClan != null)
-            {
-                MobileParty.MainParty.RemoveParty();
-            }
-            
-        }, blocking: false);
+            MobileParty.MainParty.RemoveParty();
+        }
     }
 }

@@ -2,9 +2,9 @@
 using TaleWorlds.GauntletUI.Data;
 using TaleWorlds.ScreenSystem;
 
-namespace Coop.UI
+namespace GameInterface.Services.UI
 {
-    class CoopConnectionUI : ScreenBase
+    public class CoopConnectionUI : ScreenBase
     {
         private CoopConnectMenuVM _dataSource;
         private GauntletLayer _gauntletLayer;

@@ -130,7 +130,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
 
     public void EndPlayerSettlementEncounter()
     {
-        PlayerLeaveSettlementPatch.OverrideLeaveConsequence();
+        GameLoopRunner.RunOnMainThread(PlayerLeaveSettlementPatch.OverrideLeaveConsequence);
     }
 
     public void EnterSettlement(string partyId, string settlementId)

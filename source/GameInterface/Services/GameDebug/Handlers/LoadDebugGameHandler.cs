@@ -16,17 +16,26 @@ namespace GameInterface.Services.GameDebug.Handlers
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<LoadDebugGame>(Handle);
+
+            // TODO move to different service
+            messageBroker.Subscribe<LoadGame>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<LoadDebugGame>(Handle);
+            messageBroker.Unsubscribe<LoadGame>(Handle);
         }
 
         private void Handle(MessagePayload<LoadDebugGame> payload)
         {
             messageBroker.Publish(this, new StartLoadingScreen());
             gameDebugInterface.LoadDebugGame();
+        }
+
+        private void Handle(MessagePayload<LoadGame> obj)
+        {
+            gameDebugInterface.LoadGame(obj.What.SaveName);
         }
     }
 }

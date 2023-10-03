@@ -1,5 +1,7 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Common.Network;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
 using Coop.Tests.Mocks;
@@ -11,35 +13,25 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Services.Time
 {
     public class TimeHandlerTests
     {
-        [Fact]
-        public void Dispose_UnsubscribesFromMessageBroker()
+        private ServerTestComponent serverTestComponent;
+
+        public TimeHandlerTests(ITestOutputHelper output)
         {
-            // Arrange
-            var broker = new MockMessageBroker();
-            var network = new MockNetwork();
-            var handler = new TimeHandler(broker, network);
-
-            Assert.NotEmpty(broker.Subscriptions);
-
-            // Act
-            handler.Dispose();
-
-            // Assert
-            Assert.Empty(broker.Subscriptions);
+            serverTestComponent = new ServerTestComponent(output);
         }
 
         [Fact]
         public void NetworkRequestTimeSpeedChange_Publishes_SetTimeControlMode()
         {
             // Arrange
-            var broker = new MockMessageBroker();
-            var network = new MockNetwork();
-            var handler = new TimeHandler(broker, network);
+            var handler = serverTestComponent.Container.Resolve<TimeHandler>();
+            var broker = serverTestComponent.Container.Resolve<MockMessageBroker>();
             var payload = new NetworkRequestTimeSpeedChange(TimeControlEnum.Pause);
             var message = new MessagePayload<NetworkRequestTimeSpeedChange>(null, payload);
 
@@ -57,10 +49,9 @@ namespace Coop.Tests.Server.Services.Time
         public void TimeSpeedChanged_Publishes_NetworkTimeSpeedChanged()
         {
             // Arrange
-            var broker = new MockMessageBroker();
-            var network = new MockNetwork();
-            var handler = new TimeHandler(broker, network);
-            var message = new MessagePayload<TimeSpeedChanged>(null, new TimeSpeedChanged(CampaignTimeControlMode.StoppablePlay));
+            var handler = serverTestComponent.Container.Resolve<TimeHandler>();
+            var network = serverTestComponent.Container.Resolve<MockNetwork>();
+            var message = new MessagePayload<AttemptedTimeSpeedChanged>(null, new AttemptedTimeSpeedChanged(CampaignTimeControlMode.StoppablePlay));
 
             network.CreatePeer();
 

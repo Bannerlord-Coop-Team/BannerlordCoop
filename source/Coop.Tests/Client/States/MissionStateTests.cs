@@ -29,8 +29,7 @@ namespace Coop.Tests.Client.States
         public void EnterCampaignState_Transitions_CampaignState()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             var payload = new MessagePayload<CampaignStateEntered>(
                 this, new CampaignStateEntered());
@@ -46,8 +45,7 @@ namespace Coop.Tests.Client.States
         public void EnterCampaignState_Publishes_EnterCampaignState()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             // Act
             clientLogic.EnterCampaignState();
@@ -61,8 +59,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             // Act
             clientLogic.EnterMainMenu();
@@ -76,8 +73,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Transitions_MainMenuState()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             var payload = new MessagePayload<MainMenuEntered>(
                 this, new MainMenuEntered());
@@ -93,8 +89,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             // Act
             clientLogic.Disconnect();
@@ -108,8 +103,7 @@ namespace Coop.Tests.Client.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             // Act
             clientLogic.Connect();

@@ -22,21 +22,17 @@ namespace Coop.Core.Client.Services.Time.Handlers
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
+            messageBroker.Subscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
             messageBroker.Subscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
-
-            messageBroker.Subscribe<NetworkEnableTimeControls>(Handle_NetworkEnableTimeControls);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
+            messageBroker.Unsubscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
             messageBroker.Unsubscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
-
-            messageBroker.Unsubscribe<NetworkEnableTimeControls>(Handle_NetworkEnableTimeControls);
         }
 
-        internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChanged> obj)
+        internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
         {
             var newMode = obj.What.NewControlMode;
 
@@ -53,11 +49,6 @@ namespace Coop.Core.Client.Services.Time.Handlers
             Logger.Verbose("Client requesting time change to {mode}", newMode);
 
             messageBroker.Publish(this, new SetTimeControlMode(newMode));
-        }
-
-        internal void Handle_NetworkEnableTimeControls(MessagePayload<NetworkEnableTimeControls> obj)
-        {
-            messageBroker.Publish(this, new EnableGameTimeControls());
         }
     }
 }

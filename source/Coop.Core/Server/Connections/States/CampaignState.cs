@@ -40,7 +40,7 @@ public class CampaignState : ConnectionStateBase
     {
         var peer = obj.Who as NetPeer;
 
-        messageBroker.Publish(this, new RegisterNewPlayerHero(peer, obj.What.HeroData));
+        messageBroker.Publish(this, new RegisterNewPlayerHero(peer, obj.What.PlayerId, obj.What.HeroData));
     }
 
     public override void CreateCharacter()

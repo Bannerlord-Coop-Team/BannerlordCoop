@@ -17,71 +17,44 @@ public class CampaignState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    public CampaignState(IClientLogic logic) : base(logic)
+    public CampaignState(IClientLogic logic, IMessageBroker messageBroker, INetwork network) : base(logic)
     {
-        messageBroker = logic.MessageBroker;
-        network = logic.Network;
-        
-        messageBroker.Subscribe<NetworkDisableTimeControls>(Handle_NetworkDisableTimeControls);
+        this.messageBroker = messageBroker;
+        this.network = network;
+
         messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<MissionStateEntered>(Handle_MissionStateEntered);
-        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+
+        
+        network.SendAll(new NetworkPlayerCampaignEntered());
     }
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkDisableTimeControls>(Handle_NetworkDisableTimeControls);
         messageBroker.Unsubscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
 
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<MissionStateEntered>(Handle_MissionStateEntered);
-        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
 
     private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
     {
-        var message = new RegisterNewPlayerHero((NetPeer)obj.Who, obj.What.PlayerHero);
+        var message = new RegisterNewPlayerHero((NetPeer)obj.Who, obj.What.PlayerId, obj.What.PlayerHero);
         messageBroker.Publish(this, message);
-    }
-
-    internal void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
-    {
-        InstantiateDeferredHeroes();
-
-        messageBroker.Publish(this, new SwitchToHero(Logic.ControlledHeroId));
-        network.SendAll(new NetworkPlayerCampaignEntered());
-    }
-
-    internal void Handle_NetworkDisableTimeControls(MessagePayload<NetworkDisableTimeControls> obj)
-    {
-        // TODO will conflict with timemode changed event
-        messageBroker.Publish(this, new PauseAndDisableGameTimeControls());
     }
 
     internal void Handle_MissionStateEntered(MessagePayload<MissionStateEntered> obj)
     {
-        Logic.State = new MissionState(Logic);
+        Logic.SetState<MissionState>();
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
-        Logic.State = new MainMenuState(Logic);
+        Logic.SetState<MainMenuState>();
     }
-
     
-
-    private void InstantiateDeferredHeroes()
-    {
-        foreach(var newHero in Logic.DeferredHeroRepository.GetAllDeferredHeroes())
-        {
-            var message = new RegisterNewPlayerHero(newHero.NetPeer, newHero.HeroData);
-            messageBroker.Publish(this, message);
-        }
-
-        Logic.DeferredHeroRepository.Clear();
-    }
 
     public override void EnterMissionState()
     {

@@ -11,6 +11,7 @@ using Serilog;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using TaleWorlds.Library;
 
 namespace Coop.Core.Client;
 
@@ -89,6 +90,8 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         {
             isConnected = true;
 
+            InformationManager.DisplayMessage(new InformationMessage("Connected! Please wait for transfer"));
+
             messageBroker.Publish(this, new NetworkConnected());
         }
     }
@@ -98,19 +101,22 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         if (isConnected == true)
         {
             isConnected = false;
+            InformationManager.DisplayMessage(new InformationMessage(disconnectInfo.Reason.ToString()));
             messageBroker.Publish(this, new NetworkDisconnected(disconnectInfo));
         }
     }
 
     public override void Start()
     {
+        InformationManager.DisplayMessage(new InformationMessage("Connecting..."));
+
         if (isConnected)
         {
             Stop();
         }
 
         netManager.Start();
-        
+
         serverPeer = netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
     }
 

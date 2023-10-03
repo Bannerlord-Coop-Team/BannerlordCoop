@@ -18,12 +18,12 @@ namespace Coop.Core
             builder.RegisterType<StateFactory>().As<IStateFactory>().InstancePerLifetimeScope();
 
             #region Network
-            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
+            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().InstancePerLifetimeScope();
             #endregion
 
             #region Communication
-            builder.RegisterType<PacketManager>().As<IPacketManager>().SingleInstance();
-            builder.RegisterType<EventPacketHandler>().AsSelf().SingleInstance().AutoActivate();
+            builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
+            builder.RegisterType<EventPacketHandler>().AsSelf().InstancePerLifetimeScope().AutoActivate();
             builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance();
             #endregion
 
