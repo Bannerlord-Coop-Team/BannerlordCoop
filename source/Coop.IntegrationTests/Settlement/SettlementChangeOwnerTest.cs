@@ -41,9 +41,9 @@ namespace Coop.IntegrationTests.Settlement
             // Assert
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<SettlementOwnershipChangeApproved>());
+                Assert.Equal(1, client.RecievedMessages.GetMessageCount<SettlementOwnershipChangeApproved>());
             }
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<SettlementOwnershipChangeRequest>());
+            Assert.Equal(1, server.RecievedMessages.GetMessageCount<SettlementOwnershipChangeRequest>());
         }
     }
 }

@@ -36,7 +36,7 @@ public class TimeControlTest
         // Assert
         foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
         {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<SetTimeControlMode>());
+            Assert.Equal(1, client.RecievedMessages.GetMessageCount<SetTimeControlMode>());
         }
     }
 }

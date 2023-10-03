@@ -34,7 +34,7 @@ namespace Coop.IntegrationTests.MobileParties
             // Assert
             foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<PartyEnterSettlement>());
+                Assert.Equal(1, client.RecievedMessages.GetMessageCount<PartyEnterSettlement>());
             }
         }
 
@@ -58,7 +58,7 @@ namespace Coop.IntegrationTests.MobileParties
             // Assert
             foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<PartyLeaveSettlement>());
+                Assert.Equal(1, client.RecievedMessages.GetMessageCount<PartyLeaveSettlement>());
             }
         }
     }

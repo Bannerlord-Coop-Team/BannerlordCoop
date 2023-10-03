@@ -11,7 +11,7 @@ namespace Coop.IntegrationTests.Environment.Instance;
 internal abstract class EnvironmentInstance
 {
     public NetPeer NetPeer => mockNetwork.NetPeer;
-    public MessageCollection InternalMessages => messageBroker.Messages;
+    public MessageCollection RecievedMessages => messageBroker.Messages;
     public MessageCollection SentMessages => mockNetwork.NetworkSentMessages;
 
     private readonly TestMessageBroker messageBroker;
