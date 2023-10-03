@@ -26,13 +26,13 @@ internal class TestNetworkRouter
     {
         if(receiver == Server.NetPeer)
         {
-            Server.SendMessage(sender, message);
+            Server.ReceiveMessage(sender, message);
         }
         else
         {
             var receivingClient = Clients.Single(client => client.NetPeer == receiver);
 
-            receivingClient.SendMessage(sender, message);
+            receivingClient.ReceiveMessage(sender, message);
         }
     }
     public void SendAll(NetPeer sender, IMessage message)
@@ -41,12 +41,12 @@ internal class TestNetworkRouter
         {
             foreach(var client in Clients)
             {
-                client.SendMessage(sender, message);
+                client.ReceiveMessage(sender, message);
             }
         }
         else
         {
-            Server.SendMessage(sender, message);
+            Server.ReceiveMessage(sender, message);
         }
     }
 
@@ -56,13 +56,13 @@ internal class TestNetworkRouter
         {
             foreach (var client in Clients.Where(c => c.NetPeer != ignored))
             {
-                client.SendMessage(sender, message);
+                client.ReceiveMessage(sender, message);
             }
         }
         else
         {
             if (ignored == Server.NetPeer) return;
-            Server.SendMessage(sender, message);
+            Server.ReceiveMessage(sender, message);
         }
     }
 
@@ -70,13 +70,13 @@ internal class TestNetworkRouter
     {
         if (receiver == Server.NetPeer)
         {
-            Server.SendPacket(sender, message);
+            Server.ReceivePacket(sender, message);
         }
         else
         {
             var receivingClient = Clients.Single(client => client.NetPeer == receiver);
 
-            receivingClient.SendPacket(sender, message);
+            receivingClient.ReceivePacket(sender, message);
         }
     }
     public void SendAll(NetPeer sender, IPacket message)
@@ -85,12 +85,12 @@ internal class TestNetworkRouter
         {
             foreach (var client in Clients)
             {
-                client.SendPacket(sender, message);
+                client.ReceivePacket(sender, message);
             }
         }
         else
         {
-            Server.SendPacket(sender, message);
+            Server.ReceivePacket(sender, message);
         }
     }
 
@@ -100,13 +100,13 @@ internal class TestNetworkRouter
         {
             foreach (var client in Clients.Where(c => c.NetPeer != ignored))
             {
-                client.SendPacket(sender, message);
+                client.ReceivePacket(sender, message);
             }
         }
         else
         {
             if (ignored == Server.NetPeer) return;
-            Server.SendPacket(sender, message);
+            Server.ReceivePacket(sender, message);
         }
     }
 }

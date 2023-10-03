@@ -110,7 +110,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
-        packetManager.HandleRecieve(peer, packet);
+        packetManager.HandleReceive(peer, packet);
     }
 
     public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)

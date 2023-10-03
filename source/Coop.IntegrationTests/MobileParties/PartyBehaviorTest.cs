@@ -29,7 +29,7 @@ public class PartyBehaviorTest
         var client1 = TestEnvironment.Clients.First();
 
         // Act
-        client1.SendMessage(this, message);
+        client1.ReceiveMessage(this, message);
 
         // Assert
         foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
