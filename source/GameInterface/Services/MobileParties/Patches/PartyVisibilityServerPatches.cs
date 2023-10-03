@@ -14,14 +14,14 @@ namespace GameInterface.Services.MobileParties.Patches
     /// Parties are always visible on server
     /// 
     /// </summary>
-    [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsVisible), MethodType.Getter)]
-    internal class PartyVisibleOnServerPatch
+    [HarmonyPatch(typeof(PartyBase), nameof(PartyBase.OnVisibilityChanged))]
+    internal class PartyVisibilityOnServerPatch
     {
-        private static void Postfix(ref bool __result)
+        private static void Prefix(ref bool value)
         {
-            if(ModInformation.IsServer)
+            if (ModInformation.IsServer)
             {
-                __result = true;
+                value = true;
             }
         }
     }

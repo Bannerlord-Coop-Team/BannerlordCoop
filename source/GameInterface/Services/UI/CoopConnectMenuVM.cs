@@ -75,7 +75,18 @@ namespace GameInterface.Services.UI
                 return;
             }
 
-            IPHostEntry hostEntry = Dns.GetHostEntry(connectIP);
+            IPHostEntry hostEntry = new IPHostEntry();
+
+            try
+            {
+                hostEntry = Dns.GetHostEntry(connectIP);
+            }
+            catch (System.Exception)
+            {
+                InformationManager.DisplayMessage(new InformationMessage("ERROR: The connection address could not be resolved"));
+                return;
+            }
+            
 
             if (hostEntry.AddressList.Length <= 0)
             {
@@ -84,8 +95,6 @@ namespace GameInterface.Services.UI
             }
 
             IPAddress ip = hostEntry.AddressList.First();
-
-            ScreenManager.PopScreen();
 
             MessageBroker.Instance.Publish(this, new ConnectWithIP(ip, port));
         }
