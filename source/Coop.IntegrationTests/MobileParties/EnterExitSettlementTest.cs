@@ -31,10 +31,6 @@ namespace Coop.IntegrationTests.MobileParties
             // Act
             client1.SendMessageInternal(this, message);
 
-            int i = 1;
-
-            Assert.Equal(1, i);
-
             // Assert
             foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
             {
