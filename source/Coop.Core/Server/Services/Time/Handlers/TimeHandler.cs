@@ -59,9 +59,6 @@ public class TimeHandler : IHandler
 
         var newMode = obj.What.NewControlMode;
 
-        Logger.Verbose("Server sending time change to {mode} to client", newMode);
-
-        _network.SendAll(new NetworkTimeSpeedChanged(newMode));
         SetTimeMode(newMode);
     }
 

@@ -36,7 +36,7 @@ public class LoadingState : ClientStateBase
         messageBroker.Publish(this, new RegisterAllGameObjects());
     }
 
-    private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
+    internal void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
         InstantiateDeferredHeroes();
 
