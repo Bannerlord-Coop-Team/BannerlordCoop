@@ -29,12 +29,12 @@ public class PartyBehaviorTest
         var client1 = TestEnvironment.Clients.First();
 
         // Act
-        client1.SendMessageInternal(this, message);
+        client1.SendMessage(this, message);
 
         // Assert
         foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
         {
-            Assert.Equal(1, client.RecievedMessages.GetMessageCount<UpdatePartyBehavior>());
+            Assert.Equal(1, client.InternalMessages.GetMessageCount<UpdatePartyBehavior>());
         }
     }
 }

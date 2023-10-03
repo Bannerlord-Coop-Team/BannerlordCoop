@@ -29,12 +29,12 @@ namespace Coop.IntegrationTests.MobileParties
             var client1 = TestEnvironment.Clients.First();
 
             // Act
-            client1.SendMessageInternal(this, message);
+            client1.SendMessage(this, message);
 
             // Assert
             foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.RecievedMessages.GetMessageCount<PartyEnterSettlement>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<PartyEnterSettlement>());
             }
         }
 
@@ -53,12 +53,12 @@ namespace Coop.IntegrationTests.MobileParties
             var client1 = TestEnvironment.Clients.First();
 
             // Act
-            client1.SendMessageInternal(this, message);
+            client1.SendMessage(this, message);
 
             // Assert
             foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.RecievedMessages.GetMessageCount<PartyLeaveSettlement>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<PartyLeaveSettlement>());
             }
         }
     }
