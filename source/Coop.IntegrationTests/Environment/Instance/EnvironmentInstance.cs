@@ -27,7 +27,10 @@ internal abstract class EnvironmentInstance
     {
         messageBroker.Publish(source, message);
     }
-
+    public void SendMessageExternal(IMessage message)
+    {
+        mockNetwork.SendAll(message);
+    }
     public void SendPacketInternal(NetPeer source, IPacket packet)
     {
         mockNetwork.ReceiveFromNetwork(source, packet);

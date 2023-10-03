@@ -1,5 +1,7 @@
-﻿using Coop.IntegrationTests.Environment;
-using GameInterface.Services.Settlements.Messages;
+﻿using Coop.Core.Client.Services.Settlements.Messages;
+using Coop.Core.Server.Services.Settlements.Messages;
+using Coop.IntegrationTests.Environment;
+using Coop.IntegrationTests.Environment.Instance;
 
 namespace Coop.IntegrationTests.Settlement
 {
@@ -26,18 +28,22 @@ namespace Coop.IntegrationTests.Settlement
             var capturerId = "Capturer Id";
             var detail = 2;
 
-            var message = new LocalSettlementOwnershipChange(settlementId, ownerId, capturerId, detail);
+            var message = new SettlementOwnershipChangeRequest(settlementId, ownerId, capturerId, detail);
 
             var client1 = TestEnvironment.Clients.First();
+            var server = TestEnvironment.Server;
 
             // Act
-            client1.SendMessageInternal(this, message);
+            client1.SendMessageExternal(message);
+
+            Console.WriteLine(TestEnvironment.Clients.Count());
 
             // Assert
-            foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
+            foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementOwnership>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<SettlementOwnershipChangeApproved>());
             }
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<SettlementOwnershipChangeRequest>());
         }
     }
 }
