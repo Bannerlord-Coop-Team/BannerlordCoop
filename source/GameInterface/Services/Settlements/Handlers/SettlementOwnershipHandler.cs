@@ -14,15 +14,15 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.Settlements.Handlers
 {
     /// <summary>
-    /// GameInterface Settlement handler
+    /// GameInterface Settlement Ownership handler
     /// </summary>
-    public class SettlementHandler : IHandler
+    public class SettlementOwnershipHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
-        private static readonly ILogger Logger = LogManager.GetLogger<SettlementHandler>();
+        private static readonly ILogger Logger = LogManager.GetLogger<SettlementOwnershipHandler>();
 
-        public SettlementHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+        public SettlementOwnershipHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;

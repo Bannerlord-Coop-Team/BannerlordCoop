@@ -12,14 +12,14 @@ using System.Text;
 namespace Coop.Core.Server.Services.Settlements.Handlers
 {
     /// <summary>
-    /// Server handler for settlements
+    /// Server handler for settlement ownership
     /// </summary>
-    public class ServerSettlementHandler : IHandler
+    public class ServerSettlementOwnershipHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
-        public ServerSettlementHandler(IMessageBroker messageBroker, INetwork network)
+        public ServerSettlementOwnershipHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.network = network;
