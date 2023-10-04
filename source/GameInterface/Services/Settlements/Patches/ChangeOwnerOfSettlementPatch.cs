@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Settlements.Messages;
@@ -22,6 +23,7 @@ namespace GameInterface.Services.Settlements.Patches
     public class ChangeOwnerOfSettlementPatch
     {
         private static readonly AllowedInstance<Settlement> AllowedInstance = new AllowedInstance<Settlement>();
+
         private static readonly Action<Settlement, Hero, Hero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail> ApplyInternal = 
         typeof(ChangeOwnerOfSettlementAction)
         .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
@@ -45,7 +47,7 @@ namespace GameInterface.Services.Settlements.Patches
 
                 GameLoopRunner.RunOnMainThread(() =>
                 {
-                    _applyInternal.Invoke(null, new object[] { settlement, newOwner, capturerHero, detail });
+                    ApplyInternal.Invoke(settlement, newOwner, capturerHero, detail);
                 }, true);
             }
         }
