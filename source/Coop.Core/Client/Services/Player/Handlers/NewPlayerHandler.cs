@@ -26,8 +26,9 @@ internal class NewPlayerHandler : IHandler
     private void Handle(MessagePayload<NetworkNewPlayerData> obj)
     {
         byte[] heroData = obj.What.HeroData;
+        var controllerId = obj.What.PlayerId;
         var peer = obj.Who as NetPeer;
 
-        messageBroker.Publish(this, new RegisterNewPlayerHero(peer, heroData));
+        messageBroker.Publish(this, new RegisterNewPlayerHero(peer, controllerId, heroData));
     }
 }

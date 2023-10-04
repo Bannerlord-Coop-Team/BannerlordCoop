@@ -2,6 +2,7 @@
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.States;
 using Serilog;
 
@@ -15,12 +16,8 @@ public interface IServerLogic : ILogic, IServerState
     /// <summary>
     /// Server-side state
     /// </summary>
-    IServerState State { get; set; }
-
-    /// <summary>
-    /// Networking Server for Server-side
-    /// </summary>
-    INetwork Network { get; }
+    IServerState State { get; }
+    TState SetState<TState>() where TState : IServerState;
 }
 
 /// <inheritdoc cref="IServerLogic"/>
@@ -42,27 +39,28 @@ public class ServerLogic : IServerLogic
     }
     private IServerState _state;
 
-    public INetwork Network { get; }
-
-    
-
-    public ServerLogic(INetwork network, IStateFactory stateFactory)
+    public ServerLogic(IStateFactory stateFactory)
     {
-        Network = network;
         this.stateFactory = stateFactory;
+        SetState<InitialServerState>();
     }
 
     public void Dispose() => State.Dispose();
 
     public void Start()
     {
-        State = stateFactory.CreateServerState<InitialServerState>();
         State.Start();
     }
 
     public void Stop()
     {
         State.Stop();
-        Network.Stop();
+    }
+
+    public TState SetState<TState>() where TState : IServerState
+    {
+        TState newState = stateFactory.CreateServerState<TState>(this);
+        State = newState;
+        return newState;
     }
 }

@@ -22,6 +22,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
     {
         void LoadDebugGame();
         void ShowAllParties();
+        void LoadGame(string saveName);
     }
 
     internal class DebugGameInterface : IDebugGameInterface
@@ -69,6 +70,12 @@ namespace GameInterface.Services.GameDebug.Interfaces
                 party.Party.Visuals.SetVisualVisible(true);
                 party.Party.Visuals.SetMapIconAsDirty();
             }
+        }
+
+        public void LoadGame(string saveName)
+        {
+            SaveGameFileInfo mp_save = MBSaveLoad.GetSaveFiles(null).Single(x => x.Name == saveName);
+            SandBoxSaveHelper.TryLoadSave(mp_save, StartGame, null);
         }
     }
 }

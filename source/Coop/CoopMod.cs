@@ -2,8 +2,8 @@
 using Common.Logging;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
-using Coop.UI;
-using HarmonyLib;
+using Coop.UI.LoadGameUI;
+using GameInterface.Services.UI;
 using Serilog;
 using System;
 using System.IO;
@@ -24,8 +24,7 @@ namespace Coop
     {
         public static UpdateableList Updateables { get; } = new UpdateableList();
 
-        public static CoopartiveMultiplayerExperience Coop = new CoopartiveMultiplayerExperience();
-
+        public static CoopartiveMultiplayerExperience Coop;
 
         public static InitialStateOption CoopCampaign;
 
@@ -65,26 +64,23 @@ namespace Coop
 
         private void SetupLogging()
         {
-            if (System.Diagnostics.Debugger.IsAttached)
+            var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
+
+            var filePostfix = isServer ? "server" : "client";
+            var filePath = $"Coop_{filePostfix}.log";
+
+            try
             {
-                var outputTemplate = "[({ProcessId}) {Timestamp:HH:mm:ss} {Level:u3} {SourceContext}] {Message:lj}{NewLine}{Exception}";
-
-                var filePostfix = isServer ? "server" : "client";
-                var filePath = $"Coop_{filePostfix}.log";
-
-                try
-                {
-                    // Clear old filepath
-                    File.Delete(filePath);
-                } 
-                catch(IOException) { }
-
-                LogManager.Configuration
-                    .Enrich.WithProcessId()
-                    .WriteTo.Debug(outputTemplate: outputTemplate)
-                    .WriteTo.File(filePath, outputTemplate: outputTemplate)
-                    .MinimumLevel.Verbose();
+                // Clear old filepath
+                File.Delete(filePath);
             }
+            catch (IOException) { }
+
+            LogManager.Configuration
+                .Enrich.WithProcessId()
+                .WriteTo.Debug(outputTemplate: outputTemplate)
+                .WriteTo.File(filePath, outputTemplate: outputTemplate)
+                .MinimumLevel.Verbose();
 
             Logger = LogManager.GetLogger<CoopMod>();
             Logger.Verbose("Coop Mod Module Started");
@@ -94,10 +90,12 @@ namespace Coop
 
         public override void NoHarmonyLoad()
         {
+            Coop  = new CoopartiveMultiplayerExperience();
+
             Updateables.Add(GameLoopRunner.Instance);
             Updateables.Add(Coop);
 
-            
+
 
             // Skip startup splash screen
 #if DEBUG
@@ -105,20 +103,16 @@ namespace Coop
                                 "_splashScreenPlayed",
                                 BindingFlags.Instance | BindingFlags.NonPublic)
                             .SetValue(Module.CurrentModule, true);
-#else
-            //ScreenManager.PushScreen(
-            //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-            //        new object[] { }));
 #endif
             #region ButtonAssignment
-            CoopCampaign =
-                new InitialStateOption(
+
+#if DEBUG
+            CoopCampaign = new InitialStateOption(
                     "CoOp Campaign",
                     new TextObject(isServer ? "Host Co-op Campaign" : "Join Co-op Campaign"),
                     9990,
                     () =>
                     {
-#if DEBUG
                         string[] array = Utilities.GetFullCommandLineString().Split(' ');
 
                         if (isServer)
@@ -129,15 +123,23 @@ namespace Coop
                         {
                             Coop.StartAsClient();
                         }
-#else
-                        //ScreenManager.PushScreen(
-                        //    ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
-                        //        new object[] { }));
-#endif
                     },
-
                     () => { return (false, new TextObject()); }
                 );
+#else
+            CoopCampaign = new InitialStateOption(
+                    "CoOp Campaign",
+                    new TextObject("Host Co-op Campaign"),
+                    9990,
+                    () =>
+                    {
+                        ScreenManager.PushScreen(
+                            ViewCreatorManager.CreateScreenView<CoopLoadScreen>(
+                                new object[] { }));
+                    },
+                    () => { return (false, new TextObject()); }
+                );
+#endif
 
             Module.CurrentModule.AddInitialStateOption(CoopCampaign);
 

@@ -35,8 +35,7 @@ namespace Coop.Tests.Client.States
         public void NewPlayerHeroRegistered_Transitions_ReceivingSavedDataState()
         {
             // Arrange
-            var characterCreationState = new CharacterCreationState(clientLogic);
-            clientLogic.State = characterCreationState;
+            var characterCreationState = clientLogic.SetState<CharacterCreationState>();
 
             var playerHeroRegistered = new NewPlayerHeroRegistered(null, null);
             var payload = new MessagePayload<NetworkPlayerData>(
@@ -53,8 +52,7 @@ namespace Coop.Tests.Client.States
         public void CharacterCreationFinished_Publishes_PackageMainHero()
         {
             // Arrange
-            var characterCreationState = new CharacterCreationState(clientLogic);
-            clientLogic.State = characterCreationState;
+            var characterCreationState = clientLogic.SetState<CharacterCreationState>();
 
             var payload = new MessagePayload<CharacterCreationFinished>(
                 this, new CharacterCreationFinished());
@@ -71,8 +69,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             // Arrange
-            var characterCreationState = new CharacterCreationState(clientLogic);
-            clientLogic.State = characterCreationState;
+            var characterCreationState = clientLogic.SetState<CharacterCreationState>();
 
             // Act
             clientLogic.EnterMainMenu();
@@ -86,8 +83,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Transitions_MainMenuState()
         {
             // Arrange
-            var characterCreationState = new CharacterCreationState(clientLogic);
-            clientLogic.State = characterCreationState;
+            var characterCreationState = clientLogic.SetState<CharacterCreationState>();
 
             var payload = new MessagePayload<MainMenuEntered>(
                 this, new MainMenuEntered());
@@ -103,8 +99,7 @@ namespace Coop.Tests.Client.States
         public void LoadSavedData_Transitions_ReceivingSavedDataState()
         {
             // Arrange
-            var characterCreationState = new CharacterCreationState(clientLogic);
-            clientLogic.State = characterCreationState;
+            var characterCreationState = clientLogic.SetState<CharacterCreationState>();
 
             // Act
             clientLogic.LoadSavedData();
@@ -117,8 +112,7 @@ namespace Coop.Tests.Client.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            var characterCreationState = new CharacterCreationState(clientLogic);
-            clientLogic.State = characterCreationState;
+            var characterCreationState = clientLogic.SetState<CharacterCreationState>();
 
             // Act
             clientLogic.Connect();

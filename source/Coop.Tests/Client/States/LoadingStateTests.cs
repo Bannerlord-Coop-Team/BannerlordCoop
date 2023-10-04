@@ -4,6 +4,7 @@ using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Messages;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -15,7 +16,6 @@ namespace Coop.Tests.Client.States
         private readonly ClientTestComponent clientComponent;
 
         private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => clientComponent.MockNetwork;
 
         public LoadingStateTests(ITestOutputHelper output)
         {
@@ -29,14 +29,13 @@ namespace Coop.Tests.Client.States
         public void CampaignLoaded_Transitions_CampaignState()
         {
             // Arrange
-            var loadingState = new LoadingState(clientLogic);
-            clientLogic.State = loadingState;
+            var loadingState = clientLogic.SetState<LoadingState>();
 
-            var payload = new MessagePayload<CampaignReady>(
-                this, new CampaignReady());
+            var payload = new MessagePayload<AllGameObjectsRegistered>(
+                this, new AllGameObjectsRegistered());
 
             // Act
-            loadingState.Handle_CampaignLoaded(payload);
+            loadingState.Handle_AllGameObjectsRegistered(payload);
 
             // Assert
             Assert.IsType<CampaignState>(clientLogic.State);
@@ -46,7 +45,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             // Arrange
-            clientLogic.State = new LoadingState(clientLogic);
+            clientLogic.SetState<LoadingState>();
 
             // Act
             clientLogic.Disconnect();
@@ -60,7 +59,7 @@ namespace Coop.Tests.Client.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            clientLogic.State = new LoadingState(clientLogic);
+            clientLogic.SetState<LoadingState>();
 
             // Act
             clientLogic.Connect();

@@ -26,7 +26,7 @@ public interface IHeroInterface : IGameAbstraction
     /// </summary>
     /// <param name="bytes">Hero as bytes</param>
     /// <returns>Hero string identifier</returns>
-    NewPlayerData UnpackHero(byte[] bytes);
+    NewPlayerData UnpackHero(string controllerId, byte[] bytes);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -55,7 +55,7 @@ internal class HeroInterface : IHeroInterface
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public NewPlayerData UnpackHero(byte[] bytes)
+    public NewPlayerData UnpackHero(string controllerId, byte[] bytes)
     {
         Hero hero = null;
 
@@ -63,6 +63,9 @@ internal class HeroInterface : IHeroInterface
             hero = UnpackMainHeroInternal(bytes);
         },
         blocking: true);
+
+        // TODO not saving correctly on server
+        heroRegistry.TryRegisterHeroController(controllerId, hero.StringId);
 
         var playerData = new NewPlayerData() {
             HeroData = bytes,

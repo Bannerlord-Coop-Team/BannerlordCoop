@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server;
 using Coop.Core.Server.States;
@@ -30,39 +31,30 @@ namespace Coop.Tests.Server.States
         public void InitialStateStart()
         {
             // Arrange
-            Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            Mock<INetwork> coopServer = new Mock<INetwork>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, MockMessageBroker);
-            serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
-            serverLogic.Setup(m => m.Network).Returns(coopServer.Object);
+            IServerLogic serverLogic = serverComponent.Container.Resolve<IServerLogic>();
 
             // Act
-            currentState.Start();
-
-            Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<LoadDebugGame>(MockMessageBroker.PublishedMessages.First());
+            serverLogic.State.Start();
 
             var payload = new MessagePayload<CampaignReady>(null, new CampaignReady());
-            var initialState = Assert.IsType<InitialServerState>(currentState);
+            var initialState = Assert.IsType<InitialServerState>(serverLogic.State);
             initialState.Handle_GameLoaded(payload);
 
             // Assert
-            Assert.IsType<ServerRunningState>(currentState);
+            Assert.IsType<ServerRunningState>(serverLogic.State);
         }
 
         [Fact]
         public void InitialStateStop()
         {
             // Arrange
-            Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, MockMessageBroker);
-            serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
+            IServerLogic serverLogic = serverComponent.Container.Resolve<IServerLogic>();
 
             // Act
-            currentState.Stop();
+            serverLogic.State.Stop();
 
             // Assert
-            Assert.IsType<InitialServerState>(currentState);
+            Assert.IsType<InitialServerState>(serverLogic.State);
         }
     }
 }

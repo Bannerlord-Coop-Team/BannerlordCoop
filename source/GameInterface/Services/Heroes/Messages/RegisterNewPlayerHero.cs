@@ -2,6 +2,7 @@
 using GameInterface.Services.Heroes.Data;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.DotNet;
 using TaleWorlds.MountAndBlade.Diamond;
 
 namespace GameInterface.Services.Heroes.Messages;
@@ -9,11 +10,13 @@ namespace GameInterface.Services.Heroes.Messages;
 public record RegisterNewPlayerHero : ICommand
 {
     public NetPeer SendingPeer { get; }
+    public string ControllerId { get; }
     public byte[] Bytes { get; }
 
-    public RegisterNewPlayerHero(NetPeer sendingPeer, byte[] bytes)
+    public RegisterNewPlayerHero(NetPeer sendingPeer, string controllerId, byte[] bytes)
     {
         SendingPeer = sendingPeer;
+        ControllerId = controllerId;
         Bytes = bytes;
     }
 }

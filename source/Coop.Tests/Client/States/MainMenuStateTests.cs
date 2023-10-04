@@ -30,10 +30,10 @@ namespace Coop.Tests.Client.States
         public void ValidateModulesMethod_Transitions_ValidateModuleState()
         {
             // Arrange
-            clientLogic.State = new MainMenuState(clientLogic);
+            var state = clientLogic.SetState<MainMenuState>();
 
             // Act
-            clientLogic.State.ValidateModules();
+            state.ValidateModules();
 
             // Assert
             Assert.IsType<ValidateModuleState>(clientLogic.State);
@@ -43,8 +43,7 @@ namespace Coop.Tests.Client.States
         public void Connect_ValidateModuleState()
         {
             // Arrange
-            var mainMenuState = new MainMenuState(clientLogic);
-            clientLogic.State = mainMenuState;
+            var mainMenuState = clientLogic.SetState<MainMenuState>();
 
             var payload = new MessagePayload<NetworkConnected>(
                 this, new NetworkConnected());
@@ -60,8 +59,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             // Arrange
-            var mainMenuState = new MainMenuState(clientLogic);
-            clientLogic.State = mainMenuState;
+            var mainMenuState = clientLogic.SetState<MainMenuState>();
 
             // Act
             clientLogic.Disconnect();

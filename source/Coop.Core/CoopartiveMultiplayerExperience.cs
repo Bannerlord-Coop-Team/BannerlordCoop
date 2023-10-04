@@ -4,9 +4,12 @@ using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client;
+using Coop.Core.Common.Configuration;
 using Coop.Core.Server;
 using Coop.Core.Surrogates;
 using GameInterface;
+using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.UI.Messages;
 using HarmonyLib;
 using System;
 
@@ -21,11 +24,37 @@ namespace Coop.Core
         {
             harmony.PatchAll(typeof(GameInterface.GameInterface).Assembly);
             SurrogateCollection.AssignSurrogates();
+
+            MessageBroker.Instance.Subscribe<ConnectWithIP>(Handle);
+            MessageBroker.Instance.Subscribe<HostSave>(Handle);
         }
 
         ~CoopartiveMultiplayerExperience()
         {
             harmony.UnpatchAll(HarmonyId);
+
+            MessageBroker.Instance.Unsubscribe<ConnectWithIP>(Handle);
+            MessageBroker.Instance.Unsubscribe<HostSave>(Handle);
+        }
+
+        private void Handle(MessagePayload<ConnectWithIP> obj)
+        {
+            var connectMessage = obj.What;
+
+            var config = new NetworkConfiguration()
+            {
+                Address = connectMessage.Address.ToString(),
+                Port = connectMessage.Port,
+            };
+
+            StartAsClient(config);
+        }
+
+        private void Handle(MessagePayload<HostSave> obj)
+        {
+            StartAsServer();
+
+            MessageBroker.Instance.Publish(this, new LoadGame(obj.What.SaveName));
         }
 
         public static UpdateableList Updateables { get; } = new UpdateableList();
@@ -57,6 +86,8 @@ namespace Coop.Core
 
         public void StartAsServer()
         {
+            _container?.Dispose();
+
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
@@ -73,14 +104,22 @@ namespace Coop.Core
             logic.Start();
         }
 
-        public void StartAsClient()
+        public void StartAsClient(INetworkConfiguration configuration = null)
         {
+            _container?.Dispose();
+
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ClientModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
+
+            if (configuration != null)
+            {
+                builder.RegisterInstance(configuration).As<INetworkConfiguration>().SingleInstance();
+            }
+
             _container = builder.Build();
 
             containerProvider.SetProvider(_container);

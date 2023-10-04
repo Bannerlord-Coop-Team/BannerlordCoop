@@ -33,7 +33,6 @@ internal class SaveGameHandler : IHandler
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
-        messageBroker.Subscribe<ExistingObjectGuidsLoaded>(Handle_ExistingObjectGuidsLoaded);
     }
 
     public void Dispose()
@@ -44,7 +43,6 @@ internal class SaveGameHandler : IHandler
         messageBroker.Unsubscribe<CampaignReady>(Handle_CampaignLoaded);
 
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
-        messageBroker.Unsubscribe<ExistingObjectGuidsLoaded>(Handle_ExistingObjectGuidsLoaded);
     }
 
     private string saveName;
@@ -88,11 +86,5 @@ internal class SaveGameHandler : IHandler
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
         messageBroker.Publish(this, new RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId));
-        messageBroker.Publish(this, new EnableGameTimeControls());
-    }
-
-    private void Handle_ExistingObjectGuidsLoaded(MessagePayload<ExistingObjectGuidsLoaded> obj)
-    {
-        messageBroker.Publish(this, new EnableGameTimeControls());
     }
 }

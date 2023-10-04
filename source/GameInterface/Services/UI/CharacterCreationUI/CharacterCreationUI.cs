@@ -6,12 +6,12 @@ using TaleWorlds.CampaignSystem.CharacterCreationContent;
 using SandBox.GauntletUI.CharacterCreation;
 using TaleWorlds.MountAndBlade.View.Screens;
 
-namespace Coop.UI.CharacterCreationUI
+namespace GameInterface.Services.UI.CharacterCreationUI
 {
     class ClientCharacterCreationReviewStageVM : CharacterCreationReviewStageVM
     {
         public ClientCharacterCreationReviewStageVM(
-            CharacterCreation characterCreation,
+            TaleWorlds.CampaignSystem.CharacterCreationContent.CharacterCreation characterCreation,
             Action affirmativeAction,
             TextObject affirmativeActionText,
             Action negativeAction,
@@ -42,7 +42,7 @@ namespace Coop.UI.CharacterCreationUI
     public class ClientCharacterCreationReviewStageView : CharacterCreationReviewStageView
     {
         public ClientCharacterCreationReviewStageView(
-            CharacterCreation characterCreation,
+            TaleWorlds.CampaignSystem.CharacterCreationContent.CharacterCreation characterCreation,
             ControlCharacterCreationStage affirmativeAction,
             TextObject affirmativeActionText,
             ControlCharacterCreationStage negativeAction,
