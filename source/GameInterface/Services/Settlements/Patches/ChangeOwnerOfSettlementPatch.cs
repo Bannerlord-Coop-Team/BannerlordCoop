@@ -22,7 +22,10 @@ namespace GameInterface.Services.Settlements.Patches
     public class ChangeOwnerOfSettlementPatch
     {
         private static readonly AllowedInstance<Settlement> AllowedInstance = new AllowedInstance<Settlement>();
-        private static readonly MethodInfo _applyInternal = typeof(ChangeOwnerOfSettlementAction).GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static);
+        private static readonly Action<Settlement, Hero, Hero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail> ApplyInternal = 
+        typeof(ChangeOwnerOfSettlementAction)
+        .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
+        .BuildDelegate<Action<Settlement, Hero, Hero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail>>();
     
         public static bool Prefix(Settlement settlement, Hero newOwner, Hero capturerHero, ChangeOwnerOfSettlementDetail detail)
         {
