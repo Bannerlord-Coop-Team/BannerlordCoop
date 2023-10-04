@@ -10,7 +10,7 @@ namespace GameInterface.Services.Clans.Messages
     /// <summary>
     /// Local event when a clan name is updated from game interface
     /// </summary>
-    public record ClanNameChange : ICommand
+    public record ClanNameChange : IEvent
     {
         public Clan Clan { get; }
         public string Name { get; }

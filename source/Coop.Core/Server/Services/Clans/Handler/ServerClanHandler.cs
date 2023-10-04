@@ -26,7 +26,10 @@ namespace Coop.Core.Server.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;
             messageBroker.Subscribe<NetworkClanNameChangeRequest>(Handle);
+
+            messageBroker.Subscribe<NetworkClanLeaderChangeRequest>(Handle);
         }
+
         public void Dispose()
         {
             messageBroker.Unsubscribe<NetworkClanNameChangeRequest>(Handle);
@@ -43,6 +46,19 @@ namespace Coop.Core.Server.Services.Clans.Handler
             NetworkClanNameChangeApproved clanNameChangeApproved = new NetworkClanNameChangeApproved(payload.ClanId, payload.Name, payload.InformalName);
 
             network.SendAll(clanNameChangeApproved);
+        }
+
+        private void Handle(MessagePayload<NetworkClanLeaderChangeRequest> obj)
+        {
+            var payload = obj.What;
+
+            ClanLeaderChanged clanLeaderChanged = new ClanLeaderChanged(payload.ClanId, payload.NewLeaderId);
+
+            messageBroker.Publish(this, clanLeaderChanged);
+
+            NetworkClanLeaderChangeApproved clanLeaderChangeApproved = new NetworkClanLeaderChangeApproved(payload.ClanId, payload.NewLeaderId);
+
+            network.SendAll(clanLeaderChangeApproved);
         }
     }
 }

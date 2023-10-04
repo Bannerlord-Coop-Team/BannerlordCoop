@@ -29,6 +29,7 @@ namespace GameInterface.Services.Clans.Handlers
             this.network = network;
             this.objectManager = objectManager;
             messageBroker.Subscribe<ClanNameChanged>(Handle);
+            messageBroker.Subscribe<ClanLeaderChanged>(Handle);
         }
 
         public void Dispose()
@@ -43,6 +44,23 @@ namespace GameInterface.Services.Clans.Handlers
             Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
 
             ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
+        }
+
+        private void Handle(MessagePayload<ClanLeaderChanged> obj)
+        {
+            var payload = obj.What;
+
+            Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
+
+            if(payload.NewLeaderId != null)
+            {
+                Hero newLeader = Hero.FindFirst(x => x.StringId == payload.NewLeaderId);
+                ClanLeaderChangePatch.RunOriginalChangeClanLeader(clan, newLeader);
+                return;
+            }
+
+            ClanLeaderChangePatch.RunOriginalChangeClanLeader(clan);
+
         }
     }
 }

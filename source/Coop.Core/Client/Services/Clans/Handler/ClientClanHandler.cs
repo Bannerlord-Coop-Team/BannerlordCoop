@@ -6,6 +6,7 @@ using Serilog;
 using GameInterface.Services.Clans.Messages;
 using Coop.Core.Client.Services.Clans.Messages;
 using Coop.Core.Server.Services.Clans.Messages;
+using System;
 
 namespace Coop.Core.Client.Services.Clans.Handler
 {
@@ -24,6 +25,9 @@ namespace Coop.Core.Client.Services.Clans.Handler
             this.network = network;
             messageBroker.Subscribe<ClanNameChange>(Handle);
             messageBroker.Subscribe<NetworkClanNameChangeApproved>(Handle);
+
+            messageBroker.Subscribe<ClanLeaderChange>(Handle);
+            messageBroker.Subscribe<NetworkClanLeaderChangeApproved>(Handle);
         }
 
         public void Dispose()
@@ -45,6 +49,20 @@ namespace Coop.Core.Client.Services.Clans.Handler
 
             messageBroker.Publish(this, new ClanNameChanged(payload.ClanId, payload.Name, payload.InformalName));
 
+        }
+
+        private void Handle(MessagePayload<ClanLeaderChange> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new NetworkClanLeaderChangeRequest(payload.Clan.StringId, payload.NewLeader?.StringId));
+        }
+
+        private void Handle(MessagePayload<NetworkClanLeaderChangeApproved> obj)
+        {
+            var payload = obj.What;
+
+            messageBroker.Publish(this, new ClanLeaderChanged(payload.ClanId, payload.NewLeaderId));
         }
     }
 }
