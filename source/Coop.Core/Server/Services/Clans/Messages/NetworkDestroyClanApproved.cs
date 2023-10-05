@@ -4,20 +4,20 @@ using ProtoBuf;
 namespace Coop.Core.Server.Services.Clans.Messages
 {
     /// <summary>
-    /// Clan leader change is approved by server
+    /// Clan destruction is approved by server
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record NetworkClanLeaderChangeApproved : ICommand
+    public record NetworkDestroyClanApproved : ICommand
     {
         [ProtoMember(1)]
         public string ClanId { get; }
         [ProtoMember(2)]
-        public string NewLeaderId { get; }
+        public int DetailId { get; }
 
-        public NetworkClanLeaderChangeApproved(string clanId, string newLeaderId)
+        public NetworkDestroyClanApproved(string clanId, int detailId)
         {
             ClanId = clanId;
-            NewLeaderId = newLeaderId;
+            DetailId = detailId;
         }
     }
 }

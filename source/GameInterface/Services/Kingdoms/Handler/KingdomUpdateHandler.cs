@@ -25,35 +25,14 @@ namespace GameInterface.Services.Kingdoms.Handler
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-            messageBroker.Subscribe<KingdomRelationUpdated>(Handle);
             messageBroker.Subscribe<PolicyAdded>(Handle);
             messageBroker.Subscribe<PolicyRemoved>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<KingdomRelationUpdated>(Handle);
             messageBroker.Unsubscribe<PolicyAdded>(Handle);
             messageBroker.Unsubscribe<PolicyRemoved>(Handle);
-        }
-
-        private void Handle(MessagePayload<KingdomRelationUpdated> obj)
-        {
-            var payload = obj.What;
-
-            if (objectManager.TryGetObject(payload.ClanId, out Clan clan) == false)
-            {
-                Logger.Error("PartyId not found: {id}", payload.ClanId);
-                return;
-            }
-
-            if (objectManager.TryGetObject(payload.KingdomId, out Kingdom kingdom) == false)
-            {
-                Logger.Information("KingdomId not found: {id}", payload.KingdomId);
-            }
-
-            ChangeKingdomActionPatch.RunOriginalApplyInternal(clan, kingdom, (ChangeKingdomActionDetail)payload.ChangeKingdomActionDetail,
-                payload.awardMultiplier, payload.byRebellion, payload.showNotification);
         }
         private void Handle(MessagePayload<PolicyAdded> obj)
         {

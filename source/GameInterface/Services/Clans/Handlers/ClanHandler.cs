@@ -6,15 +6,14 @@ using GameInterface.Services.Clans.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Handlers
 {
     /// <summary>
-    /// Handles all changes to clans.
+    /// Handles all changes to clans on client.
     /// </summary>
     public class ClanHandler : IHandler
     {
@@ -30,6 +29,8 @@ namespace GameInterface.Services.Clans.Handlers
             this.objectManager = objectManager;
             messageBroker.Subscribe<ClanNameChanged>(Handle);
             messageBroker.Subscribe<ClanLeaderChanged>(Handle);
+            messageBroker.Subscribe<ClanKingdomChanged>(Handle);
+            messageBroker.Subscribe<ClanDestroyed>(Handle);
         }
 
         public void Dispose()
@@ -61,6 +62,28 @@ namespace GameInterface.Services.Clans.Handlers
 
             ClanLeaderChangePatch.RunOriginalChangeClanLeader(clan);
 
+        }
+
+        private void Handle(MessagePayload<ClanKingdomChanged> obj)
+        {
+            var payload = obj.What;
+
+            Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
+
+            Kingdom newKingdom = Kingdom.All.Find(x => x.StringId == payload.NewKingdomId);
+
+            ClanChangeKingdomPatch.RunOriginalChangeClanKingdom(clan, newKingdom, (ChangeKingdomAction.ChangeKingdomActionDetail)payload.DetailId, 
+                payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
+
+        }
+
+        private void Handle(MessagePayload<ClanDestroyed> obj)
+        {
+            var payload = obj.What;
+
+            Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
+
+            ClanDestroyPatch.RunOriginalDestroyClan(clan, payload.Details);
         }
     }
 }

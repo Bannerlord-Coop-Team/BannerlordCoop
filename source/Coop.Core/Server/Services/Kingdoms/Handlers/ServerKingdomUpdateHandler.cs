@@ -28,33 +28,16 @@ namespace Coop.Core.Server.Services.Kingdoms.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
             this.objectManager = objectManager;
-            messageBroker.Subscribe<NetworkUpdateKingdomRelationRequest>(Handle);
             messageBroker.Subscribe<NetworkAddPolicyRequest>(Handle);
             messageBroker.Subscribe<NetworkRemovePolicyRequest>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<NetworkUpdateKingdomRelationRequest>(Handle);
             messageBroker.Unsubscribe<NetworkAddPolicyRequest>(Handle);
             messageBroker.Unsubscribe<NetworkRemovePolicyRequest>(Handle);
         }
 
-        private void Handle(MessagePayload<NetworkUpdateKingdomRelationRequest> obj)
-        {
-            var payload = obj.What;
-
-            var message = new KingdomRelationUpdated(payload.ClanId, payload.KingdomId, payload.ChangeKingdomActionDetail,
-                payload.awardMultiplier, payload.byRebellion, payload.showNotification);
-
-            messageBroker.Publish(this, message);
-
-            var networkMessage = new NetworkUpdateKingdomRelationApproved(payload.ClanId, payload.KingdomId, payload.ChangeKingdomActionDetail,
-                payload.awardMultiplier, payload.byRebellion, payload.showNotification);
-
-            network.SendAll(networkMessage);
-
-        }
         private void Handle(MessagePayload<NetworkAddPolicyRequest> obj)
         {
             var payload = obj.What;

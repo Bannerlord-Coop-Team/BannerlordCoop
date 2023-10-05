@@ -1,19 +1,16 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.ObjectManager;
+using Coop.Core.Client.Services.Clans.Messages;
+using Coop.Core.Server.Services.Clans.Messages;
+using GameInterface.Services.Clans.Messages;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
-using Coop.Core.Client.Services.Clans.Messages;
-using GameInterface.Services.Clans.Messages;
-using Coop.Core.Server.Services.Clans.Messages;
 
 namespace Coop.Core.Server.Services.Clans.Handler
 {
     /// <summary>
-    /// Handles all changes to clans.
+    /// Handles all changes to clans on server.
     /// </summary>
     public class ServerClanHandler : IHandler
     {
@@ -28,6 +25,10 @@ namespace Coop.Core.Server.Services.Clans.Handler
             messageBroker.Subscribe<NetworkClanNameChangeRequest>(Handle);
 
             messageBroker.Subscribe<NetworkClanLeaderChangeRequest>(Handle);
+
+            messageBroker.Subscribe<NetworkClanKingdomChangeRequest>(Handle);
+
+            messageBroker.Subscribe<NetworkDestroyClanRequest>(Handle);
         }
 
         public void Dispose()
@@ -59,6 +60,34 @@ namespace Coop.Core.Server.Services.Clans.Handler
             NetworkClanLeaderChangeApproved clanLeaderChangeApproved = new NetworkClanLeaderChangeApproved(payload.ClanId, payload.NewLeaderId);
 
             network.SendAll(clanLeaderChangeApproved);
+        }
+
+        private void Handle(MessagePayload<NetworkClanKingdomChangeRequest> obj)
+        {
+            var payload = obj.What;
+
+            ClanKingdomChanged clanKingdomChanged = new ClanKingdomChanged(payload.ClanId, payload.NewKingdomId, payload.DetailId, 
+                payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
+
+            messageBroker.Publish(this, clanKingdomChanged);
+
+            NetworkClanKingdomChangeApproved clanKingdomChangeApproved = new NetworkClanKingdomChangeApproved(payload.ClanId, payload.NewKingdomId,
+                payload.DetailId, payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
+
+            network.SendAll(clanKingdomChangeApproved);
+        }
+
+        private void Handle(MessagePayload<NetworkDestroyClanRequest> obj)
+        {
+            var payload = obj.What;
+
+            ClanDestroyed clanDestroyed = new ClanDestroyed(payload.ClanId, payload.DetailId);
+
+            messageBroker.Publish(this, clanDestroyed);
+
+            NetworkDestroyClanApproved destroyClanApproved = new NetworkDestroyClanApproved(payload.ClanId, payload.DetailId);
+
+            network.SendAll(destroyClanApproved);
         }
     }
 }

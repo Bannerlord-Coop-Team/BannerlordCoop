@@ -25,9 +25,16 @@ namespace Coop.Core.Client.Services.Clans.Handler
             this.network = network;
             messageBroker.Subscribe<ClanNameChange>(Handle);
             messageBroker.Subscribe<NetworkClanNameChangeApproved>(Handle);
+            
 
             messageBroker.Subscribe<ClanLeaderChange>(Handle);
             messageBroker.Subscribe<NetworkClanLeaderChangeApproved>(Handle);
+
+            messageBroker.Subscribe<ClanKingdomChange>(Handle);
+            messageBroker.Subscribe<NetworkClanKingdomChangeApproved>(Handle);
+
+            messageBroker.Subscribe<DestroyClan>(Handle);
+            messageBroker.Subscribe<NetworkDestroyClanApproved>(Handle);
         }
 
         public void Dispose()
@@ -63,6 +70,36 @@ namespace Coop.Core.Client.Services.Clans.Handler
             var payload = obj.What;
 
             messageBroker.Publish(this, new ClanLeaderChanged(payload.ClanId, payload.NewLeaderId));
+        }
+
+        private void Handle(MessagePayload<ClanKingdomChange> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new NetworkClanKingdomChangeRequest(payload.Clan.StringId, payload.NewKingdom?.StringId, 
+                (int)payload.Detail, payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification));
+        }
+
+        private void Handle(MessagePayload<NetworkClanKingdomChangeApproved> obj)
+        {
+            var payload = obj.What;
+
+            messageBroker.Publish(this, new ClanKingdomChanged(payload.ClanId, payload.NewKingdomId, payload.DetailId, 
+                payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification));
+        }
+
+        private void Handle(MessagePayload<DestroyClan> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new NetworkDestroyClanRequest(payload.Clan.StringId, payload.Details));
+        }
+
+        private void Handle(MessagePayload<NetworkDestroyClanApproved> obj)
+        {
+            var payload = obj.What;
+
+            messageBroker.Publish(this, new ClanDestroyed(payload.ClanId, payload.DetailId));
         }
     }
 }
