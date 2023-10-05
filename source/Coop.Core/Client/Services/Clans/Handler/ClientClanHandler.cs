@@ -35,6 +35,9 @@ namespace Coop.Core.Client.Services.Clans.Handler
 
             messageBroker.Subscribe<DestroyClan>(Handle);
             messageBroker.Subscribe<NetworkDestroyClanApproved>(Handle);
+
+            messageBroker.Subscribe<AddCompanion>(Handle);
+            messageBroker.Subscribe<NetworkCompanionAddApproved>(Handle);
         }
 
         public void Dispose()
@@ -100,6 +103,20 @@ namespace Coop.Core.Client.Services.Clans.Handler
             var payload = obj.What;
 
             messageBroker.Publish(this, new ClanDestroyed(payload.ClanId, payload.DetailId));
+        }
+
+        private void Handle(MessagePayload<AddCompanion> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new NetworkAddCompanionRequest(payload.Clan.StringId, payload.Companion.StringId));
+        }
+
+        private void Handle(MessagePayload<NetworkCompanionAddApproved> obj)
+        {
+            var payload = obj.What;
+
+            messageBroker.Publish(this, new CompanionAdded(payload.ClanId, payload.CompanionId));
         }
     }
 }

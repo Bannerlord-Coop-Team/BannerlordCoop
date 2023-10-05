@@ -29,6 +29,8 @@ namespace Coop.Core.Server.Services.Clans.Handler
             messageBroker.Subscribe<NetworkClanKingdomChangeRequest>(Handle);
 
             messageBroker.Subscribe<NetworkDestroyClanRequest>(Handle);
+
+            messageBroker.Subscribe<NetworkAddCompanionRequest>(Handle);
         }
 
         public void Dispose()
@@ -88,6 +90,19 @@ namespace Coop.Core.Server.Services.Clans.Handler
             NetworkDestroyClanApproved destroyClanApproved = new NetworkDestroyClanApproved(payload.ClanId, payload.DetailId);
 
             network.SendAll(destroyClanApproved);
+        }
+
+        private void Handle(MessagePayload<NetworkAddCompanionRequest> obj)
+        {
+            var payload = obj.What;
+
+            CompanionAdded companionAdded = new CompanionAdded(payload.ClanId, payload.CompanionId);
+
+            messageBroker.Publish(this, companionAdded);
+
+            NetworkCompanionAddApproved companionAddApproved = new NetworkCompanionAddApproved(payload.ClanId, payload.CompanionId);
+
+            network.SendAll(companionAddApproved);
         }
     }
 }

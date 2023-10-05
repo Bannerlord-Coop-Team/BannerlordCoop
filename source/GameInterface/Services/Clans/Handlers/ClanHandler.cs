@@ -31,6 +31,7 @@ namespace GameInterface.Services.Clans.Handlers
             messageBroker.Subscribe<ClanLeaderChanged>(Handle);
             messageBroker.Subscribe<ClanKingdomChanged>(Handle);
             messageBroker.Subscribe<ClanDestroyed>(Handle);
+            messageBroker.Subscribe<CompanionAdded>(Handle);
         }
 
         public void Dispose()
@@ -84,6 +85,17 @@ namespace GameInterface.Services.Clans.Handlers
             Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
 
             ClanDestroyPatch.RunOriginalDestroyClan(clan, payload.Details);
+        }
+
+        private void Handle(MessagePayload<CompanionAdded> obj)
+        {
+            var payload = obj.What;
+
+            Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
+
+            Hero companion = Hero.FindFirst(x => x.StringId == payload.CompanionId);
+
+            ClanAddCompanionPatch.RunOriginalAddCompanion(clan, companion);
         }
     }
 }

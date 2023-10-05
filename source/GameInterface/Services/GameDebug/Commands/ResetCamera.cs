@@ -41,5 +41,17 @@ namespace GameInterface.Services.GameDebug.Commands
 
             return clan.Name.ToString() + " has been destroyed";
         }
+
+        [CommandLineArgumentFunction("add_companion", "coop.debug")]
+        public static string AddCompanion(List<string> strings)
+        {
+            Clan clan = Clan.All[int.Parse(strings[0])];
+
+            Hero companion = Hero.AllAliveHeroes[int.Parse(strings[1])];
+
+            AddCompanionAction.Apply(clan, companion);
+
+            return companion.Name.ToString() + " has joined " + clan.Name.ToString();
+        }
     }
 }
