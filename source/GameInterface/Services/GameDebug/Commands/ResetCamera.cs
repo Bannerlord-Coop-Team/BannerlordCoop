@@ -53,5 +53,15 @@ namespace GameInterface.Services.GameDebug.Commands
 
             return companion.Name.ToString() + " has joined " + clan.Name.ToString();
         }
+
+        [CommandLineArgumentFunction("add_renown", "coop.debug")]
+        public static string AddRenown(List<string> strings)
+        {
+            Clan clan = Clan.All[int.Parse(strings[0])];
+
+            clan.AddRenown(int.Parse(strings[1]));
+
+            return clan.Name.ToString() + " given renown";
+        }
     }
 }

@@ -32,6 +32,7 @@ namespace GameInterface.Services.Clans.Handlers
             messageBroker.Subscribe<ClanKingdomChanged>(Handle);
             messageBroker.Subscribe<ClanDestroyed>(Handle);
             messageBroker.Subscribe<CompanionAdded>(Handle);
+            messageBroker.Subscribe<RenownAdded>(Handle);
         }
 
         public void Dispose()
@@ -96,6 +97,14 @@ namespace GameInterface.Services.Clans.Handlers
             Hero companion = Hero.FindFirst(x => x.StringId == payload.CompanionId);
 
             ClanAddCompanionPatch.RunOriginalAddCompanion(clan, companion);
+        }
+        private void Handle(MessagePayload<RenownAdded> obj)
+        {
+            var payload = obj.What;
+
+            Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
+
+            ClanAddRenownPatch.RunOriginalAddCompanion(clan, payload.Amount, payload.ShouldNotify);
         }
     }
 }

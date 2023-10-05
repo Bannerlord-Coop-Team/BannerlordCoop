@@ -38,6 +38,9 @@ namespace Coop.Core.Client.Services.Clans.Handler
 
             messageBroker.Subscribe<AddCompanion>(Handle);
             messageBroker.Subscribe<NetworkCompanionAddApproved>(Handle);
+
+            messageBroker.Subscribe<AddRenown>(Handle);
+            messageBroker.Subscribe<NetworkRenownAddApproved>(Handle);
         }
 
         public void Dispose()
@@ -118,5 +121,19 @@ namespace Coop.Core.Client.Services.Clans.Handler
 
             messageBroker.Publish(this, new CompanionAdded(payload.ClanId, payload.CompanionId));
         }
+
+        private void Handle(MessagePayload<AddRenown> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new NetworkAddRenownRequest(payload.Clan.StringId, payload.Amount, payload.ShouldNotify));
+        }
+        private void Handle(MessagePayload<NetworkRenownAddApproved> obj)
+        {
+            var payload = obj.What;
+
+            messageBroker.Publish(this, new RenownAdded(payload.ClanId, payload.Amount, payload.ShouldNotify));
+        }
+
     }
 }
