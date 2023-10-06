@@ -30,7 +30,7 @@ internal abstract class MockNetworkBase : INetwork
     public MessageCollection NetworkSentMessages { get; } = new MessageCollection();
     public PacketCollection NetworkSentPackets { get; } = new PacketCollection();
 
-    public void ReceiveFromNetwork(NetPeer peer, IPacket packet) => packetManager.HandleRecieve(peer, packet);
+    public void ReceiveFromNetwork(NetPeer peer, IPacket packet) => packetManager.HandleReceive(peer, packet);
 
     public void Send(NetPeer netPeer, IPacket packet)
     {
