@@ -25,7 +25,7 @@ namespace GameInterface.Services.Clans.Patches
         {
             if (AllowedInstance.IsAllowed(destroyedClan)) return true;
 
-            MessageBroker.Instance.Publish(destroyedClan, new DestroyClan(destroyedClan, details));
+            MessageBroker.Instance.Publish(destroyedClan, new DestroyClan(destroyedClan.StringId, details));
 
             return false;
         }

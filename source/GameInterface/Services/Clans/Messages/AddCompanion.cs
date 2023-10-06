@@ -8,13 +8,13 @@ namespace GameInterface.Services.Clans.Messages
     /// </summary>
     public record AddCompanion : IEvent
     {
-        public Clan Clan { get; }
-        public Hero Companion { get; }
+        public string ClanId { get; }
+        public string CompanionId { get; }
 
-        public AddCompanion(Clan clan, Hero companion)
+        public AddCompanion(string clanId, string companionId)
         {
-            Clan = clan;
-            Companion = companion;
+            ClanId = clanId;
+            CompanionId = companionId;
         }
     }
 }

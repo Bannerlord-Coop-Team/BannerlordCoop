@@ -8,13 +8,13 @@ namespace GameInterface.Services.Clans.Messages
     /// </summary>
     public record ClanLeaderChange : IEvent
     {
-        public Clan Clan { get; }
-        public Hero NewLeader { get; }
+        public string ClanId { get; }
+        public string NewLeaderId { get; }
 
-        public ClanLeaderChange(Clan clan, Hero newLeader)
+        public ClanLeaderChange(string clanId, string newLeaderId)
         {
-            Clan = clan;
-            NewLeader = newLeader;
+            ClanId = clanId;
+            NewLeaderId = newLeaderId;
         }
     }
 }

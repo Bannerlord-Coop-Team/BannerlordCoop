@@ -8,13 +8,13 @@ namespace GameInterface.Services.Clans.Messages
     /// </summary>
     public record AddRenown : IEvent
     {
-        public Clan Clan { get; }
+        public string ClanId { get; }
         public float Amount { get; }
         public bool ShouldNotify { get; }
 
-        public AddRenown(Clan clan, float amount, bool shouldNotify)
+        public AddRenown(string clanId, float amount, bool shouldNotify)
         {
-            Clan = clan;
+            ClanId = clanId;
             Amount = amount;
             ShouldNotify = shouldNotify;
         }

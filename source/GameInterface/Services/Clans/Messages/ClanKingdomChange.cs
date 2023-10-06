@@ -9,17 +9,17 @@ namespace GameInterface.Services.Clans.Messages
     /// </summary>
     public record ClanKingdomChange : IEvent
     {
-        public Clan Clan { get; }
-        public Kingdom NewKingdom { get; }
-        public ChangeKingdomAction.ChangeKingdomActionDetail Detail { get; }
+        public string ClanId { get; }
+        public string NewKingdomId { get; }
+        public int Detail { get; }
         public int AwardMultiplier { get; }
         public bool ByRebellion { get; }
         public bool ShowNotification { get; }
 
-        public ClanKingdomChange(Clan clan, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, int awardMultiplier, bool byRebellion, bool showNotification)
+        public ClanKingdomChange(string clanId, string newKingdom, int detail, int awardMultiplier, bool byRebellion, bool showNotification)
         {
-            Clan = clan;
-            NewKingdom = newKingdom;
+            ClanId = clanId;
+            NewKingdomId = newKingdom;
             Detail = detail;
             AwardMultiplier = awardMultiplier;
             ByRebellion = byRebellion;

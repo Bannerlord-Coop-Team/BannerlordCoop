@@ -12,13 +12,13 @@ namespace GameInterface.Services.Clans.Messages
     /// </summary>
     public record ClanNameChange : IEvent
     {
-        public Clan Clan { get; }
+        public string ClanId { get; }
         public string Name { get; }
         public string InformalName { get; }
 
-        public ClanNameChange(Clan clan, string name, string informalName)
+        public ClanNameChange(string clanId, string name, string informalName)
         {
-            Clan = clan;
+            ClanId = clanId;
             Name = name;
             InformalName = informalName;
         }

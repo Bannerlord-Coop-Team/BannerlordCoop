@@ -53,7 +53,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            network.SendAll(new NetworkClanNameChangeRequest(payload.Clan.StringId, payload.Name, payload.InformalName));
+            network.SendAll(new NetworkClanNameChangeRequest(payload.ClanId, payload.Name, payload.InformalName));
         }
 
         private void Handle(MessagePayload<NetworkClanNameChangeApproved> obj)
@@ -68,7 +68,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            network.SendAll(new NetworkClanLeaderChangeRequest(payload.Clan.StringId, payload.NewLeader?.StringId));
+            network.SendAll(new NetworkClanLeaderChangeRequest(payload.ClanId, payload.NewLeaderId));
         }
 
         private void Handle(MessagePayload<NetworkClanLeaderChangeApproved> obj)
@@ -82,7 +82,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            network.SendAll(new NetworkClanKingdomChangeRequest(payload.Clan.StringId, payload.NewKingdom?.StringId, 
+            network.SendAll(new NetworkClanKingdomChangeRequest(payload.ClanId, payload.NewKingdomId, 
                 (int)payload.Detail, payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification));
         }
 
@@ -98,7 +98,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            network.SendAll(new NetworkDestroyClanRequest(payload.Clan.StringId, payload.Details));
+            network.SendAll(new NetworkDestroyClanRequest(payload.ClanId, payload.Details));
         }
 
         private void Handle(MessagePayload<NetworkDestroyClanApproved> obj)
@@ -112,7 +112,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            network.SendAll(new NetworkAddCompanionRequest(payload.Clan.StringId, payload.Companion.StringId));
+            network.SendAll(new NetworkAddCompanionRequest(payload.ClanId, payload.CompanionId));
         }
 
         private void Handle(MessagePayload<NetworkCompanionAddApproved> obj)
@@ -126,7 +126,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            network.SendAll(new NetworkAddRenownRequest(payload.Clan.StringId, payload.Amount, payload.ShouldNotify));
+            network.SendAll(new NetworkAddRenownRequest(payload.ClanId, payload.Amount, payload.ShouldNotify));
         }
         private void Handle(MessagePayload<NetworkRenownAddApproved> obj)
         {

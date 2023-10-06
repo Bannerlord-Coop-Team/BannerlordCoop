@@ -8,12 +8,12 @@ namespace GameInterface.Services.Clans.Messages
     /// </summary>
     public record DestroyClan : IEvent
     {
-        public Clan Clan { get; }
+        public string ClanId { get; }
         public int Details { get; }
 
-        public DestroyClan(Clan clan, int details)
+        public DestroyClan(string clanId, int details)
         {
-            Clan = clan;
+            ClanId = clanId;
             Details = details;
         }
     }

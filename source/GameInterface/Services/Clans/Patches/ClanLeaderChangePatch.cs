@@ -29,7 +29,7 @@ namespace GameInterface.Services.Clans.Patches
         {
             if (AllowedInstance.IsAllowed(clan)) return true;
 
-            MessageBroker.Instance.Publish(clan, new ClanLeaderChange(clan, newLeader));
+            MessageBroker.Instance.Publish(clan, new ClanLeaderChange(clan.StringId, newLeader.StringId));
 
             return false;
         }
