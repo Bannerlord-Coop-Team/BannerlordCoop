@@ -92,11 +92,11 @@ namespace Coop.Tests.Communication
 
             Assert.Equal(0, handleCounter);
 
-            packetManager.HandleRecieve(null, packet);
+            packetManager.HandleReceive(null, packet);
 
             Assert.Equal(1, handleCounter);
 
-            packetManager.HandleRecieve(null, packet);
+            packetManager.HandleReceive(null, packet);
 
             Assert.Equal(2, handleCounter);
         }
