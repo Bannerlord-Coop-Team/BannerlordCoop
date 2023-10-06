@@ -3,6 +3,7 @@ using Common.LogicStates;
 using Common.Network;
 using Coop.Core;
 using Coop.Core.Client;
+using Coop.Core.Common;
 using Coop.Core.Server;
 using Xunit;
 
@@ -16,7 +17,7 @@ namespace Coop.Tests.Autofac
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
+            builder.RegisterModule<CommonModule>();
             builder.RegisterModule<ClientModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
             var container = builder.Build();
@@ -38,7 +39,7 @@ namespace Coop.Tests.Autofac
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
+            builder.RegisterModule<CommonModule>();
             builder.RegisterModule<ServerModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>();
             var container = builder.Build();

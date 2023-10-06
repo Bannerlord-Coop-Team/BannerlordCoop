@@ -1,7 +1,12 @@
-﻿using Common.Messaging;
+﻿// Ignore Spelling: Finalizer
+
+using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Common;
+using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
@@ -17,11 +22,16 @@ public class CampaignState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    public CampaignState(IClientLogic logic, IMessageBroker messageBroker, INetwork network) : base(logic)
+    private readonly ICoopFinalizer coopFinalizer;
+
+    public CampaignState(
+        IClientLogic logic,
+        IMessageBroker messageBroker, 
+        INetwork network, 
+        ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
-        this.network = network;
-
+        this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -52,7 +62,7 @@ public class CampaignState : ClientStateBase
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
-        Logic.SetState<MainMenuState>();
+        coopFinalizer.Finalize("Client has been stopped");
     }
     
 

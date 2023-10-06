@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Coop.Core.Common;
 using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States;
@@ -9,11 +10,15 @@ namespace Coop.Core.Client.States;
 public class MissionState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
+    private readonly ICoopFinalizer coopFinalizer;
 
-    public MissionState(IClientLogic logic, IMessageBroker messageBroker) : base(logic)
+    public MissionState(
+        IClientLogic logic,
+        IMessageBroker messageBroker,
+        ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
-
+        this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
     }
@@ -36,7 +41,7 @@ public class MissionState : ClientStateBase
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
-        Logic.SetState<MainMenuState>();
+        coopFinalizer.Finalize("Client has been stopped");
     }
 
     public override void EnterMainMenu()

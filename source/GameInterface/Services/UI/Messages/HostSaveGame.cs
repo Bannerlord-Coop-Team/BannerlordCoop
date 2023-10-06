@@ -2,9 +2,9 @@
 
 namespace GameInterface.Services.UI.Messages;
 
-public record HostSave : ICommand
+public record HostSaveGame : ICommand
 {
-    public HostSave(string saveName)
+    public HostSaveGame(string saveName)
     {
         SaveName = saveName;
     }

@@ -26,6 +26,8 @@ internal class EnterMainMenuHandler : IHandler
     {
         gameStateInterface.EnterMainMenu();
 
+        messageBroker.Respond(payload.Who, new EnterMainMenuResponse());
+
         messageBroker.Publish(this, new MainMenuEntered());
     }
 }

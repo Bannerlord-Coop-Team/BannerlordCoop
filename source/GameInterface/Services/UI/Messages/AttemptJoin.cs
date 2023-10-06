@@ -4,9 +4,9 @@ using System.Net;
 
 namespace GameInterface.Services.UI.Messages;
 
-public record ConnectWithIP : ICommand
+public record AttemptJoin : ICommand
 {
-    public ConnectWithIP(IPAddress address, int port)
+    public AttemptJoin(IPAddress address, int port)
     {
         Address = address;
         Port = port;

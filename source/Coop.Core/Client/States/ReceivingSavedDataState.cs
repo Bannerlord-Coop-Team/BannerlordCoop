@@ -2,6 +2,7 @@
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Common;
 using GameInterface.Services.GameState.Messages;
 using LiteNetLib;
 
@@ -15,11 +16,17 @@ public class ReceivingSavedDataState : ClientStateBase
     private NetworkGameSaveDataReceived saveDataMessage = default;
     private readonly IMessageBroker messageBroker;
     private readonly IDeferredHeroRepository deferredHeroRepo;
+    private readonly ICoopFinalizer coopFinalizer;
 
-    public ReceivingSavedDataState(IClientLogic logic, IMessageBroker messageBroker, IDeferredHeroRepository deferredHeroRepo) : base(logic)
+    public ReceivingSavedDataState(
+        IClientLogic logic,
+        IMessageBroker messageBroker,
+        IDeferredHeroRepository deferredHeroRepo,
+        ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.deferredHeroRepo = deferredHeroRepo;
+        this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);

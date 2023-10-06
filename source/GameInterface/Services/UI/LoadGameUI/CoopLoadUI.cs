@@ -50,7 +50,7 @@ namespace Coop.UI.LoadGameUI
                 GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
             }
 
-            MessageBroker.Instance.Publish(this, new HostSave(Save.Name));
+            MessageBroker.Instance.Publish(this, new HostSaveGame(Save.Name));
         }
 	}
 
