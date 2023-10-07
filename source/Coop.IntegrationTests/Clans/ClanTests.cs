@@ -216,5 +216,37 @@ namespace Coop.IntegrationTests.Clans
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanLeaderChanged>());
             }
         }
+        /// <summary>
+        /// Verify sending ChangeClanInfluence on one client
+        /// Triggers ClanInfluenceChanged on all other clients
+        /// </summary>
+        [Fact]
+        public void ClanInfluenceChange_Publishes_AllClients()
+        {
+            // Arrange
+            var clanId = "TestClan";
+
+            var message = new ChangeClanInfluence(clanId, 50);
+
+            var client1 = TestEnvironment.Clients.First();
+
+            var server = TestEnvironment.Server;
+
+            // Act
+            client1.ReceiveMessage(this, message);
+
+            // Assert
+            // Verify the server sends a single message to it's game interface to change owner settlement
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanInfluenceChanged>());
+
+            // Verify the origin client sends a single message to it's game interface to change owner settlement
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanInfluenceChanged>());
+
+            // Verify the other clients send a single message to their game interfaces to change owner settlement
+            foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanInfluenceChanged>());
+            }
+        }
     }
 }

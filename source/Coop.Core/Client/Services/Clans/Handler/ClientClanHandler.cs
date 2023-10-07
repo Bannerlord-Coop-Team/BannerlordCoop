@@ -41,6 +41,9 @@ namespace Coop.Core.Client.Services.Clans.Handler
 
             messageBroker.Subscribe<AddRenown>(Handle);
             messageBroker.Subscribe<NetworkRenownAddApproved>(Handle);
+
+            messageBroker.Subscribe<ChangeClanInfluence>(Handle);
+            messageBroker.Subscribe<NetworkClanChangeInfluenceApproved>(Handle);
         }
 
         public void Dispose()
@@ -135,5 +138,18 @@ namespace Coop.Core.Client.Services.Clans.Handler
             messageBroker.Publish(this, new RenownAdded(payload.ClanId, payload.Amount, payload.ShouldNotify));
         }
 
+        private void Handle(MessagePayload<ChangeClanInfluence> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new NetworkChangeClanInfluenceRequest(payload.ClanId, payload.Amount));
+        }
+
+        private void Handle(MessagePayload<NetworkClanChangeInfluenceApproved> obj)
+        {
+            var payload = obj.What;
+
+            messageBroker.Publish(this, new ClanInfluenceChanged(payload.ClanId, payload.Amount));
+        }
     }
 }
