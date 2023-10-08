@@ -18,7 +18,7 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Coop.IntegrationTests.Environment;
 
 /// <summary>
-/// Environment for integration testing
+/// Environment used for integration testing
 /// </summary>
 internal class TestEnvironment
 {

@@ -6,7 +6,7 @@ namespace Common.PacketHandlers
 {
     public interface IPacketManager
     {
-        void HandleRecieve(NetPeer peer, IPacket packet);
+        void HandleReceive(NetPeer peer, IPacket packet);
         void RegisterPacketHandler(IPacketHandler handler);
         void RemovePacketHandler(IPacketHandler handler);
     }
@@ -36,7 +36,7 @@ namespace Common.PacketHandlers
                 packetHandlers.Remove(handler.PacketType);
         }
 
-        public void HandleRecieve(NetPeer peer, IPacket packet)
+        public void HandleReceive(NetPeer peer, IPacket packet)
         {
             if (packetHandlers.TryGetValue(packet.PacketType, out var handlers))
             {
