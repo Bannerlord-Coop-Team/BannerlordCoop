@@ -1,16 +1,17 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.Kingdoms.Messages;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.MobileParties.Messages;
-using GameInterface.Services.MobileParties.Messages.Control;
 using System;
 
-namespace Coop.Core.Client.Services.MobileParties.Handlers;
+namespace Coop.Core.Client.Services.Kingdoms.Handlers;
 
 /// <summary>
-/// Handles heroes of mobile party entities.
+/// Handles faction war declarations
 /// </summary>
 public class FactionWarHandler : IHandler
 {
@@ -23,34 +24,35 @@ public class FactionWarHandler : IHandler
     public FactionWarHandler(
         IMessageBroker messageBroker,
         INetwork network,
-        IControllerIdProvider controllerIdProvider) 
+        IControllerIdProvider controllerIdProvider)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
-        messageBroker.Subscribe<AddHeroToParty>(Handle);
-        messageBroker.Subscribe<NetworkAddHeroToPartyApproved>(Handle);
+        messageBroker.Subscribe<DeclareWar>(Handle);
+        messageBroker.Subscribe<NetworkDeclareWarApproved>(Handle);
     }
+
     public void Dispose()
     {
-        messageBroker.Unsubscribe<AddHeroToParty>(Handle);
+        messageBroker.Unsubscribe<DeclareWar>(Handle);
     }
 
-    private void Handle(MessagePayload<AddHeroToParty> obj)
+    private void Handle(MessagePayload<DeclareWar> obj)
     {
         var payload = obj.What;
 
-        NetworkAddHeroToPartyRequest addHeroToPartyRequest = new NetworkAddHeroToPartyRequest(payload.HeroId, payload.PartyId, payload.ShowNotification);
+        NetworkDeclareWarRequest declareWarRequest = new NetworkDeclareWarRequest(payload.Faction1Id, payload.Faction2Id, payload.Detail);
 
-        network.SendAll(addHeroToPartyRequest);
+        network.SendAll(declareWarRequest);
     }
 
-    private void Handle(MessagePayload<NetworkAddHeroToPartyApproved> obj)
+    private void Handle(MessagePayload<NetworkDeclareWarApproved> obj)
     {
         var payload = obj.What;
 
-        HeroAddedToParty heroAddedToParty = new HeroAddedToParty(payload.HeroId, payload.NewPartyId, payload.ShowNotification);
+        WarDeclared warDeclared = new WarDeclared(payload.Faction1Id, payload.Faction2Id, payload.Detail);
 
-        messageBroker.Publish(this, heroAddedToParty);
+        messageBroker.Publish(this, warDeclared);
     }
 }

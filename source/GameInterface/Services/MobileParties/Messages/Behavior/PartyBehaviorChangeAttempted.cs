@@ -2,6 +2,7 @@
 using GameInterface.Services.MobileParties.Data;
 using TaleWorlds.CampaignSystem.Party;
 using GameInterface.Services.MobileParties.Handlers;
+using GameInterface.Services.Kingdoms.Handlers;
 
 namespace GameInterface.Services.MobileParties.Messages.Behavior
 {
