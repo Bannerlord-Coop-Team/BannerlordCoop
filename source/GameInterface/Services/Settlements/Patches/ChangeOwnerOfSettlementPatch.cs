@@ -20,7 +20,7 @@ namespace GameInterface.Services.Settlements.Patches
     /// Patches ownership changes of settlements
     /// </summary>
     [HarmonyPatch(typeof(ChangeOwnerOfSettlementAction), "ApplyInternal")]
-    public class ChangeOwnerOfSettlementPatch
+    public class AddHeroToPartyPatch
     {
         private static readonly AllowedInstance<Settlement> AllowedInstance = new AllowedInstance<Settlement>();
 

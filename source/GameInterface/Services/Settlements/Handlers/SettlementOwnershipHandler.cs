@@ -56,7 +56,7 @@ namespace GameInterface.Services.Settlements.Handlers
                 return;
             }
 
-            ChangeOwnerOfSettlementPatch.RunOriginalApplyInternal(settlement, owner, capturer, 
+            AddHeroToPartyPatch.RunOriginalApplyInternal(settlement, owner, capturer, 
                 (ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail)payload.Detail);
         }
     }
