@@ -105,12 +105,5 @@ internal class TestEnvironment
 
         return builder;
     }
-
-    internal class GameInterfaceStub : IGameInterface
-    {
-        public void Dispose()
-        {
-        }
-    }
 }
 

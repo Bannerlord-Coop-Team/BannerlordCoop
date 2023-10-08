@@ -4,18 +4,14 @@ using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client;
-using Coop.Core.Common;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using Coop.Core.Surrogates;
 using GameInterface;
-using GameInterface.Services.GameDebug;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
-using HarmonyLib;
 using System;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace Coop.Core
 {
@@ -93,6 +89,10 @@ namespace Coop.Core
 
             containerProvider.SetProvider(container);
 
+            // Create harmony patches
+            var gameInterface = container.Resolve<IGameInterface>();
+            gameInterface.PatchAll();
+
             network = container.Resolve<INetwork>();
 
             var logic = container.Resolve<ILogic>();
@@ -117,6 +117,10 @@ namespace Coop.Core
             container = builder.Build();
 
             containerProvider.SetProvider(container);
+
+            // Create harmony patches
+            var gameInterface = container.Resolve<IGameInterface>();
+            gameInterface.PatchAll();
 
             network = container.Resolve<INetwork>();
 

@@ -5,13 +5,21 @@ namespace GameInterface;
 
 public interface IGameInterface : IDisposable
 {
+    void PatchAll();
+    void UnpatchAll();
 }
 
 public class GameInterface : IGameInterface
 {
     private const string HarmonyId = "TaleWorlds.MountAndBlade.Bannerlord.Coop";
-    private readonly Harmony harmony;
-    public GameInterface()
+    private Harmony harmony;
+
+    public void Dispose()
+    {
+        UnpatchAll();
+    }
+
+    public void PatchAll()
     {
         if (Harmony.HasAnyPatches(HarmonyId)) return;
 
@@ -19,7 +27,7 @@ public class GameInterface : IGameInterface
         harmony.PatchAll(typeof(GameInterface).Assembly);
     }
 
-    public void Dispose()
+    public void UnpatchAll()
     {
         harmony?.UnpatchAll(HarmonyId);
     }
