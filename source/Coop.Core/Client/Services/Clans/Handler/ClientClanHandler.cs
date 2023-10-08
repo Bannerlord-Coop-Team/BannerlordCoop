@@ -44,12 +44,35 @@ namespace Coop.Core.Client.Services.Clans.Handler
 
             messageBroker.Subscribe<ChangeClanInfluence>(Handle);
             messageBroker.Subscribe<NetworkClanChangeInfluenceApproved>(Handle);
+
+            messageBroker.Subscribe<AdoptHero>(Handle);
+            messageBroker.Subscribe<NetworkAdoptHeroApproved>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<ClanNameChange>(Handle);
             messageBroker.Unsubscribe<NetworkClanNameChangeApproved>(Handle);
+            messageBroker.Unsubscribe<ClanLeaderChange>(Handle);
+            messageBroker.Unsubscribe<NetworkClanLeaderChangeApproved>(Handle);
+
+            messageBroker.Unsubscribe<ClanKingdomChange>(Handle);
+            messageBroker.Unsubscribe<NetworkClanKingdomChangeApproved>(Handle);
+
+            messageBroker.Unsubscribe<DestroyClan>(Handle);
+            messageBroker.Unsubscribe<NetworkDestroyClanApproved>(Handle);
+
+            messageBroker.Unsubscribe<AddCompanion>(Handle);
+            messageBroker.Unsubscribe<NetworkCompanionAddApproved>(Handle);
+
+            messageBroker.Unsubscribe<AddRenown>(Handle);
+            messageBroker.Unsubscribe<NetworkRenownAddApproved>(Handle);
+
+            messageBroker.Unsubscribe<ChangeClanInfluence>(Handle);
+            messageBroker.Unsubscribe<NetworkClanChangeInfluenceApproved>(Handle);
+
+            messageBroker.Unsubscribe<AdoptHero>(Handle);
+            messageBroker.Unsubscribe<NetworkAdoptHeroApproved>(Handle);
         }
 
         private void Handle(MessagePayload<ClanNameChange> obj)
@@ -150,6 +173,19 @@ namespace Coop.Core.Client.Services.Clans.Handler
             var payload = obj.What;
 
             messageBroker.Publish(this, new ClanInfluenceChanged(payload.ClanId, payload.Amount));
+        }
+        private void Handle(MessagePayload<AdoptHero> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new NetworkAdoptHeroRequest(payload.AdoptedHeroId, payload.ClanId, payload.PlayerHeroId));
+        }
+
+        private void Handle(MessagePayload<NetworkAdoptHeroApproved> obj)
+        {
+            var payload = obj.What;
+
+            messageBroker.Publish(this, new HeroAdopted(payload.HeroId, payload.PlayerClanId, payload.PlayerHeroId));
         }
     }
 }

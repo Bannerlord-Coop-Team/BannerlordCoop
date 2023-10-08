@@ -34,11 +34,19 @@ namespace GameInterface.Services.Clans.Handlers
             messageBroker.Subscribe<CompanionAdded>(Handle);
             messageBroker.Subscribe<RenownAdded>(Handle);
             messageBroker.Subscribe<ClanInfluenceChanged>(Handle);
+            messageBroker.Subscribe<HeroAdopted>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<ClanNameChanged>(Handle);
+            messageBroker.Unsubscribe<ClanLeaderChanged>(Handle);
+            messageBroker.Unsubscribe<ClanKingdomChanged>(Handle);
+            messageBroker.Unsubscribe<ClanDestroyed>(Handle);
+            messageBroker.Unsubscribe<CompanionAdded>(Handle);
+            messageBroker.Unsubscribe<RenownAdded>(Handle);
+            messageBroker.Unsubscribe<ClanInfluenceChanged>(Handle);
+            messageBroker.Unsubscribe<HeroAdopted>(Handle);
         }
 
         private void Handle(MessagePayload<ClanNameChanged> obj)
@@ -114,6 +122,19 @@ namespace GameInterface.Services.Clans.Handlers
             Clan clan = Clan.FindFirst(x => x.StringId == payload.ClanId);
 
             ClanChangeInfluencePatch.RunOriginalChangeClanInfluence(clan, payload.Amount);
+        }
+
+        private void Handle(MessagePayload<HeroAdopted> obj)
+        {
+            var payload = obj.What;
+
+            Clan playerClan = Clan.FindFirst(x => x.StringId == payload.ClanId);
+
+            Hero adoptedHero = Hero.FindFirst(x => x.StringId == payload.AdoptedHeroId);
+
+            Hero playerHero = Hero.FindFirst(x => x.StringId == payload.PlayerHeroId);
+
+            ClanAdoptHeroPatch.RunFixedAdoptHero(adoptedHero, playerClan, playerHero);
         }
     }
 }

@@ -41,13 +41,10 @@ namespace Coop.IntegrationTests.Clans
             client1.ReceiveMessage(this, message);
 
             // Assert
-            // Verify the server sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanNameChanged>());
 
-            // Verify the origin client sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanNameChanged>());
 
-            // Verify the other clients send a single message to their game interfaces to change owner settlement
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanNameChanged>());
@@ -74,13 +71,10 @@ namespace Coop.IntegrationTests.Clans
             client1.ReceiveMessage(this, message);
 
             // Assert
-            // Verify the server sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanKingdomChanged>());
 
-            // Verify the origin client sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanKingdomChanged>());
 
-            // Verify the other clients send a single message to their game interfaces to change owner settlement
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanKingdomChanged>());
@@ -106,13 +100,10 @@ namespace Coop.IntegrationTests.Clans
             client1.ReceiveMessage(this, message);
 
             // Assert
-            // Verify the server sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanDestroyed>());
 
-            // Verify the origin client sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanDestroyed>());
 
-            // Verify the other clients send a single message to their game interfaces to change owner settlement
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanDestroyed>());
@@ -139,13 +130,10 @@ namespace Coop.IntegrationTests.Clans
             client1.ReceiveMessage(this, message);
 
             // Assert
-            // Verify the server sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, server.InternalMessages.GetMessageCount<CompanionAdded>());
 
-            // Verify the origin client sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, client1.InternalMessages.GetMessageCount<CompanionAdded>());
 
-            // Verify the other clients send a single message to their game interfaces to change owner settlement
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<CompanionAdded>());
@@ -171,13 +159,10 @@ namespace Coop.IntegrationTests.Clans
             client1.ReceiveMessage(this, message);
 
             // Assert
-            // Verify the server sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, server.InternalMessages.GetMessageCount<RenownAdded>());
 
-            // Verify the origin client sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, client1.InternalMessages.GetMessageCount<RenownAdded>());
 
-            // Verify the other clients send a single message to their game interfaces to change owner settlement
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<RenownAdded>());
@@ -204,13 +189,10 @@ namespace Coop.IntegrationTests.Clans
             client1.ReceiveMessage(this, message);
 
             // Assert
-            // Verify the server sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanLeaderChanged>());
 
-            // Verify the origin client sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanLeaderChanged>());
 
-            // Verify the other clients send a single message to their game interfaces to change owner settlement
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanLeaderChanged>());
@@ -236,16 +218,44 @@ namespace Coop.IntegrationTests.Clans
             client1.ReceiveMessage(this, message);
 
             // Assert
-            // Verify the server sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanInfluenceChanged>());
 
-            // Verify the origin client sends a single message to it's game interface to change owner settlement
             Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanInfluenceChanged>());
 
-            // Verify the other clients send a single message to their game interfaces to change owner settlement
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanInfluenceChanged>());
+            }
+        }
+        /// <summary>
+        /// Verify sending AdoptHero on one client
+        /// Triggers HeroAdopted on all other clients
+        /// </summary>
+        [Fact]
+        public void AdoptHero_Publishes_AllClients()
+        {
+            // Arrange
+            var clanId = "TestClan";
+            var adoptedHeroId = "Adopted";
+            var heroId = "PlayerHero";
+
+            var message = new AdoptHero(adoptedHeroId, clanId, heroId);
+
+            var client1 = TestEnvironment.Clients.First();
+
+            var server = TestEnvironment.Server;
+
+            // Act
+            client1.ReceiveMessage(this, message);
+
+            // Assert
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<HeroAdopted>());
+
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<HeroAdopted>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<HeroAdopted>());
             }
         }
     }

@@ -35,11 +35,27 @@ namespace Coop.Core.Server.Services.Clans.Handler
             messageBroker.Subscribe<NetworkAddRenownRequest>(Handle);
 
             messageBroker.Subscribe<NetworkChangeClanInfluenceRequest>(Handle);
+
+            messageBroker.Subscribe<NetworkAdoptHeroRequest>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<NetworkClanNameChangeRequest>(Handle);
+
+            messageBroker.Unsubscribe<NetworkClanLeaderChangeRequest>(Handle);
+
+            messageBroker.Unsubscribe<NetworkClanKingdomChangeRequest>(Handle);
+
+            messageBroker.Unsubscribe<NetworkDestroyClanRequest>(Handle);
+
+            messageBroker.Unsubscribe<NetworkAddCompanionRequest>(Handle);
+
+            messageBroker.Unsubscribe<NetworkAddRenownRequest>(Handle);
+
+            messageBroker.Unsubscribe<NetworkChangeClanInfluenceRequest>(Handle);
+
+            messageBroker.Unsubscribe<NetworkAdoptHeroRequest>(Handle);
         }
 
         private void Handle(MessagePayload<NetworkClanNameChangeRequest> obj)
@@ -132,6 +148,19 @@ namespace Coop.Core.Server.Services.Clans.Handler
             NetworkClanChangeInfluenceApproved clanChangeInfluenceApproved = new NetworkClanChangeInfluenceApproved(payload.ClanId, payload.Amount);
 
             network.SendAll(clanChangeInfluenceApproved);
+        }
+
+        private void Handle(MessagePayload<NetworkAdoptHeroRequest> obj)
+        {
+            var payload = obj.What;
+
+            HeroAdopted heroAdopted = new HeroAdopted(payload.HeroId, payload.PlayerClanId, payload.PlayerHeroId);
+
+            messageBroker.Publish(this, heroAdopted);
+
+            NetworkAdoptHeroApproved adoptHeroApproved = new NetworkAdoptHeroApproved(payload.HeroId, payload.PlayerClanId, payload.PlayerHeroId);
+
+            network.SendAll(adoptHeroApproved);
         }
     }
 }
