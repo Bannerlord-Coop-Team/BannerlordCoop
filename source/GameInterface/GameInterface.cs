@@ -21,6 +21,8 @@ public class GameInterface : IGameInterface
 
     public void PatchAll()
     {
+        // NOTE: Patching in constructor causes issues with tests and CI
+
         if (Harmony.HasAnyPatches(HarmonyId)) return;
 
         harmony = new Harmony(HarmonyId);
