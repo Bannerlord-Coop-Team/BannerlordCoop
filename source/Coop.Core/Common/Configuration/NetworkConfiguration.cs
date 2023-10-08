@@ -10,9 +10,13 @@ public class NetworkConfiguration : INetworkConfiguration
 {
 #if DEBUG
     public string Address { get; set; } =  "localhost";
+    public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromMinutes(5);
 #else
     public string Address { get; set; } = "bannerlordcoop.duckdns.org";
+    public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(10);
 #endif
+
+
 
     public int Port { get; set; } = 4200;
 

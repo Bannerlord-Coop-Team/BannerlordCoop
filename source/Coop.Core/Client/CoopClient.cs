@@ -48,7 +48,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
 #if DEBUG
         // Increase disconnect timeout to prevent disconnect during debugging
-        //netManager.DisconnectTimeout = 300 * 1000;
+        netManager.DisconnectTimeout = 300 * 1000;
 #endif
     }
 

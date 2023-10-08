@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.GameDebug.Patches;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
@@ -15,11 +16,15 @@ namespace GameInterface.Services.MobileParties.Patches
     [HarmonyPatch(typeof(EnterSettlementAction))]
     internal class EnterSettlementActionPatches
     {
+        public static AllowedInstance<MobileParty> AllowedInstance = new AllowedInstance<MobileParty>();
+
         [HarmonyPrefix]
         [HarmonyPatch(nameof(EnterSettlementAction.ApplyForParty))]
         private static bool ApplyForPartyPrefix(ref MobileParty mobileParty, ref Settlement settlement)
         {
-            if (mobileParty.IsAllowed()) return true;
+            CallStackValidator.Validate(mobileParty, AllowedInstance);
+
+            if (AllowedInstance.IsAllowed(mobileParty)) return true;
 
             var message = new PartyEnterSettlementAttempted(settlement.StringId, mobileParty.StringId);
             MessageBroker.Instance.Publish(mobileParty, message);
@@ -29,49 +34,11 @@ namespace GameInterface.Services.MobileParties.Patches
 
         public static void OverrideApplyForParty(MobileParty mobileParty, Settlement settlement)
         {
-            using var allowedInstance = mobileParty.GetAllowInstance();
-            allowedInstance.IsAllowed = true;
-            EnterSettlementAction.ApplyForParty(mobileParty, settlement);
-        }
-    }
-
-    internal static class MobilePartyExtensions
-    {
-        private static ConditionalWeakTable<MobileParty, AllowInstance> PartyAllowInstanceExtension = new();
-
-        public static AllowInstance GetAllowInstance(this MobileParty mobileParty)
-        {
-            return PartyAllowInstanceExtension.GetOrCreateValue(mobileParty);
-        }
-
-        public static bool IsAllowed(this MobileParty mobileParty)
-        {
-            var allowedInstance = PartyAllowInstanceExtension.GetOrCreateValue(mobileParty);
-
-            return allowedInstance.IsAllowed;
-        }
-    }
-
-
-    internal class AllowInstance : IDisposable
-    {
-        private readonly SemaphoreSlim _sem = new SemaphoreSlim(1);
-        public bool IsAllowed
-        {
-            get => _isAllowed;
-            set
+            using(AllowedInstance)
             {
-                _sem.Wait();
-                _isAllowed = value;
+                AllowedInstance.Instance = mobileParty;
+                EnterSettlementAction.ApplyForParty(mobileParty, settlement);
             }
-        }
-
-        private bool _isAllowed = false;
-
-        public void Dispose()
-        {
-            _isAllowed = false;
-            _sem.Release();
         }
     }
 }

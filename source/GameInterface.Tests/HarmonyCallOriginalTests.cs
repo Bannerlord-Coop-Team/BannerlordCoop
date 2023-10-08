@@ -1,5 +1,5 @@
 ﻿using HarmonyLib;
-using System;
+using System.Diagnostics;
 using Xunit;
 
 namespace GameInterface.Tests
@@ -14,7 +14,8 @@ namespace GameInterface.Tests
 
             var original = AccessTools.Method(typeof(MyClass), nameof(MyClass.MyFn));
             var prefix = AccessTools.Method(typeof(MyPatch), nameof(MyPatch.Prefix));
-            harmony.Patch(original, new HarmonyMethod(prefix));
+            var harmonyMethod = new HarmonyMethod(prefix);
+            harmony.Patch(original, harmonyMethod);
 
             // Act
             var myClass = new MyClass();
@@ -23,6 +24,16 @@ namespace GameInterface.Tests
             Assert.Equal(0, myClass.MyFn());
 
             Assert.Equal(1, MyPatch.CallOriginal(myClass));
+
+            Assert.Equal(0, TestMod.TestMethod(myClass));
+        }
+    }
+
+    static class TestMod
+    {
+        public static int TestMethod(MyClass cls)
+        {
+            return cls.MyFn();
         }
     }
 
@@ -42,11 +53,34 @@ namespace GameInterface.Tests
 
         public static bool Prefix(ref MyClass __instance)
         {
-            if(__instance == _allowedInstance)
+            ValidateCallStack(ref __instance, ref _allowedInstance);
+
+            if (__instance == _allowedInstance)
             {
                 return true;
             }
             return false;
+        }
+
+        public static void ValidateCallStack<TInstance>(ref TInstance instance, ref TInstance allowedInstance) where TInstance : class
+        {
+            var callstack = new StackTrace();
+
+            foreach (var frame in callstack.GetFrames())
+            {
+                var method = frame.GetMethod();
+
+                if (method?.DeclaringType?.Namespace?.StartsWith("GameInterface") ?? false)
+                {
+                    if (instance != allowedInstance)
+                    {
+                        var patchedMethod = callstack.GetFrame(2);
+                        var name = patchedMethod.GetMethod().Name;
+                        ;
+                        // TODO log not allowed
+                    }
+                }
+            }
         }
         
         public static int CallOriginal(MyClass instance)

@@ -36,8 +36,6 @@ internal class DisableMapClickTimeChange
 
         return instrs;
     }
-
-    
 }
 
 

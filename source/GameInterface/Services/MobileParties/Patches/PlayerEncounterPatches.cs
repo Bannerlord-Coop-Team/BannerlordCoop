@@ -43,8 +43,6 @@ internal class EncounterManagerPatches
     {
         List<CodeInstruction> instructions = instrs.ToList();
 
-
-
         int startIdx = instructions.FindIndex(i => i.opcode == Call.opcode && i.operand as MethodInfo == Start);
 
         if (startIdx == -1) return instrs;

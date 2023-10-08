@@ -1,5 +1,9 @@
 ﻿using SandBox.View.Map;
 using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands
@@ -16,6 +20,14 @@ namespace GameInterface.Services.GameDebug.Commands
             cameraView.ResetCamera(true, true);
 
             return "Camera reset";
+        }
+
+        [CommandLineArgumentFunction("test", "coop.debug")]
+        public static string Test(List<string> strings)
+        {
+            EnterSettlementAction.ApplyForParty(MobileParty.MainParty, Campaign.Current?.Settlements.First());
+
+            return $"Executed {nameof(ResetCameraCommand)}";
         }
     }
 }
