@@ -47,6 +47,9 @@ namespace Coop.Core.Client.Services.Clans.Handler
 
             messageBroker.Subscribe<AdoptHero>(Handle);
             messageBroker.Subscribe<NetworkAdoptHeroApproved>(Handle);
+
+            messageBroker.Subscribe<LocalNewHeir>(Handle);
+            messageBroker.Subscribe<NetworkNewHeirApproved>(Handle);
         }
 
         public void Dispose()
@@ -186,6 +189,18 @@ namespace Coop.Core.Client.Services.Clans.Handler
             var payload = obj.What;
 
             messageBroker.Publish(this, new HeroAdopted(payload.HeroId, payload.PlayerClanId, payload.PlayerHeroId));
+        }
+        private void Handle(MessagePayload<LocalNewHeir> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new NetworkNewHeirRequest(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement));
+        }
+        private void Handle(MessagePayload<NetworkNewHeirApproved> obj)
+        {
+            var payload = obj.What;
+
+            messageBroker.Publish(this, new NewHeirAppointed(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement));
         }
     }
 }

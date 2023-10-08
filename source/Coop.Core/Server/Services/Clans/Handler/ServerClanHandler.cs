@@ -37,6 +37,8 @@ namespace Coop.Core.Server.Services.Clans.Handler
             messageBroker.Subscribe<NetworkChangeClanInfluenceRequest>(Handle);
 
             messageBroker.Subscribe<NetworkAdoptHeroRequest>(Handle);
+
+            messageBroker.Subscribe<NetworkNewHeirRequest>(Handle);
         }
 
         public void Dispose()
@@ -56,6 +58,8 @@ namespace Coop.Core.Server.Services.Clans.Handler
             messageBroker.Unsubscribe<NetworkChangeClanInfluenceRequest>(Handle);
 
             messageBroker.Unsubscribe<NetworkAdoptHeroRequest>(Handle);
+
+            messageBroker.Unsubscribe<NetworkNewHeirRequest>(Handle);
         }
 
         private void Handle(MessagePayload<NetworkClanNameChangeRequest> obj)
@@ -161,6 +165,19 @@ namespace Coop.Core.Server.Services.Clans.Handler
             NetworkAdoptHeroApproved adoptHeroApproved = new NetworkAdoptHeroApproved(payload.HeroId, payload.PlayerClanId, payload.PlayerHeroId);
 
             network.SendAll(adoptHeroApproved);
+        }
+
+        private void Handle(MessagePayload<NetworkNewHeirRequest> obj)
+        {
+            var payload = obj.What;
+
+            NewHeirAppointed newHeir = new NewHeirAppointed(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement);
+
+            messageBroker.Publish(this, newHeir);
+
+            NetworkNewHeirApproved newHeirApproved = new NetworkNewHeirApproved(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement);
+
+            network.SendAll(newHeirApproved);
         }
     }
 }

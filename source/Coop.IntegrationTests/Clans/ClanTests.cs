@@ -258,5 +258,35 @@ namespace Coop.IntegrationTests.Clans
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<HeroAdopted>());
             }
         }
+        /// <summary>
+        /// Verify sending LocalNewHeir on one client
+        /// Triggers NewHeirAppointed on all other clients
+        /// </summary>
+        [Fact]
+        public void NewHeir_Publishes_AllClients()
+        {
+            // Arrange
+            var playerHeroId = "TestClan";
+            var heirHeroId = "Adopted";
+
+            var message = new LocalNewHeir(heirHeroId, playerHeroId, false);
+
+            var client1 = TestEnvironment.Clients.First();
+
+            var server = TestEnvironment.Server;
+
+            // Act
+            client1.ReceiveMessage(this, message);
+
+            // Assert
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<NewHeirAppointed>());
+
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<NewHeirAppointed>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<NewHeirAppointed>());
+            }
+        }
     }
 }
