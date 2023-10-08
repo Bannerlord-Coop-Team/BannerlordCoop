@@ -42,6 +42,8 @@ public class MissionState : ClientStateBase
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
         coopFinalizer.Finalize("Client has been stopped");
+
+        Logic.SetState<MainMenuState>();
     }
 
     public override void EnterMainMenu()

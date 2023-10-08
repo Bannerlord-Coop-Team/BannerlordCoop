@@ -10,6 +10,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Save;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment.Mock;
+using GameInterface;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,7 +46,7 @@ internal class TestEnvironment
 
     private EnvironmentInstance CreateClient()
     {
-        var containerProvider = new ContainerProvider();
+        var containerProvider = new Core.ContainerProvider();
 
         var builder = new ContainerBuilder();
 
@@ -69,7 +70,7 @@ internal class TestEnvironment
 
     private EnvironmentInstance CreateServer()
     {
-        var containerProvider = new ContainerProvider();
+        var containerProvider = new Core.ContainerProvider();
 
         var builder = new ContainerBuilder();
 
@@ -103,6 +104,13 @@ internal class TestEnvironment
         builder.RegisterType<MockControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
 
         return builder;
+    }
+
+    internal class GameInterfaceStub : IGameInterface
+    {
+        public void Dispose()
+        {
+        }
     }
 }
 

@@ -21,7 +21,6 @@ namespace Coop.Core.Client.States;
 public class CampaignState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
     private readonly ICoopFinalizer coopFinalizer;
 
     public CampaignState(
@@ -63,6 +62,8 @@ public class CampaignState : ClientStateBase
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
         coopFinalizer.Finalize("Client has been stopped");
+
+        Logic.SetState<MainMenuState>();
     }
     
 

@@ -22,7 +22,6 @@ namespace Coop.Tests
 
             var containerProvider = new ContainerProvider();
             var builder = new ContainerBuilder();
-            builder.RegisterModule<CommonModule>();
             builder.RegisterModule<ServerModule>();
             builder.RegisterType<MockMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
             builder.RegisterType<MockNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();

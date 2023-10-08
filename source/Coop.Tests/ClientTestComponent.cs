@@ -5,6 +5,7 @@ using Coop.Core;
 using Coop.Core.Client;
 using Coop.Core.Common;
 using Coop.Tests.Mocks;
+using GameInterface;
 using Xunit.Abstractions;
 
 namespace Coop.Tests
@@ -20,14 +21,12 @@ namespace Coop.Tests
         {
             Output = output;
 
-            var containerProvider = new ContainerProvider();
+            var containerProvider = new Core.ContainerProvider();
             var builder = new ContainerBuilder();
-            builder.RegisterModule<CommonModule>();
             builder.RegisterModule<ClientModule>();
             builder.RegisterType<MockMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
             builder.RegisterType<MockNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>();
-
 
             Container = builder.Build();
 

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.States;
 using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
@@ -46,5 +47,7 @@ public class ServerRunningState : ServerStateBase
     {
         messageBroker.Publish(this, new SendPopupMessage("Server has been stopped"));
         messageBroker.Publish(this, new EndCoopMode());
+
+        Logic.SetState<InitialServerState>();
     }
 }

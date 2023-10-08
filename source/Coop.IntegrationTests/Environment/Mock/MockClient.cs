@@ -15,6 +15,10 @@ internal class MockClient : MockNetworkBase, ICoopClient
 
     public Guid ClientId => throw new NotImplementedException();
 
+    public void Dispose()
+    {
+    }
+
     public void OnConnectionRequest(ConnectionRequest request)
     {
         throw new NotImplementedException();
