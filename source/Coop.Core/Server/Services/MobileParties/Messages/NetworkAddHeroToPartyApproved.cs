@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using TaleWorlds.CampaignSystem.LogEntries;
 
 namespace Coop.Core.Server.Services.MobileParties.Messages;
 
