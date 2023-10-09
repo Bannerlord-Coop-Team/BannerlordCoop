@@ -67,9 +67,7 @@ internal class MobilePartyBehaviorHandler : IHandler
         var data = obj.What.BehaviorUpdateData;
         IMapEntity targetMapEntity = null;
 
-        if (data?.HasTarget ?? true) return;
-
-        if (!objectManager.TryGetObject(data.TargetId, out targetMapEntity))
+        if (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity))
             return;
 
         if (!objectManager.TryGetObject(data.PartyId, out MobileParty party))
