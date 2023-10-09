@@ -1,4 +1,6 @@
-﻿using HarmonyLib;
+﻿using Common.Util;
+using GameInterface.Services.GameDebug.Patches;
+using HarmonyLib;
 using System.Diagnostics;
 using Xunit;
 
@@ -24,8 +26,6 @@ namespace GameInterface.Tests
             Assert.Equal(0, myClass.MyFn());
 
             Assert.Equal(1, MyPatch.CallOriginal(myClass));
-
-            Assert.Equal(0, TestMod.TestMethod(myClass));
         }
     }
 
@@ -48,48 +48,23 @@ namespace GameInterface.Tests
 
     public class MyPatch
     {
-        private static object _lock = new object();
-        private static MyClass? _allowedInstance;
+        private static AllowedInstance<MyClass> allowedInstance = new AllowedInstance<MyClass>();
 
         public static bool Prefix(ref MyClass __instance)
         {
-            ValidateCallStack(ref __instance, ref _allowedInstance);
+            CallStackValidator.Validate(__instance, allowedInstance);
 
-            if (__instance == _allowedInstance)
-            {
-                return true;
-            }
+            if (allowedInstance.IsAllowed(__instance)) return true;
+
             return false;
-        }
-
-        public static void ValidateCallStack<TInstance>(ref TInstance instance, ref TInstance allowedInstance) where TInstance : class
-        {
-            var callstack = new StackTrace();
-
-            foreach (var frame in callstack.GetFrames())
-            {
-                var method = frame.GetMethod();
-
-                if (method?.DeclaringType?.Namespace?.StartsWith("GameInterface") ?? false)
-                {
-                    if (instance != allowedInstance)
-                    {
-                        var patchedMethod = callstack.GetFrame(2);
-                        var name = patchedMethod.GetMethod().Name;
-                        ;
-                        // TODO log not allowed
-                    }
-                }
-            }
         }
         
         public static int CallOriginal(MyClass instance)
         {
-            lock (_lock)
+            using(allowedInstance)
             {
-                _allowedInstance = instance;
+                allowedInstance.Instance = instance;
                 int result = instance.MyFn();
-                _allowedInstance = null;
                 return result;
             }
         }

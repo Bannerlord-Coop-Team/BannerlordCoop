@@ -16,8 +16,6 @@ public class NetworkConfiguration : INetworkConfiguration
     public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(10);
 #endif
 
-
-
     public int Port { get; set; } = 4200;
 
     // TODO find better token
