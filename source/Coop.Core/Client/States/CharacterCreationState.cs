@@ -1,9 +1,14 @@
-﻿using Common.Messaging;
+﻿// Ignore Spelling: Finalizer
+
+using Common.Messaging;
 using Common.Network;
+using Coop.Core.Common;
+using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 
@@ -17,16 +22,19 @@ public class CharacterCreationState : ClientStateBase
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly ICoopFinalizer coopFinalizer;
 
     public CharacterCreationState(
         IClientLogic logic,
         IMessageBroker messageBroker,
         INetwork network, 
-        IControllerIdProvider controllerIdProvider) : base(logic)
+        IControllerIdProvider controllerIdProvider,
+        ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
+        this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -68,6 +76,8 @@ public class CharacterCreationState : ClientStateBase
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
+        coopFinalizer.Finalize("Client has been stopped");
+
         Logic.SetState<MainMenuState>();
     }
 

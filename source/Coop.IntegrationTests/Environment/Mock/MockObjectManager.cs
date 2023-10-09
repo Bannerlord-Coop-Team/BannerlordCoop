@@ -26,12 +26,14 @@ namespace Coop.IntegrationTests.Environment.Mock
 
         public bool TryGetId(object obj, out string id)
         {
-            throw new NotImplementedException();
+            id = default;
+            return false;
         }
 
         public bool TryGetObject<T>(string id, out T obj)
         {
-            throw new NotImplementedException();
+            obj = default;
+            return false;
         }
     }
 }

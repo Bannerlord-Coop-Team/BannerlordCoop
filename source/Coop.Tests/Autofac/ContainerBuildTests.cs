@@ -16,7 +16,6 @@ namespace Coop.Tests.Autofac
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ClientModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
             var container = builder.Build();
@@ -38,7 +37,6 @@ namespace Coop.Tests.Autofac
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ServerModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>();
             var container = builder.Build();

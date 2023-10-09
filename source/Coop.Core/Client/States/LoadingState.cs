@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Services.Heroes.Data;
+using Coop.Core.Common;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using System;
 
 namespace Coop.Core.Client.States;
 
@@ -13,7 +15,10 @@ public class LoadingState : ClientStateBase
     private readonly IMessageBroker messageBroker;
     private readonly IDeferredHeroRepository deferredHeroRepo;
 
-    public LoadingState(IClientLogic logic, IMessageBroker messageBroker, IDeferredHeroRepository deferredHeroRepo) : base(logic)
+    public LoadingState(
+        IClientLogic logic,
+        IMessageBroker messageBroker,
+        IDeferredHeroRepository deferredHeroRepo) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.deferredHeroRepo = deferredHeroRepo;

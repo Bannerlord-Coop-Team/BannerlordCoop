@@ -1,9 +1,8 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.MobileParties.Messages;
-using HarmonyLib;
 
 namespace Coop.Core.Server.States;
 
@@ -43,6 +42,9 @@ public class ServerRunningState : ServerStateBase
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> payload)
     {
+        messageBroker.Publish(this, new SendPopupMessage("Server has been stopped"));
+        messageBroker.Publish(this, new EndCoopMode());
+
         Logic.SetState<InitialServerState>();
     }
 }

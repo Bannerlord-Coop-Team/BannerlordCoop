@@ -45,9 +45,13 @@ internal class EncounterManagerPatches
 
         int startIdx = instructions.FindIndex(i => i.opcode == Call.opcode && i.operand as MethodInfo == Start);
 
+        if (startIdx == -1) return instrs;
+
         instructions.RemoveRange(startIdx, 2);
 
         int initIdx = instructions.FindIndex(i => i.opcode == Callvirt.opcode && i.operand as MethodInfo == Init);
+
+        if (initIdx == -1) return instrs;
 
         instructions[initIdx].opcode = Call.opcode;
         instructions[initIdx].operand = typeof(EncounterManagerPatches)

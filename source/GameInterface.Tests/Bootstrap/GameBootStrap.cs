@@ -18,9 +18,8 @@ namespace GameInterface.Tests.Bootstrap
     {
         private static object @lock = new object();
 
-        private static bool IsInitialized = false;
-
-        private static Harmony harmony = new Harmony("Coop.Testing");
+        private const string HarmonyID = "Coop.Testing";
+        private static Harmony harmony;
 
         private static Campaign current;
 
@@ -33,15 +32,14 @@ namespace GameInterface.Tests.Bootstrap
         {
             lock (@lock)
             {
-                if (IsInitialized == false)
+                if (Harmony.HasAnyPatches(HarmonyID) == false)
                 {
+                    harmony = new Harmony(HarmonyID);
                     harmony.PatchAll();
 
                     InitializeMBObjectManager();
                     InitializeCampaign();
                     InitializeGame();
-
-                    IsInitialized = true;
                 }
 
                 Assert.NotNull(Campaign.Current);

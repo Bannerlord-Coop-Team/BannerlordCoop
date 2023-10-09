@@ -93,15 +93,6 @@ static class PartyBehaviorPatch
         SetShortTermBehavior(partyAi, newBehavior, targetMapEntity);
         SetBehaviorTarget(partyAi, targetPoint);
         UpdateBehavior(partyAi);
-
-        if (ModInformation.IsServer)
-        {
-            ;
-        }
-        else
-        {
-            ;
-        }
     }
 
     static readonly Action<MobilePartyAi, AiBehavior, IMapEntity> SetShortTermBehavior = typeof(MobilePartyAi)

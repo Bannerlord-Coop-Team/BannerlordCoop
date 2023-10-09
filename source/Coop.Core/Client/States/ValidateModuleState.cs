@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
@@ -16,12 +17,19 @@ public class ValidateModuleState : ClientStateBase
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly ICoopFinalizer coopFinalizer;
 
-    public ValidateModuleState(IClientLogic logic, IMessageBroker messageBroker, INetwork network, IControllerIdProvider controllerIdProvider) : base(logic)
+    public ValidateModuleState(
+        IClientLogic logic,
+        IMessageBroker messageBroker,
+        INetwork network,
+        IControllerIdProvider controllerIdProvider,
+        ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
+        this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
@@ -63,6 +71,8 @@ public class ValidateModuleState : ClientStateBase
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
+        coopFinalizer.Finalize("Client has been stopped");
+
         Logic.SetState<MainMenuState>();
     }
 

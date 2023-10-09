@@ -1,5 +1,7 @@
-﻿using HarmonyLib;
-using System;
+﻿using Common.Util;
+using GameInterface.Services.GameDebug.Patches;
+using HarmonyLib;
+using System.Diagnostics;
 using Xunit;
 
 namespace GameInterface.Tests
@@ -14,7 +16,8 @@ namespace GameInterface.Tests
 
             var original = AccessTools.Method(typeof(MyClass), nameof(MyClass.MyFn));
             var prefix = AccessTools.Method(typeof(MyPatch), nameof(MyPatch.Prefix));
-            harmony.Patch(original, new HarmonyMethod(prefix));
+            var harmonyMethod = new HarmonyMethod(prefix);
+            harmony.Patch(original, harmonyMethod);
 
             // Act
             var myClass = new MyClass();
@@ -23,6 +26,14 @@ namespace GameInterface.Tests
             Assert.Equal(0, myClass.MyFn());
 
             Assert.Equal(1, MyPatch.CallOriginal(myClass));
+        }
+    }
+
+    static class TestMod
+    {
+        public static int TestMethod(MyClass cls)
+        {
+            return cls.MyFn();
         }
     }
 
@@ -37,25 +48,23 @@ namespace GameInterface.Tests
 
     public class MyPatch
     {
-        private static object _lock = new object();
-        private static MyClass? _allowedInstance;
+        private static AllowedInstance<MyClass> allowedInstance = new AllowedInstance<MyClass>();
 
         public static bool Prefix(ref MyClass __instance)
         {
-            if(__instance == _allowedInstance)
-            {
-                return true;
-            }
+            CallStackValidator.Validate(__instance, allowedInstance);
+
+            if (allowedInstance.IsAllowed(__instance)) return true;
+
             return false;
         }
         
         public static int CallOriginal(MyClass instance)
         {
-            lock (_lock)
+            using(allowedInstance)
             {
-                _allowedInstance = instance;
+                allowedInstance.Instance = instance;
                 int result = instance.MyFn();
-                _allowedInstance = null;
                 return result;
             }
         }
