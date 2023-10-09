@@ -42,7 +42,7 @@ namespace GameInterface.Services.Clans.Patches
                     TeleportHeroAction.ApplyImmediateTeleportToSettlement(heir, settlement);
                 }
                 TransferCaravanOwnerships(heir, playerHero.Clan);
-                ChangeClanLeaderAction.ApplyWithSelectedNewLeader(Clan.PlayerClan, heir);
+                ChangeClanLeaderAction.ApplyWithSelectedNewLeader(playerHero.Clan, heir);
                 if (isRetirement)
                 {
                     DisableHeroAction.Apply(playerHero);

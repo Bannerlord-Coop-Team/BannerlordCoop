@@ -3,6 +3,7 @@ using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.GameDebug.Patches;
 using HarmonyLib;
 using System;
 using System.Reflection;
@@ -18,6 +19,8 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(ref Clan __instance, float value, bool shouldNotify = true)
         {
+            CallStackValidator.Validate(__instance, AllowedInstance);
+
             if (AllowedInstance.IsAllowed(__instance)) return true;
 
             MessageBroker.Instance.Publish(__instance, new AddRenown(__instance.StringId, value, shouldNotify));

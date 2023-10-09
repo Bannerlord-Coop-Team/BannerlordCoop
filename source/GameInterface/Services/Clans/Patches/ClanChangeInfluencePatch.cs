@@ -3,6 +3,7 @@ using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.GameDebug.Patches;
 using HarmonyLib;
 using System;
 using System.Reflection;
@@ -18,6 +19,8 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, float amount)
         {
+            CallStackValidator.Validate(clan, AllowedInstance);
+
             if (AllowedInstance.IsAllowed(clan)) return true;
 
             MessageBroker.Instance.Publish(clan, new ChangeClanInfluence(clan.StringId, amount));

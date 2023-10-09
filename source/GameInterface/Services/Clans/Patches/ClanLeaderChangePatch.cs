@@ -3,6 +3,7 @@ using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.GameDebug.Patches;
 using GameInterface.Services.MobileParties.Patches;
 using HarmonyLib;
 using System;
@@ -27,6 +28,8 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, Hero newLeader = null)
         {
+            CallStackValidator.Validate(clan, AllowedInstance);
+
             if (AllowedInstance.IsAllowed(clan)) return true;
 
             MessageBroker.Instance.Publish(clan, new ClanLeaderChange(clan.StringId, newLeader.StringId));

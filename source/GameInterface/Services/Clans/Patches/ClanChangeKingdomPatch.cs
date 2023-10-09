@@ -3,6 +3,7 @@ using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.GameDebug.Patches;
 using HarmonyLib;
 using System;
 using System.Reflection;
@@ -23,6 +24,8 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, int awardMultiplier = 0, bool byRebellion = false, bool showNotification = true)
         {
+            CallStackValidator.Validate(clan, AllowedInstance);
+
             if (AllowedInstance.IsAllowed(clan)) return true;
 
             MessageBroker.Instance.Publish(clan, new ClanKingdomChange(clan.StringId, newKingdom?.StringId, (int)detail, awardMultiplier, byRebellion, showNotification));

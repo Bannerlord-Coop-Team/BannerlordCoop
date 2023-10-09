@@ -3,6 +3,7 @@ using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.GameDebug.Patches;
 using HarmonyLib;
 using System;
 using System.Reflection;
@@ -18,6 +19,8 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, Hero companion)
         {
+            CallStackValidator.Validate(companion, AllowedInstance);
+
             if (AllowedInstance.IsAllowed(companion)) return true;
 
             MessageBroker.Instance.Publish(clan, new AddCompanion(clan.StringId, companion.StringId));
