@@ -4,16 +4,12 @@ using Common.Network;
 using Common.PacketHandlers;
 using Coop.Core;
 using Coop.Core.Client;
-using Coop.Core.Common;
 using Coop.Core.Server;
-using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Save;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment.Mock;
-using GameInterface;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -46,7 +42,7 @@ internal class TestEnvironment
 
     private EnvironmentInstance CreateClient()
     {
-        var containerProvider = new Core.ContainerProvider();
+        var containerProvider = new ContainerProvider();
 
         var builder = new ContainerBuilder();
 
@@ -70,7 +66,7 @@ internal class TestEnvironment
 
     private EnvironmentInstance CreateServer()
     {
-        var containerProvider = new Core.ContainerProvider();
+        var containerProvider = new ContainerProvider();
 
         var builder = new ContainerBuilder();
 

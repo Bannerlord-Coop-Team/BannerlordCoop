@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core;
-using Coop.Core.Common;
 using Coop.Core.Server;
 using Coop.Tests.Mocks;
 using Xunit.Abstractions;
