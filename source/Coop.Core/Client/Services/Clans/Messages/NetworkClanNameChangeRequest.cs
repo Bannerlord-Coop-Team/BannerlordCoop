@@ -1,7 +1,5 @@
 ﻿using Common.Messaging;
-using Common.PacketHandlers;
 using ProtoBuf;
-using TaleWorlds.CampaignSystem;
 
 namespace Coop.Core.Client.Services.Clans.Messages
 {
