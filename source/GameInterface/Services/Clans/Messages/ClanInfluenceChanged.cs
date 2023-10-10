@@ -4,9 +4,9 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
-    /// Event to update game interface when clan influence updated
+    /// Local event when a clan influence is changed from game interface
     /// </summary>
-    public record ClanInfluenceChanged : IEvent
+    public record ClanInfluenceChanged : ICommand
     {
         public string ClanId { get; }
         public float Amount { get; }

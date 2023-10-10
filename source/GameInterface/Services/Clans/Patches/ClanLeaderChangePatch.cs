@@ -4,15 +4,11 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.GameDebug.Patches;
-using GameInterface.Services.MobileParties.Patches;
 using HarmonyLib;
 using System;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans.Patches
 {
@@ -32,7 +28,7 @@ namespace GameInterface.Services.Clans.Patches
 
             if (AllowedInstance.IsAllowed(clan)) return true;
 
-            MessageBroker.Instance.Publish(clan, new ClanLeaderChange(clan.StringId, newLeader.StringId));
+            MessageBroker.Instance.Publish(clan, new ChangeClanLeader(clan.StringId, newLeader.StringId));
 
             return false;
         }

@@ -1,14 +1,10 @@
 ﻿using Common;
-using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.GameDebug.Patches;
 using HarmonyLib;
-using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.Clans.Patches
 {
@@ -23,7 +19,7 @@ namespace GameInterface.Services.Clans.Patches
 
             if (AllowedInstance.IsAllowed(__instance)) return true;
 
-            MessageBroker.Instance.Publish(__instance, new AddRenown(__instance.StringId, value, shouldNotify));
+            MessageBroker.Instance.Publish(__instance, new AddClanRenown(__instance.StringId, value, shouldNotify));
 
             return false;
         }

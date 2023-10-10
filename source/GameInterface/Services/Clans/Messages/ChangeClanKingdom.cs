@@ -1,26 +1,24 @@
 ﻿using Common.Messaging;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
-    /// Local event when a clan kingdom is changed from game interface
+    /// Event to update game interface when clan kingdom is changed
     /// </summary>
-    public record ClanKingdomChange : IEvent
+    public record ChangeClanKingdom : ICommand
     {
         public string ClanId { get; }
         public string NewKingdomId { get; }
-        public int Detail { get; }
+        public int DetailId { get; }
         public int AwardMultiplier { get; }
         public bool ByRebellion { get; }
         public bool ShowNotification { get; }
 
-        public ClanKingdomChange(string clanId, string newKingdom, int detail, int awardMultiplier, bool byRebellion, bool showNotification)
+        public ChangeClanKingdom(string clanId, string newKingdomId, int detailId, int awardMultiplier, bool byRebellion, bool showNotification)
         {
             ClanId = clanId;
-            NewKingdomId = newKingdom;
-            Detail = detail;
+            NewKingdomId = newKingdomId;
+            DetailId = detailId;
             AwardMultiplier = awardMultiplier;
             ByRebellion = byRebellion;
             ShowNotification = showNotification;

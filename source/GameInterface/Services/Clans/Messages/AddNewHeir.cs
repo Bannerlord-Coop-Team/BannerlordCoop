@@ -4,15 +4,15 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
-    /// Event to update game interface when new heir appointed
+    /// Event to update game interface when clan appoints new heir
     /// </summary>
-    public record NewHeirAppointed : IEvent
+    public record AddNewHeir : ICommand
     {
         public string HeirHeroId { get; }
         public string PlayerHeroId { get; }
         public bool IsRetirement { get; }
 
-        public NewHeirAppointed(string heirHeroId, string playerHeroId, bool isRetirement)
+        public AddNewHeir(string heirHeroId, string playerHeroId, bool isRetirement)
         {
             HeirHeroId = heirHeroId;
             PlayerHeroId = playerHeroId;

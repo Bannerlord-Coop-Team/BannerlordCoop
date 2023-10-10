@@ -8,15 +8,15 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
-    /// Local event when a clan name is updated from game interface
+    /// Event to update game interface when clan name is changed
     /// </summary>
-    public record ClanNameChange : IEvent
+    public record ChangeClanName : ICommand
     {
         public string ClanId { get; }
         public string Name { get; }
         public string InformalName { get; }
 
-        public ClanNameChange(string clanId, string name, string informalName)
+        public ChangeClanName(string clanId, string name, string informalName)
         {
             ClanId = clanId;
             Name = name;

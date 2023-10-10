@@ -4,9 +4,9 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
-    /// Event to update game interface hero is adopted
+    /// Local event when a clan adopts hero from game interface
     /// </summary>
-    public record HeroAdopted : IEvent
+    public record HeroAdopted : ICommand
     {
         public string AdoptedHeroId { get; }
         public string ClanId { get; }

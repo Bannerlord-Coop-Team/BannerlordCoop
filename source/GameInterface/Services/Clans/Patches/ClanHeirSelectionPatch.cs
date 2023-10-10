@@ -22,7 +22,7 @@ namespace GameInterface.Services.Clans.Patches
         {
             string playerHeroId = Hero.MainHero.StringId;
 
-            MessageBroker.Instance.Publish(heir, new LocalNewHeir(heir.StringId, playerHeroId, isRetirement));
+            MessageBroker.Instance.Publish(heir, new NewHeirAdded(heir.StringId, playerHeroId, isRetirement));
 
             return false;
         }

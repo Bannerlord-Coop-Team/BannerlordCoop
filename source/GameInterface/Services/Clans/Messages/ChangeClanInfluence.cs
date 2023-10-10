@@ -1,12 +1,11 @@
 ﻿using Common.Messaging;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
-    /// Local event when a clan influence changes from game interface
+    /// Event to update game interface when clan influence is changed
     /// </summary>
-    public record ChangeClanInfluence : IEvent
+    public record ChangeClanInfluence : ICommand
     {
         public string ClanId { get; }
         public float Amount { get; }

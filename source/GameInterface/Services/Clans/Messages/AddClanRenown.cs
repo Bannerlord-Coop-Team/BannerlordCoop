@@ -1,18 +1,17 @@
 ﻿using Common.Messaging;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
-    /// Event to update game interface when renown is added
+    /// Event to update game interface when clan renown is changed
     /// </summary>
-    public record RenownAdded : IEvent
+    public record AddClanRenown : ICommand
     {
         public string ClanId { get; }
         public float Amount { get; }
         public bool ShouldNotify { get; }
 
-        public RenownAdded(string clanId, float amount, bool shouldNotify)
+        public AddClanRenown(string clanId, float amount, bool shouldNotify)
         {
             ClanId = clanId;
             Amount = amount;

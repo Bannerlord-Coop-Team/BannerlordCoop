@@ -4,9 +4,9 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
-    /// Event to update game interface when companion is added
+    /// Local event when a clan adds companion from game interface
     /// </summary>
-    public record CompanionAdded : IEvent
+    public record CompanionAdded : ICommand
     {
         public string ClanId { get; }
         public string CompanionId { get; }

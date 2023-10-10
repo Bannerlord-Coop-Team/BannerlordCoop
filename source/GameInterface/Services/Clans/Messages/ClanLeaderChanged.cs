@@ -3,9 +3,9 @@
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
-    /// Event to update game interface when clan leader is changed
+    /// Local event when a clan leader is changed from game interface
     /// </summary>
-    public record ClanLeaderChanged : IEvent
+    public record ClanLeaderChanged : ICommand
     {
         public string ClanId { get; }
         public string NewLeaderId { get; }

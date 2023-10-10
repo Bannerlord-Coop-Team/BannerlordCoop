@@ -4,9 +4,9 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
-    /// Event to update game interface when clan is destroyed
+    /// Local event when a clan is destroyed from game interface
     /// </summary>
-    public record ClanDestroyed : IEvent
+    public record ClanDestroyed : ICommand
     {
         public string ClanId { get; }
         public int Details { get; }

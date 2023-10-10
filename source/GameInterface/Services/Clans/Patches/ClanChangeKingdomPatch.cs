@@ -28,7 +28,7 @@ namespace GameInterface.Services.Clans.Patches
 
             if (AllowedInstance.IsAllowed(clan)) return true;
 
-            MessageBroker.Instance.Publish(clan, new ClanKingdomChange(clan.StringId, newKingdom?.StringId, (int)detail, awardMultiplier, byRebellion, showNotification));
+            MessageBroker.Instance.Publish(clan, new ClanKingdomChanged(clan.StringId, newKingdom?.StringId, (int)detail, awardMultiplier, byRebellion, showNotification));
 
             return false;
         }

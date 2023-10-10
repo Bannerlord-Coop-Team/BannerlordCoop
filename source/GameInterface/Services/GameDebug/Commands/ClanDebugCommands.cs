@@ -1,12 +1,11 @@
-﻿using SandBox.View.Map;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands
 {
-    internal class ResetCamera
+    internal class ClanDebugCommands
     {
         [CommandLineArgumentFunction("change_clan_leader", "coop.debug")]
         public static string ChangeClanLeader(List<string> strings)

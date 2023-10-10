@@ -1,12 +1,9 @@
 ﻿using Common;
-using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.GameDebug.Patches;
 using HarmonyLib;
-using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 
