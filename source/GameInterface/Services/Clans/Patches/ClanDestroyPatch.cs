@@ -2,6 +2,7 @@
 using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.GameDebug.Patches;
 using HarmonyLib;
@@ -24,6 +25,8 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan destroyedClan, int details)
         {
+            if (PolicyProvider.AllowOriginalCalls) return true;
+
             CallStackValidator.Validate(destroyedClan, AllowedInstance);
 
             if (AllowedInstance.IsAllowed(destroyedClan)) return true;

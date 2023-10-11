@@ -37,9 +37,17 @@ namespace GameInterface.Services.Clans.Handlers
         {
             var payload = obj.What;
 
-            objectManager.TryGetObject<Clan>(payload.ClanId, out var clan);
+            if (objectManager.TryGetObject<Clan>(payload.ClanId, out var clan) == false)
+            {
+                Logger.Error("Unable to find clan ({clanId})", payload.ClanId);
+                return;
+            }
 
-            objectManager.TryGetObject<Hero>(payload.CompanionId, out var companion);
+            if (objectManager.TryGetObject<Hero>(payload.CompanionId, out var companion) == false)
+            {
+                Logger.Error("Unable to find companion ({heroId})", payload.CompanionId);
+                return;
+            }
 
             ClanAddCompanionPatch.RunOriginalAddCompanion(clan, companion);
         }

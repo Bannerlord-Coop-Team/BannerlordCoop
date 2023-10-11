@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.Clans.Messages;
+using Coop.Core.Client.States;
 using Coop.Core.Server.Services.Clans.Messages;
 using GameInterface.Services.Clans.Messages;
 using Serilog;
@@ -15,12 +16,14 @@ namespace Coop.Core.Client.Services.Clans.Handler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
+        private readonly IClientLogic clientLogic;
         private readonly ILogger Logger = LogManager.GetLogger<ClientClanNameHandler>();
 
-        public ClientClanNameHandler(IMessageBroker messageBroker, INetwork network)
+        public ClientClanNameHandler(IMessageBroker messageBroker, INetwork network, IClientLogic clientLogic)
         {
             this.messageBroker = messageBroker;
             this.network = network;
+            this.clientLogic = clientLogic;
             messageBroker.Subscribe<ClanNameChanged>(Handle);
             messageBroker.Subscribe<NetworkClanNameChangeApproved>(Handle);
             

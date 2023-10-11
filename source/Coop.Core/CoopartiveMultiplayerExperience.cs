@@ -88,6 +88,7 @@ namespace Coop.Core
             container = builder.Build();
 
             containerProvider.SetProvider(container);
+            GameInterface.ContainerProvider.SetContainer(container);
 
             // Create harmony patches
             var gameInterface = container.Resolve<IGameInterface>();
@@ -117,6 +118,7 @@ namespace Coop.Core
             container = builder.Build();
 
             containerProvider.SetProvider(container);
+            GameInterface.ContainerProvider.SetContainer(container);
 
             // Create harmony patches
             var gameInterface = container.Resolve<IGameInterface>();

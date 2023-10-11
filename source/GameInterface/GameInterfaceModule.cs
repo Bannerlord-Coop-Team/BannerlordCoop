@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using GameInterface.Serialization;
 using GameInterface.Services;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
@@ -26,6 +27,10 @@ public class GameInterfaceModule : Module
 
         builder.RegisterType<HeroRegistry>()
                .As<IHeroRegistry>()
+               .InstancePerLifetimeScope();
+
+        builder.RegisterType<ClanRegistry>()
+               .As<IClanRegistry>()
                .InstancePerLifetimeScope();
 
         builder.RegisterType<ControlledEntityRegistry>()

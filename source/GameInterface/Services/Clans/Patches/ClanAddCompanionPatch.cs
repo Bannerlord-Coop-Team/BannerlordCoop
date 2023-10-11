@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.GameDebug.Patches;
 using HarmonyLib;
@@ -16,6 +17,8 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, Hero companion)
         {
+            if (PolicyProvider.AllowOriginalCalls) return true;
+
             CallStackValidator.Validate(companion, AllowedInstance);
 
             if (AllowedInstance.IsAllowed(companion)) return true;

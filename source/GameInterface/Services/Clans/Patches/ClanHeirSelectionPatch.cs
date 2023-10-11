@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Clans.Messages;
 using HarmonyLib;
 using Helpers;
@@ -20,6 +21,8 @@ namespace GameInterface.Services.Clans.Patches
     {
         public static bool Prefix(Hero heir, bool isRetirement = false)
         {
+            if (PolicyProvider.AllowOriginalCalls) return true;
+
             string playerHeroId = Hero.MainHero.StringId;
 
             MessageBroker.Instance.Publish(heir, new NewHeirAdded(heir.StringId, playerHeroId, isRetirement));
