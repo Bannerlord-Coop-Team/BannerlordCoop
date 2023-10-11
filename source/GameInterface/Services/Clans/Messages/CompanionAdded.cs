@@ -6,7 +6,7 @@ namespace GameInterface.Services.Clans.Messages
     /// <summary>
     /// Local event when a clan adds companion from game interface
     /// </summary>
-    public record CompanionAdded : ICommand
+    public record CompanionAdded : IEvent
     {
         public string ClanId { get; }
         public string CompanionId { get; }

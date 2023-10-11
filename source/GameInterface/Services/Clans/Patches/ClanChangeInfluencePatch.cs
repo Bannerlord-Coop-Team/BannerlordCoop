@@ -20,7 +20,7 @@ namespace GameInterface.Services.Clans.Patches
 
             if (AllowedInstance.IsAllowed(clan)) return true;
 
-            MessageBroker.Instance.Publish(clan, new ChangeClanInfluence(clan.StringId, amount));
+            MessageBroker.Instance.Publish(clan, new ClanInfluenceChanged(clan.StringId, amount));
 
             return false;
         }

@@ -6,7 +6,7 @@ namespace GameInterface.Services.Clans.Messages
     /// <summary>
     /// Local event when a clan adopts hero from game interface
     /// </summary>
-    public record HeroAdopted : ICommand
+    public record HeroAdopted : IEvent
     {
         public string AdoptedHeroId { get; }
         public string ClanId { get; }

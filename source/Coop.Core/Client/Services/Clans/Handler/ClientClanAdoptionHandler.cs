@@ -22,17 +22,17 @@ namespace Coop.Core.Client.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;
 
-            messageBroker.Subscribe<AdoptHero>(Handle);
+            messageBroker.Subscribe<HeroAdopted>(Handle);
             messageBroker.Subscribe<NetworkAdoptHeroApproved>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<AdoptHero>(Handle);
+            messageBroker.Unsubscribe<HeroAdopted>(Handle);
             messageBroker.Unsubscribe<NetworkAdoptHeroApproved>(Handle);
         }
 
-        private void Handle(MessagePayload<AdoptHero> obj)
+        private void Handle(MessagePayload<HeroAdopted> obj)
         {
             var payload = obj.What;
 
@@ -43,7 +43,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new HeroAdopted(payload.HeroId, payload.PlayerClanId, payload.PlayerHeroId));
+            messageBroker.Publish(this, new AdoptHero(payload.HeroId, payload.PlayerClanId, payload.PlayerHeroId));
         }
     }
 }

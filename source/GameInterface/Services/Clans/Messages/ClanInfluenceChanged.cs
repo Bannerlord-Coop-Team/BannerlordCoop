@@ -6,7 +6,7 @@ namespace GameInterface.Services.Clans.Messages
     /// <summary>
     /// Local event when a clan influence is changed from game interface
     /// </summary>
-    public record ClanInfluenceChanged : ICommand
+    public record ClanInfluenceChanged : IEvent
     {
         public string ClanId { get; }
         public float Amount { get; }

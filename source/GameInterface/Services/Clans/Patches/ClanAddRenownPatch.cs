@@ -19,7 +19,7 @@ namespace GameInterface.Services.Clans.Patches
 
             if (AllowedInstance.IsAllowed(__instance)) return true;
 
-            MessageBroker.Instance.Publish(__instance, new AddClanRenown(__instance.StringId, value, shouldNotify));
+            MessageBroker.Instance.Publish(__instance, new ClanRenownAdded(__instance.StringId, value, shouldNotify));
 
             return false;
         }

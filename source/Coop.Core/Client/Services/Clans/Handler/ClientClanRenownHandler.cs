@@ -22,7 +22,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;
 
-            messageBroker.Subscribe<AddClanRenown>(Handle);
+            messageBroker.Subscribe<ClanRenownAdded>(Handle);
             messageBroker.Subscribe<NetworkRenownAddApproved>(Handle);
 
         }
@@ -30,12 +30,12 @@ namespace Coop.Core.Client.Services.Clans.Handler
         public void Dispose()
         {
 
-            messageBroker.Unsubscribe<AddClanRenown>(Handle);
+            messageBroker.Unsubscribe<ClanRenownAdded>(Handle);
             messageBroker.Unsubscribe<NetworkRenownAddApproved>(Handle);
 
         }
 
-        private void Handle(MessagePayload<AddClanRenown> obj)
+        private void Handle(MessagePayload<ClanRenownAdded> obj)
         {
             var payload = obj.What;
 
@@ -45,7 +45,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new ClanRenownAdded(payload.ClanId, payload.Amount, payload.ShouldNotify));
+            messageBroker.Publish(this, new AddClanRenown(payload.ClanId, payload.Amount, payload.ShouldNotify));
         }
     }
 }

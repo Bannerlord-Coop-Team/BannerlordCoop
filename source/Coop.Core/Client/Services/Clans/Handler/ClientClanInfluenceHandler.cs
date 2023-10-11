@@ -22,7 +22,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;
 
-            messageBroker.Subscribe<ChangeClanInfluence>(Handle);
+            messageBroker.Subscribe<ClanInfluenceChanged>(Handle);
             messageBroker.Subscribe<NetworkClanChangeInfluenceApproved>(Handle);
 
         }
@@ -31,12 +31,12 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
 
 
-            messageBroker.Unsubscribe<ChangeClanInfluence>(Handle);
+            messageBroker.Unsubscribe<ClanInfluenceChanged>(Handle);
             messageBroker.Unsubscribe<NetworkClanChangeInfluenceApproved>(Handle);
 
         }
 
-        private void Handle(MessagePayload<ChangeClanInfluence> obj)
+        private void Handle(MessagePayload<ClanInfluenceChanged> obj)
         {
             var payload = obj.What;
 
@@ -47,7 +47,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new ClanInfluenceChanged(payload.ClanId, payload.Amount));
+            messageBroker.Publish(this, new ChangeClanInfluence(payload.ClanId, payload.Amount));
         }
     }
 }

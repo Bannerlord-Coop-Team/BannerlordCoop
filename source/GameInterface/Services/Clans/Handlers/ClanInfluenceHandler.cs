@@ -25,15 +25,15 @@ namespace GameInterface.Services.Clans.Handlers
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-            messageBroker.Subscribe<ClanInfluenceChanged>(Handle);
+            messageBroker.Subscribe<ChangeClanInfluence>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<ClanInfluenceChanged>(Handle);
+            messageBroker.Unsubscribe<ChangeClanInfluence>(Handle);
         }
 
-        private void Handle(MessagePayload<ClanInfluenceChanged> obj)
+        private void Handle(MessagePayload<ChangeClanInfluence> obj)
         {
             var payload = obj.What;
 

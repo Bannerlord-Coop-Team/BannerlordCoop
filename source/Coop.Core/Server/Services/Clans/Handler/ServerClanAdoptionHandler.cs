@@ -23,22 +23,36 @@ namespace Coop.Core.Server.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;
 
+            messageBroker.Subscribe<HeroAdopted>(Handle);
             messageBroker.Subscribe<NetworkAdoptHeroRequest>(Handle);
-
         }
 
         public void Dispose()
         {
+            messageBroker.Unsubscribe<HeroAdopted>(Handle);
             messageBroker.Unsubscribe<NetworkAdoptHeroRequest>(Handle);
+        }
+
+        private void Handle(MessagePayload<HeroAdopted> obj)
+        {
+            var payload = obj.What;
+
+            AdoptHero adoptHero = new AdoptHero(payload.AdoptedHeroId, payload.ClanId, payload.PlayerHeroId);
+
+            messageBroker.Publish(this, adoptHero);
+
+            NetworkAdoptHeroApproved adoptHeroApproved = new NetworkAdoptHeroApproved(payload.AdoptedHeroId, payload.ClanId, payload.PlayerHeroId);
+
+            network.SendAll(adoptHeroApproved);
         }
 
         private void Handle(MessagePayload<NetworkAdoptHeroRequest> obj)
         {
             var payload = obj.What;
 
-            HeroAdopted heroAdopted = new HeroAdopted(payload.HeroId, payload.PlayerClanId, payload.PlayerHeroId);
+            AdoptHero adoptHero = new AdoptHero(payload.HeroId, payload.PlayerClanId, payload.PlayerHeroId);
 
-            messageBroker.Publish(this, heroAdopted);
+            messageBroker.Publish(this, adoptHero);
 
             NetworkAdoptHeroApproved adoptHeroApproved = new NetworkAdoptHeroApproved(payload.HeroId, payload.PlayerClanId, payload.PlayerHeroId);
 

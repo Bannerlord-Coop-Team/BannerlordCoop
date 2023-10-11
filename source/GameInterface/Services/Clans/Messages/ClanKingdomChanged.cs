@@ -5,7 +5,7 @@ namespace GameInterface.Services.Clans.Messages
     /// <summary>
     /// Local event when a clan kingdom is changed from game interface
     /// </summary>
-    public record ClanKingdomChanged : ICommand
+    public record ClanKingdomChanged : IEvent
     {
         public string ClanId { get; }
         public string NewKingdomId { get; }

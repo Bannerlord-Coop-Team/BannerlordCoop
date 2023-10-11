@@ -16,7 +16,7 @@ namespace GameInterface.Services.Clans.Patches
 
             string playerHeroId = Hero.MainHero.StringId;
 
-            MessageBroker.Instance.Publish(adoptedHero, new AdoptHero(adoptedHero.StringId, playerClanId, playerHeroId));
+            MessageBroker.Instance.Publish(adoptedHero, new HeroAdopted(adoptedHero.StringId, playerClanId, playerHeroId));
 
             return false;
         }

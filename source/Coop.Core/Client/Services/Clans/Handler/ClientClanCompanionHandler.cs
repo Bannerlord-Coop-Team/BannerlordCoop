@@ -22,19 +22,19 @@ namespace Coop.Core.Client.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;
 
-            messageBroker.Subscribe<AddCompanion>(Handle);
+            messageBroker.Subscribe<CompanionAdded>(Handle);
             messageBroker.Subscribe<NetworkCompanionAddApproved>(Handle);
         }
 
         public void Dispose()
         {
 
-            messageBroker.Unsubscribe<AddCompanion>(Handle);
+            messageBroker.Unsubscribe<CompanionAdded>(Handle);
             messageBroker.Unsubscribe<NetworkCompanionAddApproved>(Handle);
 
         }
 
-        private void Handle(MessagePayload<AddCompanion> obj)
+        private void Handle(MessagePayload<CompanionAdded> obj)
         {
             var payload = obj.What;
 
@@ -45,7 +45,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new CompanionAdded(payload.ClanId, payload.CompanionId));
+            messageBroker.Publish(this, new AddCompanion(payload.ClanId, payload.CompanionId));
         }
     }
 }

@@ -22,7 +22,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;            
 
-            messageBroker.Subscribe<ChangeClanLeader>(Handle);
+            messageBroker.Subscribe<ClanLeaderChanged>(Handle);
             messageBroker.Subscribe<NetworkClanLeaderChangeApproved>(Handle);
 
         }
@@ -30,12 +30,12 @@ namespace Coop.Core.Client.Services.Clans.Handler
         public void Dispose()
         {
 
-            messageBroker.Unsubscribe<ChangeClanLeader>(Handle);
+            messageBroker.Unsubscribe<ClanLeaderChanged>(Handle);
             messageBroker.Unsubscribe<NetworkClanLeaderChangeApproved>(Handle);
 
         }
 
-        private void Handle(MessagePayload<ChangeClanLeader> obj)
+        private void Handle(MessagePayload<ClanLeaderChanged> obj)
         {
             var payload = obj.What;
 
@@ -46,7 +46,7 @@ namespace Coop.Core.Client.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new ClanLeaderChanged(payload.ClanId, payload.NewLeaderId));
+            messageBroker.Publish(this, new ChangeClanLeader(payload.ClanId, payload.NewLeaderId));
         }
     }
 }

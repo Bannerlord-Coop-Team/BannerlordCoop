@@ -23,19 +23,33 @@ namespace Coop.Core.Server.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;
 
+            messageBroker.Subscribe<ClanRenownAdded>(Handle);
             messageBroker.Subscribe<NetworkAddRenownRequest>(Handle);
         }
 
         public void Dispose()
         {
+            messageBroker.Unsubscribe<ClanRenownAdded>(Handle);
             messageBroker.Unsubscribe<NetworkAddRenownRequest>(Handle);
+        }
+        private void Handle(MessagePayload<ClanRenownAdded> obj)
+        {
+            var payload = obj.What;
+
+            AddClanRenown renownAdded = new AddClanRenown(payload.ClanId, payload.Amount, payload.ShouldNotify);
+
+            messageBroker.Publish(this, renownAdded);
+
+            NetworkRenownAddApproved renownAddApproved = new NetworkRenownAddApproved(payload.ClanId, payload.Amount, payload.ShouldNotify);
+
+            network.SendAll(renownAddApproved);
         }
 
         private void Handle(MessagePayload<NetworkAddRenownRequest> obj)
         {
             var payload = obj.What;
 
-            ClanRenownAdded renownAdded = new ClanRenownAdded(payload.ClanId, payload.Amount, payload.ShouldNotify);
+            AddClanRenown renownAdded = new AddClanRenown(payload.ClanId, payload.Amount, payload.ShouldNotify);
 
             messageBroker.Publish(this, renownAdded);
 

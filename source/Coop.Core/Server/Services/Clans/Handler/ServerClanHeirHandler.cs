@@ -22,13 +22,26 @@ namespace Coop.Core.Server.Services.Clans.Handler
         {
             this.messageBroker = messageBroker;
             this.network = network;
-
+            messageBroker.Subscribe<NewHeirAdded>(Handle);
             messageBroker.Subscribe<NetworkNewHeirRequest>(Handle);
         }
 
         public void Dispose()
         {
+            messageBroker.Unsubscribe<NewHeirAdded>(Handle);
             messageBroker.Unsubscribe<NetworkNewHeirRequest>(Handle);
+        }
+        private void Handle(MessagePayload<NewHeirAdded> obj)
+        {
+            var payload = obj.What;
+
+            AddNewHeir newHeir = new AddNewHeir(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement);
+
+            messageBroker.Publish(this, newHeir);
+
+            NetworkNewHeirApproved newHeirApproved = new NetworkNewHeirApproved(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement);
+
+            network.SendAll(newHeirApproved);
         }
 
         private void Handle(MessagePayload<NetworkNewHeirRequest> obj)

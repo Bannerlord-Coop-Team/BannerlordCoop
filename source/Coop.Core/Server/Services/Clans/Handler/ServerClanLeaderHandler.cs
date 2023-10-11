@@ -23,19 +23,33 @@ namespace Coop.Core.Server.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;
 
+            messageBroker.Subscribe<ClanLeaderChanged>(Handle);
             messageBroker.Subscribe<NetworkClanLeaderChangeRequest>(Handle);
         }
 
         public void Dispose()
         {
+            messageBroker.Unsubscribe<ClanLeaderChanged>(Handle);
             messageBroker.Unsubscribe<NetworkClanLeaderChangeRequest>(Handle);
+        }
+        private void Handle(MessagePayload<ClanLeaderChanged> obj)
+        {
+            var payload = obj.What;
+
+            ChangeClanLeader clanLeaderChanged = new ChangeClanLeader(payload.ClanId, payload.NewLeaderId);
+
+            messageBroker.Publish(this, clanLeaderChanged);
+
+            NetworkClanLeaderChangeApproved clanLeaderChangeApproved = new NetworkClanLeaderChangeApproved(payload.ClanId, payload.NewLeaderId);
+
+            network.SendAll(clanLeaderChangeApproved);
         }
 
         private void Handle(MessagePayload<NetworkClanLeaderChangeRequest> obj)
         {
             var payload = obj.What;
 
-            ClanLeaderChanged clanLeaderChanged = new ClanLeaderChanged(payload.ClanId, payload.NewLeaderId);
+            ChangeClanLeader clanLeaderChanged = new ChangeClanLeader(payload.ClanId, payload.NewLeaderId);
 
             messageBroker.Publish(this, clanLeaderChanged);
 

@@ -19,7 +19,7 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(ref Clan __instance, TextObject name, TextObject informalName)
         {
-            MessageBroker.Instance.Publish(__instance, new ChangeClanName(__instance.StringId, name.ToString(), informalName.ToString()));
+            MessageBroker.Instance.Publish(__instance, new ClanNameChanged(__instance.StringId, name.ToString(), informalName.ToString()));
 
             return false;
         }

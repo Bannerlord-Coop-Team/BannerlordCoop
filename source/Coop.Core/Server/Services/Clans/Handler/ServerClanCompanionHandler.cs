@@ -23,23 +23,35 @@ namespace Coop.Core.Server.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;
 
+            messageBroker.Subscribe<CompanionAdded>(Handle);
             messageBroker.Subscribe<NetworkAddCompanionRequest>(Handle);
         }
 
         public void Dispose()
         {
-         
+            messageBroker.Unsubscribe<CompanionAdded>(Handle);
             messageBroker.Unsubscribe<NetworkAddCompanionRequest>(Handle);
         }
+        private void Handle(MessagePayload<CompanionAdded> obj)
+        {
+            var payload = obj.What;
 
+            AddCompanion addCompanion = new AddCompanion(payload.ClanId, payload.CompanionId);
+
+            messageBroker.Publish(this, addCompanion);
+
+            NetworkCompanionAddApproved companionAddApproved = new NetworkCompanionAddApproved(payload.ClanId, payload.CompanionId);
+
+            network.SendAll(companionAddApproved);
+        }
 
         private void Handle(MessagePayload<NetworkAddCompanionRequest> obj)
         {
             var payload = obj.What;
 
-            CompanionAdded companionAdded = new CompanionAdded(payload.ClanId, payload.CompanionId);
+            AddCompanion addCompanion = new AddCompanion(payload.ClanId, payload.CompanionId);
 
-            messageBroker.Publish(this, companionAdded);
+            messageBroker.Publish(this, addCompanion);
 
             NetworkCompanionAddApproved companionAddApproved = new NetworkCompanionAddApproved(payload.ClanId, payload.CompanionId);
 

@@ -25,15 +25,15 @@ namespace GameInterface.Services.Clans.Handlers
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-            messageBroker.Subscribe<CompanionAdded>(Handle);
+            messageBroker.Subscribe<AddCompanion>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<CompanionAdded>(Handle);
+            messageBroker.Unsubscribe<AddCompanion>(Handle);
         }
 
-        private void Handle(MessagePayload<CompanionAdded> obj)
+        private void Handle(MessagePayload<AddCompanion> obj)
         {
             var payload = obj.What;
 

@@ -23,24 +23,37 @@ namespace Coop.Core.Server.Services.Clans.Handler
             this.messageBroker = messageBroker;
             this.network = network;
 
+            messageBroker.Subscribe<ClanDestroyed>(Handle);
             messageBroker.Subscribe<NetworkDestroyClanRequest>(Handle);
 
         }
 
         public void Dispose()
         {
-
+            messageBroker.Unsubscribe<ClanDestroyed>(Handle);
             messageBroker.Unsubscribe<NetworkDestroyClanRequest>(Handle);
 
+        }
+        private void Handle(MessagePayload<ClanDestroyed> obj)
+        {
+            var payload = obj.What;
+
+            DestroyClan destroyClan = new DestroyClan(payload.ClanId, payload.Details);
+
+            messageBroker.Publish(this, destroyClan);
+
+            NetworkDestroyClanApproved destroyClanApproved = new NetworkDestroyClanApproved(payload.ClanId, payload.Details);
+
+            network.SendAll(destroyClanApproved);
         }
 
         private void Handle(MessagePayload<NetworkDestroyClanRequest> obj)
         {
             var payload = obj.What;
 
-            ClanDestroyed clanDestroyed = new ClanDestroyed(payload.ClanId, payload.DetailId);
+            DestroyClan destroyClan = new DestroyClan(payload.ClanId, payload.DetailId);
 
-            messageBroker.Publish(this, clanDestroyed);
+            messageBroker.Publish(this, destroyClan);
 
             NetworkDestroyClanApproved destroyClanApproved = new NetworkDestroyClanApproved(payload.ClanId, payload.DetailId);
 

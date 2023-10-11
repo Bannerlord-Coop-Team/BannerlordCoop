@@ -6,7 +6,7 @@ namespace GameInterface.Services.Clans.Messages
     /// <summary>
     /// Local event when a clan renown is changed from game interface
     /// </summary>
-    public record ClanRenownAdded : ICommand
+    public record ClanRenownAdded : IEvent
     {
         public string ClanId { get; }
         public float Amount { get; }

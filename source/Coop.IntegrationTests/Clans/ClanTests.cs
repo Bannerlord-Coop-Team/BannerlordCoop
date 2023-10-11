@@ -31,7 +31,7 @@ namespace Coop.IntegrationTests.Clans
             var clanName = "RealName";
             var informalName = "FakeName";
 
-            var message = new ChangeClanName(clanId, clanName, informalName);
+            var message = new ClanNameChanged(clanId, clanName, informalName);
 
             var client1 = TestEnvironment.Clients.First();
 
@@ -39,15 +39,16 @@ namespace Coop.IntegrationTests.Clans
 
             // Act
             client1.ReceiveMessage(this, message);
+            server.ReceiveMessage(this, message);
 
             // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanNameChanged>());
+            Assert.Equal(2, server.InternalMessages.GetMessageCount<ChangeClanName>());
 
-            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanNameChanged>());
+            Assert.Equal(2, client1.InternalMessages.GetMessageCount<ChangeClanName>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanNameChanged>());
+                Assert.Equal(2, client.InternalMessages.GetMessageCount<ChangeClanName>());
             }
         }
         /// <summary>
@@ -69,15 +70,16 @@ namespace Coop.IntegrationTests.Clans
 
             // Act
             client1.ReceiveMessage(this, message);
+            server.ReceiveMessage(this, message);
 
             // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<ChangeClanKingdom>());
+            Assert.Equal(2, server.InternalMessages.GetMessageCount<ChangeClanKingdom>());
 
-            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ChangeClanKingdom>());
+            Assert.Equal(2, client1.InternalMessages.GetMessageCount<ChangeClanKingdom>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeClanKingdom>());
+                Assert.Equal(2, client.InternalMessages.GetMessageCount<ChangeClanKingdom>());
             }
         }
         /// <summary>
@@ -90,7 +92,7 @@ namespace Coop.IntegrationTests.Clans
             // Arrange
             var clanId = "TestClan";
 
-            var message = new DestroyClan(clanId, 1);
+            var message = new ClanDestroyed(clanId, 1);
 
             var client1 = TestEnvironment.Clients.First();
 
@@ -98,15 +100,16 @@ namespace Coop.IntegrationTests.Clans
 
             // Act
             client1.ReceiveMessage(this, message);
+            server.ReceiveMessage(this, message);
 
             // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanDestroyed>());
+            Assert.Equal(2, server.InternalMessages.GetMessageCount<DestroyClan>());
 
-            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanDestroyed>());
+            Assert.Equal(2, client1.InternalMessages.GetMessageCount<DestroyClan>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanDestroyed>());
+                Assert.Equal(2, client.InternalMessages.GetMessageCount<DestroyClan>());
             }
         }
         /// <summary>
@@ -120,7 +123,7 @@ namespace Coop.IntegrationTests.Clans
             var clanId = "TestClan";
             var heroId = "TestHero";
 
-            var message = new AddCompanion(clanId, heroId);
+            var message = new CompanionAdded(clanId, heroId);
 
             var client1 = TestEnvironment.Clients.First();
 
@@ -128,15 +131,16 @@ namespace Coop.IntegrationTests.Clans
 
             // Act
             client1.ReceiveMessage(this, message);
+            server.ReceiveMessage(this, message);
 
             // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<CompanionAdded>());
+            Assert.Equal(2, server.InternalMessages.GetMessageCount<AddCompanion>());
 
-            Assert.Equal(1, client1.InternalMessages.GetMessageCount<CompanionAdded>());
+            Assert.Equal(2, client1.InternalMessages.GetMessageCount<AddCompanion>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<CompanionAdded>());
+                Assert.Equal(2, client.InternalMessages.GetMessageCount<AddCompanion>());
             }
         }
         /// <summary>
@@ -149,7 +153,7 @@ namespace Coop.IntegrationTests.Clans
             // Arrange
             var clanId = "TestClan";
 
-            var message = new AddClanRenown(clanId, 500, true);
+            var message = new ClanRenownAdded(clanId, 500, true);
 
             var client1 = TestEnvironment.Clients.First();
 
@@ -157,15 +161,16 @@ namespace Coop.IntegrationTests.Clans
 
             // Act
             client1.ReceiveMessage(this, message);
+            server.ReceiveMessage(this, message);
 
             // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanRenownAdded>());
+            Assert.Equal(2, server.InternalMessages.GetMessageCount<AddClanRenown>());
 
-            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanRenownAdded>());
+            Assert.Equal(2, client1.InternalMessages.GetMessageCount<AddClanRenown>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanRenownAdded>());
+                Assert.Equal(2, client.InternalMessages.GetMessageCount<AddClanRenown>());
             }
         }
         /// <summary>
@@ -179,7 +184,7 @@ namespace Coop.IntegrationTests.Clans
             var clanId = "TestClan";
             var heroId = "TestHero";
 
-            var message = new ChangeClanLeader(clanId, heroId);
+            var message = new ClanLeaderChanged(clanId, heroId);
 
             var client1 = TestEnvironment.Clients.First();
 
@@ -187,15 +192,16 @@ namespace Coop.IntegrationTests.Clans
 
             // Act
             client1.ReceiveMessage(this, message);
+            server.ReceiveMessage(this, message);
 
             // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanLeaderChanged>());
+            Assert.Equal(2, server.InternalMessages.GetMessageCount<ChangeClanLeader>());
 
-            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanLeaderChanged>());
+            Assert.Equal(2, client1.InternalMessages.GetMessageCount<ChangeClanLeader>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanLeaderChanged>());
+                Assert.Equal(2, client.InternalMessages.GetMessageCount<ChangeClanLeader>());
             }
         }
         /// <summary>
@@ -208,7 +214,7 @@ namespace Coop.IntegrationTests.Clans
             // Arrange
             var clanId = "TestClan";
 
-            var message = new ChangeClanInfluence(clanId, 50);
+            var message = new ClanInfluenceChanged(clanId, 50);
 
             var client1 = TestEnvironment.Clients.First();
 
@@ -216,15 +222,16 @@ namespace Coop.IntegrationTests.Clans
 
             // Act
             client1.ReceiveMessage(this, message);
+            server.ReceiveMessage(this, message);
 
             // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<ClanInfluenceChanged>());
+            Assert.Equal(2, server.InternalMessages.GetMessageCount<ChangeClanInfluence>());
 
-            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ClanInfluenceChanged>());
+            Assert.Equal(2, client1.InternalMessages.GetMessageCount<ChangeClanInfluence>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ClanInfluenceChanged>());
+                Assert.Equal(2, client.InternalMessages.GetMessageCount<ChangeClanInfluence>());
             }
         }
         /// <summary>
@@ -239,7 +246,7 @@ namespace Coop.IntegrationTests.Clans
             var adoptedHeroId = "Adopted";
             var heroId = "PlayerHero";
 
-            var message = new AdoptHero(adoptedHeroId, clanId, heroId);
+            var message = new HeroAdopted(adoptedHeroId, clanId, heroId);
 
             var client1 = TestEnvironment.Clients.First();
 
@@ -247,15 +254,15 @@ namespace Coop.IntegrationTests.Clans
 
             // Act
             client1.ReceiveMessage(this, message);
-
+            server.ReceiveMessage(this, message);
             // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<HeroAdopted>());
+            Assert.Equal(2, server.InternalMessages.GetMessageCount<AdoptHero>());
 
-            Assert.Equal(1, client1.InternalMessages.GetMessageCount<HeroAdopted>());
+            Assert.Equal(2, client1.InternalMessages.GetMessageCount<AdoptHero>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<HeroAdopted>());
+                Assert.Equal(2, client.InternalMessages.GetMessageCount<AdoptHero>());
             }
         }
         /// <summary>
@@ -277,15 +284,15 @@ namespace Coop.IntegrationTests.Clans
 
             // Act
             client1.ReceiveMessage(this, message);
-
+            server.ReceiveMessage(this, message);
             // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<AddNewHeir>());
+            Assert.Equal(2, server.InternalMessages.GetMessageCount<AddNewHeir>());
 
-            Assert.Equal(1, client1.InternalMessages.GetMessageCount<AddNewHeir>());
+            Assert.Equal(2, client1.InternalMessages.GetMessageCount<AddNewHeir>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<AddNewHeir>());
+                Assert.Equal(2, client.InternalMessages.GetMessageCount<AddNewHeir>());
             }
         }
     }

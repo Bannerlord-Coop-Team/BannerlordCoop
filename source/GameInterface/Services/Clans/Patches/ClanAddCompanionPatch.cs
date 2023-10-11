@@ -20,7 +20,7 @@ namespace GameInterface.Services.Clans.Patches
 
             if (AllowedInstance.IsAllowed(companion)) return true;
 
-            MessageBroker.Instance.Publish(clan, new AddCompanion(clan.StringId, companion.StringId));
+            MessageBroker.Instance.Publish(clan, new CompanionAdded(clan.StringId, companion.StringId));
 
             return false;
         }

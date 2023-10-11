@@ -6,7 +6,7 @@ namespace GameInterface.Services.Clans.Messages
     /// <summary>
     /// Local event when a clan appoints new heir from game interface
     /// </summary>
-    public record NewHeirAdded : ICommand
+    public record NewHeirAdded : IEvent
     {
         public string HeirHeroId { get; }
         public string PlayerHeroId { get; }
