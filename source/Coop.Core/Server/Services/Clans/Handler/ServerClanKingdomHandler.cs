@@ -37,28 +37,26 @@ namespace Coop.Core.Server.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            ChangeClanKingdom clanKingdomChanged = new ChangeClanKingdom(payload.ClanId, payload.NewKingdomId, payload.Detail,
-                payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
+            Send(payload.ClanId, payload.NewKingdomId, payload.Detail, payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
 
-            messageBroker.Publish(this, clanKingdomChanged);
-
-            NetworkClanKingdomChangeApproved clanKingdomChangeApproved = new NetworkClanKingdomChangeApproved(payload.ClanId, payload.NewKingdomId,
-                payload.Detail, payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
-
-            network.SendAll(clanKingdomChangeApproved);
         }
 
         private void Handle(MessagePayload<NetworkClanKingdomChangeRequest> obj)
         {
             var payload = obj.What;
 
-            ChangeClanKingdom clanKingdomChanged = new ChangeClanKingdom(payload.ClanId, payload.NewKingdomId, payload.DetailId, 
-                payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
+            Send(payload.ClanId, payload.NewKingdomId, payload.DetailId, payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
+        }
+
+        private void Send(string clanId, string newKingdomId, int detailId, int awardMultiplier, bool byRebellion, bool showNotification)
+        {
+            ChangeClanKingdom clanKingdomChanged = new ChangeClanKingdom(clanId, newKingdomId, detailId,
+                awardMultiplier, byRebellion, showNotification);
 
             messageBroker.Publish(this, clanKingdomChanged);
 
-            NetworkClanKingdomChangeApproved clanKingdomChangeApproved = new NetworkClanKingdomChangeApproved(payload.ClanId, payload.NewKingdomId,
-                payload.DetailId, payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
+            NetworkClanKingdomChangeApproved clanKingdomChangeApproved = new NetworkClanKingdomChangeApproved(clanId, newKingdomId, detailId,
+                awardMultiplier, byRebellion, showNotification);
 
             network.SendAll(clanKingdomChangeApproved);
         }

@@ -36,24 +36,23 @@ namespace Coop.Core.Server.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            AddCompanion addCompanion = new AddCompanion(payload.ClanId, payload.CompanionId);
-
-            messageBroker.Publish(this, addCompanion);
-
-            NetworkCompanionAddApproved companionAddApproved = new NetworkCompanionAddApproved(payload.ClanId, payload.CompanionId);
-
-            network.SendAll(companionAddApproved);
+            Send(payload.ClanId, payload.CompanionId);
         }
 
         private void Handle(MessagePayload<NetworkAddCompanionRequest> obj)
         {
             var payload = obj.What;
 
-            AddCompanion addCompanion = new AddCompanion(payload.ClanId, payload.CompanionId);
+            Send(payload.ClanId, payload.CompanionId);
+        }
+
+        private void Send(string clanId, string companionId)
+        {
+            AddCompanion addCompanion = new AddCompanion(clanId, companionId);
 
             messageBroker.Publish(this, addCompanion);
 
-            NetworkCompanionAddApproved companionAddApproved = new NetworkCompanionAddApproved(payload.ClanId, payload.CompanionId);
+            NetworkCompanionAddApproved companionAddApproved = new NetworkCompanionAddApproved(clanId, companionId);
 
             network.SendAll(companionAddApproved);
         }

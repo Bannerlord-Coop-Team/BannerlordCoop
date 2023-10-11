@@ -38,7 +38,7 @@ namespace GameInterface.Services.Clans.Handlers
 
             objectManager.TryGetObject<Clan>(payload.ClanId, out var clan);
 
-            ClanAddRenownPatch.RunOriginalAddCompanion(clan, payload.Amount, payload.ShouldNotify);
+            ClanAddRenownPatch.RunOriginalAddRenown(clan, payload.Amount, payload.ShouldNotify);
         }
     }
 }

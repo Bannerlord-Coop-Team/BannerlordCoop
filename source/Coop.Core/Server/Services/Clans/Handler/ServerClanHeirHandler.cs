@@ -35,24 +35,23 @@ namespace Coop.Core.Server.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            AddNewHeir newHeir = new AddNewHeir(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement);
-
-            messageBroker.Publish(this, newHeir);
-
-            NetworkNewHeirApproved newHeirApproved = new NetworkNewHeirApproved(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement);
-
-            network.SendAll(newHeirApproved);
+            Send(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement);
         }
 
         private void Handle(MessagePayload<NetworkNewHeirRequest> obj)
         {
             var payload = obj.What;
 
-            AddNewHeir newHeir = new AddNewHeir(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement);
+            Send(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement);
+        }
+
+        private void Send(string heirHeroId, string playerHeroId, bool isRetirement)
+        {
+            AddNewHeir newHeir = new AddNewHeir(heirHeroId, playerHeroId, isRetirement);
 
             messageBroker.Publish(this, newHeir);
 
-            NetworkNewHeirApproved newHeirApproved = new NetworkNewHeirApproved(payload.HeirHeroId, payload.PlayerHeroId, payload.IsRetirement);
+            NetworkNewHeirApproved newHeirApproved = new NetworkNewHeirApproved(heirHeroId, playerHeroId, isRetirement);
 
             network.SendAll(newHeirApproved);
         }

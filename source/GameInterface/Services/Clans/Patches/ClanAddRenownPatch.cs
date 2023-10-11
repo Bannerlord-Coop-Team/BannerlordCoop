@@ -24,7 +24,7 @@ namespace GameInterface.Services.Clans.Patches
             return false;
         }
 
-        public static void RunOriginalAddCompanion(Clan clan, float amount, bool shouldNotify)
+        public static void RunOriginalAddRenown(Clan clan, float amount, bool shouldNotify)
         {
             using (AllowedInstance)
             {

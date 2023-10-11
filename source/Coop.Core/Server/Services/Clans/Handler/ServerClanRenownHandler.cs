@@ -36,24 +36,23 @@ namespace Coop.Core.Server.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            AddClanRenown renownAdded = new AddClanRenown(payload.ClanId, payload.Amount, payload.ShouldNotify);
-
-            messageBroker.Publish(this, renownAdded);
-
-            NetworkRenownAddApproved renownAddApproved = new NetworkRenownAddApproved(payload.ClanId, payload.Amount, payload.ShouldNotify);
-
-            network.SendAll(renownAddApproved);
+            Send(payload.ClanId, payload.Amount, payload.ShouldNotify);
         }
 
         private void Handle(MessagePayload<NetworkAddRenownRequest> obj)
         {
             var payload = obj.What;
 
-            AddClanRenown renownAdded = new AddClanRenown(payload.ClanId, payload.Amount, payload.ShouldNotify);
+            Send(payload.ClanId, payload.Amount, payload.ShouldNotify);
+        }
+
+        private void Send(string clanId, float amount, bool shouldNotify)
+        {
+            AddClanRenown renownAdded = new AddClanRenown(clanId, amount, shouldNotify);
 
             messageBroker.Publish(this, renownAdded);
 
-            NetworkRenownAddApproved renownAddApproved = new NetworkRenownAddApproved(payload.ClanId, payload.Amount, payload.ShouldNotify);
+            NetworkRenownAddApproved renownAddApproved = new NetworkRenownAddApproved(clanId, amount, shouldNotify);
 
             network.SendAll(renownAddApproved);
         }

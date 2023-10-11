@@ -9,11 +9,11 @@ using System.Threading.Tasks;
 
 namespace Coop.IntegrationTests.Clans
 {
-    public class ClanTests
+    public class ClanServerTests
     {
         internal TestEnvironment TestEnvironment { get; }
 
-        public ClanTests()
+        public ClanServerTests()
         {
             // Creates a test environment with 1 server and 2 clients by default
             TestEnvironment = new TestEnvironment();
@@ -24,7 +24,7 @@ namespace Coop.IntegrationTests.Clans
         /// Triggers ClanNameChanged on all other clients
         /// </summary>
         [Fact]
-        public void ClanNameChange_Publishes_AllClients()
+        public void ClanNameChange_Publishes_Server()
         {
             // Arrange
             var clanId = "TestClan";
@@ -38,17 +38,16 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
             server.ReceiveMessage(this, message);
 
             // Assert
-            Assert.Equal(2, server.InternalMessages.GetMessageCount<ChangeClanName>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<ChangeClanName>());
 
-            Assert.Equal(2, client1.InternalMessages.GetMessageCount<ChangeClanName>());
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ChangeClanName>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(2, client.InternalMessages.GetMessageCount<ChangeClanName>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeClanName>());
             }
         }
         /// <summary>
@@ -56,7 +55,7 @@ namespace Coop.IntegrationTests.Clans
         /// Triggers ClanKingdomChanged on all other clients
         /// </summary>
         [Fact]
-        public void ClanKingdomChange_Publishes_AllClients()
+        public void ClanKingdomChange_Publishes_Server()
         {
             // Arrange
             var clanId = "TestClan";
@@ -69,17 +68,16 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
             server.ReceiveMessage(this, message);
 
             // Assert
-            Assert.Equal(2, server.InternalMessages.GetMessageCount<ChangeClanKingdom>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<ChangeClanKingdom>());
 
-            Assert.Equal(2, client1.InternalMessages.GetMessageCount<ChangeClanKingdom>());
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ChangeClanKingdom>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(2, client.InternalMessages.GetMessageCount<ChangeClanKingdom>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeClanKingdom>());
             }
         }
         /// <summary>
@@ -87,7 +85,7 @@ namespace Coop.IntegrationTests.Clans
         /// Triggers ClanDestroyed on all other clients
         /// </summary>
         [Fact]
-        public void DestroyClan_Publishes_AllClients()
+        public void DestroyClan_Publishes_Server()
         {
             // Arrange
             var clanId = "TestClan";
@@ -99,17 +97,16 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
             server.ReceiveMessage(this, message);
 
             // Assert
-            Assert.Equal(2, server.InternalMessages.GetMessageCount<DestroyClan>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<DestroyClan>());
 
-            Assert.Equal(2, client1.InternalMessages.GetMessageCount<DestroyClan>());
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<DestroyClan>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(2, client.InternalMessages.GetMessageCount<DestroyClan>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<DestroyClan>());
             }
         }
         /// <summary>
@@ -117,7 +114,7 @@ namespace Coop.IntegrationTests.Clans
         /// Triggers CompanionAdded on all other clients
         /// </summary>
         [Fact]
-        public void AddCompanion_Publishes_AllClients()
+        public void AddCompanion_Publishes_Server()
         {
             // Arrange
             var clanId = "TestClan";
@@ -130,17 +127,17 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
             server.ReceiveMessage(this, message);
+            
 
             // Assert
-            Assert.Equal(2, server.InternalMessages.GetMessageCount<AddCompanion>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<AddCompanion>());
 
-            Assert.Equal(2, client1.InternalMessages.GetMessageCount<AddCompanion>());
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<AddCompanion>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(2, client.InternalMessages.GetMessageCount<AddCompanion>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<AddCompanion>());
             }
         }
         /// <summary>
@@ -148,7 +145,7 @@ namespace Coop.IntegrationTests.Clans
         /// Triggers RenownAdded on all other clients
         /// </summary>
         [Fact]
-        public void AddRenown_Publishes_AllClients()
+        public void AddRenown_Publishes_Server()
         {
             // Arrange
             var clanId = "TestClan";
@@ -160,17 +157,17 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
             server.ReceiveMessage(this, message);
+            
 
             // Assert
-            Assert.Equal(2, server.InternalMessages.GetMessageCount<AddClanRenown>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<AddClanRenown>());
 
-            Assert.Equal(2, client1.InternalMessages.GetMessageCount<AddClanRenown>());
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<AddClanRenown>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(2, client.InternalMessages.GetMessageCount<AddClanRenown>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<AddClanRenown>());
             }
         }
         /// <summary>
@@ -178,7 +175,7 @@ namespace Coop.IntegrationTests.Clans
         /// Triggers ClanLeaderChanged on all other clients
         /// </summary>
         [Fact]
-        public void ClanLeaderChange_Publishes_AllClients()
+        public void ClanLeaderChange_Publishes_Server()
         {
             // Arrange
             var clanId = "TestClan";
@@ -191,17 +188,17 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
             server.ReceiveMessage(this, message);
+            
 
             // Assert
-            Assert.Equal(2, server.InternalMessages.GetMessageCount<ChangeClanLeader>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<ChangeClanLeader>());
 
-            Assert.Equal(2, client1.InternalMessages.GetMessageCount<ChangeClanLeader>());
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ChangeClanLeader>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(2, client.InternalMessages.GetMessageCount<ChangeClanLeader>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeClanLeader>());
             }
         }
         /// <summary>
@@ -209,7 +206,7 @@ namespace Coop.IntegrationTests.Clans
         /// Triggers ClanInfluenceChanged on all other clients
         /// </summary>
         [Fact]
-        public void ClanInfluenceChange_Publishes_AllClients()
+        public void ClanInfluenceChange_Publishes_Server()
         {
             // Arrange
             var clanId = "TestClan";
@@ -221,17 +218,17 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
             server.ReceiveMessage(this, message);
+            
 
             // Assert
-            Assert.Equal(2, server.InternalMessages.GetMessageCount<ChangeClanInfluence>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<ChangeClanInfluence>());
 
-            Assert.Equal(2, client1.InternalMessages.GetMessageCount<ChangeClanInfluence>());
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<ChangeClanInfluence>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(2, client.InternalMessages.GetMessageCount<ChangeClanInfluence>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeClanInfluence>());
             }
         }
         /// <summary>
@@ -239,7 +236,7 @@ namespace Coop.IntegrationTests.Clans
         /// Triggers HeroAdopted on all other clients
         /// </summary>
         [Fact]
-        public void AdoptHero_Publishes_AllClients()
+        public void AdoptHero_Publishes_Server()
         {
             // Arrange
             var clanId = "TestClan";
@@ -253,16 +250,16 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
             server.ReceiveMessage(this, message);
+            
             // Assert
-            Assert.Equal(2, server.InternalMessages.GetMessageCount<AdoptHero>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<AdoptHero>());
 
-            Assert.Equal(2, client1.InternalMessages.GetMessageCount<AdoptHero>());
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<AdoptHero>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(2, client.InternalMessages.GetMessageCount<AdoptHero>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<AdoptHero>());
             }
         }
         /// <summary>
@@ -270,7 +267,7 @@ namespace Coop.IntegrationTests.Clans
         /// Triggers NewHeirAppointed on all other clients
         /// </summary>
         [Fact]
-        public void NewHeir_Publishes_AllClients()
+        public void NewHeir_Publishes_Server()
         {
             // Arrange
             var playerHeroId = "TestClan";
@@ -283,16 +280,16 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
             server.ReceiveMessage(this, message);
+            
             // Assert
-            Assert.Equal(2, server.InternalMessages.GetMessageCount<AddNewHeir>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<AddNewHeir>());
 
-            Assert.Equal(2, client1.InternalMessages.GetMessageCount<AddNewHeir>());
+            Assert.Equal(1, client1.InternalMessages.GetMessageCount<AddNewHeir>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
-                Assert.Equal(2, client.InternalMessages.GetMessageCount<AddNewHeir>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<AddNewHeir>());
             }
         }
     }

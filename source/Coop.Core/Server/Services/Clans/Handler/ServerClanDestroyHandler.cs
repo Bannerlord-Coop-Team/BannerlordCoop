@@ -38,24 +38,23 @@ namespace Coop.Core.Server.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            DestroyClan destroyClan = new DestroyClan(payload.ClanId, payload.Details);
-
-            messageBroker.Publish(this, destroyClan);
-
-            NetworkDestroyClanApproved destroyClanApproved = new NetworkDestroyClanApproved(payload.ClanId, payload.Details);
-
-            network.SendAll(destroyClanApproved);
+            Send(payload.ClanId, payload.Details);
         }
 
         private void Handle(MessagePayload<NetworkDestroyClanRequest> obj)
         {
             var payload = obj.What;
 
-            DestroyClan destroyClan = new DestroyClan(payload.ClanId, payload.DetailId);
+            Send(payload.ClanId, payload.DetailId);
+        }
+
+        private void Send(string clanId, int detailId)
+        {
+            DestroyClan destroyClan = new DestroyClan(clanId, detailId);
 
             messageBroker.Publish(this, destroyClan);
 
-            NetworkDestroyClanApproved destroyClanApproved = new NetworkDestroyClanApproved(payload.ClanId, payload.DetailId);
+            NetworkDestroyClanApproved destroyClanApproved = new NetworkDestroyClanApproved(clanId, detailId);
 
             network.SendAll(destroyClanApproved);
         }

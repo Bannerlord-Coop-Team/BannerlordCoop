@@ -35,24 +35,23 @@ namespace Coop.Core.Server.Services.Clans.Handler
         {
             var payload = obj.What;
 
-            ChangeClanName clanNameChanged = new ChangeClanName(payload.ClanId, payload.Name, payload.InformalName);
-
-            messageBroker.Publish(this, clanNameChanged);
-
-            NetworkClanNameChangeApproved clanNameChangeApproved = new NetworkClanNameChangeApproved(payload.ClanId, payload.Name, payload.InformalName);
-
-            network.SendAll(clanNameChangeApproved);
+            Send(payload.ClanId, payload.Name, payload.InformalName);
         }
 
         private void Handle(MessagePayload<NetworkClanNameChangeRequest> obj)
         {
             var payload = obj.What;
 
-            ChangeClanName clanNameChanged = new ChangeClanName(payload.ClanId, payload.Name, payload.InformalName);
+            Send(payload.ClanId, payload.Name, payload.InformalName);
+        }
+
+        private void Send(string clanId, string name, string informalName)
+        {
+            ChangeClanName clanNameChanged = new ChangeClanName(clanId, name, informalName);
 
             messageBroker.Publish(this, clanNameChanged);
 
-            NetworkClanNameChangeApproved clanNameChangeApproved = new NetworkClanNameChangeApproved(payload.ClanId, payload.Name, payload.InformalName);
+            NetworkClanNameChangeApproved clanNameChangeApproved = new NetworkClanNameChangeApproved(clanId, name, informalName);
 
             network.SendAll(clanNameChangeApproved);
         }
