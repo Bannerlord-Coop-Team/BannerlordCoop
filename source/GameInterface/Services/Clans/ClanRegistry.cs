@@ -4,6 +4,9 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans;
 
+/// <summary>
+/// Registry class that assosiates <see cref="Clan"/> and a <see cref="string"/> id
+/// </summary>
 internal interface IClanRegistry : IRegistry<Clan>
 {
     bool RegisterClan(Clan clan);
@@ -11,6 +14,7 @@ internal interface IClanRegistry : IRegistry<Clan>
     void RegisterAllClans();
 }
 
+/// <inheritdoc cref="IClanRegistry"/>
 internal class ClanRegistry : RegistryBase<Clan>, IClanRegistry
 {
     public bool RegisterClan(Clan clan)

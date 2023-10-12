@@ -5,11 +5,15 @@ using System.Collections.Generic;
 
 namespace Coop.Core.Client.Policies;
 
-internal class SyncPolicy : ISyncPolicy
+/// <summary>
+/// Client side sync policy
+/// </summary>
+/// <inheritdoc cref="ISyncPolicy"/>
+internal class ClientSyncPolicy : ISyncPolicy
 {
     private readonly IClientLogic clientLogic;
 
-    public SyncPolicy(IClientLogic clientLogic)
+    public ClientSyncPolicy(IClientLogic clientLogic)
     {
         this.clientLogic = clientLogic;
     }
@@ -21,6 +25,8 @@ internal class SyncPolicy : ISyncPolicy
     };
 
     public bool AllowOriginalCalls => Allow();
+
+    public bool EnforceSyncing => !AllowOriginalCalls;
 
     private bool Allow()
     {

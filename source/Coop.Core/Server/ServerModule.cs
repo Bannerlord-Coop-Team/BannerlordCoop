@@ -29,7 +29,7 @@ public class ServerModule : CommonModule
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
         
         // Policies
-        builder.RegisterType<SyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
+        builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
         RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);

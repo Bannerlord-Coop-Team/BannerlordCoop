@@ -22,7 +22,7 @@ public class ClientModule : CommonModule
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
 
         // Policies
-        builder.RegisterType<SyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
         RegisterAllTypesWithInterface<ClientModule, IHandler>(builder, autoInstantiate: true);
         RegisterAllTypesWithInterface<ClientModule, IPacketHandler>(builder, autoInstantiate: true);
