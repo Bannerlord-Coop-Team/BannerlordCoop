@@ -5,11 +5,6 @@ using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Control;
 using GameInterface.Services.ObjectManager;
-using SandBox.GauntletUI.Map;
-using SandBox.View.Map;
-using SandBox.ViewModelCollection.Nameplate;
-using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
@@ -83,19 +78,12 @@ internal class MobilePartyControlHandler : IHandler
         }
     }
 
-    private static readonly MethodInfo OnPartyVisibilityChanged = typeof(PartyNameplatesVM).GetMethod("OnPartyVisibilityChanged", BindingFlags.NonPublic | BindingFlags.Instance);
     private void Handle_MobilePartyCreated(MessagePayload<MobilePartyCreated> obj)
     {
         if (!controlPartiesByDefault) return;
 
         MobileParty party = obj.What.Party;
         controlledEntityRegistry.RegisterAsControlled(ownerId, party.StringId);
-
-        var cameraView = MapScreen.Instance?.GetMapView<GauntletMapPartyNameplateView>();
-
-        PartyNameplatesVM partyNameplatesVM = (PartyNameplatesVM)cameraView.GetType().GetField("_dataSource", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(cameraView);
-
-        OnPartyVisibilityChanged.Invoke(partyNameplatesVM, new object[] { party.Party });
     }
 
     private void Handle_MobilePartyDestroyed(MessagePayload<MobilePartyDestroyed> obj)
