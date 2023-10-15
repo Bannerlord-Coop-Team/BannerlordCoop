@@ -7,5 +7,5 @@ namespace GameInterface.Services.Bandits.Patches;
 internal class DisableAiBanditPatrollingBehavior
 {
     [HarmonyPatch(nameof(AiBanditPatrollingBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => true;
 }

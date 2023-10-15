@@ -8,5 +8,5 @@ namespace GameInterface.Services.Hideouts.Patches;
 internal class DisableHideoutCampaignBehavior
 {
     [HarmonyPatch(nameof(HideoutCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => true;
 }
