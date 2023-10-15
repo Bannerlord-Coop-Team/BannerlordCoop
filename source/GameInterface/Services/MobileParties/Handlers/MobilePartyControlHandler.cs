@@ -5,12 +5,6 @@ using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Control;
 using GameInterface.Services.ObjectManager;
-using SandBox.GauntletUI.Map;
-using SandBox.View.Map;
-using SandBox.ViewModelCollection.Nameplate;
-using System;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
