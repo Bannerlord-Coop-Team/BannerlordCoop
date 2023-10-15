@@ -19,6 +19,8 @@ namespace GameInterface.Services.Clans.Patches
         {
             if (PolicyProvider.AllowOriginalCalls) return true;
 
+            if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
+
             CallStackValidator.Validate(companion, AllowedInstance);
 
             if (AllowedInstance.IsAllowed(companion)) return true;

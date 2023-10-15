@@ -27,6 +27,8 @@ namespace GameInterface.Services.Clans.Patches
         {
             if (PolicyProvider.AllowOriginalCalls) return true;
 
+            if (ModInformation.IsClient && destroyedClan != Clan.PlayerClan) return false;
+
             CallStackValidator.Validate(destroyedClan, AllowedInstance);
 
             if (AllowedInstance.IsAllowed(destroyedClan)) return true;

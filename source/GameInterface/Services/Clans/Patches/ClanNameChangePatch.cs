@@ -27,6 +27,8 @@ namespace GameInterface.Services.Clans.Patches
         {
             if (PolicyProvider.AllowOriginalCalls) return true;
 
+            if (ModInformation.IsClient && __instance != Clan.PlayerClan) return false;
+
             MessageBroker.Instance.Publish(__instance, new ClanNameChanged(__instance.StringId, name.ToString(), informalName.ToString()));
 
             return false;
