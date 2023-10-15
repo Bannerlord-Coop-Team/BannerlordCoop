@@ -17,12 +17,14 @@ namespace Coop.Core.Server.Connections;
 public interface IClientRegistry : IDisposable
 {
     bool PlayersLoading { get; }
+
+    List<NetPeer> LoadingPeers { get; }
 }
 
 /// <inheritdoc cref="IClientRegistry"/>
 public class ClientRegistry : IClientRegistry
 {
-    internal IDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new Dictionary<NetPeer, IConnectionLogic>();
+    public IDictionary<NetPeer, IConnectionLogic> ConnectionStates { get; private set; } = new Dictionary<NetPeer, IConnectionLogic>();
 
     private static HashSet<Type> loadingStates = new HashSet<Type>
     {
@@ -30,6 +32,7 @@ public class ClientRegistry : IClientRegistry
         typeof(LoadingState),
     };
     public bool PlayersLoading => ConnectionStates.Any(state => loadingStates.Contains(state.Value.State.GetType()));
+    public List<NetPeer> LoadingPeers => ConnectionStates.Where(state => loadingStates.Contains(state.Value.State.GetType())).Select(state => state.Key).ToList();
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
