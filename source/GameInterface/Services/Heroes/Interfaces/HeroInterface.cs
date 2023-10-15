@@ -152,5 +152,7 @@ internal class HeroInterface : IHeroInterface
             Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D));
 
         typeof(MobilePartyAi).GetMethod("OnGameInitialized", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party.Ai, null);
+
+        CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
     }
 }
