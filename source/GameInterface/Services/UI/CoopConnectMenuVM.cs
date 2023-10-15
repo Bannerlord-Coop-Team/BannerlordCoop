@@ -75,7 +75,7 @@ namespace GameInterface.Services.UI
                 return;
             }
 
-            IPHostEntry hostEntry = new IPHostEntry();
+            IPHostEntry hostEntry;
 
             try
             {

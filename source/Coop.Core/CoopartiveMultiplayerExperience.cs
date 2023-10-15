@@ -33,15 +33,6 @@ namespace Coop.Core
             messageBroker.Subscribe<EndCoopMode>(Handle);
         }
 
-        
-
-        ~CoopartiveMultiplayerExperience()
-        {
-            messageBroker.Unsubscribe<AttemptJoin>(Handle);
-            messageBroker.Unsubscribe<HostSaveGame>(Handle);
-            messageBroker.Unsubscribe<EndCoopMode>(Handle);
-        }
-
         private void Handle(MessagePayload<AttemptJoin> obj)
         {
             var connectMessage = obj.What;
@@ -84,7 +75,7 @@ namespace Coop.Core
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
+            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
             container = builder.Build();
 
             containerProvider.SetProvider(container);
@@ -108,7 +99,7 @@ namespace Coop.Core
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ClientModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
+            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
 
             if (configuration != null)
             {

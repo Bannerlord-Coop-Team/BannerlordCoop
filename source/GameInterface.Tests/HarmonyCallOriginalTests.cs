@@ -141,8 +141,6 @@ namespace GameInterface.Tests
                 FieldMap.Add(name, field);
             }
         }
-
-        public static void SubscribeToSignal()
     }
 
     public class FieldChangeAttempted : IEvent
