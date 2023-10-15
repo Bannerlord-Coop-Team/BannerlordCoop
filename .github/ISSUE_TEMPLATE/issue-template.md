@@ -21,7 +21,7 @@ assignees: ''
 ## Location
 <!-- Add where changes for this issue will exist. -->
 <!-- Add any related files here. -->
-
+Create a branch based from [development](https://github.com/Bannerlord-Coop-Team/BannerlordCoop)
 
 ## Related Issues
 <!-- Add any related issues here (Child of #EPIC/ Blocked by #SOMETHING). -->
