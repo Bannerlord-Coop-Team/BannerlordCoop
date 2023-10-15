@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Clans.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -12,6 +13,8 @@ namespace GameInterface.Services.Clans.Patches
     {
         public static bool Prefix(Hero adoptedHero)
         {
+            if (PolicyProvider.AllowOriginalCalls) return true;
+
             string playerClanId = Clan.PlayerClan.StringId;
 
             string playerHeroId = Hero.MainHero.StringId;

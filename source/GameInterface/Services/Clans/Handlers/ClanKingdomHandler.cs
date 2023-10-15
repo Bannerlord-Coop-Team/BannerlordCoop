@@ -37,9 +37,17 @@ namespace GameInterface.Services.Clans.Handlers
         {
             var payload = obj.What;
 
-            objectManager.TryGetObject<Clan>(payload.ClanId, out var clan);
+            if (objectManager.TryGetObject<Clan>(payload.ClanId, out var clan) == false)
+            {
+                Logger.Error("Unable to find clan ({clanId})", payload.ClanId);
+                return;
+            }
 
-            objectManager.TryGetObject<Kingdom>(payload.NewKingdomId, out var newKingdom);
+            if (objectManager.TryGetObject<Kingdom>(payload.NewKingdomId, out var newKingdom) == false)
+            {
+                Logger.Error("Unable to find kingdom ({kingdomId})", payload.NewKingdomId);
+                return;
+            }
 
             ClanChangeKingdomPatch.RunOriginalChangeClanKingdom(clan, newKingdom, (ChangeKingdomAction.ChangeKingdomActionDetail)payload.DetailId, 
                 payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);

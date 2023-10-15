@@ -1,11 +1,13 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.States;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
+using System.Linq;
 
 namespace Coop.Core.Server.Services.Time.Handlers;
 
@@ -37,11 +39,7 @@ public class TimeHandler : IHandler
 
     internal void Handle_NetworkRequestTimeSpeedChange(MessagePayload<NetworkRequestTimeSpeedChange> obj)
     {
-        if (_clientRegistry.PlayersLoading)
-        {
-            Logger.Information("Players are currently loading, unable to change time");
-            return;
-        }
+        if (AnyLoaders()) return;
 
         var newMode = obj.What.NewControlMode;
 
@@ -50,15 +48,23 @@ public class TimeHandler : IHandler
 
     internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
     {
-        if (_clientRegistry.PlayersLoading)
-        {
-            Logger.Information("Players are currently loading, unable to change time");
-            return;
-        }
+        if (AnyLoaders()) return;
 
         var newMode = obj.What.NewControlMode;
 
         SetTimeMode(newMode);
+    }
+
+    private bool AnyLoaders()
+    {
+        if (_clientRegistry.PlayersLoading)
+        {
+            var loadingPeers = _clientRegistry.LoadingPeers;
+            Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.EndPoint.ToString()))} are currently loading, unable to change time");
+            return true;
+        }
+
+        return false;
     }
 
     public void SetTimeMode(TimeControlEnum timeMode)

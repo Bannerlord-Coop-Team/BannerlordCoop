@@ -1,7 +1,9 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.GameDebug.Patches;
 using HarmonyLib;
@@ -24,6 +26,10 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, Hero newLeader = null)
         {
+            if (PolicyProvider.AllowOriginalCalls) return true;
+
+            if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
+
             CallStackValidator.Validate(clan, AllowedInstance);
 
             if (AllowedInstance.IsAllowed(clan)) return true;

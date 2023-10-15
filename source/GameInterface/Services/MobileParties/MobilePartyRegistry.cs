@@ -1,9 +1,5 @@
 ﻿using Common;
-using Common.Extensions;
 using GameInterface.Services.Registry;
-using System;
-using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -44,9 +40,7 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegi
             return;
         }
 
-        var parties = objectManager.MobileParties.ToArray();
-
-        foreach (var party in parties)
+        foreach (var party in objectManager.MobileParties)
         {
             RegisterParty(party);
         }

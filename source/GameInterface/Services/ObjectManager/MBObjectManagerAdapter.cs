@@ -1,4 +1,5 @@
 ﻿using Common.Extensions;
+using GameInterface.Services.Clans;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.Registry;
 using System;
@@ -24,15 +25,19 @@ public interface IObjectManager
 internal class MBObjectManagerAdapter : IObjectManager
 {
     private MBObjectManager objectManager => MBObjectManager.Instance;
+
     private readonly IHeroRegistry heroRegistry;
     private readonly IMobilePartyRegistry partyRegistry;
+    private readonly IClanRegistry clanRegistry;
 
     public MBObjectManagerAdapter(
         IHeroRegistry heroRegistry,
-        IMobilePartyRegistry partyRegistry)
+        IMobilePartyRegistry partyRegistry, 
+        IClanRegistry clanRegistry)
     {
         this.heroRegistry = heroRegistry;
         this.partyRegistry = partyRegistry;
+        this.clanRegistry = clanRegistry;
     }
 
     public bool AddExisting(string id, object obj)
@@ -50,20 +55,13 @@ internal class MBObjectManagerAdapter : IObjectManager
 
         obj.StringId = id;
 
-        if (obj is MobileParty party)
+        return obj switch
         {
-            return partyRegistry.RegisterExistingObject(id, party);
-        }
-
-        if(obj is Hero hero)
-        {
-            return heroRegistry.RegisterExistingObject(id, hero);
-        }
-
-        T registeredObject = objectManager.RegisterPresumedObject(obj);
-        if (registeredObject == null) return false;
-
-        return true;
+            MobileParty party => partyRegistry.RegisterExistingObject(id, party),
+            Hero hero => heroRegistry.RegisterExistingObject(id, hero),
+            Clan clan => clanRegistry.RegisterExistingObject(id, clan),
+            _ => objectManager.RegisterPresumedObject(obj) != null,
+        };
     }
 
     public bool AddNewObject(object obj, out string newId)
@@ -73,21 +71,13 @@ internal class MBObjectManagerAdapter : IObjectManager
         if (objectManager == null) return false;
         if (obj is MBObjectBase mbObject == false) return false;
 
-        if (obj is MobileParty party)
+        return obj switch
         {
-            var result = partyRegistry.RegisterNewObject(party, out newId);
-
-            return result;
-        }
-
-        if (obj is Hero hero)
-        {
-            var result = heroRegistry.RegisterNewObject(hero, out newId);
-
-            return result;
-        }
-
-        return AddNewObjectInternal(mbObject, out newId);
+            MobileParty party => partyRegistry.RegisterNewObject(party, out newId),
+            Hero hero => heroRegistry.RegisterNewObject(hero, out newId),
+            Clan clan => clanRegistry.RegisterNewObject(clan, out newId),
+            _ => AddNewObjectInternal(mbObject, out newId),
+        };
     }
 
     private bool AddNewObjectInternal<T>(T obj, out string id) where T : MBObjectBase
@@ -108,17 +98,13 @@ internal class MBObjectManagerAdapter : IObjectManager
         if (objectManager == null) return false;
         if (obj is MBObjectBase mbObject == false) return false;
 
-        if (obj is MobileParty party)
+        return obj switch
         {
-            return partyRegistry.TryGetValue(party, out string _);
-        }
-
-        if (obj is Hero hero)
-        {
-            return heroRegistry.TryGetValue(hero, out string _);
-        }
-
-        return Contains(mbObject.StringId);
+            MobileParty party => partyRegistry.TryGetValue(party, out string _),
+            Hero hero => heroRegistry.TryGetValue(hero, out string _),
+            Clan clan => clanRegistry.TryGetValue(clan, out string _),
+            _ => Contains(mbObject.StringId),
+        };
     }
 
     
@@ -133,6 +119,11 @@ internal class MBObjectManagerAdapter : IObjectManager
         }
 
         if(heroRegistry.TryGetValue(id, out Hero _))
+        {
+            return true;
+        }
+
+        if (clanRegistry.TryGetValue(id, out Clan _))
         {
             return true;
         }
@@ -154,17 +145,12 @@ internal class MBObjectManagerAdapter : IObjectManager
         return true;
     }
 
-
-    private static readonly Type PartyType = typeof(MobileParty);
-    private static readonly Type HeroType = typeof(Hero);
     public bool TryGetObject(string id, out object obj)
     {
         obj = default;
 
         if (string.IsNullOrEmpty(id)) return false;
         if (objectManager == null) return false;
-
-        MBObjectBase castedResult;
 
         if (partyRegistry.TryGetValue(id, out MobileParty party))
         {
@@ -177,6 +163,14 @@ internal class MBObjectManagerAdapter : IObjectManager
             obj = hero;
             return true;
         }
+
+        if (clanRegistry.TryGetValue(id, out Clan clan))
+        {
+            obj = clan;
+            return true;
+        }
+
+        MBObjectBase castedResult;
 
         var result = TryGetObjectInternal(id, out castedResult);
 

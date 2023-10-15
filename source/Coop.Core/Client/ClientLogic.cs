@@ -26,9 +26,14 @@ public class ClientLogic : IClientLogic
     private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
     public IStateFactory StateFactory { get; }
     public string ControlledHeroId { get; set; }
+    private IClientState InitialState => StateFactory.CreateClientState<MainMenuState>(this);
     public IClientState State 
     {
-        get { return _state; }
+        get 
+        { 
+            _state ??= InitialState;
+            return _state;
+        }
         set 
         {
             Logger.Debug("Client is changing to {state} State", value.GetType().Name);
@@ -43,7 +48,6 @@ public class ClientLogic : IClientLogic
     public ClientLogic(IStateFactory stateFactory)
     {
         StateFactory = stateFactory;
-        SetState<MainMenuState>();
     }
 
     public void Start()

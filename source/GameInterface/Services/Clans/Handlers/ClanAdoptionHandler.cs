@@ -37,11 +37,23 @@ namespace GameInterface.Services.Clans.Handlers
         {
             var payload = obj.What;
 
-            objectManager.TryGetObject<Clan>(payload.ClanId, out var playerClan);
+            if (objectManager.TryGetObject<Clan>(payload.ClanId, out var playerClan) == false)
+            {
+                Logger.Error("Unable to find clan ({clanId})", payload.ClanId);
+                return;
+            }
 
-            objectManager.TryGetObject<Hero>(payload.AdoptedHeroId, out var adoptedHero);
+            if (objectManager.TryGetObject<Hero>(payload.AdoptedHeroId, out var adoptedHero) == false)
+            {
+                Logger.Error("Unable to find adopted hero ({heroId})", payload.AdoptedHeroId);
+                return;
+            }
 
-            objectManager.TryGetObject<Hero>(payload.PlayerHeroId, out var playerHero);
+            if (objectManager.TryGetObject<Hero>(payload.PlayerHeroId, out var playerHero) == false)
+            {
+                Logger.Error("Unable to find player hero ({heroId})", payload.PlayerHeroId);
+                return;
+            }
 
             ClanAdoptHeroPatch.RunFixedAdoptHero(adoptedHero, playerClan, playerHero);
         }

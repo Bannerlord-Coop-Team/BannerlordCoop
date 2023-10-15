@@ -36,7 +36,11 @@ namespace GameInterface.Services.Clans.Handlers
         {
             var payload = obj.What;
 
-            objectManager.TryGetObject<Clan>(payload.ClanId, out var clan);
+            if (objectManager.TryGetObject<Clan>(payload.ClanId, out var clan) == false)
+            {
+                Logger.Error("Unable to find clan ({clanId})", payload.ClanId);
+                return;
+            }
 
             ClanAddRenownPatch.RunOriginalAddRenown(clan, payload.Amount, payload.ShouldNotify);
         }

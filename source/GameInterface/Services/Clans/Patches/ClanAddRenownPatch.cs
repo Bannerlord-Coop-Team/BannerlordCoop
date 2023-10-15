@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.GameDebug.Patches;
 using HarmonyLib;
@@ -15,6 +16,11 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(ref Clan __instance, float value, bool shouldNotify = true)
         {
+            if (PolicyProvider.AllowOriginalCalls) return true;
+
+            // On the client if it is not the player client skip the call
+            if (ModInformation.IsClient && __instance != Clan.PlayerClan) return false;
+
             CallStackValidator.Validate(__instance, AllowedInstance);
 
             if (AllowedInstance.IsAllowed(__instance)) return true;
