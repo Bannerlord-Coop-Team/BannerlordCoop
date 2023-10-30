@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
+using Common.Network;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.States;
@@ -10,11 +12,19 @@ namespace Coop.Core.Server.Connections.States;
 public class LoadingState : ConnectionStateBase
 {
     private readonly IMessageBroker messageBroker;
+    private readonly IClientRegistry clientRegistry;
+    private readonly INetwork network;
 
-    public LoadingState(IConnectionLogic connectionLogic, IMessageBroker messageBroker)
+    public LoadingState(
+        IConnectionLogic connectionLogic, 
+        IMessageBroker messageBroker,
+        INetwork network,
+        IClientRegistry clientRegistry)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
+        this.clientRegistry = clientRegistry;
+        this.network = network;
 
         messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
     }
@@ -32,6 +42,12 @@ public class LoadingState : ConnectionStateBase
         {
             ConnectionLogic.EnterCampaign();
             messageBroker.Publish(this, new PlayerCampaignEntered());
+        }
+
+        if (!clientRegistry.PlayersLoading)
+        {
+            messageBroker.Publish(this, new SendInformationMessage("All players connected, game can now be un-paused"));
+            network.SendAll(new SendInformationMessage("All players connected, game can now be un-paused"));
         }
     }
 

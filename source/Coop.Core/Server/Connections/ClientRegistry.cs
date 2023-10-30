@@ -2,7 +2,7 @@
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
@@ -61,6 +61,8 @@ public class ClientRegistry : IClientRegistry
         var playerPeer = obj.What.PlayerPeer;
         var connectionLogic = connectionLogicFactory.CreateLogic(playerPeer);
         ConnectionStates.Add(playerPeer, connectionLogic);
+
+        messageBroker.Publish(this, new SendInformationMessage("A new player is joining the game, pausing"));
     }
 
     internal void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)

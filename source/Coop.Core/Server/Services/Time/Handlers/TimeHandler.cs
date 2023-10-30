@@ -4,6 +4,7 @@ using Common.Network;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
@@ -39,7 +40,13 @@ public class TimeHandler : IHandler
 
     internal void Handle_NetworkRequestTimeSpeedChange(MessagePayload<NetworkRequestTimeSpeedChange> obj)
     {
-        if (AnyLoaders()) return;
+        if (AnyLoaders())
+        {
+            int loadingPeers = _clientRegistry.LoadingPeers.Count;
+            _messageBroker.Publish(this, new SendInformationMessage("Pausing disabled, " + loadingPeers + " player(s) are currently joining the game"));
+            _network.SendAll(new SendInformationMessage("Pausing disabled, " + loadingPeers + " player(s) are currently joining the game"));
+            return;
+        }
 
         var newMode = obj.What.NewControlMode;
 
