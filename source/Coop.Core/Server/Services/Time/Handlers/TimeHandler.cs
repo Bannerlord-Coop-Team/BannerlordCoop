@@ -55,7 +55,13 @@ public class TimeHandler : IHandler
 
     internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
     {
-        if (AnyLoaders()) return;
+        if (AnyLoaders())
+        {
+            int loadingPeers = _clientRegistry.LoadingPeers.Count;
+            _messageBroker.Publish(this, new SendInformationMessage("Pausing disabled, " + loadingPeers + " player(s) are currently joining the game"));
+            _network.SendAll(new SendInformationMessage("Pausing disabled, " + loadingPeers + " player(s) are currently joining the game"));
+            return;
+        }
 
         var newMode = obj.What.NewControlMode;
 

@@ -42,12 +42,12 @@ public class LoadingState : ConnectionStateBase
         {
             ConnectionLogic.EnterCampaign();
             messageBroker.Publish(this, new PlayerCampaignEntered());
-        }
 
-        if (!clientRegistry.PlayersLoading)
-        {
-            messageBroker.Publish(this, new SendInformationMessage("All players connected, game can now be un-paused"));
-            network.SendAll(new SendInformationMessage("All players connected, game can now be un-paused"));
+            if (!clientRegistry.PlayersLoading)
+            {
+                messageBroker.Publish(this, new SendInformationMessage("All players connected, game can now be un-paused"));
+                network.SendAllBut(playerId, new SendInformationMessage("All players connected, game can now be un-paused"));
+            }
         }
     }
 
