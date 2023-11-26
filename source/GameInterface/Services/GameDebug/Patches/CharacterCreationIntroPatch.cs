@@ -17,11 +17,15 @@ namespace GameInterface.Services.GameDebug.Patches
         [HarmonyPatch("OnActivate")]
         private static void OnActivate(ref TaleworldGameState __instance)
         {
-            Logger.Information("Game State is changing to: '{state}'", __instance.GetType().Name);
+            Logger.Information("Game State is changing to {state}", __instance.GetType().Name);
             if (DebugCharacterCreationInterface.InCharacterCreationIntro())
             {
-                VideoPlayerViewPatch.CurrentVideoPlayerView?.StopVideo(); // Shouldn't be null.
-                VideoPlayerViewPatch.CurrentVideoPlayerView = null;
+                if (VideoPlayerViewPatch.CurrentVideoPlayerView != null)
+                {
+                    VideoPlayerViewPatch.CurrentVideoPlayerView?.StopVideo();
+                    VideoPlayerViewPatch.CurrentVideoPlayerView = null;
+                }
+                
                 MessageBroker.Instance.Publish(__instance, new CharacterCreationStarted());
             }
         }
