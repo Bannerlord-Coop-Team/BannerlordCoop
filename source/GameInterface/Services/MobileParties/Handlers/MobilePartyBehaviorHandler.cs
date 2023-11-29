@@ -78,6 +78,8 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
 
+        party.Position2D = new Vec2(data.PartyPositionX, data.PartyPositionY);
+
         PartyBehaviorPatch.SetAiBehavior(
             party.Ai,
             data.Behavior,

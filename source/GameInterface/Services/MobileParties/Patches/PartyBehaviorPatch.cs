@@ -62,7 +62,7 @@ static class PartyBehaviorPatch
                 : targetPartyFigure.MobileParty.StringId;
         }
 
-        var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint);
+        var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint, party.Position2D);
         var message = new PartyBehaviorChangeAttempted(party, data);
         MessageBroker.Instance.Publish(__instance, message);
 
