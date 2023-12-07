@@ -10,6 +10,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches;
