@@ -62,7 +62,7 @@ static class PartyBehaviorPatch
                 : targetPartyFigure.MobileParty.StringId;
         }
 
-        var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint);
+        var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint, party.Position2D);
         var message = new PartyBehaviorChangeAttempted(party, data);
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -70,7 +70,7 @@ static class PartyBehaviorPatch
     }
 
     public static void SetAiBehavior(
-        MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint)
+        MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint, Vec2 currentPosition)
     {
         DefaultBehavior(partyAi, newBehavior);
 
@@ -89,11 +89,16 @@ static class PartyBehaviorPatch
         }
 
         TargetPosition(mobileParty, targetPoint);
+        CurrentPosition(mobileParty, currentPosition);
 
         SetShortTermBehavior(partyAi, newBehavior, targetMapEntity);
         SetBehaviorTarget(partyAi, targetPoint);
         UpdateBehavior(partyAi);
     }
+
+    static readonly Action<MobileParty, Vec2> CurrentPosition = typeof(MobileParty)
+        .GetProperty(nameof(MobileParty.Position2D)).GetSetMethod(true)
+        .BuildDelegate<Action<MobileParty, Vec2>>();
 
     static readonly Action<MobilePartyAi, AiBehavior, IMapEntity> SetShortTermBehavior = typeof(MobilePartyAi)
         .GetMethod("SetShortTermBehavior", BindingFlags.Instance | BindingFlags.NonPublic)
