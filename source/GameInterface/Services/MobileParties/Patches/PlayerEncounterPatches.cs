@@ -16,10 +16,11 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// <summary>
 /// Patches for player encounters
 /// </summary>
+
 [HarmonyPatch(typeof(EncounterManager))]
 internal class EncounterManagerPatches
 {
-    public static bool inSettlement = false;
+    private static bool inSettlement = false;
     private static MethodInfo Start => typeof(PlayerEncounter).GetMethod(nameof(PlayerEncounter.Start));
     private static MethodInfo Init => typeof(PlayerEncounter).GetMethod(
         "Init",
@@ -71,5 +72,12 @@ internal class EncounterManagerPatches
         MessageBroker.Instance.Publish(attackerParty, message);
 
         inSettlement = true;
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Finish))]
+    private static void PlayerEncounterFinishPatch(bool forcePlayerOutFromSettlement)
+    {
+        inSettlement = false;
     }
 }

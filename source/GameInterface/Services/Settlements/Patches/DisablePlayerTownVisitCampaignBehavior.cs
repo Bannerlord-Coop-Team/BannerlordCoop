@@ -63,7 +63,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_streets_on_consequence")]
     static bool DisableTownCenter()
     {
-        return true;
+        return false;
     }
 
     /// <summary>
@@ -93,7 +93,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_village_village_center_on_consequence")]
     static bool DisableVillageCenter()
     {
-        return true;
+        return false;
     }
 
     /// <summary>
