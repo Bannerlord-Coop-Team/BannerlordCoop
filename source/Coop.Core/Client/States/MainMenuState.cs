@@ -36,7 +36,6 @@ public class MainMenuState : ClientStateBase
     internal void Handle_NetworkConnected(MessagePayload<NetworkConnected> obj)
     {
         Logic.ValidateModules();
-        messageBroker.Publish(this, new SendInformationMessage("A new player is joining the game, pausing"));
     }
 
     public override void Disconnect()
