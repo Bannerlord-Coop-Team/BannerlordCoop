@@ -49,14 +49,14 @@ public class CoopLoadingScreenHandler : IHandler
      * tutorial.testShow
      * tutorial.testHide                                                                       */
 
-    [CommandLineFunctionality.CommandLineArgumentFunction("testShow", "tutorial")]
+    [CommandLineFunctionality.CommandLineArgumentFunction("ShowLoadingScreen", "Coop.Debug")]
     public static string testShow(List<string> strings)
     {
         MessageBroker.Instance.Publish(null, new ShowLoadingScreen());
         return "Command Executed!";
     }
 
-    [CommandLineFunctionality.CommandLineArgumentFunction("testHide", "tutorial")]
+    [CommandLineFunctionality.CommandLineArgumentFunction("HideLoadingScreen", "Coop.Debug")]
     public static string testHide(List<string> strings)
     {
         MessageBroker.Instance.Publish(null, new HideLoadingScreen());
