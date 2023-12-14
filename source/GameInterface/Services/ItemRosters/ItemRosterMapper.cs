@@ -46,16 +46,18 @@ namespace GameInterface.Services.ItemRosters
                 return;
 
             if (Get(roster) != null)
-                table.Remove(roster);
+                if (!table.Remove(roster))
+                    return;
 
             try
             {
                 table.Add(roster, party);
             }
-            catch (ArgumentException e)
+            catch (ArgumentException)
             {
-                //if (table.Remove(roster))
-                //    Set(party, roster); throws exceptions even though they are handled, TODO: fix, then remove if (Get(roster) != null)
+                //TODO: fix exceptions reported even when handled, then remove if (Get(roster) != null) and uncomment:
+                // if(table.Remove(roster))
+                //     Set(roster, party)
             }
         }
     }

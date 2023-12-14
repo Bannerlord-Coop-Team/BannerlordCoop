@@ -6,7 +6,7 @@ namespace Coop.Core.Server.Services.PartyBases.Messages
     /// <summary>
     /// Sent to the client by the server when a PartyBase's ItemRoster is updated.
     /// </summary>
-    public class NetworkPartyBaseItemRosterUpdated : IMessage
+    public class NetworkItemRosterUpdated : IMessage
     {
         [ProtoMember(1)]
         public string PartyBaseId { get; }
@@ -15,7 +15,7 @@ namespace Coop.Core.Server.Services.PartyBases.Messages
         [ProtoMember(3)]
         public int Number { get; }
 
-        public NetworkPartyBaseItemRosterUpdated(string partyBaseId, byte[] equipmentElement, int number)
+        public NetworkItemRosterUpdated(string partyBaseId, byte[] equipmentElement, int number)
         {
             PartyBaseId = partyBaseId;
             EquipmentElement = equipmentElement;

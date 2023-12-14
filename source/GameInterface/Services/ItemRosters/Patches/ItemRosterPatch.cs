@@ -23,7 +23,7 @@ namespace GameInterface.Services.ItemRosters.Patches
 
             if (ModInformation.IsServer)
             {
-                MessageBroker.Instance.Publish(instance, new PreparePartyBaseItemRosterUpdated(pb.Id, rosterElement, number));
+                MessageBroker.Instance.Publish(instance, new PrepareItemRosterUpdated(pb.Id, rosterElement, number));
             }
         }
     }

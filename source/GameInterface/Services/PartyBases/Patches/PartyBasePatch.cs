@@ -17,6 +17,8 @@ namespace GameInterface.Services.PartyBases.Patches
         [HarmonyPostfix]
         public static void ItemRosterSetterPostfix(ref PartyBase __instance)
         {
+            if (ModInformation.IsClient)
+                return;
             ItemRosterMapper.Instance.Set(__instance.ItemRoster, __instance);
         }
     }
