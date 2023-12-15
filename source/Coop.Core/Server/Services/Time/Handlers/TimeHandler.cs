@@ -1,10 +1,8 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.States;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Time.Messages;
-using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
@@ -40,6 +38,8 @@ public class TimeHandler : IHandler
 
     internal void Handle_NetworkRequestTimeSpeedChange(MessagePayload<NetworkRequestTimeSpeedChange> obj)
     {
+        if (AnyLoaders()) return;
+
         var newMode = obj.What.NewControlMode;
 
         SetTimeMode(newMode);
@@ -47,10 +47,7 @@ public class TimeHandler : IHandler
 
     internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
     {
-        if (AnyLoaders())
-        {
-            return;
-        }
+        if (AnyLoaders()) return;
 
         var newMode = obj.What.NewControlMode;
 

@@ -1,7 +1,5 @@
 ﻿using Common.Messaging;
-using Common.Network;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.States;
@@ -13,9 +11,7 @@ public class LoadingState : ConnectionStateBase
 {
     private readonly IMessageBroker messageBroker;
 
-    public LoadingState(
-        IConnectionLogic connectionLogic, 
-        IMessageBroker messageBroker)
+    public LoadingState(IConnectionLogic connectionLogic, IMessageBroker messageBroker)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
