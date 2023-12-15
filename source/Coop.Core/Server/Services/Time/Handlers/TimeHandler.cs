@@ -40,14 +40,6 @@ public class TimeHandler : IHandler
 
     internal void Handle_NetworkRequestTimeSpeedChange(MessagePayload<NetworkRequestTimeSpeedChange> obj)
     {
-        if (AnyLoaders())
-        {
-            int loadingPeers = _clientRegistry.LoadingPeers.Count;
-            _messageBroker.Publish(this, new SendInformationMessage("Pausing disabled, " + loadingPeers + " player(s) are currently joining the game"));
-            _network.SendAll(new SendInformationMessage("Pausing disabled, " + loadingPeers + " player(s) are currently joining the game"));
-            return;
-        }
-
         var newMode = obj.What.NewControlMode;
 
         SetTimeMode(newMode);
@@ -57,9 +49,6 @@ public class TimeHandler : IHandler
     {
         if (AnyLoaders())
         {
-            int loadingPeers = _clientRegistry.LoadingPeers.Count;
-            _messageBroker.Publish(this, new SendInformationMessage("Pausing disabled, " + loadingPeers + " player(s) are currently joining the game"));
-            _network.SendAll(new SendInformationMessage("Pausing disabled, " + loadingPeers + " player(s) are currently joining the game"));
             return;
         }
 

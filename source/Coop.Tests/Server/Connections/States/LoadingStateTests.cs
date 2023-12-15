@@ -79,7 +79,7 @@ namespace Coop.Tests.Server.Connections.States
 
 
             // Assert
-            Assert.True(MockMessageBroker.PublishedMessages.Count == 2);
+            Assert.Single(MockMessageBroker.PublishedMessages);
             Assert.IsType<PlayerCampaignEntered>(MockMessageBroker.PublishedMessages.First());
 
             Assert.IsType<CampaignState>(connectionLogic.State);

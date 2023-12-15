@@ -12,19 +12,13 @@ namespace Coop.Core.Server.Connections.States;
 public class LoadingState : ConnectionStateBase
 {
     private readonly IMessageBroker messageBroker;
-    private readonly IClientRegistry clientRegistry;
-    private readonly INetwork network;
 
     public LoadingState(
         IConnectionLogic connectionLogic, 
-        IMessageBroker messageBroker,
-        INetwork network,
-        IClientRegistry clientRegistry)
+        IMessageBroker messageBroker)
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
-        this.clientRegistry = clientRegistry;
-        this.network = network;
 
         messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
     }

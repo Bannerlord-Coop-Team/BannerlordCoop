@@ -61,8 +61,6 @@ public class ClientRegistry : IClientRegistry
         var playerPeer = obj.What.PlayerPeer;
         var connectionLogic = connectionLogicFactory.CreateLogic(playerPeer);
         ConnectionStates.Add(playerPeer, connectionLogic);
-
-        messageBroker.Publish(this, new SendInformationMessage("A new player is joining the game, pausing"));
     }
 
     internal void PlayerDisconnectedHandler(MessagePayload<PlayerDisconnected> obj)
