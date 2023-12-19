@@ -44,6 +44,7 @@ internal class NewHeroHandler : IHandler
         catch (Exception e)
         {
             Logger.Error("Error while packing new Hero: {error}", e.Message);
+            Logger.Error(e.StackTrace);
         }
     }
 

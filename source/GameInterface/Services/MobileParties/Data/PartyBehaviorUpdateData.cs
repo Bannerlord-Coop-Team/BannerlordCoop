@@ -30,7 +30,13 @@ namespace GameInterface.Services.MobileParties.Data
         [ProtoMember(6)]
         public float TargetPointY { get; }
 
-        public PartyBehaviorUpdateData(string partyId, AiBehavior aiBehavior, bool hasTarget, string targetId, Vec2 targetPoint)
+        [ProtoMember(7)]
+        public float PartyPositionX { get; }
+
+        [ProtoMember(8)]
+        public float PartyPositionY { get; }
+
+        public PartyBehaviorUpdateData(string partyId, AiBehavior aiBehavior, bool hasTarget, string targetId, Vec2 targetPoint, Vec2 partyPosition)
         {
             PartyId = partyId;
             Behavior = aiBehavior;
@@ -38,6 +44,8 @@ namespace GameInterface.Services.MobileParties.Data
             TargetId = targetId;
             TargetPointX = targetPoint.X;
             TargetPointY = targetPoint.Y;
+            PartyPositionX = partyPosition.X;
+            PartyPositionY = partyPosition.Y;
         }
     }
 }

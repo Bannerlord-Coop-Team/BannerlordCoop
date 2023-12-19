@@ -223,8 +223,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         private static readonly FieldInfo Hero_HairTags = typeof(Hero).GetField("HairTags", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_BeardTags = typeof(Hero).GetField("BeardTags", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_TattooTags = typeof(Hero).GetField("TattooTags", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_BattleEquipment = typeof(Hero).GetField("<BattleEquipment>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_CivilianEquipment = typeof(Hero).GetField("<CivilianEquipment>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        private static readonly FieldInfo Hero_BattleEquipment = typeof(Hero).GetField("<_battleEquipment>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        private static readonly FieldInfo Hero_CivilianEquipment = typeof(Hero).GetField("<_civilianEquipment>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_CaptivityStartTime = typeof(Hero).GetField("<CaptivityStartTime>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_PreferredUpgradeFormation = typeof(Hero).GetField("<PreferredUpgradeFormation>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_heroState = typeof(Hero).GetField("_heroState", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
@@ -374,12 +374,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             public CultureObject Culture { get; private set; }
             public List<CaravanPartyComponent> OwnedCaravans { get; private set; }
             public PartyBase PartyBelongedToAsPrisoner { get; private set; }
-            public List<ItemObject> SpecialItems { get; private set; }
+            public MBList<ItemObject> SpecialItems { get; private set; }
             public Hero Father { get; private set; }
             public Hero Mother { get; private set; }
             public MBList<Hero> ExSpouses { get; private set; }
             public Hero Spouse { get; private set; }
-            public List<Hero> Children { get; private set; }
+            public MBList<Hero> Children { get; private set; }
             public HeroDeveloper HeroDeveloper { get; private set; }
 
             public RandomHeroWithData(IObjectManager objectManager)
@@ -534,7 +534,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             private void CreateItems()
             {
-                SpecialItems = new List<ItemObject>
+                SpecialItems = new MBList<ItemObject>
                 {
                     (ItemObject)FormatterServices.GetUninitializedObject(typeof(ItemObject)),
                     (ItemObject)FormatterServices.GetUninitializedObject(typeof(ItemObject)),
@@ -599,7 +599,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 Ch3.StringId = "My Ch3";
                 objectManager.AddExisting(Ch3.StringId, Ch3);
 
-                Children = new List<Hero>
+                Children = new MBList<Hero>
                 {
                     Ch1,
                     Ch2,

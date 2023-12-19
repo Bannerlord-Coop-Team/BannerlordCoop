@@ -6,6 +6,8 @@ using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
+using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.Registry;
 using Serilog;
 using System;
@@ -136,15 +138,15 @@ internal class HeroInterface : IHeroInterface
 
         var partyBase = party.Party;
 
-        partyBase.Visuals.OnStartup(partyBase);
-        partyBase.Visuals.SetMapIconAsDirty();
+        partyBase.GetPartyVisual().OnStartup();
+        partyBase.SetVisualAsDirty();
     }
 
     private void SetupNewParty(Hero hero)
     {
         var party = hero.PartyBelongedTo;
         party.IsVisible = true;
-        party.Party.Visuals.SetMapIconAsDirty();
+        party.Party.SetVisualAsDirty();
 
         typeof(MobileParty).GetMethod("RecoverPositionsForNavMeshUpdate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party, null);
         typeof(MobileParty).GetProperty("CurrentNavigationFace").SetValue(
