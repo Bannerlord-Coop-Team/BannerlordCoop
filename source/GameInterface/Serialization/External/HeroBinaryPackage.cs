@@ -86,7 +86,8 @@ namespace GameInterface.Serialization.External
 
             MBList<Hero> exSpouses = new MBList<Hero>(ResolveIds<Hero>(exSpousesIds));
             Hero_ExSpouses.SetValue(Object, exSpouses);
-            Hero_Children.SetValue(Object, ResolveIds<Hero>(childrenIds).ToList());
+            MBList<Hero> children = new MBList<Hero>(ResolveIds<Hero>(childrenIds));
+            Hero_Children.SetValue(Object, children);
         }
     }
 }

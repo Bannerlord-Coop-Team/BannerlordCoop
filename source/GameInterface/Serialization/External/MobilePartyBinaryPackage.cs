@@ -44,7 +44,6 @@ namespace GameInterface.Serialization.External
             "_cachedPartySizeRatio",
             "_latestUsedPaymentRatio",
             "<VersionNo>k__BackingField",
-            "_errorPosition",
             "_currentNavigationFace",
             "_lastNavigationFace",
             "_locatorNodeIndex",
@@ -76,8 +75,7 @@ namespace GameInterface.Serialization.External
             surgeonId = Object.EffectiveSurgeon?.StringId;
         }
 
-
-        private static MethodInfo MobileParty_InitCached => typeof(MobileParty).GetMethod("InitCached", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static ConstructorInfo MobileParty_ctor => typeof(MobileParty).GetConstructor(Array.Empty<Type>());
         protected override void UnpackInternal()
         {
             if(string.IsNullOrEmpty(stringId) == false)
@@ -86,7 +84,7 @@ namespace GameInterface.Serialization.External
                 return;
             }
 
-            MobileParty_InitCached.Invoke(Object, Array.Empty<string>());
+            MobileParty_ctor.Invoke(Object, Array.Empty<object>());
 
             base.UnpackFields();
 
