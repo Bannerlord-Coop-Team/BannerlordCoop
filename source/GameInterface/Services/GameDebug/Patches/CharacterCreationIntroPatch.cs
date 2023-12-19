@@ -2,7 +2,6 @@
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
-using GameInterface.Services.Heroes.Interfaces;
 using HarmonyLib;
 using Serilog;
 using TaleworldGameState = TaleWorlds.Core.GameState;
@@ -10,9 +9,9 @@ using TaleworldGameState = TaleWorlds.Core.GameState;
 namespace GameInterface.Services.GameDebug.Patches
 {
     [HarmonyPatch(typeof(TaleworldGameState))]
-    internal class CharacterCreationIntoPatch
+    internal class CharacterCreationIntroPatch
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<CharacterCreationIntoPatch>();
+        private static readonly ILogger Logger = LogManager.GetLogger<CharacterCreationIntroPatch>();
 
         [HarmonyPostfix]
         [HarmonyPatch("OnActivate")]
@@ -21,6 +20,12 @@ namespace GameInterface.Services.GameDebug.Patches
             Logger.Information("Game State is changing to {state}", __instance.GetType().Name);
             if (DebugCharacterCreationInterface.InCharacterCreationIntro())
             {
+                if (VideoPlayerViewPatch.CurrentVideoPlayerView != null)
+                {
+                    VideoPlayerViewPatch.CurrentVideoPlayerView?.StopVideo();
+                    VideoPlayerViewPatch.CurrentVideoPlayerView = null;
+                }
+                
                 MessageBroker.Instance.Publish(__instance, new CharacterCreationStarted());
             }
         }

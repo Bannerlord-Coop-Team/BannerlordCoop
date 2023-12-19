@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     
     container:
-      image: garrettluskey/bannerlordcoop:v1.1.4
+      image: garrettluskey/bannerlordcoop:latest
       
     steps:
       - name: Checkout Repo
