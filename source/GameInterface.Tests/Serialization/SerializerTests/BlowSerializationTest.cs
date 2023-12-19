@@ -64,7 +64,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             blow.MovementSpeedDamageModifier = 0.3f;
             blow.NoIgnore = true;
             blow.OwnerId = 2;
-            blow.Position = new TaleWorlds.Library.Vec3(1, 2, 3);
+            blow.GlobalPosition = new TaleWorlds.Library.Vec3(1, 2, 3);
             blow.SelfInflictedDamage = 5;
             blow.StrikeType = TaleWorlds.Core.StrikeType.Swing;
             blow.SwingDirection = new TaleWorlds.Library.Vec3(5, 6, 7);
@@ -112,7 +112,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(deserializedBlow.IsFallDamage, blow.IsFallDamage);
             Assert.Equal(deserializedBlow.MovementSpeedDamageModifier, blow.MovementSpeedDamageModifier);
             Assert.Equal(deserializedBlow.NoIgnore, blow.NoIgnore);
-            Assert.Equal(deserializedBlow.Position, blow.Position);
+            Assert.Equal(deserializedBlow.GlobalPosition, blow.GlobalPosition);
             Assert.Equal(deserializedBlow.SelfInflictedDamage, blow.SelfInflictedDamage);
             Assert.Equal(deserializedBlow.StrikeType, blow.StrikeType);
             Assert.Equal(deserializedBlow.SwingDirection, blow.SwingDirection);
