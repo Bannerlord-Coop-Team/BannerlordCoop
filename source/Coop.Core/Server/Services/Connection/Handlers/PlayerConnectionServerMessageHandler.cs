@@ -29,17 +29,15 @@ namespace Coop.Core.Server.Services.Connection.Handlers
             this.clientRegistry = clientRegistry;
             this.network = network;
 
-            messageBroker.Subscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
-            messageBroker.Subscribe<PlayerConnected>(PlayerConnectedHandler);
-            messageBroker.Subscribe<NetworkRequestTimeSpeedChange>(NetworkRequestTimeSpeedChange);
+            messageBroker.Subscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
+            messageBroker.Subscribe<AttemptedTimeSpeedChanged>(AttemptedTimeSpeedChanged);
             messageBroker.Subscribe<PackageGameSaveData>(Handle_NetworkConnected);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<NetworkPlayerCampaignEntered>(PlayerCampaignEnteredHandler);
-            messageBroker.Unsubscribe<PlayerConnected>(PlayerConnectedHandler);
-            messageBroker.Unsubscribe<NetworkRequestTimeSpeedChange>(NetworkRequestTimeSpeedChange);
+            messageBroker.Unsubscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
+            messageBroker.Unsubscribe<AttemptedTimeSpeedChanged>(AttemptedTimeSpeedChanged);
             messageBroker.Unsubscribe<PackageGameSaveData>(Handle_NetworkConnected);
         }
 
@@ -48,21 +46,18 @@ namespace Coop.Core.Server.Services.Connection.Handlers
             messageBroker.Publish(this, new SendInformationMessage("A new player is joining the game, pausing"));
         }
 
-        private void PlayerCampaignEnteredHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
+        private void PlayerCampaignEnteredHandler(MessagePayload<PlayerCampaignEntered> obj)
         {
             var playerId = (NetPeer)obj.Who;
 
-            if (!clientRegistry.PlayersLoading)
+            if (!AnyLoaders())
             {
                 messageBroker.Publish(this, new SendInformationMessage(unpauseReadyMessage));
                 network.SendAllBut(playerId, new SendInformationMessage(unpauseReadyMessage));
             }
         }
-        private void PlayerConnectedHandler(MessagePayload<PlayerConnected> obj)
-        {
-            messageBroker.Publish(this, new SendInformationMessage("A new player is joining the game, pausing"));
-        }
-        private void NetworkRequestTimeSpeedChange(MessagePayload<NetworkRequestTimeSpeedChange> obj)
+
+        private void AttemptedTimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
         {
             if (AnyLoaders())
             {
