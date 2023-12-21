@@ -15,6 +15,7 @@ using GameInterface.Services.GameDebug.Patches;
 using TaleWorlds.CampaignSystem;
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
+using GameInterface.Services.PartyBases.Extensions;
 
 namespace GameInterface.Services.GameDebug.Interfaces
 {
@@ -67,8 +68,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
             foreach(var party in Campaign.Current.MobileParties)
             {
                 party.IsVisible = true;
-                party.Party.Visuals.SetVisualVisible(true);
-                party.Party.Visuals.SetMapIconAsDirty();
+                party.Party.SetVisualAsDirty();
             }
         }
 

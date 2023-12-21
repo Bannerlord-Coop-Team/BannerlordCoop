@@ -29,6 +29,10 @@ internal class TimeControlHandler : IHandler
     {
         var payload = obj.What;
         CampaignTimeControlMode newTimeMode = (CampaignTimeControlMode)payload.NewTimeMode;
+
+        if (newTimeMode == CampaignTimeControlMode.StoppablePlay) { newTimeMode = CampaignTimeControlMode.UnstoppablePlay; }
+        if (newTimeMode == CampaignTimeControlMode.StoppableFastForward) { newTimeMode = CampaignTimeControlMode.UnstoppableFastForward; }
+
         timeControlInterface.SetTimeControl(newTimeMode);
 
         messageBroker.Respond(obj.Who, new TimeControlModeSet(payload.NewTimeMode));

@@ -69,7 +69,7 @@ namespace GameInterface.Services.Clans.Patches
                 }
                 for (int i = playerHero.OwnedWorkshops.Count - 1; i >= 0; i--)
                 {
-                    ChangeOwnerOfWorkshopAction.ApplyByDeath(playerHero.OwnedWorkshops[i], heir, null);
+                    ChangeOwnerOfWorkshopAction.ApplyByDeath(playerHero.OwnedWorkshops[i], heir);
                 }
                 if (heir.PartyBelongedTo != playerHero.PartyBelongedTo)
                 {
