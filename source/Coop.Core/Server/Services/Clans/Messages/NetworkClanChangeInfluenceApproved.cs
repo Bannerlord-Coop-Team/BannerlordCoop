@@ -7,6 +7,7 @@ namespace Coop.Core.Server.Services.Clans.Messages
     /// Clan influence change is approved by server
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
+    [DontLogMessage]
     public record NetworkClanChangeInfluenceApproved : ICommand
     {
         [ProtoMember(1)]

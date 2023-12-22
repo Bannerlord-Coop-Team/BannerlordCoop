@@ -31,10 +31,10 @@ namespace GameInterface.Services.MobileParties.Data
         public float TargetPointY { get; }
 
         [ProtoMember(7)]
-        public float PartyPositionX { get; }
+        public float PartyPositionX { get; set; }
 
         [ProtoMember(8)]
-        public float PartyPositionY { get; }
+        public float PartyPositionY { get; set; }
 
         public PartyBehaviorUpdateData(string partyId, AiBehavior aiBehavior, bool hasTarget, string targetId, Vec2 targetPoint, Vec2 partyPosition)
         {

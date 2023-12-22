@@ -10,6 +10,7 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior
     /// Must be confirmed by the server before the change is applied.
     /// </summary>
     /// <seealso cref="MobilePartyBehaviorHandler"/>
+    [DontLogMessage]
     public record ControlledPartyBehaviorUpdated : IEvent
     {
         public PartyBehaviorUpdateData BehaviorUpdateData { get; }

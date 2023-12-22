@@ -9,6 +9,7 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior
     /// The game has attempted to change party behavior.
     /// </summary>
     /// <seealso cref="MobilePartyBehaviorHandler"/>
+    [DontLogMessage]
     internal record PartyBehaviorChangeAttempted : IEvent
     {
         public MobileParty Party { get; }

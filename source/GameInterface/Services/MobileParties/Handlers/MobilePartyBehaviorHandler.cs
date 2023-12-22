@@ -2,6 +2,7 @@
 using GameInterface.Extentions;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -25,17 +26,20 @@ internal class MobilePartyBehaviorHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IMobilePartyInterface mobilePartyInterface;
     private readonly IObjectManager objectManager;
 
     public MobilePartyBehaviorHandler(
         IMessageBroker messageBroker,
         IControlledEntityRegistry controlledEntityRegistry,
         IControllerIdProvider controllerIdProvider,
+        IMobilePartyInterface mobilePartyInterface,
         IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.controlledEntityRegistry = controlledEntityRegistry;
         this.controllerIdProvider = controllerIdProvider;
+        this.mobilePartyInterface = mobilePartyInterface;
         this.objectManager = objectManager;
 
         messageBroker.Subscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
@@ -78,14 +82,23 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
 
-        Vec2 currentPosition = new Vec2(data.PartyPositionX, data.PartyPositionY);
-
         PartyBehaviorPatch.SetAiBehavior(
             party.Ai,
             data.Behavior,
             targetMapEntity,
-            targetPoint,
-            currentPosition
+            targetPoint
         );
+
+        if (ModInformation.IsClient)
+        {
+            Vec2 truePosition = new Vec2(data.PartyPositionX, data.PartyPositionY);
+            party.Position2D = truePosition;
+        }
+        else
+        {
+            data.PartyPositionX = party.Position2D.x;
+            data.PartyPositionY = party.Position2D.y;
+            messageBroker.Publish(this, new PartyBehaviorUpdated(data));
+        }
     }
 }

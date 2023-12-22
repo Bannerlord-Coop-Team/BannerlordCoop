@@ -8,6 +8,7 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 /// For all parties except the player party
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
+[DontLogMessage]
 public record NetworkPartyEnterSettlement : ICommand
 {
     [ProtoMember(1)]

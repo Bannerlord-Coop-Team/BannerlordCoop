@@ -5,6 +5,7 @@ using Coop.Core.Client.Services.MobileParties.Packets;
 using Coop.Core.Server.Services.MobileParties.Packets;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using LiteNetLib;
+using System;
 
 namespace Coop.Core.Server.Services.MobileParties.PacketHandlers;
 
@@ -28,11 +29,15 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
         this.network = network;
         this.messageBroker = messageBroker;
         packetManager.RegisterPacketHandler(this);
+
+        messageBroker.Subscribe<PartyBehaviorUpdated>(Handle_PartyBehaviorUpdated);
     }
 
     public void Dispose()
     {
         packetManager.RemovePacketHandler(this);
+
+        messageBroker.Unsubscribe<PartyBehaviorUpdated>(Handle_PartyBehaviorUpdated);
     }
 
     public void HandlePacket(NetPeer peer, IPacket packet)
@@ -41,8 +46,11 @@ internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
 
         var data = convertedPacket.BehaviorUpdateData;
 
-        network.SendAll(new UpdatePartyBehaviorPacket(data));
-
         messageBroker.Publish(this, new UpdatePartyBehavior(data));
+    }
+
+    private void Handle_PartyBehaviorUpdated(MessagePayload<PartyBehaviorUpdated> payload)
+    {
+        network.SendAll(new UpdatePartyBehaviorPacket(payload.What.BehaviorUpdateData));
     }
 }

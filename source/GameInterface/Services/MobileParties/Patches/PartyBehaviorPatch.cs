@@ -22,25 +22,9 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(MobilePartyAi))]
 static class PartyBehaviorPatch
 {
-    static readonly Func<MobilePartyAi, bool> get_DefaultBehaviorNeedsUpdate = typeof(MobilePartyAi)
-        .GetField("DefaultBehaviorNeedsUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildUntypedGetter<MobilePartyAi, bool>();
-
     static readonly Func<MobilePartyAi, MobileParty> _mobileParty = typeof(MobilePartyAi)
         .GetField("_mobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
         .BuildUntypedGetter<MobilePartyAi, MobileParty>();
-
-    /// <summary>
-    /// This prevents the tick method being called without the need for an update
-    /// Likely speeds the game up quite a bit lmao
-    /// </summary>
-    [HarmonyPrefix]
-    [HarmonyPatch("Tick")]
-    private static bool TickPrefix(ref MobilePartyAi __instance)
-    {
-        // Allows ticking if default behavior needs update
-        return get_DefaultBehaviorNeedsUpdate(__instance);
-    }
 
     [HarmonyPrefix]
     [HarmonyPatch("SetAiBehavior")]
@@ -71,7 +55,7 @@ static class PartyBehaviorPatch
     }
 
     public static void SetAiBehavior(
-        MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint, Vec2 currentPosition)
+        MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint)
     {
         DefaultBehavior(partyAi, newBehavior);
 
@@ -90,16 +74,11 @@ static class PartyBehaviorPatch
         }
 
         TargetPosition(mobileParty, targetPoint);
-        CurrentPosition(mobileParty, currentPosition);
 
         SetShortTermBehavior(partyAi, newBehavior, targetMapEntity);
         SetBehaviorTarget(partyAi, targetPoint);
         UpdateBehavior(partyAi);
     }
-
-    static readonly Action<MobileParty, Vec2> CurrentPosition = typeof(MobileParty)
-        .GetProperty(nameof(MobileParty.Position2D)).GetSetMethod(true)
-        .BuildDelegate<Action<MobileParty, Vec2>>();
 
     static readonly Action<MobilePartyAi, AiBehavior, IMapEntity> SetShortTermBehavior = typeof(MobilePartyAi)
         .GetMethod("SetShortTermBehavior", BindingFlags.Instance | BindingFlags.NonPublic)

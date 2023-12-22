@@ -2,6 +2,7 @@
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace Common.Messaging
@@ -39,33 +40,16 @@ namespace Common.Messaging
             _subscribers = new Dictionary<Type, List<WeakDelegate>>();
         }
 
-        private static readonly HashSet<string> omit = new HashSet<string>
-        {
-            "PartyBehaviorChangeAttempted",
-            "UpdatePartyBehavior",
-            "ControlledPartyBehaviorUpdated",
-            "PartyEnterSettlementAttempted",
-            "PartyLeaveSettlementAttempted",
-            "NetworkPartyEnterSettlement",
-            "NetworkPartyLeaveSettlement",
-            "PartyEnterSettlement",
-            "PartyLeaveSettlement",
-            "ClanInfluenceChanged",
-            "ChangeClanInfluence",
-            "NetworkClanChangeInfluenceApproved",
-        };
-
         public virtual void Publish<T>(object source, T message) where T : IMessage
         {
             if (message == null)
                 return;
 
             var msgType = message.GetType();
-            var msgName = msgType.Name;
 
-            if (omit.Contains(msgName) == false)
+            if (msgType.GetCustomAttribute<DontLogMessageAttribute>() == null)
             {
-                Logger.Verbose("Publishing {msgName} from {sourceName}", msgName, source?.GetType().Name);
+                Logger.Verbose("Publishing {msgName} from {sourceName}", msgType.Name, source?.GetType().Name);
             }
             
 

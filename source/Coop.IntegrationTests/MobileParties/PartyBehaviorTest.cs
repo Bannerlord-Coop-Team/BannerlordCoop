@@ -17,22 +17,48 @@ public class PartyBehaviorTest
     }
 
     /// <summary>
-    /// Verify sending ControlledPartyBehaviorUpdated on one client
-    /// Triggers UpdatePartyBehavior on all other clients
+    /// Verify sending ControlledPartyBehaviorUpdated on the server
+    /// UpdatePartyBehavior triggers only on the server
     /// </summary>
     [Fact]
-    public void ControlledPartyBehaviorUpdated_Publishes_AllClients()
+    public void ControlledPartyBehaviorUpdated_Publishes_Server()
     {
         // Arrange
         var message = ObjectHelper.SkipConstructor<ControlledPartyBehaviorUpdated>();
 
         var client1 = TestEnvironment.Clients.First();
+        var server = TestEnvironment.Server;
 
         // Act
         client1.ReceiveMessage(this, message);
 
         // Assert
-        foreach (var client in TestEnvironment.Clients.Where(c => c != client1))
+        Assert.Equal(1, server.InternalMessages.GetMessageCount<UpdatePartyBehavior>());
+
+        // Only publishes on the server
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.Equal(0, client.InternalMessages.GetMessageCount<UpdatePartyBehavior>());
+        }
+    }
+
+    /// <summary>
+    /// Verify when the server internally receives PartyBehaviorUpdated
+    /// UpdatePartyBehavior triggers on all other clients
+    /// </summary>
+    [Fact]
+    public void ControlledPartyBehaviorUpdated_Publishes_AllClients()
+    {
+        // Arrange
+        var message = ObjectHelper.SkipConstructor<PartyBehaviorUpdated>();
+
+        var server = TestEnvironment.Server;
+
+        // Act
+        server.ReceiveMessage(this, message);
+
+        // Assert
+        foreach (var client in TestEnvironment.Clients)
         {
             Assert.Equal(1, client.InternalMessages.GetMessageCount<UpdatePartyBehavior>());
         }

@@ -1,17 +1,17 @@
-﻿using System;
+﻿using Serilog;
+using Serilog.Events;
+using System;
 using System.Collections.Concurrent;
 using System.Threading;
 using System.Threading.Tasks;
-using Serilog;
-using Serilog.Events;
 
 namespace Common.Logging
 {
-	/// <summary>
-	/// A class for logging batches of messages of type T.
-	/// </summary>
-	/// <typeparam name="T">The type of object you want to be counted</typeparam>
-	public sealed class BatchLogger<T> : IDisposable
+    /// <summary>
+    /// A class for logging batches of messages of type T.
+    /// </summary>
+    /// <typeparam name="T">The type of object you want to be counted</typeparam>
+    public sealed class BatchLogger<T> : IDisposable
 	{
 		// A concurrent dictionary to store messages of type T and their counts.
 		private readonly ConcurrentDictionary<T, int> _messages = new ConcurrentDictionary<T, int>();
@@ -46,13 +46,13 @@ namespace Common.Logging
 			1, (_, i) => ++i);
 
 		// A method to poll for messages to log.
-		private void Poll()
+		private async void Poll()
 		{
 			// Keep polling until cancellation is requested.
 			while (!_cancellation.IsCancellationRequested)
 			{
 				// Sleep for the specified number of milliseconds.
-				Thread.Sleep(_waitMilliseconds);
+				await Task.Delay(_waitMilliseconds);
 				// Iterate through the keys in the messages dictionary.
 				foreach (var key in _messages.Keys)
 				{
