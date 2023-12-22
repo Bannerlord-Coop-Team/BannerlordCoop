@@ -11,15 +11,13 @@ namespace GameInterface.Services.PartyBases.Patches
     [HarmonyPatch(typeof(PartyBase))]
     internal class PartyBasePatch
     {
-        private readonly PartyBasePatch instance = new();
-
         [HarmonyPatch(nameof(PartyBase.ItemRoster), MethodType.Setter)]
         [HarmonyPostfix]
         public static void ItemRosterSetterPostfix(ref PartyBase __instance)
         {
             if (ModInformation.IsClient)
                 return;
-            ItemRosterMapper.Instance.Set(__instance.ItemRoster, __instance);
+            ItemRosterLookup.Set(__instance.ItemRoster, __instance);
         }
     }
 }
