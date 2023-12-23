@@ -1,7 +1,10 @@
-﻿using Common.PacketHandlers;
+﻿using Common.Messaging;
+using Common.PacketHandlers;
+using Coop.Core.Client.Services.Sync;
 using LiteNetLib;
 using System;
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Threading;
 
 namespace Coop.Core.Client.Network
@@ -14,6 +17,7 @@ namespace Coop.Core.Client.Network
         private ConcurrentQueue<Tuple<NetPeer, IPacket>> queue;
 
         private bool run;
+        private bool isSynchronized = true;
 
         /// <summary>
         /// Default constructor.
@@ -69,9 +73,20 @@ namespace Coop.Core.Client.Network
                 if (queue.TryDequeue(out Tuple<NetPeer, IPacket> t)) 
                 {
                     //TODO: figure out a max queue size amount
-                    if (queue.Count > 40)
+                    if (queue.Count > 110)
                     {
-                        //TODO: notify
+                        if (isSynchronized)
+                        {
+                            MessageBroker.Instance.Publish(this, new NetworkSyncWait());
+                            isSynchronized = false;
+                        }
+                            
+                    }
+
+                    if (!isSynchronized && queue.Count == 0)
+                    {
+                        MessageBroker.Instance.Publish(this, new NetworkSyncComplete());
+                        isSynchronized = true;
                     }
 
                     var peer = t.Item1;
