@@ -1,79 +1,41 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
-using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States
 {
-    public class LoadingStateTests : CoopTest
+    public class LoadingStateTests
     {
         private readonly IClientLogic clientLogic;
-        public LoadingStateTests(ITestOutputHelper output) : base(output)
+        private readonly ClientTestComponent clientComponent;
+
+        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
+
+        public LoadingStateTests(ITestOutputHelper output)
         {
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
-        }
+            clientComponent = new ClientTestComponent(output);
+            var container = clientComponent.Container;
 
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            // Arrange
-            clientLogic.State = new LoadingState(clientLogic);
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            clientLogic.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
-        }
-
-        [Fact]
-        public void EnterMainMenu_Publishes_EnterMainMenuEvent()
-        {
-            // Arrange
-            clientLogic.State = new LoadingState(clientLogic);
-
-            // Act
-            clientLogic.EnterMainMenu();
-
-            // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<EnterMainMenu>(message);
-        }
-
-        [Fact]
-        public void MainMenuEntered_Transitions_MainMenuState()
-        {
-            // Arrange
-            var loadingState = new LoadingState(clientLogic);
-            clientLogic.State = loadingState;
-
-            var payload = new MessagePayload<MainMenuEntered>(
-                this, new MainMenuEntered());
-
-            // Act
-            loadingState.Handle_MainMenuEntered(payload);
-
-            // Assert
-            Assert.IsType<MainMenuState>(clientLogic.State);
+            clientLogic = container.Resolve<IClientLogic>()!;
         }
 
         [Fact]
         public void CampaignLoaded_Transitions_CampaignState()
         {
             // Arrange
-            var loadingState = new LoadingState(clientLogic);
-            clientLogic.State = loadingState;
+            var loadingState = clientLogic.SetState<LoadingState>();
 
-            var payload = new MessagePayload<CampaignReady>(
-                this, new CampaignReady());
+            var payload = new MessagePayload<AllGameObjectsRegistered>(
+                this, new AllGameObjectsRegistered());
 
             // Act
-            loadingState.Handle_CampaignLoaded(payload);
+            loadingState.Handle_AllGameObjectsRegistered(payload);
 
             // Assert
             Assert.IsType<CampaignState>(clientLogic.State);
@@ -83,7 +45,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             // Arrange
-            clientLogic.State = new LoadingState(clientLogic);
+            clientLogic.SetState<LoadingState>();
 
             // Act
             clientLogic.Disconnect();
@@ -97,7 +59,7 @@ namespace Coop.Tests.Client.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            clientLogic.State = new LoadingState(clientLogic);
+            clientLogic.SetState<LoadingState>();
 
             // Act
             clientLogic.Connect();
@@ -110,6 +72,9 @@ namespace Coop.Tests.Client.States
             Assert.IsType<LoadingState>(clientLogic.State);
 
             clientLogic.LoadSavedData();
+            Assert.IsType<LoadingState>(clientLogic.State);
+
+            clientLogic.EnterMainMenu();
             Assert.IsType<LoadingState>(clientLogic.State);
 
             clientLogic.StartCharacterCreation();

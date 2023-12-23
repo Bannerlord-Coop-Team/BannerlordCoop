@@ -8,10 +8,10 @@ namespace Coop.Core.Server.Connections.Messages;
 /// </summary>
 public record PlayerConnected : IEvent
 {
-    public NetPeer PlayerId { get; }
+    public NetPeer PlayerPeer { get; }
 
-    public PlayerConnected(NetPeer playerId)
+    public PlayerConnected(NetPeer peer)
     {
-        PlayerId = playerId;
+        PlayerPeer = peer;
     }
 }

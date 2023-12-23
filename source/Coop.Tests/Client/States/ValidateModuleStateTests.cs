@@ -1,7 +1,9 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Tests.Mocks;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
@@ -11,36 +13,29 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States
 {
-    public class ValidateModuleStateTests : CoopTest
+    public class ValidateModuleStateTests
     {
         private readonly IClientLogic clientLogic;
         private readonly NetPeer serverPeer;
-        public ValidateModuleStateTests(ITestOutputHelper output) : base(output)
+        private readonly ClientTestComponent clientComponent;
+
+        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => clientComponent.MockNetwork;
+
+        public ValidateModuleStateTests(ITestOutputHelper output)
         {
+            clientComponent = new ClientTestComponent(output);
+            var container = clientComponent.Container;
+
             serverPeer = MockNetwork.CreatePeer();
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
-        }
-
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            // Arrange
-            clientLogic.State = new ValidateModuleState(clientLogic);
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            clientLogic.State.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
+            clientLogic = container.Resolve<IClientLogic>()!;
         }
 
         [Fact]
         public void ValidateModuleState_EntryEvents()
         {
             // Act
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Assert
             Assert.NotEmpty(MockNetwork.Peers);
@@ -53,8 +48,7 @@ namespace Coop.Tests.Client.States
         public void NetworkClientValidated_Transitions_ReceivingSavedDataState()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             var heroExists = true;
             var payload = new MessagePayload<NetworkClientValidated>(
@@ -71,8 +65,7 @@ namespace Coop.Tests.Client.States
         public void NetworkClientValidated_Publishes_StartCharacterCreation()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             var heroExists = false;
             var payload = new MessagePayload<NetworkClientValidated>(
@@ -90,8 +83,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Act
             clientLogic.EnterMainMenu();
@@ -105,8 +97,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Transitions_MainMenuState()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             var payload = new MessagePayload<MainMenuEntered>(
                 this, new MainMenuEntered());
@@ -122,8 +113,7 @@ namespace Coop.Tests.Client.States
         public void LoadSavedData_Transitions_ReceivingSavedDataState()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Act
             clientLogic.LoadSavedData();
@@ -136,8 +126,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Act
             clientLogic.Disconnect();
@@ -151,8 +140,7 @@ namespace Coop.Tests.Client.States
         public void StartCharacterCreation_Publishes_StartCharacterCreation()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Act
             clientLogic.StartCharacterCreation();
@@ -166,8 +154,7 @@ namespace Coop.Tests.Client.States
         public void CharacterCreationStarted_Transitions_CharacterCreationState()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             var payload = new MessagePayload<CharacterCreationStarted>(
                 this, new CharacterCreationStarted());
@@ -183,8 +170,7 @@ namespace Coop.Tests.Client.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Act
             clientLogic.Connect();

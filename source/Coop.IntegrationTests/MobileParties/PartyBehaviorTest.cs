@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Coop.Core.Server.Services.MobileParties.Packets;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Utils;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -28,7 +29,7 @@ public class PartyBehaviorTest
         var client1 = TestEnvironment.Clients.First();
 
         // Act
-        client1.SendMessageInternal(this, message);
+        client1.ReceiveMessage(this, message);
 
         // Assert
         foreach (var client in TestEnvironment.Clients.Where(c => c != client1))

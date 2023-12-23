@@ -37,3 +37,7 @@ RUN wget -O dotnet.tar.gz https://dotnetcli.azureedge.net/dotnet/Sdk/$DOTNET_SDK
 # Copy MB assemblies (Make sure you run DockerPrepare.ps1 first)
 WORKDIR /home
 COPY DockerAssembliesTemp ./mb2
+
+# Run "docker build -t garrettluskey/bannerlordcoop:latest -t garrettluskey/bannerlordcoop:<version> ."
+# "docker push garrettluskey/bannerlordcoop:<version>"
+# "docker push garrettluskey/bannerlordcoop:latest"

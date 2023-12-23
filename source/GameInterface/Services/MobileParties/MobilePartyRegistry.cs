@@ -1,5 +1,4 @@
 ﻿using Common;
-using Coop.Mod.Extentions;
 using GameInterface.Services.Registry;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -41,11 +40,29 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegi
             return;
         }
 
-        var parties = objectManager.MobileParties.ToArray();
-
-        foreach (var party in parties)
+        foreach (var party in objectManager.MobileParties)
         {
             RegisterParty(party);
         }
+    }
+
+    private const string PartyStringIdPrefix = "CoopParty";
+    public override bool RegisterNewObject(MobileParty obj, out string id)
+    {
+        id = null;
+
+        if (Campaign.Current?.CampaignObjectManager == null) return false;
+
+        var newId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>(PartyStringIdPrefix);
+
+        if (objIds.ContainsKey(newId)) return false;
+
+        obj.StringId = newId;
+
+        objIds.Add(newId, obj);
+
+        id = newId;
+
+        return true;
     }
 }

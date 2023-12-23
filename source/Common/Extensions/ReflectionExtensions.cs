@@ -57,8 +57,6 @@ namespace Common.Extensions
 
             List<FieldInfo> fields = new List<FieldInfo>();
 
-            //fields = fields.Where(f => excludes.Contains(f.Name) == false && f.IsLiteral == false).ToArray();
-
             foreach (var field in GetAllFieldsRecursive(type).ToArray())
             {
                 if (excludes.Contains(field.Name))

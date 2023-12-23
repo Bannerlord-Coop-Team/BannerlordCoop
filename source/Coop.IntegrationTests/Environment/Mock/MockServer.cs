@@ -15,7 +15,7 @@ internal class MockServer : MockNetworkBase, ICoopServer
 
     public IEnumerable<NetPeer> ConnectedPeers => throw new NotImplementedException();
 
-    public Guid ServerId => throw new NotImplementedException();
+    public string ServerId => throw new NotImplementedException();
 
     public void AllowJoining()
     {

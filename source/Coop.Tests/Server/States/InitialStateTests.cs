@@ -1,75 +1,56 @@
-﻿using Common.Messaging;
-using Common.Network;
+﻿using Autofac;
+using Common.Messaging;
 using Coop.Core.Server;
 using Coop.Core.Server.States;
-using GameInterface.Services.GameDebug.Messages;
+using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
-using Moq;
-using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.States
 {
-    public class InitialStateTests : CoopTest
+    public class InitialStateTests
     {
-        public InitialStateTests(ITestOutputHelper output) : base(output)
+        private readonly ServerTestComponent serverComponent;
+
+        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => serverComponent.MockNetwork;
+
+        public InitialStateTests(ITestOutputHelper output)
         {
+            serverComponent = new ServerTestComponent(output);
+
+            var container = serverComponent.Container;
         }
 
         [Fact]
         public void InitialStateStart()
         {
             // Arrange
-            Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            Mock<INetwork> coopServer = new Mock<INetwork>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, MockMessageBroker);
-            serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
-            serverLogic.Setup(m => m.Network).Returns(coopServer.Object);
+            IServerLogic serverLogic = serverComponent.Container.Resolve<IServerLogic>();
 
             // Act
-            currentState.Start();
-
-            Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<LoadDebugGame>(MockMessageBroker.PublishedMessages.First());
+            serverLogic.State.Start();
 
             var payload = new MessagePayload<CampaignReady>(null, new CampaignReady());
-            var initialState = Assert.IsType<InitialServerState>(currentState);
+            var initialState = Assert.IsType<InitialServerState>(serverLogic.State);
             initialState.Handle_GameLoaded(payload);
 
             // Assert
-            Assert.IsType<ServerRunningState>(currentState);
+            Assert.IsType<ServerRunningState>(serverLogic.State);
         }
 
         [Fact]
         public void InitialStateStop()
         {
             // Arrange
-            Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, MockMessageBroker);
-            serverLogic.SetupSet(x => x.State = It.IsAny<IServerState>()).Callback<IServerState>(value => currentState = value);
+            IServerLogic serverLogic = serverComponent.Container.Resolve<IServerLogic>();
 
             // Act
-            currentState.Stop();
+            serverLogic.State.Stop();
 
             // Assert
-            Assert.IsType<InitialServerState>(currentState);
-        }
-
-        [Fact]
-        public void InitialStateDispose()
-        {
-            // Arrange
-            Mock<IServerLogic> serverLogic = new Mock<IServerLogic>();
-            IServerState currentState = new InitialServerState(serverLogic.Object, MockMessageBroker);
-
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            currentState.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
+            Assert.IsType<InitialServerState>(serverLogic.State);
         }
     }
 }

@@ -1,8 +1,13 @@
-﻿using Common.Messaging;
+﻿// Ignore Spelling: Finalizer
+
+using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.MobileParties.Messages;
+using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using LiteNetLib;
 
 namespace Coop.Core.Client.States;
 
@@ -12,58 +17,56 @@ namespace Coop.Core.Client.States;
 public class CampaignState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
-    public CampaignState(IClientLogic logic) : base(logic)
+    private readonly ICoopFinalizer coopFinalizer;
+
+    public CampaignState(
+        IClientLogic logic,
+        IMessageBroker messageBroker, 
+        INetwork network, 
+        ICoopFinalizer coopFinalizer) : base(logic)
     {
-        messageBroker = logic.MessageBroker;
-        network = logic.Network;
-        
-        messageBroker.Subscribe<NetworkDisableTimeControls>(Handle_NetworkDisableTimeControls);
+        this.messageBroker = messageBroker;
+        this.coopFinalizer = coopFinalizer;
+        messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
 
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<MissionStateEntered>(Handle_MissionStateEntered);
-        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
-    }
 
-    internal void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
-    {
-        messageBroker.Publish(this, new SwitchToHero(Logic.ControlledHeroId));
+        
         network.SendAll(new NetworkPlayerCampaignEntered());
-    }
-
-    internal void Handle_NetworkDisableTimeControls(MessagePayload<NetworkDisableTimeControls> obj)
-    {
-        // TODO will conflict with timemode changed event
-        messageBroker.Publish(this, new PauseAndDisableGameTimeControls());
-    }
-
-    internal void Handle_MissionStateEntered(MessagePayload<MissionStateEntered> obj)
-    {
-        Logic.State = new MissionState(Logic);
-    }
-
-    internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
-    {
-        Logic.State = new MainMenuState(Logic);
     }
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkDisableTimeControls>(Handle_NetworkDisableTimeControls);
+        messageBroker.Unsubscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
 
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<MissionStateEntered>(Handle_MissionStateEntered);
-        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
 
+    private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
+    {
+        var message = new RegisterNewPlayerHero((NetPeer)obj.Who, obj.What.PlayerId, obj.What.PlayerHero);
+        messageBroker.Publish(this, message);
+    }
+
+    internal void Handle_MissionStateEntered(MessagePayload<MissionStateEntered> obj)
+    {
+        Logic.SetState<MissionState>();
+    }
+
+    internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
+    {
+        coopFinalizer.Finalize("Client has been stopped");
+
+        Logic.SetState<MainMenuState>();
+    }
     
 
     public override void EnterMissionState()
     {
         messageBroker.Publish(this, new EnterMissionState());
     }
-
-    
 
     public override void EnterMainMenu()
     {

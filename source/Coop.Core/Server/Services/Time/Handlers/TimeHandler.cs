@@ -1,9 +1,13 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.States;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
+using System.Linq;
 
 namespace Coop.Core.Server.Services.Time.Handlers;
 
@@ -16,36 +20,58 @@ public class TimeHandler : IHandler
 
     private readonly IMessageBroker _messageBroker;
     private readonly INetwork _network;
+    private readonly IClientRegistry _clientRegistry;
 
-    public TimeHandler(IMessageBroker messageBroker, INetwork network)
+    public TimeHandler(IMessageBroker messageBroker, INetwork network, IClientRegistry clientRegistry)
     {
         _messageBroker = messageBroker;
         _network = network;
-        _messageBroker.Subscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
+        _clientRegistry = clientRegistry;
+        _messageBroker.Subscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
         _messageBroker.Subscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
     }
 
     public void Dispose()
     {
-        _messageBroker.Unsubscribe<TimeSpeedChanged>(Handle_TimeSpeedChanged);
+        _messageBroker.Unsubscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
         _messageBroker.Unsubscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
     }
 
     internal void Handle_NetworkRequestTimeSpeedChange(MessagePayload<NetworkRequestTimeSpeedChange> obj)
     {
+        if (AnyLoaders()) return;
+
         var newMode = obj.What.NewControlMode;
 
-        Logger.Verbose("Server changing time to {mode} from client", newMode);
-
-        _messageBroker.Publish(this, new SetTimeControlMode(newMode));
+        SetTimeMode(newMode);
     }
 
-    internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChanged> obj)
+    internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
     {
+        if (AnyLoaders()) return;
+
         var newMode = obj.What.NewControlMode;
 
-        Logger.Verbose("Server sending time change to {mode} to client", newMode);
+        SetTimeMode(newMode);
+    }
 
-        _network.SendAll(new NetworkTimeSpeedChanged(newMode));
+    private bool AnyLoaders()
+    {
+        if (_clientRegistry.PlayersLoading)
+        {
+            var loadingPeers = _clientRegistry.LoadingPeers;
+            Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.EndPoint.ToString()))} are currently loading, unable to change time");
+            return true;
+        }
+
+        return false;
+    }
+
+    public void SetTimeMode(TimeControlEnum timeMode)
+    {
+        Logger.Verbose("Server changing time to {mode}", timeMode);
+
+        _messageBroker.Publish(this, new SetTimeControlMode(timeMode));
+        _network.SendAll(new NetworkTimeSpeedChanged(timeMode));
     }
 }

@@ -13,10 +13,14 @@ namespace Coop.Tests.Autofac
         [Fact]
         public void Client_Container_Build()
         {
+            var containerProvider = new ContainerProvider();
+
             ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ClientModule>();
+            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
             var container = builder.Build();
+
+            containerProvider.SetProvider(container);
 
             Assert.NotNull(container);
 
@@ -30,10 +34,14 @@ namespace Coop.Tests.Autofac
         [Fact]
         public void Server_Container_Build()
         {
+            var containerProvider = new ContainerProvider();
+
             ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ServerModule>();
+            builder.RegisterInstance(containerProvider).As<IContainerProvider>();
             var container = builder.Build();
+
+            containerProvider.SetProvider(container);
 
             Assert.NotNull(container);
 

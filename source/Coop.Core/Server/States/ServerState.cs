@@ -6,14 +6,7 @@ namespace Coop.Core.Server.States;
 public abstract class ServerStateBase : IServerState
 {
     protected IServerLogic Logic;
-    protected IMessageBroker MessageBroker;
-    public ServerStateBase(IServerLogic logic, IMessageBroker messageBroker)
-    {
-        Logic = logic;
-        MessageBroker = messageBroker;
-    }
-
-    protected ServerStateBase(IServerLogic logic)
+    public ServerStateBase(IServerLogic logic)
     {
         Logic = logic;
     }

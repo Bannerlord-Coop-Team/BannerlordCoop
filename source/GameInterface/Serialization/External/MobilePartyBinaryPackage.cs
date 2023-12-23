@@ -13,10 +13,11 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class MobilePartyBinaryPackage : BinaryPackageBase<MobileParty>
     {
-        public static readonly PropertyInfo MobileParty_Scout = typeof(MobileParty).GetProperty("Scout", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly PropertyInfo MobileParty_Engineer = typeof(MobileParty).GetProperty("Engineer", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly PropertyInfo MobileParty_Quartermaster = typeof(MobileParty).GetProperty("Quartermaster", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly PropertyInfo MobileParty_Surgeon = typeof(MobileParty).GetProperty("Surgeon", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static PropertyInfo MobileParty_Scout => typeof(MobileParty).GetProperty("Scout", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static PropertyInfo MobileParty_Engineer => typeof(MobileParty).GetProperty("Engineer", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static PropertyInfo MobileParty_Quartermaster => typeof(MobileParty).GetProperty("Quartermaster", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static PropertyInfo MobileParty_Surgeon => typeof(MobileParty).GetProperty("Surgeon", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static MethodInfo MobileParty_OnFinishLoadState => typeof(MobileParty).GetMethod("OnFinishLoadState", BindingFlags.Instance | BindingFlags.NonPublic);
 
         private string stringId = string.Empty;
 
@@ -43,7 +44,6 @@ namespace GameInterface.Serialization.External
             "_cachedPartySizeRatio",
             "_latestUsedPaymentRatio",
             "<VersionNo>k__BackingField",
-            "_errorPosition",
             "_currentNavigationFace",
             "_lastNavigationFace",
             "_locatorNodeIndex",
@@ -75,18 +75,16 @@ namespace GameInterface.Serialization.External
             surgeonId = Object.EffectiveSurgeon?.StringId;
         }
 
-
-        private static readonly MethodInfo MobileParty_InitCached = typeof(MobileParty).GetMethod("InitCached", BindingFlags.NonPublic | BindingFlags.Instance);
+        private static ConstructorInfo MobileParty_ctor => typeof(MobileParty).GetConstructor(Array.Empty<Type>());
         protected override void UnpackInternal()
         {
-            MobileParty mobileParty = ResolveId<MobileParty>(stringId);
-            if(mobileParty != null)
+            if(string.IsNullOrEmpty(stringId) == false)
             {
-                Object = mobileParty;
+                Object = ResolveId<MobileParty>(stringId);
                 return;
             }
 
-            MobileParty_InitCached.Invoke(Object, new object[0]);
+            MobileParty_ctor.Invoke(Object, Array.Empty<object>());
 
             base.UnpackFields();
 
@@ -94,6 +92,9 @@ namespace GameInterface.Serialization.External
             MobileParty_Engineer     .SetValue(Object, ResolveId<Hero>(engineerId));
             MobileParty_Quartermaster.SetValue(Object, ResolveId<Hero>(quartermasterId));
             MobileParty_Surgeon      .SetValue(Object, ResolveId<Hero>(surgeonId));
+
+
+            MobileParty_OnFinishLoadState.Invoke(Object, Array.Empty<string>());
         }
     }
 }

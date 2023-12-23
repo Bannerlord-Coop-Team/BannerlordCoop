@@ -1,10 +1,14 @@
 ﻿using Autofac;
 using Common.LogicStates;
+using Common.Messaging;
 using Common.Network;
+using Common.PacketHandlers;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections;
+using Coop.Core.Server.Policies;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.States;
+using GameInterface.Policies;
 using LiteNetLib;
 
 namespace Coop.Core.Server;
@@ -12,21 +16,24 @@ namespace Coop.Core.Server;
 /// <summary>
 /// Server dependencies
 /// </summary>
-public class ServerModule : Module
+public class ServerModule : CommonModule
 {
     protected override void Load(ContainerBuilder builder)
     {
+        base.Load(builder);
+
+        builder.RegisterModule<ConnectionModule>();
+
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
-        builder.RegisterType<InitialServerState>().As<IServerState>();
-        builder.RegisterType<ClientRegistry>().As<IClientRegistry>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
+        
+        // Policies
+        builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
-        foreach (var handlerType in HandlerCollector.Collect<ServerModule>())
-        {
-            builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope().AutoActivate();
-        }
+        RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true);
+        RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
 
-        base.Load(builder);
+        RegisterAllTypesWithInterface<ServerModule, IServerState>(builder);
     }
 }

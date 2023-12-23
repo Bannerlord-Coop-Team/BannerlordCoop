@@ -1,7 +1,5 @@
 ﻿using Common.Logging;
 using Common.LogicStates;
-using Common.Messaging;
-using Common.Network;
 using Coop.Core.Client.States;
 using Serilog;
 
@@ -12,29 +10,30 @@ namespace Coop.Core.Client;
 /// </summary>
 public interface IClientLogic : ILogic, IClientState
 {
+    string ControlledHeroId { get; set; }
+
     /// <summary>
     /// Client-side state
     /// </summary>
-    IClientState State { get; set; }
-
-    /// <summary>
-    /// Networking Client for Client-side
-    /// </summary>
-    INetwork Network { get; }
-    IMessageBroker MessageBroker { get; }
-    string ControlledHeroId { get; set; }
+    IClientState State { get; }
+    
+    TState SetState<TState>() where TState : IClientState;
 }
 
 /// <inheritdoc cref="IClientLogic"/>
 public class ClientLogic : IClientLogic
 {
     private readonly ILogger Logger = LogManager.GetLogger<ClientLogic>();
-    public INetwork Network { get; }
-    public IMessageBroker MessageBroker { get; }
+    public IStateFactory StateFactory { get; }
     public string ControlledHeroId { get; set; }
+    private IClientState InitialState => StateFactory.CreateClientState<MainMenuState>(this);
     public IClientState State 
     {
-        get { return _state; }
+        get 
+        { 
+            _state ??= InitialState;
+            return _state;
+        }
         set 
         {
             Logger.Debug("Client is changing to {state} State", value.GetType().Name);
@@ -46,11 +45,9 @@ public class ClientLogic : IClientLogic
 
     private IClientState _state;
 
-    public ClientLogic(INetwork network, IMessageBroker messageBroker)
+    public ClientLogic(IStateFactory stateFactory)
     {
-        Network = network;
-        MessageBroker = messageBroker;
-        State = new MainMenuState(this);
+        StateFactory = stateFactory;
     }
 
     public void Start()
@@ -61,6 +58,13 @@ public class ClientLogic : IClientLogic
     public void Stop()
     {
         Disconnect();
+    }
+
+    public TState SetState<TState>() where TState : IClientState
+    {
+        TState newState = StateFactory.CreateClientState<TState>(this);
+        State = newState;
+        return newState;
     }
 
     public void Dispose() => State.Dispose();

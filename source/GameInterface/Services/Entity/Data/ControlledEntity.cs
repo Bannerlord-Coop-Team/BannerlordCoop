@@ -16,7 +16,7 @@ public class ControlledEntity
     /// Id of owner of the controlled entity.
     /// This can be either a client or server.
     /// </summary>
-    public Guid OwnerId { get; }
+    public string OwnerId { get; }
 
     /// <summary>
     /// Id of the controlled entity.
@@ -26,7 +26,7 @@ public class ControlledEntity
     /// </remarks>
     public string EntityId { get; }
 
-    public ControlledEntity(Guid ownerId, string entityId)
+    public ControlledEntity(string ownerId, string entityId)
     {
 
         if (ownerId == default)
@@ -42,4 +42,13 @@ public class ControlledEntity
         OwnerId = ownerId;
         EntityId = entityId;
     }
+
+    public override bool Equals(object obj)
+    {
+        if (obj is not ControlledEntity controlledEntity) return false;
+
+        return OwnerId == controlledEntity.OwnerId && EntityId == controlledEntity.EntityId;
+    }
+
+    public override int GetHashCode() => base.GetHashCode();
 }

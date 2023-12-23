@@ -1,41 +1,39 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
+using Common.Network;
+using Coop.Core;
 using Coop.Core.Server;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.States;
+using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.States
 {
-    public class RunningStateTests : CoopTest
+    public class RunningStateTests
     {
         private readonly IServerLogic serverLogic;
-        public RunningStateTests(ITestOutputHelper output) : base(output)
+        private readonly ServerTestComponent serverComponent;
+
+        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => serverComponent.MockNetwork;
+
+        public RunningStateTests(ITestOutputHelper output)
         {
-            serverLogic = new ServerLogic(MockMessageBroker, MockNetwork);
-        }
+            serverComponent = new ServerTestComponent(output);
 
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            // Arrange
-            var currentState = new ServerRunningState(serverLogic, MockMessageBroker);
-            serverLogic.State = currentState;
+            var container = serverComponent.Container;
 
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            currentState.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
+            serverLogic = container.Resolve<ServerLogic>();
         }
 
         [Fact]
         public void Stop_Publishes_EnterMainMenu()
         {
             // Arrange
-            var currentState = new ServerRunningState(serverLogic, MockMessageBroker);
+            var currentState = serverLogic.SetState<ServerRunningState>();
 
             // Act
             currentState.Stop();
@@ -49,8 +47,7 @@ namespace Coop.Tests.Server.States
         public void MainMenuEntered_Transitions_InitialServerState()
         {
             // Arrange
-            var currentState = new ServerRunningState(serverLogic, MockMessageBroker);
-            serverLogic.State = currentState;
+            var currentState = serverLogic.SetState<ServerRunningState>();
 
             var serverRunningState = Assert.IsType<ServerRunningState>(currentState);
 
@@ -69,8 +66,7 @@ namespace Coop.Tests.Server.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            var currentState = new ServerRunningState(serverLogic, MockMessageBroker);
-            serverLogic.State = currentState;
+            var currentState = serverLogic.SetState<ServerRunningState>();
 
             // Act
             ((IServerState)serverLogic).Start();

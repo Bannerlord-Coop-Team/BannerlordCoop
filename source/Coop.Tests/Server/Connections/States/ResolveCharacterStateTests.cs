@@ -1,50 +1,46 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
+using Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
-using GameInterface.Services.GameDebug.Messages;
+using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
-using System;
 using System.Linq;
-using System.Runtime.Serialization;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Connections.States
 {
-    public class ResolveCharacterStateTests : CoopTest
+    public class ResolveCharacterStateTests
     {
         private readonly IConnectionLogic connectionLogic;
         private readonly NetPeer playerPeer;
         private readonly NetPeer differentPeer;
-        public ResolveCharacterStateTests(ITestOutputHelper output) : base(output)
+        private readonly ServerTestComponent serverComponent;
+
+        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => serverComponent.MockNetwork;
+
+        public ResolveCharacterStateTests(ITestOutputHelper output)
         {
-            playerPeer = MockNetwork.CreatePeer();
-            differentPeer = MockNetwork.CreatePeer();
-            connectionLogic = new ConnectionLogic(playerPeer, MockMessageBroker, MockNetwork);
-        }
+            serverComponent = new ServerTestComponent(output);
 
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            // Arrange
-            connectionLogic.State = new CampaignState(connectionLogic);
+            var container = serverComponent.Container;
 
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
+            var network = container.Resolve<MockNetwork>();
 
-            // Act
-            connectionLogic.State.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
+            playerPeer = network.CreatePeer();
+            differentPeer = network.CreatePeer();
+            connectionLogic = container.Resolve<ConnectionLogic>(new NamedParameter("playerId", playerPeer));
         }
 
         [Fact]
         public void CreateCharacterMethod_TransitionState_CreateCharacterState()
         {
             // Arrange
-            connectionLogic.State = new ResolveCharacterState(connectionLogic);
+            connectionLogic.SetState<ResolveCharacterState>();
 
             // Act
             connectionLogic.CreateCharacter();
@@ -57,7 +53,7 @@ namespace Coop.Tests.Server.Connections.States
         public void TransferSaveMethod_TransitionState_TransferSaveState()
         {
             // Arrange
-            connectionLogic.State = new ResolveCharacterState(connectionLogic);
+            connectionLogic.SetState<ResolveCharacterState>();
 
             // Act
             connectionLogic.TransferSave();
@@ -70,7 +66,7 @@ namespace Coop.Tests.Server.Connections.States
         public void UnusedStatesMethods_DoNothing()
         {
             // Arrange
-            connectionLogic.State = new ResolveCharacterState(connectionLogic);
+            connectionLogic.SetState<ResolveCharacterState>();
 
             // Act
             connectionLogic.Load();
@@ -85,8 +81,7 @@ namespace Coop.Tests.Server.Connections.States
         public void NetworkClientValidate_ValidPlayerId()
         {
             // Arrange
-            var currentState = new ResolveCharacterState(connectionLogic);
-            connectionLogic.State = currentState;
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
             string playerId = "MyPlayer";
 
@@ -97,9 +92,9 @@ namespace Coop.Tests.Server.Connections.States
 
             // Assert
             var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<ResolveDebugHero>(message);
+            Assert.IsType<ResolveHero>(message);
 
-            var castedMessage = (ResolveDebugHero)message;
+            var castedMessage = (ResolveHero)message;
             Assert.Equal(playerId, castedMessage.PlayerId);
         }
 
@@ -107,8 +102,7 @@ namespace Coop.Tests.Server.Connections.States
         public void NetworkClientValidate_InvalidPlayerId()
         {
             // Arrange
-            var currentState = new ResolveCharacterState(connectionLogic);
-            connectionLogic.State = currentState;
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
             string playerId = "MyPlayer";
 
@@ -125,8 +119,7 @@ namespace Coop.Tests.Server.Connections.States
         public void ResolveHero_Valid()
         {
             // Arrange
-            var currentState = new ResolveCharacterState(connectionLogic);
-            connectionLogic.State = currentState;
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
             string playerId = "MyPlayer";
 
@@ -151,8 +144,7 @@ namespace Coop.Tests.Server.Connections.States
         public void HeroNotFound_Valid()
         {
             // Arrange
-            var currentState = new ResolveCharacterState(connectionLogic);
-            connectionLogic.State = currentState;
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
 
             // Act
             var payload = new MessagePayload<ResolveHeroNotFound>(

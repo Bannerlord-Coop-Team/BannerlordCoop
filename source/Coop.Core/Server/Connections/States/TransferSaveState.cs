@@ -1,7 +1,8 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Messages;
-using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Core.Server.Connections.States;
@@ -15,17 +16,17 @@ public class TransferSaveState : ConnectionStateBase
     private IMessageBroker messageBroker;
     private INetwork network;
 
-    public TransferSaveState(IConnectionLogic connectionLogic)
+    public TransferSaveState(IConnectionLogic connectionLogic, IMessageBroker messageBroker, INetwork network)
         : base(connectionLogic)
     {
-        network = ConnectionLogic.Network;
-        messageBroker = ConnectionLogic.MessageBroker;
+        this.network = network;
+        this.messageBroker = messageBroker;
 
         messageBroker.Subscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
 
-        network.SendAll(new NetworkDisableTimeControls());
-        // TODO will conflict with timemode changed event
-        messageBroker.Publish(this, new PauseAndDisableGameTimeControls());
+        messageBroker.Publish(this, new SetTimeControlMode(TimeControlEnum.Pause));
+        network.SendAll(new NetworkTimeSpeedChanged(TimeControlEnum.Pause));
+
         messageBroker.Publish(this, new PackageGameSaveData());
     }
 
@@ -63,7 +64,7 @@ public class TransferSaveState : ConnectionStateBase
 
     public override void Load()
     {
-        ConnectionLogic.State = new LoadingState(ConnectionLogic);
+        ConnectionLogic.SetState<LoadingState>();
     }
 
     public override void TransferSave()

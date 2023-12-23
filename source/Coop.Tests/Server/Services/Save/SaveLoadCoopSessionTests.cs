@@ -17,16 +17,16 @@ namespace Coop.Tests.Server.Services.Save
         private const string SAVE_PATH = "./";
 
         private readonly ITestOutputHelper output;
+        private readonly ServerTestComponent serverComponent;
         private readonly IContainer container;
 
         public SaveLoadCoopSessionTests(ITestOutputHelper output)
         {
             this.output = output;
 
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
-            builder.RegisterModule<ServerModule>();
-            container = builder.Build();
+            serverComponent = new ServerTestComponent(output);
+
+            container = serverComponent.Container; ;
         }
 
         [Fact]

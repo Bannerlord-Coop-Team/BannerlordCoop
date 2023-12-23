@@ -15,6 +15,7 @@ using GameInterface.Services.GameDebug.Patches;
 using TaleWorlds.CampaignSystem;
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
+using GameInterface.Services.PartyBases.Extensions;
 
 namespace GameInterface.Services.GameDebug.Interfaces
 {
@@ -22,6 +23,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
     {
         void LoadDebugGame();
         void ShowAllParties();
+        void LoadGame(string saveName);
     }
 
     internal class DebugGameInterface : IDebugGameInterface
@@ -43,8 +45,9 @@ namespace GameInterface.Services.GameDebug.Interfaces
         {
             Logger.Information("Downloading save file to: {savePath}", FullSavePath);
 
-            GoogleDriveDownloader saveDownloader = new GoogleDriveDownloader();
-            saveDownloader.DownloadFile("https://drive.google.com/file/d/10lZ8E7JdbOMuh29PZggsoCU_-blAs6wd/view?usp=share_link", FullSavePath);
+            WebDownloader webDownloader = new WebDownloader();
+            // TODO maybe uncomment for debugging
+            //webDownloader.DownloadFile("https://coop.theodor.dev/MP.sav", FullSavePath);
 
             Logger.Information("Downloaded save file.");
 
@@ -65,9 +68,14 @@ namespace GameInterface.Services.GameDebug.Interfaces
             foreach(var party in Campaign.Current.MobileParties)
             {
                 party.IsVisible = true;
-                party.Party.Visuals.SetVisualVisible(true);
-                party.Party.Visuals.SetMapIconAsDirty();
+                party.Party.SetVisualAsDirty();
             }
+        }
+
+        public void LoadGame(string saveName)
+        {
+            SaveGameFileInfo mp_save = MBSaveLoad.GetSaveFiles(null).Single(x => x.Name == saveName);
+            SandBoxSaveHelper.TryLoadSave(mp_save, StartGame, null);
         }
     }
 }

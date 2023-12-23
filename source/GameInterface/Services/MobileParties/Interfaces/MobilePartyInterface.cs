@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Extensions;
 using Common.Logging;
+using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -43,7 +44,7 @@ internal interface IMobilePartyInterface : IGameAbstraction
     /// Registers all parties in the game as controlled by <paramref name="ownerId"/>.
     /// </summary>
     /// <param name="ownerId">Owner to assign all parties</param>
-    void RegisterAllPartiesAsControlled(Guid ownerId);
+    void RegisterAllPartiesAsControlled(string ownerId);
     /// <summary>
     /// Forces party to enter settlement, bypasses patch skip rules
     /// </summary>
@@ -56,9 +57,6 @@ internal class MobilePartyInterface : IMobilePartyInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyInterface>();
     private static readonly MethodInfo PartyBase_OnFinishLoadState = typeof(PartyBase).GetMethod("OnFinishLoadState", BindingFlags.NonPublic | BindingFlags.Instance);
-    private static MethodInfo AddMobileParty => typeof(CampaignObjectManager).GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic);
-    private static readonly Action<CampaignObjectManager, MobileParty> AddMobileParty_Delegate = 
-        AddMobileParty.BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
 
     private readonly IMobilePartyRegistry partyRegistry;
     private readonly IObjectManager objectManager;
@@ -76,23 +74,20 @@ internal class MobilePartyInterface : IMobilePartyInterface
 
     public void ManageNewParty(MobileParty party)
     {
-        AddMobileParty_Delegate(Campaign.Current.CampaignObjectManager, party);
-
         party.IsVisible = true;
 
         PartyBase_OnFinishLoadState.Invoke(party.Party, null);
     }
 
-    public void RegisterAllPartiesAsControlled(Guid ownerId)
+    public void RegisterAllPartiesAsControlled(string ownerId)
     {
         foreach(var party in partyRegistry)
         {
             controlledEntityRegistry.RegisterAsControlled(ownerId, party.Key);
         }
     }
-    
-    private static readonly object _lock = new object();
 
+    private static  AllowedInstance<MobileParty> allowedInstance = new AllowedInstance<MobileParty>();
     private static MethodInfo InitMethod => typeof(PlayerEncounter).GetMethod(
         "Init",
         BindingFlags.NonPublic | BindingFlags.Instance,
@@ -121,27 +116,23 @@ internal class MobilePartyInterface : IMobilePartyInterface
             Logger.Error("Settlement {settlementName} did not have a party value", settlement.Name);
             return;
         }
-        lock (_lock)
+
+        
+        GameLoopRunner.RunOnMainThread(() =>
         {
             using (EnterSettlementActionPatches.AllowedInstance)
             {
                 EnterSettlementActionPatches.AllowedInstance.Instance = mobileParty;
-
-
-                GameLoopRunner.RunOnMainThread(() =>
-                {
-                    if (PlayerEncounter.Current is not null) return;
-                    PlayerEncounter.Start();
-                    Init(PlayerEncounter.Current, mobileParty.Party, settlementParty, settlement);
-                }, true);
-
+                if (PlayerEncounter.Current is not null) return;
+                PlayerEncounter.Start();
+                Init(PlayerEncounter.Current, mobileParty.Party, settlementParty, settlement);
             }
-        }
+        });
     }
 
     public void EndPlayerSettlementEncounter()
     {
-        PlayerLeaveSettlementPatch.OverrideLeaveConsequence();
+        GameLoopRunner.RunOnMainThread(PlayerLeaveSettlementPatch.OverrideLeaveConsequence);
     }
 
     public void EnterSettlement(string partyId, string settlementId)
@@ -158,13 +149,10 @@ internal class MobilePartyInterface : IMobilePartyInterface
             return;
         }
 
-        lock (_lock)
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                EnterSettlementActionPatches.OverrideApplyForParty(mobileParty, settlement);
-            }, false);
-        }
+            EnterSettlementActionPatches.OverrideApplyForParty(mobileParty, settlement);
+        });
     }
 
     public void LeaveSettlement(string partyId)
@@ -175,12 +163,9 @@ internal class MobilePartyInterface : IMobilePartyInterface
             return;
         }
 
-        lock (_lock)
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                LeaveSettlementActionPatches.OverrideApplyForParty(mobileParty);
-            }, false);
-        }
+            LeaveSettlementActionPatches.OverrideApplyForParty(mobileParty);
+        });
     }
 }

@@ -13,7 +13,7 @@ namespace Coop.Core.Server.Services.MobileParties.PacketHandlers;
 /// </summary>
 internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
 {
-    public PacketType PacketType => PacketType.RequestMobilePartyBehavior;
+    public PacketType PacketType => PacketType.RequestUpdatePartyBehavior;
 
     private readonly IPacketManager packetManager;
     private readonly INetwork network;

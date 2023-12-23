@@ -1,63 +1,36 @@
-﻿using Coop.Core.Client;
+﻿using Autofac;
+using Common.Messaging;
+using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Tests.Mocks;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
-using Moq;
-using Serilog;
+using System;
 using Xunit;
 using Xunit.Abstractions;
-using GameInterface.Services.GameState.Messages;
-using Common.Messaging;
 
 namespace Coop.Tests.Client.States
 {
-    public class CampaignStateTests : CoopTest
+    public class CampaignStateTests
     {
         private readonly IClientLogic clientLogic;
-        public CampaignStateTests(ITestOutputHelper output) : base(output)
+        private readonly ClientTestComponent clientComponent;
+
+        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => clientComponent.MockNetwork;
+        public CampaignStateTests(ITestOutputHelper output)
         {
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
-            
-        }
-
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            // Arrange
-            clientLogic.State = new CampaignState(clientLogic);
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            clientLogic.State.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
-        }
-
-        [Fact]
-        public void NetworkDisableTimeControls_Publishes_PauseAndDisableGameTimeControls()
-        {
-            // Arrange
-            var campaignState = new CampaignState(clientLogic);
-            clientLogic.State = campaignState;
-
-            var payload = new MessagePayload<NetworkDisableTimeControls>(
-                this, new NetworkDisableTimeControls());
-
-            // Act
-            campaignState.Handle_NetworkDisableTimeControls(payload);
-
-            // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<PauseAndDisableGameTimeControls>(message);
+            clientComponent = new ClientTestComponent(output);
+            var container = clientComponent.Container;
+            clientLogic = container.Resolve<IClientLogic>()!;
         }
 
         [Fact]
         public void EnterMissionState_Publishes_EnterMissionState()
         {
             // Arrange
-            var campaignState = new CampaignState(clientLogic);
-            clientLogic.State = campaignState;
+            var campaignState = clientLogic.SetState<CampaignState>();
 
             // Act
             clientLogic.EnterMissionState();
@@ -71,8 +44,7 @@ namespace Coop.Tests.Client.States
         public void MissionStateEntered_Transitions_MissionState()
         {
             // Arrange
-            var campaignState = new CampaignState(clientLogic);
-            clientLogic.State = campaignState;
+            var campaignState = clientLogic.SetState<CampaignState>();
 
             var payload = new MessagePayload<MissionStateEntered>(
                 this, new MissionStateEntered());
@@ -88,8 +60,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             // Arrange
-            var campaignState = new CampaignState(clientLogic);
-            clientLogic.State = campaignState;
+            var campaignState = clientLogic.SetState<CampaignState>();
 
             // Act
             clientLogic.EnterMainMenu();
@@ -103,8 +74,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Transitions_MainMenuState()
         {
             // Arrange
-            var campaignState = new CampaignState(clientLogic);
-            clientLogic.State = campaignState;
+            var campaignState = clientLogic.SetState<CampaignState>();
 
             var payload = new MessagePayload<MainMenuEntered>(
                 this, new MainMenuEntered());
@@ -120,8 +90,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             // Arrange
-            var campaignState = new CampaignState(clientLogic);
-            clientLogic.State = campaignState;
+            var campaignState = clientLogic.SetState<CampaignState>();
 
             // Act
             clientLogic.Disconnect();
@@ -134,8 +103,7 @@ namespace Coop.Tests.Client.States
         [Fact]
         public void OtherStateMethods_DoNotAlterState()
         {
-            var campaignState = new CampaignState(clientLogic);
-            clientLogic.State = campaignState;
+            var campaignState = clientLogic.SetState<CampaignState>();
 
             clientLogic.Connect();
             Assert.IsType<CampaignState>(clientLogic.State);

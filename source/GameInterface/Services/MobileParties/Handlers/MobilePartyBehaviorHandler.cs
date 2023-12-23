@@ -9,73 +9,83 @@ using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
-namespace GameInterface.Services.MobileParties.Handlers
+namespace GameInterface.Services.MobileParties.Handlers;
+
+/// <summary>
+/// Handles synchronization of the <see cref="MobilePartyAi"/>'s behavior on the campaign map, which includes
+/// target positions and target entities used for updating movement.
+/// </summary>
+/// <remarks>
+/// Important note: <see cref="MobilePartyAi"/> is also present in player-controlled parties, where it is 
+/// responsible for pathfinding and movement.
+/// </remarks>
+/// <seealso cref="AiBehavior"/>
+internal class MobilePartyBehaviorHandler : IHandler
 {
-    /// <summary>
-    /// Handles synchronization of the <see cref="MobilePartyAi"/>'s behavior on the campaign map, which includes
-    /// target positions and target entities used for updating movement.
-    /// </summary>
-    /// <remarks>
-    /// Important note: <see cref="MobilePartyAi"/> is also present in player-controlled parties, where it is 
-    /// responsible for pathfinding and movement.
-    /// </remarks>
-    /// <seealso cref="AiBehavior"/>
-    internal class MobilePartyBehaviorHandler : IHandler
+    private readonly IMessageBroker messageBroker;
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
+    private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IObjectManager objectManager;
+
+    public MobilePartyBehaviorHandler(
+        IMessageBroker messageBroker,
+        IControlledEntityRegistry controlledEntityRegistry,
+        IControllerIdProvider controllerIdProvider,
+        IObjectManager objectManager)
     {
-        private readonly IMessageBroker messageBroker;
-        private readonly IControlledEntityRegistry controlledEntityRegistry;
-        private readonly IObjectManager objectManager;
+        this.messageBroker = messageBroker;
+        this.controlledEntityRegistry = controlledEntityRegistry;
+        this.controllerIdProvider = controllerIdProvider;
+        this.objectManager = objectManager;
 
-        public MobilePartyBehaviorHandler(
-            IMessageBroker messageBroker, 
-            IControlledEntityRegistry controlledEntityRegistry,
-            IObjectManager objectManager) 
-        {
-            this.messageBroker = messageBroker;
-            this.controlledEntityRegistry = controlledEntityRegistry;
-            this.objectManager = objectManager;
+        messageBroker.Subscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
+        messageBroker.Subscribe<UpdatePartyBehavior>(Handle_UpdatePartyBehavior);
+    }
 
-            messageBroker.Subscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
-            messageBroker.Subscribe<UpdatePartyBehavior>(Handle_UpdatePartyBehavior);
-        }
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
+        messageBroker.Unsubscribe<UpdatePartyBehavior>(Handle_UpdatePartyBehavior);
+    }
 
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<PartyBehaviorChangeAttempted>(Handle_PartyBehaviorChanged);
-            messageBroker.Unsubscribe<UpdatePartyBehavior>(Handle_UpdatePartyBehavior);
-        }
+    public void Handle_PartyBehaviorChanged(MessagePayload<PartyBehaviorChangeAttempted> obj)
+    {
+        var party = obj.What.Party;
 
-        public void Handle_PartyBehaviorChanged(MessagePayload<PartyBehaviorChangeAttempted> obj)
-        {
-            MobileParty party = obj.What.Party;
+        var controllerId = controllerIdProvider.ControllerId;
 
-            if (controlledEntityRegistry.IsOwned(party.StringId) == false)
-                return;
+        if (controlledEntityRegistry.IsControlledBy(controllerId, party.StringId) == false)
+            return;
 
-            PartyBehaviorUpdateData data = obj.What.BehaviorUpdateData;
+        PartyBehaviorUpdateData data = obj.What.BehaviorUpdateData;
 
-            messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
-        }
+        messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
+    }
 
-        public void Handle_UpdatePartyBehavior(MessagePayload<UpdatePartyBehavior> obj)
-        {
-            var data = obj.What.BehaviorUpdateData;
-            IMapEntity targetMapEntity = null;
+    public void Handle_UpdatePartyBehavior(MessagePayload<UpdatePartyBehavior> obj)
+    {
+        var data = obj.What.BehaviorUpdateData;
 
-            if (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity)) 
-                return;
+        if (data == null) return;
 
-            if (!objectManager.TryGetObject(data.PartyId, out MobileParty party)) 
-                return;
+        IMapEntity targetMapEntity = null;
 
-            Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
+        if (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity))
+            return;
 
-            PartyBehaviorPatch.SetAiBehavior(
-                party.Ai,
-                data.Behavior,
-                targetMapEntity,
-                targetPoint
-            );
-        }
+        if (!objectManager.TryGetObject(data.PartyId, out MobileParty party))
+            return;
+
+        Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
+
+        Vec2 currentPosition = new Vec2(data.PartyPositionX, data.PartyPositionY);
+
+        PartyBehaviorPatch.SetAiBehavior(
+            party.Ai,
+            data.Behavior,
+            targetMapEntity,
+            targetPoint,
+            currentPosition
+        );
     }
 }

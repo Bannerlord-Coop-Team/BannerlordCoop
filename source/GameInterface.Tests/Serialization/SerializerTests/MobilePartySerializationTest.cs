@@ -10,6 +10,7 @@ using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 using Common.Serialization;
+using System.Reflection;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -42,6 +43,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
+        PropertyInfo MobileParty_Party = typeof(MobileParty).GetProperty(nameof(MobileParty.Party));
+
         [Fact]
         public void MobileParty_Full_Serialization()
         {
@@ -51,6 +54,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             mobilePartyObject.SetCustomName(new TextObject("Custom Name"));
             mobilePartyObject.Aggressiveness = 56;
             mobilePartyObject.IsActive = true;
+
+            MobileParty_Party.SetValue(mobilePartyObject, new PartyBase(mobilePartyObject));
 
             Hero surgeon = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
             surgeon.StringId = "My Surgeon";

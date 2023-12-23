@@ -1,4 +1,7 @@
 ﻿using HarmonyLib;
+using Helpers;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Towns.Patches
@@ -15,46 +18,25 @@ namespace GameInterface.Services.Towns.Patches
         {
             return false;
         }
+    }
 
-        [HarmonyPatch(nameof(Town.OwnerClan), MethodType.Setter)]
+    [HarmonyPatch(typeof(DefaultSettlementProsperityModel))]
+    internal class DefaultSettlementProsperityModelPatches
+    {
+        [HarmonyPatch(nameof(DefaultSettlementProsperityModel.CalculateProsperityChange))]
         [HarmonyPrefix]
-        private static bool OwnerClanPrefix()
+        private static bool CalculateProsperityChangePatch()
         {
             return false;
         }
+    }
 
-        [HarmonyPatch(nameof(Town.Security), MethodType.Setter)]
+    [HarmonyPatch(typeof(BuildingHelper))]
+    internal class BuilderHelperPatches
+    {
+        [HarmonyPatch("AddDefaultDailyBonus")]
         [HarmonyPrefix]
-        private static bool SecurityPrefix()
-        {
-            return false;
-        }
-
-        [HarmonyPatch(nameof(Town.Loyalty), MethodType.Setter)]
-        [HarmonyPrefix]
-        private static bool LoyaltyPrefix()
-        {
-            return false;
-        }
-
-
-        [HarmonyPatch(nameof(Town.TradeTaxAccumulated), MethodType.Setter)]
-        [HarmonyPrefix]
-        private static bool TradeTaxAccumulatedPrefix()
-        {
-            return false;
-        }
-
-        [HarmonyPatch(nameof(Town.Governor), MethodType.Setter)]
-        [HarmonyPrefix]
-        private static bool GovernorPrefix()
-        {
-            return false;
-        }
-
-        [HarmonyPatch(nameof(Town.LastCapturedBy), MethodType.Setter)]
-        [HarmonyPrefix]
-        private static bool LastCapturedByPrefix()
+        private static bool AddDefaultDailyBonusPatch()
         {
             return false;
         }

@@ -1,33 +1,35 @@
 ﻿using Common.Messaging;
-using System;
+using GameInterface.Services.Heroes.Data;
+using LiteNetLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.DotNet;
+using TaleWorlds.MountAndBlade.Diamond;
 
 namespace GameInterface.Services.Heroes.Messages;
 
 public record RegisterNewPlayerHero : ICommand
 {
+    public NetPeer SendingPeer { get; }
+    public string ControllerId { get; }
     public byte[] Bytes { get; }
 
-    public RegisterNewPlayerHero(byte[] bytes)
+    public RegisterNewPlayerHero(NetPeer sendingPeer, string controllerId, byte[] bytes)
     {
+        SendingPeer = sendingPeer;
+        ControllerId = controllerId;
         Bytes = bytes;
     }
 }
 
 public record NewPlayerHeroRegistered : IResponse
 {
-    public string HeroStringId { get; }
-    public string PartyStringId { get; }
-    public string CharacterObjectStringId { get; }
-    public string ClanStringId { get; }
+    public NetPeer SendingPeer { get; }
+    public NewPlayerData NewPlayerData { get; }
 
-    public NewPlayerHeroRegistered(Hero hero)
+    public NewPlayerHeroRegistered(NetPeer sendingPeer, NewPlayerData playerData)
     {
-        if (hero == null) return;
+        SendingPeer = sendingPeer;
 
-        HeroStringId = hero.StringId;
-        PartyStringId = hero.PartyBelongedTo.StringId;
-        CharacterObjectStringId = hero.CharacterObject.StringId;
-        ClanStringId = hero.Clan.StringId;
+        NewPlayerData = playerData;
     }
 }

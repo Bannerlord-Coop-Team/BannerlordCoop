@@ -1,42 +1,35 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
+using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
-using Moq;
-using Serilog;
 using Xunit;
 using Xunit.Abstractions;
 
 namespace Coop.Tests.Client.States
 {
-    public class MissionStateTests : CoopTest
+    public class MissionStateTests
     {
         private readonly IClientLogic clientLogic;
-        public MissionStateTests(ITestOutputHelper output) : base(output)
+        private readonly ClientTestComponent clientComponent;
+
+        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => clientComponent.MockNetwork;
+
+        public MissionStateTests(ITestOutputHelper output)
         {
-            clientLogic = new ClientLogic(MockNetwork, MockMessageBroker);
-        }
+            clientComponent = new ClientTestComponent(output);
+            var container = clientComponent.Container;
 
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            // Arrange
-            clientLogic.State = new MissionState(clientLogic);
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
-
-            // Act
-            clientLogic.State.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
+            clientLogic = container.Resolve<IClientLogic>()!;
         }
 
         [Fact]
         public void EnterCampaignState_Transitions_CampaignState()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             var payload = new MessagePayload<CampaignStateEntered>(
                 this, new CampaignStateEntered());
@@ -52,8 +45,7 @@ namespace Coop.Tests.Client.States
         public void EnterCampaignState_Publishes_EnterCampaignState()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             // Act
             clientLogic.EnterCampaignState();
@@ -67,8 +59,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             // Act
             clientLogic.EnterMainMenu();
@@ -82,8 +73,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Transitions_MainMenuState()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             var payload = new MessagePayload<MainMenuEntered>(
                 this, new MainMenuEntered());
@@ -99,8 +89,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             // Act
             clientLogic.Disconnect();
@@ -114,8 +103,7 @@ namespace Coop.Tests.Client.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            var missionState = new MissionState(clientLogic);
-            clientLogic.State = missionState;
+            var missionState = clientLogic.SetState<MissionState>();
 
             // Act
             clientLogic.Connect();

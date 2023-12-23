@@ -11,7 +11,7 @@ namespace Coop.Core.Common;
 /// <see cref="IHandler"/> or <see cref="IPacketHandler"/> interfaces
 /// in a given namespace
 /// </summary>
-public static class HandlerCollector
+public static class TypeCollector
 {
     /// <summary>
     /// collects of classes in a given namespace
@@ -19,21 +19,22 @@ public static class HandlerCollector
     /// <typeparam name="TModule">Module type to get namespace</typeparam>
     /// <returns>
     /// Enumerable of types that inherit
-    /// <see cref="IHandler"/> or <see cref="IPacketHandler"/>
+    /// <typeparamref name="T"/>
     /// within the <typeparamref name="TModule"/>'s namespace
     /// </returns>
-    public static IEnumerable<Type> Collect<TModule>()
+    public static IEnumerable<Type> Collect<TModule, T>()
     {
         string namespacePrefix = typeof(TModule).Namespace;
 
         List<Type> types = new List<Type>();
 
+        var targetType = typeof(T);
+
         foreach (Type t in AppDomain.CurrentDomain.GetDomainTypes(namespacePrefix))
         {
             if (t.IsAbstract) continue;
 
-            if (t.GetInterface(nameof(IHandler)) == null &&
-                t.GetInterface(nameof(IPacketHandler)) == null) continue;
+            if (targetType.IsAssignableFrom(t) == false) continue;
 
             types.Add(t);
         }

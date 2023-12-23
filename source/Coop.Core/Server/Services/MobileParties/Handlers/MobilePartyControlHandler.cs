@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
+using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Messages.Control;
 
 namespace Coop.Core.Server.Services.MobileParties.Handlers;
@@ -14,11 +15,12 @@ public class MobilePartyControlHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
 
-    public MobilePartyControlHandler(IMessageBroker messageBroker, INetwork network)
+    public MobilePartyControlHandler(
+        IMessageBroker messageBroker,
+        INetwork network)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-
         messageBroker.Subscribe<NetworkRequestMobilePartyControl>(Handle);
     }
 
@@ -29,10 +31,11 @@ public class MobilePartyControlHandler : IHandler
 
     private void Handle(MessagePayload<NetworkRequestMobilePartyControl> obj)
     {
-        string partyId = obj.What.PartyId;
+        var partyId = obj.What.PartyId;
+        var controllerId = obj.What.ControllerId;
 
-        messageBroker.Publish(this, new UpdateMobilePartyControl(partyId, true));
+        messageBroker.Publish(this, new UpdateMobilePartyControl(controllerId, partyId));
 
-        network.SendAll(new NetworkGrantPartyControl(partyId));
+        network.SendAll(new NetworkGrantPartyControl(controllerId, partyId));
     }
 }

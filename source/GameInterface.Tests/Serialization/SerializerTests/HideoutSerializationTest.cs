@@ -49,43 +49,46 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Hideout_Full_Serialization()
         {
-            Hideout hideout = new Hideout
+            lock (Hideout.All)
             {
-                IsSpotted = true
-            };
+                Hideout hideout = new Hideout
+                {
+                    IsSpotted = true
+                };
 
-            Hideout_nextPossibleAttackTime.SetValue(hideout, new CampaignTime());
-            Hideout_SceneName.SetValue(hideout, "something");
+                Hideout_nextPossibleAttackTime.SetValue(hideout, new CampaignTime());
+                Hideout_SceneName.SetValue(hideout, "something");
 
-            MBList<Hideout> allhideouts = (MBList<Hideout>)Campaign_hideouts.GetValue(Campaign.Current) ?? new MBList<Hideout>();
-            
-            allhideouts.Add(hideout);
+                MBList<Hideout> allhideouts = Campaign_hideouts.GetValue(Campaign.Current) as MBList<Hideout> ?? new MBList<Hideout>();
 
-            Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
+                allhideouts.Add(hideout);
 
-            var factory = container.Resolve<IBinaryPackageFactory>();
-            HideoutBinaryPackage package = new HideoutBinaryPackage(hideout, factory);
+                Campaign_hideouts.SetValue(Campaign.Current, allhideouts);
 
-            package.Pack();
+                var factory = container.Resolve<IBinaryPackageFactory>();
+                HideoutBinaryPackage package = new HideoutBinaryPackage(hideout, factory);
 
-            byte[] bytes = BinaryFormatterSerializer.Serialize(package);
+                package.Pack();
 
-            Assert.NotEmpty(bytes);
+                byte[] bytes = BinaryFormatterSerializer.Serialize(package);
 
-            object obj = BinaryFormatterSerializer.Deserialize(bytes);
+                Assert.NotEmpty(bytes);
 
-            Assert.IsType<HideoutBinaryPackage>(obj);
+                object obj = BinaryFormatterSerializer.Deserialize(bytes);
 
-            HideoutBinaryPackage returnedPackage = (HideoutBinaryPackage)obj;
+                Assert.IsType<HideoutBinaryPackage>(obj);
 
-            var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
-            Hideout newHideout = returnedPackage.Unpack<Hideout>(deserializeFactory);
+                HideoutBinaryPackage returnedPackage = (HideoutBinaryPackage)obj;
 
-            Assert.Equal(hideout, newHideout);
-            Assert.Equal(hideout.SceneName, newHideout.SceneName);
-            Assert.Equal(hideout.IsSpotted, newHideout.IsSpotted);
-            Assert.Equal(Hideout_nextPossibleAttackTime.GetValue(hideout),
-                         Hideout_nextPossibleAttackTime.GetValue(newHideout));
+                var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
+                Hideout newHideout = returnedPackage.Unpack<Hideout>(deserializeFactory);
+
+                Assert.Equal(hideout, newHideout);
+                Assert.Equal(hideout.SceneName, newHideout.SceneName);
+                Assert.Equal(hideout.IsSpotted, newHideout.IsSpotted);
+                Assert.Equal(Hideout_nextPossibleAttackTime.GetValue(hideout),
+                             Hideout_nextPossibleAttackTime.GetValue(newHideout));
+            }
         }
     }
 }

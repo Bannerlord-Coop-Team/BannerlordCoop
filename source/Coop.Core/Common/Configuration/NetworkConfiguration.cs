@@ -8,12 +8,18 @@ namespace Coop.Core.Common.Configuration;
 /// </summary>
 public class NetworkConfiguration : INetworkConfiguration
 {
-    public string Address => "localhost";
+#if DEBUG
+    public string Address { get; set; } =  "localhost";
+    public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromMinutes(5);
+#else
+    public string Address { get; set; } = "bannerlordcoop.duckdns.org";
+    public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(10);
+#endif
 
-    public int Port => 4200;
+    public int Port { get; set; } = 4200;
 
     // TODO find better token
-    public string Token => "TempToken";
+    public string Token { get; set; } = "TempToken";
 
     public string P2PToken => throw new NotImplementedException();
 

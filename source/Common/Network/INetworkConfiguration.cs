@@ -10,5 +10,6 @@ namespace Common.Network
         int Port { get; }
         string Token { get; }
         string P2PToken { get; }
+        TimeSpan ConnectionTimeout { get; }
     }
 }

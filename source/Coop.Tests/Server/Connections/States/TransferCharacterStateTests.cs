@@ -1,8 +1,12 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
+using Common.Network;
 using Coop.Core.Client.Messages;
+using Coop.Core.Server;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
+using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System.Linq;
@@ -11,39 +15,34 @@ using Xunit.Abstractions;
 
 namespace Coop.Tests.Server.Connections.States
 {
-    public class TransferCharacterStateTests : CoopTest
+    public class TransferCharacterStateTests
     {
         private readonly IConnectionLogic connectionLogic;
         private readonly NetPeer playerPeer;
         private readonly NetPeer differentPeer;
+        private readonly ServerTestComponent serverComponent;
 
-        public TransferCharacterStateTests(ITestOutputHelper output) : base(output)
+        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
+        private MockNetwork MockNetwork => serverComponent.MockNetwork;
+
+        public TransferCharacterStateTests(ITestOutputHelper output)
         {
-            playerPeer = MockNetwork.CreatePeer();
-            differentPeer = MockNetwork.CreatePeer();
-            connectionLogic = new ConnectionLogic(playerPeer, MockMessageBroker, MockNetwork);
-        }
+            serverComponent = new ServerTestComponent(output);
 
-        [Fact]
-        public void Dispose_RemovesAllHandlers()
-        {
-            // Arrange
-            connectionLogic.State = new CampaignState(connectionLogic);
+            var container = serverComponent.Container;
 
-            Assert.NotEmpty(MockMessageBroker.Subscriptions);
+            var network = container.Resolve<MockNetwork>();
 
-            // Act
-            connectionLogic.State.Dispose();
-
-            // Assert
-            Assert.Empty(MockMessageBroker.Subscriptions);
+            playerPeer = network.CreatePeer();
+            differentPeer = network.CreatePeer();
+            connectionLogic = container.Resolve<ConnectionLogic>(new NamedParameter("playerId", playerPeer));
         }
 
         [Fact]
         public void LoadMethod_TransitionState_LoadingState()
         {
             // Arrange
-            connectionLogic.State = new TransferSaveState(connectionLogic);
+            connectionLogic.SetState<TransferSaveState>();
 
             // Act
             connectionLogic.Load();
@@ -56,7 +55,7 @@ namespace Coop.Tests.Server.Connections.States
         public void UnusedStatesMethods_DoNothing()
         {
             // Arrange
-            connectionLogic.State = new TransferSaveState(connectionLogic);
+            connectionLogic.SetState<TransferSaveState>();
 
             // Act
             connectionLogic.CreateCharacter();
@@ -69,30 +68,10 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void CreateCharacterState_EntryEvents()
-        {
-            // Act
-            connectionLogic.State = new TransferSaveState(connectionLogic);
-
-            // Assert
-            Assert.NotEmpty(MockNetwork.SentNetworkMessages);
-
-            foreach(var peer in MockNetwork.Peers)
-            {
-                var message = Assert.Single(MockNetwork.GetPeerMessages(peer));
-                Assert.IsType<NetworkDisableTimeControls>(message);
-            }
-
-            Assert.IsType<PauseAndDisableGameTimeControls>(MockMessageBroker.PublishedMessages[0]);
-            Assert.IsType<PackageGameSaveData>(MockMessageBroker.PublishedMessages[1]);
-        }
-
-        [Fact]
         public void GameSaveDataPackaged_ValidTransactionId()
         {
             // Arrange
-            var currentState = new TransferSaveState(connectionLogic);
-            connectionLogic.State = currentState;
+            var currentState = connectionLogic.SetState<TransferSaveState>();
 
             byte[] data = new byte[1];
             string campaignId = "12345";

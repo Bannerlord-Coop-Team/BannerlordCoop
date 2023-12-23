@@ -1,5 +1,9 @@
 ﻿using Common.Messaging;
+using Coop.Core.Client.Services.Heroes.Data;
+using Coop.Core.Common;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Heroes.Messages;
+using System;
 
 namespace Coop.Core.Client.States;
 
@@ -8,30 +12,41 @@ namespace Coop.Core.Client.States;
 /// </summary>
 public class LoadingState : ClientStateBase
 {
-    public LoadingState(IClientLogic logic) : base(logic)
+    private readonly IMessageBroker messageBroker;
+    private readonly IDeferredHeroRepository deferredHeroRepo;
+
+    public LoadingState(
+        IClientLogic logic,
+        IMessageBroker messageBroker,
+        IDeferredHeroRepository deferredHeroRepo) : base(logic)
     {
-        Logic.MessageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
-        Logic.MessageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        this.messageBroker = messageBroker;
+        this.deferredHeroRepo = deferredHeroRepo;
+        messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
+        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
 
     public override void Dispose()
     {
-        Logic.MessageBroker.Unsubscribe<CampaignReady>(Handle_CampaignLoaded);
-        Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Unsubscribe<CampaignReady>(Handle_CampaignLoaded);
     }
 
     public override void EnterMainMenu()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
-    }
-
-    internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
-    {
-        Logic.State = new MainMenuState(Logic);
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     internal void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
     {
+        messageBroker.Publish(this, new RegisterAllGameObjects());
+    }
+
+    internal void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
+    {
+        InstantiateDeferredHeroes();
+
+        messageBroker.Publish(this, new SwitchToHero(Logic.ControlledHeroId));
+
         Logic.EnterCampaignState();
     }
 
@@ -41,7 +56,7 @@ public class LoadingState : ClientStateBase
 
     public override void Disconnect()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     public override void ExitGame()
@@ -58,7 +73,7 @@ public class LoadingState : ClientStateBase
 
     public override void EnterCampaignState()
     {
-        Logic.State = new CampaignState(Logic);
+        Logic.SetState<CampaignState>();
     }
 
     public override void EnterMissionState()
@@ -67,5 +82,16 @@ public class LoadingState : ClientStateBase
 
     public override void ValidateModules()
     {
+    }
+
+    private void InstantiateDeferredHeroes()
+    {
+        foreach (var newHero in deferredHeroRepo.GetAllDeferredHeroes())
+        {
+            var message = new RegisterNewPlayerHero(newHero.NetPeer, newHero.ControllerId, newHero.HeroData);
+            messageBroker.Publish(this, message);
+        }
+
+        deferredHeroRepo.Clear();
     }
 }

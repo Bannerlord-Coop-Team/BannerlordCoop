@@ -6,6 +6,7 @@ using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
 using Coop.Core.Common.Network;
+using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -17,9 +18,8 @@ namespace Coop.Core.Client;
 /// <summary>
 /// Client used for Coop
 /// </summary>
-public interface ICoopClient : INetwork, IUpdateable, INetEventListener
+public interface ICoopClient : INetwork, IUpdateable, INetEventListener, IDisposable
 {
-    Guid ClientId { get; }
 }
 
 /// <inheritdoc cref="ICoopClient"/>
@@ -29,14 +29,11 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     
     private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
 
-    public Guid ClientId { get; } = Guid.NewGuid();
-
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
     private readonly NetManager netManager;
 
     private bool isConnected = false;
-    private NetPeer serverPeer;
 
     public CoopClient(
         INetworkConfiguration config,
@@ -55,9 +52,14 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 #endif
     }
 
+    public void Dispose()
+    {
+        Stop();
+    }
+
     public void Disconnect()
     {
-        serverPeer.Disconnect();
+        netManager.DisconnectAll();
     }
 
     public void OnConnectionRequest(ConnectionRequest request)
@@ -78,7 +80,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
-        packetManager.HandleRecieve(peer, packet);
+        packetManager.HandleReceive(peer, packet);
     }
 
     public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -92,6 +94,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         {
             isConnected = true;
 
+            messageBroker.Publish(this, new SendInformationMessage("Connected! Please wait for transfer"));
             messageBroker.Publish(this, new NetworkConnected());
         }
     }
@@ -100,20 +103,23 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     {
         if (isConnected == true)
         {
-            isConnected = false;
+            messageBroker.Publish(this, new SendInformationMessage(disconnectInfo.Reason.ToString()));
             messageBroker.Publish(this, new NetworkDisconnected(disconnectInfo));
         }
     }
 
     public override void Start()
     {
+        messageBroker.Publish(this, new SendInformationMessage("Connecting..."));
+
         if (isConnected)
         {
             Stop();
         }
 
         netManager.Start();
-        serverPeer = netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
+
+        netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
     }
 
     public override void Stop()

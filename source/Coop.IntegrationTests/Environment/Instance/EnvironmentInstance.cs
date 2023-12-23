@@ -11,8 +11,14 @@ namespace Coop.IntegrationTests.Environment.Instance;
 internal abstract class EnvironmentInstance
 {
     public NetPeer NetPeer => mockNetwork.NetPeer;
+    /// <summary>
+    /// Messages sent internally or received over the network via the message broker
+    /// </summary>
     public MessageCollection InternalMessages => messageBroker.Messages;
-    public MessageCollection SentMessages => mockNetwork.NetworkSentMessages;
+    /// <summary>
+    /// Messages sent over the network
+    /// </summary>
+    public MessageCollection NetworkSentMessages => mockNetwork.NetworkSentMessages;
 
     private readonly TestMessageBroker messageBroker;
     private readonly MockNetworkBase mockNetwork;
@@ -23,12 +29,22 @@ internal abstract class EnvironmentInstance
         this.mockNetwork = mockNetwork;
     }
 
-    public void SendMessageInternal(object source, IMessage message)
+    /// <summary>
+    /// Simulate receiving a message from the message broker
+    /// </summary>
+    /// <param name="source">Source of the message</param>
+    /// <param name="message">Received Message</param>
+    public void ReceiveMessage(object source, IMessage message)
     {
         messageBroker.Publish(source, message);
     }
 
-    public void SendPacketInternal(NetPeer source, IPacket packet)
+    /// <summary>
+    /// Simulate receiving a packet from the network
+    /// </summary>
+    /// <param name="source">Source Peer</param>
+    /// <param name="packet">Received Packet</param>
+    public void ReceivePacket(NetPeer source, IPacket packet)
     {
         mockNetwork.ReceiveFromNetwork(source, packet);
     }
