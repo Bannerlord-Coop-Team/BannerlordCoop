@@ -5,7 +5,6 @@ using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Client.Messages;
-using Coop.Core.Client.Network;
 using Coop.Core.Common.Network;
 using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
@@ -33,7 +32,6 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
     private readonly NetManager netManager;
-    private readonly PacketQueue packetQueue;
 
     private bool isConnected = false;
 
@@ -44,8 +42,6 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
-
-        packetQueue = new PacketQueue(packetManager);
 
         // TODO add configuration
         netManager = new NetManager(this);
@@ -84,7 +80,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
-        packetQueue.Receive(peer, packet);
+        packetManager.HandleReceive(peer, packet);
     }
 
     public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -121,7 +117,6 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             Stop();
         }
 
-        packetQueue.Start();
         netManager.Start();
 
         netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
@@ -129,9 +124,6 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void Stop()
     {
-        packetQueue.Stop();
-        packetQueue.Discard();
-
         netManager.Stop();
     }
 

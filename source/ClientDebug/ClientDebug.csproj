@@ -43,12 +43,6 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Coop\Coop.csproj">
-      <Project>{2c1c41c6-591a-4092-a01a-feee1b53185f}</Project>
-      <Name>Coop</Name>
-    </ProjectReference>
-  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>dotnet build "$(SolutionDir)Coop/Coop.csproj" --no-incremental -c $(configuration) /p:"SolutionDir=$(SolutionDir)\"</PostBuildEvent>
