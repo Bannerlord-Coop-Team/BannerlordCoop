@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.Villages.Messages;
 using Coop.Core.Server.Services.Villages.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;

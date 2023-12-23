@@ -23,6 +23,8 @@ namespace GameInterface.Services.Villages.Patches
         {
             if (_allowedInstance.IsAllowed(village)) return true;
 
+            if (raiderParty == null) return false;
+
             MessageBroker.Instance.Publish(village, new ChangeVillageState(village.StringId, Convert.ToInt32(newState), raiderParty.StringId));
 
             return false;
