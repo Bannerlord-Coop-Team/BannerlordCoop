@@ -16,6 +16,8 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(ref Clan __instance, float value, bool shouldNotify = true)
         {
+            if (value == 0f) return false;
+
             if (PolicyProvider.AllowOriginalCalls) return true;
 
             // On the client if it is not the player client skip the call
