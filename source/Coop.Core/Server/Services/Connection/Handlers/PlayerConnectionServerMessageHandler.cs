@@ -48,7 +48,7 @@ namespace Coop.Core.Server.Services.Connection.Handlers
 
         private void PlayerCampaignEnteredHandler(MessagePayload<PlayerCampaignEntered> obj)
         {
-            var playerId = (NetPeer)obj.Who;
+            var playerId = obj.What.playerId;
 
             if (!AnyLoaders())
             {

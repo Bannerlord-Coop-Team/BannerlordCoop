@@ -31,7 +31,7 @@ public class LoadingState : ConnectionStateBase
         if (playerId == ConnectionLogic.Peer)
         {
             ConnectionLogic.EnterCampaign();
-            messageBroker.Publish(this, new PlayerCampaignEntered());
+            messageBroker.Publish(this, new PlayerCampaignEntered(playerId));
         }
     }
 

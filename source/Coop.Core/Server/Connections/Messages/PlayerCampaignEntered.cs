@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using LiteNetLib;
 
 namespace Coop.Core.Server.Connections.Messages;
 
@@ -7,4 +8,10 @@ namespace Coop.Core.Server.Connections.Messages;
 /// </summary>
 internal record PlayerCampaignEntered : IEvent
 {
+    public NetPeer playerId { get; }
+
+    public PlayerCampaignEntered(NetPeer playerId)
+    {
+        this.playerId = playerId;
+    }
 }
