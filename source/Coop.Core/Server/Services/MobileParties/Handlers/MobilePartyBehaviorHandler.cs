@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Packets;
+using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 
 namespace Coop.Core.Server.Services.MobileParties.Handlers;
@@ -30,8 +31,10 @@ public class MobilePartyBehaviorHandler : IHandler
     {
         var data = obj.What.BehaviorUpdateData;
 
-        network.SendAll(new UpdatePartyBehaviorPacket(data));
+        var datas = new PartyBehaviorUpdateData[] { data };
 
-        messageBroker.Publish(this, new UpdatePartyBehavior(data));
+        network.SendAll(new UpdatePartyBehaviorPacket(ref datas));
+
+        messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
     }
 }

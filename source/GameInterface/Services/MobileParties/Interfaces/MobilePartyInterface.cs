@@ -8,7 +8,6 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;

@@ -98,6 +98,7 @@ internal class HeroInterface : IHeroInterface
 
     public bool TryResolveHero(string controllerId, out string heroId) => heroRegistry.TryGetControlledHero(controllerId, out heroId);
 
+    private static readonly PropertyInfo MainParty = typeof(Campaign).GetProperty(nameof(Campaign.MainParty));
     public void SwitchMainHero(string heroId)
     {
         if(objectManager.TryGetObject(heroId, out Hero resolvedHero))
@@ -105,6 +106,7 @@ internal class HeroInterface : IHeroInterface
             Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
 
             ChangePlayerCharacterAction.Apply(resolvedHero);
+            MainParty.SetValue(Campaign.Current, resolvedHero.PartyBelongedTo);
 
             Campaign_PlayerClan.SetValue(Campaign.Current, resolvedHero.Clan);
         }

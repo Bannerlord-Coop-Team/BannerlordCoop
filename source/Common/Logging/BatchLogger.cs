@@ -1,66 +1,62 @@
-﻿using System;
-using System.Collections.Concurrent;
+﻿using Serilog;
+using Serilog.Events;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
-using Serilog;
-using Serilog.Events;
 
 namespace Common.Logging
 {
-	/// <summary>
-	/// A class for logging batches of messages of type T.
-	/// </summary>
-	/// <typeparam name="T">The type of object you want to be counted</typeparam>
-	public sealed class BatchLogger<T> : IDisposable
+    /// <summary>
+    /// A class for logging batches of messages of type T.
+    /// </summary>
+    public sealed class BatchLogger : IDisposable
 	{
-		// A concurrent dictionary to store messages of type T and their counts.
-		private readonly ConcurrentDictionary<T, int> _messages = new ConcurrentDictionary<T, int>();
+        private readonly string messageName;
+        private int messageCount = 0;
 		// A logger to log the messages.
-		private readonly ILogger _logger = LogManager.GetLogger<BatchLogger<T>>();
+		private static readonly ILogger Logger = LogManager.GetLogger<BatchLogger>();
 		// The log level to use when logging the messages.
-		private readonly LogEventLevel _level;
+		private readonly LogEventLevel level;
 		// A cancellation token source to cancel the poller task.
 		private readonly CancellationTokenSource _cancellation = new CancellationTokenSource();
 		// A task to poll for messages to log.
-		private readonly Task _poller;
+		private readonly Task poller;
 		// The number of milliseconds to wait between polls.
-		private readonly int _waitMilliseconds;
+		private readonly int waitMilliseconds;
 
-		/// <summary>
-		/// Constructs a BatchLogger.
-		/// </summary>
-		/// <param name="level">The log level to use when logging the messages.</param>
+        /// <summary>
+        /// Constructs a BatchLogger.
+        /// </summary>
+        /// <param name="level">The log level to use when logging the messages.</param>
 		/// <param name="waitMilliseconds">The number of milliseconds to wait between polls (optional, default is 1000).</param>
-		public BatchLogger(LogEventLevel level, int waitMilliseconds = 1000)
+		public BatchLogger(string messageName, LogEventLevel level, int waitMilliseconds = 1000)
 		{
-			_level = level;
-			_waitMilliseconds = waitMilliseconds;
-			_poller = Task.Factory.StartNew(Poll, _cancellation.Token);
+			this.messageName = messageName;
+			this.level = level;
+			this.waitMilliseconds = waitMilliseconds;
+			poller = Task.Factory.StartNew(Poll, _cancellation.Token);
 		}
 
 		/// <summary>
-		/// Logs a message of type T.
+		/// Logs a message.
 		/// </summary>
-		/// <param name="value">The message to log.</param>
-		public void Log(T value) => _messages.AddOrUpdate(value,
-			1, (_, i) => ++i);
+		public void LogOne() => Interlocked.Increment(ref messageCount);
 
-		// A method to poll for messages to log.
-		private void Poll()
+        // A method to poll for messages to log.
+        private async void Poll()
 		{
 			// Keep polling until cancellation is requested.
 			while (!_cancellation.IsCancellationRequested)
 			{
 				// Sleep for the specified number of milliseconds.
-				Thread.Sleep(_waitMilliseconds);
-				// Iterate through the keys in the messages dictionary.
-				foreach (var key in _messages.Keys)
+				await Task.Delay(waitMilliseconds);
+
+				if(messageCount > 0)
 				{
-					// If the message can be removed from the dictionary, log it.
-					if (_messages.TryRemove(key, out var value))
-						_logger.Write(_level, "{Type} received {Times} times in last {WaitMilliseconds}ms",
-							key, value, _waitMilliseconds);
-				}
+                    Logger.Information("{messageCount} {messageName} messages has been received in {milliseconds}ms", messageCount, messageName, waitMilliseconds);
+
+                    Interlocked.Exchange(ref messageCount, 0);
+                }
 			}
 		}
 
@@ -74,10 +70,11 @@ namespace Common.Logging
 				return;
 			_cancellation.Cancel();
 			// Wait for the poller task to complete.
-			while (!_poller.IsCompleted)
+			while (!poller.IsCompleted)
 			{
 				Thread.Sleep(1);
 			}
+
 			// Dispose of the cancellation token source.
 			_cancellation?.Dispose();
 		}

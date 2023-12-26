@@ -15,16 +15,13 @@ namespace Coop.Core.Client.Services.MobileParties.PacketHandlers
         public PacketType PacketType => PacketType.UpdatePartyBehavior;
 
         private readonly IPacketManager packetManager;
-        private readonly INetwork network;
         private readonly IMessageBroker messageBroker;
 
         public UpdatePartyBehaviorPacketHandler(
             IPacketManager packetManager,
-            INetwork network,
             IMessageBroker messageBroker)
         {
             this.packetManager = packetManager;
-            this.network = network;
             this.messageBroker = messageBroker;
             packetManager.RegisterPacketHandler(this);
         }
@@ -38,7 +35,15 @@ namespace Coop.Core.Client.Services.MobileParties.PacketHandlers
         {
             UpdatePartyBehaviorPacket convertedPacket = (UpdatePartyBehaviorPacket)packet;
 
-            messageBroker.Publish(this, new UpdatePartyBehavior(convertedPacket.BehaviorUpdateData));
+            var datas = convertedPacket.BehaviorUpdateData;
+
+            if (datas == null) return;
+
+            foreach ( var item in datas)
+            {
+                var data = item;
+                messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
+            }
         }
     }
 }

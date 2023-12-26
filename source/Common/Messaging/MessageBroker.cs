@@ -1,7 +1,9 @@
 ﻿using Common.Logging;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading.Tasks;
 
 namespace Common.Messaging
@@ -33,27 +35,12 @@ namespace Common.Messaging
             } 
         } 
             
+        
 
         public MessageBroker()
         {
             _subscribers = new Dictionary<Type, List<WeakDelegate>>();
         }
-
-        private static readonly HashSet<string> omit = new HashSet<string>
-        {
-            "PartyBehaviorChangeAttempted",
-            "UpdatePartyBehavior",
-            "ControlledPartyBehaviorUpdated",
-            "PartyEnterSettlementAttempted",
-            "PartyLeaveSettlementAttempted",
-            "NetworkPartyEnterSettlement",
-            "NetworkPartyLeaveSettlement",
-            "PartyEnterSettlement",
-            "PartyLeaveSettlement",
-            "ClanInfluenceChanged",
-            "ChangeClanInfluence",
-            "NetworkClanChangeInfluenceApproved",
-        };
 
         public virtual void Publish<T>(object source, T message) where T : IMessage
         {
@@ -61,13 +48,16 @@ namespace Common.Messaging
                 return;
 
             var msgType = message.GetType();
-            var msgName = msgType.Name;
 
-            if (omit.Contains(msgName) == false)
+            if (msgType.GetCustomAttribute<DontLogMessageAttribute>() == null)
             {
-                Logger.Verbose("Publishing {msgName} from {sourceName}", msgName, source?.GetType().Name);
+                Logger.Verbose("Publishing {msgName} from {sourceName}", msgType.Name, source?.GetType().Name);
             }
-            
+            else
+            {
+                LogMessage(msgType);
+            }
+
 
             if (!_subscribers.ContainsKey(typeof(T)))
             {
@@ -89,6 +79,26 @@ namespace Common.Messaging
                 }
 
                 Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+            }
+        }
+
+        private ConcurrentDictionary<Type, BatchLogger> _loggers = new ConcurrentDictionary<Type, BatchLogger>();
+        private void LogMessage(Type messageType)
+        {
+            if (_loggers.TryGetValue(messageType, out var batchLogger))
+            {
+                batchLogger.LogOne();
+            }
+            else
+            {
+                var newBatchLogger = new BatchLogger(messageType.Name, Serilog.Events.LogEventLevel.Verbose);
+                if(_loggers.TryAdd(messageType, newBatchLogger))
+                {
+                    Logger.Error("Unable to add {messageType} to batch loggers");
+                    return;
+                }
+
+                newBatchLogger.LogOne();
             }
         }
 

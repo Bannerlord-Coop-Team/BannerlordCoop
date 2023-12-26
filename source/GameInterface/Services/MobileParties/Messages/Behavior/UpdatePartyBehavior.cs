@@ -9,11 +9,26 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior
     /// Updates <see cref="MobilePartyAi"/> behavior on the campaign map.
     /// </summary>
     /// <seealso cref="MobilePartyBehaviorHandler"/>
-    public record UpdatePartyBehavior : ICommand
+    [DontLogMessage]
+    public struct UpdatePartyBehavior : ICommand
+    {
+        public PartyBehaviorUpdateData BehaviorUpdateData;
+
+        public UpdatePartyBehavior(ref PartyBehaviorUpdateData behaviorUpdateData)
+        {
+            BehaviorUpdateData = behaviorUpdateData;
+        }
+    }
+
+    /// <summary>
+    /// Notifies that PartyBehavior was updated
+    /// </summary>
+    /// <seealso cref="MobilePartyBehaviorHandler"/>
+    [DontLogMessage]
+    public struct PartyBehaviorUpdated : IEvent
     {
         public PartyBehaviorUpdateData BehaviorUpdateData { get; }
-
-        public UpdatePartyBehavior(PartyBehaviorUpdateData behaviorUpdateData)
+        public PartyBehaviorUpdated(ref PartyBehaviorUpdateData behaviorUpdateData)
         {
             BehaviorUpdateData = behaviorUpdateData;
         }

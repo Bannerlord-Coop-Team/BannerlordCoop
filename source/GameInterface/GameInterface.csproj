@@ -35,6 +35,11 @@
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Services\GameDebug\Commands\**" />
+    <EmbeddedResource Remove="Services\GameDebug\Commands\**" />
+    <None Remove="Services\GameDebug\Commands\**" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
@@ -217,6 +222,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Services\GameDebug\Commands\" />
+    <Folder Include="Services\MobileParties\Extensions\" />
   </ItemGroup>
 </Project>

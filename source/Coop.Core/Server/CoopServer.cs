@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -9,8 +10,10 @@ using GameInterface;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 
@@ -27,6 +30,8 @@ public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, I
 /// <inheritdoc cref="ICoopServer"/>
 public class CoopServer : CoopNetworkBase, ICoopServer
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopServer>();
+
     public const string ServerControllerId = "Server";
 
     public override int Priority => 0;
@@ -150,11 +155,27 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void SendAll(IPacket packet)
     {
+        CheckIfClientOverwhelmed();
+
         SendAll(netManager, packet);
+    }
+
+    private void CheckIfClientOverwhelmed(NetPeer ignoredPeer = null)
+    {
+        foreach (var netPeer in netManager.Where(peer => peer != ignoredPeer))
+        {
+            int outgoingPacketCount = netPeer.GetPacketsCountInReliableQueue(0, true);
+
+            if (outgoingPacketCount > 100){
+                Logger.Debug("Client is overwhelmed, {packetCount} packets waiting", outgoingPacketCount);
+            }
+        }
     }
 
     public override void SendAllBut(NetPeer netPeer, IPacket packet)
     {
+        CheckIfClientOverwhelmed(netPeer);
+
         SendAllBut(netManager, netPeer, packet);
     }
 
