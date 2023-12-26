@@ -2,6 +2,7 @@
 using Coop.Core.Server.Services.MobileParties.Packets;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Utils;
+using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 
 namespace Coop.IntegrationTests.MobileParties;
@@ -50,12 +51,17 @@ public class PartyBehaviorTest
     public void ControlledPartyBehaviorUpdated_Publishes_AllClients()
     {
         // Arrange
-        var message = ObjectHelper.SkipConstructor<PartyBehaviorUpdated>();
+        var data = new PartyBehaviorUpdateData("Test_Party", default, default, default, default, default);
+
+        var message = new PartyBehaviorUpdated(ref data);
 
         var server = TestEnvironment.Server;
 
         // Act
         server.ReceiveMessage(this, message);
+
+        /// wait for polling task to complete <see cref="RequestMobilePartyBehaviorPacketHandler.Poll"/>
+        Thread.Sleep(1000);
 
         // Assert
         foreach (var client in TestEnvironment.Clients)
