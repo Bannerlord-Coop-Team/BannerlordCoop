@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
@@ -34,6 +35,7 @@ namespace Common.Messaging
             } 
         } 
             
+        
 
         public MessageBroker()
         {
@@ -51,7 +53,11 @@ namespace Common.Messaging
             {
                 Logger.Verbose("Publishing {msgName} from {sourceName}", msgType.Name, source?.GetType().Name);
             }
-            
+            else
+            {
+                LogMessage(msgType);
+            }
+
 
             if (!_subscribers.ContainsKey(typeof(T)))
             {
@@ -73,6 +79,26 @@ namespace Common.Messaging
                 }
 
                 Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+            }
+        }
+
+        private ConcurrentDictionary<Type, BatchLogger> _loggers = new ConcurrentDictionary<Type, BatchLogger>();
+        private void LogMessage(Type messageType)
+        {
+            if (_loggers.TryGetValue(messageType, out var batchLogger))
+            {
+                batchLogger.LogOne();
+            }
+            else
+            {
+                var newBatchLogger = new BatchLogger(messageType.Name, Serilog.Events.LogEventLevel.Verbose);
+                if(_loggers.TryAdd(messageType, newBatchLogger))
+                {
+                    Logger.Error("Unable to add {messageType} to batch loggers");
+                    return;
+                }
+
+                newBatchLogger.LogOne();
             }
         }
 

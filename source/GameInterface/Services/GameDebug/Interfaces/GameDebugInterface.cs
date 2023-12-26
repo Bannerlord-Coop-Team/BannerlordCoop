@@ -43,13 +43,13 @@ namespace GameInterface.Services.GameDebug.Interfaces
         private static string FullSavePath => TaleWorlds.Library.Common.PlatformFileHelper?.GetFileFullPath(SavePath);
         private void InternalLoadDebugGame()
         {
-            Logger.Information("Downloading save file to: {savePath}", FullSavePath);
+            //Logger.Information("Downloading save file to: {savePath}", FullSavePath);
 
-            WebDownloader webDownloader = new WebDownloader();
-            // TODO maybe uncomment for debugging
+            //WebDownloader webDownloader = new WebDownloader();
+            //// TODO maybe uncomment for debugging
             //webDownloader.DownloadFile("https://coop.theodor.dev/MP.sav", FullSavePath);
 
-            Logger.Information("Downloaded save file.");
+            //Logger.Information("Downloaded save file.");
 
             SaveGameFileInfo mp_save = MBSaveLoad.GetSaveFiles(null).Single(x => x.Name == LOAD_GAME);
             SandBoxSaveHelper.TryLoadSave(mp_save, StartGame, null);

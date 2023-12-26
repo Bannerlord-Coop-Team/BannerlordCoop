@@ -10,7 +10,7 @@ namespace GameInterface.Services.MobileParties.Data
     /// </summary>
     /// <seealso cref="MobilePartyBehaviorHandler"/>
     [ProtoContract(SkipConstructor = true)]
-    public record PartyBehaviorUpdateData
+    public struct PartyBehaviorUpdateData
     {
         [ProtoMember(1)]
         public string PartyId { get; }

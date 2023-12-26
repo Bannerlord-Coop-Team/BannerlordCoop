@@ -70,8 +70,6 @@ internal class MobilePartyBehaviorHandler : IHandler
     {
         var data = obj.What.BehaviorUpdateData;
 
-        if (data == null) return;
-
         IMapEntity targetMapEntity = null;
 
         if (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity))
@@ -91,14 +89,13 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         if (ModInformation.IsClient)
         {
-            Vec2 truePosition = new Vec2(data.PartyPositionX, data.PartyPositionY);
-            party.Position2D = truePosition;
+            party.Position2D = new Vec2(data.PartyPositionX, data.PartyPositionY);
         }
         else
         {
             data.PartyPositionX = party.Position2D.x;
             data.PartyPositionY = party.Position2D.y;
-            messageBroker.Publish(this, new PartyBehaviorUpdated(data));
+            messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
         }
     }
 }

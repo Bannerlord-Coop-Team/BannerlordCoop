@@ -34,6 +34,8 @@ static class PartyBehaviorPatch
         ref PartyBase targetPartyFigure,
         ref Vec2 bestTargetPoint)
     {
+        if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref targetPartyFigure, ref bestTargetPoint)) return false;
+
         MobileParty party = __instance.GetMobileParty();
 
         bool hasTargetEntity = false;
@@ -52,6 +54,29 @@ static class PartyBehaviorPatch
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
+    }
+
+    private static Func<MobilePartyAi, Vec2> get_MobilePartyAi_BehaviorTarget = typeof(MobilePartyAi)
+        .GetField("BehaviorTarget", BindingFlags.NonPublic | BindingFlags.Instance)
+        .BuildUntypedGetter<MobilePartyAi, Vec2>();
+    private static bool BehaviorIsSame(
+        ref MobilePartyAi __instance,
+        ref AiBehavior newAiBehavior,
+        ref PartyBase targetPartyFigure,
+        ref Vec2 bestTargetPoint)
+    {
+        MobileParty party = __instance.GetMobileParty();
+        IMapEntity targetEntity = null;
+
+        if (targetPartyFigure != null)
+        {
+            targetEntity = targetPartyFigure.IsSettlement ? targetPartyFigure.MobileParty : targetPartyFigure.Settlement;
+        }
+
+        return __instance.AiBehaviorMapEntity == targetEntity && 
+            party.ShortTermBehavior == newAiBehavior && 
+            get_MobilePartyAi_BehaviorTarget(__instance) == bestTargetPoint;
+
     }
 
     public static void SetAiBehavior(

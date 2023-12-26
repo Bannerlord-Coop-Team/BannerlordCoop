@@ -2,7 +2,6 @@
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Handlers;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Messages.Behavior
 {
@@ -11,11 +10,11 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior
     /// </summary>
     /// <seealso cref="MobilePartyBehaviorHandler"/>
     [DontLogMessage]
-    public record UpdatePartyBehavior : ICommand
+    public struct UpdatePartyBehavior : ICommand
     {
-        public PartyBehaviorUpdateData BehaviorUpdateData { get; }
+        public PartyBehaviorUpdateData BehaviorUpdateData;
 
-        public UpdatePartyBehavior(PartyBehaviorUpdateData behaviorUpdateData)
+        public UpdatePartyBehavior(ref PartyBehaviorUpdateData behaviorUpdateData)
         {
             BehaviorUpdateData = behaviorUpdateData;
         }
@@ -26,10 +25,10 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior
     /// </summary>
     /// <seealso cref="MobilePartyBehaviorHandler"/>
     [DontLogMessage]
-    public record PartyBehaviorUpdated : IEvent
+    public struct PartyBehaviorUpdated : IEvent
     {
         public PartyBehaviorUpdateData BehaviorUpdateData { get; }
-        public PartyBehaviorUpdated(PartyBehaviorUpdateData behaviorUpdateData)
+        public PartyBehaviorUpdated(ref PartyBehaviorUpdateData behaviorUpdateData)
         {
             BehaviorUpdateData = behaviorUpdateData;
         }
