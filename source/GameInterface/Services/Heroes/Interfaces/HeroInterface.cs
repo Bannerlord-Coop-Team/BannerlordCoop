@@ -11,6 +11,7 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.Registry;
 using Serilog;
 using System;
+using System.Diagnostics;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -38,6 +39,9 @@ internal class HeroInterface : IHeroInterface
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IHeroRegistry heroRegistry;
 
+    private static PropertyInfo Campaign_PlayerClan => typeof(Campaign).GetProperty("PlayerDefaultFaction", BindingFlags.Instance | BindingFlags.NonPublic);
+
+
     public HeroInterface(
         IObjectManager objectManager,
         IBinaryPackageFactory binaryPackageFactory,
@@ -52,8 +56,10 @@ internal class HeroInterface : IHeroInterface
     {
         Hero.MainHero.StringId = string.Empty;
         Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
+        Hero.MainHero.Clan.StringId = Guid.NewGuid().ToString();
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
+
         return BinaryFormatterSerializer.Serialize(package);
     }
 
@@ -101,6 +107,8 @@ internal class HeroInterface : IHeroInterface
 
             ChangePlayerCharacterAction.Apply(resolvedHero);
             MainParty.SetValue(Campaign.Current, resolvedHero.PartyBelongedTo);
+
+            Campaign_PlayerClan.SetValue(Campaign.Current, resolvedHero.Clan);
         }
         else
         {
@@ -120,10 +128,14 @@ internal class HeroInterface : IHeroInterface
     private static readonly Action<CampaignObjectManager, MobileParty> CampaignObjectManager_AddMobileParty = typeof(CampaignObjectManager)
         .GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
         .BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
+    private static readonly Action<CampaignObjectManager, Clan> CampaignObjectManager_AddClan = typeof(CampaignObjectManager)
+        .GetMethod("AddClan", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildDelegate<Action<CampaignObjectManager, Clan>>();
     private void SetupHeroWithObjectManagers(Hero hero)
     {
         objectManager.AddNewObject(hero, out string heroId);
         objectManager.AddNewObject(hero.PartyBelongedTo, out string partyId);
+        objectManager.AddNewObject(hero.Clan, out string clanId);
 
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
         if (campaignObjectManager == null)
@@ -139,6 +151,8 @@ internal class HeroInterface : IHeroInterface
         CampaignObjectManager_AddMobileParty(campaignObjectManager, party);
 
         var partyBase = party.Party;
+
+        CampaignObjectManager_AddClan(campaignObjectManager, hero.Clan);
 
         partyBase.GetPartyVisual().OnStartup();
         partyBase.SetVisualAsDirty();
