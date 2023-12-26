@@ -25,7 +25,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
             this.network = network;
             messageBroker.Subscribe<OnUnitRecruited>(Handle);
             messageBroker.Subscribe<NetworkUnitRecruited>(Handle);
-            messageBroker.Subscribe<PartyRecruitedUnit>(Handle);
+            messageBroker.Subscribe<NetworkPartyRecruitedUnit>(Handle);
         }
         public void Dispose()
         {
@@ -52,7 +52,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new PartyRecruitGranted(
+            messageBroker.Publish(this, new PartyRecruitedUnit(
                 payload.PartyId,
                 payload.SettlementId,
                 payload.HeroId,
