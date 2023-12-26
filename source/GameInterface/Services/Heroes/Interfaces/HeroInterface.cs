@@ -52,8 +52,10 @@ internal class HeroInterface : IHeroInterface
     {
         Hero.MainHero.StringId = string.Empty;
         Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
+        Hero.MainHero.Clan.StringId = Guid.NewGuid().ToString();
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
+
         return BinaryFormatterSerializer.Serialize(package);
     }
 
@@ -118,10 +120,14 @@ internal class HeroInterface : IHeroInterface
     private static readonly Action<CampaignObjectManager, MobileParty> CampaignObjectManager_AddMobileParty = typeof(CampaignObjectManager)
         .GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
         .BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
+    private static readonly Action<CampaignObjectManager, Clan> CampaignObjectManager_AddClan = typeof(CampaignObjectManager)
+        .GetMethod("AddClan", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildDelegate<Action<CampaignObjectManager, Clan>>();
     private void SetupHeroWithObjectManagers(Hero hero)
     {
         objectManager.AddNewObject(hero, out string heroId);
         objectManager.AddNewObject(hero.PartyBelongedTo, out string partyId);
+        objectManager.AddNewObject(hero.Clan, out string clanId);
 
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
         if (campaignObjectManager == null)
@@ -137,6 +143,8 @@ internal class HeroInterface : IHeroInterface
         CampaignObjectManager_AddMobileParty(campaignObjectManager, party);
 
         var partyBase = party.Party;
+
+        CampaignObjectManager_AddClan(campaignObjectManager, hero.Clan);
 
         partyBase.GetPartyVisual().OnStartup();
         partyBase.SetVisualAsDirty();
