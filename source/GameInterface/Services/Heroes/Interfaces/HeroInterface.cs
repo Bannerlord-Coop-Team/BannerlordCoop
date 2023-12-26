@@ -11,6 +11,7 @@ using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.Registry;
 using Serilog;
 using System;
+using System.Diagnostics;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -37,6 +38,9 @@ internal class HeroInterface : IHeroInterface
     private readonly IObjectManager objectManager;
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IHeroRegistry heroRegistry;
+
+    private static PropertyInfo Campaign_PlayerClan => typeof(Campaign).GetProperty("PlayerDefaultFaction", BindingFlags.Instance | BindingFlags.NonPublic);
+
 
     public HeroInterface(
         IObjectManager objectManager,
@@ -101,6 +105,8 @@ internal class HeroInterface : IHeroInterface
             Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
 
             ChangePlayerCharacterAction.Apply(resolvedHero);
+
+            Campaign_PlayerClan.SetValue(Campaign.Current, resolvedHero.Clan);
         }
         else
         {
