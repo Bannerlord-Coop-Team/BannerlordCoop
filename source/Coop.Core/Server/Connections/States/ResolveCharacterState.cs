@@ -62,15 +62,6 @@ public class ResolveCharacterState : ConnectionStateBase
         ConnectionLogic.CreateCharacter();
     }
 
-    // TODO
-    //internal void HeroNotFoundHandler(MessagePayload<HeroAlreadyClaimed> obj)
-    //{
-    //    var validateMessage = new NetworkClientValidated(false, string.Empty);
-    //    var playerPeer = ConnectionLogic.Peer;
-    //    ConnectionLogic.Network.Send(playerPeer, validateMessage);
-    //    ConnectionLogic.CreateCharacter();
-    //}
-
     public override void CreateCharacter()
     {
         ConnectionLogic.SetState<CreateCharacterState>();

@@ -6,6 +6,8 @@ using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
+using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.Registry;
 using Serilog;
 using System;
@@ -26,7 +28,7 @@ public interface IHeroInterface : IGameAbstraction
     /// </summary>
     /// <param name="bytes">Hero as bytes</param>
     /// <returns>Hero string identifier</returns>
-    NewPlayerData UnpackHero(byte[] bytes);
+    NewPlayerData UnpackHero(string controllerId, byte[] bytes);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -55,7 +57,7 @@ internal class HeroInterface : IHeroInterface
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public NewPlayerData UnpackHero(byte[] bytes)
+    public NewPlayerData UnpackHero(string controllerId, byte[] bytes)
     {
         Hero hero = null;
 
@@ -63,6 +65,9 @@ internal class HeroInterface : IHeroInterface
             hero = UnpackMainHeroInternal(bytes);
         },
         blocking: true);
+
+        // TODO not saving correctly on server
+        heroRegistry.TryRegisterHeroController(controllerId, hero.StringId);
 
         var playerData = new NewPlayerData() {
             HeroData = bytes,
@@ -133,15 +138,15 @@ internal class HeroInterface : IHeroInterface
 
         var partyBase = party.Party;
 
-        partyBase.Visuals.OnStartup(partyBase);
-        partyBase.Visuals.SetMapIconAsDirty();
+        partyBase.GetPartyVisual().OnStartup();
+        partyBase.SetVisualAsDirty();
     }
 
     private void SetupNewParty(Hero hero)
     {
         var party = hero.PartyBelongedTo;
         party.IsVisible = true;
-        party.Party.Visuals.SetMapIconAsDirty();
+        party.Party.SetVisualAsDirty();
 
         typeof(MobileParty).GetMethod("RecoverPositionsForNavMeshUpdate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party, null);
         typeof(MobileParty).GetProperty("CurrentNavigationFace").SetValue(
@@ -149,5 +154,7 @@ internal class HeroInterface : IHeroInterface
             Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D));
 
         typeof(MobilePartyAi).GetMethod("OnGameInitialized", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party.Ai, null);
+
+        CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
     }
 }

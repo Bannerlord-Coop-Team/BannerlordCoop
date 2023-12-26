@@ -11,6 +11,13 @@ public record EnterMainMenu : ICommand
 }
 
 /// <summary>
+/// Response to <see cref="EnterMainMenu"/> publisher
+/// </summary>
+public record EnterMainMenuResponse : IResponse
+{
+}
+
+/// <summary>
 /// Event when main menu is entered
 /// </summary>
 public record MainMenuEntered : IEvent

@@ -31,8 +31,7 @@ namespace Coop.Tests.Client.States
         public void NetworkGameSaveDataReceived_Publishes_EnterMainMenuEvent()
         {
             // Arrange
-            var currentState = new ReceivingSavedDataState(clientLogic);
-            clientLogic.State = currentState;
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
             var gameSaveData = new byte[16];
             var campaignId = "12345";
@@ -52,8 +51,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Publishes_LoadGameSave()
         {
             // Arrange
-            var currentState = new ReceivingSavedDataState(clientLogic);
-            clientLogic.State = currentState;
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
             var gameSaveData = new byte[16];
             var campaignId = "12345";
@@ -82,8 +80,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Handles_DefaultData()
         {
             // Arrange
-            var currentState = new ReceivingSavedDataState(clientLogic);
-            clientLogic.State = currentState;
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
             var campaignId = "12345";
 
@@ -107,8 +104,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Handles_NullSaveData()
         {
             // Arrange
-            var currentState = new ReceivingSavedDataState(clientLogic);
-            clientLogic.State = currentState;
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
             var campaignId = "12345";
 
@@ -132,8 +128,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Handles_ZeroLenArray()
         {
             // Arrange
-            var currentState = new ReceivingSavedDataState(clientLogic);
-            clientLogic.State = currentState;
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
             var gameSaveData = Array.Empty<byte>();
             var campaignId = "12345";
@@ -158,8 +153,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             // Arrange
-            var currentState = new ReceivingSavedDataState(clientLogic);
-            clientLogic.State = currentState;
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
             // Act
             clientLogic.EnterMainMenu();
@@ -173,8 +167,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             // Arrange
-            var currentState = new ReceivingSavedDataState(clientLogic);
-            clientLogic.State = currentState;
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
             // Act
             clientLogic.Disconnect();
@@ -198,8 +191,7 @@ namespace Coop.Tests.Client.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            var currentState = new ReceivingSavedDataState(clientLogic);
-            clientLogic.State = currentState;
+            var currentState = clientLogic.SetState<ReceivingSavedDataState>();
 
             // Act
             clientLogic.Connect();

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Extensions;
 using Common.Logging;
+using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -85,9 +86,8 @@ internal class MobilePartyInterface : IMobilePartyInterface
             controlledEntityRegistry.RegisterAsControlled(ownerId, party.Key);
         }
     }
-    
-    private static readonly object _lock = new object();
 
+    private static  AllowedInstance<MobileParty> allowedInstance = new AllowedInstance<MobileParty>();
     private static MethodInfo InitMethod => typeof(PlayerEncounter).GetMethod(
         "Init",
         BindingFlags.NonPublic | BindingFlags.Instance,
@@ -120,17 +120,19 @@ internal class MobilePartyInterface : IMobilePartyInterface
         
         GameLoopRunner.RunOnMainThread(() =>
         {
-            using var allowedInstance = mobileParty.GetAllowInstance();
-            allowedInstance.IsAllowed = true;
-            if (PlayerEncounter.Current is not null) return;
-            PlayerEncounter.Start();
-            Init(PlayerEncounter.Current, mobileParty.Party, settlementParty, settlement);
+            using (EnterSettlementActionPatches.AllowedInstance)
+            {
+                EnterSettlementActionPatches.AllowedInstance.Instance = mobileParty;
+                if (PlayerEncounter.Current is not null) return;
+                PlayerEncounter.Start();
+                Init(PlayerEncounter.Current, mobileParty.Party, settlementParty, settlement);
+            }
         });
     }
 
     public void EndPlayerSettlementEncounter()
     {
-        PlayerLeaveSettlementPatch.OverrideLeaveConsequence();
+        GameLoopRunner.RunOnMainThread(PlayerLeaveSettlementPatch.OverrideLeaveConsequence);
     }
 
     public void EnterSettlement(string partyId, string settlementId)

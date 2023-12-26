@@ -13,7 +13,6 @@ namespace GameInterface.Services.UI.Patches
         {
             return gameState switch
             {
-                ClanState => false,
                 KingdomState => false,
                 QuestsState => false,
                 CharacterDeveloperState => false,

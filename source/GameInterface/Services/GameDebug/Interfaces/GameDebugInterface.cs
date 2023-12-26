@@ -15,6 +15,7 @@ using GameInterface.Services.GameDebug.Patches;
 using TaleWorlds.CampaignSystem;
 using SandBox.View.Map;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
+using GameInterface.Services.PartyBases.Extensions;
 
 namespace GameInterface.Services.GameDebug.Interfaces
 {
@@ -22,6 +23,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
     {
         void LoadDebugGame();
         void ShowAllParties();
+        void LoadGame(string saveName);
     }
 
     internal class DebugGameInterface : IDebugGameInterface
@@ -66,9 +68,14 @@ namespace GameInterface.Services.GameDebug.Interfaces
             foreach(var party in Campaign.Current.MobileParties)
             {
                 party.IsVisible = true;
-                party.Party.Visuals.SetVisualVisible(true);
-                party.Party.Visuals.SetMapIconAsDirty();
+                party.Party.SetVisualAsDirty();
             }
+        }
+
+        public void LoadGame(string saveName)
+        {
+            SaveGameFileInfo mp_save = MBSaveLoad.GetSaveFiles(null).Single(x => x.Name == saveName);
+            SandBoxSaveHelper.TryLoadSave(mp_save, StartGame, null);
         }
     }
 }

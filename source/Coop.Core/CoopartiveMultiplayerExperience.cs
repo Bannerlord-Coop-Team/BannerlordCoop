@@ -4,91 +4,127 @@ using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client;
+using Coop.Core.Common.Configuration;
+using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using Coop.Core.Surrogates;
 using GameInterface;
-using HarmonyLib;
+using GameInterface.Services.GameDebug.Messages;
+using GameInterface.Services.UI.Messages;
 using System;
 
 namespace Coop.Core
 {
     public class CoopartiveMultiplayerExperience : IUpdateable
     {
-        private const string HarmonyId = "com.TaleWorlds.MountAndBlade.Bannerlord.Coop";
-        private readonly Harmony harmony = new Harmony(HarmonyId);
+        private readonly IMessageBroker messageBroker;
+        private IContainer container;
+        private INetwork network;
 
-        public CoopartiveMultiplayerExperience()
+        public CoopartiveMultiplayerExperience(IMessageBroker messageBroker)
         {
-            harmony.PatchAll(typeof(GameInterface.GameInterface).Assembly);
+            this.messageBroker = messageBroker;
+
+            
             SurrogateCollection.AssignSurrogates();
+
+            messageBroker.Subscribe<AttemptJoin>(Handle);
+            messageBroker.Subscribe<HostSaveGame>(Handle);
+            messageBroker.Subscribe<EndCoopMode>(Handle);
         }
 
-        ~CoopartiveMultiplayerExperience()
+        private void Handle(MessagePayload<AttemptJoin> obj)
         {
-            harmony.UnpatchAll(HarmonyId);
-        }
+            var connectMessage = obj.What;
 
-        public static UpdateableList Updateables { get; } = new UpdateableList();
-
-        private IContainer _container;
-
-        private IUpdateable updateable
-        {
-            get { return _updateable; }
-            set
+            var config = new NetworkConfiguration()
             {
-                if(_updateable != null) 
-                {
-                    Updateables.Remove(value);
-                }
-                _updateable = value;
-                Updateables.Add(_updateable);
-            }
+                Address = connectMessage.Address.ToString(),
+                Port = connectMessage.Port,
+            };
+
+            StartAsClient(config);
         }
 
-        private IUpdateable _updateable;
+        private void Handle(MessagePayload<HostSaveGame> obj)
+        {
+            StartAsServer();
+
+            messageBroker.Publish(this, new LoadGame(obj.What.SaveName));
+        }
+
+        private void Handle(MessagePayload<EndCoopMode> payload)
+        {
+            DestroyContainer();
+
+            messageBroker.Publish(this, new CoopModeEnded());
+        }
 
         public int Priority => 0;
 
         public void Update(TimeSpan deltaTime)
         {
-            Updateables.UpdateAll(deltaTime);
+            network?.Update(deltaTime);
         }
 
         public void StartAsServer()
         {
+            DestroyContainer();
+
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ServerModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
-            _container = builder.Build();
+            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
+            container = builder.Build();
 
-            containerProvider.SetProvider(_container);
+            containerProvider.SetProvider(container);
+            GameInterface.ContainerProvider.SetContainer(container);
 
-            updateable = _container.Resolve<INetwork>();
+            // Create harmony patches
+            var gameInterface = container.Resolve<IGameInterface>();
+            gameInterface.PatchAll();
 
-            var logic = _container.Resolve<ILogic>();
+            network = container.Resolve<INetwork>();
+
+            var logic = container.Resolve<ILogic>();
             logic.Start();
         }
 
-        public void StartAsClient()
+        public void StartAsClient(INetworkConfiguration configuration = null)
         {
+            DestroyContainer();
+
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterModule<CoopModule>();
             builder.RegisterModule<ClientModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
-            _container = builder.Build();
+            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
 
-            containerProvider.SetProvider(_container);
+            if (configuration != null)
+            {
+                builder.RegisterInstance(configuration).As<INetworkConfiguration>().SingleInstance();
+            }
 
-            updateable = _container.Resolve<INetwork>();
+            container = builder.Build();
 
-            var logic = _container.Resolve<ILogic>();
+            containerProvider.SetProvider(container);
+            GameInterface.ContainerProvider.SetContainer(container);
+
+            // Create harmony patches
+            var gameInterface = container.Resolve<IGameInterface>();
+            gameInterface.PatchAll();
+
+            network = container.Resolve<INetwork>();
+
+            var logic = container.Resolve<ILogic>();
             logic.Start();
+        }
+
+        private void DestroyContainer()
+        {
+            container?.Dispose();
+            container = null;
         }
     }
 }

@@ -5,7 +5,6 @@ using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Control;
 using GameInterface.Services.ObjectManager;
-using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;

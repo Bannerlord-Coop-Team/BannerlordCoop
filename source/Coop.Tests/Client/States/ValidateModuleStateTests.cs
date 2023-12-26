@@ -35,8 +35,7 @@ namespace Coop.Tests.Client.States
         public void ValidateModuleState_EntryEvents()
         {
             // Act
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Assert
             Assert.NotEmpty(MockNetwork.Peers);
@@ -49,8 +48,7 @@ namespace Coop.Tests.Client.States
         public void NetworkClientValidated_Transitions_ReceivingSavedDataState()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             var heroExists = true;
             var payload = new MessagePayload<NetworkClientValidated>(
@@ -67,8 +65,7 @@ namespace Coop.Tests.Client.States
         public void NetworkClientValidated_Publishes_StartCharacterCreation()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             var heroExists = false;
             var payload = new MessagePayload<NetworkClientValidated>(
@@ -86,8 +83,7 @@ namespace Coop.Tests.Client.States
         public void EnterMainMenu_Publishes_EnterMainMenuEvent()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Act
             clientLogic.EnterMainMenu();
@@ -101,8 +97,7 @@ namespace Coop.Tests.Client.States
         public void MainMenuEntered_Transitions_MainMenuState()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             var payload = new MessagePayload<MainMenuEntered>(
                 this, new MainMenuEntered());
@@ -118,8 +113,7 @@ namespace Coop.Tests.Client.States
         public void LoadSavedData_Transitions_ReceivingSavedDataState()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Act
             clientLogic.LoadSavedData();
@@ -132,8 +126,7 @@ namespace Coop.Tests.Client.States
         public void Disconnect_Publishes_EnterMainMenu()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Act
             clientLogic.Disconnect();
@@ -147,8 +140,7 @@ namespace Coop.Tests.Client.States
         public void StartCharacterCreation_Publishes_StartCharacterCreation()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Act
             clientLogic.StartCharacterCreation();
@@ -162,8 +154,7 @@ namespace Coop.Tests.Client.States
         public void CharacterCreationStarted_Transitions_CharacterCreationState()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             var payload = new MessagePayload<CharacterCreationStarted>(
                 this, new CharacterCreationStarted());
@@ -179,8 +170,7 @@ namespace Coop.Tests.Client.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            var validateState = new ValidateModuleState(clientLogic);
-            clientLogic.State = validateState;
+            var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Act
             clientLogic.Connect();

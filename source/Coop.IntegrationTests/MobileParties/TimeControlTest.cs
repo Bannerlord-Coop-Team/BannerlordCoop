@@ -1,10 +1,5 @@
-﻿using Common.Messaging;
-using Coop.Core.Server.Services.MobileParties.Packets;
-using Coop.IntegrationTests.Environment;
-using Coop.IntegrationTests.Utils;
-using GameInterface.Services.Heroes.Enum;
+﻿using Coop.IntegrationTests.Environment;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.MobileParties.Messages.Behavior;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.IntegrationTests.MobileParties;
@@ -27,11 +22,11 @@ public class TimeControlTest
     public void SetTimeControlMode_Publishes_AllClients()
     {
         // Arrange
-        var message = new TimeSpeedChanged(CampaignTimeControlMode.StoppablePlay);
+        var message = new AttemptedTimeSpeedChanged(CampaignTimeControlMode.StoppablePlay);
         var client1 = TestEnvironment.Clients.First();
 
         // Act
-        client1.SendMessageInternal(this, message);
+        client1.ReceiveMessage(this, message);
 
         // Assert
         foreach (var client in TestEnvironment.Clients.Where(c => c != client1))

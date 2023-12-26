@@ -1,20 +1,20 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
+using Coop.Core;
 using Coop.Core.Client;
-using Coop.Core.Common;
 using Coop.Core.Server;
 using Coop.Core.Server.Services.Save;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment.Mock;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace Coop.IntegrationTests.Environment;
 
 /// <summary>
-/// Environment for integration testing
+/// Environment used for integration testing
 /// </summary>
 internal class TestEnvironment
 {
@@ -26,10 +26,10 @@ internal class TestEnvironment
     {
         Server = CreateServer();
 
-        List<EnvironmentInstance> clients = new List<EnvironmentInstance>();
+        var clients = new EnvironmentInstance[numClients];
         for (int i = 0; i < numClients; i++)
         {
-            clients.Add(CreateClient());
+            clients[i] = CreateClient();
         }
 
         Clients = clients;
@@ -38,39 +38,26 @@ internal class TestEnvironment
     public IEnumerable<EnvironmentInstance> Clients { get; }
     public EnvironmentInstance Server { get; }
 
-    private List<object> _handlers = new List<object>();
-
     private TestNetworkRouter networkOrchestrator = new TestNetworkRouter();
 
     private EnvironmentInstance CreateClient()
     {
-        var handlerTypes = TypeCollector.Collect<ClientModule, IHandler>();
-        handlerTypes = handlerTypes.Concat(TypeCollector.Collect<ClientModule, IPacketHandler>());
+        var containerProvider = new ContainerProvider();
 
-        var serviceCollection = new ServiceCollection();
+        var builder = new ContainerBuilder();
 
-        AddSharedDependencies(serviceCollection);
+        builder.RegisterModule<ClientModule>();
+        builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
+        builder.RegisterType<ClientInstance>().AsSelf();
+        builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
 
-        foreach (var handlerType in handlerTypes)
-        {
-            serviceCollection.AddScoped(handlerType);
-        }
+        AddSharedDependencies(builder);
 
-        serviceCollection.AddScoped<MockClient>();
-        serviceCollection.AddScoped<INetwork, MockClient>(x => x.GetService<MockClient>()!);
-        serviceCollection.AddScoped<ICoopClient, MockClient>(x => x.GetService<MockClient>()!);
+        var container = builder.Build();
 
+        containerProvider.SetProvider(container);
 
-        serviceCollection.AddScoped<ClientInstance>();
-
-        var serviceProvider = serviceCollection.BuildServiceProvider();
-
-        foreach (var handlerType in handlerTypes)
-        {
-            _handlers.Add(serviceProvider.GetService(handlerType)!);
-        }
-
-        var instance = serviceProvider.GetService<ClientInstance>()!;
+        var instance = container.Resolve<ClientInstance>()!;
 
         networkOrchestrator.AddClient(instance);
 
@@ -79,50 +66,40 @@ internal class TestEnvironment
 
     private EnvironmentInstance CreateServer()
     {
-        var handlerTypes = TypeCollector.Collect<ServerModule, IHandler>();
-        handlerTypes = handlerTypes.Concat(TypeCollector.Collect<ServerModule, IPacketHandler>());
+        var containerProvider = new ContainerProvider();
 
-        var serviceCollection = new ServiceCollection();
+        var builder = new ContainerBuilder();
 
-        AddSharedDependencies(serviceCollection);
+        builder.RegisterModule<ServerModule>();
+        builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
+        builder.RegisterType<ServerInstance>().AsSelf();
+        builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
 
-        foreach (var handlerType in handlerTypes)
-        {
-            serviceCollection.AddScoped(handlerType);
-        }
+        AddSharedDependencies(builder);
 
-        serviceCollection.AddScoped<MockServer>();
-        serviceCollection.AddScoped<INetwork, MockServer>(x => x.GetService<MockServer>()!);
-        serviceCollection.AddScoped<ICoopServer, MockServer>(x => x.GetService<MockServer>()!);
-        serviceCollection.AddScoped<ServerInstance>();
-        
+        var container = builder.Build();
 
-        var serviceProvider = serviceCollection.BuildServiceProvider();
+        containerProvider.SetProvider(container);
 
-        foreach (var handlerType in handlerTypes)
-        {
-            _handlers.Add(serviceProvider.GetService(handlerType)!);
-        }
-
-        var instance = serviceProvider.GetService<ServerInstance>()!;
+        var instance = container.Resolve<ServerInstance>()!;
 
         networkOrchestrator.AddServer(instance);
 
         return instance;
     }
 
-    private IServiceCollection AddSharedDependencies(IServiceCollection services)
+    private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
     {
-        services.AddSingleton(networkOrchestrator);
+        builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();
 
-        services.AddScoped<IMessageBroker, TestMessageBroker>();
-        services.AddScoped<IPacketManager, PacketManager>();
-        services.AddScoped<IObjectManager, MockObjectManager>();
-        services.AddScoped<ICoopSaveManager, CoopSaveManager>();
-        services.AddScoped<IControllerIdProvider, ControllerIdProvider>();
-        services.AddScoped<IControlledEntityRegistry, MockControlledEntityRegistry>();
+        builder.RegisterType<TestMessageBroker>().As<IMessageBroker>().SingleInstance();
+        builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
+        builder.RegisterType<MockObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
+        builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
+        builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
+        builder.RegisterType<MockControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
 
-        return services;
+        return builder;
     }
 }
 

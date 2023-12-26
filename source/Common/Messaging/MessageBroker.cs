@@ -50,6 +50,9 @@ namespace Common.Messaging
             "NetworkPartyLeaveSettlement",
             "PartyEnterSettlement",
             "PartyLeaveSettlement",
+            "ClanInfluenceChanged",
+            "ChangeClanInfluence",
+            "NetworkClanChangeInfluenceApproved",
         };
 
         public virtual void Publish<T>(object source, T message) where T : IMessage

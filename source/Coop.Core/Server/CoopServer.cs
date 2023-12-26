@@ -50,7 +50,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
         this.controllerIdProvider = controllerIdProvider;
-        messageBroker.Subscribe<GameTimeControlsEnabled>(Handle_GameTimeControlsEnabled);
+        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
 
         ModInformation.IsServer = true;
 
@@ -71,6 +71,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+
         netManager.DisconnectAll();
         netManager.Stop();
     }
@@ -110,7 +112,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
-        packetManager.HandleRecieve(peer, packet);
+        packetManager.HandleReceive(peer, packet);
     }
 
     public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
@@ -156,7 +158,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         SendAllBut(netManager, netPeer, packet);
     }
 
-    private void Handle_GameTimeControlsEnabled(MessagePayload<GameTimeControlsEnabled> obj)
+    private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
         allowJoining = true;
     }

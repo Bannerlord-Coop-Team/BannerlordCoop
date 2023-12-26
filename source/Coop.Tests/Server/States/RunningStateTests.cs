@@ -33,7 +33,7 @@ namespace Coop.Tests.Server.States
         public void Stop_Publishes_EnterMainMenu()
         {
             // Arrange
-            var currentState = new ServerRunningState(serverLogic, MockMessageBroker);
+            var currentState = serverLogic.SetState<ServerRunningState>();
 
             // Act
             currentState.Stop();
@@ -47,8 +47,7 @@ namespace Coop.Tests.Server.States
         public void MainMenuEntered_Transitions_InitialServerState()
         {
             // Arrange
-            var currentState = new ServerRunningState(serverLogic, MockMessageBroker);
-            serverLogic.State = currentState;
+            var currentState = serverLogic.SetState<ServerRunningState>();
 
             var serverRunningState = Assert.IsType<ServerRunningState>(currentState);
 
@@ -67,8 +66,7 @@ namespace Coop.Tests.Server.States
         public void OtherStateMethods_DoNotAlterState()
         {
             // Arrange
-            var currentState = new ServerRunningState(serverLogic, MockMessageBroker);
-            serverLogic.State = currentState;
+            var currentState = serverLogic.SetState<ServerRunningState>();
 
             // Act
             ((IServerState)serverLogic).Start();

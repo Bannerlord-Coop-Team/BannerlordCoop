@@ -68,25 +68,6 @@ namespace Coop.Tests.Server.Connections.States
         }
 
         [Fact]
-        public void CreateCharacterState_EntryEvents()
-        {
-            // Act
-            connectionLogic.SetState<TransferSaveState>();
-
-            // Assert
-            Assert.NotEmpty(MockNetwork.SentNetworkMessages);
-
-            foreach(var peer in MockNetwork.Peers)
-            {
-                var message = Assert.Single(MockNetwork.GetPeerMessages(peer));
-                Assert.IsType<NetworkDisableTimeControls>(message);
-            }
-
-            Assert.IsType<PauseAndDisableGameTimeControls>(MockMessageBroker.PublishedMessages[0]);
-            Assert.IsType<PackageGameSaveData>(MockMessageBroker.PublishedMessages[1]);
-        }
-
-        [Fact]
         public void GameSaveDataPackaged_ValidTransactionId()
         {
             // Arrange

@@ -65,6 +65,9 @@ internal class MobilePartyBehaviorHandler : IHandler
     public void Handle_UpdatePartyBehavior(MessagePayload<UpdatePartyBehavior> obj)
     {
         var data = obj.What.BehaviorUpdateData;
+
+        if (data == null) return;
+
         IMapEntity targetMapEntity = null;
 
         if (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity))
@@ -75,11 +78,14 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
 
+        Vec2 currentPosition = new Vec2(data.PartyPositionX, data.PartyPositionY);
+
         PartyBehaviorPatch.SetAiBehavior(
             party.Ai,
             data.Behavior,
             targetMapEntity,
-            targetPoint
+            targetPoint,
+            currentPosition
         );
     }
 }

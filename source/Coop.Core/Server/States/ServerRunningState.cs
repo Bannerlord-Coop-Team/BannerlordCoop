@@ -1,8 +1,8 @@
 ﻿using Common.Messaging;
+using Common.Network;
+using Coop.Core.Common.Services.Connection.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.MobileParties.Messages;
-using HarmonyLib;
 
 namespace Coop.Core.Server.States;
 
@@ -11,14 +11,20 @@ namespace Coop.Core.Server.States;
 /// </summary>
 public class ServerRunningState : ServerStateBase
 {
-    public ServerRunningState(IServerLogic logic, IMessageBroker messageBroker) : base(logic, messageBroker)
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+
+    public ServerRunningState(IServerLogic logic, IMessageBroker messageBroker, INetwork network) : base(logic)
     {
-        MessageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        this.messageBroker = messageBroker;
+        this.network = network;
+
+        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     public override void Dispose()
     {
-        MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
     }
 
     public override void Start()
@@ -28,14 +34,17 @@ public class ServerRunningState : ServerStateBase
     public override void Stop()
     {
         // Stop server
-        Logic.Network.Stop();
+        network.Stop();
 
         // Go to main menu
-        MessageBroker.Publish(this, new EnterMainMenu());
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> payload)
     {
-        Logic.State = new InitialServerState(Logic, MessageBroker);
+        messageBroker.Publish(this, new SendPopupMessage("Server has been stopped"));
+        messageBroker.Publish(this, new EndCoopMode());
+
+        Logic.SetState<InitialServerState>();
     }
 }

@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Registry;
 using Serilog;
 using System;
 
@@ -14,15 +15,15 @@ internal class NewHeroHandler : IHandler
 
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
-    private readonly IObjectManager objectManager;
+    private readonly IHeroRegistry heroRegistry;
     public NewHeroHandler(
         IHeroInterface heroInterface,
         IMessageBroker messageBroker,
-        IObjectManager objectManager)
+        IHeroRegistry heroRegistry)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
-        this.objectManager = objectManager;
+        this.heroRegistry = heroRegistry;
         messageBroker.Subscribe<PackageMainHero>(Handle);
         messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
     }
@@ -43,17 +44,19 @@ internal class NewHeroHandler : IHandler
         catch (Exception e)
         {
             Logger.Error("Error while packing new Hero: {error}", e.Message);
+            Logger.Error(e.StackTrace);
         }
     }
 
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
     {
         byte[] bytes = obj.What.Bytes;
+        var controllerId = obj.What.ControllerId;
         var sendingPeer = obj.What.SendingPeer;
 
         try
         {
-            var playerData = heroInterface.UnpackHero(bytes);
+            var playerData = heroInterface.UnpackHero(controllerId, bytes);
 
             Logger.Debug("New Hero ID: {id}", playerData.HeroStringId);
 

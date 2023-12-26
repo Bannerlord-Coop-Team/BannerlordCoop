@@ -1,7 +1,7 @@
 using Common.Messaging;
+using Common.Network;
 using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Messages;
-using System.ComponentModel;
 
 namespace Coop.Core.Client.States;
 
@@ -10,19 +10,25 @@ namespace Coop.Core.Client.States;
 /// </summary>
 public class MainMenuState : ClientStateBase
 {
-    public MainMenuState(IClientLogic logic) : base(logic)
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+
+    public MainMenuState(IClientLogic logic, IMessageBroker messageBroker, INetwork network) : base(logic)
     {
-        Logic.MessageBroker.Subscribe<NetworkConnected>(Handle_NetworkConnected);
+        this.messageBroker = messageBroker;
+        this.network = network;
+
+        messageBroker.Subscribe<NetworkConnected>(Handle_NetworkConnected);
     }
 
     public override void Dispose() 
     {
-        Logic.MessageBroker.Unsubscribe<NetworkConnected>(Handle_NetworkConnected);
+        messageBroker.Unsubscribe<NetworkConnected>(Handle_NetworkConnected);
     }
 
     public override void Connect()
     {
-        Logic.Network.Start();
+        network.Start();
     }
 
     internal void Handle_NetworkConnected(MessagePayload<NetworkConnected> obj)
@@ -32,7 +38,7 @@ public class MainMenuState : ClientStateBase
 
     public override void Disconnect()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     public override void EnterMainMenu()
@@ -61,6 +67,6 @@ public class MainMenuState : ClientStateBase
 
     public override void ValidateModules()
     {
-        Logic.State = new ValidateModuleState(Logic);
+        Logic.SetState<ValidateModuleState>();
     }
 }

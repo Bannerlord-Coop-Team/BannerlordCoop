@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using Coop.Core.Common;
 using GameInterface.Services.GameState.Messages;
 
 namespace Coop.Core.Client.States;
@@ -8,36 +9,46 @@ namespace Coop.Core.Client.States;
 /// </summary>
 public class MissionState : ClientStateBase
 {
-    public MissionState(IClientLogic logic) : base(logic)
+    private readonly IMessageBroker messageBroker;
+    private readonly ICoopFinalizer coopFinalizer;
+
+    public MissionState(
+        IClientLogic logic,
+        IMessageBroker messageBroker,
+        ICoopFinalizer coopFinalizer) : base(logic)
     {
-        Logic.MessageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        Logic.MessageBroker.Subscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
+        this.messageBroker = messageBroker;
+        this.coopFinalizer = coopFinalizer;
+        messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Subscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
     }
 
     public override void Dispose()
     {
-        Logic.MessageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        Logic.MessageBroker.Unsubscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
+        messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
+        messageBroker.Unsubscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
     }
 
     public override void EnterCampaignState()
     {
-        Logic.MessageBroker.Publish(this, new EnterCampaignState());
+        messageBroker.Publish(this, new EnterCampaignState());
     }
 
     internal void Handle_CampaignStateEntered(MessagePayload<CampaignStateEntered> obj)
     {
-        Logic.State = new CampaignState(Logic);
+        Logic.SetState<CampaignState>();
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
-        Logic.State = new MainMenuState(Logic);
+        coopFinalizer.Finalize("Client has been stopped");
+
+        Logic.SetState<MainMenuState>();
     }
 
     public override void EnterMainMenu()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     public override void Connect()
@@ -46,7 +57,7 @@ public class MissionState : ClientStateBase
 
     public override void Disconnect()
     {
-        Logic.MessageBroker.Publish(this, new EnterMainMenu());
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     public override void EnterMissionState()

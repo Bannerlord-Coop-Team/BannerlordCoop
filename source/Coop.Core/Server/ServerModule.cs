@@ -3,12 +3,12 @@ using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
-using Coop.Core.Client;
-using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections;
+using Coop.Core.Server.Policies;
 using Coop.Core.Server.Services.Save;
 using Coop.Core.Server.States;
+using GameInterface.Policies;
 using LiteNetLib;
 
 namespace Coop.Core.Server;
@@ -16,37 +16,24 @@ namespace Coop.Core.Server;
 /// <summary>
 /// Server dependencies
 /// </summary>
-public class ServerModule : Module
+public class ServerModule : CommonModule
 {
     protected override void Load(ContainerBuilder builder)
     {
+        base.Load(builder);
+
         builder.RegisterModule<ConnectionModule>();
 
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopServer>().As<ICoopServer>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
-        builder.RegisterType<InitialServerState>().As<IServerState>();
         builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
-
-        RegisterAllTypesWithInterface<IHandler>(builder, autoInstantiate: true);
-        RegisterAllTypesWithInterface<IPacketHandler>(builder, autoInstantiate: true);
-
-        RegisterAllTypesWithInterface<IServerState>(builder);
-
         
+        // Policies
+        builder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
-        base.Load(builder);
-    }
+        RegisterAllTypesWithInterface<ServerModule, IHandler>(builder, autoInstantiate: true);
+        RegisterAllTypesWithInterface<ServerModule, IPacketHandler>(builder, autoInstantiate: true);
 
-    private void RegisterAllTypesWithInterface<TInterface>(ContainerBuilder builder, bool autoInstantiate = false)
-    {
-        foreach (var handlerType in TypeCollector.Collect<ServerModule, TInterface>())
-        {
-            var handlerBuilder = builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope();
-
-            if (autoInstantiate)
-            {
-                handlerBuilder.AutoActivate();
-            }
-        }
+        RegisterAllTypesWithInterface<ServerModule, IServerState>(builder);
     }
 }
