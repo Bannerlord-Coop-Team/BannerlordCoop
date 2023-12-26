@@ -17,16 +17,16 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, float amount)
         {
+            if (PolicyProvider.AllowOriginalCalls) return true;
+
             if (amount == 0f) return false;
 
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (AllowedInstance.IsAllowed(clan)) return true;
 
             // If not controlled by client skip call
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
 
             CallStackValidator.Validate(clan, AllowedInstance);
-
-            if (AllowedInstance.IsAllowed(clan)) return true;
 
             MessageBroker.Instance.Publish(clan, new ClanInfluenceChanged(clan.StringId, amount));
 
