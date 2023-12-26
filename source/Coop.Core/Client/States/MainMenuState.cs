@@ -2,7 +2,6 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Messages;
 using GameInterface.Services.GameState.Messages;
-using System.ComponentModel;
 
 namespace Coop.Core.Client.States;
 
