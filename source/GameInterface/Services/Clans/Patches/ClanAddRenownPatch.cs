@@ -16,14 +16,16 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(ref Clan __instance, float value, bool shouldNotify = true)
         {
+            if (value == 0f) return false;
+
+            if (AllowedInstance.IsAllowed(__instance)) return true;
+
             if (PolicyProvider.AllowOriginalCalls) return true;
 
             // On the client if it is not the player client skip the call
             if (ModInformation.IsClient && __instance != Clan.PlayerClan) return false;
 
             CallStackValidator.Validate(__instance, AllowedInstance);
-
-            if (AllowedInstance.IsAllowed(__instance)) return true;
 
             MessageBroker.Instance.Publish(__instance, new ClanRenownAdded(__instance.StringId, value, shouldNotify));
 
