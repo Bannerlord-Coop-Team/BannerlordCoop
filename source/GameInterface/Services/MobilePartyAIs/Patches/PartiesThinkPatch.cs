@@ -11,11 +11,10 @@ namespace GameInterface.Services.MobilePartyAIs.Patches;
 [HarmonyPatch(typeof(Campaign))]
 internal class PartiesThinkPatch
 {
-
+    // TODO move to config
     private const int UPDATES_PER_TICK = 100;
     private const int TICK_DELAY_MS = 100;
 
-    private static int CurrentStartIdx = 0;
 
     private static readonly Action<MobilePartyAi, float> AI_Tick = typeof(MobilePartyAi)
         .GetMethod("Tick", BindingFlags.NonPublic | BindingFlags.Instance)
@@ -23,6 +22,7 @@ internal class PartiesThinkPatch
 
     private static Task delay = Task.CompletedTask;
 
+    private static int CurrentStartIdx = 0;
 
     [HarmonyPatch("PartiesThink")]
     [HarmonyPrefix]
