@@ -31,7 +31,6 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     private static readonly ILogger Logger = LogManager.GetLogger<CoopClient>();
 
     private readonly IMessageBroker messageBroker;
-    private readonly IPacketManager packetManager;
     private readonly NetManager netManager;
     private readonly PacketQueue packetQueue;
 
@@ -43,9 +42,8 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         IPacketManager packetManager) : base(config)
     {
         this.messageBroker = messageBroker;
-        this.packetManager = packetManager;
 
-        packetQueue = new PacketQueue(packetManager);
+        packetQueue = new PacketQueue(packetManager, this);
 
         // TODO add configuration
         netManager = new NetManager(this);

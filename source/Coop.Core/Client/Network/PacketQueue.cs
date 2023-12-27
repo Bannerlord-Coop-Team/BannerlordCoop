@@ -1,31 +1,41 @@
-﻿using Common.Messaging;
+﻿using Common.Network;
 using Common.PacketHandlers;
 using Coop.Core.Client.Services.Sync;
 using LiteNetLib;
 using System;
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Threading;
 
 namespace Coop.Core.Client.Network
 {
+    /// <summary>
+    /// Queued packet are being handled on a separate execution thread.
+    /// If a packet queue is too large, a message is published to the server
+    /// requesting a pause.
+    /// </summary>
     internal class PacketQueue
     {
         private readonly IPacketManager manager;
+        private readonly INetwork network;
         private readonly Thread runner;
 
         private ConcurrentQueue<Tuple<NetPeer, IPacket>> queue;
 
         private bool run;
-        private bool isSynchronized = true;
+        private bool isSynchronized;
 
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public PacketQueue(IPacketManager manager)
+        public PacketQueue(IPacketManager manager, INetwork network)
         {
             this.manager = manager;
+            this.network = network;
+
             queue = new();
+
+            run = false;
+            isSynchronized = true;
             
             runner = new(Run);
         }
@@ -73,19 +83,15 @@ namespace Coop.Core.Client.Network
                 if (queue.TryDequeue(out Tuple<NetPeer, IPacket> t)) 
                 {
                     //TODO: figure out a max queue size amount
-                    if (queue.Count > 110)
+                    if (queue.Count > 80 && isSynchronized)
                     {
-                        if (isSynchronized)
-                        {
-                            MessageBroker.Instance.Publish(this, new NetworkSyncWait());
-                            isSynchronized = false;
-                        }
-                            
+                        network.SendAll(new NetworkSyncWait());
+                        isSynchronized = false;
                     }
 
                     if (!isSynchronized && queue.Count == 0)
                     {
-                        MessageBroker.Instance.Publish(this, new NetworkSyncComplete());
+                        network.SendAll(new NetworkSyncComplete());
                         isSynchronized = true;
                     }
 
