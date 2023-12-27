@@ -31,9 +31,7 @@ public class MobilePartyBehaviorHandler : IHandler
     {
         var data = obj.What.BehaviorUpdateData;
 
-        var datas = new PartyBehaviorUpdateData[] { data };
-
-        network.SendAll(new UpdatePartyBehaviorPacket(ref datas));
+        network.SendAll(new UpdatePartyBehaviorPacket(ref data));
 
         messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
     }

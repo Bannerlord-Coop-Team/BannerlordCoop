@@ -35,15 +35,9 @@ namespace Coop.Core.Client.Services.MobileParties.PacketHandlers
         {
             UpdatePartyBehaviorPacket convertedPacket = (UpdatePartyBehaviorPacket)packet;
 
-            var datas = convertedPacket.BehaviorUpdateData;
+            var data = convertedPacket.BehaviorUpdateData;
 
-            if (datas == null) return;
-
-            foreach ( var item in datas)
-            {
-                var data = item;
-                messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
-            }
+            messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
         }
     }
 }
