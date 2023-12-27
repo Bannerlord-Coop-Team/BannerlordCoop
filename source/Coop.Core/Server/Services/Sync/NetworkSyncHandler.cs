@@ -4,6 +4,7 @@ using Coop.Core.Client.Services.Sync.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -39,7 +40,7 @@ namespace Coop.Core.Server.Services.Sync
                 if (waiting.Count == 0)
                 {
                     //TODO: maybe remember original timespeed
-                    //TODO: play
+                    MessageBroker.Instance.Publish(this, new AttemptedTimeSpeedChanged(CampaignTimeControlMode.StoppablePlay));
                 }
             } else
             {
@@ -49,7 +50,7 @@ namespace Coop.Core.Server.Services.Sync
                             (p.Who as NetPeer).EndPoint.Address.ToString())
                         ));
 
-                //TODO: pause
+                MessageBroker.Instance.Publish(this, new AttemptedTimeSpeedChanged(CampaignTimeControlMode.Stop));
             }
         }
 
