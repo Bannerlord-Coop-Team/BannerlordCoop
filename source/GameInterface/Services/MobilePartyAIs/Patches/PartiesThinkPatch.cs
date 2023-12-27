@@ -24,8 +24,8 @@ internal class PartiesThinkPatch
 
     private static int CurrentStartIdx = 0;
 
-    [HarmonyPatch("PartiesThink")]
-    [HarmonyPrefix]
+    //[HarmonyPatch("PartiesThink")]
+    //[HarmonyPrefix]
     private static bool PartiesThinkPrefix(Campaign __instance, ref float dt)
     {
         if (delay.IsCompleted == false) return false;

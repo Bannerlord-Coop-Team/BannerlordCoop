@@ -4,8 +4,8 @@ using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
-using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Services.Time.Messages;
 using GameInterface;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Messages;
@@ -36,13 +36,11 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override int Priority => 0;
 
-    public IEnumerable<NetPeer> ConnectedPeers => netManager.ConnectedPeerList;
+    public IEnumerable<NetPeer> ConnectedPeers => netManager;
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
-    private readonly IControllerIdProvider controllerIdProvider;
     private readonly NetManager netManager;
-
     private bool allowJoining = false;
 
     public CoopServer(
@@ -54,7 +52,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
-        this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
 
         ModInformation.IsServer = true;
@@ -155,28 +152,31 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void SendAll(IPacket packet)
     {
-        CheckIfClientOverwhelmed();
-
+        CheckNetworkQueueOverloaded();
         SendAll(netManager, packet);
     }
 
-    private void CheckIfClientOverwhelmed(NetPeer ignoredPeer = null)
+    public override void SendAllBut(NetPeer ignoredPeer, IPacket packet)
     {
-        foreach (var netPeer in netManager.Where(peer => peer != ignoredPeer))
-        {
-            int outgoingPacketCount = netPeer.GetPacketsCountInReliableQueue(0, true);
-
-            if (outgoingPacketCount > 100){
-                Logger.Debug("Client is overwhelmed, {packetCount} packets waiting", outgoingPacketCount);
-            }
-        }
+        CheckNetworkQueueOverloaded(ignoredPeer);
+        SendAllBut(netManager, ignoredPeer, packet);
     }
 
-    public override void SendAllBut(NetPeer netPeer, IPacket packet)
+    private void CheckNetworkQueueOverloaded(NetPeer ignoredPeer = null)
     {
-        CheckIfClientOverwhelmed(netPeer);
+        // TODO see if Parallel.ForEach works here
+        foreach (var netPeer in ConnectedPeers.Where(peer => peer != ignoredPeer))
+        {
+            // Sending defaults to channel 0
+            int outgoingPacketCount = 
+                  netPeer.GetPacketsCountInReliableQueue(0, true)
+                + netPeer.GetPacketsCountInReliableQueue(0, false);
 
-        SendAllBut(netManager, netPeer, packet);
+            if (outgoingPacketCount > Configuration.MaxPacketsInQueue)
+            {
+                messageBroker.Publish(this, new NetworkQueueOverloaded(netPeer));
+            }
+        }
     }
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)

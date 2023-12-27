@@ -70,6 +70,6 @@ public abstract class CoopNetworkBase : INetwork
     public abstract void Start();
     public abstract void Stop();
     public abstract void SendAll(IPacket packet);
-    public abstract void SendAllBut(NetPeer netPeer, IPacket packet);
+    public abstract void SendAllBut(NetPeer ignoredPeer, IPacket packet);
     public abstract void Update(TimeSpan frameTime);
 }

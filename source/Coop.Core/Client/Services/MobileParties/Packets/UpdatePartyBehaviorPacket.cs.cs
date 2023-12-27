@@ -2,7 +2,6 @@
 using GameInterface.Services.MobileParties.Data;
 using LiteNetLib;
 using ProtoBuf;
-using System;
 
 namespace Coop.Core.Client.Services.MobileParties.Packets
 {

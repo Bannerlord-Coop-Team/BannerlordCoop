@@ -23,6 +23,8 @@ public class NetworkConfiguration : INetworkConfiguration
 
     public string P2PToken => throw new NotImplementedException();
 
+    public int MaxPacketsInQueue => 1000;
+
     public void LoadFromFile()
     {
         throw new NotImplementedException();

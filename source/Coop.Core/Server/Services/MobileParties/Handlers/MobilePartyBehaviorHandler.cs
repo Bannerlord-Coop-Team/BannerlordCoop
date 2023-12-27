@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Packets;
-using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 
 namespace Coop.Core.Server.Services.MobileParties.Handlers;

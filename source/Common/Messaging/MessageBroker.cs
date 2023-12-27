@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Common.Messaging
@@ -42,6 +43,8 @@ namespace Common.Messaging
             _subscribers = new Dictionary<Type, List<WeakDelegate>>();
         }
 
+        public static int TaskCounter = 0;
+
         public virtual void Publish<T>(object source, T message) where T : IMessage
         {
             if (message == null)
@@ -78,7 +81,10 @@ namespace Common.Messaging
                     continue;
                 }
 
-                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+                Interlocked.Increment(ref TaskCounter);
+
+                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }))
+                    .ContinueWith((_) => { Interlocked.Decrement(ref TaskCounter); } );
             }
         }
 
