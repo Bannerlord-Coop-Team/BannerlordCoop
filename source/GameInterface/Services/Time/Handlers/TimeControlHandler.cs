@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
+using System;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Handlers;
@@ -18,22 +19,27 @@ internal class TimeControlHandler : IHandler
         this.messageBroker = messageBroker;
 
         messageBroker.Subscribe<SetTimeControlMode>(Handle);
+        messageBroker.Subscribe<GetTimeControlMode>(Handle);
+    }
+
+    private void Handle(MessagePayload<GetTimeControlMode> payload)
+    {
+        var mode = timeControlInterface.GetTimeControl();
+
+        messageBroker.Respond(payload.Who, new TimeControlModeResponse(mode));
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<SetTimeControlMode>(Handle);
+        messageBroker.Unsubscribe<GetTimeControlMode>(Handle);
     }
 
     private void Handle(MessagePayload<SetTimeControlMode> obj)
     {
         var payload = obj.What;
-        CampaignTimeControlMode newTimeMode = (CampaignTimeControlMode)payload.NewTimeMode;
 
-        if (newTimeMode == CampaignTimeControlMode.StoppablePlay) { newTimeMode = CampaignTimeControlMode.UnstoppablePlay; }
-        if (newTimeMode == CampaignTimeControlMode.StoppableFastForward) { newTimeMode = CampaignTimeControlMode.UnstoppableFastForward; }
-
-        timeControlInterface.SetTimeControl(newTimeMode);
+        timeControlInterface.SetTimeControl(payload.NewTimeMode);
 
         messageBroker.Respond(obj.Who, new TimeControlModeSet(payload.NewTimeMode));
     }

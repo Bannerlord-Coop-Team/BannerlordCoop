@@ -134,7 +134,7 @@ namespace Common.Messaging
                     continue;
                 }
 
-                if (weakDelegate.Instance == target)
+                if (ReferenceEquals(weakDelegate.Instance, target))
                 {
                     Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
                     // Can only respond to one source, no longer need to loop if found
