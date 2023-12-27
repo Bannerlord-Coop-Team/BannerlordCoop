@@ -3,15 +3,8 @@ using Common.Network;
 using Common.PacketHandlers;
 using Coop.Core.Client.Services.MobileParties.Packets;
 using Coop.Core.Server.Services.MobileParties.Packets;
-using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using LiteNetLib;
-using System;
-using System.Collections.Concurrent;
-using System.Data;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Coop.Core.Server.Services.MobileParties.PacketHandlers;
 
