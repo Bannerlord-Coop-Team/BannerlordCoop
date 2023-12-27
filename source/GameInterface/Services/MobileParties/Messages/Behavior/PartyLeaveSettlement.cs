@@ -1,11 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 
 namespace GameInterface.Services.MobileParties.Messages.Behavior;
 
 /// <summary>
 /// Commands a party to leave a settlement
 /// </summary>
-[DontLogMessage]
+[BatchLogMessage]
 public record PartyLeaveSettlement : ICommand
 {
     public string PartyId { get; }
