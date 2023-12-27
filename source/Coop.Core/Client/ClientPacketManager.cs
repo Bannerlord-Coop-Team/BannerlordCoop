@@ -11,7 +11,6 @@ namespace Coop.Core.Client
 {
     internal class ClientPacketManager : PacketManagerBase, IPacketManager, IDisposable
     {
-        private readonly IPacketManager packetManager;
         private readonly Thread runner;
 
         private ConcurrentQueue<Tuple<NetPeer, IPacket>> queue;
@@ -22,9 +21,8 @@ namespace Coop.Core.Client
         /// <summary>
         /// Default constructor.
         /// </summary>
-        public ClientPacketManager(IPacketManager manager)
+        public ClientPacketManager()
         {
-            packetManager = manager;
             queue = new();
 
             isSynchronized = true;
@@ -48,8 +46,9 @@ namespace Coop.Core.Client
                     }
 
                     //TODO: figure out a max queue size amount
-                    if (queue.Count > 80 && isSynchronized || GameDebugCommands.ForceSync)
+                    if ((queue.Count > 110 && isSynchronized) || GameDebugCommands.ForceSync)
                     {
+                        GameDebugCommands.ForceSync = false;
                         MessageBroker.Instance.Publish(this, new SyncChange(false));
                         isSynchronized = false;
                     }

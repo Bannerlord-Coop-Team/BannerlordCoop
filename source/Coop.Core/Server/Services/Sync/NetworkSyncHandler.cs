@@ -6,6 +6,7 @@ using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
 using LiteNetLib;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 
 namespace Coop.Core.Server.Services.Sync
 {
@@ -38,7 +39,7 @@ namespace Coop.Core.Server.Services.Sync
                 if (waiting.Count == 0)
                 {
                     //TODO: maybe remember original timespeed
-                    network.SendAll(new NetworkTimeSpeedChanged(TimeControlEnum.Play_1x));
+                    //TODO: play
                 }
             } else
             {
@@ -48,7 +49,7 @@ namespace Coop.Core.Server.Services.Sync
                             (p.Who as NetPeer).EndPoint.Address.ToString())
                         ));
 
-                network.SendAll(new NetworkTimeSpeedChanged(TimeControlEnum.Pause));
+                //TODO: pause
             }
         }
 
