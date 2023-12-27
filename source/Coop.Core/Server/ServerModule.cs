@@ -22,6 +22,8 @@ public class ServerModule : CommonModule
     {
         base.Load(builder);
 
+        builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
+
         builder.RegisterModule<ConnectionModule>();
 
         builder.RegisterType<ServerLogic>().As<IServerLogic>().As<ILogic>().InstancePerLifetimeScope();

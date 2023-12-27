@@ -18,6 +18,8 @@ public class ClientModule : CommonModule
 {
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<ClientPacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
+
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
 

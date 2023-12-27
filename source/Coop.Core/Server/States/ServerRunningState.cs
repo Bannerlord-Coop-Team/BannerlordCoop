@@ -7,7 +7,7 @@ using GameInterface.Services.GameState.Messages;
 namespace Coop.Core.Server.States;
 
 /// <summary>
-/// State representing the server is in the campaign and running
+/// Synchronized representing the server is in the campaign and running
 /// </summary>
 public class ServerRunningState : ServerStateBase
 {

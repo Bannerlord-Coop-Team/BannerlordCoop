@@ -11,9 +11,11 @@ namespace Common.PacketHandlers
         void RemovePacketHandler(IPacketHandler handler);
     }
 
-    public class PacketManager : IPacketManager
+    public abstract class PacketManagerBase : IPacketManager
     {
-        private readonly Dictionary<PacketType, List<IPacketHandler>> packetHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
+        protected readonly Dictionary<PacketType, List<IPacketHandler>> packetHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
+
+        public abstract void HandleReceive(NetPeer peer, IPacket packet);
 
         public void RegisterPacketHandler(IPacketHandler handler)
         {
@@ -35,8 +37,11 @@ namespace Common.PacketHandlers
             if (handlers.Count == 0)
                 packetHandlers.Remove(handler.PacketType);
         }
+    }
 
-        public void HandleReceive(NetPeer peer, IPacket packet)
+    public class PacketManager : PacketManagerBase, IPacketManager
+    {
+        public override void HandleReceive(NetPeer peer, IPacket packet)
         {
             if (packetHandlers.TryGetValue(packet.PacketType, out var handlers))
             {
