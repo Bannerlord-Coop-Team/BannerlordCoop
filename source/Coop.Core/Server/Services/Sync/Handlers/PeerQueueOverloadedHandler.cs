@@ -52,11 +52,7 @@ namespace Coop.Core.Server.Services.Sync.Handlers
                 messageBroker.Publish(this, new SetTimeControlMode(originalSpeed));
                 network.SendAll(new NetworkTimeSpeedChanged(originalSpeed));
 
-                //TODO: replace with helper
-                var msg = new SendInformationMessage(
-                    string.Format("Client {0} is out-of-sync, pausing",
-                        payload.What.NetPeer.EndPoint.Address.ToString())
-                    );
+                var msg = new SendInformationMessage($"{overloadedPeers} clients are catching up, pausing");
                 messageBroker.Publish(this, msg);
                 network.SendAll(msg);
             }
@@ -95,8 +91,7 @@ namespace Coop.Core.Server.Services.Sync.Handlers
                 messageBroker.Publish(this, new SetTimeControlMode(originalSpeed));
                 network.SendAll(new NetworkTimeSpeedChanged(originalSpeed));
 
-                //TODO: replace with helper
-                var msg = new SendInformationMessage("All clients synchronized, resuming.");
+                var msg = new SendInformationMessage("All clients synchronized, resuming");
                 messageBroker.Publish(this, msg);
                 network.SendAll(msg);
 
