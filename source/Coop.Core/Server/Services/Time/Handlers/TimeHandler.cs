@@ -100,7 +100,7 @@ public class TimeHandler : IHandler
         return unpausePolicies.Any(policy => policy.IsAlive && policy.Invoke<bool>(Array.Empty<object>()) == false);
     }
 
-    private void SetTimeMode(TimeControlEnum timeMode)
+    public void SetTimeMode(TimeControlEnum timeMode)
     {
         if (UnpauseDisallowed()) return;   
 
