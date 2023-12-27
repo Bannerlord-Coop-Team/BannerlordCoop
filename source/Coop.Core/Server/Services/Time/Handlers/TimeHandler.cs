@@ -26,6 +26,7 @@ public class TimeHandler : IHandler
         _messageBroker = messageBroker;
         _network = network;
         _clientRegistry = clientRegistry;
+
         _messageBroker.Subscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
         _messageBroker.Subscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
     }

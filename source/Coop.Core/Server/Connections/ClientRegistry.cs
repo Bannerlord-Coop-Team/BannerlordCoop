@@ -30,8 +30,11 @@ public class ClientRegistry : IClientRegistry
         typeof(TransferSaveState),
         typeof(LoadingState),
     };
+
     public bool PlayersLoading => ConnectionStates.Any(state => loadingStates.Contains(state.Value.State.GetType()));
     public List<NetPeer> LoadingPeers => ConnectionStates.Where(state => loadingStates.Contains(state.Value.State.GetType())).Select(state => state.Key).ToList();
+
+    public List<NetPeer> OverloadedPeers => throw new NotImplementedException();
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
