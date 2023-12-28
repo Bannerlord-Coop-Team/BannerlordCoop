@@ -69,7 +69,7 @@ namespace Coop.Core.Server.Services.Sync.Handlers
 
         private void Poll(TimeSpan _)
         {
-            HashSet<NetPeer> toRemove = new();
+            List<NetPeer> toRemove = new();
 
             foreach (var peer in new HashSet<NetPeer>(overloadedPeers))
             {
