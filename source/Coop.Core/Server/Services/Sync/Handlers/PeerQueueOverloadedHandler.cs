@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Server.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.Heroes.Enum;
@@ -8,13 +9,12 @@ using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace Coop.Core.Server.Services.Sync.Handlers
 {
     internal class PeerQueueOverloadedHandler : IHandler
     {
-        private static readonly long POLL_INTERVAL = 100;
-
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
@@ -23,16 +23,20 @@ namespace Coop.Core.Server.Services.Sync.Handlers
 
         private TimeControlEnum originalSpeed;
 
+        private readonly TimeHandler timeHandler;
+
         public PeerQueueOverloadedHandler(
             IMessageBroker messageBroker, 
-            INetwork network
+            INetwork network,
+            TimeHandler timeHandler
         )
         {
             this.messageBroker = messageBroker;
             this.network = network;
+            this.timeHandler = timeHandler;
 
             overloadedPeers = new();
-            poller = new(Poll, TimeSpan.FromMilliseconds(POLL_INTERVAL));
+            poller = new(Poll, TimeSpan.FromMilliseconds(100));
 
             messageBroker.Subscribe<PeerQueueOverloaded>(Handle);
 
@@ -41,8 +45,11 @@ namespace Coop.Core.Server.Services.Sync.Handlers
 
         private void Handle(MessagePayload<PeerQueueOverloaded> payload) 
         {
-            if (SafeAdd(payload.What.NetPeer))
+            Monitor.Enter(overloadedPeers);
+
+            if (overloadedPeers.Add(payload.What.NetPeer))
             {
+                Monitor.Exit(overloadedPeers);
                 //TODO: set originalSpeed
                 originalSpeed = TimeControlEnum.Play_1x;
 
@@ -53,13 +60,12 @@ namespace Coop.Core.Server.Services.Sync.Handlers
                 var msg = new SendInformationMessage($"{overloadedPeers} clients are catching up, pausing");
                 messageBroker.Publish(this, msg);
                 network.SendAll(msg);
-                poller.Start();
             }
         }
 
         private void Poll(TimeSpan _)
         {
-            List<NetPeer> toRemove = new();
+            HashSet<NetPeer> toRemove = new();
 
             foreach (var peer in new HashSet<NetPeer>(overloadedPeers))
             {
@@ -69,37 +75,34 @@ namespace Coop.Core.Server.Services.Sync.Handlers
                 }
             }
 
+            //TODO: maybe concurrent hashset?
+            Monitor.Enter(overloadedPeers);
             if (toRemove.Count == 0)
             {
+                Monitor.Exit(overloadedPeers);
                 return;
             }
 
-            lock (overloadedPeers) // To prevent changes, until we notify the the clients
+            foreach (var item in toRemove)
             {
-                toRemove.ForEach(peer => { overloadedPeers.Remove(peer); });
-
-                if (overloadedPeers.Count == 0)
-                {
-                    //TODO: check for loaders OR replace with helper
-                    messageBroker.Publish(this, new SetTimeControlMode(originalSpeed));
-                    network.SendAll(new NetworkTimeSpeedChanged(originalSpeed));
-
-                    var msg = new SendInformationMessage("All clients synchronized, resuming");
-                    messageBroker.Publish(this, msg);
-                    network.SendAll(msg);
-
-                    poller.Stop();
-                    return;
-                }
+                overloadedPeers.Remove(item);
             }
-        }
 
-        private bool SafeAdd(NetPeer peer)
-        {
-            lock(overloadedPeers)
+            if (overloadedPeers.Count == 0)
             {
-                return overloadedPeers.Add(peer);
+                Monitor.Exit(overloadedPeers);
+
+                //TODO: check for loaders OR replace with helper
+                messageBroker.Publish(this, new SetTimeControlMode(originalSpeed));
+                network.SendAll(new NetworkTimeSpeedChanged(originalSpeed));
+
+                var msg = new SendInformationMessage("All clients synchronized, resuming");
+                messageBroker.Publish(this, msg);
+                network.SendAll(msg);
+
+                return;
             }
+            Monitor.Exit(overloadedPeers);
         }
 
         public void Dispose()
