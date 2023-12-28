@@ -48,8 +48,13 @@ namespace Coop.Core.Server.Services.Sync.Handlers
             {
                 if (overloadedPeers.Add(payload.What.NetPeer))
                 {
-                    //TODO: set originalSpeed
-                    originalSpeed = TimeControlEnum.Play_1x;
+                    if(timeHandler.TryGetTimeControlMode(out TimeControlEnum t))
+                    {
+                        originalSpeed = t;
+                    } else
+                    {
+                        originalSpeed = TimeControlEnum.Play_1x;
+                    }
 
                     timeHandler.SetTimeMode(TimeControlEnum.Pause);
 
