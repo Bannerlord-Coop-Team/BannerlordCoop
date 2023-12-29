@@ -11,6 +11,10 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Registry;
 
+
+/// <summary>
+/// Registry for identifying ownership of <see cref="Hero"/> objects
+/// </summary>
 internal interface IHeroRegistry : IRegistry<Hero>
 {
     void RegisterAllHeroes();
@@ -24,6 +28,7 @@ internal interface IHeroRegistry : IRegistry<Hero>
     bool IsControlledBy(string controllerId, Hero hero);
 }
 
+/// <inheritdoc cref="IHeroRegistry"/>
 [ProtoContract]
 internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
 {
@@ -54,6 +59,10 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
 
     public bool TryRegisterHeroController(string controllerId, string heroId)
     {
+        // Input validation
+        if (string.IsNullOrEmpty(controllerId)) return false;
+        if (string.IsNullOrEmpty(heroId)) return false;
+
         if (controlledHeros.ContainsKey(controllerId))
         {
             Logger.Error("Tried to register {controller} with hero {heroId}, but they were already registered", controllerId, heroId);
@@ -81,6 +90,10 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
 
     public bool TryRemoveHeroController(string controllerId, string heroId)
     {
+        // Input validation
+        if (string.IsNullOrEmpty(controllerId)) return false;
+        if (string.IsNullOrEmpty(heroId)) return false;
+
         if (controlledHeros.ContainsKey(controllerId) == false) return false;
 
         if (objIds.TryGetValue(heroId, out var hero) == false) return false;
@@ -105,6 +118,9 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
 
     public bool IsControlled(string heroId)
     {
+        // Input validation
+        if (string.IsNullOrEmpty(heroId)) return false;
+
         if (objIds.TryGetValue(heroId, out var hero) == false) return false;
 
         return IsControlled(hero);
@@ -112,11 +128,18 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
 
     public bool IsControlled(Hero hero)
     {
+        // Input validation
+        if (hero == null) return false;
+
         return heroControllerExtension.TryGetValue(hero, out _);
     }
 
     public bool IsControlledBy(string controllerId, string heroId)
     {
+        // Input validation
+        if (string.IsNullOrEmpty(controllerId)) return false;
+        if (string.IsNullOrEmpty(heroId)) return false;
+
         if (objIds.TryGetValue(heroId, out var hero) == false) return false;
 
         return IsControlledBy(controllerId, hero);
@@ -124,6 +147,10 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
 
     public bool IsControlledBy(string controllerId, Hero hero)
     {
+        // Input validation
+        if (string.IsNullOrEmpty(controllerId)) return false;
+        if (hero == null) return false;
+
         if (heroControllerExtension.TryGetValue(hero, out var resolvedControllerId) == false) return false;
 
         return resolvedControllerId == controllerId;
@@ -133,6 +160,9 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
     public override bool RegisterNewObject(Hero obj, out string id)
     {
         id = null;
+
+        // Input validation
+        if (obj == null) return false;
 
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
 

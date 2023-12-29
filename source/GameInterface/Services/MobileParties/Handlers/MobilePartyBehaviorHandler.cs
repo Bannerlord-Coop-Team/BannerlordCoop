@@ -4,7 +4,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;

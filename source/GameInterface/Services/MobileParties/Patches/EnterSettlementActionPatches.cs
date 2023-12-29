@@ -22,6 +22,8 @@ namespace GameInterface.Services.MobileParties.Patches
         [HarmonyPatch(nameof(EnterSettlementAction.ApplyForParty))]
         private static bool ApplyForPartyPrefix(ref MobileParty mobileParty, ref Settlement settlement)
         {
+            if (mobileParty.CurrentSettlement == settlement) return false;
+
             CallStackValidator.Validate(mobileParty, AllowedInstance);
 
             if (AllowedInstance.IsAllowed(mobileParty)) return true;

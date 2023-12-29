@@ -2,7 +2,6 @@
 using GameInterface.Services.MobileParties.Data;
 using LiteNetLib;
 using ProtoBuf;
-using System;
 
 namespace Coop.Core.Client.Services.MobileParties.Packets
 {
@@ -13,13 +12,13 @@ namespace Coop.Core.Client.Services.MobileParties.Packets
     public struct UpdatePartyBehaviorPacket : IPacket
     {
         [ProtoMember(1)]
-        public PartyBehaviorUpdateData[] BehaviorUpdateData { get; }
+        public PartyBehaviorUpdateData BehaviorUpdateData { get; }
 
         public readonly PacketType PacketType => PacketType.UpdatePartyBehavior;
 
         public readonly DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableUnordered;
 
-        public UpdatePartyBehaviorPacket(ref PartyBehaviorUpdateData[] behaviorUpdateData)
+        public UpdatePartyBehaviorPacket(ref PartyBehaviorUpdateData behaviorUpdateData)
         {
             BehaviorUpdateData = behaviorUpdateData;
         }
