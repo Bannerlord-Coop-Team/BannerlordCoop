@@ -21,8 +21,6 @@ namespace GameInterface.Services.MobilePartyAIs.Patches;
 [HarmonyPatch(typeof(MobilePartyAi))]
 static class PartyBehaviorPatch
 {
-    const bool DISABLE_AI = true;
-
     static readonly Func<MobilePartyAi, bool> get_DefaultBehaviorNeedsUpdate = typeof(MobilePartyAi)
         .GetField("DefaultBehaviorNeedsUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
         .BuildUntypedGetter<MobilePartyAi, bool>();
@@ -38,7 +36,7 @@ static class PartyBehaviorPatch
     [HarmonyPatch("Tick")]
     private static bool TickPrefix(ref MobilePartyAi __instance)
     {
-        if (DISABLE_AI == false) return true;
+        if (ModInformation.DISABLE_AI == false) return true;
 
         // This disables AI
         return get_DefaultBehaviorNeedsUpdate(__instance);
