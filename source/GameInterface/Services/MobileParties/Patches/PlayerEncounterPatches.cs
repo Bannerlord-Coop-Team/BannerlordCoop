@@ -1,5 +1,7 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.Registry;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -79,5 +81,19 @@ internal class EncounterManagerPatches
     private static void PlayerEncounterFinishPatch(bool forcePlayerOutFromSettlement)
     {
         inSettlement = false;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
+    private static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty)
+    {
+        // Allow method if container or registry cannot be resolved
+        if (ContainerProvider.TryGetContainer(out var lifetimeScope) == false) return true;
+        if (lifetimeScope.TryResolve<IHeroRegistry>(out var heroRegistry) == false) return true;
+
+        // Skip method if hero is not controlled
+        if (heroRegistry.IsControlled(mobileParty.LeaderHero?.StringId) == false) return false;
+
+        return true;
     }
 }
