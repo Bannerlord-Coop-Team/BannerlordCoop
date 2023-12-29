@@ -23,9 +23,6 @@ public class LeaveSettlementActionPatches
     {
         if(AllowedInstance.IsAllowed(mobileParty)) return true;
 
-        // Skip this method if party is not controlled
-        if (mobileParty.IsPartyControlled() == false) return false;
-
         var message = new PartyLeaveSettlementAttempted(mobileParty.StringId);
         MessageBroker.Instance.Publish(mobileParty, message);
 
