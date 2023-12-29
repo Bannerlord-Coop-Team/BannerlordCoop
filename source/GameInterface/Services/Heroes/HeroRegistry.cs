@@ -1,13 +1,6 @@
 ﻿using Common;
-using Common.Extensions;
-using ProtoBuf;
-using System;
-using System.Collections.Concurrent;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Registry;
 
@@ -18,25 +11,13 @@ namespace GameInterface.Services.Registry;
 internal interface IHeroRegistry : IRegistry<Hero>
 {
     void RegisterAllHeroes();
-    bool TryGetControlledHero(string controllerId, out string heroId);
-    bool TryRegisterHeroController(string controllerId, string heroId);
-    bool TryRemoveHeroController(string controllerId, string heroId);
-
-    bool IsControlled(string heroId);
-    bool IsControlled(Hero hero);
-    bool IsControlledBy(string controllerId, string heroId);
-    bool IsControlledBy(string controllerId, Hero hero);
+    bool RegisterHero(Hero hero);
+    bool RemoveHero(Hero hero);
 }
 
 /// <inheritdoc cref="IHeroRegistry"/>
-[ProtoContract]
 internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
 {
-    [ProtoMember(1)]
-    private readonly ConcurrentDictionary<string, string> controlledHeros = new ConcurrentDictionary<string, string>();
-
-    private static readonly ConditionalWeakTable<Hero, string> heroControllerExtension = new ConditionalWeakTable<Hero, string>();
-
     public void RegisterAllHeroes()
     {
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
@@ -50,113 +31,25 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
         var heroes = campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes).ToArray();
         foreach (var hero in heroes)
         {
-            if (RegisterExistingObject(hero.StringId, hero) == false)
-            {
-                Logger.Warning("Unable to register hero: {object}", hero.Name);
-            }
+            RegisterHero(hero);
         }
     }
 
-    public bool TryRegisterHeroController(string controllerId, string heroId)
+    public bool RegisterHero(Hero hero)
     {
-        // Input validation
-        if (string.IsNullOrEmpty(controllerId)) return false;
-        if (string.IsNullOrEmpty(heroId)) return false;
-
-        if (controlledHeros.ContainsKey(controllerId))
+        if (RegisterExistingObject(hero.StringId, hero) == false)
         {
-            Logger.Error("Tried to register {controller} with hero {heroId}, but they were already registered", controllerId, heroId);
-
+            Logger.Warning("Unable to register hero: {object}", hero.Name);
             return false;
         }
 
-
-        if (objIds.TryGetValue(heroId, out var hero) == false) return false;
-
-        // If hero already registered as controlled return false
-        if (heroControllerExtension.TryGetValue(hero, out _))
-        {
-            Logger.Error("Found controller id registered with hero but did not exist in {controlledHeroes}", nameof(controlledHeros));
-            return false;
-        }
-
-        var result = true;
-
-        result &= controlledHeros.TryAdd(controllerId, heroId);
-        heroControllerExtension.Add(hero, controllerId);
-
-        return result;
+        return true;
     }
 
-    public bool TryRemoveHeroController(string controllerId, string heroId)
-    {
-        // Input validation
-        if (string.IsNullOrEmpty(controllerId)) return false;
-        if (string.IsNullOrEmpty(heroId)) return false;
+    public bool RemoveHero(Hero hero) => Remove(hero.StringId);
 
-        if (controlledHeros.ContainsKey(controllerId) == false) return false;
 
-        if (objIds.TryGetValue(heroId, out var hero) == false) return false;
-
-        // If hero controller id was not set with hero then log error
-        if (heroControllerExtension.TryGetValue(hero, out _) == false)
-        {
-            Logger.Error("Found controller id registered with {controlledHeros} but did not exist in {hero}", nameof(controlledHeros), nameof(Hero));
-
-            return false;
-        }
-
-        var result = true;
-
-        result &= controlledHeros.TryRemove(controllerId, out _);
-        result &= heroControllerExtension.Remove(hero);
-
-        return result;
-    }
-
-    public bool TryGetControlledHero(string controllerId, out string heroId) => controlledHeros.TryGetValue(controllerId, out heroId);
-
-    public bool IsControlled(string heroId)
-    {
-        // Input validation
-        if (string.IsNullOrEmpty(heroId)) return false;
-
-        if (objIds.TryGetValue(heroId, out var hero) == false) return false;
-
-        return IsControlled(hero);
-    }
-
-    public bool IsControlled(Hero hero)
-    {
-        // Input validation
-        if (hero == null) return false;
-
-        return heroControllerExtension.TryGetValue(hero, out _);
-    }
-
-    public bool IsControlledBy(string controllerId, string heroId)
-    {
-        // Input validation
-        if (string.IsNullOrEmpty(controllerId)) return false;
-        if (string.IsNullOrEmpty(heroId)) return false;
-
-        if (objIds.TryGetValue(heroId, out var hero) == false) return false;
-
-        return IsControlledBy(controllerId, hero);
-    }
-
-    public bool IsControlledBy(string controllerId, Hero hero)
-    {
-        // Input validation
-        if (string.IsNullOrEmpty(controllerId)) return false;
-        if (hero == null) return false;
-
-        if (heroControllerExtension.TryGetValue(hero, out var resolvedControllerId) == false) return false;
-
-        return resolvedControllerId == controllerId;
-    }
-
-    private const string HeroStringIdPrefix = "CoopHero";
+    public static readonly string HeroStringIdPrefix = "CoopHero";
     public override bool RegisterNewObject(Hero obj, out string id)
     {
         id = null;

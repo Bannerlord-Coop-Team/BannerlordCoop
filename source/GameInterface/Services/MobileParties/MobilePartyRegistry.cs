@@ -25,10 +25,7 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegi
         return true;
     }
 
-    public bool RemoveParty(MobileParty party)
-    {
-        return Remove(party.StringId);
-    }
+    public bool RemoveParty(MobileParty party) => Remove(party.StringId);
 
     public void RegisterAllParties()
     {
