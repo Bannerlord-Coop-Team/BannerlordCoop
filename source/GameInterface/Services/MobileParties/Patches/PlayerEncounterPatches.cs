@@ -1,8 +1,10 @@
-﻿using Autofac;
+﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Entity;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.Registry;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,6 +24,8 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(EncounterManager))]
 internal class EncounterManagerPatches
 {
+    private static ILogger Logger = LogManager.GetLogger<EncounterManagerPatches>();
+
     private static bool inSettlement = false;
     private static MethodInfo Start => typeof(PlayerEncounter).GetMethod(nameof(PlayerEncounter.Start));
     private static MethodInfo Init => typeof(PlayerEncounter).GetMethod(
@@ -85,14 +89,10 @@ internal class EncounterManagerPatches
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
-    private static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty)
+    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty)
     {
-        // Allow method if container or registry cannot be resolved
-        if (ContainerProvider.TryGetContainer(out var lifetimeScope) == false) return true;
-        if (lifetimeScope.TryResolve<IHeroRegistry>(out var heroRegistry) == false) return true;
-
-        // Skip method if hero is not controlled
-        if (heroRegistry.IsControlled(mobileParty.LeaderHero?.StringId) == false) return false;
+        // Skip this method if party is not controlled
+        if (mobileParty.IsPartyControlled() == false) return false;
 
         return true;
     }

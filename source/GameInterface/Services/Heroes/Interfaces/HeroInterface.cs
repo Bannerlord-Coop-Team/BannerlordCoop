@@ -4,6 +4,7 @@ using Common.Logging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
@@ -12,6 +13,7 @@ using GameInterface.Services.Registry;
 using Serilog;
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -38,6 +40,7 @@ internal class HeroInterface : IHeroInterface
     private readonly IObjectManager objectManager;
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IHeroRegistry heroRegistry;
+    private readonly IControlledEntityRegistry entityRegistry;
 
     private static PropertyInfo Campaign_PlayerClan => typeof(Campaign).GetProperty("PlayerDefaultFaction", BindingFlags.Instance | BindingFlags.NonPublic);
 
@@ -45,11 +48,13 @@ internal class HeroInterface : IHeroInterface
     public HeroInterface(
         IObjectManager objectManager,
         IBinaryPackageFactory binaryPackageFactory,
-        IHeroRegistry heroRegistry)
+        IHeroRegistry heroRegistry,
+        IControlledEntityRegistry entityRegistry)
     {
         this.objectManager = objectManager;
         this.binaryPackageFactory = binaryPackageFactory;
         this.heroRegistry = heroRegistry;
+        this.entityRegistry = entityRegistry;
     }
 
     public byte[] PackageMainHero()
@@ -72,8 +77,7 @@ internal class HeroInterface : IHeroInterface
         },
         blocking: true);
 
-        // TODO not saving correctly on server
-        heroRegistry.TryRegisterHeroController(controllerId, hero.StringId);
+        entityRegistry.RegisterAsControlled(controllerId, hero.StringId);
 
         var playerData = new NewPlayerData() {
             HeroData = bytes,
@@ -96,7 +100,28 @@ internal class HeroInterface : IHeroInterface
         return hero;
     }
 
-    public bool TryResolveHero(string controllerId, out string heroId) => heroRegistry.TryGetControlledHero(controllerId, out heroId);
+    public bool TryResolveHero(string controllerId, out string heroId)
+    {
+        heroId = null;
+
+        if (entityRegistry.TryGetControlledEntities(controllerId, out var entities) == false)
+        {
+            Logger.Error("Unable to resolve hero for {controllerId}", controllerId);
+            return false;
+        }
+
+        var resolvedEntity = entities.SingleOrDefault(entity => entity.EntityId.StartsWith(HeroRegistry.HeroStringIdPrefix));
+
+        if (resolvedEntity == null)
+        {
+            Logger.Error("No hero was registered for {controllerId}", controllerId);
+            return false;
+        }
+
+        heroId = resolvedEntity.EntityId;
+
+        return true;
+    }
 
     private static readonly PropertyInfo MainParty = typeof(Campaign).GetProperty(nameof(Campaign.MainParty));
     public void SwitchMainHero(string heroId)

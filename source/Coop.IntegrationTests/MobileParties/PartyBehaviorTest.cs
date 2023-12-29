@@ -1,7 +1,5 @@
-﻿using Common.Messaging;
-using Coop.Core.Server.Services.MobileParties.Packets;
+﻿using Common.Util;
 using Coop.IntegrationTests.Environment;
-using Coop.IntegrationTests.Utils;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 

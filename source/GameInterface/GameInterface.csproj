@@ -221,7 +221,4 @@
     <PackageReference Include="Bannerlord.Lib.Harmony" Version="2.2.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Services\MobileParties\Extensions\" />
-  </ItemGroup>
 </Project>

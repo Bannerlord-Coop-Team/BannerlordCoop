@@ -31,7 +31,7 @@ public class ControllerIdProvider : IControllerIdProvider
 
             ControllerId = args[platformArgIndex + 1];
         }
-        catch(Exception ex)
+        catch(Exception)
         {
             SetAsDefault();
         }        
