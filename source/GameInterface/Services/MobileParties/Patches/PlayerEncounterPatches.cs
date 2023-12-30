@@ -86,14 +86,4 @@ internal class EncounterManagerPatches
     {
         inSettlement = false;
     }
-
-    [HarmonyPrefix]
-    [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
-    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty)
-    {
-        // Skip this method if party is not controlled
-        if (mobileParty.IsPartyControlled() == false) return false;
-
-        return true;
-    }
 }

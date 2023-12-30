@@ -46,6 +46,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         // TODO add configuration
         netManager = new NetManager(this);
 
+        netManager.DisconnectTimeout = 300 * 1000;
 #if DEBUG
         // Increase disconnect timeout to prevent disconnect during debugging
         netManager.DisconnectTimeout = 300 * 1000;

@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Services.Settlements.Patches;
 using GameInterface.Tests.Bootstrap;
 using System;
 using TaleWorlds.CampaignSystem.Party;
@@ -30,7 +31,7 @@ public class PartyBehaviorPatchTests : IDisposable
         party.StringId = "TestEntityId";
 
         // Act
-        var runMethod = EncounterManagerPatches.HandleEncounterForMobilePartyPatch(ref party);
+        var runMethod = SettlementEncounterPatch.HandleEncounterForMobilePartyPatch(ref party);
 
         // Assert
         Assert.False(runMethod);
@@ -51,7 +52,7 @@ public class PartyBehaviorPatchTests : IDisposable
         entityRegistry.RegisterAsControlled(controllerId, party.StringId);
 
         // Act
-        var runMethod = EncounterManagerPatches.HandleEncounterForMobilePartyPatch(ref party);
+        var runMethod = SettlementEncounterPatch.HandleEncounterForMobilePartyPatch(ref party);
 
         // Assert
         Assert.True(runMethod);
