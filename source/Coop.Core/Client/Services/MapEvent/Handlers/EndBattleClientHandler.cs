@@ -17,18 +17,28 @@ namespace Coop.Core.Client.Services.MapEvent.Handlers
     public class EndBattleClientHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
+        private readonly INetwork network;
         private readonly ILogger Logger = LogManager.GetLogger<EndBattleClientHandler>();
 
-        public EndBattleClientHandler(IMessageBroker messageBroker)
+        public EndBattleClientHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
+            this.network = network;
 
+            messageBroker.Subscribe<BattleEnded>(Handle);
             messageBroker.Subscribe<NetworkEndBattleApproved>(Handle);
         }
 
         public void Dispose()
         {
+            messageBroker.Subscribe<BattleEnded>(Handle);
             messageBroker.Unsubscribe<NetworkEndBattleApproved>(Handle);
+        }
+        private void Handle(MessagePayload<BattleEnded> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new NetworkBattleEndedRequest(payload.partyId));
         }
 
         private void Handle(MessagePayload<NetworkEndBattleApproved> obj)

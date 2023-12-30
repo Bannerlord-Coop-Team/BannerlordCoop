@@ -28,13 +28,22 @@ namespace Coop.Core.Server.Services.MapEvent.Handlers
             this.network = network;
 
             messageBroker.Subscribe<BattleEnded>(Handle);
+            messageBroker.Subscribe<NetworkBattleEndedRequest>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<BattleEnded>(Handle);
+            messageBroker.Unsubscribe<NetworkBattleEndedRequest>(Handle);
         }
         private void Handle(MessagePayload<BattleEnded> obj)
+        {
+            var payload = obj.What;
+
+            Send(payload.partyId);
+        }
+
+        private void Handle(MessagePayload<NetworkBattleEndedRequest> obj)
         {
             var payload = obj.What;
 
