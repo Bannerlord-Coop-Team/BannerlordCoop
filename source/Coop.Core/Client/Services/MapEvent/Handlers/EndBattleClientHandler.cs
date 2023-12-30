@@ -17,13 +17,11 @@ namespace Coop.Core.Client.Services.MapEvent.Handlers
     public class EndBattleClientHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
-        private readonly INetwork network;
         private readonly ILogger Logger = LogManager.GetLogger<EndBattleClientHandler>();
 
-        public EndBattleClientHandler(IMessageBroker messageBroker, INetwork network)
+        public EndBattleClientHandler(IMessageBroker messageBroker)
         {
             this.messageBroker = messageBroker;
-            this.network = network;
 
             messageBroker.Subscribe<NetworkEndBattleApproved>(Handle);
         }

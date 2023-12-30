@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -16,7 +17,6 @@ namespace GameInterface.Services.MapEvents.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly ILogger Logger = LogManager.GetLogger<EndBattleHandler>();
-        private MobileParty lastAttackingParty;
 
         public EndBattleHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
@@ -29,7 +29,7 @@ namespace GameInterface.Services.MapEvents.Handlers
         {
             messageBroker.Unsubscribe<EndBattle>(Handle);
         }
-
+            
         private void Handle(MessagePayload<EndBattle> obj)
         {
             var payload = obj.What;
@@ -39,8 +39,7 @@ namespace GameInterface.Services.MapEvents.Handlers
                 Logger.Error("Unable to find attacking MobileParty ({attackerPartyId})", payload.partyId);
                 return;
             }
-
-            party.MapEvent.FinalizeEvent();
+            MapEventUpdatePatch.RunOriginalFinishBattle(party.MapEvent);
         }
     }
 }

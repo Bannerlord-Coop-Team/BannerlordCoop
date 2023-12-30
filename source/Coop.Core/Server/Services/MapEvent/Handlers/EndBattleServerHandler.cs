@@ -38,7 +38,16 @@ namespace Coop.Core.Server.Services.MapEvent.Handlers
         {
             var payload = obj.What;
 
-            NetworkEndBattleApproved endBattleApproved = new NetworkEndBattleApproved(payload.partyId);
+            Send(payload.partyId);
+        }
+
+        private void Send(string partyId)
+        {
+            EndBattle endBattle = new EndBattle(partyId);
+
+            messageBroker.Publish(this, endBattle);
+
+            NetworkEndBattleApproved endBattleApproved = new NetworkEndBattleApproved(partyId);
 
             network.SendAll(endBattleApproved);
         }
