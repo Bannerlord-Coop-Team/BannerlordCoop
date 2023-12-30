@@ -1,19 +1,12 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
-using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Conversation;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using static TaleWorlds.CampaignSystem.MapEvents.MapEvent;
 
 namespace GameInterface.Services.MapEvents.Handlers
 {
@@ -22,8 +15,7 @@ namespace GameInterface.Services.MapEvents.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly ILogger Logger = LogManager.GetLogger<StartBattleHandler>();
-
-        public static PropertyInfo Conversation_SpeakerAgent => typeof(ConversationManager).GetProperty("SpeakerAgent", BindingFlags.NonPublic | BindingFlags.Instance);
+        private MobileParty lastAttackingParty;
 
         public StartBattleHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
@@ -76,7 +68,12 @@ namespace GameInterface.Services.MapEvents.Handlers
                 }
             }
 
-            EncounterManager.StartPartyEncounter(attackerParty.Party, defenderParty.Party);
+            if (lastAttackingParty == null || lastAttackingParty != attackerParty)
+            {
+                lastAttackingParty = attackerParty;
+                Logger.Information(attackerParty.Name.ToString() + " attacks " + defenderParty.Name.ToString());
+                EncounterManager.StartPartyEncounter(attackerParty.Party, defenderParty.Party);
+            }            
         }
     }
 }

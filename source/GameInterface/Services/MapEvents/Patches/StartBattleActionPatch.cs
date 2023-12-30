@@ -14,13 +14,14 @@ using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
+using System.Collections.Concurrent;
 
 namespace GameInterface.Services.MapEvents.Patches
 {
     [HarmonyPatch(typeof(MobileParty))]
     public class StartBattleActionPatch
     {
-        [HarmonyPatch("TaleWorlds.CampaignSystem.Map.IMapEntity.OnPartyInteraction")] //WHY NO WORK?
+        [HarmonyPatch("TaleWorlds.CampaignSystem.Map.IMapEntity.OnPartyInteraction")]
         static bool Prefix(MobileParty __instance, MobileParty engagingParty)
         {
             if (ModInformation.IsClient) return false;
