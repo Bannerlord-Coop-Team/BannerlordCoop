@@ -129,6 +129,8 @@ public class TimeHandler : IHandler
     TaskCompletionSource<TimeControlEnum> tcs;
     public bool TryGetTimeControlMode(out TimeControlEnum timeControlMode)
     {
+        tcs = new();
+
         var cts = new CancellationTokenSource(1000);
 
         timeControlMode = TimeControlEnum.Pause;
