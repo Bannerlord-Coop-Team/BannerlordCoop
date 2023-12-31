@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 using System.Collections.Concurrent;
+using GameInterface.Services.MobileParties.Extensions;
 
 namespace GameInterface.Services.MapEvents.Patches
 {
@@ -32,6 +33,8 @@ namespace GameInterface.Services.MapEvents.Patches
             {
                 mobileParty = mobileParty.AttachedTo;
             }
+
+            if(!engagingParty.IsPartyControlled() && !mobileParty.IsPartyControlled()) { return false; } //Player interaction
 
             MessageBroker.Instance.Publish(engagingParty, new BattleStarted(
                 engagingParty.StringId,
