@@ -16,7 +16,7 @@ namespace Common
         private CancellationTokenSource _cts;
 
         // A flag to indicate whether the poller is currently running
-        private bool _isRunning;
+        public bool IsRunning { get; private set; }
 
         private Task _pollingTask;
 
@@ -39,7 +39,7 @@ namespace Common
         private async Task StartAsync()
         {
             // Set the running flag to true
-            _isRunning = true;
+            IsRunning = true;
 
             // Create a new cancellation token source
             _cts = new CancellationTokenSource();
@@ -50,7 +50,7 @@ namespace Common
             // Run the polling loop asynchronously
             await Task.Factory.StartNew(async () =>
             {
-                while (_isRunning)
+                while (IsRunning)
                 {
                     // Calculate the delta time span
                     var delta = DateTime.Now - startTime;
@@ -69,7 +69,7 @@ namespace Common
         public void Stop()
         {
             // Set the running flag to false
-            _isRunning = false;
+            IsRunning = false;
 
             // Cancel the cancellation token
             _cts?.Cancel();

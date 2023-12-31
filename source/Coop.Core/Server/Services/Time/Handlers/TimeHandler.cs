@@ -35,6 +35,7 @@ public class TimeHandler : IHandler
         this.messageBroker.Subscribe<TimeControlModeResponse>(Handle_TimeControlModeResponse);
 
         AddUnpausePolicy(PlayersLoadingPolicy);
+        AddUnpausePolicy(PlayersOverloadedPolicy);
     }
 
     public void Dispose()
@@ -44,6 +45,7 @@ public class TimeHandler : IHandler
         messageBroker.Unsubscribe<TimeControlModeResponse>(Handle_TimeControlModeResponse);
 
         RemoveUnpausePolicy(PlayersLoadingPolicy);
+        RemoveUnpausePolicy(PlayersOverloadedPolicy);
     }
 
     List<WeakDelegate> unpausePolicies = new List<WeakDelegate>();
@@ -91,6 +93,18 @@ public class TimeHandler : IHandler
         return true;
     }
 
+    private bool PlayersOverloadedPolicy()
+    {
+        if (clientRegistry.PlayersOverloaded)
+        {
+            Logger.Information($"{clientRegistry.OverloadedPeers.Count} clients are catching up, unable to change time");
+            return false;
+        }
+
+        return true;
+    }
+
+
     /// <summary>
     /// If any unpause policy fails, unpausing is not allowed
     /// </summary>
@@ -100,14 +114,15 @@ public class TimeHandler : IHandler
         return unpausePolicies.Any(policy => policy.IsAlive && policy.Invoke<bool>(Array.Empty<object>()) == false);
     }
 
-    public void SetTimeMode(TimeControlEnum timeMode)
+    public bool SetTimeMode(TimeControlEnum timeMode)
     {
-        if (UnpauseDisallowed()) return;   
+        if (UnpauseDisallowed()) return false;   
 
         Logger.Verbose("Server changing time to {mode}", timeMode);
 
         messageBroker.Publish(this, new SetTimeControlMode(timeMode));
         network.SendAll(new NetworkTimeSpeedChanged(timeMode));
+        return true;
     }
 
 
@@ -117,7 +132,6 @@ public class TimeHandler : IHandler
         var cts = new CancellationTokenSource(1000);
 
         timeControlMode = TimeControlEnum.Pause;
-
         try
         {
             tcs.Task.Wait(cts.Token);

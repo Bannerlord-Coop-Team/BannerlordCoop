@@ -1,6 +1,4 @@
 ﻿using Common.Logging;
-using Common.Messaging;
-using Common.Network;
 using Coop.Core.Server.Connections.States;
 using LiteNetLib;
 using Serilog;
@@ -14,6 +12,7 @@ public interface IConnectionLogic : IConnectionState
 {
     NetPeer Peer { get; }
     IConnectionState State { get; }
+    bool IsOverloaded { get; set; }
     TState SetState<TState>() where TState : IConnectionState;
 }
 
@@ -21,9 +20,9 @@ public interface IConnectionLogic : IConnectionState
 public class ConnectionLogic : IConnectionLogic
 {
     private readonly ILogger Logger = LogManager.GetLogger<ConnectionLogic>();
-
     public NetPeer Peer { get; }
     public IStateFactory StateFactory { get; }
+    public bool IsOverloaded { get; set; }
 
     public IConnectionState State 
     {
