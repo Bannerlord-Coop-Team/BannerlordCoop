@@ -10,10 +10,9 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Library;
 
-namespace GameInterface.Services.MobileParties.Patches;
+namespace GameInterface.Services.MobilePartyAIs.Patches;
 
 /// <summary>
 /// Handles changes in party behavior for the <see cref="MobilePartyAi"/> behavior synchronization system.
@@ -22,9 +21,26 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(MobilePartyAi))]
 static class PartyBehaviorPatch
 {
+    static readonly Func<MobilePartyAi, bool> get_DefaultBehaviorNeedsUpdate = typeof(MobilePartyAi)
+        .GetField("DefaultBehaviorNeedsUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildUntypedGetter<MobilePartyAi, bool>();
     static readonly Func<MobilePartyAi, MobileParty> _mobileParty = typeof(MobilePartyAi)
         .GetField("_mobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
         .BuildUntypedGetter<MobilePartyAi, MobileParty>();
+
+    /// <summary>
+    /// This prevents the tick method being called without the need for an update
+    /// Likely speeds the game up quite a bit lmao
+    /// </summary>
+    [HarmonyPrefix]
+    [HarmonyPatch("Tick")]
+    private static bool TickPrefix(ref MobilePartyAi __instance)
+    {
+        if (ModInformation.DISABLE_AI == false) return true;
+
+        // This disables AI
+        return get_DefaultBehaviorNeedsUpdate(__instance);
+    }
 
     [HarmonyPrefix]
     [HarmonyPatch("SetAiBehavior")]
@@ -73,8 +89,8 @@ static class PartyBehaviorPatch
             targetEntity = targetPartyFigure.IsSettlement ? targetPartyFigure.MobileParty : targetPartyFigure.Settlement;
         }
 
-        return __instance.AiBehaviorMapEntity == targetEntity && 
-            party.ShortTermBehavior == newAiBehavior && 
+        return __instance.AiBehaviorMapEntity == targetEntity &&
+            party.ShortTermBehavior == newAiBehavior &&
             get_MobilePartyAi_BehaviorTarget(__instance) == bestTargetPoint;
 
     }
@@ -131,5 +147,5 @@ static class PartyBehaviorPatch
 
     static readonly Action<MobileParty, Vec2> TargetPosition = typeof(MobileParty)
         .GetProperty(nameof(MobileParty.TargetPosition)).GetSetMethod(true)
-        .BuildDelegate < Action <MobileParty, Vec2>>();
+        .BuildDelegate<Action<MobileParty, Vec2>>();
 }

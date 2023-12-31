@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.Logging.Attributes;
 using Common.Messaging;
 using Common.Serialization;
 using LiteNetLib;
@@ -41,7 +42,7 @@ namespace Common.PacketHandlers
 
             IMessage networkEvent = convertedPacket.Event;
 
-            if (networkEvent.GetType().GetCustomAttribute<DontLogMessageAttribute>() == null)
+            if (networkEvent.GetType().GetCustomAttribute<BatchLogMessageAttribute>() == null)
             {
                 Logger.Information("Received network event from {Peer} of {EventType}", peer.EndPoint, networkEvent.GetType().Name);
             }

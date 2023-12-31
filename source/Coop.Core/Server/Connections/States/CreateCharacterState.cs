@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.Entity.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using Serilog;
@@ -57,6 +58,7 @@ public class CreateCharacterState : ConnectionStateBase
         if (sendingPeer != ConnectionLogic.Peer) return;
 
         NetworkPlayerData playerData = new NetworkPlayerData(obj.What);
+
         // Send newly create player to all clients
         var peer = ConnectionLogic.Peer;
         network.Send(peer, playerData);

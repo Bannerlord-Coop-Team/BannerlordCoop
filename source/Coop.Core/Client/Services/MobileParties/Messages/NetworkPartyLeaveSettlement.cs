@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 using ProtoBuf;
 
 namespace Coop.Core.Client.Services.MobileParties.Messages;
@@ -8,7 +9,7 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 /// For all parties except the player party
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-[DontLogMessage]
+[BatchLogMessage]
 internal record NetworkPartyLeaveSettlement : ICommand
 {
     [ProtoMember(1)]

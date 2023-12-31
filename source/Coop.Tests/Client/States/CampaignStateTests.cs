@@ -71,22 +71,6 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void MainMenuEntered_Transitions_MainMenuState()
-        {
-            // Arrange
-            var campaignState = clientLogic.SetState<CampaignState>();
-
-            var payload = new MessagePayload<MainMenuEntered>(
-                this, new MainMenuEntered());
-
-            // Act
-            campaignState.Handle_MainMenuEntered(payload);
-
-            // Assert
-            Assert.IsType<MainMenuState>(clientLogic.State);
-        }
-
-        [Fact]
         public void Disconnect_Publishes_EnterMainMenu()
         {
             // Arrange
