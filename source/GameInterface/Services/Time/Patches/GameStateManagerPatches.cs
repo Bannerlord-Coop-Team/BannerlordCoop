@@ -17,7 +17,6 @@ namespace GameInterface.Services.Time.Patches
         [HarmonyPatch(nameof(GameStateManager.RegisterActiveStateDisableRequest))]
         static bool Prefix() => false;
 
-
         // Prevents pausing in menus with their own game states (such as the banner editor, party screen, clan screen, etc.)
         [HarmonyPatch(nameof(GameStateManager.OnTick))]
         static void Prefix(ref GameStateManager __instance, float dt)
