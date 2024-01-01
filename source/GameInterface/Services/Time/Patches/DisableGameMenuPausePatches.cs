@@ -14,8 +14,7 @@ namespace GameInterface.Services.Time.Patches;
 [HarmonyPatch(typeof(GameMenu))]
 internal static class DisableGameMenuPausePatches
 {
-    private static readonly MethodInfo MapState_OnTick = typeof(MapState).GetMethod("OnTick", BindingFlags.NonPublic | BindingFlags.Instance);
-
+    
     [HarmonyPatch(nameof(GameMenu.ActivateGameMenu))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ActivateGameMenuPatch(IEnumerable<CodeInstruction> instructions) => ReplaceTimeControlMode(instructions);
@@ -55,18 +54,21 @@ internal static class DisableGameMenuPausePatches
 
         return instrs;
     }
+}
 
-    [HarmonyPatch(typeof(GameStateManager), nameof(GameStateManager.RegisterActiveStateDisableRequest))]
-    [HarmonyPrefix]
-    static bool RegisterActiveStateDisableRequestPatch()
-    {
-        return false;
-    }
+[HarmonyPatch(typeof(GameStateManager))]
+class GameStateManagerPatches
+{
+    private static readonly MethodInfo MapState_OnTick = typeof(MapState).GetMethod("OnTick", BindingFlags.NonPublic | BindingFlags.Instance);
+
+    // Prevent pausing in menus without their own game state (such as the encyclopedia)
+    [HarmonyPatch(nameof(GameStateManager.RegisterActiveStateDisableRequest))]
+    static bool Prefix() => false;
 
 
-    [HarmonyPatch(typeof(GameStateManager), nameof(GameStateManager.OnTick))]
-    [HarmonyPrefix]
-    static void OnTickPatch(ref GameStateManager __instance, float dt)
+    // Prevent pausing in menus with their own game states (such as the banner editor, party screen, clan screen, etc.)
+    [HarmonyPatch(nameof(GameStateManager.OnTick))]
+    static void Prefix(ref GameStateManager __instance, float dt)
     {
         if (!(__instance.ActiveState is MapState))
         {
@@ -77,10 +79,14 @@ internal static class DisableGameMenuPausePatches
         }
     }
 
+}
+
+[HarmonyPatch(typeof(MapState), "OnMapModeTick")]
+class MapStatePatch
+{
     // Remove "base.GameStateManager.ActiveState == this" condition from if statement
-    [HarmonyPatch(typeof(MapState), "OnMapModeTick")]
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> OnMapModeTickPatch(IEnumerable<CodeInstruction> instructions)
+    // to enable campaign ticks while in menu states
+    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
         List<CodeInstruction> instrs = instructions.ToList();
 
@@ -92,6 +98,7 @@ internal static class DisableGameMenuPausePatches
 
             if (instr.opcode == OpCodes.Callvirt &&
                instr.operand as MethodInfo == activeStateGetter &&
+               instrs.Count() > i + 2 && 
                instrs[i - 2].opcode == OpCodes.Ldarg_0 &&
                instrs[i + 2].opcode == OpCodes.Bne_Un_S)
             {
