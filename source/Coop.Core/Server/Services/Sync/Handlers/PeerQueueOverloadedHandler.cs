@@ -52,7 +52,7 @@ namespace Coop.Core.Server.Services.Sync.Handlers
         {
             lock (syncLock)
             {
-                if (clientRegistry.OverloadedPeers.Contains(payload.What.NetPeer))
+                if (clientRegistry.IsOverloaded(payload.What.NetPeer))
                     return;
 
                 if (timeHandler.TryGetTimeControlMode(out TimeControlEnum t))
@@ -63,19 +63,19 @@ namespace Coop.Core.Server.Services.Sync.Handlers
                 {
                     originalSpeed = TimeControlEnum.Play_1x;
                 }
+
                 if (originalSpeed != TimeControlEnum.Pause)
                 {
                     timeHandler.SetTimeMode(TimeControlEnum.Pause);
                 }
 
-                clientRegistry.ConnectionStates[payload.What.NetPeer].IsOverloaded = true;
+                clientRegistry.MarkOverloaded(payload.What.NetPeer, true);
 
                 var msg = new SendInformationMessage($"{clientRegistry.OverloadedPeers.Count} clients are catching up, pausing");
                 messageBroker.Publish(this, msg);
                 network.SendAll(msg);
-
                 logger.Information("Clients overloaded, paused.");
-
+                
                 if (!poller.IsRunning)
                     poller.Start();
             }
@@ -89,7 +89,7 @@ namespace Coop.Core.Server.Services.Sync.Handlers
                 {
                     if (connection.Value.IsOverloaded && connection.Key.GetPacketsCountInReliableQueue(0, false) == 0)
                     {
-                        clientRegistry.ConnectionStates[connection.Key].IsOverloaded = false;
+                        clientRegistry.MarkOverloaded(connection.Key, false);
                     }
                 }
 

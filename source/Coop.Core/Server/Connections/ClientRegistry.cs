@@ -7,6 +7,7 @@ using LiteNetLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace Coop.Core.Server.Connections;
 
@@ -23,6 +24,19 @@ public interface IClientRegistry : IDisposable
     List<NetPeer> LoadingPeers { get; }
 
     List<NetPeer> OverloadedPeers { get; }
+
+    /// <summary>
+    /// Marks client's overload state.
+    /// </summary>
+    /// <param name="peer">the client</param>
+    /// <param name="val">overload state</param>
+    void MarkOverloaded(NetPeer peer, bool val);
+
+    /// <summary>
+    /// Checks whether a client is overloaded.
+    /// </summary>
+    /// <param name="peer">the client</param>
+    bool IsOverloaded(NetPeer peer);
 }
 
 /// <inheritdoc cref="IClientRegistry"/>
@@ -80,6 +94,22 @@ public class ClientRegistry : IClientRegistry
         {
             ConnectionStates.Remove(playerId);
             logic.Dispose();
+        }
+    }
+
+    public void MarkOverloaded(NetPeer peer, bool val)
+    {
+        lock(ConnectionStates)
+        {
+            ConnectionStates[peer].IsOverloaded = val;
+        }
+    }
+
+    public bool IsOverloaded(NetPeer peer)
+    {
+        lock (ConnectionStates)
+        {
+            return ConnectionStates[peer].IsOverloaded;
         }
     }
 }

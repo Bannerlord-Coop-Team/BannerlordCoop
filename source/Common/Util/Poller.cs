@@ -17,7 +17,7 @@ public class Poller
 
     private Task pollingTask;
 
-    public bool IsRunning => !cts.Token.IsCancellationRequested; 
+    public bool IsRunning => cts == null ? false : !cts.IsCancellationRequested; 
 
     public Poller(Action<TimeSpan> pollingFunction, TimeSpan pollingInterval)
     {
