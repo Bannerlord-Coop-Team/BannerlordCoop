@@ -22,8 +22,6 @@ namespace GameInterface.Services.MapEvents.Patches
         private static readonly ILogger Logger = LogManager.GetLogger<StartBattleHandler>();
         private static readonly AllowedInstance<MapEvent> AllowedInstance = new AllowedInstance<MapEvent>();
 
-        private static MobileParty lastMobileParty;
-
         private static readonly MethodInfo MapEvent_FinishBattle = typeof(MapEvent).GetMethod("FinishBattle", BindingFlags.NonPublic | BindingFlags.Instance);
 
 
@@ -49,14 +47,6 @@ namespace GameInterface.Services.MapEvents.Patches
         {
             if (AllowedInstance.IsAllowed(__instance)) 
             {
-                if(ModInformation.IsClient)
-                {
-                    Logger.Information("Ended battle on client: " + __instance.ToString());
-                }
-                else
-                {
-                    Logger.Information("Ended battle on server: " + __instance.ToString());
-                }
                 return true;
             }
 
@@ -69,7 +59,6 @@ namespace GameInterface.Services.MapEvents.Patches
 
             MobileParty party = __instance.InvolvedParties.First().MobileParty;
 
-            lastMobileParty = party;
             MessageBroker.Instance.Publish(party, new BattleEnded(party.StringId));
 
             return false;

@@ -31,7 +31,6 @@ public class LeaveSettlementActionPatches
         return false;
     }
 
-    private static object _lock = new object();
     public static void OverrideApplyForParty(MobileParty party)
     {
         using(AllowedInstance)
