@@ -1,20 +1,20 @@
 ﻿using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection.Emit;
 using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem;
-using System.Xml.Serialization;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Time.Patches;
 
 [HarmonyPatch(typeof(GameMenu))]
-internal static class DisabeGameMenuPausePatches
+internal static class DisableGameMenuPausePatches
 {
+    
     [HarmonyPatch(nameof(GameMenu.ActivateGameMenu))]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ActivateGameMenuPatch(IEnumerable<CodeInstruction> instructions) => ReplaceTimeControlMode(instructions);
