@@ -9,7 +9,7 @@ namespace Coop.Core.Server.Services.MobileParties.Packets;
 /// Party behavior update request from client to server
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record RequestMobilePartyBehaviorPacket : IPacket
+public struct RequestMobilePartyBehaviorPacket : IPacket
 {
     public PacketType PacketType => PacketType.RequestUpdatePartyBehavior;
     public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableUnordered;

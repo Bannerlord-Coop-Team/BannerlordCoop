@@ -9,16 +9,16 @@ namespace Coop.Core.Client.Services.MobileParties.Packets
     /// Packet containing data to update party behavior
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record UpdatePartyBehaviorPacket : IPacket
+    public struct UpdatePartyBehaviorPacket : IPacket
     {
         [ProtoMember(1)]
         public PartyBehaviorUpdateData BehaviorUpdateData { get; }
 
-        public PacketType PacketType => PacketType.UpdatePartyBehavior;
+        public readonly PacketType PacketType => PacketType.UpdatePartyBehavior;
 
-        public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableUnordered;
+        public readonly DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableUnordered;
 
-        public UpdatePartyBehaviorPacket(PartyBehaviorUpdateData behaviorUpdateData)
+        public UpdatePartyBehaviorPacket(ref PartyBehaviorUpdateData behaviorUpdateData)
         {
             BehaviorUpdateData = behaviorUpdateData;
         }

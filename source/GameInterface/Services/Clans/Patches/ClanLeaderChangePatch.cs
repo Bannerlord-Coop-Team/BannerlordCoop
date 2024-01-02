@@ -26,13 +26,13 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, Hero newLeader = null)
         {
+            if (AllowedInstance.IsAllowed(clan)) return true;
+
             if (PolicyProvider.AllowOriginalCalls) return true;
 
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
 
             CallStackValidator.Validate(clan, AllowedInstance);
-
-            if (AllowedInstance.IsAllowed(clan)) return true;
 
             MessageBroker.Instance.Publish(clan, new ClanLeaderChanged(clan.StringId, newLeader.StringId));
 

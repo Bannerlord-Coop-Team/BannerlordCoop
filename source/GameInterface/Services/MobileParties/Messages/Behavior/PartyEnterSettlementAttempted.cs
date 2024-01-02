@@ -1,10 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 
 namespace GameInterface.Services.MobileParties.Messages.Behavior;
 
 /// <summary>
 /// Triggered when a party attempts to enter a settlement
 /// </summary>
+[BatchLogMessage]
 public record PartyEnterSettlementAttempted : IEvent
 {
     public string SettlementId { get; }
