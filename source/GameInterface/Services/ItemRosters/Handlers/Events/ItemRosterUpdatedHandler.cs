@@ -10,6 +10,8 @@ using TaleWorlds.CampaignSystem;
 using System;
 using Serilog;
 using Common.Logging;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ItemRosters.Handlers.Events
 {
@@ -42,24 +44,25 @@ namespace GameInterface.Services.ItemRosters.Handlers.Events
             var package_ee = BinaryFormatterSerializer.Deserialize<EquipmentElementBinaryPackage>(payload.What.EquipmentElement);
             var equipmentElement = package_ee.Unpack<EquipmentElement>(binaryPackageFactory);
 
-
+            //TODO: fix party lookup
+            /*
             if (mobilePartyRegistry.TryGetValue(payload.What.PartyBaseId, out var party))
             {
                 party.ItemRoster.AddToCounts(equipmentElement, payload.What.Number);
             } else
             {
                 logger.Error("Failed to update mobile party's ItemRoster, party not found");
-            }
+            } */
 
-            try
+
+            if (MBObjectManager.Instance.ContainsObject<Settlement>(payload.What.PartyBaseId))
             {
-                Campaign.Current.Settlements.Find((s) =>
-                {
-                    return s.StringId == payload.What.PartyBaseId;
-                }).ItemRoster.AddToCounts(equipmentElement, payload.What.Number);
-            } catch(Exception e)
+                var obj = MBObjectManager.Instance.GetObject<Settlement>(payload.What.PartyBaseId);
+                obj.ItemRoster.AddToCounts(equipmentElement, payload.What.Number);
+            }
+            else
             {
-                logger.Error("Failed to update settlement's ItemRoster: " + e.Message);
+                logger.Error("Failed to update item roster, settlement not found");
             }
         }
 

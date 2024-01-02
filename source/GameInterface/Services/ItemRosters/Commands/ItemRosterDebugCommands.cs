@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.Party;
+﻿using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
@@ -19,22 +17,29 @@ namespace GameInterface.Services.ItemRosters.Commands
             }
 
             ItemRoster roster;
+            string owner;
 
             if (MBObjectManager.Instance.ContainsObject<Settlement>(args[0]))
             {
                 var obj = MBObjectManager.Instance.GetObject<Settlement>(args[0]);
                 roster = obj.ItemRoster;
 
-            } else if (MBObjectManager.Instance.ContainsObject<MobileParty>(args[0]))
+                owner = obj.Town.Name.ToString();
+
+            }
+            //TODO: fix mobile party lookup
+            /*else if (MBObjectManager.Instance.ContainsObject<MobileParty>(args[0]))
             {
                 var obj = MBObjectManager.Instance.GetObject<MobileParty>(args[0]);
                 roster = obj.ItemRoster;
-            } else
+                owner = obj.GetName().Value;
+            } */
+            else 
             {
-                return String.Format("ID: '{0}' not found", args[0]);
+                return string.Format("ID: '{0}' not found", args[0]);
             }
 
-            return String.Format("Item count: {0}\nItem roster hash: {1:X}\n", roster.Count, hash(roster));
+            return string.Format("'{0}' item roster info:\n  Item count: {1}\n  Hash: {2:X}\n", owner, roster.Count, hash(roster));
         }
 
         private static int hash(ItemRoster roster)
