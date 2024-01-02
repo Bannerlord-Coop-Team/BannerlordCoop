@@ -61,7 +61,6 @@ namespace GameInterface.Services.ItemRosters.Handlers.Events
             {
                 logger.Error("Failed to update settlement's ItemRoster: " + e.Message);
             }
-            logger.Information("Item roster updated with " + payload.What.Number + " of " + equipmentElement.Item.Name.ToString());
         }
 
         public void Dispose()

@@ -1,10 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 
 namespace GameInterface.Services.ItemRosters.Messages.Events
 {
     /// <summary>
     /// Called when an item roster is updated.
     /// </summary>
+    [BatchLogMessage]
     public class ItemRosterUpdated : IEvent
     {
         public string PartyBaseId { get; }

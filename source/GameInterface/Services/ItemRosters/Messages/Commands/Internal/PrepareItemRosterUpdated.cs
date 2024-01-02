@@ -1,8 +1,10 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.ItemRosters.Messages.Commands.Internal
 {
+    [BatchLogMessage]
     internal class PrepareItemRosterUpdated : ICommand
     {
         public string PartyBaseId { get; }
