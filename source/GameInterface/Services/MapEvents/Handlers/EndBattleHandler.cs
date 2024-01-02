@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Patches;
@@ -39,7 +40,12 @@ namespace GameInterface.Services.MapEvents.Handlers
                 Logger.Error("Unable to find attacking MobileParty ({attackerPartyId})", payload.partyId);
                 return;
             }
-            MapEventUpdatePatch.RunOriginalFinishBattle(party.MapEvent);
+
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                party.MapEvent?.FinalizeEvent();
+            }, true);
+            
         }
     }
 }

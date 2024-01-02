@@ -45,11 +45,6 @@ namespace GameInterface.Services.MapEvents.Patches
         [HarmonyPatch("FinishBattle")]
         static bool PrefixFinishBattle(MapEvent __instance)
         {
-            if (AllowedInstance.IsAllowed(__instance)) 
-            {
-                return true;
-            }
-
             if (ModInformation.IsClient) return false;
 
             if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsPartyControlled()))
@@ -62,20 +57,6 @@ namespace GameInterface.Services.MapEvents.Patches
             MessageBroker.Instance.Publish(party, new BattleEnded(party.StringId));
 
             return false;
-        }
-
-        public static void RunOriginalFinishBattle(MapEvent mapEvent)
-        {
-            using (AllowedInstance)
-            {
-                AllowedInstance.Instance = mapEvent;
-
-                GameLoopRunner.RunOnMainThread(() =>
-                {
-                    if (mapEvent == null) return;
-                    MapEvent_FinishBattle.Invoke(mapEvent, null);
-                }, true);
-            }
         }
     }
 }
