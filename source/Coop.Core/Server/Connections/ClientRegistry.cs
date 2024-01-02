@@ -2,13 +2,10 @@
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
-using Coop.Core.Server.Services.Sync.Handlers;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
-
 namespace Coop.Core.Server.Connections;
 
 /// <summary>
@@ -99,17 +96,11 @@ public class ClientRegistry : IClientRegistry
 
     public void MarkOverloaded(NetPeer peer, bool val)
     {
-        lock(ConnectionStates)
-        {
-            ConnectionStates[peer].IsOverloaded = val;
-        }
+        ConnectionStates[peer].IsOverloaded = val;
     }
 
     public bool IsOverloaded(NetPeer peer)
     {
-        lock (ConnectionStates)
-        {
-            return ConnectionStates[peer].IsOverloaded;
-        }
+        return ConnectionStates[peer].IsOverloaded;
     }
 }
