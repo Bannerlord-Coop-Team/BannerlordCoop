@@ -10,9 +10,9 @@ namespace Coop.Tests.Stubs
         public int GetTotalSubscribers()
         {
             int total = 0;
-            foreach (var type in _subscribers.Keys)
+            foreach (var type in subscribers.Keys)
             {
-                total += _subscribers[type].Count;
+                total += subscribers[type].Count;
             }
 
             return total;
@@ -20,11 +20,11 @@ namespace Coop.Tests.Stubs
 
         public override void Publish<T>(object? source, T message)
         {
-            if (!_subscribers.ContainsKey(typeof(T)))
+            if (!subscribers.ContainsKey(typeof(T)))
             {
                 return;
             }
-            var delegates = _subscribers[typeof(T)];
+            var delegates = subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);
             for (int i = 0; i < delegates.Count; i++)

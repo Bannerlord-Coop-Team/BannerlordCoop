@@ -47,9 +47,9 @@ namespace Coop.Core.Server.Services.Clans.Handler
 
         private void Send(string clanId, float amount)
         {
-            ChangeClanInfluence clanInfluenceChanged = new ChangeClanInfluence(clanId, amount);
+            ChangeClanInfluence changeClanInfluence = new ChangeClanInfluence(clanId, amount);
 
-            messageBroker.Publish(this, clanInfluenceChanged);
+            messageBroker.Publish(this, changeClanInfluence);
 
             NetworkClanChangeInfluenceApproved clanChangeInfluenceApproved = new NetworkClanChangeInfluenceApproved(clanId, amount);
 

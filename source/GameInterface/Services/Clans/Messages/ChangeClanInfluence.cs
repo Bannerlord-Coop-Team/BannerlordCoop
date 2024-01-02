@@ -1,10 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 
 namespace GameInterface.Services.Clans.Messages
 {
     /// <summary>
     /// Event to update game interface when clan influence is changed
     /// </summary>
+    [BatchLogMessage]
     public record ChangeClanInfluence : ICommand
     {
         public string ClanId { get; }

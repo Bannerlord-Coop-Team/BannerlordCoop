@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using Common.Network;
 using Common.PacketHandlers;
 using Coop.Core.Client.Services.MobileParties.Packets;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -15,16 +14,13 @@ namespace Coop.Core.Client.Services.MobileParties.PacketHandlers
         public PacketType PacketType => PacketType.UpdatePartyBehavior;
 
         private readonly IPacketManager packetManager;
-        private readonly INetwork network;
         private readonly IMessageBroker messageBroker;
 
         public UpdatePartyBehaviorPacketHandler(
             IPacketManager packetManager,
-            INetwork network,
             IMessageBroker messageBroker)
         {
             this.packetManager = packetManager;
-            this.network = network;
             this.messageBroker = messageBroker;
             packetManager.RegisterPacketHandler(this);
         }
@@ -38,7 +34,9 @@ namespace Coop.Core.Client.Services.MobileParties.PacketHandlers
         {
             UpdatePartyBehaviorPacket convertedPacket = (UpdatePartyBehaviorPacket)packet;
 
-            messageBroker.Publish(this, new UpdatePartyBehavior(convertedPacket.BehaviorUpdateData));
+            var data = convertedPacket.BehaviorUpdateData;
+
+            messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
         }
     }
 }

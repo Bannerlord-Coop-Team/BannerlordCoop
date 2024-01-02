@@ -4,9 +4,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Data;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.Registry;
 using Serilog;
-using System;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -16,20 +14,17 @@ internal class HeroRegistryHandler : IHandler
 
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
-    private readonly IHeroRegistry heroRegistry;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
 
     public HeroRegistryHandler(
         IHeroInterface heroInterface,
         IMessageBroker messageBroker,
-        IHeroRegistry heroRegistry,
         IControlledEntityRegistry controlledEntityRegistry,
         IControllerIdProvider controllerIdProvider)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
-        this.heroRegistry = heroRegistry;
         this.controlledEntityRegistry = controlledEntityRegistry;
         this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<PlayerHeroChanged>(Handle_PlayerHeroChanged);
