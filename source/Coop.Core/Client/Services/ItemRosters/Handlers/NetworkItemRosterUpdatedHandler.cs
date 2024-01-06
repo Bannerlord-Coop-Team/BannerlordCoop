@@ -20,7 +20,12 @@ namespace Coop.Core.Client.Services.PartyBases.Handlers
 
         public void Handle(MessagePayload<NetworkItemRosterUpdate> payload)
         {
-            messageBroker.Publish(this, new ItemRosterUpdate(payload.What.PartyBaseID, payload.What.ItemID, payload.What.ItemModifierID, payload.What.Amount));
+            messageBroker.Publish(this, new ItemRosterUpdate(
+                    payload.What.PartyBaseID,
+                    payload.What.ItemID,
+                    payload.What.ItemModifierID,
+                    payload.What.Amount)
+                );
         }
 
         public void Dispose()

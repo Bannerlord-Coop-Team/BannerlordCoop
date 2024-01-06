@@ -1,13 +1,8 @@
 ﻿using Common.Messaging;
-using Common.Serialization;
-using GameInterface.Serialization.External;
-using GameInterface.Serialization;
 using GameInterface.Services.ItemRosters.Messages.Events;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using GameInterface.Services.MobileParties;
 using TaleWorlds.CampaignSystem;
-using System;
 using Serilog;
 using Common.Logging;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -23,18 +18,14 @@ namespace GameInterface.Services.ItemRosters.Handlers.Events
     internal class ItemRosterUpdateHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
-        private readonly IBinaryPackageFactory binaryPackageFactory;
-        private readonly IMobilePartyRegistry mobilePartyRegistry;
         private readonly ILogger logger;
 
-        public ItemRosterUpdateHandler(IMessageBroker messageBroker, IBinaryPackageFactory binaryPackageFactory, IMobilePartyRegistry mobilePartyRegistry)
+        public ItemRosterUpdateHandler(IMessageBroker messageBroker)
         {
             if (ModInformation.IsServer)
                 return;
 
             this.messageBroker = messageBroker;
-            this.binaryPackageFactory = binaryPackageFactory;
-            this.mobilePartyRegistry = mobilePartyRegistry;
 
             logger = LogManager.GetLogger<ItemRosterUpdateHandler>();
 
@@ -54,7 +45,8 @@ namespace GameInterface.Services.ItemRosters.Handlers.Events
                     return;
                 }
 
-                if (payload.What.ItemModifierID != null && (modifier = MBObjectManager.Instance.GetObject<ItemModifier>(payload.What.ItemModifierID)) == null)
+                if (payload.What.ItemModifierID != null &&
+                    (modifier = MBObjectManager.Instance.GetObject<ItemModifier>(payload.What.ItemModifierID)) == null)
                 {
                     logger.Error("Failed to update item roster, ItemModifier '{0}' not found", payload.What.ItemModifierID);
                     return;

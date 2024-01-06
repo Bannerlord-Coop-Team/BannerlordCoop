@@ -17,7 +17,12 @@ namespace GameInterface.Services.ItemRosters.Patches
             {
                 if (ModInformation.IsServer)
                 {
-                    MessageBroker.Instance.Publish(__instance, new ItemRosterUpdate(pb.Id, rosterElement.Item.StringId, rosterElement.ItemModifier?.StringId, number));
+                    MessageBroker.Instance.Publish(__instance, new ItemRosterUpdate(
+                        pb.Id,
+                        rosterElement.Item.StringId,
+                        rosterElement.ItemModifier?.StringId,
+                        number
+                    ));
                 }
             }
         }
