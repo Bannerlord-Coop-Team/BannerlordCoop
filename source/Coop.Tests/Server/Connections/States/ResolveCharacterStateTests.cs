@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.Network;
+using Common.Tests.Utils;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
@@ -20,16 +21,13 @@ namespace Coop.Tests.Server.Connections.States
         private readonly NetPeer differentPeer;
         private readonly ServerTestComponent serverComponent;
 
-        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => serverComponent.MockNetwork;
-
         public ResolveCharacterStateTests(ITestOutputHelper output)
         {
             serverComponent = new ServerTestComponent(output);
 
             var container = serverComponent.Container;
 
-            var network = container.Resolve<MockNetwork>();
+            var network = container.Resolve<TestNetwork>();
 
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
@@ -91,7 +89,7 @@ namespace Coop.Tests.Server.Connections.States
             currentState.ClientValidateHandler(payload);
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            var message = Assert.Single(serverComponent.TestMessageBroker.Messages);
             Assert.IsType<ResolveHero>(message);
 
             var castedMessage = (ResolveHero)message;
@@ -112,7 +110,7 @@ namespace Coop.Tests.Server.Connections.States
             currentState.ClientValidateHandler(payload);
 
             // Assert
-            Assert.Empty(MockMessageBroker.PublishedMessages);
+            Assert.Empty(serverComponent.TestMessageBroker.Messages);
         }
 
         [Fact]
@@ -129,15 +127,15 @@ namespace Coop.Tests.Server.Connections.States
             currentState.ResolveHeroHandler(payload);
 
             // Assert
-            Assert.Equal(2, MockNetwork.GetPeerMessages(playerPeer).Count());
-            var message = MockNetwork.GetPeerMessages(playerPeer).First();
+            Assert.Equal(2, serverComponent.TestNetwork.GetPeerMessages(playerPeer).Count());
+            var message = serverComponent.TestNetwork.GetPeerMessages(playerPeer).First();
             Assert.IsType<NetworkClientValidated>(message);
 
             var castedMessage = (NetworkClientValidated)message;
             Assert.Equal(playerId, castedMessage.HeroId);
             Assert.True(castedMessage.HeroExists);
 
-            Assert.Single(MockNetwork.GetPeerMessages(differentPeer));
+            Assert.Single(serverComponent.TestNetwork.GetPeerMessages(differentPeer));
         }
 
         [Fact]
@@ -152,14 +150,14 @@ namespace Coop.Tests.Server.Connections.States
             currentState.HeroNotFoundHandler(payload);
 
             // Assert
-            var message = Assert.Single(MockNetwork.GetPeerMessages(playerPeer));
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
             Assert.IsType<NetworkClientValidated>(message);
 
             var castedMessage = (NetworkClientValidated)message;
             Assert.Equal(string.Empty, castedMessage.HeroId);
             Assert.False(castedMessage.HeroExists);
 
-            Assert.False(MockNetwork.SentNetworkMessages.ContainsKey(differentPeer.Id));
+            Assert.False(serverComponent.TestNetwork.SentNetworkMessages.ContainsKey(differentPeer.Id));
         }
     }
 }

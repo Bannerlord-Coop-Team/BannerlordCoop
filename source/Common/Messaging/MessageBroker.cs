@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.Messaging;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -12,9 +13,9 @@ namespace Common.Messaging
 
         void Respond<T>(object target, T message) where T : IResponse;
 
-        void Subscribe<T>(Action<MessagePayload<T>> subscription);
+        void Subscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage;
 
-        void Unsubscribe<T>(Action<MessagePayload<T>> subscription);
+        void Unsubscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage;
     }
 
     public class MessageBroker : IMessageBroker
@@ -106,7 +107,7 @@ namespace Common.Messaging
             }
         }
 
-        public virtual void Subscribe<T>(Action<MessagePayload<T>> subscription)
+        public virtual void Subscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage
         {
             var delegates = subscribers.ContainsKey(typeof(T)) ?
                             subscribers[typeof(T)] : new List<WeakDelegate>();
@@ -117,7 +118,7 @@ namespace Common.Messaging
             subscribers[typeof(T)] = delegates;
         }
 
-        public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
+        public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage
         {
             
             if (!subscribers.ContainsKey(typeof(T))) return;

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.PacketHandlers;
+using Common.Tests.Utils;
 using Coop.IntegrationTests.Environment.Mock;
 using LiteNetLib;
 
@@ -34,7 +35,7 @@ internal abstract class EnvironmentInstance
     /// </summary>
     /// <param name="source">Source of the message</param>
     /// <param name="message">Received Message</param>
-    public void ReceiveMessage(object source, IMessage message)
+    public void ReceiveMessage<T>(object source, T message) where T : IMessage
     {
         messageBroker.Publish(source, message);
     }

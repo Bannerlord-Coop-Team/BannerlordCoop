@@ -13,9 +13,6 @@ namespace Coop.Tests.Server.States
     {
         private readonly ServerTestComponent serverComponent;
 
-        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => serverComponent.MockNetwork;
-
         public InitialStateTests(ITestOutputHelper output)
         {
             serverComponent = new ServerTestComponent(output);

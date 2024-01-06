@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Tests.Mocks;
@@ -13,9 +14,6 @@ namespace Coop.Tests.Client.States
     {
         private readonly IClientLogic clientLogic;
         private readonly ClientTestComponent clientComponent;
-
-        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => clientComponent.MockNetwork;
 
         public MissionStateTests(ITestOutputHelper output)
         {
@@ -51,7 +49,7 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterCampaignState();
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<EnterCampaignState>(message);
         }
 
@@ -65,8 +63,7 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterMainMenu();
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<EnterMainMenu>(message);
+            Assert.Equal(1, clientComponent.TestMessageBroker.GetMessageCountFromType<EnterMainMenu>());
         }
 
         [Fact]
@@ -95,8 +92,7 @@ namespace Coop.Tests.Client.States
             clientLogic.Disconnect();
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<EnterMainMenu>(message);
+            Assert.Equal(1, clientComponent.TestMessageBroker.GetMessageCountFromType<EnterMainMenu>());
         }
 
         [Fact]

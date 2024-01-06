@@ -6,6 +6,7 @@ using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Server;
 using GameInterface;
+using GameInterface.Services.Entity;
 
 namespace Coop.Core.Common;
 
@@ -28,11 +29,8 @@ public abstract class CommonModule : Module
         builder.RegisterInstance(MessageBroker.Instance).As<IMessageBroker>().SingleInstance().ExternallyOwned();
         #endregion
 
+        builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<DeferredHeroRepository>().As<IDeferredHeroRepository>().InstancePerLifetimeScope();
-
-        #region GameInterface
-        builder.RegisterModule<GameInterfaceModule>();
-        #endregion
 
         builder.RegisterType<CoopFinalizer>().As<ICoopFinalizer>().InstancePerLifetimeScope();
 

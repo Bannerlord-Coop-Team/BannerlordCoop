@@ -16,24 +16,7 @@ public interface IClientRegistry : IDisposable
 {
     bool PlayersLoading { get; }
 
-    bool PlayersOverloaded { get; }
-
     List<NetPeer> LoadingPeers { get; }
-
-    List<NetPeer> OverloadedPeers { get; }
-
-    /// <summary>
-    /// Marks client's overload state.
-    /// </summary>
-    /// <param name="peer">the client</param>
-    /// <param name="val">overload state</param>
-    void MarkOverloaded(NetPeer peer, bool val);
-
-    /// <summary>
-    /// Checks whether a client is overloaded.
-    /// </summary>
-    /// <param name="peer">the client</param>
-    bool IsOverloaded(NetPeer peer);
 }
 
 /// <inheritdoc cref="IClientRegistry"/>
@@ -48,11 +31,8 @@ public class ClientRegistry : IClientRegistry
     };
 
     public bool PlayersLoading => ConnectionStates.Any(state => loadingStates.Contains(state.Value.State.GetType()));
-    public bool PlayersOverloaded => ConnectionStates.Any(state => state.Value.IsOverloaded);
 
     public List<NetPeer> LoadingPeers => ConnectionStates.Where(state => loadingStates.Contains(state.Value.State.GetType())).Select(state => state.Key).ToList();
-
-    public List<NetPeer> OverloadedPeers => ConnectionStates.Where(state => state.Value.IsOverloaded).Select(state => state.Key).ToList();
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
@@ -92,15 +72,5 @@ public class ClientRegistry : IClientRegistry
             ConnectionStates.Remove(playerId);
             logic.Dispose();
         }
-    }
-
-    public void MarkOverloaded(NetPeer peer, bool val)
-    {
-        ConnectionStates[peer].IsOverloaded = val;
-    }
-
-    public bool IsOverloaded(NetPeer peer)
-    {
-        return ConnectionStates[peer].IsOverloaded;
     }
 }

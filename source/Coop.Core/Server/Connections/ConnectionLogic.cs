@@ -12,7 +12,6 @@ public interface IConnectionLogic : IConnectionState
 {
     NetPeer Peer { get; }
     IConnectionState State { get; }
-    bool IsOverloaded { get; set; }
     TState SetState<TState>() where TState : IConnectionState;
 }
 
@@ -22,7 +21,6 @@ public class ConnectionLogic : IConnectionLogic
     private readonly ILogger Logger = LogManager.GetLogger<ConnectionLogic>();
     public NetPeer Peer { get; }
     public IStateFactory StateFactory { get; }
-    public bool IsOverloaded { get; set; }
 
     public IConnectionState State 
     {

@@ -17,9 +17,6 @@ namespace Coop.Tests.Server.States
         private readonly IServerLogic serverLogic;
         private readonly ServerTestComponent serverComponent;
 
-        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => serverComponent.MockNetwork;
-
         public RunningStateTests(ITestOutputHelper output)
         {
             serverComponent = new ServerTestComponent(output);
@@ -39,7 +36,7 @@ namespace Coop.Tests.Server.States
             currentState.Stop();
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            var message = Assert.Single(serverComponent.TestMessageBroker.Messages);
             Assert.IsType<EnterMainMenu>(message);
         }
 
