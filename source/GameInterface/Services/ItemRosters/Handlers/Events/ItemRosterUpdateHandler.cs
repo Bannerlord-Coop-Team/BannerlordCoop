@@ -65,14 +65,12 @@ namespace GameInterface.Services.ItemRosters.Handlers.Events
                 
                 if (roster == null)
                 {
-                    logger.Error("Failed to update item roster, Settlement nor Party with ID '{0}' not found", payload.What.PartyBaseID);
+                    logger.Error("Failed to update item roster, no Settlement nor Party with ID '{0}' was found", payload.What.PartyBaseID);
                 } else
                 {
                     roster.AddToCounts(new EquipmentElement(item, modifier), payload.What.Amount);
                 }
             });
-
-           
         }
 
         public void Dispose()
