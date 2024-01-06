@@ -1,0 +1,61 @@
+﻿using Autofac;
+using Common.Messaging;
+using Common.Network;
+using Common.Tests.Utils;
+using Coop.Core;
+using Coop.Tests.Mocks;
+using Xunit.Abstractions;
+
+namespace Coop.Tests;
+
+internal abstract class TestComponentBase
+{
+    public ITestOutputHelper Output { get; }
+
+    public TestMessageBroker TestMessageBroker { get; protected set; }
+    public TestNetwork TestNetwork { get; protected set; }
+    public IContainer Container { get; protected set; }
+
+    protected TestComponentBase(ITestOutputHelper output)
+    {
+        Output = output;
+    }
+
+    /// <summary>
+    /// Builds container and assigns class properties for ease of use in testing
+    /// </summary>
+    /// <param name="builder">Container builder</param>
+    /// <returns>Container with all common types registered</returns>
+    protected IContainer BuildContainer(ContainerBuilder builder)
+    {
+        RegisterCommonTypes(builder);
+
+        var container = SetupContainerProvider(builder);
+
+        TestMessageBroker = container.Resolve<TestMessageBroker>();
+        TestNetwork = container.Resolve<TestNetwork>();
+        Container = container;
+
+        TestMessageBroker.Messages.Clear();
+        TestNetwork.Clear();
+
+        return container;
+    }
+
+    private ContainerBuilder RegisterCommonTypes(ContainerBuilder builder)
+    {
+        builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
+        builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
+        builder.RegisterType<TestNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
+        return builder;
+    }
+
+    private IContainer SetupContainerProvider(ContainerBuilder builder)
+    {
+        var container = builder.Build();
+
+        container.Resolve<IContainerProvider>().SetProvider(container);
+
+        return container;
+    }
+}

@@ -6,6 +6,7 @@ using Coop.Core.Client.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
 using System;
+using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -15,9 +16,6 @@ namespace Coop.Tests.Client.States
     {
         private readonly IClientLogic clientLogic;
         private readonly ClientTestComponent clientComponent;
-
-        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => clientComponent.MockNetwork;
 
         public ReceivingSavedDataStateTests(ITestOutputHelper output)
         {
@@ -43,7 +41,7 @@ namespace Coop.Tests.Client.States
             currentState.Handle_NetworkGameSaveDataReceived(payload);
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<EnterMainMenu>(message);
         }
 
@@ -68,8 +66,8 @@ namespace Coop.Tests.Client.States
             currentState.Handle_MainMenuEntered(mainMenuPayload);
 
             // Assert
-            Assert.Equal(2, MockMessageBroker.PublishedMessages.Count);
-            var message = MockMessageBroker.PublishedMessages[1];
+            Assert.Equal(2, clientComponent.TestMessageBroker.Messages.Count);
+            var message = clientComponent.TestMessageBroker.Messages.ElementAt(1);
             var loadSaveMessage = Assert.IsType<LoadGameSave>(message);
             Assert.Equal(gameSaveData, loadSaveMessage.SaveData);
 
@@ -96,7 +94,7 @@ namespace Coop.Tests.Client.States
             currentState.Handle_MainMenuEntered(mainMenuPayload);
 
             // Assert
-            Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
@@ -120,7 +118,7 @@ namespace Coop.Tests.Client.States
             currentState.Handle_MainMenuEntered(mainMenuPayload);
 
             // Assert
-            Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
@@ -145,7 +143,7 @@ namespace Coop.Tests.Client.States
             currentState.Handle_MainMenuEntered(mainMenuPayload);
 
             // Assert
-            Assert.Single(MockMessageBroker.PublishedMessages);
+            Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<ReceivingSavedDataState>(clientLogic.State);
         }
 
@@ -159,7 +157,7 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterMainMenu();
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<EnterMainMenu>(message);
         }
 
@@ -173,7 +171,7 @@ namespace Coop.Tests.Client.States
             clientLogic.Disconnect();
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<EnterMainMenu>(message);
         }
 

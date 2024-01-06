@@ -1,11 +1,12 @@
 ﻿using Common.Messaging;
+using System.Collections;
 
-namespace Coop.IntegrationTests.Environment;
+namespace Common.Tests.Utils;
 
 /// <summary>
 /// Collection of <see cref="IMessage"/>s
 /// </summary>
-internal class MessageCollection
+public class MessageCollection : IEnumerable<IMessage>
 {
     public readonly List<IMessage> Messages = new List<IMessage>();
 
@@ -38,4 +39,10 @@ internal class MessageCollection
     /// </summary>
     /// <param name="message">Message to add to the collection</param>
     public void Add(IMessage message) => Messages.Add(message);
+
+    public IEnumerator<IMessage> GetEnumerator() => Messages.GetEnumerator();
+
+    IEnumerator IEnumerable.GetEnumerator() => Messages.GetEnumerator();
+
+    public void Clear() => Messages.Clear();
 }

@@ -76,6 +76,7 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ServerModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
+            builder.RegisterModule<GameInterfaceModule>();
             container = builder.Build();
 
             containerProvider.SetProvider(container);
@@ -100,6 +101,7 @@ namespace Coop.Core
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ClientModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
+            builder.RegisterModule<GameInterfaceModule>();
 
             if (configuration != null)
             {

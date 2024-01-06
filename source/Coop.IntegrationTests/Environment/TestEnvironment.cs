@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
+using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Core.Client;
 using Coop.Core.Server;

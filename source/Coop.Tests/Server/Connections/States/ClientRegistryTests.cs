@@ -4,6 +4,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
+using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System.Linq;
@@ -23,7 +24,7 @@ namespace Coop.Tests.Server.Connections.States
             serverComponent = new ServerTestComponent(output);
 
             var container = serverComponent.Container;
-            var network = container.Resolve<MockNetwork>();
+            var network = container.Resolve<TestNetwork>();
 
             playerPeer = network.CreatePeer();
 

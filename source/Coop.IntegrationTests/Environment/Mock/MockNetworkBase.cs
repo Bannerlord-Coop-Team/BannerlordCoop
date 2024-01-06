@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
+using Common.Tests.Utils;
 using Coop.IntegrationTests.Environment.Extensions;
 using LiteNetLib;
 

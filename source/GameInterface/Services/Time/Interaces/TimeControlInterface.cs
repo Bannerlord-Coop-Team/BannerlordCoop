@@ -1,17 +1,32 @@
-﻿using GameInterface.Services.Heroes.Patches;
+﻿using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Time;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Interaces;
 
 internal interface ITimeControlInterface : IGameAbstraction
 {
-    void SetTimeControl(CampaignTimeControlMode newMode);
+    TimeControlEnum GetTimeControl();
+    void SetTimeControl(TimeControlEnum newMode);
 }
 
 internal class TimeControlInterface : ITimeControlInterface
 {
-    public void SetTimeControl(CampaignTimeControlMode newMode)
+    private readonly ITimeControlModeConverter modeConverter;
+
+    public TimeControlInterface(ITimeControlModeConverter modeConverter)
     {
-        TimePatches.OverrideTimeControlMode(Campaign.Current, newMode);
+        this.modeConverter = modeConverter;
+    }
+
+    public TimeControlEnum GetTimeControl()
+    {
+        return modeConverter.Convert(Campaign.Current.TimeControlMode);
+    }
+
+    public void SetTimeControl(TimeControlEnum newMode)
+    {
+        TimePatches.OverrideTimeControlMode(Campaign.Current, modeConverter.Convert(newMode));
     }
 }
