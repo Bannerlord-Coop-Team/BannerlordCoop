@@ -23,6 +23,8 @@ public class LeaveSettlementActionPatches
     {
         if(AllowedInstance.IsAllowed(mobileParty)) return true;
 
+        if (ModInformation.IsClient) return false;
+
         var message = new PartyLeaveSettlementAttempted(mobileParty.StringId);
         MessageBroker.Instance.Publish(mobileParty, message);
 
