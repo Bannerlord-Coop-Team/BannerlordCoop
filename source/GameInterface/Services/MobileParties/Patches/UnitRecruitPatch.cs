@@ -1,20 +1,13 @@
-﻿using Common;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.Clans.Messages;
-using GameInterface.Services.GameDebug.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
-using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.CampaignSystem.CampaignBehaviors.RecruitmentCampaignBehavior;
 
 namespace GameInterface.Services.MobileParties.Patches
 {
