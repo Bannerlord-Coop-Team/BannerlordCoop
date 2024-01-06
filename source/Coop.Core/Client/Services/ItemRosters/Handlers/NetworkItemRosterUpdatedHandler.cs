@@ -2,7 +2,6 @@
 using Common.Network;
 using Coop.Core.Server.Services.PartyBases.Messages;
 using GameInterface.Services.ItemRosters.Messages.Events;
-using System.Data;
 
 namespace Coop.Core.Client.Services.PartyBases.Handlers
 {
@@ -16,17 +15,17 @@ namespace Coop.Core.Client.Services.PartyBases.Handlers
             messageBroker = broker;
             this.network = network;
 
-            messageBroker.Subscribe<NetworkItemRosterUpdated>(Handle);
+            messageBroker.Subscribe<NetworkItemRosterUpdate>(Handle);
         }
 
-        public void Handle(MessagePayload<NetworkItemRosterUpdated> payload)
+        public void Handle(MessagePayload<NetworkItemRosterUpdate> payload)
         {
-            messageBroker.Publish(this, new ItemRosterUpdated(payload.What.PartyBaseId, payload.What.EquipmentElement, payload.What.Number));
+            messageBroker.Publish(this, new ItemRosterUpdate(payload.What.PartyBaseID, payload.What.ItemID, payload.What.ItemModifierID, payload.What.Amount));
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<NetworkItemRosterUpdated>(Handle);
+            messageBroker.Unsubscribe<NetworkItemRosterUpdate>(Handle);
         }
     }
 }

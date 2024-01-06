@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.ItemRosters.Messages.Commands.Internal;
+using GameInterface.Services.ItemRosters.Messages.Events;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -17,7 +17,7 @@ namespace GameInterface.Services.ItemRosters.Patches
             {
                 if (ModInformation.IsServer)
                 {
-                    MessageBroker.Instance.Publish(__instance, new PrepareItemRosterUpdated(pb.Id, rosterElement, number));
+                    MessageBroker.Instance.Publish(__instance, new ItemRosterUpdate(pb.Id, rosterElement.Item.StringId, rosterElement.ItemModifier?.StringId, number));
                 }
             }
         }

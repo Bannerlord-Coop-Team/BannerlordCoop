@@ -1,8 +1,12 @@
 ﻿using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
+using System.Collections.Immutable;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.ItemRosters.Commands
 {
@@ -16,8 +20,8 @@ namespace GameInterface.Services.ItemRosters.Commands
                 return "ID expected";
             }
 
-            ItemRoster roster;
-            string owner;
+            ItemRoster roster = null;
+            string owner = null;
 
             if (MBObjectManager.Instance.ContainsObject<Settlement>(args[0]))
             {
@@ -27,30 +31,46 @@ namespace GameInterface.Services.ItemRosters.Commands
                 owner = obj.Town.Name.ToString();
 
             }
-            //TODO: fix mobile party lookup
-            /*else if (MBObjectManager.Instance.ContainsObject<MobileParty>(args[0]))
+
+            MobileParty party = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
+            if (party != null)
             {
-                var obj = MBObjectManager.Instance.GetObject<MobileParty>(args[0]);
-                roster = obj.ItemRoster;
-                owner = obj.GetName().Value;
-            } */
-            else 
+                roster = party.ItemRoster;
+                owner = party.Owner.Name.ToString();
+            }
+            
+            if (roster == null || owner == null)
             {
                 return string.Format("ID: '{0}' not found", args[0]);
             }
 
-            return string.Format("'{0}' item roster info:\n  Item count: {1}\n  Hash: {2:X}\n", owner, roster.Count, hash(roster));
+            return string.Format("ItemRoster info for '{0}':\n  Item count: {1}\n  Hash: {2:X}\n  Version No.: {3:X}\n",
+                owner, roster.Count, hash(roster), roster.VersionNo);
         }
 
         private static int hash(ItemRoster roster)
         {
-            int hash = 17;
-            foreach (var item in roster)
+            int hash = 1009;
+            var sorted = roster.ToImmutableSortedSet(new ItemRosterElementComparer());
+            foreach (var item in sorted)
             {
-                hash = hash * 31 + item.GetHashCode();
+                hash = hash * 9176 + item.EquipmentElement.Item.StringId.GetHashCode();
+                if (item.EquipmentElement.ItemModifier != null)
+                    hash = hash * 9176 + item.EquipmentElement.ItemModifier.StringId.GetHashCode();
+                else
+                    hash = hash * 9176 + 0;
+                hash = hash * 9176 + item.Amount;
             }
 
             return hash;
+        }
+
+        private class ItemRosterElementComparer : IComparer<ItemRosterElement>
+        {
+            public int Compare(ItemRosterElement x, ItemRosterElement y)
+            {
+                return x.EquipmentElement.Item.StringId.CompareTo(y.EquipmentElement.Item.StringId);
+            }
         }
     }
 }

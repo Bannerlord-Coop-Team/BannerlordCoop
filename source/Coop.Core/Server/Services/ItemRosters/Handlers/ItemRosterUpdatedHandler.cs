@@ -18,17 +18,17 @@ namespace Coop.Core.Server.Services.PartyBases.Handlers
             messageBroker = broker;
             this.network = network;
 
-            messageBroker.Subscribe<ItemRosterUpdated>(Handle);
+            messageBroker.Subscribe<ItemRosterUpdate>(Handle);
         }
 
-        public void Handle(MessagePayload<ItemRosterUpdated> payload)
+        public void Handle(MessagePayload<ItemRosterUpdate> payload)
         {
-            network.SendAll(new NetworkItemRosterUpdated(payload.What.PartyBaseId, payload.What.EquipmentElement, payload.What.Number));
+            network.SendAll(new NetworkItemRosterUpdate(payload.What.PartyBaseID, payload.What.ItemID, payload.What.ItemModifierID, payload.What.Amount));
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<ItemRosterUpdated>(Handle);
+            messageBroker.Unsubscribe<ItemRosterUpdate>(Handle);
         }
     }
 }
