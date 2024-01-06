@@ -105,8 +105,7 @@ internal class PeerQueueOverloadedHandler : IHandler
         lock (overloadedPeers)
         {
             // removes all peers with clear queues
-            overloadedPeers.RemoveAll(peer => peer.GetPacketsCountInReliableQueue(0, true)
-                                            + peer.GetPacketsCountInReliableQueue(0, false) == 0);
+            overloadedPeers.RemoveAll(IsClientCaughtUp);
 
             // continue if any queue is not empty
             if (overloadedPeers.Count > 0) return;
@@ -115,6 +114,18 @@ internal class PeerQueueOverloadedHandler : IHandler
         ResumeTime();
 
         Poller.Stop();
+    }
+
+    private bool IsClientCaughtUp(NetPeer peer)
+    {
+        if (peer.ConnectionState != ConnectionState.Connected) return true;
+
+        var numPacketsInQueue = peer.GetPacketsCountInReliableQueue(0, true)
+                              + peer.GetPacketsCountInReliableQueue(0, false);
+
+        Logger.Information($"Peer {peer.EndPoint} is catching up with {numPacketsInQueue} packets remaining");
+
+        return numPacketsInQueue == 0;
     }
 
     private void ResumeTime()

@@ -1,7 +1,7 @@
 <Tasks>
     <CreateItem/>
     <UpdateItem>
-        <ModuleFolder Value="D:\Mod Development\BannerlordCoop\mb2\Modules\Coop"/>
+        <ModuleFolder Value="E:\Mod Development\BannerlordCoop\mb2\Modules\Coop"/>
         <!-- A direct path of your module -->
         <ItemDescription Value="Coop Pre-Alpha 0.1"/>
         <!-- A description that will be displayed on Steam Workshop, can be edited via the Steam UI -->
