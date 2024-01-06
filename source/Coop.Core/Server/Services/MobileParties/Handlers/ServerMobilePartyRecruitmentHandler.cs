@@ -23,37 +23,31 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
             messageBroker.Subscribe<NetworkRecruitRequest>(Handle);
-            messageBroker.Subscribe<PartyRecruitUnit>(Handle);
+            messageBroker.Subscribe<TroopCountChanged>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<NetworkRecruitRequest>(Handle);
-            messageBroker.Unsubscribe<PartyRecruitUnit>(Handle);
+            messageBroker.Unsubscribe<TroopCountChanged>(Handle);
         }
 
         internal void Handle(MessagePayload<NetworkRecruitRequest> obj)
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId));
+            messageBroker.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonRoster));
 
-            network.SendAllBut(obj.Who as NetPeer, new NetworkUnitRecruited(payload.CharacterId, payload.Amount, payload.PartyId));
+            network.SendAll(new NetworkUnitRecruited(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonRoster));
         }
 
-        private void Handle(MessagePayload<PartyRecruitUnit> obj)
+        private void Handle(MessagePayload<TroopCountChanged> obj)
         {
             var payload = obj.What;
 
-            network.SendAll(new NetworkPartyRecruitedUnit(
-                payload.PartyId, 
-                payload.SettlementId, 
-                payload.HeroId, 
-                payload.CharacterId, 
-                payload.Amount,
-                payload.BitCode,
-                payload.RecruitingDetail
-                ));
+            messageBroker.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonerRoster));
+
+            network.SendAll(new NetworkUnitRecruited(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonerRoster));
         }
     }
 }

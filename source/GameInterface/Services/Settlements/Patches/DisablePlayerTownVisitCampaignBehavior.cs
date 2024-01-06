@@ -53,7 +53,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_market_on_consequence")]
     static bool DisableTownMarket()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -153,7 +153,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_ui_village_buy_good_on_consequence")]
     static bool DisableVillageBuyGoods()
     {
-        return false;
+        return true;
     }
 
     /// <summary>

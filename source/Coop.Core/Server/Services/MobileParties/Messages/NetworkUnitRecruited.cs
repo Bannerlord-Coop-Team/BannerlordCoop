@@ -18,12 +18,15 @@ namespace Coop.Core.Server.Services.MobileParties.Messages
         public int Amount;
         [ProtoMember(3)]
         public string PartyId;
+        [ProtoMember(4)]
+        public bool IsPrisonerRoster;
 
-        public NetworkUnitRecruited(string characterId, int amount, string partyId)
+        public NetworkUnitRecruited(string characterId, int amount, string partyId, bool prisonerRoster)
         {
             CharacterId = characterId;
             Amount = amount;
             PartyId = partyId;
+            IsPrisonerRoster = prisonerRoster;
         }
     }
 }

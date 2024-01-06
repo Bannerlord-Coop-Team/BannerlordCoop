@@ -23,44 +23,26 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<OnUnitRecruited>(Handle);
+            messageBroker.Subscribe<TroopCountChanged>(Handle);
             messageBroker.Subscribe<NetworkUnitRecruited>(Handle);
-            messageBroker.Subscribe<NetworkPartyRecruitedUnit>(Handle);
         }
         public void Dispose()
         {
-            messageBroker.Unsubscribe<OnUnitRecruited>(Handle);
+            messageBroker.Unsubscribe<TroopCountChanged>(Handle);
             messageBroker.Unsubscribe<NetworkUnitRecruited>(Handle);
-            messageBroker.Unsubscribe<NetworkPartyRecruitedUnit>(Handle);
         }
 
-        private void Handle(MessagePayload<NetworkUnitRecruited> obj)
+        internal void Handle(MessagePayload<TroopCountChanged> obj)
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId));
+            network.SendAll(new NetworkRecruitRequest(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonerRoster));
         }
-
-        internal void Handle(MessagePayload<OnUnitRecruited> obj)
+        internal void Handle(MessagePayload<NetworkUnitRecruited> obj)
         {
             var payload = obj.What;
 
-            network.SendAll(new NetworkRecruitRequest(payload.CharacterId, payload.Amount, payload.PartyId));
-        }
-
-        private void Handle(MessagePayload<NetworkPartyRecruitedUnit> obj)
-        {
-            var payload = obj.What;
-
-            messageBroker.Publish(this, new PartyRecruitedUnit(
-                payload.PartyId,
-                payload.SettlementId,
-                payload.HeroId,
-                payload.CharacterId,
-                payload.Amount,
-                payload.BitCode,
-                payload.RecruitingDetail
-                ));
+            messageBroker.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId, payload.IsPrisonerRoster));
         }
     }
 }

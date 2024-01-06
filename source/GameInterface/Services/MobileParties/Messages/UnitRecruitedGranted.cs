@@ -11,11 +11,14 @@ namespace GameInterface.Services.MobileParties.Messages
         public int Amount { get; }
         public string PartyId { get; }
 
-        public UnitRecruitGranted (string characterId, int amount, string partyId)
+        public bool IsPrisonRoster { get; }
+
+        public UnitRecruitGranted (string characterId, int amount, string partyId, bool prisonRoster)
         {
             CharacterId = characterId;
             Amount = amount;
             PartyId = partyId;
+            IsPrisonRoster = prisonRoster;
         }
     }
 }

@@ -1,41 +1,64 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
+using Common.Util;
+using GameInterface.Policies;
+using GameInterface.Services.Clans.Messages;
+using GameInterface.Services.GameDebug.Patches;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using System;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.CampaignSystem.CampaignBehaviors.RecruitmentCampaignBehavior;
 
 namespace GameInterface.Services.MobileParties.Patches
 {
-    [HarmonyPatch(typeof(RecruitmentCampaignBehavior))]
+    [HarmonyPatch(typeof(TroopRoster))]
     public class UnitRecruitPatch
     {
-        [HarmonyPatch("OnUnitRecruited")]
-        public static void Prefix(CharacterObject troop, int count)
+        private static PropertyInfo TroopRoster_OwnerParty => typeof(TroopRoster).GetProperty("OwnerParty", BindingFlags.Instance | BindingFlags.NonPublic);
+
+        private static readonly AllowedInstance<CharacterObject> AllowedInstance = new AllowedInstance<CharacterObject>();
+
+        [HarmonyPatch(nameof(TroopRoster.AddToCounts))]
+        public static bool Prefix(TroopRoster __instance, CharacterObject character, int count, bool insertAtFront = false, int woundedCount = 0, int xpChange = 0, bool removeDepleted = true, int index = -1)
         {
-            MessageBroker.Instance.Publish(MobileParty.MainParty, new OnUnitRecruited(troop.StringId, count, MobileParty.MainParty.StringId));
+            if (AllowedInstance.IsAllowed(character)) return true;
+
+            if (PolicyProvider.AllowOriginalCalls) return true;
+
+            PartyBase ownerParty = (PartyBase)TroopRoster_OwnerParty.GetValue(__instance);
+
+            if (ownerParty == null) return false;
+
+            if (ownerParty.MobileParty.IsPartyControlled() == false) return false;
+
+            MessageBroker.Instance.Publish(__instance, new TroopCountChanged(character.StringId, count, ownerParty.MobileParty.StringId, __instance.IsPrisonRoster));
+
+            return false;
         }
 
-        [HarmonyPatch("ApplyInternal")] //TODO: Does this fire when other player parties recruit? If so, return false.
-        public static bool Prefix(MobileParty side1Party, Settlement settlement, Hero individual, 
-            CharacterObject troop, int number, int bitCode, RecruitingDetail detail)
+
+        public static void RunOriginalAddToCounts(CharacterObject character, int amount, MobileParty party, bool isPrisonerRoster)
         {
-            if (ModInformation.IsClient) { return false; }
+            using (AllowedInstance)
+            {
+                AllowedInstance.Instance = character;
 
-            MessageBroker.Instance.Publish(side1Party, new PartyRecruitUnit(
-                side1Party.StringId, 
-                settlement?.StringId, 
-                individual?.StringId, 
-                troop.StringId, 
-                number,
-                bitCode,
-                Convert.ToInt16(detail)
-                ));
-
-            return true;
+                if (isPrisonerRoster)
+                {
+                    party.PrisonRoster.AddToCounts(character, amount);
+                }
+                else
+                {
+                    party.MemberRoster.AddToCounts(character, amount);
+                }
+            }
         }
     }
 }
