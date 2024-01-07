@@ -61,10 +61,7 @@ namespace GameInterface.Services.MapEvents.Handlers
                 if (attackerParty == MobileParty.MainParty)
                 {
                     MapState mapState = Game.Current.GameStateManager.ActiveState as MapState;
-                    if (mapState != null)
-                    {
-                        mapState.OnMainPartyEncounter();
-                    }
+                    mapState?.OnMainPartyEncounter();
                 }
             }
 
