@@ -5,12 +5,12 @@ using GameInterface.Services.ItemRosters.Messages.Events;
 
 namespace Coop.Core.Client.Services.PartyBases.Handlers
 {
-    public class NetworkItemRosterUpdatedHandler : IHandler
+    public class NetworkItemRosterUpdateHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
-        public NetworkItemRosterUpdatedHandler(IMessageBroker broker, INetwork network)
+        public NetworkItemRosterUpdateHandler(IMessageBroker broker, INetwork network)
         {
             messageBroker = broker;
             this.network = network;

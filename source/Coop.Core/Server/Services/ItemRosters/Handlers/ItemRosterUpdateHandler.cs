@@ -8,12 +8,12 @@ namespace Coop.Core.Server.Services.PartyBases.Handlers
     /// <summary>
     /// Handles ItemRosterUpdated and sends network event to all clients.
     /// </summary>
-    public class ItemRosterUpdatedHandler : IHandler
+    public class ItemRosterUpdateHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
-        public ItemRosterUpdatedHandler(IMessageBroker broker, INetwork network)
+        public ItemRosterUpdateHandler(IMessageBroker broker, INetwork network)
         {
             messageBroker = broker;
             this.network = network;
