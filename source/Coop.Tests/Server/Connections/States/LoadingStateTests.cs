@@ -6,7 +6,6 @@ using Coop.Core.Server.Connections.States;
 using Coop.Tests.Extensions;
 using Coop.Tests.Mocks;
 using LiteNetLib;
-using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -19,16 +18,13 @@ namespace Coop.Tests.Server.Connections.States
         private readonly NetPeer differentPeer;
         private readonly ServerTestComponent serverComponent;
 
-        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => serverComponent.MockNetwork;
-
         public LoadingStateTests(ITestOutputHelper output)
         {
             serverComponent = new ServerTestComponent(output);
 
             var container = serverComponent.Container;
 
-            var network = container.Resolve<MockNetwork>();
+            var network = container.Resolve<TestNetwork>();
 
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
@@ -79,8 +75,7 @@ namespace Coop.Tests.Server.Connections.States
 
 
             // Assert
-            Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<PlayerCampaignEntered>(MockMessageBroker.PublishedMessages.First());
+            Assert.Equal(1, serverComponent.TestMessageBroker.GetMessageCountFromType<PlayerCampaignEntered>());
 
             Assert.IsType<CampaignState>(connectionLogic.State);
         }
@@ -98,7 +93,7 @@ namespace Coop.Tests.Server.Connections.States
 
 
             // Assert
-            Assert.Empty(MockMessageBroker.PublishedMessages);
+            Assert.Empty(serverComponent.TestMessageBroker.Messages);
 
             Assert.IsType<LoadingState>(connectionLogic.State);
         }

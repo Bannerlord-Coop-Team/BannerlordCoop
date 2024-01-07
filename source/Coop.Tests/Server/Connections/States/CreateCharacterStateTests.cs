@@ -20,16 +20,13 @@ namespace Coop.Tests.Server.Connections.States
         private readonly NetPeer differentPeer;
         private readonly ServerTestComponent serverComponent;
 
-        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => serverComponent.MockNetwork;
-
         public CreateCharacterStateTests(ITestOutputHelper output)
         {
             serverComponent = new ServerTestComponent(output);
 
             var container = serverComponent.Container;
 
-            var network = container.Resolve<MockNetwork>();
+            var network = container.Resolve<TestNetwork>();
 
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
@@ -71,8 +68,8 @@ namespace Coop.Tests.Server.Connections.States
             currentState.PlayerTransferedHeroHandler(payload);
 
             // Assert
-            Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<RegisterNewPlayerHero>(MockMessageBroker.PublishedMessages[0]);
+            Assert.Single(serverComponent.TestMessageBroker.Messages);
+            Assert.IsType<RegisterNewPlayerHero>(serverComponent.TestMessageBroker.Messages.First());
             Assert.IsType<CreateCharacterState>(connectionLogic.State);
         }
 
@@ -88,8 +85,8 @@ namespace Coop.Tests.Server.Connections.States
             currentState.PlayerHeroRegisteredHandler(payload);
 
             // Assert
-            Assert.Equal(2, MockNetwork.GetPeerMessages(playerPeer).Count());
-            var message = MockNetwork.GetPeerMessages(playerPeer).First();
+            Assert.Equal(2, serverComponent.TestNetwork.GetPeerMessages(playerPeer).Count());
+            var message = serverComponent.TestNetwork.GetPeerMessages(playerPeer).First();
             Assert.IsType<NetworkPlayerData>(message);
 
             Assert.IsType<TransferSaveState>(connectionLogic.State);

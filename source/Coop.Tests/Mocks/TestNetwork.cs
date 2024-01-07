@@ -12,7 +12,7 @@ using TaleWorlds.Library;
 
 namespace Coop.Tests.Mocks;
 
-public class MockNetwork : INetwork
+public class TestNetwork : INetwork
 {
     public INetworkConfiguration Configuration => throw new NotImplementedException();
 
@@ -28,21 +28,37 @@ public class MockNetwork : INetwork
     public NetPeer CreatePeer()
     {
         var newPeer = (NetPeer)FormatterServices.GetUninitializedObject(typeof(NetPeer));
-        newPeer.SetId(NewPeerId);
+        newPeer.Setup(NewPeerId);
 
         Peers.Add(newPeer);
 
         return newPeer;
     }
 
-    public IEnumerable<IMessage> GetPeerMessages(NetPeer peer)
+    public IEnumerable<IMessage> GetPeerMessages(NetPeer peer) => SentNetworkMessages[peer.Id];
+
+    public IEnumerable<T> GetPeerMessagesFromType<T>(NetPeer peer) where T : IMessage
     {
-        return SentNetworkMessages[peer.Id];
+        return SentNetworkMessages[peer.Id]
+            .Where(msg => msg.GetType() == typeof(T))
+            .Select(msg => (T)msg);
     }
 
-    public IEnumerable<IPacket> GetPeerPackets(NetPeer peer)
+    public int GetPeerMessageCountFromType<T>(NetPeer peer) where T : IMessage
     {
-        return SentPackets[peer.Id];
+        return SentNetworkMessages[peer.Id].Count(msg => msg.GetType() == typeof(T));
+    }
+
+    public IEnumerable<IPacket> GetPeerPackets(NetPeer peer) => SentPackets[peer.Id];
+
+    public IEnumerable<T> GetPeerPacketsFromType<T>(NetPeer peer) where T : IPacket 
+    {
+        return SentPackets[peer.Id].Where(pkt => pkt.GetType() == typeof(T)).Select(msg => (T)msg);
+    }
+
+    public int GetPeerPacketCountFromType<T>(NetPeer peer) where T : IPacket 
+    { 
+        return SentPackets[peer.Id].Count(pkt => pkt.GetType() == typeof(T)); 
     }
 
     public void Send(NetPeer netPeer, IPacket packet)
@@ -105,5 +121,11 @@ public class MockNetwork : INetwork
 
     public void Update(TimeSpan frameTime)
     {
+    }
+
+    public void Clear()
+    {
+        SentNetworkMessages.Clear();
+        SentPackets.Clear();
     }
 }

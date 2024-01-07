@@ -23,13 +23,13 @@ namespace Coop.Core.Client.Services.Time.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
             messageBroker.Subscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
-            messageBroker.Subscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
+            messageBroker.Subscribe<NetworkChangeTimeControlMode>(Handle_NetworkTimeSpeedChanged);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
-            messageBroker.Unsubscribe<NetworkTimeSpeedChanged>(Handle_NetworkTimeSpeedChanged);
+            messageBroker.Unsubscribe<NetworkChangeTimeControlMode>(Handle_NetworkTimeSpeedChanged);
         }
 
         internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
@@ -42,7 +42,7 @@ namespace Coop.Core.Client.Services.Time.Handlers
             network.SendAll(payload);
         }
 
-        internal void Handle_NetworkTimeSpeedChanged(MessagePayload<NetworkTimeSpeedChanged> obj)
+        internal void Handle_NetworkTimeSpeedChanged(MessagePayload<NetworkChangeTimeControlMode> obj)
         {
             var newMode = obj.What.NewControlMode;
 

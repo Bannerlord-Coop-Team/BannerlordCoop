@@ -1,38 +1,15 @@
 ﻿using Autofac;
-using Common.Messaging;
-using Common.Network;
-using Coop.Core;
 using Coop.Core.Server;
-using Coop.Tests.Mocks;
 using Xunit.Abstractions;
 
-namespace Coop.Tests
+namespace Coop.Tests;
+
+internal class ServerTestComponent : TestComponentBase
 {
-    internal class ServerTestComponent
+    public ServerTestComponent(ITestOutputHelper output) : base(output)
     {
-        public MockMessageBroker MockMessageBroker { get; }
-        public MockNetwork MockNetwork { get; }
-        public ITestOutputHelper Output { get; }
-        public IContainer Container { get; }
-
-        public ServerTestComponent(ITestOutputHelper output)
-        {
-            Output = output;
-
-            var containerProvider = new ContainerProvider();
-            var builder = new ContainerBuilder();
-            builder.RegisterModule<ServerModule>();
-            builder.RegisterType<MockMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
-            builder.RegisterType<MockNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>();
-
-
-            Container = builder.Build();
-
-            containerProvider.SetProvider(Container);
-
-            MockMessageBroker = Container.Resolve<MockMessageBroker>()!;
-            MockNetwork = Container.Resolve<MockNetwork>()!;
-        }
+        var builder = new ContainerBuilder();
+        builder.RegisterModule<ServerModule>();
+        Container = BuildContainer(builder);
     }
 }

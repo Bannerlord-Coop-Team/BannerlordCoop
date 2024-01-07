@@ -25,7 +25,7 @@ public class TransferSaveState : ConnectionStateBase
         messageBroker.Subscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
 
         messageBroker.Publish(this, new SetTimeControlMode(TimeControlEnum.Pause));
-        network.SendAll(new NetworkTimeSpeedChanged(TimeControlEnum.Pause));
+        network.SendAll(new NetworkChangeTimeControlMode(TimeControlEnum.Pause));
 
         messageBroker.Publish(this, new PackageGameSaveData());
     }

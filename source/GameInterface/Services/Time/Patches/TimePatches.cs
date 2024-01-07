@@ -1,6 +1,7 @@
 ﻿using Common.Extensions;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Time;
 using HarmonyLib;
 using System;
 using System.Reflection;
@@ -20,6 +21,8 @@ internal class TimePatches
         .GetField("_timeControlMode", BindingFlags.NonPublic | BindingFlags.Instance)
         .BuildUntypedGetter<Campaign, CampaignTimeControlMode>();
 
+    private static readonly TimeControlModeConverter timeControlModeConverter = new();
+
     [HarmonyPatch("TimeControlMode")]
     [HarmonyPatch(MethodType.Setter)]
     private static bool Prefix(ref Campaign __instance, ref CampaignTimeControlMode value)
@@ -27,7 +30,8 @@ internal class TimePatches
         if (__instance.TimeControlModeLock == false &&
             value != _getTimeControlMode(__instance))
         {
-            MessageBroker.Instance.Publish(__instance, new AttemptedTimeSpeedChanged(value));
+            var controlMode = timeControlModeConverter.Convert(value);
+            MessageBroker.Instance.Publish(__instance, new AttemptedTimeSpeedChanged(controlMode));
         }
 
         return false;

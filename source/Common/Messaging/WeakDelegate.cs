@@ -21,13 +21,18 @@ namespace Common.Messaging
             method = @delegate.Method;
         }
 
-        public void Invoke(object[] parameters)
+        public T Invoke<T>(object[] parameters)
+        {
+            return (T)Invoke(parameters);
+        }
+
+        public object Invoke(object[] parameters)
         {
             var obj = reference.Target;
 
-            if (obj == null) return;
+            if (obj == null) return null;
 
-            method.Invoke(obj, parameters);
+            return method.Invoke(obj, parameters);
         }
 
         public override bool Equals(object obj)
