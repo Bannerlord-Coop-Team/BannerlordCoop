@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Serialization;
+using GameInterface;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using ProtoBuf;
@@ -10,7 +11,7 @@ using TaleWorlds.Library;
 namespace Missions.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public class MissionJoinInfo : INetworkEvent
+    public class MissionJoinInfo : IEvent
     {
         [ProtoMember(1)]
         public readonly Guid PlayerId;
@@ -34,7 +35,9 @@ namespace Missions.Messages
 
         private byte[] PackCharacter(CharacterObject characterObject)
         {
-            var factory = new BinaryPackageFactory();
+            if (!ContainerProvider.TryResolve<IBinaryPackageFactory>(out var factory)) {
+                throw new SystemException();          
+            }
             var character = new CharacterObjectBinaryPackage(characterObject, factory);
             character.Pack();
 
@@ -43,11 +46,14 @@ namespace Missions.Messages
 
         private CharacterObject UnpackCharacter()
         {
-            var factory = new BinaryPackageFactory();
+            if (!ContainerProvider.TryResolve<IBinaryPackageFactory>(out var factory))
+            {
+                throw new SystemException();
+            }
             var character = BinaryFormatterSerializer.Deserialize<CharacterObjectBinaryPackage>(_packedCharacter);
             character.BinaryPackageFactory = factory;
 
-            return character.Unpack<CharacterObject>();
+            return character.Unpack<CharacterObject>(factory);
         }
     }
 }

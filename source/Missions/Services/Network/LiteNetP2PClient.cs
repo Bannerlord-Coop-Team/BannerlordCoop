@@ -1,6 +1,8 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Network;
+using Common.PacketHandlers;
 using Common.Serialization;
 using IntroServer.Config;
 using IntroServer.Data;
@@ -8,7 +10,6 @@ using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Missions.Services.Network.Messages;
-using Missions.Services.Network.PacketHandlers;
 using Serilog;
 using Serilog.Events;
 using System;
@@ -20,7 +21,7 @@ using Version = System.Version;
 
 namespace Missions.Services.Network
 {
-    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable
+    public class LiteNetP2PClient : INatPunchListener, INetEventListener, IUpdateable, IDisposable, INetwork
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LiteNetP2PClient>();
         private static readonly Dictionary<PacketType, List<IPacketHandler>> PacketHandlers = new Dictionary<PacketType, List<IPacketHandler>>();
@@ -30,15 +31,17 @@ namespace Missions.Services.Network
         public NetPeer PeerServer { get; private set; }
         public int Priority => 2;
 
+        public INetworkConfiguration Configuration => throw new NotImplementedException();
+
         private string _instance;
 
         private readonly Guid id = Guid.NewGuid();
-        private readonly BatchLogger<PacketType> _batchLogger = new BatchLogger<PacketType>(LogEventLevel.Verbose, 10000);
+        private readonly BatchLogger _batchLogger = new BatchLogger(LogEventLevel.Verbose.ToString(), TimeSpan.FromMilliseconds(10000));
         private readonly NetManager _netManager;
         private readonly NetworkConfiguration _networkConfig;
         private readonly Version _version = typeof(MissionTestServer).Assembly.GetName().Version;
         private readonly IMessageBroker _messageBroker;
-        private readonly Poller _poller;
+        private readonly Common.Util.Poller _poller;
         public LiteNetP2PClient(NetworkConfiguration config, IMessageBroker messageBroker)
         {
             _networkConfig = config;
@@ -56,7 +59,7 @@ namespace Missions.Services.Network
 
             _netManager.Start();
 
-            _poller = new Poller(Update, TimeSpan.FromMilliseconds(1000/60));
+            _poller = new Common.Util.Poller(Update, TimeSpan.FromMilliseconds(1000/60));
             _poller.Start();
         }
 
@@ -150,14 +153,14 @@ namespace Missions.Services.Network
             _netManager.Stop();
         }
 
-        public void SendEvent(INetworkEvent networkEvent, NetPeer peer)
+        public void SendEvent(IEvent networkEvent, NetPeer peer)
         {
             EventPacket eventPacket = new EventPacket(networkEvent);
 
             Send(eventPacket, peer);
         }
 
-        public void SendAllEvent(INetworkEvent networkEvent)
+        public void SendAllEvent(IEvent networkEvent)
         {
             EventPacket eventPacket = new EventPacket(networkEvent);
 
@@ -233,7 +236,7 @@ namespace Missions.Services.Network
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetBytesWithLength());
             if (PacketHandlers.TryGetValue(packet.PacketType, out var handlers))
             {
-                _batchLogger.Log(packet.PacketType);
+                _batchLogger.LogOne();
                 foreach (var handler in handlers)
                 {
                     handler.HandlePacket(peer, packet);
@@ -267,6 +270,41 @@ namespace Missions.Services.Network
             {
                 request.Reject();
             }
+        }
+
+        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+        {
+            OnNetworkReceive(peer, reader, deliveryMethod);
+        }
+
+        public void Send(NetPeer netPeer, IPacket packet)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SendAllBut(NetPeer excludedPeer, IPacket packet)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Send(NetPeer netPeer, IMessage message)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SendAll(IMessage message)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void SendAllBut(NetPeer excludedPeer, IMessage message)
+        {
+            throw new NotImplementedException();
+        }
+
+        public void Start()
+        {
+            throw new NotImplementedException();
         }
     }
 }

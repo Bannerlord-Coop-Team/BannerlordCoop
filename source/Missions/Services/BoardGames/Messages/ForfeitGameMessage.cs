@@ -5,7 +5,7 @@ using System;
 namespace Missions.Services.BoardGames.Messages
 {
     [ProtoContract]
-    public readonly struct ForfeitGameMessage : INetworkEvent
+    public readonly struct ForfeitGameMessage : IEvent
     {
         public ForfeitGameMessage(Guid gameId)
         {

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.PacketHandlers;
 using LiteNetLib;
 using Missions.Services.Network;
 using Missions.Services.Network.Messages;
@@ -135,7 +136,7 @@ namespace Missions.Services.Agents.Packets
                 {
                     GameLoopRunner.RunOnMainThread(() =>
                     {
-                        agent.MakeDead(false, ActionIndexCache.act_none);
+                        agent.MakeDead(false, ActionIndexValueCache.act_none);
                         agent.FadeOut(false, true);
                     });
                 }

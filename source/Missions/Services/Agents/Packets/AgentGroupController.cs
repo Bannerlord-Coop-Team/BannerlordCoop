@@ -1,4 +1,5 @@
-﻿using System;
+﻿using LiteNetLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.MountAndBlade;
@@ -9,6 +10,16 @@ namespace Missions.Services.Agents.Packets
     {
         public IReadOnlyDictionary<Guid, Agent> ControlledAgents => m_ControlledAgents;
         private readonly Dictionary<Guid, Agent> m_ControlledAgents = new Dictionary<Guid, Agent>();
+        public NetPeer ControllingPeer { get; }
+
+        public AgentGroupController()
+        {
+        }
+
+        public AgentGroupController(NetPeer controllingPeer)
+        {
+            ControllingPeer = controllingPeer;
+        }
 
         public bool Contains(Agent agent)
         {

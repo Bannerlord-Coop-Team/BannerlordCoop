@@ -5,7 +5,7 @@ using System;
 namespace Missions.Services.BoardGames.Messages
 {
     [ProtoContract]
-    public readonly struct PawnCapturedMessage : INetworkEvent
+    public readonly struct PawnCapturedMessage : IEvent
     {
         public PawnCapturedMessage(Guid gameId, int index)
         {

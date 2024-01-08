@@ -36,11 +36,11 @@
     <Reference Include="0Harmony, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\Lib.Harmony.2.2.2\lib\net472\0Harmony.dll</HintPath>
     </Reference>
-    <Reference Include="Autofac, Version=6.4.0.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
-      <HintPath>..\packages\Autofac.6.4.0\lib\netstandard2.0\Autofac.dll</HintPath>
+    <Reference Include="Autofac, Version=7.0.1.0, Culture=neutral, PublicKeyToken=17863af14b0044da, processorArchitecture=MSIL">
+      <HintPath>..\packages\Autofac.7.0.1\lib\netstandard2.0\Autofac.dll</HintPath>
     </Reference>
-    <Reference Include="LiteNetLib, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\LiteNetLib.0.9.5.2\lib\net35\LiteNetLib.dll</HintPath>
+    <Reference Include="LiteNetLib, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\LiteNetLib.1.1.0\lib\net471\LiteNetLib.dll</HintPath>
     </Reference>
     <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=1.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.1.1.0\lib\net461\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
@@ -138,6 +138,37 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ContainerProvider.cs" />
+    <Compile Include="IMissionGameManager.cs" />
+    <Compile Include="MissionModule.cs" />
+    <Compile Include="Services\Agents\Handlers\AgentDamageHandler.cs" />
+    <Compile Include="Services\Agents\Handlers\AgentDeathHandler.cs" />
+    <Compile Include="Services\Agents\Handlers\AgentMovementHandler.cs" />
+    <Compile Include="Services\Agents\Handlers\ShieldDamageHandler.cs" />
+    <Compile Include="Services\Agents\Handlers\WeaponDropHandler.cs" />
+    <Compile Include="Services\Agents\Handlers\WeaponPickupHandler.cs" />
+    <Compile Include="Services\Agents\Messages\AgentDamaged.cs" />
+    <Compile Include="Services\Agents\Messages\AgentDied.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkAgentDamaged.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkAgentKilled.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkDamageAgent.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkShieldBreak.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkShieldDamaged.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkWeaponDropped.cs" />
+    <Compile Include="Services\Agents\Messages\NetworkWeaponPickedup.cs" />
+    <Compile Include="Services\Agents\Messages\ShieldDamaged.cs" />
+    <Compile Include="Services\Agents\Messages\WeaponDropped.cs" />
+    <Compile Include="Services\Agents\Messages\WeaponPickedup.cs" />
+    <Compile Include="Services\Agents\Patches\AgentDamagePatch.cs" />
+    <Compile Include="Services\Agents\Patches\AgentDropPatch.cs" />
+    <Compile Include="Services\Agents\Patches\AgentKilledPatch.cs" />
+    <Compile Include="Services\Agents\Patches\AgentPickupPatch.cs" />
+    <Compile Include="Services\Agents\Patches\AgentShieldDamagePatch.cs" />
+    <Compile Include="Services\Agents\Patches\WeaponDropPatch.cs" />
+    <Compile Include="Services\Agents\Patches\WeaponPickupPatch.cs" />
+    <Compile Include="Services\Arena\CoopArenaController.cs" />
+    <Compile Include="Services\Arena\RandomEquipmentGenerator.cs" />
+    <Compile Include="Services\Battles\CoopBattlesController.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameMoveMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnSetPawnCapturedMessage.cs" />
     <Compile Include="Services\BoardGames\Messages\OnHandlePreMovementStageMessage.cs" />
@@ -151,6 +182,16 @@
     <Compile Include="CoopMission.cs" />
     <Compile Include="Services\Agents\Extensions\AgentExtensions.cs" />
     <Compile Include="IMission.cs" />
+    <Compile Include="Services\Exceptions\ExceptionLogger.cs" />
+    <Compile Include="Services\Missiles\Handlers\MissileHandler.cs" />
+    <Compile Include="Services\Missiles\Message\AgentShoot.cs" />
+    <Compile Include="Services\Missiles\Message\NetworkAgentShoot.cs" />
+    <Compile Include="Services\Missiles\Message\PeerMissileAdded.cs" />
+    <Compile Include="Services\Missiles\NetworkMissileRegistry.cs" />
+    <Compile Include="Services\Missiles\Patches\MissileAuxPatches.cs" />
+    <Compile Include="Services\Network\Data\AiAgentData.cs" />
+    <Compile Include="Services\Network\EventQueueManager.cs" />
+    <Compile Include="Services\Network\Handlers\ServerDisconnectHandler.cs" />
     <Compile Include="Services\Network\IMissionPlayerNetwork.cs" />
     <Compile Include="Messages\BattleNetworkMessages.cs" />
     <Compile Include="Services\BoardGames\Messages\BoardGameChallengeRequest.cs" />
@@ -161,21 +202,23 @@
     <Compile Include="Messages\MissionEventInfos.cs" />
     <Compile Include="Messages\MissionJoinRequest.cs" />
     <Compile Include="Messages\MissionMessages.cs" />
+    <Compile Include="Services\Network\Messages\NetworkMissionJoinInfo.cs" />
     <Compile Include="Services\Network\Messages\PeerConnected.cs" />
     <Compile Include="Services\Network\Messages\PeerDisconnected.cs" />
+    <Compile Include="Services\Network\Messages\PeerReady.cs" />
+    <Compile Include="Services\Network\Messages\ServerDisconnected.cs" />
     <Compile Include="Services\Network\MissionClient.cs" />
     <Compile Include="Services\Network\MissionNetworkBehavior.cs" />
     <Compile Include="Services\Network\MissionShard.cs" />
     <Compile Include="Services\Network\EDisconnectReason.cs" />
     <Compile Include="Services\Network\INetworkObject.cs" />
-    <Compile Include="Services\Network\IPacket.cs" />
-    <Compile Include="Services\Network\IPacketHandler.cs" />
     <Compile Include="Services\Network\LiteNetP2PClient.cs" />
     <Compile Include="Services\Network\NetworkAgent.cs" />
     <Compile Include="Services\Network\NetworkAgentRegistry.cs" />
     <Compile Include="Services\Network\NetworkLooseWeapon.cs" />
     <Compile Include="Services\Network\NetworkMount.cs" />
     <Compile Include="Services\Network\NetworkSiegeEngine.cs" />
+    <Compile Include="Services\Network\PacketHandlers\EventPacketHandler.cs" />
     <Compile Include="Services\Network\Player.cs" />
     <Compile Include="Services\Agents\Packets\AgentActionData.cs" />
     <Compile Include="Services\Agents\Packets\AgentData.cs" />
@@ -184,7 +227,6 @@
     <Compile Include="Services\Agents\Packets\AgentMountData.cs" />
     <Compile Include="Services\Agents\Packets\MovementHandler.cs" />
     <Compile Include="Services\Agents\Patches\AgentInteractionPatches.cs" />
-    <Compile Include="Services\Network\PacketHandlers\EventPacketHandler.cs" />
     <Compile Include="Services\BoardGames\Patches\BoardGamePatches.cs" />
     <Compile Include="Services\Pausing\Patches\PausePatch.cs" />
     <Compile Include="PlayerId.cs" />

@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using Autofac;
+using Common;
 using SandBox;
 using System;
 using System.Collections.Generic;
@@ -12,6 +13,11 @@ using TaleWorlds.MountAndBlade;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 using Missions;
+using TaleWorlds.ScreenSystem;
+using TaleWorlds.MountAndBlade.View;
+using System.ComponentModel;
+using Module = TaleWorlds.MountAndBlade.Module;
+using IContainer = Autofac.IContainer;
 
 namespace MissionTestMod
 {
@@ -20,7 +26,10 @@ namespace MissionTestMod
 	    private static ILogger Logger;
 		private static UpdateableList Updateables { get; } = new UpdateableList();
         private static InitialStateOption JoinTavern;
-        
+        private static InitialStateOption JoinArena;
+        private static InitialStateOption JoinBattle;
+        private IContainer container;
+
         protected override void OnSubModuleLoad()
         {
 	        if (System.Diagnostics.Debugger.IsAttached)
@@ -44,8 +53,14 @@ namespace MissionTestMod
               9991,
               StartClientInTavern,
               () => (false, new TextObject()));
-
+            JoinArena = new InitialStateOption(
+               "Join Online Arena",
+               new TextObject("Join Online Arena"),
+               9992,
+               StartClientInArena,
+               () => (false, new TextObject()));
             Module.CurrentModule.AddInitialStateOption(JoinTavern);
+            Module.CurrentModule.AddInitialStateOption(JoinArena);
             base.OnSubModuleLoad();
             Logger.Verbose("Bannerlord Coop Mod loaded");
 
@@ -65,7 +80,7 @@ namespace MissionTestMod
             Updateables.UpdateAll(frameTime);
         }
 
-        private static void StartClientInTavern()
+        private void StartClientInTavern()
         {
 	        SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles(null);
             SaveGameFileInfo save = saveFiles.FirstOrDefault(s => ValidateModules(s.MetaData));
@@ -76,7 +91,23 @@ namespace MissionTestMod
             }
             else
             {
-                SandBoxSaveHelper.TryLoadSave(save, StartGame, null);
+                SandBoxSaveHelper.TryLoadSave(save, StartGameInTavern, null);
+            }
+        }
+
+        private void StartClientInArena()
+        {
+
+            SaveGameFileInfo[] saveFiles = MBSaveLoad.GetSaveFiles(null);
+            SaveGameFileInfo save = saveFiles.FirstOrDefault(s => ValidateModules(s.MetaData));
+
+            if (save == null)
+            {
+                InformationManager.DisplayMessage(new InformationMessage("Unable to find a save without Mods. Create a fresh game and try again."));
+            }
+            else
+            {
+                SandBoxSaveHelper.TryLoadSave(save, StartGameInArena, null);
             }
         }
 
@@ -100,10 +131,31 @@ namespace MissionTestMod
             return true;
         }
 
-        private static void StartGame(LoadResult loadResult)
+        private void BuildContainer()
+        {
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<MissionModule>();
+
+            container = builder.Build();
+
+            ContainerProvider.SetContainer(container);
+        }
+
+        private void StartGameInTavern(LoadResult loadResult)
         {
             MissionTestGameManager manager = new MissionTestGameManager(loadResult);
             manager.StartGameInTavern();
+         
         }
+        private void StartGameInArena(LoadResult loadResult)
+        {
+            BuildContainer();
+            MissionTestGameManager manager = container.Resolve<MissionTestGameManager>(new NamedParameter("loadedGameResult", loadResult));
+            manager.StartGameInArena();
+
+        }
+
+
     }
 }

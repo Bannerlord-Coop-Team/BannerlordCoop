@@ -7,6 +7,8 @@ using Missions.Services.Network;
 using Missions.Services.Network.Surrogates;
 using ProtoBuf.Meta;
 using SandBox;
+using SandBox.Missions.MissionLogics.Arena;
+using SandBox.Missions.MissionLogics;
 using Serilog;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,12 +22,33 @@ using TaleWorlds.Core;
 using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.Source.Missions.Handlers;
+using TaleWorlds.MountAndBlade.Source.Missions;
 using TaleWorlds.SaveSystem.Load;
+using Missions.Services;
 
 namespace Missions
 {
     public class MissionTestGameManager : SandBoxGameManager
     {
+        private MissionType missionType
+        {
+            get;
+            set;
+        }
+
+        enum MissionType
+        {
+            None,
+            Tavern,
+            Arena
+        }
+
+        private readonly LiteNetP2PClient _client;
+        private readonly CoopBattlesController _battlesController;
+        private readonly MissionNetworkBehavior _networkBehavior;
+
+
         static MissionTestGameManager()
         {
             RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
@@ -41,12 +64,42 @@ namespace Missions
             harmony.PatchAll();
         }
 
+        public MissionTestGameManager(
+            LoadResult loadedGameResult,
+            LiteNetP2PClient client,
+            CoopBattlesController battlesController,
+            MissionNetworkBehavior networkBehavior) : base(loadedGameResult)
+        {
+            _client = client;
+            _battlesController = battlesController;
+            _networkBehavior = networkBehavior;
+            harmony.PatchAll();
+        }
+
         ~MissionTestGameManager()
         {
         }
 
         public void StartGameInTavern()
         {
+            missionType = MissionType.Tavern;
+            NetworkConfiguration config = new NetworkConfiguration();
+
+            m_Client = new LiteNetP2PClient(config, MessageBroker.Instance);
+
+            if (m_Client.ConnectToP2PServer())
+            {
+                StartNewGame(this);
+            }
+            else
+            {
+                Logger.Error("Server Unreachable");
+            }
+        }
+
+        public void StartGameInArena()
+        {
+            missionType = MissionType.Arena;
             NetworkConfiguration config = new NetworkConfiguration();
 
             m_Client = new LiteNetP2PClient(config, MessageBroker.Instance);
@@ -76,40 +129,55 @@ namespace Missions
             //Set our encounter to the created encounter
             PlayerEncounter.LocationEncounter = locationEncounter;
 
-            int upgradeLevel = settlement.Town?.GetWallLevel() ?? 1;
-            Location tavern = LocationComplex.Current.GetLocationWithId("tavern");
-            string scene = tavern.GetSceneName(upgradeLevel);
-            Mission mission = SandBoxMissions.OpenIndoorMission(scene, tavern);
-            mission.AddMissionBehavior(new MissionNetworkBehavior(m_Client, MessageBroker.Instance));
+            int upgradeLevel = settlement.IsTown ? settlement.Town.GetWallLevel() : 1;
 
-            //PlayerEncounter.EnterSettlement();
+            switch (missionType)
+            {
+                case MissionType.Arena:
+                    base.OnLoadFinished();
 
-            //Location center = settlement.LocationComplex.GetLocationWithId("center");
+                    // create an encounter of the town with the player
+                    EncounterManager.StartSettlementEncounter(MobileParty.MainParty, settlement);
 
-            //return arena scenae name of current town
-            //         int upgradeLevel = settlement.IsTown ? settlement.Town.GetWallLevel() : 1;
+                    //Set our encounter to the created encounter
+                    PlayerEncounter.LocationEncounter = locationEncounter;
 
-            //         //Open a new arena mission with the scene; commented out because we are not doing Arena testing right now
-            //string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
-            //         Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(locationWithId.GetSceneName(upgradeLevel), "", false), (Mission mission) => new MissionBehavior[]
-            //            {
-            //                             new MissionOptionsComponent(),
-            //                             //new ArenaDuelMissionController(CharacterObject.PlayerCharacter, false, false, null, 1), //this was the default controller that spawned the player and 1 opponent. Not very useful
-            //                             new MissionFacialAnimationHandler(),
-            //                             new MissionDebugHandler(),
-            //                             new MissionAgentPanicHandler(),
-            //                             new AgentCommonAILogic(),
-            //                             new AgentHumanAILogic(),
-            //                             new ArenaAgentStateDeciderLogic(),
-            //                             new VisualTrackerMissionBehavior(),
-            //                             new CampaignMissionComponent(),
-            //                             new MissionNetworkComponent(),
-            //                             new EquipmentControllerLeaveLogic(),
-            //                             new MissionAgentHandler(locationWithId, null),
-            //                             new MissionNetworkBehavior(),
-            //            }, true, true);
+                    Location arena = settlement.LocationComplex.GetLocationWithId("arena");
 
-            //MouseManager.ShowCursor(false);
+
+                    //Open a new arena mission with the scene; commented out because we are not doing Arena testing right now
+                    NetworkAgentRegistry.Instance.Clear();
+
+                    string civilianUpgradeLevelTag = Campaign.Current.Models.LocationModel.GetCivilianUpgradeLevelTag(upgradeLevel);
+                    Mission currentMission = MissionState.OpenNew("ArenaDuelMission", SandBoxMissions.CreateSandBoxMissionInitializerRecord(arena.GetSceneName(upgradeLevel), "", false), (n_mission) => new MissionBehavior[]
+                    {
+                        new MissionOptionsComponent(),
+                        new MissionFacialAnimationHandler(),
+                       // new MissionDebugHandler(),
+                        new MissionAgentPanicHandler(),
+                        new AgentHumanAILogic(),
+                        new ArenaAgentStateDeciderLogic(),
+                        new VisualTrackerMissionBehavior(),
+                        new CampaignMissionComponent(),
+                        new EquipmentControllerLeaveLogic(),
+                        new MissionAgentHandler(arena, null),
+                        new MissionNetworkBehavior(m_Client, MessageBroker.Instance),
+                        _networkBehavior,
+                        _battlesController,
+                                //ViewCreator.CreateMissionOrderUIHandler(),
+                    }, true, true);
+
+                    MouseManager.ShowCursor(false);
+                    break;
+                case MissionType.Tavern:
+                    Location tavern = LocationComplex.Current.GetLocationWithId("tavern");
+                    string scene = tavern.GetSceneName(upgradeLevel);
+                    Mission mission = SandBoxMissions.OpenIndoorMission(scene, tavern);
+                    mission.AddMissionBehavior(new MissionNetworkBehavior(m_Client, MessageBroker.Instance));
+                    break;
+                default:
+                    break;
+            }
 
 
         }
@@ -124,7 +192,7 @@ namespace Missions
             agentBuildData = agentBuildData.Team(Mission.Current.PlayerAllyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
-            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);
+            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false);
             agent.FadeIn();
             agent.Controller = Agent.ControllerType.None;
             return agent;
@@ -139,7 +207,7 @@ namespace Missions
             agentBuildData = agentBuildData.Team(isMain ? Mission.Current.PlayerTeam : Mission.Current.PlayerEnemyTeam).InitialPosition(frame.origin);
             Vec2 vec = frame.rotation.f.AsVec2;
             vec = vec.Normalized();
-            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false, 0);                             //this spawns an archer
+            Agent agent = mission.SpawnAgent(agentBuildData.InitialDirection(vec).NoHorses(true).Equipment(character.FirstBattleEquipment).TroopOrigin(new SimpleAgentOrigin(character, -1, null, default)), false);                             //this spawns an archer
             agent.FadeIn();
 
             if (isMain)

@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Serialization;
@@ -9,7 +9,7 @@ using Serilog;
 using System;
 using System.Reflection;
 using Missions.Services.Network;
-using Missions.Services.Network.PacketHandlers;
+using Common.PacketHandlers;
 
 namespace Missions.Services.Network.PacketHandlers
 {
@@ -33,26 +33,31 @@ namespace Missions.Services.Network.PacketHandlers
         {
             EventPacket convertedPacket = (EventPacket)packet;
 
-            INetworkEvent @event = convertedPacket.Event;
+            IMessage @event = convertedPacket.Event;
 
             Logger.Information("Received network event from {Peer} of {EventType}", peer, @event.GetType());
 
             Publish.MakeGenericMethod(@event.GetType()).Invoke(_messageBroker, new object[] { peer, @event });
         }
+
+        public void Dispose()
+        {
+            //throw new NotImplementedException();
+        }
     }
 
     [ProtoContract(SkipConstructor = true)]
-    public class EventPacket : IPacket
+    public class EventPacket : IMessage
     {
         public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
 
-        public PacketType PacketType => PacketType.Event;
 
-        public INetworkEvent Event
+
+        public IMessage Event
         {
             get
             {
-                return (INetworkEvent)ProtoBufSerializer.Deserialize(_event);
+                return (IMessage)ProtoBufSerializer.Deserialize(_event);
             }
             set
             {
@@ -60,10 +65,12 @@ namespace Missions.Services.Network.PacketHandlers
             }
         }
 
+        PacketType PacketType => PacketType.Event;
+
         [ProtoMember(1)]
         public byte[] _event;
 
-        public EventPacket(INetworkEvent @event)
+        public EventPacket(IMessage @event)
         {
             if (RuntimeTypeModel.Default.IsDefined(@event.GetType()) == false)
             {

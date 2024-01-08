@@ -7,10 +7,10 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
 using Missions.Services.BoardGames;
-using Missions.Services.Network.PacketHandlers;
 using Missions.Messages;
 using Missions.Services.Network.Messages;
 using Missions.Services.Agents.Packets;
+using Missions.Services.Network.PacketHandlers;
 
 namespace Missions.Services.Network
 {
