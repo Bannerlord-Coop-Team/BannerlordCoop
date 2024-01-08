@@ -36,8 +36,6 @@ namespace GameInterface.Services.MobileParties.Handlers
 
         private void Handle(MessagePayload<UnitRecruitGranted> obj)
         {
-            recruitmentCampaignBehavior ??= Campaign.Current.CampaignBehaviorManager.GetBehavior<RecruitmentCampaignBehavior>();
-
             var payload = obj.What;
 
             if (objectManager.TryGetObject(payload.PartyId, out MobileParty mobileParty) == false)
