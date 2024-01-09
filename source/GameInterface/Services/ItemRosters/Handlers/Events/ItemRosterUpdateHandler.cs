@@ -9,7 +9,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 using Common;
 using TaleWorlds.CampaignSystem.Roster;
-using GameInterface.Services.ItemRosters.Commands;
+using GameInterface.Services.ItemRosters.Patches;
 
 namespace GameInterface.Services.ItemRosters.Handlers.Events
 {
@@ -69,7 +69,7 @@ namespace GameInterface.Services.ItemRosters.Handlers.Events
                     logger.Error("Failed to update item roster, no Settlement nor Party with ID '{0}' was found", payload.What.PartyBaseID);
                 } else
                 {
-                    roster.AddToCounts(new EquipmentElement(item, modifier), payload.What.Amount);
+                    ItemRosterPatch.AddToCountsOverride(roster, new EquipmentElement(item, modifier), payload.What.Amount);
                 }
             });
         }
