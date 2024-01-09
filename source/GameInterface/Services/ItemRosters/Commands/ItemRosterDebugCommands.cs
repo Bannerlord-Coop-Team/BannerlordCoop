@@ -4,20 +4,26 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 using System.Collections.Immutable;
 using TaleWorlds.Core;
+using System.Linq;
+
+using static TaleWorlds.Library.CommandLineFunctionality;
+using System.Security.Cryptography;
+using System;
+using System.Text;
+using System.IO;
 
 namespace GameInterface.Services.ItemRosters.Commands
 {
     internal class ItemRosterDebugCommands
     {
-        [CommandLineArgumentFunction("Info", "Coop.Debug.ItemRosters")]
-        public static string ItemRosterInfo(List<string> args)
+        [CommandLineArgumentFunction("info", "coop.debug.itemrosters")]
+        public static string Info(List<string> args)
         {
             if (args.Count < 1)
             {
-                return "ID expected";
+                return "Usage: coop.debug.itemrosters.info <party base id>";
             }
 
             ItemRoster roster = null;
@@ -29,7 +35,6 @@ namespace GameInterface.Services.ItemRosters.Commands
                 roster = obj.ItemRoster;
 
                 owner = obj.Town.Name.ToString();
-
             }
 
             MobileParty party = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
@@ -44,32 +49,53 @@ namespace GameInterface.Services.ItemRosters.Commands
                 return string.Format("ID: '{0}' not found", args[0]);
             }
 
-            return string.Format("ItemRoster info for '{0}':\n  Item count: {1}\n  Hash: {2:X}\n  Version No.: {3:X}\n",
-                owner, roster.Count, hash(roster), roster.VersionNo);
+            return string.Format("ItemRoster info for '{0}':\n  Items: {1}\n  Count: {2}\n  SHA1: {3:X}\n",
+                owner, roster.Count, roster.Sum((i) => { return i.Amount; }), ItemRosterHash(roster));
         }
 
-        private static int hash(ItemRoster roster)
+        private static string ItemRosterHash(ItemRoster roster)
         {
-            int hash = 1009;
+            StringBuilder content = new();
             var sorted = roster.ToImmutableSortedSet(new ItemRosterElementComparer());
             foreach (var item in sorted)
             {
-                hash = hash * 9176 + item.EquipmentElement.Item.StringId.GetHashCode();
+                content.Append(item.EquipmentElement.Item.StringId);
                 if (item.EquipmentElement.ItemModifier != null)
-                    hash = hash * 9176 + item.EquipmentElement.ItemModifier.StringId.GetHashCode();
-                else
-                    hash = hash * 9176 + 0;
-                hash = hash * 9176 + item.Amount;
+                    content.Append(item.EquipmentElement.ItemModifier.StringId);
+                content.Append(item.Amount);
+                content.AppendLine();
             }
+            
+            return HashString(content.ToString());
+        }
 
-            return hash;
+        private static string HashString(string input)
+        {
+            using (SHA1Managed sha1 = new SHA1Managed())
+            {
+                var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(input));
+                var sb = new StringBuilder(hash.Length * 2);
+
+                foreach (byte b in hash)
+                {
+                    sb.Append(b.ToString("X2"));
+                }
+
+                return sb.ToString();
+            }
         }
 
         private class ItemRosterElementComparer : IComparer<ItemRosterElement>
         {
             public int Compare(ItemRosterElement x, ItemRosterElement y)
             {
-                return x.EquipmentElement.Item.StringId.CompareTo(y.EquipmentElement.Item.StringId);
+                int diff = 0;
+                diff += x.EquipmentElement.Item.StringId.CompareTo(y.EquipmentElement.Item.StringId);
+                if (x.EquipmentElement.ItemModifier != null)
+                    diff += x.EquipmentElement.ItemModifier.StringId.CompareTo(y.EquipmentElement.ItemModifier?.StringId);
+
+                diff += y.Amount - x.Amount;
+                return diff;
             }
         }
     }

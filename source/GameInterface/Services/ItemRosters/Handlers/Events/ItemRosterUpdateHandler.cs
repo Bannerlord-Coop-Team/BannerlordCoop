@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 using Common;
 using TaleWorlds.CampaignSystem.Roster;
+using GameInterface.Services.ItemRosters.Commands;
 
 namespace GameInterface.Services.ItemRosters.Handlers.Events
 {
@@ -22,9 +23,6 @@ namespace GameInterface.Services.ItemRosters.Handlers.Events
 
         public ItemRosterUpdateHandler(IMessageBroker messageBroker)
         {
-            if (ModInformation.IsServer)
-                return;
-
             this.messageBroker = messageBroker;
 
             logger = LogManager.GetLogger<ItemRosterUpdateHandler>();
@@ -34,6 +32,9 @@ namespace GameInterface.Services.ItemRosters.Handlers.Events
 
         public void Handle(MessagePayload<ItemRosterUpdate> payload)
         {
+            if (ModInformation.IsServer)
+                return;
+
             GameLoopRunner.RunOnMainThread(() =>
             {
                 ItemObject item;
@@ -75,9 +76,6 @@ namespace GameInterface.Services.ItemRosters.Handlers.Events
 
         public void Dispose()
         {
-            if (ModInformation.IsServer)
-                return;
-
             messageBroker.Unsubscribe<ItemRosterUpdate>(Handle);
         }
     }
