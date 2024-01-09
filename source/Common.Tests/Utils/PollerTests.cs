@@ -10,17 +10,26 @@ public class PollerTests
     {
         // Arrange
         int actualCount = 0;
+        
         var poller = new Poller((dt) => { 
-            Interlocked.Increment(ref actualCount); 
+            Interlocked.Increment(ref actualCount);
         }, TimeSpan.FromMilliseconds(interval));
         
         // Act
         poller.Start();
         var startTime = DateTime.Now;
-
-        while (actualCount < expectedCount) { }
-
         var endTime = DateTime.Now;
+
+        var timeout = TimeSpan.FromMilliseconds(expectedCount * interval * 2);
+
+        while (actualCount < expectedCount &&
+            // time out while if running time is greater than 2x expected time
+            endTime - startTime < timeout)
+        {
+            Thread.Sleep(1);
+            endTime = DateTime.Now;
+        }
+
         poller.Stop();
 
         var actualTimeMs = endTime - startTime;
