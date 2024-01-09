@@ -4,7 +4,7 @@
         <!-- Can be found in the URL of your workshop item -->
     </GetItem>
     <UpdateItem>
-        <ModuleFolder Value="D:\Mod Development\BannerlordCoop\mb2\Modules\Coop"/>
+        <ModuleFolder Value="E:\Mod Development\BannerlordCoop\mb2\Modules\Coop"/>
         <!-- A direct path of your module -->   
         <ChangeNotes Value="Another Bug Fix" />
         <!-- Insert patch notes -->
