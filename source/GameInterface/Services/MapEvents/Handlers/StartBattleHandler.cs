@@ -10,6 +10,9 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers
 {
+    /// <summary>
+    /// Game Interface handler for Starting Map Events
+    /// </summary>
     public class StartBattleHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
@@ -45,24 +48,19 @@ namespace GameInterface.Services.MapEvents.Handlers
             }
 
             bool flag = false;
-            if (defenderParty.CurrentSettlement != null)
+            if (defenderParty.CurrentSettlement != null && defenderParty.MapEvent != null)
             {
-                if (defenderParty.MapEvent != null)
-                {
-                    flag = (defenderParty.MapEvent.MapEventSettlement == defenderParty.CurrentSettlement && (defenderParty.MapEvent.AttackerSide.LeaderParty.MapFaction == attackerParty.MapFaction || defenderParty.MapEvent.DefenderSide.LeaderParty.MapFaction == attackerParty.MapFaction));
-                }
+                    flag = (defenderParty.MapEvent.MapEventSettlement == defenderParty.CurrentSettlement 
+                    && (defenderParty.MapEvent.AttackerSide.LeaderParty.MapFaction == attackerParty.MapFaction 
+                    || defenderParty.MapEvent.DefenderSide.LeaderParty.MapFaction == attackerParty.MapFaction));
             }
-            else
+            else if (attackerParty != MobileParty.MainParty ||
+                     !defenderParty.IsEngaging ||
+                      defenderParty.ShortTermTargetParty != MobileParty.MainParty &&
+                      attackerParty == MobileParty.MainParty)
             {
-                flag = (attackerParty != MobileParty.MainParty || !defenderParty.IsEngaging || defenderParty.ShortTermTargetParty != MobileParty.MainParty);
-            }
-            if (flag)
-            {
-                if (attackerParty == MobileParty.MainParty)
-                {
-                    MapState mapState = Game.Current.GameStateManager.ActiveState as MapState;
-                    mapState?.OnMainPartyEncounter();
-                }
+                MapState mapState = Game.Current.GameStateManager.ActiveState as MapState;
+                mapState?.OnMainPartyEncounter();
             }
 
             if (lastAttackingParty == null || lastAttackingParty != attackerParty)

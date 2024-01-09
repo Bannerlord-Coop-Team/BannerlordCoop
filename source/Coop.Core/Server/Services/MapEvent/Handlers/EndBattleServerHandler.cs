@@ -16,6 +16,9 @@ using System.Text;
 
 namespace Coop.Core.Server.Services.MapEvent.Handlers
 {
+    /// <summary>
+    /// Server handler for Ending Map Events
+    /// </summary>
     public class EndBattleServerHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;

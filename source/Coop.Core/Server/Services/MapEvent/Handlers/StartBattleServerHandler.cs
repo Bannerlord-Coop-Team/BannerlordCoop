@@ -16,6 +16,9 @@ using System.Text;
 
 namespace Coop.Core.Server.Services.MapEvent.Handlers
 {
+    /// <summary>
+    /// Server handler for Starting Map Events
+    /// </summary>
     public class StartBattleServerHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;

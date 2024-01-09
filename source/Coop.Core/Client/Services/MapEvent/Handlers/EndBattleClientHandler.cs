@@ -14,6 +14,9 @@ using System.Text;
 
 namespace Coop.Core.Client.Services.MapEvent.Handlers
 {
+    /// <summary>
+    /// Client handler for Ending Map Events
+    /// </summary>
     public class EndBattleClientHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;

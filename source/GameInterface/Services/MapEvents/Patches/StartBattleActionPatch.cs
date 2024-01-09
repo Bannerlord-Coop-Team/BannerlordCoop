@@ -29,12 +29,14 @@ namespace GameInterface.Services.MapEvents.Patches
 
             MobileParty mobileParty = __instance;
 
+            //This handles situations where Armies are involved (untested)
             if (mobileParty.AttachedTo != null && engagingParty != mobileParty.AttachedTo)
             {
                 mobileParty = mobileParty.AttachedTo;
             }
 
-            if(!engagingParty.IsPartyControlled() && !mobileParty.IsPartyControlled()) { return false; } //Player interaction
+            //Disables interaction between players, this will be handled in a future issue
+            if (!engagingParty.IsPartyControlled() && !mobileParty.IsPartyControlled()) { return false; } 
 
             MessageBroker.Instance.Publish(engagingParty, new BattleStarted(
                 engagingParty.StringId,

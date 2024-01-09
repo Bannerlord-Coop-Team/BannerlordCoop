@@ -13,6 +13,9 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEvents.Handlers
 {
+    /// <summary>
+    /// Game Interface handler for Ending Map Events
+    /// </summary>
     public class EndBattleHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;

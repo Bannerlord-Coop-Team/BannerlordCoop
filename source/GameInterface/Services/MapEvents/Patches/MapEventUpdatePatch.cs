@@ -19,18 +19,9 @@ namespace GameInterface.Services.MapEvents.Patches
     [HarmonyPatch(typeof(MapEvent))]
     public class MapEventUpdatePatch
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<StartBattleHandler>();
-        private static readonly AllowedInstance<MapEvent> AllowedInstance = new AllowedInstance<MapEvent>();
-
-        private static readonly MethodInfo MapEvent_FinishBattle = typeof(MapEvent).GetMethod("FinishBattle", BindingFlags.NonPublic | BindingFlags.Instance);
-
         [HarmonyPrefix]
         [HarmonyPatch("Update")]
-        static bool PrefixUpdate(MapEvent __instance)
-        {
-            if (ModInformation.IsClient) return false;
-            return true;
-        }
+        static bool PrefixUpdate(MapEvent __instance) => ModInformation.IsServer;
 
         [HarmonyPrefix]
         [HarmonyPatch("FinishBattle")]
@@ -40,7 +31,7 @@ namespace GameInterface.Services.MapEvents.Patches
 
             if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsPartyControlled()))
             {
-                return false; //Player involved
+                return false; //TODO Manage player party interactions
             }
 
             MobileParty party = __instance.InvolvedParties.First().MobileParty;

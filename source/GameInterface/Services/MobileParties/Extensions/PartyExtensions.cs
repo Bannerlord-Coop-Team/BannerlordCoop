@@ -32,7 +32,7 @@ internal static class PartyExtensions
             return false;
         };
 
-        if(party == null) { return false; }
+        if(party == null) return false;
 
         return entityRegistry.IsControlledBy(idProvider.ControllerId, party.StringId);
     }

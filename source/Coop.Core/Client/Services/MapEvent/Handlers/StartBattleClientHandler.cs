@@ -14,6 +14,9 @@ using System.Text;
 
 namespace Coop.Core.Client.Services.MapEvent.Handlers
 {
+    /// <summary>
+    /// Client handler for Starting Map Events
+    /// </summary>
     public class StartBattleClientHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;

@@ -20,7 +20,7 @@ namespace GameInterface.Services.MapEvents.Patches
 
         [HarmonyPrefix]
         [HarmonyPatch(nameof(PlayerEncounter.FinalizeBattle))]
-        static bool PrefixFinalizeBattle()
+        static bool PrefixFinalizeBattle() //TODO Sync battle results
         {
             MessageBroker.Instance.Publish(MobileParty.MainParty, new BattleEnded(MobileParty.MainParty.StringId));
 
