@@ -12,21 +12,20 @@ using GameInterface.Services.ObjectManager;
 namespace GameInterface.Services.ItemRosters.Handlers
 {
     /// <summary>
-    /// Handles ItemRosterUpdated on client.
+    /// Handles ItemRosterUpdate.
     /// </summary>
     internal class ItemRosterUpdateHandler : IHandler
     {
+        private static readonly ILogger Logger =LogManager.GetLogger<ItemRosterUpdateHandler>();
+
         private readonly IMessageBroker messageBroker;
-        private readonly ILogger logger;
         private readonly IObjectManager objectManager;
 
         public ItemRosterUpdateHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-
-            logger = LogManager.GetLogger<ItemRosterUpdateHandler>();
-
+                 
             messageBroker.Subscribe<ItemRosterUpdate>(Handle);
         }
 

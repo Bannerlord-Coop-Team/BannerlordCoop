@@ -5,7 +5,7 @@ using ProtoBuf;
 namespace Coop.Core.Server.Services.PartyBases.Messages
 {
     /// <summary>
-    /// Sent to the client by the server when a PartyBase's ItemRoster is updated.
+    /// Sent to the client by the server when an ItemRoster is updated.
     /// </summary>
     [BatchLogMessage]
     public class NetworkItemRosterUpdate : IMessage

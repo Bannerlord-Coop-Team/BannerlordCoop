@@ -4,22 +4,13 @@ using Common.Messaging;
 namespace GameInterface.Services.ItemRosters.Messages
 {
     /// <summary>
-    /// Called when an item roster is updated.
+    /// Called when an ItemRoster should be updated.
     /// </summary>
     [BatchLogMessage]
-    public class ItemRosterUpdate : IEvent
+    public class ItemRosterUpdate : ItemRosterMessageBase, ICommand
     {
-        public string PartyBaseID { get; }
-        public string ItemID { get; }
-        public string ItemModifierID { get; }
-        public int Amount { get; }
-
-        public ItemRosterUpdate(string partyBaseID, string itemID, string itemModifierID, int amount)
+        public ItemRosterUpdate(string partyBaseID, string itemID, string itemModifierID, int amount) : base(partyBaseID, itemID, itemModifierID, amount)
         {
-            PartyBaseID = partyBaseID;
-            ItemID = itemID;
-            ItemModifierID = itemModifierID;
-            Amount = amount;
         }
     }
 }

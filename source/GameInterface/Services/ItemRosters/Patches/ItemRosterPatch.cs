@@ -42,7 +42,7 @@ namespace GameInterface.Services.ItemRosters.Patches
             }
 
             // Publish on server
-            MessageBroker.Instance.Publish(__instance, new ItemRosterUpdate(
+            MessageBroker.Instance.Publish(__instance, new ItemRosterUpdated(
                         partyBase.Id,
                         rosterElement.Item.StringId,
                         rosterElement.ItemModifier?.StringId,

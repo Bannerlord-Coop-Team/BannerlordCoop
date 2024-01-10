@@ -8,20 +8,20 @@ namespace Coop.Core.Server.Services.PartyBases.Handlers
     /// <summary>
     /// Handles ItemRosterUpdated and sends network event to all clients.
     /// </summary>
-    public class ItemRosterUpdateHandler : IHandler
+    public class ItemRosterUpdatedHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
-        public ItemRosterUpdateHandler(IMessageBroker broker, INetwork network)
+        public ItemRosterUpdatedHandler(IMessageBroker broker, INetwork network)
         {
             messageBroker = broker;
             this.network = network;
 
-            messageBroker.Subscribe<ItemRosterUpdate>(Handle);
+            messageBroker.Subscribe<ItemRosterUpdated>(Handle);
         }
 
-        public void Handle(MessagePayload<ItemRosterUpdate> payload)
+        public void Handle(MessagePayload<ItemRosterUpdated> payload)
         {
             network.SendAll(new NetworkItemRosterUpdate(
                     payload.What.PartyBaseID,
@@ -33,7 +33,7 @@ namespace Coop.Core.Server.Services.PartyBases.Handlers
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<ItemRosterUpdate>(Handle);
+            messageBroker.Unsubscribe<ItemRosterUpdated>(Handle);
         }
     }
 }
