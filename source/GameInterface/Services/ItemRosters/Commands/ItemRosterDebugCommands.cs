@@ -13,7 +13,6 @@ using System.Security.Cryptography;
 using System;
 using System.Text;
 using System.IO;
-using GameInterface.Services.GameState.Messages;
 
 namespace GameInterface.Services.ItemRosters.Commands
 {
@@ -91,7 +90,7 @@ namespace GameInterface.Services.ItemRosters.Commands
                 content.AppendLine();
             }
 
-            File.WriteAllText("." + (ModInformation.IsServer ? "server-output.txt" : "client-output.txt"), content.ToString());
+            File.WriteAllText("." + (ModInformation.IsServer ? "server-itemroster-info.txt" : "client-itemroster-info.txt"), content.ToString());
 
             return HashString(content.ToString());
         }

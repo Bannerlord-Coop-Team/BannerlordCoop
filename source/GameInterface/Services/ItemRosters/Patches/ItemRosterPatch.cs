@@ -3,7 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.GameDebug.Patches;
-using GameInterface.Services.ItemRosters.Messages.Events;
+using GameInterface.Services.ItemRosters.Messages;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Roster;
@@ -20,7 +20,7 @@ namespace GameInterface.Services.ItemRosters.Patches
 
         [HarmonyPatch(nameof(ItemRoster.AddToCounts), new[] { typeof(EquipmentElement), typeof(int) })]
         [HarmonyPrefix]
-        public static bool AddToCountsPrefix(ItemRoster __instance, EquipmentElement rosterElement, int number)
+        public static bool AddToCountsPrefix(ItemRoster __instance, ref int __result, EquipmentElement rosterElement, int number)
         {
             // If AddToCountsOverride is called allow original
             if (AllowedInstance.IsAllowed(__instance)) return true;
@@ -28,11 +28,16 @@ namespace GameInterface.Services.ItemRosters.Patches
             CallStackValidator.Validate(__instance, AllowedInstance);
 
             // Skip if client
-            if (ModInformation.IsClient) return false;
+            if (ModInformation.IsClient)
+            {
+                __result = -1;
+                return false;
+            }
 
             if (ItemRosterLookup.TryGetValue(__instance, out var partyBase) == false)
             {
                 Logger.Error("Unable to find party from item roster");
+                __result = -1;
                 return false;
             }
 

@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.ItemRosters.Messages.Events;
 using Common.Network;
 using Coop.Core.Server.Services.PartyBases.Messages;
+using GameInterface.Services.ItemRosters.Messages;
 
 namespace Coop.Core.Server.Services.PartyBases.Handlers
 {

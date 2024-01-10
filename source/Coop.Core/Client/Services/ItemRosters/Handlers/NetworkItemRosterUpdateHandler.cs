@@ -1,10 +1,13 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Services.PartyBases.Messages;
-using GameInterface.Services.ItemRosters.Messages.Events;
+using GameInterface.Services.ItemRosters.Messages;
 
 namespace Coop.Core.Client.Services.PartyBases.Handlers
 {
+    /// <summary>
+    /// Handles NetworkItemRosterUpdate and publishes ItemRosterUpdate
+    /// </summary>
     public class NetworkItemRosterUpdateHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
