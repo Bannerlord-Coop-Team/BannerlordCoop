@@ -28,7 +28,7 @@ public sealed class BatchLogger : IDisposable
 	/// <param name="waitMilliseconds">The number of milliseconds to wait between polls (optional, default is 1000).</param>
 	public BatchLogger(string messageName, TimeSpan pollInterval)
 	{
-			this.messageName = messageName;
+		this.messageName = messageName;
         this.pollInterval = pollInterval;
         poller = new Poller(Poll, pollInterval);
         poller.Start();
@@ -42,10 +42,10 @@ public sealed class BatchLogger : IDisposable
 
     // A method to poll for messages to log.
     private void Poll(TimeSpan dt)
-		{
+	{
         if (messageCount > 0)
         {
-            Logger.Information("{messageCount} {messageName} messages has been received in {milliseconds}ms", messageCount, messageName, pollInterval.Milliseconds);
+            //Logger.Information("{messageCount} {messageName} messages has been received in {milliseconds}ms", messageCount, messageName, pollInterval.Milliseconds);
 
             Interlocked.Exchange(ref messageCount, 0);
         }

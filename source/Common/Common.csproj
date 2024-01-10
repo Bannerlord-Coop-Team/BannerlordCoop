@@ -26,6 +26,11 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+	  <_Parameter1>Common.Tests</_Parameter1>
+	</AssemblyAttribute>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="LiteNetLib" Version="1.0.1.1" />

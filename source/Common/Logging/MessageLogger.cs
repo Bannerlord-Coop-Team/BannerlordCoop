@@ -47,7 +47,7 @@ public class MessageLogger
         else
         {
             var newBatchLogger = new BatchLogger(messageType.Name, TimeSpan.FromSeconds(1));
-            if (loggers.TryAdd(messageType, newBatchLogger))
+            if (loggers.TryAdd(messageType, newBatchLogger) == false)
             {
                 logger.Error("Unable to add {messageType} to batch loggers", messageType);
                 return;

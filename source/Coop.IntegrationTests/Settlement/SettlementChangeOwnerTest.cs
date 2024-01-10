@@ -33,7 +33,7 @@ namespace Coop.IntegrationTests.Settlement
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
+            client1.SimulateMessage(this, message);
 
             // Assert
             // Verify the server sends a single message to it's game interface to change owner settlement

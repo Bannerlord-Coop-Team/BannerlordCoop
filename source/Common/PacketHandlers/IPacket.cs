@@ -6,7 +6,7 @@ namespace Common.PacketHandlers
     {
         Invalid,
         PacketWrapper,
-        Event,
+        Message,
         Example,
         Test,
         Movement,
