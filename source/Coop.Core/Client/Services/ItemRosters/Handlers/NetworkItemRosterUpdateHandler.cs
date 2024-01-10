@@ -6,7 +6,7 @@ using GameInterface.Services.ItemRosters.Messages;
 namespace Coop.Core.Client.Services.PartyBases.Handlers
 {
     /// <summary>
-    /// Handles NetworkItemRosterUpdate and publishes ItemRosterUpdate
+    /// Handles NetworkItemRosterUpdate and publishes UpdateItemRoster
     /// </summary>
     public class NetworkItemRosterUpdateHandler : IHandler
     {
@@ -23,7 +23,7 @@ namespace Coop.Core.Client.Services.PartyBases.Handlers
 
         public void Handle(MessagePayload<NetworkItemRosterUpdate> payload)
         {
-            messageBroker.Publish(this, new ItemRosterUpdate(
+            messageBroker.Publish(this, new UpdateItemRoster(
                     payload.What.PartyBaseID,
                     payload.What.ItemID,
                     payload.What.ItemModifierID,

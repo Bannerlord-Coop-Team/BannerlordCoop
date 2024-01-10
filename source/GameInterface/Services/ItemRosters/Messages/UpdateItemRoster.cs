@@ -7,9 +7,9 @@ namespace GameInterface.Services.ItemRosters.Messages
     /// Called when an ItemRoster should be updated.
     /// </summary>
     [BatchLogMessage]
-    public class ItemRosterUpdate : ItemRosterMessageBase, ICommand
+    public class UpdateItemRoster : ItemRosterMessageBase, ICommand
     {
-        public ItemRosterUpdate(string partyBaseID, string itemID, string itemModifierID, int amount) : base(partyBaseID, itemID, itemModifierID, amount)
+        public UpdateItemRoster(string partyBaseID, string itemID, string itemModifierID, int amount) : base(partyBaseID, itemID, itemModifierID, amount)
         {
         }
     }

@@ -12,23 +12,23 @@ using GameInterface.Services.ObjectManager;
 namespace GameInterface.Services.ItemRosters.Handlers
 {
     /// <summary>
-    /// Handles ItemRosterUpdate.
+    /// Handles UpdateItemRoster.
     /// </summary>
-    internal class ItemRosterUpdateHandler : IHandler
+    internal class UpdateItemRosterHandler : IHandler
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<ItemRosterUpdateHandler>();
+        private static readonly ILogger Logger = LogManager.GetLogger<UpdateItemRosterHandler>();
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
 
-        public ItemRosterUpdateHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+        public UpdateItemRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
 
-            messageBroker.Subscribe<ItemRosterUpdate>(Handle);
+            messageBroker.Subscribe<UpdateItemRoster>(Handle);
         }
 
-        public void Handle(MessagePayload<ItemRosterUpdate> payload)
+        public void Handle(MessagePayload<UpdateItemRoster> payload)
         {
             var msg = payload.What;
             if (objectManager.TryGetObject(msg.ItemID, out ItemObject item) == false)
@@ -68,7 +68,7 @@ namespace GameInterface.Services.ItemRosters.Handlers
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<ItemRosterUpdate>(Handle);
+            messageBroker.Unsubscribe<UpdateItemRoster>(Handle);
         }
     }
 }
