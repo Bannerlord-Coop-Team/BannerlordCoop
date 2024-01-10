@@ -45,7 +45,11 @@ public sealed class BatchLogger : IDisposable
 	{
         if (messageCount > 0)
         {
-            //Logger.Information("{messageCount} {messageName} messages has been received in {milliseconds}ms", messageCount, messageName, pollInterval.Milliseconds);
+            Logger.Information(
+				"{messageCount} {messageName} messages has been received in {milliseconds}ms", 
+				messageCount, 
+				messageName, 
+				pollInterval.Milliseconds);
 
             Interlocked.Exchange(ref messageCount, 0);
         }
