@@ -18,7 +18,6 @@ namespace GameInterface.Services.ItemRosters.Handlers
     {
         private static readonly ILogger Logger = LogManager.GetLogger<ItemRosterUpdateHandler>();
         private readonly IMessageBroker messageBroker;
-        private readonly ILogger logger;
         private readonly IObjectManager objectManager;
 
         public ItemRosterUpdateHandler(IMessageBroker messageBroker, IObjectManager objectManager)
