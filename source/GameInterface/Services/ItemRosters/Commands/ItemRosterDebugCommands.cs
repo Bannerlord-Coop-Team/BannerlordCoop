@@ -13,11 +13,36 @@ using System.Security.Cryptography;
 using System;
 using System.Text;
 using System.IO;
+using GameInterface.Services.GameState.Messages;
 
 namespace GameInterface.Services.ItemRosters.Commands
 {
     internal class ItemRosterDebugCommands
     {
+        [CommandLineArgumentFunction("add_random_item", "coop.debug.itemrosters")]
+        public static string AddRandomItem(List<string> args)
+        {
+            if (args.Count < 1)
+            {
+                return "Usage: coop.debug.itemrosters.add_random_item <party base id> (i.e. town_V1)";
+            }
+
+            var settlementId = args[0];
+            var settlement = MBObjectManager.Instance.GetObject<Settlement>(settlementId);
+
+            if (settlement == null) return $"Unable to find settlement with id: {settlementId}";
+
+            Random random = new Random();
+
+            var itemEnumerable = MBObjectManager.Instance.GetObjectTypeList<ItemObject>();
+
+            var randomItem = itemEnumerable.Skip(random.Next(itemEnumerable.Count)).First();
+
+            settlement.ItemRoster.AddToCounts(new EquipmentElement(randomItem), 1);
+
+            return $"Added {randomItem.Name} to {settlement.Name}'s ItemRoster";
+        }
+
         [CommandLineArgumentFunction("info", "coop.debug.itemrosters")]
         public static string Info(List<string> args)
         {
@@ -59,13 +84,15 @@ namespace GameInterface.Services.ItemRosters.Commands
             var sorted = roster.ToImmutableSortedSet(new ItemRosterElementComparer());
             foreach (var item in sorted)
             {
-                content.Append(item.EquipmentElement.Item.StringId);
+                content.Append(item.EquipmentElement.Item.StringId + " ");
                 if (item.EquipmentElement.ItemModifier != null)
-                    content.Append(item.EquipmentElement.ItemModifier.StringId);
+                    content.Append(item.EquipmentElement.ItemModifier.StringId + " ");
                 content.Append(item.Amount);
                 content.AppendLine();
             }
-            
+
+            File.WriteAllText("." + (ModInformation.IsServer ? "server-output.txt" : "client-output.txt"), content.ToString());
+
             return HashString(content.ToString());
         }
 
