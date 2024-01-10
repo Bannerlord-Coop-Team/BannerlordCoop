@@ -16,16 +16,16 @@ namespace GameInterface.Services.ItemRosters.Handlers
     /// </summary>
     internal class ItemRosterUpdateHandler : IHandler
     {
-        private static readonly ILogger Logger =LogManager.GetLogger<ItemRosterUpdateHandler>();
-
+        private static readonly ILogger Logger = LogManager.GetLogger<ItemRosterUpdateHandler>();
         private readonly IMessageBroker messageBroker;
+        private readonly ILogger logger;
         private readonly IObjectManager objectManager;
 
         public ItemRosterUpdateHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-                 
+
             messageBroker.Subscribe<ItemRosterUpdate>(Handle);
         }
 
