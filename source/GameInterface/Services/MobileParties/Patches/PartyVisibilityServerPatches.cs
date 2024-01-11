@@ -1,40 +1,42 @@
-﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages.Control;
-using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using HarmonyLib;
+using System.Diagnostics;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.MobileParties.Patches
+namespace GameInterface.Services.MobileParties.Patches;
+
+/// <summary>
+/// Parties are always visible on server
+/// </summary>
+[HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsSpotted))]
+internal class PartyIsSpottedServerPatch
 {
-    /// <summary>
-    /// 
-    /// Parties are always visible on server
-    /// 
-    /// </summary>
-    [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsSpotted))]
-    internal class PartyIsSpottedServerPatch
+    private static void Postfix(ref bool __result)
     {
-        private static void Postfix(ref bool __result)
+        if (ModInformation.IsServer || Debugger.IsAttached)
         {
-            if (ModInformation.IsServer)
-            {
-                __result = true;
-            }
+            __result = true;
+        }
+    }
+}
+
+[HarmonyPatch(typeof(MobileParty))]
+internal class PartyVisibilityOnServerPatch
+{
+    [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Setter)]
+    private static void Prefix(ref bool value)
+    {
+        if (ModInformation.IsServer || Debugger.IsAttached)
+        {
+            value = true;
         }
     }
 
-    [HarmonyPatch(typeof(PartyBase), nameof(PartyBase.OnVisibilityChanged))]
-    internal class PartyVisibilityOnServerPatch
+    [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Getter)]
+    private static void Postfix(ref bool __result)
     {
-        private static void Prefix(ref bool value)
+        if (ModInformation.IsServer || Debugger.IsAttached)
         {
-            if (ModInformation.IsServer)
-            {
-                value = true;
-            }
+            __result = true;
         }
     }
 }
