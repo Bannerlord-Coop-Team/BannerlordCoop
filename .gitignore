@@ -545,3 +545,5 @@ source/.editorconfig
 source/.idea
 !*ClientDebug.csproj.user
 !*MissionTestMod.csproj.user
+doc/BannerlordCoopConnectionStates.png
+doc/Architecture.png
