@@ -22,7 +22,6 @@ namespace GameInterface.Services.ItemRosters.Patches
         [HarmonyPrefix]
         public static bool AddToCountsPrefix(ItemRoster __instance, ref int __result, EquipmentElement rosterElement, int number)
         {
-            return false;
             // If AddToCountsOverride is called allow original
             if (AllowedInstance.IsAllowed(__instance)) return true;
 
