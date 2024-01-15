@@ -27,6 +27,12 @@ internal class CalculateBaseSpeedPatch
     }
 }
 
+/// <summary>
+/// Fixes issue with DefaultPartySpeedCalculatingModel._culture statically calls GameTexts.FindText
+/// and when harmony patches, it calls the static constructor for DefaultPartySpeedCalculatingModel
+/// and results in a null reference exception because _gameTextManager has not been initialized
+/// This patch initializes _gameTextManager if it is null
+/// </summary>
 [HarmonyPatchCategory(GameInterface.HARMONY_STATIC_FIXES_CATEGORY)]
 [HarmonyPatch(typeof(GameTexts))]
 internal class GameTextsPatches
