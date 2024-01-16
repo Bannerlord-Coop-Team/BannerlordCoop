@@ -8,6 +8,8 @@ using TaleWorlds.MountAndBlade.ViewModelCollection.HUD;
 namespace Missions.Services.Agents.Patches
 {
     /// <summary>
+    /// GameNetwork.IsMultiplayer breaks the constructor for <see cref="MissionMainAgentCheerBarkControllerVM"/>
+    /// This patch fixes the check for that
     /// </summary>
     [HarmonyPatch(typeof(MissionMainAgentCheerBarkControllerVM))]
     public class DisableMainAgentCheerBarkMultiplayer

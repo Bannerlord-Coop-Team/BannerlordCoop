@@ -125,14 +125,14 @@ namespace IntroServer.Server
             {
                 string[] data = token.Split('%');
 
-                if (data.Length != 2)
+                if (data.Length != 3)
                 {
                     _logger.LogWarning("Invalid token format from {endpoint}: {token}", remoteEndPoint, token);
                     return;
                 }
 
-                string instance = data[0];
-                if (Guid.TryParse(data[1], out Guid id) == false)
+                string instance = data[1];
+                if (Guid.TryParse(data[0], out Guid id) == false)
                 {
                     _logger.LogWarning("Invalid Guid format from {endpoint}: {token}", remoteEndPoint, token);
                     return;

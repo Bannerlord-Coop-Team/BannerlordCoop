@@ -177,6 +177,7 @@
     <Compile Include="Services\Agents\Patches\AgentPickupPatch.cs" />
     <Compile Include="Services\Agents\Patches\AgentShieldDamagePatch.cs" />
     <Compile Include="Services\Arena\Patches\DisableMainAgentCheerBarkMultiplayer.cs" />
+    <Compile Include="Services\Arena\Patches\WarPartyComponentFix.cs" />
     <Compile Include="Services\Exceptions\ExceptionLogger.cs" />
     <Compile Include="Services\Battles\BattlesTestGameManager.cs" />
     <Compile Include="Services\Battles\CoopBattlesController.cs" />
