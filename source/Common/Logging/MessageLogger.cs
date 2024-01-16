@@ -24,7 +24,7 @@ public class MessageLogger
         this.logger = logger;
     }
 
-    public void LogMessage(Type messageType)
+    public void LogMessage(object source, Type messageType)
     {
         if (messageType.GetCustomAttribute<DontLogMessageAttribute>() != null) return;
 
@@ -34,7 +34,7 @@ public class MessageLogger
             return;
         }
 
-        logger.Verbose("Publishing {msgName} from {sourceName}", messageType.Name, messageType?.GetType().Name);
+        logger.Verbose("Publishing {msgName} from {sourceName}", messageType.Name, source?.GetType().Name ?? "Static Method");
     }
 
     private ConcurrentDictionary<Type, BatchLogger> loggers = new ConcurrentDictionary<Type, BatchLogger>();

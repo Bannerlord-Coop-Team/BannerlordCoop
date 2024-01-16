@@ -31,7 +31,7 @@ namespace Coop.Tests.Server.Services.Time
         {
             // Arrange
             var handler = serverTestComponent.Container.Resolve<TimeHandler>();
-            var broker = serverTestComponent.Container.Resolve<MockMessageBroker>();
+            var broker = serverTestComponent.TestMessageBroker;
             var payload = new NetworkRequestTimeSpeedChange(TimeControlEnum.Pause);
             var message = new MessagePayload<NetworkRequestTimeSpeedChange>(null, payload);
 
@@ -39,9 +39,9 @@ namespace Coop.Tests.Server.Services.Time
             handler.Handle_NetworkRequestTimeSpeedChange(message);
 
             // Assert
-            Assert.Single(broker.PublishedMessages);
-            Assert.IsType<SetTimeControlMode>(broker.PublishedMessages[0]);
-            var setTimeControlMode = (SetTimeControlMode)broker.PublishedMessages[0];
+            Assert.Single(broker.Messages);
+            Assert.IsType<SetTimeControlMode>(broker.Messages.First());
+            var setTimeControlMode = (SetTimeControlMode)broker.Messages.First();
             Assert.Equal(payload.NewControlMode, setTimeControlMode.NewTimeMode);
         }
 
@@ -50,8 +50,8 @@ namespace Coop.Tests.Server.Services.Time
         {
             // Arrange
             var handler = serverTestComponent.Container.Resolve<TimeHandler>();
-            var network = serverTestComponent.Container.Resolve<MockNetwork>();
-            var message = new MessagePayload<AttemptedTimeSpeedChanged>(null, new AttemptedTimeSpeedChanged(CampaignTimeControlMode.StoppablePlay));
+            var network = serverTestComponent.Container.Resolve<TestNetwork>();
+            var message = new MessagePayload<AttemptedTimeSpeedChanged>(null, new AttemptedTimeSpeedChanged(TimeControlEnum.Play_1x));
 
             network.CreatePeer();
 
@@ -63,7 +63,7 @@ namespace Coop.Tests.Server.Services.Time
             foreach(var peer in network.Peers)
             {
                 var speedChangedMessage = Assert.Single(network.GetPeerMessages(peer));
-                Assert.IsType<NetworkTimeSpeedChanged>(speedChangedMessage);
+                Assert.IsType<NetworkChangeTimeControlMode>(speedChangedMessage);
             }
         }
     }

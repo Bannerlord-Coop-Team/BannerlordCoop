@@ -174,7 +174,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
             if (outgoingPacketCount > Configuration.MaxPacketsInQueue)
             {
-                messageBroker.Publish(this, new NetworkQueueOverloaded(netPeer));
+                messageBroker.Publish(this, new PeerQueueOverloaded(netPeer));
             }
         }
     }

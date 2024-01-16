@@ -1,4 +1,6 @@
 ﻿using Autofac;
+using Common.Network;
+using Coop.Core.Client;
 
 namespace Coop.Tests.Autofac
 {
@@ -6,6 +8,7 @@ namespace Coop.Tests.Autofac
     {
         protected override void Load(ContainerBuilder builder)
         {
+            builder.RegisterType<CoopClient>().As<INetwork>();
             base.Load(builder);
         }
     }

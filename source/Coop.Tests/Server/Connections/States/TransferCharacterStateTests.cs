@@ -22,16 +22,13 @@ namespace Coop.Tests.Server.Connections.States
         private readonly NetPeer differentPeer;
         private readonly ServerTestComponent serverComponent;
 
-        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => serverComponent.MockNetwork;
-
         public TransferCharacterStateTests(ITestOutputHelper output)
         {
             serverComponent = new ServerTestComponent(output);
 
             var container = serverComponent.Container;
 
-            var network = container.Resolve<MockNetwork>();
+            var network = container.Resolve<TestNetwork>();
 
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();
@@ -82,13 +79,13 @@ namespace Coop.Tests.Server.Connections.States
             currentState.Handle_GameSaveDataPackaged(payload);
 
             // Assert
-            Assert.Equal(2, MockNetwork.GetPeerMessages(playerPeer).Count());
-            var message = MockNetwork.GetPeerMessages(playerPeer).Last();
+            Assert.Equal(2, serverComponent.TestNetwork.GetPeerMessages(playerPeer).Count());
+            var message = serverComponent.TestNetwork.GetPeerMessages(playerPeer).Last();
             var castedMessage = Assert.IsType<NetworkGameSaveDataReceived>(message);
             Assert.Equal(data, castedMessage.GameSaveData);
             Assert.Equal(campaignId, castedMessage.CampaignID);
 
-            Assert.Single(MockNetwork.GetPeerMessages(differentPeer));
+            Assert.Single(serverComponent.TestNetwork.GetPeerMessages(differentPeer));
         }
     }
 }

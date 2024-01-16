@@ -11,6 +11,7 @@ public interface IGameInterface : IDisposable
 
 public class GameInterface : IGameInterface
 {
+    public const string HARMONY_STATIC_FIXES_CATEGORY = "HarmonyStaticFixes";
     private const string HarmonyId = "TaleWorlds.MountAndBlade.Bannerlord.Coop";
     private Harmony harmony;
 
@@ -25,8 +26,11 @@ public class GameInterface : IGameInterface
 
         if (Harmony.HasAnyPatches(HarmonyId)) return;
 
+        var assembly = typeof(GameInterface).Assembly;
+
         harmony = new Harmony(HarmonyId);
-        harmony.PatchAll(typeof(GameInterface).Assembly);
+        harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
+        harmony.PatchAllUncategorized(assembly);
     }
 
     public void UnpatchAll()

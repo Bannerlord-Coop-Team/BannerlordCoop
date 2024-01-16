@@ -19,16 +19,13 @@ namespace Coop.Tests.Server.Connections.States
         private readonly NetPeer differentPeer;
         private readonly ServerTestComponent serverComponent;
 
-        private MockMessageBroker MockMessageBroker => serverComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => serverComponent.MockNetwork;
-
         public CampaignStateTests(ITestOutputHelper output)
         {
             serverComponent = new ServerTestComponent(output);
 
             var container = serverComponent.Container;
 
-            var network = container.Resolve<MockNetwork>();
+            var network = container.Resolve<TestNetwork>();
 
             playerPeer = network.CreatePeer();
             differentPeer = network.CreatePeer();

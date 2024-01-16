@@ -1,6 +1,8 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.Network;
+using Common.Tests.Utils;
+using Coop.Core;
 using Coop.Core.Common.Configuration;
 using Coop.Tests.Stubs;
 using LiteNetLib;
@@ -11,7 +13,8 @@ namespace Coop.Tests.Autofac
     {
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
+            builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
+            builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
             builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
             base.Load(builder);
         }
