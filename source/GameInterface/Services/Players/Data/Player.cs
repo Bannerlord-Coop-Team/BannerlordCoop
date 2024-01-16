@@ -2,6 +2,9 @@
 
 namespace GameInterface.Services.Players.Data;
 
+/// <summary>
+/// Holds information about the players.
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 public record Player
 {

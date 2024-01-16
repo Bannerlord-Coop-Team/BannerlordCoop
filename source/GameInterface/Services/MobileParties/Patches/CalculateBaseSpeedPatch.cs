@@ -11,6 +11,10 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
+
+/// <summary>
+/// Applies speed difficulty modifier to all player parties on client & server.
+/// </summary>
 [HarmonyPatch(typeof(DefaultPartySpeedCalculatingModel))]
 internal class CalculateBaseSpeedPatch 
 {

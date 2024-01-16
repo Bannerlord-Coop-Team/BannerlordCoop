@@ -7,6 +7,9 @@ using System.Text;
 
 namespace Coop.Core.Client.Services.Players.Handlers;
 
+/// <summary>
+/// Handles new NetworkRegisterPlayer from the server and then goes to the GameInterface.
+/// </summary>
 internal class ClientPlayerHandler : IHandler
 {
 

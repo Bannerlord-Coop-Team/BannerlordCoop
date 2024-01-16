@@ -3,6 +3,9 @@ using GameInterface.Services.Players.Data;
 
 namespace GameInterface.Services.Players.Messages;
 
+/// <summary>
+/// Registers a Player in PlayerRegistry
+/// </summary>
 public class RegisterPlayer : ICommand
 {
     public RegisterPlayer(Player player)

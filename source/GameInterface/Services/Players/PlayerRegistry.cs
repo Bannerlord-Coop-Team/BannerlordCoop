@@ -1,22 +1,32 @@
-﻿using Common;
-using Common.Messaging;
+﻿using Common.Messaging;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
-using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Players;
 
+/// <summary>
+/// Keeps track & managers all players on the server/client. 
+/// </summary>
 internal interface IPlayerRegistry: IEnumerable<Player>
 {
+    /// <summary>
+    /// Adds a player to the registry
+    /// </summary>
+    /// <param name="player">The player to be added to the registry</param>
+    /// <returns>if the player was added to the registry</returns>
     bool AddPlayer(Player player);
     
+    /// <summary>
+    /// Checks if the Mobileparty is a player party
+    /// </summary>
+    /// <param name="mobileParty">checks to see if a <paramref name="mobileParty"/> is a player</param>
+    /// <returns>true if the <paramref name="mobileParty"/> is a player otherwise false.</returns>
     bool Contains(MobileParty mobileParty);
 }
+/// <inheritdoc cref="IPlayerRegistry"/>
 internal class PlayerRegistry : IPlayerRegistry
 {
     private readonly IMessageBroker messageBroker;
@@ -27,6 +37,7 @@ internal class PlayerRegistry : IPlayerRegistry
         this.messageBroker = messageBroker;
     }
 
+    /// <inheritdoc cref="IPlayerRegistry.AddPlayer(Player)"/>
     public bool AddPlayer(Player player)
     {
         if (!_players.Add(player)) return false;
@@ -36,6 +47,7 @@ internal class PlayerRegistry : IPlayerRegistry
         return true;
     }
 
+    /// <inheritdoc cref="IPlayerRegistry.Contains(MobileParty)"/>
     public bool Contains(MobileParty player)
     {
         return _playerMobileParties.Contains(player.StringId);
