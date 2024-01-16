@@ -19,7 +19,6 @@ namespace Coop.Core.Server.Services.Villages.Handlers
 
             // This handles an internal message
             messageBroker.Subscribe<VillageStateChanged>(Handle);
-
         }
 
         public void Dispose()
