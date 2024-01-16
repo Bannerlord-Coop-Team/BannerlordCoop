@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace Coop.Core.Server.Services.Villages.Messages;
 
 /// <summary>
-/// 
+/// Server sends this data when a Village Changes State
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public record NetworkChangeVillageState : IEvent

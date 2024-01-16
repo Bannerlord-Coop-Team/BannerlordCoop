@@ -10,8 +10,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.Villages.Handlers;
 
 /// <summary>
-/// TODO update summary
-/// Handlers are auto-instantiated by <see cref="ServiceModule"/>
+/// Handles VillageState Changes (e.g. Raided, Pillaged, Normal).
 /// </summary>
 public class VillageStateHandler : IHandler
 {
@@ -19,11 +18,6 @@ public class VillageStateHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
-
-    // TODO remove explanitory comments
-    // Our dependency injection framework (autofac) will automatically resolve interfaces and pass them to the constructor
-    // For this example, a messageBroker instance is automatically passed to this constructor.
-    // You can pass as many interfaces as you want to the constructor as long as the interface is registered int GameInterfaceModule
     public VillageStateHandler(IMessageBroker messageBroker, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker; 

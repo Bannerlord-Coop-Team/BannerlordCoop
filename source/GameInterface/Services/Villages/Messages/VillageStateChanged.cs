@@ -3,8 +3,7 @@
 namespace GameInterface.Services.Villages.Messages;
 
 /// <summary>
-/// TODO update summary
-/// A command changes the state of something
+/// This is used when the server needs to update the VillageStates to the client
 /// </summary>
 public record VillageStateChanged : ICommand
 {

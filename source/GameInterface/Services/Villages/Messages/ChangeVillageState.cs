@@ -8,7 +8,7 @@ namespace GameInterface.Services.Villages.Messages;
 
 
 /// <summary>
-/// TODO
+/// This is used when the Client Sends the GameInterface data to change its state.
 /// </summary>
 public record ChangeVillageState : ICommand
 {

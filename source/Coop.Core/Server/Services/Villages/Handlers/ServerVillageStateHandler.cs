@@ -5,7 +5,7 @@ using GameInterface.Services.Villages.Messages;
 namespace Coop.Core.Server.Services.Villages.Handlers
 {
     /// <summary>
-    /// TODO describe class
+    /// Handles VillageStates changes on the server.
     /// </summary>
     internal class ServerVillageStateHandler : IHandler
     {
