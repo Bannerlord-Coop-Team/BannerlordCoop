@@ -58,7 +58,7 @@ namespace Missions
 
             builder.RegisterType<RandomEquipmentGenerator>().As<IRandomEquipmentGenerator>();
             builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
-            builder.RegisterType<EventQueueManager>().As<IEventPacketHandler>().InstancePerLifetimeScope();
+            builder.RegisterType<EventQueueManager>().As<IMessagePacketHandler>().InstancePerLifetimeScope();
             builder.RegisterType<AgentMovementHandler>().As<IAgentMovementHandler>().InstancePerLifetimeScope();
             builder.RegisterType<MissileHandler>().As<IMissileHandler>().InstancePerLifetimeScope();
             builder.RegisterType<WeaponPickupHandler>().As<IWeaponPickupHandler>().InstancePerLifetimeScope();

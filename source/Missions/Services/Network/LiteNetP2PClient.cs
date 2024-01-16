@@ -5,6 +5,7 @@ using Common.Network;
 using Common.Network.Data;
 using Common.PacketHandlers;
 using Common.Serialization;
+using Common.Util;
 using IntroServer.Config;
 using IntroServer.Data;
 using IntroServer.Server;
@@ -36,7 +37,6 @@ namespace Missions.Services.Network
         private string instance;
 
         private readonly Guid id = Guid.NewGuid();
-        private readonly BatchLogger<PacketType> batchLogger = new BatchLogger<PacketType>(LogEventLevel.Verbose, 10000);
         private readonly NetManager netManager;
         private readonly NetworkConfiguration networkConfig;
         private readonly Version version = typeof(MissionTestServer).Assembly.GetName().Version;
@@ -71,7 +71,6 @@ namespace Missions.Services.Network
 
         public void Dispose()
         {
-            batchLogger.Dispose();
             Stop();
         }
 
@@ -267,28 +266,27 @@ namespace Missions.Services.Network
 
         public void Send(NetPeer netPeer, IMessage message)
         {
-            var eventPacket = new EventPacket(message);
-            Send(netPeer, eventPacket);
+            var messagePacket = new MessagePacket(message);
+            Send(netPeer, messagePacket);
         }
 
         public void SendAll(IMessage message)
         {
-            var eventPacket = new EventPacket(message);
-            SendAll(eventPacket);
+            var messagePacket = new MessagePacket(message);
+            SendAll(messagePacket);
         }
 
         public void SendAllBut(NetPeer excludedPeer, IMessage message)
         {
-            var eventPacket = new EventPacket(message);
-            SendAllBut(excludedPeer, eventPacket);
+            var messagePacket = new MessagePacket(message);
+            SendAllBut(excludedPeer, messagePacket);
         }
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
         {
             IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
-            batchLogger.Log(packet.PacketType);
 
-            PacketManager.HandleRecieve(peer, packet);
+            PacketManager.HandleReceive(peer, packet);
         }
     }
 }

@@ -37,20 +37,20 @@ namespace Missions.Services.Agents.Patches
 
         private static bool Prefix(ref Agent __instance)
         {
-            if (__instance == _allowedInstance?.Instance) return true;
+            if (AllowedThread.IsThisThreadAllowed()) return true;
 
             return NetworkAgentRegistry.Instance.IsControlled(__instance);
         }
 
         public static void RunOriginalRegisterBlow(Agent agent, Blow blow, AttackCollisionData collisionData)
         {
-            using(_allowedInstance = new AllowedInstance<Agent>(agent))
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                GameLoopRunner.RunOnMainThread(() =>
+                using(new AllowedThread())
                 {
                     agent.RegisterBlow(blow, collisionData);
-                }, true);
-            }
+                }
+            });
         }
     }
 

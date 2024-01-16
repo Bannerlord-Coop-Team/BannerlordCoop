@@ -16,7 +16,7 @@ namespace Missions.Services.Network
     /// This class stores events from a connected client that are not ready to be processed,
     /// When the client events can be processed this class will process those events
     /// </summary>
-    public class EventQueueManager : EventPacketHandler, IDisposable
+    public class EventQueueManager : MessagePacketHandler, IDisposable
     {
         private static readonly ILogger Logger = LogManager.GetLogger<EventQueueManager>();
 
@@ -98,15 +98,15 @@ namespace Missions.Services.Network
                 }
                 else
                 {
-                    EventPacket convertedPacket = (EventPacket)packet;
+                    MessagePacket convertedPacket = (MessagePacket)packet;
 
-                    if(convertedPacket.Event is NetworkMissionJoinInfo)
+                    if(convertedPacket.Message is NetworkMissionJoinInfo)
                     {
                         base.HandlePacket(peer, packet);
                         return;
                     }
 
-                    Queues[peer].Enqueue(convertedPacket.Event);
+                    Queues[peer].Enqueue(convertedPacket.Message);
                 }
             }
             else

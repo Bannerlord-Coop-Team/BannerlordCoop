@@ -27,7 +27,7 @@ namespace Missions.Services.Network
             IMessageBroker messageBroker,
             INetworkAgentRegistry agentRegistry,
             IAgentMovementHandler movementHandler,
-            IEventPacketHandler eventPacketHandler)
+            IMessagePacketHandler messagePacketHandler)
         {
             this.client = client;
             this.messageBroker = messageBroker;
@@ -37,7 +37,7 @@ namespace Missions.Services.Network
             {
                 client,
                 movementHandler,
-                eventPacketHandler
+                messagePacketHandler
             };
         }
 

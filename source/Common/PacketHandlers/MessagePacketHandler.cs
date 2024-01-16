@@ -53,7 +53,7 @@ namespace Common.PacketHandlers
             PublishEvent(peer, networkEvent);
         }
         private Dictionary<Type, Action<IMessageBroker, object, object>> publishFunctionLookup = new Dictionary<Type, Action<IMessageBroker, object, object>>();
-        internal virtual void PublishEvent(NetPeer peer, IMessage message)
+        protected virtual void PublishEvent(NetPeer peer, IMessage message)
         {
             var msgType = message.GetType();
             if (publishFunctionLookup.TryGetValue(msgType, out var action))

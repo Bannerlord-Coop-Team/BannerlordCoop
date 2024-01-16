@@ -91,17 +91,15 @@ namespace Missions.Services.Arena
             {
                 new MissionOptionsComponent(),
                 new MissionFacialAnimationHandler(),
-                new MissionDebugHandler(),
                 new MissionAgentPanicHandler(),
                 new AgentHumanAILogic(),
                 new ArenaAgentStateDeciderLogic(),
                 new VisualTrackerMissionBehavior(),
                 new CampaignMissionComponent(),
                 new EquipmentControllerLeaveLogic(),
-                new MissionAgentHandler(location),
+                new MissionAgentHandler(location, null),
                 _networkBehavior,
                 _battlesController,
-                //ViewCreator.CreateMissionOrderUIHandler(),
             }, true, true);
         }
 
