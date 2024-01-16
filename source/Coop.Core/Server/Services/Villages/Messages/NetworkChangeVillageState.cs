@@ -1,15 +1,12 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Server.Services.Villages.Messages;
 
 /// <summary>
 /// 
 /// </summary>
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 public record NetworkChangeVillageState : IEvent
 {
     [ProtoMember(1)]

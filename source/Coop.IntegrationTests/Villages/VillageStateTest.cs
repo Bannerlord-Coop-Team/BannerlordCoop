@@ -29,12 +29,12 @@ public class VillageStateTest
 
         // Assert
         // Verify the server sends a single message to it's game interface
-        Assert.Equal(1, server.InternalMessages.GetMessageCount<ChangeVillageState>());
+        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeVillageState>());
 
         // Verify the all clients send a single message to their game interfaces
         foreach (EnvironmentInstance client in TestEnvironment.Clients)
         {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<NetworkChangeVillageState>());
+            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeVillageState>());
         }
     }
 
