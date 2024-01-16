@@ -1,5 +1,9 @@
-﻿using HarmonyLib;
+﻿using Common.Messaging;
+using GameInterface.Services.Villages.Messages;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
+using static TaleWorlds.CampaignSystem.Settlements.Village;
+
 
 namespace GameInterface.Services.Villages.Patches;
 
@@ -13,13 +17,19 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool DailyTickPrefix()
     {
+        if(ModInformation.IsServer) return true;
         return false;
     }
 
     [HarmonyPatch(nameof(Village.VillageState), MethodType.Setter)]
     [HarmonyPrefix]
-    private static bool VillageStatePrefix()
+    private static bool VillageStatePrefix(ref Village __instance)
     {
+        if (ModInformation.IsServer)
+        {
+            MessageBroker.Instance.Publish(__instance, new VillageStateChange(__instance));    
+            return true;
+        }
         return false;
     }
 
