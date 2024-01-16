@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Players.Data;
 using LiteNetLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.DotNet;
@@ -24,12 +24,12 @@ public record RegisterNewPlayerHero : ICommand
 public record NewPlayerHeroRegistered : IResponse
 {
     public NetPeer SendingPeer { get; }
-    public NewPlayerData NewPlayerData { get; }
+    public Player Player { get; }
 
-    public NewPlayerHeroRegistered(NetPeer sendingPeer, NewPlayerData playerData)
+    public NewPlayerHeroRegistered(NetPeer sendingPeer, Player playerData)
     {
         SendingPeer = sendingPeer;
 
-        NewPlayerData = playerData;
+        Player = playerData;
     }
 }

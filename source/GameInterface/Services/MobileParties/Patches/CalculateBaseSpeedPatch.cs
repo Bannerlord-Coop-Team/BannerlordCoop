@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System;
 using System.Reflection;
@@ -6,9 +7,14 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
+
+/// <summary>
+/// Applies speed difficulty modifier to all player parties on client & server.
+/// </summary>
 [HarmonyPatch(typeof(DefaultPartySpeedCalculatingModel))]
 internal class CalculateBaseSpeedPatch 
 {
@@ -16,8 +22,9 @@ internal class CalculateBaseSpeedPatch
     [HarmonyPostfix]
     private static void CalculateBaseSpeed(ref MobileParty mobileParty, ref ExplainedNumber __result)
     {
-        if(ModInformation.IsServer && mobileParty.IsPartyControlled() == false)
+        if(mobileParty.IsPlayerParty() && mobileParty != MobileParty.MainParty)
         {
+            
             float playerMapMovementSpeedBonusMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerMapMovementSpeedBonusMultiplier();
             if (playerMapMovementSpeedBonusMultiplier > 0f)
             {
