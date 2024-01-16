@@ -18,13 +18,13 @@ public record Player
     }
 
     [ProtoMember(1)]
-    public byte[] HeroData { get; internal set; }
+    public byte[] HeroData { get; }
     [ProtoMember(2)]
-    public string HeroStringId { get; internal set; }
+    public string HeroStringId { get; }
     [ProtoMember(3)]
-    public string PartyStringId { get; internal set; }
+    public string PartyStringId { get; }
     [ProtoMember(4)]
-    public string CharacterObjectStringId { get; internal set; }
+    public string CharacterObjectStringId { get; }
     [ProtoMember(5)]
-    public string ClanStringId { get; internal set; }
+    public string ClanStringId { get; }
 }
