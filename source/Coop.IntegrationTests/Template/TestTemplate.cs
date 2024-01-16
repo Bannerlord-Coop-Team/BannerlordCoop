@@ -4,7 +4,7 @@ using GameInterface.Services.Template.Messages;
 
 namespace Coop.IntegrationTests.Template;
 
-public class TestTemplate
+public class TestVillageState
 {
     // Creates a test environment with 1 server and 2 clients by default
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();

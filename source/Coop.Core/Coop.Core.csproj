@@ -80,6 +80,6 @@
 	  </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Client\Services\Villages\Messages\" />
+    <Folder Include="Client\Services\NewFolder\" />
   </ItemGroup>
 </Project>

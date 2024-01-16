@@ -11,12 +11,14 @@ namespace GameInterface.Services.Villages.Messages;
 /// TODO update summary
 /// A command changes the state of something
 /// </summary>
-public record VillageChangeState : ICommand
+public record VillageStateChanged : ICommand
 {
-    public Village VillageChange { get; }
+    public string SettlementId { get; }
+    public int State { get; }
 
-    public VillageChangeState(Village villageChange)
+    public VillageStateChanged(string settlementId, int state)
     {
-        VillageChange = villageChange;
+        SettlementId = settlementId;
+        State = state;
     }
 }

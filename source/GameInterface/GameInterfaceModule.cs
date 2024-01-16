@@ -41,8 +41,5 @@ public class GameInterfaceModule : Module
                .As<IControlledEntityRegistry>()
                .InstancePerLifetimeScope();
 
-        builder.RegisterType<VillageRegistry>()
-                .As<IVillageRegistry>()
-                .InstancePerLifetimeScope();
     }
 }

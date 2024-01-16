@@ -1,4 +1,6 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -25,12 +27,25 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool VillageStatePrefix(ref Village __instance)
     {
+        if(AllowedThread.IsThisThreadAllowed()) return true;
         if (ModInformation.IsServer)
         {
-            MessageBroker.Instance.Publish(__instance, new VillageStateChange(__instance));    
+            var message = new VillageStateChanged(__instance.Settlement.StringId, (int)__instance.VillageState);
+            MessageBroker.Instance.Publish(__instance, message);    
             return true;
         }
         return false;
+    }
+
+    public static void RunVillageStateChange(Village village, VillageStates state)
+    {
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                using (new AllowedThread())
+                {
+                    village.VillageState = state;
+                }
+            });
     }
 
     [HarmonyPatch(nameof(Village.Hearth), MethodType.Setter)]
