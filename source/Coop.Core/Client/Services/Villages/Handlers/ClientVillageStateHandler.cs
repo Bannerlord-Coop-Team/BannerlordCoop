@@ -5,6 +5,9 @@ using GameInterface.Services.Villages.Messages;
 
 namespace Coop.Core.Client.Services.Villages.Handlers
 {
+    /// <summary>
+    /// Handles Network Communications from the Server regarding village states.
+    /// </summary>
     internal class ClientVillageStateHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;

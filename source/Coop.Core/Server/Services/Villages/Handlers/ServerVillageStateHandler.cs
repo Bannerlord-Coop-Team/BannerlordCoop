@@ -7,12 +7,12 @@ namespace Coop.Core.Server.Services.Villages.Handlers
     /// <summary>
     /// TODO describe class
     /// </summary>
-    internal class TemplateServerHandler : IHandler
+    internal class ServerVillageStateHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
-        public TemplateServerHandler(IMessageBroker messageBroker, INetwork network)
+        public ServerVillageStateHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.network = network;
