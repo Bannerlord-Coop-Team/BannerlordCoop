@@ -4,8 +4,12 @@ using Common.Util;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Time;
 using HarmonyLib;
+using SandBox.View.Map;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Map.MapBar;
 
@@ -66,6 +70,33 @@ internal class TimePatches
 [HarmonyPatch(typeof(MapTimeControlVM), "ExecuteTimeControlChange")]
 internal class AllowTimeControlFromControlsPatches
 {
+    private static void Prefix()
+    {
+        AllowedThread.AllowThisThread();
+    }
+
+    private static void Postfix()
+    {
+        AllowedThread.RevokeThisThread();
+    }
+}
+
+
+[HarmonyPatch(typeof(MapScreen), "TaleWorlds.CampaignSystem.GameState.IMapStateHandler.BeforeTick")]
+internal class AllowTimeControlFromHotKeysPatches
+{
+    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var instrs = instructions.ToList();
+
+        var allow = AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.AllowThisThread));
+        var revoke = AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.RevokeThisThread));
+
+        instrs.Insert(514, new CodeInstruction(OpCodes.Call, allow));
+        instrs.Insert(760, new CodeInstruction(OpCodes.Call, revoke));
+
+        return instrs;
+    }
     private static void Prefix()
     {
         AllowedThread.AllowThisThread();

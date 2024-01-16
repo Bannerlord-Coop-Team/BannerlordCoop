@@ -33,7 +33,7 @@ public class TemplateHandler : IHandler
         // Clean up subscriptions so the message broker does not keep this instance alive.
         // Delegates attach the instance so if that delegate is stored somewhere the garbage collecter will not collect this instance
         // The current implementation 
-        messageBroker.Unsubscribe<TemplateCommandMessage>(Handle_TemplateCommandMessage);
+        messageBroker?.Unsubscribe<TemplateCommandMessage>(Handle_TemplateCommandMessage);
     }
 
     // This is a handler of a command message

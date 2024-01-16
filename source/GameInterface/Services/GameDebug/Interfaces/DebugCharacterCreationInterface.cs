@@ -5,14 +5,10 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
-using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
-using TaleWorlds.MountAndBlade.GauntletUI;
 using TaleWorlds.MountAndBlade.GauntletUI.BodyGenerator;
-using TaleWorlds.MountAndBlade.View.Screens;
 using TaleWorlds.MountAndBlade.ViewModelCollection.FaceGenerator;
 
 namespace GameInterface.Services.GameDebug.Interfaces
@@ -47,10 +43,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
             if (InCharacterCreationIntro() == false) return;
 
             // Logic
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                SkipCharacterCreationInternal();
-            });
+            GameLoopRunner.RunOnMainThread(SkipCharacterCreationInternal);
         }
 
         public void SkipCharacterCreationInternal()
