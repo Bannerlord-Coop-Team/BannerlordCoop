@@ -3,7 +3,7 @@
 namespace GameInterface.Services.Villages.Messages;
 
 /// <summary>
-/// This is used when the server needs to update the VillageStates to the client
+/// This event is fired when the village state is updated
 /// </summary>
 public record VillageStateChanged : ICommand
 {

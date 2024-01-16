@@ -19,7 +19,6 @@ namespace Coop.Core.Server.Services.Villages.Handlers
 
             // This handles an internal message
             messageBroker.Subscribe<VillageStateChanged>(Handle);
-
         }
 
         public void Dispose()
@@ -30,8 +29,6 @@ namespace Coop.Core.Server.Services.Villages.Handlers
         private void Handle(MessagePayload<VillageStateChanged> obj)
         {
             var payload = obj.What;
-
-            // Here you can add checks to allow or disallow the state change
 
             // Broadcast to all the clients that the state was changed
             var networkMessage = new NetworkChangeVillageState(payload.SettlementId, payload.State);
