@@ -1,6 +1,10 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.Entity;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,6 +24,8 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(EncounterManager))]
 internal class EncounterManagerPatches
 {
+    private static ILogger Logger = LogManager.GetLogger<EncounterManagerPatches>();
+
     private static bool inSettlement = false;
     private static MethodInfo Start => typeof(PlayerEncounter).GetMethod(nameof(PlayerEncounter.Start));
     private static MethodInfo Init => typeof(PlayerEncounter).GetMethod(
@@ -79,5 +85,15 @@ internal class EncounterManagerPatches
     private static void PlayerEncounterFinishPatch(bool forcePlayerOutFromSettlement)
     {
         inSettlement = false;
+    }
+
+    [HarmonyPrefix]
+    [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
+    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty)
+    {
+        // Skip this method if party is not controlled
+        if (mobileParty.IsPartyControlled() == false) return false;
+
+        return true;
     }
 }

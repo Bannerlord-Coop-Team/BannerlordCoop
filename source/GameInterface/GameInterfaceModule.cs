@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Registry;
+using GameInterface.Services.Time;
 
 namespace GameInterface;
 
@@ -19,6 +20,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterModule<ServiceModule>();
 
         builder.RegisterType<MobilePartyRegistry>()

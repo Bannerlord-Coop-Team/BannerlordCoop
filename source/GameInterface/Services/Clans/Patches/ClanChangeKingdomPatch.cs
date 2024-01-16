@@ -25,13 +25,13 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, int awardMultiplier = 0, bool byRebellion = false, bool showNotification = true)
         {
+            if (AllowedInstance.IsAllowed(clan)) return true;
+
             if (PolicyProvider.AllowOriginalCalls) return true;
 
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
 
             CallStackValidator.Validate(clan, AllowedInstance);
-
-            if (AllowedInstance.IsAllowed(clan)) return true;
 
             MessageBroker.Instance.Publish(clan, new ClanKingdomChanged(clan.StringId, newKingdom?.StringId, (int)detail, awardMultiplier, byRebellion, showNotification));
 

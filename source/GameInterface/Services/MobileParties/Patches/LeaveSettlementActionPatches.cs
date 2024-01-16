@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
@@ -21,6 +22,8 @@ public class LeaveSettlementActionPatches
     private static bool Prefix(MobileParty mobileParty)
     {
         if(AllowedInstance.IsAllowed(mobileParty)) return true;
+
+        if (ModInformation.IsClient) return false;
 
         var message = new PartyLeaveSettlementAttempted(mobileParty.StringId);
         MessageBroker.Instance.Publish(mobileParty, message);

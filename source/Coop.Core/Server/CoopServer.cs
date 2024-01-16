@@ -1,16 +1,19 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.Core.Common.Network;
-using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
+using Coop.Core.Server.Services.Time.Messages;
 using GameInterface;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 
@@ -27,17 +30,17 @@ public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, I
 /// <inheritdoc cref="ICoopServer"/>
 public class CoopServer : CoopNetworkBase, ICoopServer
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<CoopServer>();
+
     public const string ServerControllerId = "Server";
 
     public override int Priority => 0;
 
-    public IEnumerable<NetPeer> ConnectedPeers => netManager.ConnectedPeerList;
+    public IEnumerable<NetPeer> ConnectedPeers => netManager;
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
-    private readonly IControllerIdProvider controllerIdProvider;
     private readonly NetManager netManager;
-
     private bool allowJoining = false;
 
     public CoopServer(
@@ -49,7 +52,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
-        this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
 
         ModInformation.IsServer = true;
@@ -150,12 +152,31 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void SendAll(IPacket packet)
     {
+        CheckNetworkQueueOverloaded();
         SendAll(netManager, packet);
     }
 
-    public override void SendAllBut(NetPeer netPeer, IPacket packet)
+    public override void SendAllBut(NetPeer ignoredPeer, IPacket packet)
     {
-        SendAllBut(netManager, netPeer, packet);
+        CheckNetworkQueueOverloaded(ignoredPeer);
+        SendAllBut(netManager, ignoredPeer, packet);
+    }
+
+    private void CheckNetworkQueueOverloaded(NetPeer ignoredPeer = null)
+    {
+        // TODO see if Parallel.ForEach works here
+        foreach (var netPeer in ConnectedPeers.Where(peer => peer != ignoredPeer))
+        {
+            // Sending defaults to channel 0
+            int outgoingPacketCount = 
+                  netPeer.GetPacketsCountInReliableQueue(0, true)
+                + netPeer.GetPacketsCountInReliableQueue(0, false);
+
+            if (outgoingPacketCount > Configuration.MaxPacketsInQueue)
+            {
+                messageBroker.Publish(this, new PeerQueueOverloaded(netPeer));
+            }
+        }
     }
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)

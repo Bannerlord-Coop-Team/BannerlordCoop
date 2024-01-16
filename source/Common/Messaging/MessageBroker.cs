@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.Messaging;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -12,48 +13,32 @@ namespace Common.Messaging
 
         void Respond<T>(object target, T message) where T : IResponse;
 
-        void Subscribe<T>(Action<MessagePayload<T>> subscription);
+        void Subscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage;
 
-        void Unsubscribe<T>(Action<MessagePayload<T>> subscription);
+        void Unsubscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage;
     }
 
     public class MessageBroker : IMessageBroker
     {
         private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
-        protected static MessageBroker _instance;
-        protected readonly Dictionary<Type, List<WeakDelegate>> _subscribers;
+        protected static MessageBroker instance;
+        protected readonly Dictionary<Type, List<WeakDelegate>> subscribers;
+        private readonly MessageLogger messageLogger = new MessageLogger(Logger);
         public static MessageBroker Instance { 
             get
             {
-                if( _instance == null)
+                if( instance == null)
                 {
-                    _instance = new MessageBroker();
+                    instance = new MessageBroker();
                 }
-                return _instance;
+                return instance;
             } 
-        } 
-            
+        }
 
         public MessageBroker()
         {
-            _subscribers = new Dictionary<Type, List<WeakDelegate>>();
+            subscribers = new Dictionary<Type, List<WeakDelegate>>();
         }
-
-        private static readonly HashSet<string> omit = new HashSet<string>
-        {
-            "PartyBehaviorChangeAttempted",
-            "UpdatePartyBehavior",
-            "ControlledPartyBehaviorUpdated",
-            "PartyEnterSettlementAttempted",
-            "PartyLeaveSettlementAttempted",
-            "NetworkPartyEnterSettlement",
-            "NetworkPartyLeaveSettlement",
-            "PartyEnterSettlement",
-            "PartyLeaveSettlement",
-            "ClanInfluenceChanged",
-            "ChangeClanInfluence",
-            "NetworkClanChangeInfluenceApproved",
-        };
 
         public virtual void Publish<T>(object source, T message) where T : IMessage
         {
@@ -61,20 +46,15 @@ namespace Common.Messaging
                 return;
 
             var msgType = message.GetType();
-            var msgName = msgType.Name;
 
-            if (omit.Contains(msgName) == false)
-            {
-                Logger.Verbose("Publishing {msgName} from {sourceName}", msgName, source?.GetType().Name);
-            }
-            
+            messageLogger.LogMessage(source, msgType);
 
-            if (!_subscribers.ContainsKey(typeof(T)))
+            if (!subscribers.ContainsKey(typeof(T)))
             {
                 return;
             }
 
-            var delegates = _subscribers[typeof(T)];
+            var delegates = subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);
             for (int i = 0; i < delegates.Count; i++)
@@ -99,12 +79,12 @@ namespace Common.Messaging
 
             Logger.Verbose($"Responding {message.GetType().Name} to {target?.GetType().Name}");
 
-            if (!_subscribers.ContainsKey(typeof(T)))
+            if (!subscribers.ContainsKey(typeof(T)))
             {
                 return;
             }
 
-            var delegates = _subscribers[typeof(T)];
+            var delegates = subscribers[typeof(T)];
             if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(target, message);
             for (int i = 0; i < delegates.Count; i++)
@@ -118,7 +98,7 @@ namespace Common.Messaging
                     continue;
                 }
 
-                if (weakDelegate.Instance == target)
+                if (ReferenceEquals(weakDelegate.Instance, target))
                 {
                     Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
                     // Can only respond to one source, no longer need to loop if found
@@ -127,31 +107,31 @@ namespace Common.Messaging
             }
         }
 
-        public virtual void Subscribe<T>(Action<MessagePayload<T>> subscription)
+        public virtual void Subscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage
         {
-            var delegates = _subscribers.ContainsKey(typeof(T)) ?
-                            _subscribers[typeof(T)] : new List<WeakDelegate>();
+            var delegates = subscribers.ContainsKey(typeof(T)) ?
+                            subscribers[typeof(T)] : new List<WeakDelegate>();
             if (!delegates.Contains(subscription))
             {
                 delegates.Add(subscription);
             }
-            _subscribers[typeof(T)] = delegates;
+            subscribers[typeof(T)] = delegates;
         }
 
-        public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
+        public virtual void Unsubscribe<T>(Action<MessagePayload<T>> subscription) where T : IMessage
         {
             
-            if (!_subscribers.ContainsKey(typeof(T))) return;
-            var delegates = _subscribers[typeof(T)];
+            if (!subscribers.ContainsKey(typeof(T))) return;
+            var delegates = subscribers[typeof(T)];
             if (delegates.Contains(new WeakDelegate(subscription)))
                 delegates.Remove(subscription);
             if (delegates.Count == 0)
-                _subscribers.Remove(typeof(T));
+                subscribers.Remove(typeof(T));
         }
 
         public virtual void Dispose()
         {
-            _subscribers?.Clear();
+            subscribers?.Clear();
         }
     }
 }

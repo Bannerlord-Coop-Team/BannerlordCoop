@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
@@ -19,8 +20,8 @@ namespace Coop.Tests.Client.States
         private readonly NetPeer serverPeer;
         private readonly ClientTestComponent clientComponent;
 
-        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => clientComponent.MockNetwork;
+        private TestMessageBroker TestMessageBroker => clientComponent.TestMessageBroker;
+        private TestNetwork MockNetwork => clientComponent.TestNetwork;
 
         public CharacterCreationStateTests(ITestOutputHelper output)
         {
@@ -61,8 +62,7 @@ namespace Coop.Tests.Client.States
             characterCreationState.Handle_CharacterCreationFinished(payload);
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<PackageMainHero>(message);
+            Assert.Equal(1, TestMessageBroker.GetMessageCountFromType<PackageMainHero>());
         }
 
         [Fact]
@@ -75,8 +75,7 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterMainMenu();
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
-            Assert.IsType<EnterMainMenu>(message);
+            Assert.Equal(1, TestMessageBroker.GetMessageCountFromType<EnterMainMenu>());
         }
 
         [Fact]

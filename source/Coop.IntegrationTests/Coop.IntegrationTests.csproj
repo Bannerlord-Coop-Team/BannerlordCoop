@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Common.Tests\Common.Tests.csproj" />
     <ProjectReference Include="..\Coop.Core\Coop.Core.csproj" />
   </ItemGroup>
 
@@ -31,6 +32,13 @@
     <Reference Include="TaleWorlds.CampaignSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.Library">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Utils\" />
   </ItemGroup>
 
 </Project>

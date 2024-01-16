@@ -19,15 +19,12 @@ namespace Coop.Tests.Client.States
         private readonly NetPeer serverPeer;
         private readonly ClientTestComponent clientComponent;
 
-        private MockMessageBroker MockMessageBroker => clientComponent.MockMessageBroker;
-        private MockNetwork MockNetwork => clientComponent.MockNetwork;
-
         public ValidateModuleStateTests(ITestOutputHelper output)
         {
             clientComponent = new ClientTestComponent(output);
             var container = clientComponent.Container;
 
-            serverPeer = MockNetwork.CreatePeer();
+            serverPeer = clientComponent.TestNetwork.CreatePeer();
             clientLogic = container.Resolve<IClientLogic>()!;
         }
 
@@ -38,9 +35,9 @@ namespace Coop.Tests.Client.States
             var validateState = clientLogic.SetState<ValidateModuleState>();
 
             // Assert
-            Assert.NotEmpty(MockNetwork.Peers);
+            Assert.NotEmpty(clientComponent.TestNetwork.Peers);
 
-            var message = Assert.Single(MockNetwork.GetPeerMessages(serverPeer));
+            var message = Assert.Single(clientComponent.TestNetwork.GetPeerMessages(serverPeer));
             Assert.IsType<NetworkClientValidate>(message);
         }
 
@@ -75,7 +72,7 @@ namespace Coop.Tests.Client.States
             validateState.Handle_NetworkClientValidated(payload);
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<StartCharacterCreation>(message);
         }
 
@@ -89,7 +86,7 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterMainMenu();
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<EnterMainMenu>(message);
         }
 
@@ -132,7 +129,7 @@ namespace Coop.Tests.Client.States
             clientLogic.Disconnect();
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<EnterMainMenu>(message);
         }
 
@@ -146,7 +143,7 @@ namespace Coop.Tests.Client.States
             clientLogic.StartCharacterCreation();
 
             // Assert
-            var message = Assert.Single(MockMessageBroker.PublishedMessages);
+            var message = Assert.Single(clientComponent.TestMessageBroker.Messages);
             Assert.IsType<StartCharacterCreation>(message);
         }
 

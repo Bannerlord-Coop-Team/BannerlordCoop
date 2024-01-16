@@ -2,12 +2,10 @@
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
-using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
 namespace Coop.Core.Server.Connections;
 
 /// <summary>
@@ -31,7 +29,9 @@ public class ClientRegistry : IClientRegistry
         typeof(TransferSaveState),
         typeof(LoadingState),
     };
+
     public bool PlayersLoading => ConnectionStates.Any(state => loadingStates.Contains(state.Value.State.GetType()));
+
     public List<NetPeer> LoadingPeers => ConnectionStates.Where(state => loadingStates.Contains(state.Value.State.GetType())).Select(state => state.Key).ToList();
 
     private readonly IMessageBroker messageBroker;

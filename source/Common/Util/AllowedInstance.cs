@@ -10,7 +10,7 @@ namespace Common.Util;
 /// <typeparam name="T">Type to allow state changing</typeparam>
 public class AllowedInstance<T> : IDisposable where T : class
 {
-    private readonly static SemaphoreSlim _sem = new SemaphoreSlim(1);
+    private readonly SemaphoreSlim _sem = new SemaphoreSlim(1);
     public T Instance
     {
         get => _instance;

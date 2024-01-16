@@ -4,6 +4,7 @@ using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 
 namespace GameInterface.Serialization
 {
@@ -12,6 +13,7 @@ namespace GameInterface.Serialization
         IObjectManager ObjectManager { get; }
 
         T GetBinaryPackage<T>(object obj);
+
         IBinaryPackage GetBinaryPackage(object obj);
     }
 
@@ -66,11 +68,15 @@ namespace GameInterface.Serialization
             }
         }
 
+        // Quick fix on synchronization, will impact performance
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public T GetBinaryPackage<T>(object obj)
         {
             return (T)GetBinaryPackage(obj);
         }
 
+        // Quick fix on synchronization, will impact performance
+        [MethodImpl(MethodImplOptions.Synchronized)]
         public IBinaryPackage GetBinaryPackage(object obj)
         {
             if (obj == null) return new NullBinaryPackage();
