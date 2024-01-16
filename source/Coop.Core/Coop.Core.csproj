@@ -79,7 +79,4 @@
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
 	  </Reference>
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Client\Services\NewFolder\" />
-  </ItemGroup>
 </Project>
