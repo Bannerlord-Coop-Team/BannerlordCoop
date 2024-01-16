@@ -9,7 +9,6 @@ using TaleworldGameState = TaleWorlds.Core.GameState;
 namespace GameInterface.Services.GameDebug.Patches;
 
 // Only skip for debugging
-#if DEBUG
 [HarmonyPatch(typeof(TaleworldGameState))]
 internal class CharacterCreationIntroPatch
 {
@@ -20,6 +19,10 @@ internal class CharacterCreationIntroPatch
     private static void OnActivate(ref TaleworldGameState __instance)
     {
         Logger.Information("Game State is changing to {state}", __instance.GetType().Name);
+        
+        MessageBroker.Instance.Publish(__instance, new CharacterCreationStarted());
+
+#if DEBUG
         if (DebugCharacterCreationInterface.InCharacterCreationIntro())
         {
             if (VideoPlayerViewPatch.CurrentVideoPlayerView != null)
@@ -27,9 +30,7 @@ internal class CharacterCreationIntroPatch
                 VideoPlayerViewPatch.CurrentVideoPlayerView?.StopVideo();
                 VideoPlayerViewPatch.CurrentVideoPlayerView = null;
             }
-            
-            MessageBroker.Instance.Publish(__instance, new CharacterCreationStarted());
         }
+#endif
     }
 }
-#endif

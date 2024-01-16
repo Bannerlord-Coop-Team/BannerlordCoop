@@ -1,18 +1,8 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using GameInterface.Services.MobileParties.Handlers;
-using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Settlements.Handlers;
-using GameInterface.Services.Settlements.Messages;
-using GameInterface.Services.Settlements.Patches;
 using GameInterface.Services.Template.Messages;
+using GameInterface.Services.Template.Patches;
 using Serilog;
-using System;
-using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Template.Handlers;
 
@@ -43,13 +33,16 @@ public class TemplateHandler : IHandler
         // Clean up subscriptions so the message broker does not keep this instance alive.
         // Delegates attach the instance so if that delegate is stored somewhere the garbage collecter will not collect this instance
         // The current implementation 
-        messageBroker.Unsubscribe<TemplateCommandMessage>(Handle_TemplateCommandMessage);
+        messageBroker?.Unsubscribe<TemplateCommandMessage>(Handle_TemplateCommandMessage);
     }
 
+    // This is a handler of a command message
+    // A command message changes the state of the software
+    // Normally received to a handler in Coop.Core
     private void Handle_TemplateCommandMessage(MessagePayload<TemplateCommandMessage> payload)
     {
         // TODO remove explanitory comments
-        // Publishing a message to all internal software is done using the message broker
-        messageBroker.Publish(this, new TemplateEventMessage());
+        // Run unpatched version of the intercepted method
+        TemplatePatch.OverrideTemplateFn();
     }
 }

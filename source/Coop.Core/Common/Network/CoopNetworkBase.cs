@@ -51,19 +51,19 @@ public abstract class CoopNetworkBase : INetwork
 
     public void Send(NetPeer netPeer, IMessage message)
     {
-        var eventPacket = new EventPacket(message);
+        var eventPacket = new MessagePacket(message);
         Send(netPeer, eventPacket);
     }
 
     public void SendAll(IMessage message)
     {
-        var eventPacket = new EventPacket(message);
+        var eventPacket = new MessagePacket(message);
         SendAll(eventPacket);
     }
 
     public void SendAllBut(NetPeer excludedPeer, IMessage message)
     {
-        var eventPacket = new EventPacket(message);
+        var eventPacket = new MessagePacket(message);
         SendAllBut(excludedPeer, eventPacket);
     }
 

@@ -29,7 +29,7 @@ public class PartyBehaviorTest
         var server = TestEnvironment.Server;
 
         // Act
-        client1.ReceiveMessage(this, message);
+        client1.SimulateMessage(this, message);
 
         // Assert
         Assert.Equal(1, server.InternalMessages.GetMessageCount<UpdatePartyBehavior>());
@@ -56,7 +56,7 @@ public class PartyBehaviorTest
         var server = TestEnvironment.Server;
 
         // Act
-        server.ReceiveMessage(this, message);
+        server.SimulateMessage(this, message);
 
         /// wait for polling task to complete <see cref="RequestMobilePartyBehaviorPacketHandler.Poll"/>
         Thread.Sleep(1000);

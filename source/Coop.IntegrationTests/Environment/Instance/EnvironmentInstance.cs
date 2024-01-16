@@ -35,7 +35,7 @@ internal abstract class EnvironmentInstance
     /// </summary>
     /// <param name="source">Source of the message</param>
     /// <param name="message">Received Message</param>
-    public void ReceiveMessage<T>(object source, T message) where T : IMessage
+    public void SimulateMessage<T>(object source, T message) where T : IMessage
     {
         messageBroker.Publish(source, message);
     }
@@ -45,7 +45,7 @@ internal abstract class EnvironmentInstance
     /// </summary>
     /// <param name="source">Source Peer</param>
     /// <param name="packet">Received Packet</param>
-    public void ReceivePacket(NetPeer source, IPacket packet)
+    public void SimulatePacket(NetPeer source, IPacket packet)
     {
         mockNetwork.ReceiveFromNetwork(source, packet);
     }
