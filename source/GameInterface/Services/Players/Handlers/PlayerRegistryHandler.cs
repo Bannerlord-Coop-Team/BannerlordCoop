@@ -41,7 +41,6 @@ namespace GameInterface.Services.Players.Handlers
             {
                 Logger.Error("Player has been already added.");
             }
-
         }
 
 
