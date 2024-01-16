@@ -17,11 +17,7 @@ internal class VillagePatches
 {
     [HarmonyPatch("DailyTick")]
     [HarmonyPrefix]
-    private static bool DailyTickPrefix()
-    {
-        if(ModInformation.IsServer) return true;
-        return false;
-    }
+    private static bool DailyTickPrefix() => ModInformation.IsServer;
 
     [HarmonyPatch(nameof(Village.VillageState), MethodType.Setter)]
     [HarmonyPrefix]
