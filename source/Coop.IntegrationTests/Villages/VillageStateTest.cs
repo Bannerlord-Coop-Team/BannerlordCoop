@@ -12,10 +12,10 @@ public class VillageStateTest
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
     /// <summary>
-    /// Use for server controlled functionality
+    /// Used to Test that client recieves VillageStateChanged messsages.
     /// </summary>
     [Fact]
-    public void ServerReceivesTemplateEventMessage_PublishesTemplateCommandMessage_AllClients()
+    public void ServerVillageStateChanged_Publishes_AllClients()
     {
         // Arrange
         string settlementId = "Settlement1";
