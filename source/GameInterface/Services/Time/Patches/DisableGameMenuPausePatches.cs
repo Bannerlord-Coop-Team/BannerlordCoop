@@ -8,34 +8,30 @@ using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
+using SandBox;
+using SandBox.View.Map;
 
 namespace GameInterface.Services.Time.Patches;
 
-[HarmonyPatch(typeof(GameMenu))]
+[HarmonyPatch]
 internal static class DisableGameMenuPausePatches
 {
-    
-    [HarmonyPatch(nameof(GameMenu.ActivateGameMenu))]
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> ActivateGameMenuPatch(IEnumerable<CodeInstruction> instructions) => ReplaceTimeControlMode(instructions);
-    
-    [HarmonyPatch(nameof(GameMenu.StartWait))]
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> StartWaitPatch(IEnumerable<CodeInstruction> instructions) => ReplaceTimeControlMode(instructions);
+    static IEnumerable<MethodBase> TargetMethods()
+    {
+        return new MethodBase[]
+        {
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)),
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.StartWait)),
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.EndWait)),
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)),
+            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
+            AccessTools.Method(typeof(MapScreen), "HandleLeftMouseButtonClick"),
+            AccessTools.Method(typeof(MapScreen), "HandleMouse"),
+        };
+    }
 
-    [HarmonyPatch(nameof(GameMenu.EndWait))]
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> EndWaitPatch(IEnumerable<CodeInstruction> instructions) => ReplaceTimeControlMode(instructions);
-
-    [HarmonyPatch(nameof(GameMenu.ExitToLast))]
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> ExitToLastPatch(IEnumerable<CodeInstruction> instructions) => ReplaceTimeControlMode(instructions);
-
-    [HarmonyPatch(nameof(GameMenu.SwitchToMenu))]
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> SwitchToMenuPatch(IEnumerable<CodeInstruction> instructions) => ReplaceTimeControlMode(instructions);
-
-    private static IEnumerable<CodeInstruction> ReplaceTimeControlMode(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
         List<CodeInstruction> instrs = instructions.ToList();
 

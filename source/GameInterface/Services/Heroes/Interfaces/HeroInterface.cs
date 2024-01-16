@@ -61,7 +61,7 @@ internal class HeroInterface : IHeroInterface
     {
         Hero.MainHero.StringId = string.Empty;
         Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
-        Hero.MainHero.Clan.StringId = Guid.NewGuid().ToString();
+        Hero.MainHero.Clan.StringId = $"CoopClan_{Guid.NewGuid()}";
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
