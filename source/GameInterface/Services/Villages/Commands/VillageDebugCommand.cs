@@ -74,6 +74,9 @@ namespace GameInterface.Services.Villages.Commands
         [CommandLineArgumentFunction("set_state", "coop.debug.village")]
         public static string SetVillageState(List<string> args)
         {
+            if (ModInformation.IsClient)
+                return "Usage: This command can only be used by the server for debugging purposes.";
+
             if (args.Count < 2)
             {
                 return "Usage: coop.debug.village.set_state <villageId> <BeingRaided | ForcedForVolunteers | ForcedForSupplies | Looted> ";
