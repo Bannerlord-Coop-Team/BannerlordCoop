@@ -38,7 +38,7 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
+            client1.SimulateMessage(this, message);
 
             // Assert
             Assert.Equal(1, server.InternalMessages.GetMessageCount<ChangeClanName>());
@@ -68,7 +68,7 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
+            client1.SimulateMessage(this, message);
 
             // Assert
             Assert.Equal(1, server.InternalMessages.GetMessageCount<ChangeClanKingdom>());
@@ -97,7 +97,7 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
+            client1.SimulateMessage(this, message);
 
             // Assert
             Assert.Equal(1, server.InternalMessages.GetMessageCount<DestroyClan>());
@@ -127,7 +127,7 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
+            client1.SimulateMessage(this, message);
             
 
             // Assert
@@ -157,7 +157,7 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
+            client1.SimulateMessage(this, message);
             
 
             // Assert
@@ -188,7 +188,7 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
+            client1.SimulateMessage(this, message);
             
 
             // Assert
@@ -218,7 +218,7 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
+            client1.SimulateMessage(this, message);
             
 
             // Assert
@@ -250,7 +250,7 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
+            client1.SimulateMessage(this, message);
             
             // Assert
             Assert.Equal(1, server.InternalMessages.GetMessageCount<AdoptHero>());
@@ -280,7 +280,7 @@ namespace Coop.IntegrationTests.Clans
             var server = TestEnvironment.Server;
 
             // Act
-            client1.ReceiveMessage(this, message);
+            client1.SimulateMessage(this, message);
             
             // Assert
             Assert.Equal(1, server.InternalMessages.GetMessageCount<AddNewHeir>());

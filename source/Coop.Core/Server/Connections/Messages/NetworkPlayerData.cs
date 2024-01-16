@@ -12,7 +12,7 @@ public record NetworkPlayerData : IEvent
 {
     public NetworkPlayerData(NewPlayerHeroRegistered registrationData)
     {
-        var playerData = registrationData.NewPlayerData;
+        var playerData = registrationData.Player;
 
         if (playerData == null) return;
 

@@ -5,10 +5,10 @@ using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Registry;
 using Serilog;
 using System;
@@ -31,7 +31,7 @@ public interface IHeroInterface : IGameAbstraction
     /// </summary>
     /// <param name="bytes">Hero as bytes</param>
     /// <returns>Hero string identifier</returns>
-    NewPlayerData UnpackHero(string controllerId, byte[] bytes);
+    Player UnpackHero(string controllerId, byte[] bytes);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -61,14 +61,14 @@ internal class HeroInterface : IHeroInterface
     {
         Hero.MainHero.StringId = string.Empty;
         Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
-        Hero.MainHero.Clan.StringId = Guid.NewGuid().ToString();
+        Hero.MainHero.Clan.StringId = $"CoopClan_{Guid.NewGuid()}";
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public NewPlayerData UnpackHero(string controllerId, byte[] bytes)
+    public Player UnpackHero(string controllerId, byte[] bytes)
     {
         Hero hero = null;
 
@@ -79,13 +79,13 @@ internal class HeroInterface : IHeroInterface
 
         entityRegistry.RegisterAsControlled(controllerId, hero.StringId);
 
-        var playerData = new NewPlayerData() {
-            HeroData = bytes,
-            HeroStringId = hero.StringId,
-            PartyStringId = hero.PartyBelongedTo.StringId,
-            CharacterObjectStringId = hero.CharacterObject.StringId,
-            ClanStringId = hero.Clan.StringId
-        };
+        var playerData = new Player(
+            bytes,
+            hero.StringId,
+            hero.PartyBelongedTo.StringId,
+            hero.CharacterObject.StringId,
+            hero.Clan.StringId
+        );
 
         return playerData;
     }

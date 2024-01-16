@@ -18,7 +18,7 @@ namespace Coop.IntegrationTests.ItemRosters
 
             var server = TestEnvironment.Server;
 
-            server.ReceiveMessage(this, triggerMessage);
+            server.SimulateMessage(this, triggerMessage);
 
             Assert.Equal(1, server.InternalMessages.GetMessageCount<ItemRosterUpdated>());
 

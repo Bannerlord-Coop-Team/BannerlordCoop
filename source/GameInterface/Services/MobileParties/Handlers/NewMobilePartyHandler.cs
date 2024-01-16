@@ -34,9 +34,9 @@ internal class NewMobilePartyHandler : IHandler
 
     private void Handle(MessagePayload<NewPlayerHeroRegistered> obj)
     {
-        if (objectManager.TryGetObject(obj.What.NewPlayerData.PartyStringId, out MobileParty party) == false)
+        if (objectManager.TryGetObject(obj.What.Player.PartyStringId, out MobileParty party) == false)
         {
-            Logger.Error("Could not find {objType} with string id {stringId}", typeof(MobileParty), obj.What.NewPlayerData.PartyStringId);
+            Logger.Error("Could not find {objType} with string id {stringId}", typeof(MobileParty), obj.What.Player.PartyStringId);
             return;
         }
 

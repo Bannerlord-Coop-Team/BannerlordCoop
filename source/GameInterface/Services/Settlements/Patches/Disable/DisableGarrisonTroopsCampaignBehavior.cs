@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.Settlements.Patches;
+namespace GameInterface.Services.Settlements.Patches.Disable;
 
 
 [HarmonyPatch(typeof(GarrisonTroopsCampaignBehavior))]

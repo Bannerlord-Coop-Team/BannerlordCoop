@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
 
-namespace GameInterface.Services.Settlements.Patches;
+namespace GameInterface.Services.Settlements.Patches.Disable;
 
 
 [HarmonyPatch(typeof(NearbyBanditBaseIssueBehavior))]

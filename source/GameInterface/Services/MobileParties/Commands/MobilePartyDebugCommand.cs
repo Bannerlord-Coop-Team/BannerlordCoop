@@ -22,13 +22,13 @@ namespace GameInterface.Services.MobileParties.Commands
             }
 
             MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
-            Hero owner = mobileParty.Owner;
 
             if(mobileParty == null )
             {
                 return string.Format("ID: '{0}' not found", args[0]);
             }
-  
+
+            Hero owner = mobileParty.Owner;
             FieldInfo typeMobileParty = typeof(MobileParty).GetField("_lastCalculatedSpeed", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
             var _lastCalculatedSpeed = typeMobileParty.GetValue(mobileParty);
 
