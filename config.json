@@ -1,7 +1,7 @@
 {
     "modsDir" : "mb2\\Modules",
-    "name" : "Coop",
-    "main_class" : "CoopMod",
+    "name" : "MissionTestMod",
+    "main_class" : "TestMod",
     "version" : "v0.0.1",
     "game_version" : "v1.1.6"
 }

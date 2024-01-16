@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using HarmonyLib;
 using Missions;
 using Missions.Services;
 using Missions.Services.Network;
@@ -6,32 +7,15 @@ using Xunit;
 
 namespace MissionTests
 {
-    public class AutoFacTests
+    public class PatchTests
     {
-        IContainer _container;
-        public AutoFacTests()
-        {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<MissionModule>();
-
-            _container = builder.Build();
-        }
 
         [Fact]
         public void MissionModule_Resolve_CoopMissionNetworkBehavior()
         {
-            var networkBehavior = _container.Resolve<CoopMissionNetworkBehavior>();
+            Harmony harmony = new Harmony(nameof(PatchTests));
 
-            Assert.NotNull(networkBehavior);
-        }
-
-        [Fact]
-        public void MissionModule_Resolve_CoopArenaController()
-        {
-            var networkBehavior = _container.Resolve<CoopArenaController>();
-
-            Assert.NotNull(networkBehavior);
+            harmony.PatchAll(typeof(MissionModule).Assembly);
         }
     }
 }

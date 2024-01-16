@@ -261,7 +261,7 @@ namespace Missions.Services
             }
         }
 
-        private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("BattleEquipment", BindingFlags.Public | BindingFlags.Instance);
+        private static readonly PropertyInfo Hero_BattleEquipment = typeof(Hero).GetProperty("_battleEquipment", BindingFlags.NonPublic | BindingFlags.Instance);
         /// <summary>
         /// Spawn an agent based on its character object and frame. For now, Main agent character object is used
         /// This should be the real character object in the future
