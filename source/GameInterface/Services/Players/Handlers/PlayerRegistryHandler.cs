@@ -30,7 +30,6 @@ namespace GameInterface.Services.Players.Handlers
             {
                 Logger.Error("Player has been already added.");
             } 
-
         }
 
         private void Handle(MessagePayload<RegisterPlayer> obj)
