@@ -36,6 +36,8 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
         {
             var payload = obj.What;
 
+            var message = new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonRoster);
+
             messageBroker.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonRoster));
 
             network.SendAll(new NetworkUnitRecruited(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonRoster));

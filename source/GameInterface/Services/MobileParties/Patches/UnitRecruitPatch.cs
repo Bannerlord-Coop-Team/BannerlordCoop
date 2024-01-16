@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Extensions;
@@ -15,15 +16,11 @@ namespace GameInterface.Services.MobileParties.Patches
     public class UnitRecruitPatch
     {
         private static PropertyInfo TroopRoster_OwnerParty => typeof(TroopRoster).GetProperty("OwnerParty", BindingFlags.Instance | BindingFlags.NonPublic);
-
-        private static readonly AllowedInstance<CharacterObject> AllowedInstance = new AllowedInstance<CharacterObject>();
-
+        
         [HarmonyPatch(nameof(TroopRoster.AddToCounts))]
         public static bool Prefix(TroopRoster __instance, CharacterObject character, int count, bool insertAtFront = false, int woundedCount = 0, int xpChange = 0, bool removeDepleted = true, int index = -1)
         {
-            if (AllowedInstance.IsAllowed(character)) return true;
-
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (AllowedThread.IsThisThreadAllowed()) return true;
 
             PartyBase ownerParty = (PartyBase)TroopRoster_OwnerParty.GetValue(__instance);
 
@@ -39,18 +36,19 @@ namespace GameInterface.Services.MobileParties.Patches
 
         public static void RunOriginalAddToCounts(CharacterObject character, int amount, MobileParty party, bool isPrisonerRoster)
         {
-            using (AllowedInstance)
+            using(new AllowedThread())
             {
-                AllowedInstance.Instance = character;
-
-                if (isPrisonerRoster)
+                GameLoopRunner.RunOnMainThread(() =>
                 {
-                    party.PrisonRoster.AddToCounts(character, amount);
-                }
-                else
-                {
-                    party.MemberRoster.AddToCounts(character, amount);
-                }
+                    if (isPrisonerRoster)
+                    {
+                        party.PrisonRoster.AddToCounts(character, amount);
+                    }
+                    else
+                    {
+                        party.MemberRoster.AddToCounts(character, amount);
+                    }
+                }, true);
             }
         }
     }
