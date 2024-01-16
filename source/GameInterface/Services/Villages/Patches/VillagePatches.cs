@@ -28,13 +28,11 @@ internal class VillagePatches
     private static bool VillageStatePrefix(ref Village __instance)
     {
         if(AllowedThread.IsThisThreadAllowed()) return true;
-        if (ModInformation.IsServer)
-        {
-            var message = new VillageStateChanged(__instance.Settlement.StringId, (int)__instance.VillageState);
-            MessageBroker.Instance.Publish(__instance, message);    
-            return true;
-        }
-        return false;
+        if (ModInformation.IsClient) return false;
+        
+        var message = new VillageStateChanged(__instance.Settlement.StringId, (int)__instance.VillageState);
+        MessageBroker.Instance.Publish(__instance, message);    
+        return true;
     }
 
     public static void RunVillageStateChange(Village village, VillageStates state)
