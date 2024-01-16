@@ -1,12 +1,9 @@
 ﻿using Common.Messaging;
-using Coop.Core.Client.Services.Player.Messages;
-using GameInterface.Services.Entity;
-using GameInterface.Services.Heroes.Interfaces;
+using Coop.Core.Client.Services.Players.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
-using System;
 
-namespace Coop.Core.Client.Services.Player.Handlers;
+namespace Coop.Core.Client.Services.Players.Handlers;
 
 internal class NewPlayerHandler : IHandler
 {

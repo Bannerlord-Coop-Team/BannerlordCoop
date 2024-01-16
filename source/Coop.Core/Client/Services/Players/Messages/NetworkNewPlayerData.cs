@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
 
-namespace Coop.Core.Client.Services.Player.Messages;
+namespace Coop.Core.Client.Services.Players.Messages;
 
 // TODO remove if not used
 public record NetworkNewPlayerData : IEvent

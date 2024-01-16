@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System;
 using System.Reflection;
@@ -6,6 +7,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -16,8 +18,9 @@ internal class CalculateBaseSpeedPatch
     [HarmonyPostfix]
     private static void CalculateBaseSpeed(ref MobileParty mobileParty, ref ExplainedNumber __result)
     {
-        if(ModInformation.IsServer && mobileParty.IsPartyControlled() == false)
+        if(mobileParty != MobileParty.MainParty && mobileParty.IsPlayerParty())
         {
+            
             float playerMapMovementSpeedBonusMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerMapMovementSpeedBonusMultiplier();
             if (playerMapMovementSpeedBonusMultiplier > 0f)
             {

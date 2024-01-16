@@ -5,6 +5,7 @@ using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
 using GameInterface.Services.Registry;
 using GameInterface.Services.Time;
 
@@ -21,6 +22,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
+        builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
         builder.RegisterModule<ServiceModule>();
 
         builder.RegisterType<MobilePartyRegistry>()

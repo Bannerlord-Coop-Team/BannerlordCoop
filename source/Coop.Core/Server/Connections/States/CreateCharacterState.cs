@@ -63,7 +63,7 @@ public class CreateCharacterState : ConnectionStateBase
         var peer = ConnectionLogic.Peer;
         network.Send(peer, playerData);
 
-        var newPlayerData = obj.What.NewPlayerData;
+        var newPlayerData = obj.What.Player;
 
         Logger.Information("Hero StringId: {stringId}", newPlayerData?.HeroStringId);
         ConnectionLogic.TransferSave();
