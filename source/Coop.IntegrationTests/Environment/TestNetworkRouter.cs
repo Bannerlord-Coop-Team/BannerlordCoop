@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using Common.PacketHandlers;
+using Common.Serialization;
 using Coop.IntegrationTests.Environment.Instance;
 using LiteNetLib;
+using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -24,7 +26,9 @@ internal class TestNetworkRouter
 
     public void Send(NetPeer sender, NetPeer receiver, IMessage message)
     {
-        if(receiver == Server.NetPeer)
+        EnsureSerializable(message);
+
+        if (receiver == Server.NetPeer)
         {
             Server.SimulateMessage(sender, message);
         }
@@ -37,6 +41,8 @@ internal class TestNetworkRouter
     }
     public void SendAll(NetPeer sender, IMessage message)
     {
+        EnsureSerializable(message);
+
         if (sender == Server.NetPeer)
         {
             foreach(var client in Clients)
@@ -52,6 +58,8 @@ internal class TestNetworkRouter
 
     public void SendAllBut(NetPeer sender, NetPeer ignored, IMessage message)
     {
+        EnsureSerializable(message);
+
         if (sender == Server.NetPeer)
         {
             foreach (var client in Clients.Where(c => c.NetPeer != ignored))
@@ -68,6 +76,8 @@ internal class TestNetworkRouter
 
     public void Send(NetPeer sender, NetPeer receiver, IPacket message)
     {
+        EnsureSerializable(message);
+
         if (receiver == Server.NetPeer)
         {
             Server.SimulatePacket(sender, message);
@@ -81,6 +91,8 @@ internal class TestNetworkRouter
     }
     public void SendAll(NetPeer sender, IPacket message)
     {
+        EnsureSerializable(message);
+
         if (sender == Server.NetPeer)
         {
             foreach (var client in Clients)
@@ -96,6 +108,8 @@ internal class TestNetworkRouter
 
     public void SendAllBut(NetPeer sender, NetPeer ignored, IPacket message)
     {
+        EnsureSerializable(message);
+
         if (sender == Server.NetPeer)
         {
             foreach (var client in Clients.Where(c => c.NetPeer != ignored))
@@ -108,5 +122,12 @@ internal class TestNetworkRouter
             if (ignored == Server.NetPeer) return;
             Server.SimulatePacket(sender, message);
         }
+    }
+
+    public T EnsureSerializable<T>(T obj) where T : class
+    {
+        byte[] bytes = ProtoBufSerializer.Serialize(obj);
+
+        return (T)ProtoBufSerializer.Deserialize(bytes);
     }
 }
