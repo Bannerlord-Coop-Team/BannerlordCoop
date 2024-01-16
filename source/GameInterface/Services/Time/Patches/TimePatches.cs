@@ -92,6 +92,7 @@ internal class AllowTimeControlFromHotKeysPatches
         var allow = AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.AllowThisThread));
         var revoke = AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.RevokeThisThread));
 
+        // Inject allow and revoke thread for hotkey time controls
         instrs.Insert(514, new CodeInstruction(OpCodes.Call, allow));
         instrs.Insert(760, new CodeInstruction(OpCodes.Call, revoke));
 
