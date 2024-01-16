@@ -7,7 +7,7 @@ using System.Text;
 
 namespace Coop.Core.Client.Services.Players.Messages;
 
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 internal class NetworkRegisterPlayer : ICommand
 {
     [ProtoMember(1)]

@@ -62,7 +62,7 @@ internal class NewHeroHandler : IHandler
 
             var registerMessage = new NewPlayerHeroRegistered(sendingPeer, playerData);
 
-            messageBroker.Respond(obj.Who, registerMessage);
+            messageBroker.Publish(this, registerMessage);
         }
         catch (Exception e)
         {

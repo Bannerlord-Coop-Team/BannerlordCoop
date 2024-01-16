@@ -2,7 +2,7 @@
 
 namespace GameInterface.Services.Players.Data;
 
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 public record Player
 {
     public Player(byte[] heroData, string heroStringId, string partyStringId, string characterObjectStringId, string clanStringId)

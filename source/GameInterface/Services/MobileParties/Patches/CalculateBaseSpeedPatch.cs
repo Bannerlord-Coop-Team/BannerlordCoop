@@ -18,7 +18,7 @@ internal class CalculateBaseSpeedPatch
     [HarmonyPostfix]
     private static void CalculateBaseSpeed(ref MobileParty mobileParty, ref ExplainedNumber __result)
     {
-        if(mobileParty != MobileParty.MainParty && mobileParty.IsPlayerParty())
+        if(mobileParty.IsPlayerParty() && mobileParty != MobileParty.MainParty)
         {
             
             float playerMapMovementSpeedBonusMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerMapMovementSpeedBonusMultiplier();
