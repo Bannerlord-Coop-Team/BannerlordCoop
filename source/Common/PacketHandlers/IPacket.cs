@@ -6,13 +6,14 @@ namespace Common.PacketHandlers
     {
         Invalid,
         PacketWrapper,
-        Event,
+        Message,
         Example,
         Test,
         Movement,
-        RequestMobilePartyBehavior,
+        RequestMobilePartyMovement,
+        UpdateMobilePartyMovement,
+        RequestUpdatePartyBehavior,
         UpdatePartyBehavior,
-
     }
 
     public interface IPacket

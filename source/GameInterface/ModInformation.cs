@@ -2,7 +2,9 @@
 {
     public static class ModInformation
     {
-        public static bool IsServer = false;
+        public static bool IsServer { get; set; } = false;
         public static bool IsClient => !IsServer;
+
+        public static readonly bool DISABLE_AI = false;
     }
 }

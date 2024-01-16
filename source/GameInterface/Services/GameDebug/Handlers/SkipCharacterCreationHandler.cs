@@ -25,7 +25,9 @@ namespace GameInterface.Services.GameDebug.Handlers
 
         private void Handle(MessagePayload<CharacterCreationStarted> obj)
         {
+#if DEBUG
             characterCreationInterface.SkipCharacterCreation();
+#endif
         }
     }
 }

@@ -7,5 +7,5 @@ namespace GameInterface.Services.Characters.Patches;
 internal class DisableWorkshopsCampaignBehavior
 {
     [HarmonyPatch(nameof(WorkshopsCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

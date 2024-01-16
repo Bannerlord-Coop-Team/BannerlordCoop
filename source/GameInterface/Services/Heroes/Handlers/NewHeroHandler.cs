@@ -2,9 +2,10 @@
 using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Registry;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -14,14 +15,15 @@ internal class NewHeroHandler : IHandler
 
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
-
+    private readonly IHeroRegistry heroRegistry;
     public NewHeroHandler(
         IHeroInterface heroInterface,
-        IMessageBroker messageBroker)
+        IMessageBroker messageBroker,
+        IHeroRegistry heroRegistry)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
-
+        this.heroRegistry = heroRegistry;
         messageBroker.Subscribe<PackageMainHero>(Handle);
         messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
     }
@@ -42,26 +44,29 @@ internal class NewHeroHandler : IHandler
         catch (Exception e)
         {
             Logger.Error("Error while packing new Hero: {error}", e.Message);
+            Logger.Error(e.StackTrace);
         }
     }
 
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
     {
         byte[] bytes = obj.What.Bytes;
+        var controllerId = obj.What.ControllerId;
+        var sendingPeer = obj.What.SendingPeer;
 
         try
         {
-            Hero hero = heroInterface.UnpackMainHero(bytes);
+            var playerData = heroInterface.UnpackHero(controllerId, bytes);
 
-            Logger.Information("New Hero ID: {id}", hero.Id.InternalValue);
+            Logger.Debug("New Hero ID: {id}", playerData.HeroStringId);
 
-            var registerMessage = new NewPlayerHeroRegistered(hero);
+            var registerMessage = new NewPlayerHeroRegistered(sendingPeer, playerData);
 
-            messageBroker.Respond(obj.Who, registerMessage);
+            messageBroker.Publish(this, registerMessage);
         }
-        catch(Exception e)
+        catch (Exception e)
         {
-            Logger.Error("Error while unpacking new Hero: {error}", e.Message);
+            Logger.Error("Error while unpacking new Hero: {error}", e);
         }
     }
 }

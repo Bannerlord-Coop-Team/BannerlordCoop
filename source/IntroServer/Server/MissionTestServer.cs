@@ -5,7 +5,6 @@ using System;
 using System.Net;
 using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
-using Common.Network.Data;
 
 namespace IntroServer.Server
 {
@@ -94,6 +93,17 @@ namespace IntroServer.Server
 
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
+            if (latency > 0)
+				_logger.LogDebug("Network latency update of {Latency} for {Peer}", latency, peer.EndPoint);
+        }
+
+        public void OnNetworkReceive(
+            NetPeer peer,
+            NetPacketReader reader,
+            byte channelNumber,
+            DeliveryMethod deliveryMethod)
+        {
+            
         }
 
         public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
@@ -113,14 +123,20 @@ namespace IntroServer.Server
         {
             try
             {
-                if(ConnectionToken.TryParse(token, out var connectionToken) == false)
+                string[] data = token.Split('%');
+
+                if (data.Length != 2)
                 {
-                    _logger.LogWarning("Unable to parse token: {tokenString}", token);
+                    _logger.LogWarning("Invalid token format from {endpoint}: {token}", remoteEndPoint, token);
                     return;
                 }
 
-                var instance = connectionToken.InstanceName;
-                var id = connectionToken.PeerId;
+                string instance = data[0];
+                if (Guid.TryParse(data[1], out Guid id) == false)
+                {
+                    _logger.LogWarning("Invalid Guid format from {endpoint}: {token}", remoteEndPoint, token);
+                    return;
+                }
 
                 if (_peerRegistry.ContainsP2PPeer(instance, id))
                 {
@@ -129,27 +145,13 @@ namespace IntroServer.Server
 
                 foreach (var existingPeer in _peerRegistry.GetPeersInInstance(instance))
                 {
-                    
-
-                    if(existingPeer.ExternalAddr.Address == remoteEndPoint.Address)
-                    {
-                        _logger.LogInformation("Connecting internally {LocalAgent} to {Peer}", localEndPoint, existingPeer.InternalAddr);
-                    }
-                    else
-                    {
-                        _logger.LogInformation("Connecting externally {LocalAgent} to {Peer}", remoteEndPoint, existingPeer.ExternalAddr);
-                    }
-
-                    var p2pNatType = existingPeer.ExternalAddr.Address == remoteEndPoint.Address ? NatAddressType.Internal : NatAddressType.External;
-                    var newToken = new ConnectionToken(id, instance, p2pNatType);
-
-                    
+                    _logger.LogInformation("Connecting {LocalAgent} to {Peer}", localEndPoint, existingPeer.InternalAddr);
                     _netManager.NatPunchModule.NatIntroduce(
                         existingPeer.InternalAddr, // host internal
                         existingPeer.ExternalAddr, // host external
                         localEndPoint, // client internal
                         remoteEndPoint, // client external
-                        newToken // request token
+                        token // request token
                     );
                 }
 
@@ -164,17 +166,11 @@ namespace IntroServer.Server
             {
                 _logger.LogError(ex, "Error while handling NAT introduction: {ErrorMessage}", ex.Message);
             }
-
         }
 
         public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
         {
             _logger.LogTrace("Nat Introduction succeeded for {Peer}", targetEndPoint);
-        }
-
-        public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
-        {
-            // TODO create packet forwarding for strict nat
         }
     }
 }

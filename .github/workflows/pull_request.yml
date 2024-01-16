@@ -1,0 +1,35 @@
+name: Build and Test
+
+on:
+  pull_request:
+    types:
+      [opened, synchronize]
+    
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    container:
+      image: garrettluskey/bannerlordcoop:latest
+      
+    steps:
+      - name: Checkout Repo
+        run: |
+          git clone https://github.com/${{ github.repository }}
+          cd BannerlordCoop
+          git fetch origin "pull/${{ github.event.number }}/head:${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
+          git checkout "${{ github.event.pull_request.base.ref }}-PR-${{ github.event.number }}"
+
+      - name: Link Game Assemblies Folder
+        run: |
+          ln -s /home/mb2 BannerlordCoop
+          
+      - name: Build Solution
+        run: |
+          cd BannerlordCoop/source
+          dotnet build Coop.Core -c Release
+      
+      - name: Run Unit Tests
+        run: |
+          cd BannerlordCoop/source
+          dotnet test -c Release --consoleLoggerParameters:ErrorsOnly

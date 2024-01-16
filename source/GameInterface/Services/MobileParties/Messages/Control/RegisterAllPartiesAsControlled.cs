@@ -10,7 +10,12 @@ namespace GameInterface.Services.MobileParties.Messages.Control;
 /// This is meant to be used by the server at startup so the server can
 /// control all AI movement.
 /// </remarks>
-public readonly struct RegisterAllPartiesAsControlled : ICommand
+public record RegisterAllPartiesAsControlled : ICommand
 {
-    public Guid TransactionID => Guid.Empty;
+    public string OwnerId { get; }
+
+    public RegisterAllPartiesAsControlled(string ownerId)
+    {
+        OwnerId = ownerId;
+    }
 }

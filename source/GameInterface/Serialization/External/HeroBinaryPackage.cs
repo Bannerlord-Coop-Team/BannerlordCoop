@@ -20,11 +20,11 @@ namespace GameInterface.Serialization.External
         private string spouseId;
         private string[] childrenIds;
         
-        public static readonly FieldInfo Hero_Father = typeof(Hero).GetField("_father", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_Mother = typeof(Hero).GetField("_mother", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_Spouse = typeof(Hero).GetField("_spouse", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_ExSpouses = typeof(Hero).GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_Children = typeof(Hero).GetField("_children", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static FieldInfo Hero_Father => typeof(Hero).GetField("_father", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static FieldInfo Hero_Mother => typeof(Hero).GetField("_mother", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static FieldInfo Hero_Spouse => typeof(Hero).GetField("_spouse", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static FieldInfo Hero_ExSpouses => typeof(Hero).GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static FieldInfo Hero_Children => typeof(Hero).GetField("_children", BindingFlags.NonPublic | BindingFlags.Instance);
 
         public HeroBinaryPackage(Hero obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
@@ -50,7 +50,6 @@ namespace GameInterface.Serialization.External
             motherId = Object.Mother?.StringId;
             spouseId = Object.Spouse?.StringId;
 
-            FieldInfo Hero_ExSpouses = typeof(Hero).GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance);
             List<Hero> exSpoueses = (List<Hero>)Hero_ExSpouses.GetValue(Object);
             exSpousesIds = PackIds(exSpoueses);
             childrenIds = PackIds(Object.Children);
@@ -65,7 +64,7 @@ namespace GameInterface.Serialization.External
         {
             // If the stringId already exists in the object manager use that object
             // Otherwise, create a new object and initialize it
-            if (stringId != null)
+            if (string.IsNullOrEmpty(stringId) == false)
             {
                 var newObject = ResolveId<Hero>(stringId);
                 if (newObject != null)
@@ -87,7 +86,8 @@ namespace GameInterface.Serialization.External
 
             MBList<Hero> exSpouses = new MBList<Hero>(ResolveIds<Hero>(exSpousesIds));
             Hero_ExSpouses.SetValue(Object, exSpouses);
-            Hero_Children.SetValue(Object, ResolveIds<Hero>(childrenIds).ToList());
+            MBList<Hero> children = new MBList<Hero>(ResolveIds<Hero>(childrenIds));
+            Hero_Children.SetValue(Object, children);
         }
     }
 }

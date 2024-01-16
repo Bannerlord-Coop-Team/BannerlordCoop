@@ -83,6 +83,8 @@ namespace MissionTestMod
 
             base.OnSubModuleLoad();
             Logger.Verbose("Bannerlord Coop Mod loaded");
+
+            GameLoopRunner.Instance.SetGameLoopThread();
         }
 
         private void SetupLogger()

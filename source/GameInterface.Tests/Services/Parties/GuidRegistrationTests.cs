@@ -25,6 +25,8 @@ namespace GameInterface.Tests.Services.Parties
         readonly Harmony harmony;
         public GuidRegistrationTests()
         {
+            GameBootStrap.Initialize();
+
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
             builder.RegisterModule<GameInterfaceModule>();

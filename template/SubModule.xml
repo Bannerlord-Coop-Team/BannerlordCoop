@@ -16,7 +16,7 @@
         <SubModule>
             <Name value="${name}"/>
             <DLLName value="${name}.dll"/>
-            <SubModuleClassType value="${name}.TestMod"/>
+            <SubModuleClassType value="${name}.${main_class}"/>
             <Tags>
                 <Tag key="DedicatedServerType" value="none" />
                 <Tag key="IsNoRenderModeElement" value="false" />
