@@ -42,10 +42,6 @@ public class VillageStateHandler : IHandler
 
     public void Dispose()
     {
-        // TODO remove explanitory comments
-        // Clean up subscriptions so the message broker does not keep this instance alive.
-        // Delegates attach the instance so if that delegate is stored somewhere the garbage collecter will not collect this instance
-        // The current implementation 
         messageBroker?.Unsubscribe<ChangeVillageState>(Handle);
     }
 }
