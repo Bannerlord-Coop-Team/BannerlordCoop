@@ -10,7 +10,6 @@ reated by https://www.gitignore.io/api/csharp,powershell,dotnetcore,visualstudio
 # User-specific files
 *.rsuser
 *.suo
-*.user
 *.userosscache
 *.sln.docstates
 
