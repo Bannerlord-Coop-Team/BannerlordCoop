@@ -70,7 +70,7 @@ namespace GameInterface.Services.ItemRosters.Commands
 
             var roster = FindItemRoster(args[0], out string owner);
 
-            if (roster == null || owner == null)
+            if (roster == null)
             {
                 return string.Format("ID: '{0}' not found", args[0]);
             }
@@ -87,7 +87,6 @@ namespace GameInterface.Services.ItemRosters.Commands
             {
                 var obj = MBObjectManager.Instance.GetObject<Settlement>(id);
                 
-
                 name = obj.Town.Name.ToString();
                 return obj.ItemRoster;
             }
@@ -95,7 +94,6 @@ namespace GameInterface.Services.ItemRosters.Commands
             MobileParty party = Campaign.Current.CampaignObjectManager.Find<MobileParty>(id);
             if (party != null)
             {
-                
                 name = party.Owner.Name.ToString();
                 return party.ItemRoster;
             }
