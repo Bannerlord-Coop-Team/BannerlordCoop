@@ -157,16 +157,6 @@ internal class DisablePlayerTownVisitCampaignBehavior
     }
 
     /// <summary>
-    /// Disables entering the town recruitment from the town menu
-    /// </summary>
-    [HarmonyPrefix]
-    [HarmonyPatch("game_menu_ui_recruit_volunteers_on_consequence")]
-    static bool DisableTroopRecruitment()
-    {
-        return false;
-    }
-
-    /// <summary>
     /// Disables entering the town stash from the town menu
     /// </summary>
     [HarmonyPrefix]
