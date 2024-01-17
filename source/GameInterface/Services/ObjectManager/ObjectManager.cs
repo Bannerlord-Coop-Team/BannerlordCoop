@@ -114,15 +114,17 @@ internal class ObjectManager : IObjectManager
         };
     }
 
-    private bool AddNewObjectInternal<T>(T obj, out string id) where T : MBObjectBase
+
+    private static readonly MethodInfo RegisterObject = typeof(MBObjectManager)
+        .GetMethod(nameof(MBObjectManager.RegisterObject));
+    private bool AddNewObjectInternal(object obj, out string id)
     {
         id = null;
 
-        T registeredObject = objectManager?.RegisterObject(obj);
+        if (objectManager == null) return false;
+        if (obj is MBObjectBase mbObject == false) return false;
 
-        if (registeredObject == null) return false;
-
-        id = registeredObject.StringId;
+        RegisterObject.MakeGenericMethod(obj.GetType()).Invoke(objectManager, new object[] { mbObject });
 
         return true;
     }
