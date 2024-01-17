@@ -1,21 +1,11 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
-using Common;
-using GameInterface.Services.GameDebug.Patches;
-using HarmonyLib;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem;
 using GameInterface.Services.MapEvents.Messages;
-using System.Diagnostics;
-using Common.Logging;
-using GameInterface.Services.MobileParties.Handlers;
-using Serilog;
-using System.Collections.Generic;
-using TaleWorlds.CampaignSystem.Map;
-using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.Core;
-using System.Collections.Concurrent;
 using GameInterface.Services.MobileParties.Extensions;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches
 {

@@ -6,8 +6,6 @@ using GameInterface.Services.MapEvents.Messages;
 using HarmonyLib;
 using System;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 
@@ -43,21 +41,16 @@ namespace GameInterface.Services.MapEvents.Patches
         //    return false;
         //}
 
-        //[HarmonyPrefix]
-        //[HarmonyPatch(nameof(MapEvent.SimulateBattleForRounds))]
-        //static bool Prefix(int simulationRoundsDefender, int simulationRoundsAttacker) => ModInformation.IsServer;
-
         public static void OverrideSimulateBattleRound(MapEvent mapEvent, BattleSideEnum side, float advantage)
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
                 using (new AllowedThread())
                 {
+                    if(mapEvent == null) return;
                     MapEvent_SimulateBattleRound.Invoke(mapEvent, side, advantage);
                 }
             }, true);
         }
-
-       
     }
 }

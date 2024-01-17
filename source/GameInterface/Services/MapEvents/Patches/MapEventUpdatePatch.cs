@@ -1,16 +1,11 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
-using Serilog;
-using System;
 using System.Linq;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
