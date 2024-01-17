@@ -49,7 +49,7 @@ namespace GameInterface.Services.ItemRosters.Commands
                 return "Usage: coop.debug.itemrosters.info <party base id> (i.e. town_V1)";
             }
 
-            var roster = FindPartyBase(args[0], out string owner);
+            var roster = FindItemRoster(args[0], out string owner);
             
             if (roster == null)
             {
@@ -68,7 +68,7 @@ namespace GameInterface.Services.ItemRosters.Commands
                 return "Usage: coop.debug.itemrosters.export <party base id> (i.e. town_V1)";
             }
 
-            var roster = FindPartyBase(args[0], out string owner);
+            var roster = FindItemRoster(args[0], out string owner);
 
             if (roster == null || owner == null)
             {
@@ -81,7 +81,7 @@ namespace GameInterface.Services.ItemRosters.Commands
             return $"Exported '{owner}' into '{name}'.\n Check bannerlord bin directory.";
         }
 
-        private static ItemRoster FindPartyBase(string id, out string name)
+        private static ItemRoster FindItemRoster(string id, out string name)
         {
             if (MBObjectManager.Instance.ContainsObject<Settlement>(id))
             {
