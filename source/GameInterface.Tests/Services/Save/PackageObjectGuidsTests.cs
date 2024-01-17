@@ -43,7 +43,7 @@ namespace GameInterface.Tests.Services.Save
                 objectManager.AddExisting(hero.StringId, hero);
 
                 // Ensure hero was registered
-                Assert.True(objectManager.TryGetObject(hero.StringId, out Hero _));
+                Assert.True(objectManager.TryGetId(hero, out string _));
             }
         }
     }

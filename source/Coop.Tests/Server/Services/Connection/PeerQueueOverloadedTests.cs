@@ -64,8 +64,6 @@ public class PeerQueueOverloadedTests
         netPeer.SetQueueLength(1);
         /// This is handled by <see cref="PeerQueueOverloadedHandler.Handle"/>
         TestMessageBroker.Publish(this, new PeerQueueOverloaded(netPeer));
-        /// Prevent polling
-        peerOverloadedHandler.Poller.Stop();
         /// Set peer queue length to 0 so <see cref="PeerQueueOverloadedHandler.Poll"/> resumes the game
         netPeer.SetQueueLength(0);
 

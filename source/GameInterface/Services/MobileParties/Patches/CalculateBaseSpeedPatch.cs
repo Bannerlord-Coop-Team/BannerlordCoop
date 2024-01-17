@@ -1,10 +1,13 @@
 ﻿using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -21,6 +24,7 @@ internal class CalculateBaseSpeedPatch
     {
         if(mobileParty.IsPlayerParty() && mobileParty != MobileParty.MainParty)
         {
+            
             float playerMapMovementSpeedBonusMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerMapMovementSpeedBonusMultiplier();
             if (playerMapMovementSpeedBonusMultiplier > 0f)
             {

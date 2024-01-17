@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Tests.Stubs
 {
@@ -51,19 +50,24 @@ namespace GameInterface.Tests.Stubs
             return registry.ContainsKey(id);
         }
 
-        public IEnumerable<T> GetObjectsOfType<T>()
+        public bool TryGetId(object obj, out string id)
         {
-            throw new NotImplementedException();
-        }
+            foreach(var kvp in registry)
+            {
+                if(kvp.Value == obj)
+                {
+                    id = kvp.Key;
+                    return true;
+                }
+            }
 
-        public void Initialize()
-        {
-            throw new NotImplementedException();
+            id = string.Empty;
+            return false;
         }
 
         public bool TryGetObject(string id, out object obj) => registry.TryGetValue(id, out obj);
 
-        public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
+        public bool TryGetObject<T>(string id, out T obj)
         {
             obj = default;
 

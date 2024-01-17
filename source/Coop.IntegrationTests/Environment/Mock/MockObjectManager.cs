@@ -1,5 +1,4 @@
 ﻿using GameInterface.Services.ObjectManager;
-using TaleWorlds.ObjectSystem;
 
 namespace Coop.IntegrationTests.Environment.Mock
 {
@@ -31,7 +30,7 @@ namespace Coop.IntegrationTests.Environment.Mock
             return false;
         }
 
-        public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
+        public bool TryGetObject<T>(string id, out T obj)
         {
             obj = default;
             return false;
