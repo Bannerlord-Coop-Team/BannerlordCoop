@@ -4,7 +4,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
-using System.Collections.Immutable;
 using TaleWorlds.Core;
 using System.Linq;
 
@@ -31,7 +30,7 @@ namespace GameInterface.Services.ItemRosters.Commands
 
             if (settlement == null) return $"Unable to find settlement with id: {settlementId}";
 
-            Random random = new Random();
+            Random random = new();
 
             var itemEnumerable = MBObjectManager.Instance.GetObjectTypeList<ItemObject>();
 
@@ -47,28 +46,12 @@ namespace GameInterface.Services.ItemRosters.Commands
         {
             if (args.Count < 1)
             {
-                return "Usage: coop.debug.itemrosters.info <party base id>";
+                return "Usage: coop.debug.itemrosters.info <party base id> (i.e. town_V1)";
             }
 
-            ItemRoster roster = null;
-            string owner = null;
-
-            if (MBObjectManager.Instance.ContainsObject<Settlement>(args[0]))
-            {
-                var obj = MBObjectManager.Instance.GetObject<Settlement>(args[0]);
-                roster = obj.ItemRoster;
-
-                owner = obj.Town.Name.ToString();
-            }
-
-            MobileParty party = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
-            if (party != null)
-            {
-                roster = party.ItemRoster;
-                owner = party.Owner.Name.ToString();
-            }
+            var roster = FindPartyBase(args[0], out string owner);
             
-            if (roster == null || owner == null)
+            if (roster == null)
             {
                 return string.Format("ID: '{0}' not found", args[0]);
             }
@@ -77,10 +60,56 @@ namespace GameInterface.Services.ItemRosters.Commands
                 owner, roster.Count, roster.Sum((i) => { return i.Amount; }), ItemRosterHash(roster));
         }
 
-        private static string ItemRosterHash(ItemRoster roster)
+        [CommandLineArgumentFunction("export", "coop.debug.itemrosters")]
+        public static string Export(List<string> args)
+        {
+            if (args.Count < 1)
+            {
+                return "Usage: coop.debug.itemrosters.export <party base id> (i.e. town_V1)";
+            }
+
+            var roster = FindPartyBase(args[0], out string owner);
+
+            if (roster == null || owner == null)
+            {
+                return string.Format("ID: '{0}' not found", args[0]);
+            }
+
+            var name = "!" + (ModInformation.IsServer ? "server-itemroster-export-" : "client-itemroster-export-") + $"{owner}.txt";
+            File.WriteAllText(name, ItemRosterContent(roster));
+
+            return $"Exported '{owner}' into '{name}'.\n Check bannerlord bin directory.";
+        }
+
+        private static ItemRoster FindPartyBase(string id, out string name)
+        {
+            if (MBObjectManager.Instance.ContainsObject<Settlement>(id))
+            {
+                var obj = MBObjectManager.Instance.GetObject<Settlement>(id);
+                
+
+                name = obj.Town.Name.ToString();
+                return obj.ItemRoster;
+            }
+
+            MobileParty party = Campaign.Current.CampaignObjectManager.Find<MobileParty>(id);
+            if (party != null)
+            {
+                
+                name = party.Owner.Name.ToString();
+                return party.ItemRoster;
+            }
+
+            name = null;
+            return null;
+        }
+
+        private static string ItemRosterContent(ItemRoster roster)
         {
             StringBuilder content = new();
-            var sorted = roster.ToImmutableSortedSet(new ItemRosterElementComparer());
+
+            var sorted = roster.ToList();
+            sorted.Sort(new ItemRosterElementComparer());
             foreach (var item in sorted)
             {
                 content.Append(item.EquipmentElement.Item.StringId + " ");
@@ -89,39 +118,43 @@ namespace GameInterface.Services.ItemRosters.Commands
                 content.Append(item.Amount);
                 content.AppendLine();
             }
+            return content.ToString();
+        }
 
-            File.WriteAllText("." + (ModInformation.IsServer ? "server-itemroster-info.txt" : "client-itemroster-info.txt"), content.ToString());
-
-            return HashString(content.ToString());
+        private static string ItemRosterHash(ItemRoster roster)
+        {
+            return HashString(ItemRosterContent(roster));
         }
 
         private static string HashString(string input)
         {
-            using (SHA1Managed sha1 = new SHA1Managed())
+            using SHA1Managed sha1 = new();
+            var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(input));
+            var sb = new StringBuilder(hash.Length * 2);
+
+            foreach (byte b in hash)
             {
-                var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(input));
-                var sb = new StringBuilder(hash.Length * 2);
-
-                foreach (byte b in hash)
-                {
-                    sb.Append(b.ToString("X2"));
-                }
-
-                return sb.ToString();
+                sb.Append(b.ToString("X2"));
             }
+
+            return sb.ToString();
         }
 
         private class ItemRosterElementComparer : IComparer<ItemRosterElement>
         {
             public int Compare(ItemRosterElement x, ItemRosterElement y)
             {
-                int diff = 0;
-                diff += x.EquipmentElement.Item.StringId.CompareTo(y.EquipmentElement.Item.StringId);
+                var first = x.EquipmentElement.Item.StringId;
                 if (x.EquipmentElement.ItemModifier != null)
-                    diff += x.EquipmentElement.ItemModifier.StringId.CompareTo(y.EquipmentElement.ItemModifier?.StringId);
+                    first += x.EquipmentElement.ItemModifier.StringId;
+                first += x.Amount;
 
-                diff += y.Amount - x.Amount;
-                return diff;
+                var second = y.EquipmentElement.Item.StringId;
+                if (y.EquipmentElement.ItemModifier != null)
+                    second += y.EquipmentElement.ItemModifier.StringId;
+                second += y.Amount;
+
+                return first.CompareTo(second);
             }
         }
     }
