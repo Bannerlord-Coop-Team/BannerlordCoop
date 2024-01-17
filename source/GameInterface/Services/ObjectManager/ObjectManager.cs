@@ -2,7 +2,6 @@
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
-using GameInterface.Services.Settlements;
 using System;
 using System.Linq;
 using System.Reflection;
@@ -14,14 +13,50 @@ namespace GameInterface.Services.ObjectManager;
 
 public interface IObjectManager
 {
+    /// <summary>
+    /// Determins if an object is stored in the object manager
+    /// </summary>
+    /// <param name="obj">Object to check if stored</param>
+    /// <returns>True if stored, false if not</returns>
     bool Contains(object obj);
+
+    /// <summary>
+    /// Determins if an StringId is stored in the object manager
+    /// </summary>
+    /// <param name="id">StringId to check if stored</param>
+    /// <returns>True if stored, false if not</returns>
     bool Contains(string id);
+
+    /// <summary>
+    /// Attempts to get an object using a StringId and object type
+    /// </summary>
+    /// <typeparam name="T">Type of object</typeparam>
+    /// <param name="id">StringId used to lookup object</param>
+    /// <param name="obj">Out parameter for the object</param>
+    /// <returns>True if successful, false if failed</returns>
     bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase;
+
+    /// <summary>
+    /// Add an object with already existing StringId
+    /// </summary>
+    /// <param name="id">Id to assosiate with object</param>
+    /// <param name="obj">Object to assosiate with id</param>
+    /// <returns>True if successful, false if failed</returns>
     bool AddExisting(string id, object obj);
+
+    /// <summary>
+    /// Adds an object without a registered StringId
+    /// </summary>
+    /// <param name="obj">Object to register</param>
+    /// <param name="newId">Newly created StringId</param>
+    /// <returns>True if successful, false if failed</returns>
     bool AddNewObject(object obj, out string newId);
 }
 
-internal class MBObjectManagerAdapter : IObjectManager
+/// <summary>
+/// Ground truth for storing and retreiving object and ids
+/// </summary>
+internal class ObjectManager : IObjectManager
 {
     private MBObjectManager objectManager => MBObjectManager.Instance;
 
@@ -29,7 +64,7 @@ internal class MBObjectManagerAdapter : IObjectManager
     private readonly IMobilePartyRegistry partyRegistry;
     private readonly IClanRegistry clanRegistry;
 
-    public MBObjectManagerAdapter(
+    public ObjectManager(
         IHeroRegistry heroRegistry,
         IMobilePartyRegistry partyRegistry, 
         IClanRegistry clanRegistry)

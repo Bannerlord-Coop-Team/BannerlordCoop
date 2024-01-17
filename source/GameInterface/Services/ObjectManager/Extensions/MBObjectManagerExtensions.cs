@@ -5,200 +5,209 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.ObjectManager.Extensions
+namespace GameInterface.Services.ObjectManager.Extensions;
+
+
+/// <summary>
+/// Extensions to MBObjectManager for accessing private data
+/// </summary>
+public static class MBObjectManagerExtensions
 {
-    public static class MBObjectManagerExtensions
+    private static readonly ConditionalWeakTable<MBObjectManager, MBObjectManagerFacade> objectManagerExtensionData = new();
+
+    public static IEnumerable<MBObjectBase> GetAllObjects(this MBObjectManager objectManager)
     {
-        private static readonly ConditionalWeakTable<MBObjectManager, ObjectTypeRecordsFacade> objectManagerExtensionData = new();
+        return objectManager.GetFacade().GetAllObjects();
+    }
 
-        public static IEnumerable<MBObjectBase> GetAllObjects(this MBObjectManager objectManager)
+    private static readonly MethodInfo _registerPresumedObject = typeof(ObjectManager).GetMethod(nameof(MBObjectManager.RegisterPresumedObject));
+    public static void RegisterPresumedObject(this MBObjectManager objectManager, MBObjectBase obj)
+    {
+        _registerPresumedObject
+            .MakeGenericMethod(obj.GetType())
+            .Invoke(objectManager, new object[] { obj });
+    }
+
+    private static readonly MethodInfo _containsObject = typeof(ObjectManager).GetMethod(nameof(MBObjectManager.ContainsObject));
+    public static bool ContainsObject(this MBObjectManager objectManager, MBObjectBase obj)
+    {
+        return (bool)_containsObject
+            .MakeGenericMethod(obj.GetType())
+            .Invoke(objectManager, new object[] { obj.StringId });
+    }
+
+    public static IEnumerable<MBObjectBase> GetObjectsOfType<T>(this MBObjectManager objectManager)
+    {
+        return objectManager.GetFacade().GetObjectsOfType<T>();
+    }
+
+    private static uint typeCounter = 100U;
+    private static readonly MethodInfo _registerType = typeof(ObjectManager).GetMethod(nameof(MBObjectManager.RegisterType));
+    public static void RegisterType(this MBObjectManager objectManager, Type type)
+    {
+        _registerType
+            .MakeGenericMethod(type)
+            .Invoke(objectManager, new object[] { type.Name, type.Name + 's', typeCounter++ });
+    }
+
+    public static bool ContainsType(this MBObjectManager objectManager, Type type)
+    {
+        return objectManager.GetFacade().ContainsType(type);
+    }
+
+    public static bool Contains(this MBObjectManager objectManager, string id)
+    {
+        return objectManager.GetFacade().Contains(id);
+    }
+
+    private static MBObjectManagerFacade GetFacade(this MBObjectManager objectManager)
+    {
+        if (objectManagerExtensionData.TryGetValue(objectManager, out var facade) == false)
         {
-            return objectManager.GetFacade().GetAllObjects();
+            facade = new MBObjectManagerFacade(objectManager);
+            objectManagerExtensionData.Add(objectManager, facade);
         }
 
-        private static readonly MethodInfo _registerPresumedObject = typeof(MBObjectManagerAdapter).GetMethod(nameof(MBObjectManager.RegisterPresumedObject));
-        public static void RegisterPresumedObject(this MBObjectManager objectManager, MBObjectBase obj)
+        return facade;
+    }
+}
+
+/// <summary>
+/// Facade class used to wrap MBObjectManager
+/// </summary>
+internal class MBObjectManagerFacade
+{
+    private Dictionary<Type, ObjectTypeRecordFacade> Records { get => GetRecords(); }
+
+    private readonly FieldInfo ObjectTypeRecords = typeof(MBObjectManager)
+        .GetField("ObjectTypeRecords", BindingFlags.NonPublic | BindingFlags.Instance);
+    private readonly MBObjectManager objectManager;
+
+    public MBObjectManagerFacade(MBObjectManager objectManager)
+    {
+        this.objectManager = objectManager;
+    }
+
+    private Dictionary<Type, ObjectTypeRecordFacade> GetRecords()
+    {
+        var records = new Dictionary<Type, ObjectTypeRecordFacade>();
+        foreach (var obj in (IEnumerable<object>)ObjectTypeRecords.GetValue(objectManager))
         {
-            _registerPresumedObject
-                .MakeGenericMethod(obj.GetType())
-                .Invoke(objectManager, new object[] { obj });
+            var type = obj.GetType();
+            var handledType = type.GetGenericArguments()[0];
+
+            records.Add(handledType, new ObjectTypeRecordFacade(obj));
         }
 
-        private static readonly MethodInfo _containsObject = typeof(MBObjectManagerAdapter).GetMethod(nameof(MBObjectManager.ContainsObject));
-        public static bool ContainsObject(this MBObjectManager objectManager, MBObjectBase obj)
-        {
-            return (bool)_containsObject
-                .MakeGenericMethod(obj.GetType())
-                .Invoke(objectManager, new object[] { obj.StringId });
-        }
+        return records;
+    }
 
-        public static IEnumerable<MBObjectBase> GetObjectsOfType<T>(this MBObjectManager objectManager)
+    public IEnumerable<MBObjectBase> GetAllObjects()
+    {
+        foreach(var typeRecord in Records.Values)
         {
-            return objectManager.GetFacade().GetObjectsOfType<T>();
-        }
-
-        private static uint typeCounter = 100U;
-        private static readonly MethodInfo _registerType = typeof(MBObjectManagerAdapter).GetMethod(nameof(MBObjectManager.RegisterType));
-        public static void RegisterType(this MBObjectManager objectManager, Type type)
-        {
-            _registerType
-                .MakeGenericMethod(type)
-                .Invoke(objectManager, new object[] { type.Name, type.Name + 's', typeCounter++ });
-        }
-
-        public static bool ContainsType(this MBObjectManager objectManager, Type type)
-        {
-            return objectManager.GetFacade().ContainsType(type);
-        }
-
-        public static bool Contains(this MBObjectManager objectManager, string id)
-        {
-            return objectManager.GetFacade().Contains(id);
-        }
-
-        private static ObjectTypeRecordsFacade GetFacade(this MBObjectManager objectManager)
-        {
-            if (objectManagerExtensionData.TryGetValue(objectManager, out var facade) == false)
+            foreach(var obj in typeRecord.GetObjects())
             {
-                facade = new ObjectTypeRecordsFacade(objectManager);
-                objectManagerExtensionData.Add(objectManager, facade);
+                yield return obj;
             }
-
-            return facade;
         }
     }
 
-    internal class ObjectTypeRecordsFacade
+    public IEnumerable<MBObjectBase> GetObjectsOfType<T>()
     {
-        private Dictionary<Type, ObjectTypeRecordFacade> Records { get => GetRecords(); }
+        if (Records.ContainsKey(typeof(T)) == false) return Array.Empty<MBObjectBase>();
 
-        private readonly FieldInfo ObjectTypeRecords = typeof(MBObjectManager)
-            .GetField("ObjectTypeRecords", BindingFlags.NonPublic | BindingFlags.Instance);
-        private readonly MBObjectManager objectManager;
+        return Records[typeof(T)].GetObjects();
+    }
 
-        public ObjectTypeRecordsFacade(MBObjectManager objectManager)
+    public bool ContainsType(Type type) => Records.ContainsKey(type);
+
+    public bool Contains(string id)
+    {
+        return Records.Values.Any(record => record.Contains(id));
+    }
+}
+
+/// <summary>
+/// Facade class used to wrap internal class ObjectTypeRecord
+/// </summary>
+internal class ObjectTypeRecordFacade
+{
+    private static readonly Type ObjectTypeRecordType = typeof(MBObjectManager).GetNestedType("ObjectTypeRecord`1", BindingFlags.NonPublic);
+
+    private readonly WeakReference refObjectTypeRecord;
+
+    private readonly Type type;
+    private readonly Type storedValueType;
+
+    public object ObjectTypeRecord
+    {
+        get
         {
-            this.objectManager = objectManager;
-        }
-
-        private Dictionary<Type, ObjectTypeRecordFacade> GetRecords()
-        {
-            var records = new Dictionary<Type, ObjectTypeRecordFacade>();
-            foreach (var obj in (IEnumerable<object>)ObjectTypeRecords.GetValue(objectManager))
+            if (refObjectTypeRecord.IsAlive == false)
             {
-                var type = obj.GetType();
-                var handledType = type.GetGenericArguments()[0];
-
-                records.Add(handledType, new ObjectTypeRecordFacade(obj));
+                return null;
             }
 
-            return records;
-        }
-
-        public IEnumerable<MBObjectBase> GetAllObjects()
-        {
-            foreach(var typeRecord in Records.Values)
-            {
-                foreach(var obj in typeRecord.GetObjects())
-                {
-                    yield return obj;
-                }
-            }
-        }
-
-        public IEnumerable<MBObjectBase> GetObjectsOfType<T>()
-        {
-            if (Records.ContainsKey(typeof(T)) == false) return Array.Empty<MBObjectBase>();
-
-            return Records[typeof(T)].GetObjects();
-        }
-
-        public bool ContainsType(Type type) => Records.ContainsKey(type);
-
-        public bool Contains(string id)
-        {
-            return Records.Values.Any(record => record.Contains(id));
+            return refObjectTypeRecord.Target;
         }
     }
 
-    internal class ObjectTypeRecordFacade
+    public ObjectTypeRecordFacade(object objectTypeRecord)
     {
-        private static readonly Type ObjectTypeRecordType = typeof(MBObjectManager).GetNestedType("ObjectTypeRecord`1", BindingFlags.NonPublic);
+        refObjectTypeRecord = new WeakReference(objectTypeRecord);
 
-        private readonly WeakReference refObjectTypeRecord;
+        type = objectTypeRecord.GetType();
+        storedValueType = type.GetGenericArguments()[0];
 
-        private readonly Type type;
-        private readonly Type storedValueType;
-
-        public object ObjectTypeRecord
+        if (type.GetGenericTypeDefinition() != ObjectTypeRecordType)
         {
-            get
-            {
-                if (refObjectTypeRecord.IsAlive == false)
-                {
-                    return null;
-                }
-
-                return refObjectTypeRecord.Target;
-            }
+            throw new ArgumentException($"Type {type} was not of expected type {ObjectTypeRecordType}");
         }
+    }
 
-        public ObjectTypeRecordFacade(object objectTypeRecord)
-        {
-            refObjectTypeRecord = new WeakReference(objectTypeRecord);
+    public IEnumerable<string> GetKeys()
+    {
+        var objs = type.GetField("_registeredObjects", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(refObjectTypeRecord.Target);
 
-            type = objectTypeRecord.GetType();
-            storedValueType = type.GetGenericArguments()[0];
+        var t1 = objs.GetType().GetGenericArguments()[0];
+        var t2 = objs.GetType().GetGenericArguments()[1];
 
-            if (type.GetGenericTypeDefinition() != ObjectTypeRecordType)
-            {
-                throw new ArgumentException($"Type {type} was not of expected type {ObjectTypeRecordType}");
-            }
-        }
+        var values = typeof(Dictionary<,>)
+            .MakeGenericType(t1, t2)
+            .GetProperty("Keys")
+            .GetValue(objs);
 
-        public IEnumerable<string> GetKeys()
-        {
-            var objs = type.GetField("_registeredObjects", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(refObjectTypeRecord.Target);
+        return (IEnumerable<string>)values;
+    }
 
-            var t1 = objs.GetType().GetGenericArguments()[0];
-            var t2 = objs.GetType().GetGenericArguments()[1];
+    public IEnumerable<MBObjectBase> GetValues()
+    {
+        var objs = type.GetField("_registeredObjects", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(refObjectTypeRecord.Target);
 
-            var values = typeof(Dictionary<,>)
-                .MakeGenericType(t1, t2)
-                .GetProperty("Keys")
-                .GetValue(objs);
+        var t1 = objs.GetType().GetGenericArguments()[0];
+        var t2 = objs.GetType().GetGenericArguments()[1];
 
-            return (IEnumerable<string>)values;
-        }
+        var values = typeof(Dictionary<,>)
+            .MakeGenericType(t1, t2)
+            .GetProperty("Values")
+            .GetValue(objs);
 
-        public IEnumerable<MBObjectBase> GetValues()
-        {
-            var objs = type.GetField("_registeredObjects", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(refObjectTypeRecord.Target);
+        return (IEnumerable<MBObjectBase>)values;
+    }
 
-            var t1 = objs.GetType().GetGenericArguments()[0];
-            var t2 = objs.GetType().GetGenericArguments()[1];
+    public IEnumerable<MBObjectBase> GetObjects() => GetValues();
 
-            var values = typeof(Dictionary<,>)
-                .MakeGenericType(t1, t2)
-                .GetProperty("Values")
-                .GetValue(objs);
+    public bool Contains(string id)
+    {
+        var objs = type.GetField("_registeredObjects", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(refObjectTypeRecord.Target);
 
-            return (IEnumerable<MBObjectBase>)values;
-        }
+        var t1 = objs.GetType().GetGenericArguments()[0];
+        var t2 = objs.GetType().GetGenericArguments()[1];
 
-        public IEnumerable<MBObjectBase> GetObjects() => GetValues();
-
-        public bool Contains(string id)
-        {
-            var objs = type.GetField("_registeredObjects", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(refObjectTypeRecord.Target);
-
-            var t1 = objs.GetType().GetGenericArguments()[0];
-            var t2 = objs.GetType().GetGenericArguments()[1];
-
-            return (bool)typeof(Dictionary<,>)
-                .MakeGenericType(t1, t2)
-                .GetMethod("ContainsKey")
-                .Invoke(objs, new object[] { id });
-        }
+        return (bool)typeof(Dictionary<,>)
+            .MakeGenericType(t1, t2)
+            .GetMethod("ContainsKey")
+            .Invoke(objs, new object[] { id });
     }
 }
