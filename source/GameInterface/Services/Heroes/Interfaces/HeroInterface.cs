@@ -207,7 +207,9 @@ internal class HeroInterface : IHeroInterface
         party.Party.SetVisualAsDirty();
 
         TroopRoster_VersionNo_Setter(party.MemberRoster, 1);
+        TroopRoster_VersionNo_Setter(party.PrisonRoster, 1);
         TroopRoster_troopRosterElements.SetValue(party.MemberRoster, new MBList<TroopRosterElement> { });
+        TroopRoster_troopRosterElements.SetValue(party.PrisonRoster, new MBList<TroopRosterElement> { });
 
         typeof(MobileParty).GetMethod("RecoverPositionsForNavMeshUpdate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party, null);
         typeof(MobileParty).GetProperty("CurrentNavigationFace").SetValue(
