@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
@@ -47,28 +48,7 @@ namespace GameInterface.Services.MapEvents.Handlers
                 return;
             }
 
-            bool flag = false;
-            if (defenderParty.CurrentSettlement != null && defenderParty.MapEvent != null)
-            {
-                    flag = (defenderParty.MapEvent.MapEventSettlement == defenderParty.CurrentSettlement 
-                    && (defenderParty.MapEvent.AttackerSide.LeaderParty.MapFaction == attackerParty.MapFaction 
-                    || defenderParty.MapEvent.DefenderSide.LeaderParty.MapFaction == attackerParty.MapFaction));
-            }
-            else if (attackerParty != MobileParty.MainParty ||
-                     !defenderParty.IsEngaging ||
-                      defenderParty.ShortTermTargetParty != MobileParty.MainParty &&
-                      attackerParty == MobileParty.MainParty)
-            {
-                MapState mapState = Game.Current.GameStateManager.ActiveState as MapState;
-                mapState?.OnMainPartyEncounter();
-            }
-
-            if (lastAttackingParty == null || lastAttackingParty != attackerParty)
-            {
-                lastAttackingParty = attackerParty;
-                Logger.Information(attackerParty.Name.ToString() + " attacks " + defenderParty.Name.ToString());
-                EncounterManager.StartPartyEncounter(attackerParty.Party, defenderParty.Party);
-            }            
+            StartBattleActionPatch.OverrideOnPartyInteraction(defenderParty, attackerParty);
         }
     }
 }

@@ -5,11 +5,16 @@ using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System.Reflection;
+using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using Common.Extensions;
+using Common.Util;
 
 namespace GameInterface.Services.MapEvents.Handlers
 {
@@ -22,6 +27,7 @@ namespace GameInterface.Services.MapEvents.Handlers
         private readonly IObjectManager objectManager;
         private readonly ILogger Logger = LogManager.GetLogger<EndBattleHandler>();
 
+        
         public EndBattleHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
@@ -44,11 +50,9 @@ namespace GameInterface.Services.MapEvents.Handlers
                 return;
             }
 
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                party.MapEvent?.FinalizeEvent();
-            }, true);
-            
+            if (party.MapEvent == null) return;
+
+            MapEventUpdatePatch.OverrideFinishBattle(party.MapEvent);
         }
     }
 }

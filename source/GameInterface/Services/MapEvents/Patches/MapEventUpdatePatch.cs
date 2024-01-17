@@ -19,14 +19,18 @@ namespace GameInterface.Services.MapEvents.Patches
     [HarmonyPatch(typeof(MapEvent))]
     public class MapEventUpdatePatch
     {
-        [HarmonyPrefix]
-        [HarmonyPatch("Update")]
-        static bool PrefixUpdate(MapEvent __instance) => ModInformation.IsServer;
+        private static readonly MethodInfo MapEvent_FinishBattle = typeof(MapEvent).GetMethod("FinishBattle", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        //[HarmonyPrefix]
+        //[HarmonyPatch("Update")]
+        //static bool PrefixUpdate(MapEvent __instance) => ModInformation.IsServer;
 
         [HarmonyPrefix]
         [HarmonyPatch("FinishBattle")]
         static bool PrefixFinishBattle(MapEvent __instance)
         {
+            if (AllowedThread.IsThisThreadAllowed()) return true;
+
             if (ModInformation.IsClient) return false;
 
             if (__instance.InvolvedParties.Any(x => !x.MobileParty.IsPartyControlled()))
@@ -39,6 +43,17 @@ namespace GameInterface.Services.MapEvents.Patches
             MessageBroker.Instance.Publish(party, new BattleEnded(party.StringId));
 
             return false;
+        }
+
+        public static void OverrideFinishBattle(MapEvent mapEvent)
+        {
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                using (new AllowedThread())
+                {
+                    MapEvent_FinishBattle.Invoke(mapEvent, new object[] { });
+                }
+            }, true);
         }
     }
 }

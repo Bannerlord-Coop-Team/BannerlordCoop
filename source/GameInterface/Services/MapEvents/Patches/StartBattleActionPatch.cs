@@ -19,30 +19,35 @@ using GameInterface.Services.MobileParties.Extensions;
 
 namespace GameInterface.Services.MapEvents.Patches
 {
-    [HarmonyPatch(typeof(MobileParty))]
+    [HarmonyPatch(typeof(EncounterManager))]
     public class StartBattleActionPatch
     {
-        [HarmonyPatch("TaleWorlds.CampaignSystem.Map.IMapEntity.OnPartyInteraction")]
-        static bool Prefix(MobileParty __instance, MobileParty engagingParty)
+        [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
+        static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
         {
+            if (AllowedThread.IsThisThreadAllowed()) return true;
+            
             if (ModInformation.IsClient) return false;
 
-            MobileParty mobileParty = __instance;
-
-            //This handles situations where Armies are involved (untested)
-            if (mobileParty.AttachedTo != null && engagingParty != mobileParty.AttachedTo)
-            {
-                mobileParty = mobileParty.AttachedTo;
-            }
-
             //Disables interaction between players, this will be handled in a future issue
-            if (!engagingParty.IsPartyControlled() && !mobileParty.IsPartyControlled()) { return false; } 
+            if (!attackerParty.MobileParty.IsPartyControlled() && !defenderParty.MobileParty.IsPartyControlled()) { return false; } 
 
-            MessageBroker.Instance.Publish(engagingParty, new BattleStarted(
-                engagingParty.StringId,
-                mobileParty.StringId));
+            MessageBroker.Instance.Publish(attackerParty, new BattleStarted(
+                attackerParty.MobileParty.StringId,
+                defenderParty.MobileParty.StringId));
 
             return false;
+        }
+
+        public static void OverrideOnPartyInteraction(MobileParty interactedParty, MobileParty engagingParty)
+        {
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                using(new AllowedThread())
+                {
+                    EncounterManager.StartPartyEncounter(engagingParty.Party, interactedParty.Party);
+                }
+            }, true);
         }
     }
 }
