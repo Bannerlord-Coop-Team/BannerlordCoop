@@ -54,16 +54,24 @@ namespace GameInterface.Services.Villages.Commands
 
             List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsVillage).ToList();
 
-            Village village = settlements.Find(e => e.Village.StringId == args[0]).Village;
-
             if (village == null)
             {
                 return string.Format("ID: '{0}' not found", args[0]);
             }
 
-            return String.Format("ID: '{0}'\nVillageName: '{1}'\nVillageState: '{2}'\nVillageOwner: '{3}'\n", 
-                args[0],village.Name, village.VillageState.ToString(), village.Owner.Name);
+            Village village = settlements.Find(e => e.Village.StringId == args[0]).Village;
 
+            StringBuilder sb = new StringBuilder();
+
+            sb.AppendFormat("ID: '{0}'\n", args[0]);
+            sb.AppendFormat("Name: '{0}'\n", village.Name);
+            sb.AppendFormat("Owner: '{0}'\n", village.Owner.Name);
+            sb.AppendFormat("State: '{0}'", village.VillageState.ToString());
+            sb.AppendFormat("Hearth: '{0}'\n", village.Hearth);
+            sb.AppendFormat("TradeTaxAccumulated: '{0}'\n", village.TradeTaxAccumulated);
+            sb.AppendFormat("LastDemandStatisifiedTime: '{0}'\n", village.LastDemandSatisfiedTime);
+
+            return sb.ToString();
         }
 
         // coop.debug.village.set_state castle_village_comp_K7_2 BeingRaided
