@@ -38,10 +38,6 @@ public class GameInterfaceModule : Module
                .As<IClanRegistry>()
                .InstancePerLifetimeScope();
 
-        builder.RegisterType<SettlementRegistry>()
-               .As<ISettlementRegistry>()
-               .InstancePerLifetimeScope();
-
         builder.RegisterType<ControlledEntityRegistry>()
                .As<IControlledEntityRegistry>()
                .InstancePerLifetimeScope();

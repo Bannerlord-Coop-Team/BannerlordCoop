@@ -13,20 +13,17 @@ internal class RegistryHandler : IHandler
     private readonly IHeroRegistry heroRegistry;
     private readonly IMobilePartyRegistry partyRegistry;
     private readonly IClanRegistry clanRegistry;
-    private readonly ISettlementRegistry settlementRegistry;
 
     public RegistryHandler(
         IMessageBroker messageBroker,
         IHeroRegistry heroRegistry,
         IMobilePartyRegistry partyRegistry,
-        IClanRegistry clanRegistry,
-        ISettlementRegistry settlementRegistry)
+        IClanRegistry clanRegistry)
     {
         this.messageBroker = messageBroker;
         this.heroRegistry = heroRegistry;
         this.partyRegistry = partyRegistry;
         this.clanRegistry = clanRegistry;
-        this.settlementRegistry = settlementRegistry;
         messageBroker.Subscribe<RegisterAllGameObjects>(Handle);
     }
 
@@ -40,7 +37,6 @@ internal class RegistryHandler : IHandler
         heroRegistry.RegisterAllHeroes();
         partyRegistry.RegisterAllParties();
         clanRegistry.RegisterAllClans();
-        settlementRegistry.RegisterAllSettlements();
 
         messageBroker.Publish(this, new AllGameObjectsRegistered());
     }

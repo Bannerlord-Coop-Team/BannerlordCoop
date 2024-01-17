@@ -28,18 +28,15 @@ internal class MBObjectManagerAdapter : IObjectManager
     private readonly IHeroRegistry heroRegistry;
     private readonly IMobilePartyRegistry partyRegistry;
     private readonly IClanRegistry clanRegistry;
-    private readonly ISettlementRegistry settlementRegistry;
 
     public MBObjectManagerAdapter(
         IHeroRegistry heroRegistry,
         IMobilePartyRegistry partyRegistry, 
-        IClanRegistry clanRegistry,
-        ISettlementRegistry settlementRegistry)
+        IClanRegistry clanRegistry)
     {
         this.heroRegistry = heroRegistry;
         this.partyRegistry = partyRegistry;
         this.clanRegistry = clanRegistry;
-        this.settlementRegistry = settlementRegistry;
     }
 
     public bool AddExisting(string id, object obj)
@@ -62,7 +59,6 @@ internal class MBObjectManagerAdapter : IObjectManager
             MobileParty party => partyRegistry.RegisterExistingObject(id, party),
             Hero hero => heroRegistry.RegisterExistingObject(id, hero),
             Clan clan => clanRegistry.RegisterExistingObject(id, clan),
-            //Settlement settlement => settlementRegistry.RegisterExistingObject(id, settlement),
             _ => objectManager.RegisterPresumedObject(obj) != null,
         };
     }
@@ -79,7 +75,6 @@ internal class MBObjectManagerAdapter : IObjectManager
             MobileParty party => partyRegistry.RegisterNewObject(party, out newId),
             Hero hero => heroRegistry.RegisterNewObject(hero, out newId),
             Clan clan => clanRegistry.RegisterNewObject(clan, out newId),
-            //Settlement settlement => settlementRegistry.RegisterNewObject(settlement, out newId),
             _ => AddNewObjectInternal(mbObject, out newId),
         };
     }
@@ -107,7 +102,6 @@ internal class MBObjectManagerAdapter : IObjectManager
             MobileParty party => partyRegistry.TryGetValue(party, out string _),
             Hero hero => heroRegistry.TryGetValue(hero, out string _),
             Clan clan => clanRegistry.TryGetValue(clan, out string _),
-            //Settlement settlement => settlementRegistry.TryGetValue(settlement, out string _),
             _ => Contains(mbObject.StringId),
         };
     }
