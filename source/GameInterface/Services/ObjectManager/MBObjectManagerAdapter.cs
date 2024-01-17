@@ -1,9 +1,9 @@
-﻿using Common.Extensions;
-using GameInterface.Services.Clans;
+﻿using GameInterface.Services.Clans;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
+using GameInterface.Services.Settlements;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -28,15 +28,18 @@ internal class MBObjectManagerAdapter : IObjectManager
     private readonly IHeroRegistry heroRegistry;
     private readonly IMobilePartyRegistry partyRegistry;
     private readonly IClanRegistry clanRegistry;
+    private readonly ISettlementRegistry settlementRegistry;
 
     public MBObjectManagerAdapter(
         IHeroRegistry heroRegistry,
         IMobilePartyRegistry partyRegistry, 
-        IClanRegistry clanRegistry)
+        IClanRegistry clanRegistry,
+        ISettlementRegistry settlementRegistry)
     {
         this.heroRegistry = heroRegistry;
         this.partyRegistry = partyRegistry;
         this.clanRegistry = clanRegistry;
+        this.settlementRegistry = settlementRegistry;
     }
 
     public bool AddExisting(string id, object obj)
@@ -59,6 +62,7 @@ internal class MBObjectManagerAdapter : IObjectManager
             MobileParty party => partyRegistry.RegisterExistingObject(id, party),
             Hero hero => heroRegistry.RegisterExistingObject(id, hero),
             Clan clan => clanRegistry.RegisterExistingObject(id, clan),
+            //Settlement settlement => settlementRegistry.RegisterExistingObject(id, settlement),
             _ => objectManager.RegisterPresumedObject(obj) != null,
         };
     }
@@ -75,6 +79,7 @@ internal class MBObjectManagerAdapter : IObjectManager
             MobileParty party => partyRegistry.RegisterNewObject(party, out newId),
             Hero hero => heroRegistry.RegisterNewObject(hero, out newId),
             Clan clan => clanRegistry.RegisterNewObject(clan, out newId),
+            //Settlement settlement => settlementRegistry.RegisterNewObject(settlement, out newId),
             _ => AddNewObjectInternal(mbObject, out newId),
         };
     }
@@ -102,6 +107,7 @@ internal class MBObjectManagerAdapter : IObjectManager
             MobileParty party => partyRegistry.TryGetValue(party, out string _),
             Hero hero => heroRegistry.TryGetValue(hero, out string _),
             Clan clan => clanRegistry.TryGetValue(clan, out string _),
+            //Settlement settlement => settlementRegistry.TryGetValue(settlement, out string _),
             _ => Contains(mbObject.StringId),
         };
     }
@@ -127,9 +133,7 @@ internal class MBObjectManagerAdapter : IObjectManager
             return true;
         }
 
-        var adapterList = new ObjectTypeRecordsFacade(objectManager);
-
-        return adapterList.Contains(id);
+        return objectManager.Contains(id);
     }
 
     public bool TryGetId(object obj, out string id)
@@ -174,103 +178,5 @@ internal class MBObjectManagerAdapter : IObjectManager
         obj = (T)GetObject.MakeGenericMethod(typeof(T)).Invoke(objectManager, new object[] { id });
 
         return obj != null;
-    }
-}
-
-internal class ObjectTypeRecordsFacade
-{
-    private static readonly Type ObjectTypeRecordType = typeof(MBObjectManager).GetNestedType("ObjectTypeRecord`1", BindingFlags.NonPublic);
-
-    private readonly Dictionary<Type, ObjectTypeRecordFacade> records = new Dictionary<Type, ObjectTypeRecordFacade>();
-
-    private readonly Func<MBObjectManager, IEnumerable<object>> ObjectTypeRecordsGetter = typeof(MBObjectManager)
-        .GetField("ObjectTypeRecords", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildUntypedGetter<MBObjectManager, IEnumerable<object>>();
-    private readonly MBObjectManager objectManager;
-
-    private IEnumerable<ObjectTypeRecordFacade> objectTypeRecords { get
-        {
-            UpdateRecords();
-            return records.Values;
-        } 
-    }
-
-    public ObjectTypeRecordsFacade(MBObjectManager objectManager) 
-    {
-        this.objectManager = objectManager;
-
-        UpdateRecords();
-    }
-
-    private void UpdateRecords()
-    {
-        foreach (var obj in ObjectTypeRecordsGetter(objectManager))
-        {
-            var type = obj.GetType();
-
-            if (type != ObjectTypeRecordType) continue;
-
-            var handledType = type.GetGenericArguments()[0];
-
-            if (records.ContainsKey(handledType))
-            {
-                if (records[handledType] == obj) continue;
-
-                records[handledType] = new ObjectTypeRecordFacade(obj);
-            }
-
-            records.Add(handledType, new ObjectTypeRecordFacade(obj));
-        }
-    }
-
-    public bool Contains(string id)
-    {
-        return objectTypeRecords.Any(objectTypeRecord => objectTypeRecord.ContainsObject(id));
-    }
-}
-
-internal class ObjectTypeRecordFacade
-{
-    private static readonly Type ObjectTypeRecordType = typeof(MBObjectManager).GetNestedType("ObjectTypeRecord`1", BindingFlags.NonPublic);
-
-    private readonly WeakReference refObjectTypeRecord;
-
-    private readonly Func<object, string, bool> ContainsObjectDelegate;
-
-    public object ObjectTypeRecord 
-    { 
-        get
-        {
-            if (refObjectTypeRecord.IsAlive == false)
-            {
-                return null;
-            }
-
-            return refObjectTypeRecord.Target;
-        } 
-    }
-
-    public ObjectTypeRecordFacade(object objectTypeRecord)
-    {
-        this.refObjectTypeRecord = new WeakReference(objectTypeRecord);
-
-        Type type = objectTypeRecord.GetType();
-
-        if (type.GetGenericTypeDefinition() != ObjectTypeRecordType)
-        {
-            throw new ArgumentException($"Type {type} was not of expected type {ObjectTypeRecordType}");
-        }
-
-        ContainsObjectDelegate = (Func<object, string, bool>)type
-            .GetMethod("ContainsObject")
-            .CreateDelegate(type);
-    }
-
-    public bool ContainsObject(string id)
-    {
-        var objectTypeRecord = ObjectTypeRecord;
-        if (objectTypeRecord == null) return false;
-
-        return ContainsObjectDelegate(objectTypeRecord, id);
     }
 }

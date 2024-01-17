@@ -55,6 +55,11 @@ namespace GameInterface.Services.ObjectManager.Extensions
             return objectManager.GetFacade().ContainsType(type);
         }
 
+        public static bool Contains(this MBObjectManager objectManager, string id)
+        {
+            return objectManager.GetFacade().Contains(id);
+        }
+
         private static ObjectTypeRecordsFacade GetFacade(this MBObjectManager objectManager)
         {
             if (objectManagerExtensionData.TryGetValue(objectManager, out var facade) == false)
@@ -113,6 +118,11 @@ namespace GameInterface.Services.ObjectManager.Extensions
         }
 
         public bool ContainsType(Type type) => Records.ContainsKey(type);
+
+        public bool Contains(string id)
+        {
+            return Records.Values.Any(record => record.Contains(id));
+        }
     }
 
     internal class ObjectTypeRecordFacade
@@ -181,5 +191,18 @@ namespace GameInterface.Services.ObjectManager.Extensions
         }
 
         public IEnumerable<MBObjectBase> GetObjects() => GetValues();
+
+        public bool Contains(string id)
+        {
+            var objs = type.GetField("_registeredObjects", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(refObjectTypeRecord.Target);
+
+            var t1 = objs.GetType().GetGenericArguments()[0];
+            var t2 = objs.GetType().GetGenericArguments()[1];
+
+            return (bool)typeof(Dictionary<,>)
+                .MakeGenericType(t1, t2)
+                .GetMethod("ContainsKey")
+                .Invoke(objs, new object[] { id });
+        }
     }
 }

@@ -1,8 +1,11 @@
-﻿using System;
+﻿using Autofac;
+using GameInterface.Services.ObjectManager;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Template.Commands;
@@ -10,7 +13,7 @@ namespace GameInterface.Services.Template.Commands;
 internal class SettlementCommands
 {
     [CommandLineArgumentFunction("enter_random_castle", "coop.debug.settlements")]
-    public static string TemplateCommand(List<string> strings)
+    public static string EnterRandomCastle(List<string> strings)
     {
         var castles = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsCastle).ToArray();
 
@@ -21,5 +24,24 @@ internal class SettlementCommands
         EncounterManager.StartSettlementEncounter(MobileParty.MainParty, randomCastle);
 
         return $"Entering {randomCastle.Name} castle";
+    }
+
+    [CommandLineArgumentFunction("get_town_name", "coop.debug.settlements")]
+    public static string GetTownName(List<string> strings)
+    {
+        if (strings.Count != 1) return "Invalid usage, expected \"get_town_name <settlment id>\"";
+
+        string settlementId = strings.Single();
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get town name";
+
+        var objectManager = container.Resolve<IObjectManager>();
+
+        if (objectManager.Contains(settlementId) == false) return $"{settlementId} does not exist";
+
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false) 
+            throw new Exception($"{settlementId} was in object manager but was unable to be resolved");
+
+        return $"Settlement Name: {settlement.Name}";
     }
 }
