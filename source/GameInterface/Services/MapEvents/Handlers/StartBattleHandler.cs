@@ -19,7 +19,8 @@ namespace GameInterface.Services.MapEvents.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly ILogger Logger = LogManager.GetLogger<StartBattleHandler>();
-        private MobileParty lastAttackingParty;
+
+        private string lastAttackerPartyId;
 
         public StartBattleHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
@@ -36,6 +37,9 @@ namespace GameInterface.Services.MapEvents.Handlers
         private void Handle(MessagePayload<StartBattle> obj)
         {
             var payload = obj.What;
+
+            if (lastAttackerPartyId == payload.attackerPartyId) return;
+            lastAttackerPartyId = payload.attackerPartyId;
 
             if (objectManager.TryGetObject<MobileParty>(payload.attackerPartyId, out var attackerParty) == false)
             {

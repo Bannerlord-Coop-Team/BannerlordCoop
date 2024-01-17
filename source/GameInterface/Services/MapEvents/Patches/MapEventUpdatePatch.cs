@@ -21,9 +21,9 @@ namespace GameInterface.Services.MapEvents.Patches
     {
         private static readonly MethodInfo MapEvent_FinishBattle = typeof(MapEvent).GetMethod("FinishBattle", BindingFlags.NonPublic | BindingFlags.Instance);
 
-        //[HarmonyPrefix]
-        //[HarmonyPatch("Update")]
-        //static bool PrefixUpdate(MapEvent __instance) => ModInformation.IsServer;
+        [HarmonyPrefix]
+        [HarmonyPatch("Update")]
+        static bool PrefixUpdate(MapEvent __instance) => ModInformation.IsServer;
 
         [HarmonyPrefix]
         [HarmonyPatch("FinishBattle")]
