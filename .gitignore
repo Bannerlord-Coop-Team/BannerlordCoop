@@ -10,6 +10,7 @@ reated by https://www.gitignore.io/api/csharp,powershell,dotnetcore,visualstudio
 # User-specific files
 *.rsuser
 *.suo
+*.user
 *.userosscache
 *.sln.docstates
 
@@ -543,4 +544,5 @@ source/.editorconfig
 # Rider IDE
 source/.idea
 !*ClientDebug.csproj.user
+!*ClientDebug2.csproj.user
 !*MissionTestMod.csproj.user
