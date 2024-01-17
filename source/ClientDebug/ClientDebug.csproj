@@ -45,6 +45,7 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>dotnet build "$(SolutionDir)Coop/Coop.csproj" --no-incremental -c $(configuration) /p:"SolutionDir=$(SolutionDir)\"</PostBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
   </PropertyGroup>
 </Project>

@@ -4,7 +4,9 @@ using Common.Logging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
@@ -38,6 +40,8 @@ internal class HeroInterface : IHeroInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
     private readonly IObjectManager objectManager;
+    private readonly IClanRegistry clanRegistry;
+    private readonly IMobilePartyRegistry mobilePartyRegistry;
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IHeroRegistry heroRegistry;
     private readonly IControlledEntityRegistry entityRegistry;
@@ -46,22 +50,28 @@ internal class HeroInterface : IHeroInterface
 
 
     public HeroInterface(
-        IObjectManager objectManager,
+        IClanRegistry clanRegistry,
+        IMobilePartyRegistry mobilePartyRegistry,
         IBinaryPackageFactory binaryPackageFactory,
         IHeroRegistry heroRegistry,
-        IControlledEntityRegistry entityRegistry)
+        IControlledEntityRegistry entityRegistry,
+        IObjectManager objectManager)
     {
         this.objectManager = objectManager;
+        this.clanRegistry = clanRegistry;
+        this.mobilePartyRegistry = mobilePartyRegistry;
         this.binaryPackageFactory = binaryPackageFactory;
         this.heroRegistry = heroRegistry;
         this.entityRegistry = entityRegistry;
+        this.objectManager = objectManager;
     }
 
     public byte[] PackageMainHero()
     {
         Hero.MainHero.StringId = string.Empty;
         Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
-        Hero.MainHero.Clan.StringId = $"CoopClan_{Guid.NewGuid()}";
+        //Hero.MainHero.Clan.StringId = $"CoopClan_{Guid.NewGuid()}";
+        Hero.MainHero.Clan.StringId = string.Empty;
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
@@ -158,9 +168,9 @@ internal class HeroInterface : IHeroInterface
         .BuildDelegate<Action<CampaignObjectManager, Clan>>();
     private void SetupHeroWithObjectManagers(Hero hero)
     {
-        objectManager.AddNewObject(hero, out string heroId);
-        objectManager.AddNewObject(hero.PartyBelongedTo, out string partyId);
-        objectManager.AddNewObject(hero.Clan, out string clanId);
+        objectManager.AddNewObject(hero, out var _);
+        objectManager.AddNewObject(hero.PartyBelongedTo, out var _);
+        objectManager.AddNewObject(hero.Clan, out var _);
 
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
         if (campaignObjectManager == null)
