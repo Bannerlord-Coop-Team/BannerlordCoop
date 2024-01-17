@@ -38,6 +38,7 @@ namespace GameInterface.Services.Villages.Commands
         }
 
         /// coop.debug.village.info castle_village_comp_K7_2
+        /// coop.debug.village.info village_ES1_3
         /// <summary>
         /// Gets information on a specific village
         /// </summary>
