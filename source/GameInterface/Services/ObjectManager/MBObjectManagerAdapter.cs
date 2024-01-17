@@ -16,8 +16,7 @@ public interface IObjectManager
 {
     bool Contains(object obj);
     bool Contains(string id);
-    bool TryGetId(object obj, out string id);
-    bool TryGetObject<T>(string id, out T obj);
+    bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase;
     bool AddExisting(string id, object obj);
     bool AddNewObject(object obj, out string newId);
 }
@@ -145,7 +144,9 @@ internal class MBObjectManagerAdapter : IObjectManager
         return true;
     }
 
-    public bool TryGetObject(string id, out object obj)
+    private static readonly MethodInfo GetObject = typeof(MBObjectManager)
+        .GetMethod(nameof(MBObjectManager.GetObject), new Type[] { typeof(string) });
+    public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
     {
         obj = default;
 
@@ -154,53 +155,23 @@ internal class MBObjectManagerAdapter : IObjectManager
 
         if (partyRegistry.TryGetValue(id, out MobileParty party))
         {
-            obj = party;
-            return true;
+            obj = party as T;
+            return obj != null;
         }
 
         if (heroRegistry.TryGetValue(id, out Hero hero))
         {
-            obj = hero;
-            return true;
+            obj = hero as T;
+            return obj != null;
         }
 
         if (clanRegistry.TryGetValue(id, out Clan clan))
         {
-            obj = clan;
-            return true;
+            obj = clan as T;
+            return obj != null;
         }
 
-        MBObjectBase castedResult;
-
-        var result = TryGetObjectInternal(id, out castedResult);
-
-        obj = castedResult;
-
-        return result;
-    }
-
-    public bool TryGetObject<T>(string id, out T obj)
-    {
-        obj = default;
-
-        if(TryGetObject(id, out object resolvedObj))
-        {
-            if (resolvedObj is T castedObj == false) return false;
-
-            obj = castedObj;
-            return true;
-        }
-
-        return false;
-    }
-
-    private bool TryGetObjectInternal<T>(string id, out T obj) where T : MBObjectBase
-    {
-        obj = default;
-
-        if (string.IsNullOrEmpty(id)) return false;
-
-        obj = objectManager.GetObject<T>(id);
+        obj = (T)GetObject.MakeGenericMethod(typeof(T)).Invoke(objectManager, new object[] { id });
 
         return obj != null;
     }
