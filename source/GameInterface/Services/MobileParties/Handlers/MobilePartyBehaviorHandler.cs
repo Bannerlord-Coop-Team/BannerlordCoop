@@ -6,9 +6,12 @@ using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
+using System;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
@@ -70,15 +73,27 @@ internal class MobilePartyBehaviorHandler : IHandler
     {
         var data = obj.What.BehaviorUpdateData;
 
-        IMapEntity targetMapEntity = null;
-
-        if (data.HasTarget && !objectManager.TryGetObject(data.TargetId, out targetMapEntity))
+        MobileParty targetParty = null;
+        Settlement targetSettlement = null;
+        if (data.HasTarget && 
+            !objectManager.TryGetObject(data.TargetId, out targetParty) &&
+            !objectManager.TryGetObject(data.TargetId, out targetSettlement))
             return;
 
         if (!objectManager.TryGetObject(data.PartyId, out MobileParty party))
             return;
 
         Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
+
+        IMapEntity targetMapEntity = null;
+        if (data.HasTarget && targetParty != null)
+        {
+            targetMapEntity = targetParty;
+        }
+        else if (data.HasTarget && targetSettlement != null)
+        {
+            targetMapEntity = targetSettlement;
+        }
 
         PartyBehaviorPatch.SetAiBehavior(
             party.Ai,
