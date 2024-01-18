@@ -2,6 +2,7 @@
 using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
@@ -33,6 +34,8 @@ internal class VillagePatches
     private static bool VillageStatePrefix(ref Village __instance, ref VillageStates value)
     {
         if(AllowedThread.IsThisThreadAllowed()) return true;
+        if (PolicyProvider.AllowOriginalCalls) return true;
+
         if (ModInformation.IsClient) return false;
         if (get_villageState(__instance) == value) return false;
         
@@ -67,6 +70,8 @@ internal class VillagePatches
     private static bool HearthPrefix(ref Village __instance, ref float value)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (PolicyProvider.AllowOriginalCalls) return true;
+
         if (ModInformation.IsClient) return false;
 
         var message = new VillageHearthChanged(__instance.StringId, value);
@@ -100,6 +105,8 @@ internal class VillagePatches
     private static bool TradeBoundPrefix(ref Village __instance, ref Settlement value)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (PolicyProvider.AllowOriginalCalls) return true;
+
         if (ModInformation.IsClient) return false;
 
         if (get_tradeBound(__instance) == value) return false;
