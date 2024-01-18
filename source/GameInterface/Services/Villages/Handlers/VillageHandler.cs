@@ -25,6 +25,20 @@ public class VillageHandler : IHandler
  
         messageBroker.Subscribe<ChangeVillageState>(HandleVillageState);
         messageBroker.Subscribe<ChangeVillageTradeBound>(HandleTradeBound);
+        messageBroker.Subscribe<ChangeVillageHearth>(HandleHearth);
+    }
+
+    private void HandleHearth(MessagePayload<ChangeVillageHearth> payload)
+    {
+        var obj = payload.What;
+
+        if (objectManager.TryGetObject<Village>(obj.VillageId, out var village) == false)
+        {
+            Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
+            return;
+        }
+
+        VillagePatches.ChangeHearth(village, obj.Hearth);
     }
 
     private void HandleTradeBound(MessagePayload<ChangeVillageTradeBound> payload)
@@ -44,7 +58,7 @@ public class VillageHandler : IHandler
         }
 
 
-        //VillagePatches.RunTradeBoundChange(village, settlement);
+        VillagePatches.RunTradeBoundChange(village, settlement);
     }
 
     private void HandleVillageState(MessagePayload<ChangeVillageState> payload)

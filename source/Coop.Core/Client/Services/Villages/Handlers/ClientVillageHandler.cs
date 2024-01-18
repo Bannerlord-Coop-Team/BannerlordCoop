@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Server.Services.Villages.Messages;
 using GameInterface.Services.Villages.Messages;
+using System;
 
 namespace Coop.Core.Client.Services.Villages.Handlers
 {
@@ -21,6 +22,17 @@ namespace Coop.Core.Client.Services.Villages.Handlers
             messageBroker.Subscribe<NetworkChangeVillageState>(HandleVillageState);
 
             messageBroker.Subscribe<NetworkChangeVillageTradeBound>(HandleTrade);
+
+            messageBroker.Subscribe<NetworkChangeVillageHearth>(HandleHearth);
+        }
+
+        private void HandleHearth(MessagePayload<NetworkChangeVillageHearth> payload)
+        {
+            var obj = payload.What;
+
+            var message = new ChangeVillageHearth(obj.VillageId, obj.Hearth);
+
+            messageBroker.Publish(this, message);
         }
 
         private void HandleVillageState(MessagePayload<NetworkChangeVillageState> payload)

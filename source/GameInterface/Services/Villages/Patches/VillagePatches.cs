@@ -4,6 +4,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -63,9 +64,27 @@ internal class VillagePatches
 
     [HarmonyPatch(nameof(Village.Hearth), MethodType.Setter)]
     [HarmonyPrefix]
-    private static bool HearthPrefix()
+    private static bool HearthPrefix(ref Village __instance, ref float value)
     {
-        return false;
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (ModInformation.IsClient) return false;
+
+        var message = new VillageHearthChanged(__instance.StringId, value);
+        MessageBroker.Instance.Publish(__instance, message);
+        return true;
+    }
+
+    public static void ChangeHearth(Village village, float Hearth)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                village.Hearth = Hearth;
+            }
+        });
+
+
     }
 
 

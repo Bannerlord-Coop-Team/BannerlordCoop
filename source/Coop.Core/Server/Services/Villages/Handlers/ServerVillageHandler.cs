@@ -22,6 +22,15 @@ namespace Coop.Core.Server.Services.Villages.Handlers
             // This handles an internal message
             messageBroker.Subscribe<VillageStateChanged>(HandleVillageState);
             messageBroker.Subscribe<VillageTradeBoundChanged>(HandleTradeBound);
+            messageBroker.Subscribe<VillageHearthChanged>(HandleHearth);
+        }
+
+        private void HandleHearth(MessagePayload<VillageHearthChanged> payload)
+        {
+            var obj = payload.What;
+
+            var networkMessage = new NetworkChangeVillageHearth(obj.VillageID, obj.Hearth);
+            network.SendAll(networkMessage);
         }
 
         private void HandleTradeBound(MessagePayload<VillageTradeBoundChanged> payload)
