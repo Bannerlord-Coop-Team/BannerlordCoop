@@ -29,7 +29,7 @@ namespace Coop.Core.Server.Services.Villages.Handlers
         {
             var obj = payload.What;
 
-            var networkMessage = new NetworkChangeVillageHearth(obj.VillageID, obj.Hearth);
+            var networkMessage = new NetworkChangeVillageHearth(obj.VillageId, obj.Hearth);
             network.SendAll(networkMessage);
         }
 
