@@ -1,11 +1,14 @@
 ﻿using Common.Messaging;
+using System;
+using System.Collections.Generic;
+using System.Text;
 
 namespace GameInterface.Services.MobileParties.Messages
 {
     /// <summary>
-    /// Event sent when player recruits unit
+    /// Event to tell GameInterface to handle unit being recruited
     /// </summary>
-    public record TroopIndexAdded : IEvent
+    public record TroopIndexAddGranted : IEvent
     {
         public string PartyId { get; }
         public bool IsPrisonerRoster { get; }
@@ -15,12 +18,7 @@ namespace GameInterface.Services.MobileParties.Messages
         public int XpChange { get; }
         public bool RemoveDepleted { get; }
 
-        public TroopIndexAdded(string partyId, 
-            bool isPrisonerRoster, 
-            int index, int countChange, 
-            int woundedCountChange, 
-            int xpChange, 
-            bool removeDepleted)
+        public TroopIndexAddGranted(string partyId, bool isPrisonerRoster, int index, int countChange, int woundedCountChange, int xpChange, bool removeDepleted)
         {
             PartyId = partyId;
             IsPrisonerRoster = isPrisonerRoster;

@@ -23,26 +23,43 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<TroopCountChanged>(Handle);
-            messageBroker.Subscribe<NetworkUnitRecruited>(Handle);
+            messageBroker.Subscribe<NewTroopAdded>(Handle);
+            messageBroker.Subscribe<NetworkNewTroopAdded>(Handle);
+            messageBroker.Subscribe<TroopIndexAdded>(Handle);
+            messageBroker.Subscribe<NetworkTroopIndexAdded>(Handle);
         }
         public void Dispose()
         {
-            messageBroker.Unsubscribe<TroopCountChanged>(Handle);
-            messageBroker.Unsubscribe<NetworkUnitRecruited>(Handle);
+            messageBroker.Unsubscribe<NewTroopAdded>(Handle);
+            messageBroker.Unsubscribe<NetworkNewTroopAdded>(Handle);
+            messageBroker.Unsubscribe<TroopIndexAdded>(Handle);
+            messageBroker.Unsubscribe<NetworkTroopIndexAdded>(Handle);
         }
 
-        internal void Handle(MessagePayload<TroopCountChanged> obj)
+        internal void Handle(MessagePayload<NewTroopAdded> obj)
         {
             var payload = obj.What;
 
-            network.SendAll(new NetworkRecruitRequest(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonerRoster));
+            network.SendAll(new NetworkNewTroopRequest(payload.CharacterId, payload.PartyId, payload.isPrisonerRoster, payload.InsertAtFront, payload.InsertionIndex));
         }
-        internal void Handle(MessagePayload<NetworkUnitRecruited> obj)
+        internal void Handle(MessagePayload<NetworkNewTroopAdded> obj)
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId, payload.IsPrisonerRoster));
+            messageBroker.Publish(this, new UnitNewTroopGranted(payload.CharacterId, payload.PartyId, payload.IsPrisonerRoster, payload.InsertAtFront, payload.InsertionIndex));
+        }
+
+        internal void Handle(MessagePayload<TroopIndexAdded> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new NetworkTroopIndexAddRequest(payload.PartyId, payload.IsPrisonerRoster, payload.Index, payload.CountChange, payload.WoundedCountChange, payload.XpChange, payload.RemoveDepleted));
+        }
+        internal void Handle(MessagePayload<NetworkTroopIndexAdded> obj)
+        {
+            var payload = obj.What;
+
+            network.SendAll(new TroopIndexAddGranted(payload.PartyId, payload.IsPrisonerRoster, payload.Index, payload.CountChange, payload.WoundedCountChange, payload.XpChange, payload.RemoveDepleted));
         }
     }
 }
