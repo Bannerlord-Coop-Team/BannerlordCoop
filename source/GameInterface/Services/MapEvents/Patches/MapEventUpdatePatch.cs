@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.MountAndBlade.Diamond.Lobby.LocalData;
 
 namespace GameInterface.Services.MapEvents.Patches
 {
@@ -18,7 +19,15 @@ namespace GameInterface.Services.MapEvents.Patches
 
         [HarmonyPrefix]
         [HarmonyPatch("Update")]
-        static bool PrefixUpdate(MapEvent __instance) => ModInformation.IsServer;
+        static bool PrefixUpdate(MapEvent __instance)
+        {
+            if (ModInformation.IsClient) return false;
+
+            //Don't update if a player is involved
+            if (__instance.InvolvedParties.Any(x => x.MobileParty.IsPartyControlled() == false)) return false;
+
+            return true;
+        }
 
         [HarmonyPrefix]
         [HarmonyPatch("FinishBattle")]

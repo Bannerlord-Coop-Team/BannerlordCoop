@@ -46,7 +46,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new UnitNewTroopGranted(payload.CharacterId, payload.PartyId, payload.IsPrisonerRoster, payload.InsertAtFront, payload.InsertionIndex));
+            messageBroker.Publish(this, new AddNewTroop(payload.CharacterId, payload.PartyId, payload.IsPrisonerRoster, payload.InsertAtFront, payload.InsertionIndex));
         }
 
         internal void Handle(MessagePayload<TroopIndexAdded> obj)
@@ -59,7 +59,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         {
             var payload = obj.What;
 
-            network.SendAll(new TroopIndexAddGranted(payload.PartyId, payload.IsPrisonerRoster, payload.Index, payload.CountChange, payload.WoundedCountChange, payload.XpChange, payload.RemoveDepleted));
+            messageBroker.Publish(this, new AddTroopIndex(payload.PartyId, payload.IsPrisonerRoster, payload.Index, payload.CountChange, payload.WoundedCountChange, payload.XpChange, payload.RemoveDepleted));
         }
     }
 }
