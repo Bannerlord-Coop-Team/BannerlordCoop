@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using GameInterface.Policies;
 using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Heroes;
