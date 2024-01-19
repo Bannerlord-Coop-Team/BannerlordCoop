@@ -154,9 +154,9 @@ internal class VillageDebugCommand
 
     // coop.debug.village.set_trade_tax_acc castle_village_comp_K7_2 500
     /// <summary>
-    /// sets the tradetaxaccumulated  value for a village.
+    /// sets the tradetaxaccumulated value for a village.
     /// </summary>
-    /// <param name="args">the village and hearth value float</param>
+    /// <param name="args">the village and tradetaxaccumulated value float</param>
     /// <returns>string output if success</returns>
     [CommandLineArgumentFunction("set_trade_tax_acc", "coop.debug.village")]
     public static string SetTradeTaxAccumulated(List<string> args)

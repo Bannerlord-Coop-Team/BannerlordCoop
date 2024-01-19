@@ -5,6 +5,9 @@ using System.Text;
 
 namespace GameInterface.Services.Villages.Messages;
 
+/// <summary>
+/// When Village Tax has changed
+/// </summary>
 public record VillageTaxAccumulateChanged : ICommand
 {
     public string VilageId { get; }

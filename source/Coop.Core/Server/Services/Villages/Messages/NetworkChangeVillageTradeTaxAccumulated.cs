@@ -6,6 +6,9 @@ using System.Text;
 
 namespace Coop.Core.Server.Services.Villages.Messages;
 
+/// <summary>
+/// message sent for TradeTaxAccumulated changes 
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal class NetworkChangeVillageTradeTaxAccumulated : IEvent
 {
