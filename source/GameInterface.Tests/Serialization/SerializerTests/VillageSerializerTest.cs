@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using Autofac;
 using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Policies;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -27,6 +28,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Village testVillage = (Village)FormatterServices.GetUninitializedObject(typeof(Village));
 
             var factory = container.Resolve<IBinaryPackageFactory>();
+
             VillageBinaryPackage package = new VillageBinaryPackage(testVillage, factory);
 
             package.Pack();
