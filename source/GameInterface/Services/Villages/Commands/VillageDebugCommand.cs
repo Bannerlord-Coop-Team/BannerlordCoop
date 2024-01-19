@@ -3,10 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using static TaleWorlds.Library.CommandLineFunctionality;
-using TaleWorlds.CampaignSystem.Extensions;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
 using TaleWorlds.CampaignSystem.Settlements;
 using System.Linq;
 
@@ -14,12 +11,22 @@ namespace GameInterface.Services.Villages.Commands;
 
 internal class VillageDebugCommand
 {
+
+    private static readonly PropertyInfo LastDemandSatisifiedTime = typeof(Village).GetProperty(nameof(Village.LastDemandSatisfiedTime));
+
+    /// <summary>
+    /// Finds a specific village in game.
+    /// </summary>
+    /// <param name="villageId">string id of the village to search</param>
+    /// <returns>Village or null.</returns>
     private static Village findVillage(string villageId)
     {
-        List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsVillage).ToList();
+        List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
+            .Where(settlement => settlement.IsVillage).ToList();
         Village village = settlements.Find(e => e.Village.StringId == villageId)?.Village;
         return village;
     }
+
     // coop.debug.village.list
     /// <summary>
     /// Lists all the villages
@@ -128,7 +135,7 @@ internal class VillageDebugCommand
 
         if (args.Count < 2)
         {
-            return "Usage: coop.debug.village.set_state <villageId> <0.0> ";
+            return "Usage: coop.debug.village.set_hearth <villageId> <0.0> ";
         }
 
         Village village = findVillage(args[0]);
@@ -166,7 +173,7 @@ internal class VillageDebugCommand
 
         if (args.Count < 2)
         {
-            return "Usage: coop.debug.village.set_state <villageId> <0.0> ";
+            return "Usage: coop.debug.village.set_trade_tax_acc <villageId> <0.0> ";
         }
 
         Village village = findVillage(args[0]);
@@ -189,5 +196,45 @@ internal class VillageDebugCommand
         village.TradeTaxAccumulated = tradeTaxAccumulated;
 
         return string.Format("Hearth has changed to to: {0}", tradeTaxAccumulated);
+    }
+
+
+    // coop.debug.village.set_demand_time castle_village_comp_K7_2 2.0
+    /// <summary>
+    /// sets the LastDemandTimeSatisified
+    /// </summary>
+    /// <param name="args">the village and village last demand time value</param>
+    /// <returns>string output if success</returns>
+    [CommandLineArgumentFunction("set_demand_time", "coop.debug.village")]
+    public static string SetLastDemandTimeSatisified(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Usage: This command can only be used by the server for debugging purposes.";
+
+        if (args.Count < 2)
+        {
+            return "Usage: coop.debug.village.set_demand_time <villageId> <0.0> ";
+        }
+
+        Village village = findVillage(args[0]);
+
+        if (village == null)
+        {
+            return string.Format("ID: '{0}' not found", args[0]);
+        }
+
+        float lastDemandTime = 0.0f;
+        try
+        {
+            lastDemandTime = float.Parse(args[1]);
+        }
+        catch (Exception)
+        {
+            return string.Format("Failed to parse the value: {0}", lastDemandTime);
+        }
+
+        LastDemandSatisifiedTime.SetValue(village, lastDemandTime);
+
+        return string.Format("Hearth has changed to to: {0}", lastDemandTime);
     }
 }

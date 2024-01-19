@@ -24,6 +24,17 @@ namespace Coop.Core.Server.Services.Villages.Handlers
             messageBroker.Subscribe<VillageTradeBoundChanged>(HandleTradeBound);
             messageBroker.Subscribe<VillageHearthChanged>(HandleHearth);
             messageBroker.Subscribe<VillageTaxAccumulateChanged>(HandleTradeTaxAccumulated);
+            messageBroker.Subscribe<VillageDemandTimeChanged>(HandleLastDemandSatisifiedTime);
+
+        }
+
+        private void HandleLastDemandSatisifiedTime(MessagePayload<VillageDemandTimeChanged> payload)
+        {
+            var obj = payload.What;
+
+            var networkMessage = new NetworkChangeVillageDemandTime(obj.VillageId, obj.LastDemandSatisfiedTime);
+
+            network.SendAll(networkMessage);
         }
 
         private void HandleTradeTaxAccumulated(MessagePayload<VillageTaxAccumulateChanged> payload)

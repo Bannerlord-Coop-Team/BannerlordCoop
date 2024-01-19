@@ -5,7 +5,6 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
-using Newtonsoft.Json.Linq;
 using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -156,4 +155,34 @@ internal class VillagePatches
         });
 
     }
+
+
+    private static readonly PropertyInfo LastDemandSatisifiedTime = typeof(Village).GetProperty(nameof(Village.LastDemandSatisfiedTime));
+    [HarmonyPatch(nameof(Village.LastDemandSatisfiedTime), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static bool LastDemandSatisifiedTimePrefix(ref Village __instance, ref float value)
+    {
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (PolicyProvider.AllowOriginalCalls) return true;
+
+        if (ModInformation.IsClient) return false;
+
+        var message = new VillageDemandTimeChanged(__instance.StringId, value);
+        MessageBroker.Instance.Publish(__instance, message);
+        return true;
+    }
+
+    internal static void RunLastDemandTimeSatisified(Village village, float LastDemandSatisfiedTime)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                LastDemandSatisifiedTime.SetValue(village, LastDemandSatisfiedTime);
+            }
+        });
+
+    }
+
+
 }
