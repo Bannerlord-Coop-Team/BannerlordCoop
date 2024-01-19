@@ -14,6 +14,12 @@ namespace GameInterface.Services.Villages.Commands;
 
 internal class VillageDebugCommand
 {
+    private static Village findVillage(string villageId)
+    {
+        List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsVillage).ToList();
+        Village village = settlements.Find(e => e.Village.StringId == villageId)?.Village;
+        return village;
+    }
     // coop.debug.village.list
     /// <summary>
     /// Lists all the villages
@@ -52,9 +58,7 @@ internal class VillageDebugCommand
             return "Usage: coop.debug.village.info <villageId>";
         }
 
-        List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsVillage).ToList();
-
-        Village village = settlements.Find(e => e.Village.StringId == args[0])?.Village;
+        Village village = findVillage(args[0]);
 
         if (village == null)
         {
@@ -92,15 +96,12 @@ internal class VillageDebugCommand
             return "Usage: coop.debug.village.set_state <villageId> <BeingRaided | ForcedForVolunteers | ForcedForSupplies | Looted> ";
         }
 
-        List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsVillage).ToList();
-
-        Village village = settlements.Find(e => e.Village.StringId == args[0]).Village;
+        Village village = findVillage(args[0]);
 
         if (village == null)
         {
             return string.Format("ID: '{0}' not found", args[0]);
         }
-
 
 
         if(!Enum.TryParse(args[1], out Village.VillageStates villageState))
@@ -130,9 +131,7 @@ internal class VillageDebugCommand
             return "Usage: coop.debug.village.set_state <villageId> <0.0> ";
         }
 
-        List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsVillage).ToList();
-
-        Village village = settlements.Find(e => e.Village.StringId == args[0])?.Village;
+        Village village = findVillage(args[0]);
 
         if (village == null)
         {
@@ -151,5 +150,44 @@ internal class VillageDebugCommand
         village.Hearth = hearth;
 
         return string.Format("Hearth has changed to to: {0}", hearth);
+    }
+
+    // coop.debug.village.set_trade_tax_acc castle_village_comp_K7_2 500
+    /// <summary>
+    /// sets the tradetaxaccumulated  value for a village.
+    /// </summary>
+    /// <param name="args">the village and hearth value float</param>
+    /// <returns>string output if success</returns>
+    [CommandLineArgumentFunction("set_trade_tax_acc", "coop.debug.village")]
+    public static string SetTradeTaxAccumulated(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Usage: This command can only be used by the server for debugging purposes.";
+
+        if (args.Count < 2)
+        {
+            return "Usage: coop.debug.village.set_state <villageId> <0.0> ";
+        }
+
+        Village village = findVillage(args[0]);
+
+        if (village == null)
+        {
+            return string.Format("ID: '{0}' not found", args[0]);
+        }
+
+        int tradeTaxAccumulated = 0;
+        try
+        {
+            tradeTaxAccumulated = int.Parse(args[1]);
+        }
+        catch (Exception)
+        {
+            return string.Format("Failed to parse the value: {0}", tradeTaxAccumulated);
+        }
+
+        village.TradeTaxAccumulated = tradeTaxAccumulated;
+
+        return string.Format("Hearth has changed to to: {0}", tradeTaxAccumulated);
     }
 }

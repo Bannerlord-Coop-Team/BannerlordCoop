@@ -23,6 +23,15 @@ namespace Coop.Core.Server.Services.Villages.Handlers
             messageBroker.Subscribe<VillageStateChanged>(HandleVillageState);
             messageBroker.Subscribe<VillageTradeBoundChanged>(HandleTradeBound);
             messageBroker.Subscribe<VillageHearthChanged>(HandleHearth);
+            messageBroker.Subscribe<VillageTaxAccumulateChanged>(HandleTradeTaxAccumulated);
+        }
+
+        private void HandleTradeTaxAccumulated(MessagePayload<VillageTaxAccumulateChanged> payload)
+        {
+            var obj = payload.What;
+
+            var networkMessage = new NetworkChangeVillageTradeTaxAccumulated(obj.VilageId, obj.TradeTaxAccumulated);
+            network.SendAll(networkMessage);
         }
 
         private void HandleHearth(MessagePayload<VillageHearthChanged> payload)

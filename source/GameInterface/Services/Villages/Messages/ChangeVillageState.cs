@@ -12,12 +12,12 @@ namespace GameInterface.Services.Villages.Messages;
 /// </summary>
 public record ChangeVillageState : ICommand
 {
-    public string SettlementId { get; }
+    public string VillageId { get; }
     public int State { get; }
 
     public ChangeVillageState(string settlementId, int state)
     {
-        SettlementId = settlementId;
+        VillageId = settlementId;
         State = state;
     }
 }

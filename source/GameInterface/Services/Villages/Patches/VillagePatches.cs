@@ -133,8 +133,27 @@ internal class VillagePatches
 
     [HarmonyPatch(nameof(Village.TradeTaxAccumulated), MethodType.Setter)]
     [HarmonyPrefix]
-    private static bool TradeTaxAccumulatedPrefix()
+    private static bool TradeTaxAccumulatedPrefix(ref Village __instance, ref int value)
     {
-        return false;
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (PolicyProvider.AllowOriginalCalls) return true;
+
+        if (ModInformation.IsClient) return false;
+
+        var message = new VillageTaxAccumulateChanged(__instance.StringId, value);
+        MessageBroker.Instance.Publish(__instance, message);
+        return true;
+    }
+
+    internal static void RunTradeTaxChange(Village village, int tradeTaxAccumulated)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                village.TradeTaxAccumulated = tradeTaxAccumulated;
+            }
+        });
+
     }
 }

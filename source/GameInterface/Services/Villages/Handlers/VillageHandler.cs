@@ -26,6 +26,22 @@ public class VillageHandler : IHandler
         messageBroker.Subscribe<ChangeVillageState>(HandleVillageState);
         messageBroker.Subscribe<ChangeVillageTradeBound>(HandleTradeBound);
         messageBroker.Subscribe<ChangeVillageHearth>(HandleHearth);
+        messageBroker.Subscribe<ChangeVillageTradeTaxAccumulated>(HandleTradeTax);
+    }
+
+    private void HandleTradeTax(MessagePayload<ChangeVillageTradeTaxAccumulated> payload)
+    {
+        var obj = payload.What;
+
+
+        if (objectManager.TryGetObject<Village>(obj.VillageId, out var village) == false)
+        {
+            Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
+            return;
+        }
+
+        VillagePatches.RunTradeTaxChange(village, obj.TradeTaxAccumulated);
+
     }
 
     private void HandleHearth(MessagePayload<ChangeVillageHearth> payload)
@@ -65,9 +81,9 @@ public class VillageHandler : IHandler
     {
         var obj = payload.What;
 
-        if(objectManager.TryGetObject<Village>(obj.SettlementId, out var village) == false)
+        if(objectManager.TryGetObject<Village>(obj.VillageId, out var village) == false)
         {
-            Logger.Error("Unable to find Village ({villageId})", obj.SettlementId);
+            Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
             return;
         }
 
