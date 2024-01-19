@@ -19,6 +19,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             builder.RegisterModule<SerializationTestModule>();
 
+
             container = builder.Build();
         }
 

@@ -16,8 +16,6 @@ namespace GameInterface.Tests.Bootstrap.Modules
             base.Load(builder);
             builder.RegisterType<ObjectManagerAdapterStub>().As<IObjectManager>().InstancePerLifetimeScope();
             builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>();
-
-            builder.RegisterType<ISyncPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
         }
     }
 }
