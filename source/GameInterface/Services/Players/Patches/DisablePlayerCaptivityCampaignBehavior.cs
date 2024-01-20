@@ -7,5 +7,5 @@ namespace GameInterface.Services.Players.Patches;
 internal class DisablePlayerCaptivityCampaignBehavior
 {
     [HarmonyPatch(nameof(PlayerCaptivityCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => true;
 }
