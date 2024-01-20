@@ -16,8 +16,6 @@ namespace GameInterface.Services.Clans.Patches
     [HarmonyPatch(typeof(DestroyClanAction), "ApplyInternal")]
     public class ClanDestroyPatch
     {
-        private static readonly AllowedInstance<Clan> AllowedInstance = new AllowedInstance<Clan>();
-
         private static readonly Action<Clan, int> ApplyInternal =
             typeof(DestroyClanAction)
             .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
@@ -25,13 +23,11 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan destroyedClan, int details)
         {
-            if (AllowedInstance.IsAllowed(destroyedClan)) return true;
+            if (AllowedThread.IsThisThreadAllowed()) return true;
 
             if (PolicyProvider.AllowOriginalCalls) return true;
 
             if (ModInformation.IsClient && destroyedClan != Clan.PlayerClan) return false;
-
-            CallStackValidator.Validate(destroyedClan, AllowedInstance);
 
             MessageBroker.Instance.Publish(destroyedClan, new ClanDestroyed(destroyedClan.StringId, details));
 
@@ -40,15 +36,13 @@ namespace GameInterface.Services.Clans.Patches
 
         public static void RunOriginalDestroyClan(Clan clan, int details)
         {
-            using (AllowedInstance)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AllowedInstance.Instance = clan;
-
-                GameLoopRunner.RunOnMainThread(() =>
+                using(new AllowedThread())
                 {
                     ApplyInternal.Invoke(clan, details);
-                }, true);
-            }
+                }
+            }, true);
         }
     }
 }

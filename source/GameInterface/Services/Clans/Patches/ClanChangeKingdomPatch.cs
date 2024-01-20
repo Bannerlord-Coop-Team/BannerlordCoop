@@ -16,8 +16,6 @@ namespace GameInterface.Services.Clans.Patches
     [HarmonyPatch(typeof(ChangeKingdomAction), "ApplyInternal")]
     public class ClanChangeKingdomPatch
     {
-        private static readonly AllowedInstance<Clan> AllowedInstance = new AllowedInstance<Clan>();
-
         private static readonly Action<Clan, Kingdom, ChangeKingdomAction.ChangeKingdomActionDetail, int, bool, bool> ApplyInternal =
             typeof(ChangeKingdomAction)
             .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
@@ -25,13 +23,11 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, int awardMultiplier = 0, bool byRebellion = false, bool showNotification = true)
         {
-            if (AllowedInstance.IsAllowed(clan)) return true;
+            if (AllowedThread.IsThisThreadAllowed()) return true;
 
             if (PolicyProvider.AllowOriginalCalls) return true;
 
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
-
-            CallStackValidator.Validate(clan, AllowedInstance);
 
             MessageBroker.Instance.Publish(clan, new ClanKingdomChanged(clan.StringId, newKingdom?.StringId, (int)detail, awardMultiplier, byRebellion, showNotification));
 
@@ -40,15 +36,13 @@ namespace GameInterface.Services.Clans.Patches
 
         public static void RunOriginalChangeClanKingdom(Clan clan, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, int awardMultiplier = 0, bool byRebellion = false, bool showNotification = true)
         {
-            using (AllowedInstance)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AllowedInstance.Instance = clan;
-
-                GameLoopRunner.RunOnMainThread(() =>
+                using(new AllowedThread())
                 {
                     ApplyInternal.Invoke(clan, newKingdom, detail, awardMultiplier, byRebellion, showNotification);
-                }, true);
-            }
+                }
+            }, true);
         }
     }
 }
