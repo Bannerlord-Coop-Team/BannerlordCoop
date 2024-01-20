@@ -1,8 +1,8 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Template.Messages;
-using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Template.Patches;
@@ -35,17 +35,24 @@ class TemplatePatch
 
     public static void OverrideTemplateFn()
     {
-        // Allowed thread will call the original function rather than skip or do patch functionality
-        // See if (AllowedThread.IsThisThreadAllowed()) return true; in the method above
-        using (new AllowedThread())
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            // Do something with the patched instance here
-        }
+            // Allowed thread will call the original function rather than skip or do patch functionality
+            // See if (AllowedThread.IsThisThreadAllowed()) return true; in the method above
+            using (new AllowedThread())
+            {
+                // Do something with the patched instance here
+            }
+        }, blocking: true);
+
 
         // This is equivalant to the using statement above
         // Only one version is needed
-        AllowedThread.AllowThisThread();
-        // Do something with the patched instance here
-        AllowedThread.RevokeThisThread();
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            AllowedThread.AllowThisThread();
+            // Do something with the patched instance here
+            AllowedThread.RevokeThisThread();
+        }, blocking: true);
     }
 }
