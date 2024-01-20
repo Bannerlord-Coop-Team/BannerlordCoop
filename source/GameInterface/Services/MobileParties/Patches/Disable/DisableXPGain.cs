@@ -1,8 +1,4 @@
 ﻿using HarmonyLib;
-using SandBox.Issues;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MobileParties.Patches.Disable
