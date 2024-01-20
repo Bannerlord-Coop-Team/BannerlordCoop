@@ -7,5 +7,5 @@ namespace GameInterface.Services.Towns.Patches;
 internal class DisablePrisonerCaptureCampaignBehavior
 {
     [HarmonyPatch(nameof(PrisonerCaptureCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => true;
 }

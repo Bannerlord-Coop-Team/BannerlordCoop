@@ -29,6 +29,8 @@ namespace GameInterface.Services.Heroes.Patches
 
             if (PolicyProvider.AllowOriginalCalls) return true;
 
+            if (ModInformation.IsClient) return false;
+
             MessageBroker.Instance.Publish(capturerParty, new PrisonerTaken(
                 capturerParty.MobileParty.StringId,
                 prisonerCharacter.StringId,
