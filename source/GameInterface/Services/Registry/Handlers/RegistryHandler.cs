@@ -3,6 +3,7 @@ using GameInterface.Services.MobileParties;
 using GameInterface.Services.Heroes.Messages;
 using TaleWorlds.CampaignSystem;
 using GameInterface.Services.Clans;
+using GameInterface.Services.Settlements;
 
 namespace GameInterface.Services.Registry.Handlers;
 
