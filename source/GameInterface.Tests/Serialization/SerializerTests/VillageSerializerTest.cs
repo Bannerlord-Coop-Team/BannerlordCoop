@@ -18,6 +18,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             builder.RegisterModule<SerializationTestModule>();
 
+
             container = builder.Build();
         }
 
@@ -27,6 +28,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Village testVillage = (Village)FormatterServices.GetUninitializedObject(typeof(Village));
 
             var factory = container.Resolve<IBinaryPackageFactory>();
+
             VillageBinaryPackage package = new VillageBinaryPackage(testVillage, factory);
 
             package.Pack();
