@@ -30,6 +30,15 @@ public class VillageHandler : IHandler
         messageBroker.Subscribe<ChangeVillageLastDemandTime>(HandleLastDemandTime);
     }
 
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<ChangeVillageState>(HandleVillageState);
+        messageBroker.Unsubscribe<ChangeVillageTradeBound>(HandleTradeBound);
+        messageBroker.Unsubscribe<ChangeVillageHearth>(HandleHearth);
+        messageBroker.Unsubscribe<ChangeVillageTradeTaxAccumulated>(HandleTradeTax);
+        messageBroker.Unsubscribe<ChangeVillageLastDemandTime>(HandleLastDemandTime);
+    }
+
     private void HandleLastDemandTime(MessagePayload<ChangeVillageLastDemandTime> payload)
     {
         var obj = payload.What;
@@ -106,8 +115,4 @@ public class VillageHandler : IHandler
     }
 
 
-    public void Dispose()
-    {
-        messageBroker?.Unsubscribe<ChangeVillageState>(HandleVillageState);
-    }
 }

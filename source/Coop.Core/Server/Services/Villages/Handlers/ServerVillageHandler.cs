@@ -28,6 +28,17 @@ namespace Coop.Core.Server.Services.Villages.Handlers
 
         }
 
+
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<VillageStateChanged>(HandleVillageState);
+            messageBroker.Unsubscribe<VillageTradeBoundChanged>(HandleTradeBound);
+            messageBroker.Unsubscribe<VillageHearthChanged>(HandleHearth);
+            messageBroker.Unsubscribe<VillageTaxAccumulateChanged>(HandleTradeTaxAccumulated);
+            messageBroker.Unsubscribe<VillageDemandTimeChanged>(HandleLastDemandSatisifiedTime);
+
+        }
+
         private void HandleLastDemandSatisifiedTime(MessagePayload<VillageDemandTimeChanged> payload)
         {
             var obj = payload.What;
@@ -69,13 +80,6 @@ namespace Coop.Core.Server.Services.Villages.Handlers
             // Broadcast to all the clients that the state was changed
             var networkMessage = new NetworkChangeVillageState(obj.SettlementId, obj.State);
             network.SendAll(networkMessage);
-        }
-
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<VillageStateChanged>(HandleVillageState);
-            messageBroker.Unsubscribe<VillageTradeBoundChanged>(HandleTradeBound);
-
         }
 
     }

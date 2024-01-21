@@ -6,7 +6,6 @@ using TaleWorlds.CampaignSystem.Settlements;
 using Autofac;
 using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
-using GameInterface.Policies;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

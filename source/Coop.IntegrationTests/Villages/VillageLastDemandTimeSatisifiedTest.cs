@@ -10,6 +10,10 @@ public class VillageLastDemandTimeSatisifiedTest
 
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
+
+    /// <summary>
+    /// Used to check if LastDemandTimeSatisified server to client works.
+    /// </summary>
     [Fact]
     public void ServerLastDemandTimeChanged_Publishes_AllClients()
     {

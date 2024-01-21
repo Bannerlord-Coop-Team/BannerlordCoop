@@ -2,6 +2,9 @@
 
 namespace GameInterface.Services.Villages.Messages;
 
+/// <summary>
+/// Used to change the Value of the Village's hearth.
+/// </summary>
 public record ChangeVillageHearth : ICommand
 {
     public string VillageId { get; }

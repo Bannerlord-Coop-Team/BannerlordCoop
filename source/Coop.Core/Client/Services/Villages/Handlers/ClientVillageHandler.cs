@@ -30,6 +30,20 @@ namespace Coop.Core.Client.Services.Villages.Handlers
             messageBroker.Subscribe<NetworkChangeVillageDemandTime>(HandleLastDemandSatsifiedTime);
         }
 
+        public void Dispose()
+        {
+
+            messageBroker.Unsubscribe<NetworkChangeVillageState>(HandleVillageState);
+
+            messageBroker.Unsubscribe<NetworkChangeVillageTradeBound>(HandleTrade);
+
+            messageBroker.Unsubscribe<NetworkChangeVillageHearth>(HandleHearth);
+
+            messageBroker.Unsubscribe<NetworkChangeVillageTradeTaxAccumulated>(HandleTradeTax);
+
+            messageBroker.Unsubscribe<NetworkChangeVillageDemandTime>(HandleLastDemandSatsifiedTime);
+        }
+
         private void HandleLastDemandSatsifiedTime(MessagePayload<NetworkChangeVillageDemandTime> payload)
         {
             var obj = payload.What;
@@ -76,10 +90,5 @@ namespace Coop.Core.Client.Services.Villages.Handlers
         }
 
 
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<NetworkChangeVillageState>(HandleVillageState);
-            messageBroker.Unsubscribe<NetworkChangeVillageTradeBound>(HandleTrade);
-        }
     }
 }
