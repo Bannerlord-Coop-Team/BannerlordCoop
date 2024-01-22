@@ -4,11 +4,8 @@ using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
@@ -20,21 +17,22 @@ namespace GameInterface.Services.MobileParties.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly ILogger Logger = LogManager.GetLogger<MobilePartyRecruitmentHandler>();
-        private RecruitmentCampaignBehavior recruitmentCampaignBehavior;
 
         public MobilePartyRecruitmentHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-            messageBroker.Subscribe<UnitRecruitGranted>(Handle);
+            messageBroker.Subscribe<AddNewTroop>(Handle);
+            messageBroker.Subscribe<AddTroopIndex>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<UnitRecruitGranted>(Handle);
+            messageBroker.Unsubscribe<AddNewTroop>(Handle);
+            messageBroker.Unsubscribe<AddTroopIndex>(Handle);
         }
 
-        private void Handle(MessagePayload<UnitRecruitGranted> obj)
+        private void Handle(MessagePayload<AddNewTroop> obj)
         {
             var payload = obj.What;
 
@@ -44,7 +42,18 @@ namespace GameInterface.Services.MobileParties.Handlers
                 return;
             }
 
-            UnitRecruitPatch.RunOriginalAddToCounts(CharacterObject.Find(payload.CharacterId), payload.Amount, mobileParty, payload.IsPrisonRoster);
+            UnitRecruitPatch.RunOriginalAddNewElement(CharacterObject.Find(payload.CharacterId), mobileParty, payload.IsPrisonRoster, payload.InsertAtFront, payload.InsertionIndex);
+        }
+        private void Handle(MessagePayload<AddTroopIndex> obj)
+        {
+            var payload = obj.What;
+
+            if (objectManager.TryGetObject(payload.PartyId, out MobileParty mobileParty) == false)
+            {
+                Logger.Error("Could not handle TroopIndexAddGranted, PartyId not found: {id}", payload.PartyId);
+                return;
+            }
+            UnitRecruitPatch.RunOriginalAddToCountsAtIndex(mobileParty, payload.IsPrisonerRoster, payload.Index, payload.CountChange, payload.WoundedCountChange, payload.XpChange, payload.RemoveDepleted);
         }
     }
 }

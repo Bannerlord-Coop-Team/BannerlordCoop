@@ -10,23 +10,26 @@ namespace Coop.Core.Server.Services.MobileParties.Messages
     /// Network command for recruited unit
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record NetworkUnitRecruited : ICommand
+    public record NetworkNewTroopAdded : ICommand
     {
         [ProtoMember(1)]
         public string CharacterId;
         [ProtoMember(2)]
-        public int Amount;
-        [ProtoMember(3)]
         public string PartyId;
-        [ProtoMember(4)]
+        [ProtoMember(3)]
         public bool IsPrisonerRoster;
+        [ProtoMember(4)]
+        public bool InsertAtFront;
+        [ProtoMember(5)]
+        public int InsertionIndex;
 
-        public NetworkUnitRecruited(string characterId, int amount, string partyId, bool prisonerRoster)
+        public NetworkNewTroopAdded(string characterId, string partyId, bool isPrisonerRoster, bool insertAtFront, int insertionIndex)
         {
             CharacterId = characterId;
-            Amount = amount;
             PartyId = partyId;
-            IsPrisonerRoster = prisonerRoster;
+            IsPrisonerRoster = isPrisonerRoster;
+            InsertAtFront = insertAtFront;
+            InsertionIndex = insertionIndex;
         }
     }
 }

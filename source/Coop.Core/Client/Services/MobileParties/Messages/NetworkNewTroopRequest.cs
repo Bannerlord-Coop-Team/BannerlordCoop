@@ -10,23 +10,26 @@ namespace Coop.Core.Client.Services.MobileParties.Messages
     /// Request to recruit troops from client
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record NetworkRecruitRequest : ICommand
+    public record NetworkNewTroopRequest : ICommand
     {
         [ProtoMember(1)]
         public string CharacterId;
         [ProtoMember(2)]
-        public int Amount;
-        [ProtoMember(3)]
         public string PartyId;
+        [ProtoMember(3)]
+        public bool IsPrisonRoster;
         [ProtoMember(4)]
-        public bool isPrisonRoster;
+        public bool InsertAtFront;
+        [ProtoMember(5)]
+        public int InsertionIndex;
 
-        public NetworkRecruitRequest(string characterId, int amount, string partyId, bool prisonRoster)
+        public NetworkNewTroopRequest(string characterId, string partyId, bool isPrisonRoster, bool insertAtFront, int insertionIndex)
         {
             CharacterId = characterId;
-            Amount = amount;
             PartyId = partyId;
-            isPrisonRoster = prisonRoster;
+            IsPrisonRoster = isPrisonRoster;
+            InsertAtFront = insertAtFront;
+            InsertionIndex = insertionIndex;
         }
     }
 }

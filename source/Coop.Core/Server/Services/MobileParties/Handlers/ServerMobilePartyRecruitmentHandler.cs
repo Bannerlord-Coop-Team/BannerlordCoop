@@ -22,34 +22,54 @@ namespace Coop.Core.Server.Services.MobileParties.Handlers
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<NetworkRecruitRequest>(Handle);
-            messageBroker.Subscribe<TroopCountChanged>(Handle);
+            messageBroker.Subscribe<NetworkNewTroopRequest>(Handle);
+            messageBroker.Subscribe<NewTroopAdded>(Handle); 
+            messageBroker.Subscribe<NetworkTroopIndexAddRequest>(Handle);
+            messageBroker.Subscribe<TroopIndexAdded>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<NetworkRecruitRequest>(Handle);
-            messageBroker.Unsubscribe<TroopCountChanged>(Handle);
+            messageBroker.Unsubscribe<NetworkNewTroopRequest>(Handle);
+            messageBroker.Unsubscribe<NewTroopAdded>(Handle);
+            messageBroker.Unsubscribe<NetworkTroopIndexAddRequest>(Handle);
+            messageBroker.Unsubscribe<TroopIndexAdded>(Handle);
         }
 
-        internal void Handle(MessagePayload<NetworkRecruitRequest> obj)
+        internal void Handle(MessagePayload<NetworkNewTroopRequest> obj)
         {
             var payload = obj.What;
 
-            var message = new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonRoster);
+            messageBroker.Publish(this, new AddNewTroop(payload.CharacterId, payload.PartyId, payload.IsPrisonRoster, payload.InsertAtFront, payload.InsertionIndex));
 
-            messageBroker.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonRoster));
-
-            network.SendAll(new NetworkUnitRecruited(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonRoster));
+            network.SendAll(new NetworkNewTroopAdded(payload.CharacterId, payload.PartyId, payload.IsPrisonRoster, payload.InsertAtFront, payload.InsertionIndex));
         }
 
-        private void Handle(MessagePayload<TroopCountChanged> obj)
+        private void Handle(MessagePayload<NewTroopAdded> obj)
         {
             var payload = obj.What;
 
-            messageBroker.Publish(this, new UnitRecruitGranted(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonerRoster));
+            messageBroker.Publish(this, new AddNewTroop(payload.CharacterId, payload.PartyId, payload.isPrisonerRoster, payload.InsertAtFront, payload.InsertionIndex));
 
-            network.SendAll(new NetworkUnitRecruited(payload.CharacterId, payload.Amount, payload.PartyId, payload.isPrisonerRoster));
+            network.SendAll(new NetworkNewTroopAdded(payload.CharacterId, payload.PartyId, payload.isPrisonerRoster, payload.InsertAtFront, payload.InsertionIndex));
+        }
+
+        internal void Handle(MessagePayload<NetworkTroopIndexAddRequest> obj)
+        {
+            var payload = obj.What;
+
+            messageBroker.Publish(this, new AddTroopIndex(payload.PartyId, payload.IsPrisonerRoster, payload.Index, payload.CountChange, payload.WoundedCountChange, payload.XpChange, payload.RemoveDepleted));
+
+            network.SendAll(new NetworkTroopIndexAdded(payload.PartyId, payload.IsPrisonerRoster, payload.Index, payload.CountChange, payload.WoundedCountChange, payload.XpChange, payload.RemoveDepleted));
+        }
+
+        private void Handle(MessagePayload<TroopIndexAdded> obj)
+        {
+            var payload = obj.What;
+
+            messageBroker.Publish(this, new AddTroopIndex(payload.PartyId, payload.IsPrisonerRoster, payload.Index, payload.CountChange, payload.WoundedCountChange, payload.XpChange, payload.RemoveDepleted));
+
+            network.SendAll(new NetworkTroopIndexAdded(payload.PartyId, payload.IsPrisonerRoster, payload.Index, payload.CountChange, payload.WoundedCountChange, payload.XpChange, payload.RemoveDepleted));
         }
     }
 }

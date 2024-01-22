@@ -5,20 +5,22 @@ namespace GameInterface.Services.MobileParties.Messages
     /// <summary>
     /// Event sent when player recruits unit
     /// </summary>
-    public record TroopCountChanged : IEvent
+    public record NewTroopAdded : IEvent
     {
         public string CharacterId { get; }
         public string PartyId { get; }
-        public int Amount { get; }
         public bool isPrisonerRoster { get; }
+        public bool InsertAtFront { get; }
+        public int InsertionIndex { get; }
 
 
-        public TroopCountChanged(string characterId, int amount, string partyId, bool prisonerRoster)
+        public NewTroopAdded(string characterId, string partyId, bool prisonerRoster, bool insertAtFront, int insertionIndex)
         {
             CharacterId = characterId;
-            Amount = amount;
             PartyId = partyId;
             isPrisonerRoster = prisonerRoster;
+            InsertAtFront = insertAtFront;
+            InsertionIndex = insertionIndex;
         }
     }
 }
