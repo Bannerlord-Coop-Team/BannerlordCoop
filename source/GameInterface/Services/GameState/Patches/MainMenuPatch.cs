@@ -5,16 +5,13 @@ using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.GameState.Patches;
 
-internal class MainMenuPatch
+[HarmonyPatch(typeof(InitialState))]
+internal class MainMenuEnteredPatch
 {
-    [HarmonyPatch(typeof(InitialState))]
-    class MainMenuEnteredPatch
+    [HarmonyPostfix]
+    [HarmonyPatch("OnActivate")]
+    static void OnActivate(ref InitialState __instance)
     {
-        [HarmonyPostfix]
-        [HarmonyPatch("OnActivate")]
-        static void OnActivate(ref InitialState __instance)
-        {
-            MessageBroker.Instance.Publish(__instance, new MainMenuEntered());
-        }
+        MessageBroker.Instance.Publish(__instance, new MainMenuEntered());
     }
 }

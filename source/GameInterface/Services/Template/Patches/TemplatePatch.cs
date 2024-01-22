@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Template.Messages;
 using TaleWorlds.CampaignSystem;
 
@@ -19,6 +20,9 @@ class TemplatePatch
     {
         // Returning true in a prefix calls the original function (after all other patches)
         if (AllowedThread.IsThisThreadAllowed()) return true;
+
+        // returns true if when the client state is not in Campaign or Mission to allow original calls
+        if (PolicyProvider.AllowOriginalCalls) return true;
 
         // Publishing a message to all internal software is done using the message broker
         // This type of message should be IEvent since it is a reaction to something
