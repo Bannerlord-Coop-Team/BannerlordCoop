@@ -3,7 +3,7 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.CraftingService.Patches;
+namespace GameInterface.Services.MobileParties.Patches;
 
 [HarmonyPatch(typeof(CampaignEvents))]
 internal class HourlyPartyTickServerPatch
