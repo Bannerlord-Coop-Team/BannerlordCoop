@@ -46,7 +46,7 @@ namespace GameInterface.Services.Heroes.Handlers
                 return;
             }
 
-            TakePrisonerActionPatch.RunOriginalApplyInternal(party.Party, hero, payload.IsEventCalled);
+            TakePrisonerPatch.RunOriginalApplyInternal(party.Party, hero, payload.IsEventCalled);
         }
     }
 }

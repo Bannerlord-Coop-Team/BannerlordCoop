@@ -14,7 +14,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Heroes.Patches
 {
     [HarmonyPatch(typeof(TakePrisonerAction))]
-    public class TakePrisonerActionPatch
+    public class TakePrisonerPatch
     {
         private static readonly Action<PartyBase, Hero, bool> ApplyInternal =
             typeof(TakePrisonerAction)
@@ -29,7 +29,7 @@ namespace GameInterface.Services.Heroes.Patches
 
             if (PolicyProvider.AllowOriginalCalls) return true;
 
-            if (ModInformation.IsClient) return false;
+            if (ModInformation.IsClient && prisonerCharacter != Hero.MainHero) return false;
 
             MessageBroker.Instance.Publish(capturerParty, new PrisonerTaken(
                 capturerParty.MobileParty.StringId,

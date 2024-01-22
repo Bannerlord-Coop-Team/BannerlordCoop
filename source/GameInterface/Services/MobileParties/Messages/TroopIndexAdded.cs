@@ -1,10 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 
 namespace GameInterface.Services.MobileParties.Messages
 {
     /// <summary>
     /// Event sent when player recruits unit
     /// </summary>
+    [BatchLogMessage]
     public record TroopIndexAdded : IEvent
     {
         public string PartyId { get; }
