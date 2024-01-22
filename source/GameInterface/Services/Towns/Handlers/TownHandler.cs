@@ -2,7 +2,9 @@
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Messages;
+using GameInterface.Services.Towns.Patches;
 using Serilog;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Towns.Handlers
@@ -42,6 +44,8 @@ namespace GameInterface.Services.Towns.Handlers
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
+
+            TownPatches.ChangeTradeTaxAccumulated(town, obj.TradeTaxAccumulated);
         }
 
         private void HandleChangeTownGarrisonAutoRecruitmentIsEnabled(MessagePayload<ChangeTownGarrisonAutoRecruitmentIsEnabled> payload)
@@ -54,6 +58,8 @@ namespace GameInterface.Services.Towns.Handlers
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
+
+            TownPatches.ChangeTownGarrisonAutoRecruitmentIsEnabled(town, obj.GarrisonAutoRecruitmentIsEnabled);
         }
 
         private void HandleChangeTownInRebelliousState(MessagePayload<ChangeTownInRebelliousState> payload)
@@ -66,6 +72,8 @@ namespace GameInterface.Services.Towns.Handlers
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
+
+            TownPatches.ChangeTownInRebelliousState(town, obj.InRebelliousState);
         }
 
         private void HandleChangeTownLastCapturedBy(MessagePayload<ChangeTownLastCapturedBy> payload)
@@ -78,6 +86,13 @@ namespace GameInterface.Services.Towns.Handlers
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
+            if (objectManager.TryGetObject<Clan>(obj.ClanId, out Clan clan) == false)
+            {
+                Logger.Error("Unable to find Clan ({clanId})", obj.ClanId);
+                return;
+            }
+
+            TownPatches.ChangeTownLastCapturedBy(town, clan);
         }
 
         private void HandleChangeTownSecurity(MessagePayload<ChangeTownSecurity> payload)
@@ -90,6 +105,8 @@ namespace GameInterface.Services.Towns.Handlers
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
+
+            TownPatches.ChangeTownSecurity(town, obj.Security);
         }
 
         private void HandleChangeTownProsperity(MessagePayload<ChangeTownProsperity> payload)
@@ -102,6 +119,8 @@ namespace GameInterface.Services.Towns.Handlers
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
+
+            TownPatches.ChangeTownProsperity(town, obj.Prosperity);
         }
 
         private void HandleChangeTownLoyalty(MessagePayload<ChangeTownLoyalty> payload)
@@ -114,6 +133,8 @@ namespace GameInterface.Services.Towns.Handlers
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
+
+            TownPatches.ChangeTownLoyalty(town, obj.Loyalty);
         }
 
         private void HandleChangeTownGovernor(MessagePayload<ChangeTownGovernor> payload)
@@ -126,6 +147,13 @@ namespace GameInterface.Services.Towns.Handlers
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
+            if (objectManager.TryGetObject<Hero>(obj.GovernorId, out Hero governor) == false)
+            {
+                Logger.Error("Unable to find Hero ({governorId})", obj.GovernorId);
+                return;
+            }
+
+            TownPatches.ChangeTownGovernor(town, governor);
         }
 
         public void Dispose()
