@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Towns.ProtoSerializers;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Towns.Messages
@@ -10,12 +12,12 @@ namespace GameInterface.Services.Towns.Messages
     public record TownSoldItemsChanged : ICommand
     {
         public string TownId { get; }
-        public IEnumerable<Town.SellLog> LogList { get; }
+        public List<SellLogSerializer> LogList { get; }
 
         public TownSoldItemsChanged(string townId, IEnumerable<Town.SellLog> logList)
         {
             TownId = townId;
-            LogList = logList;
+            LogList = logList.Select(sellLog => new SellLogSerializer(sellLog.Number, sellLog.Category.StringId)).ToList();
         }
     }
 }

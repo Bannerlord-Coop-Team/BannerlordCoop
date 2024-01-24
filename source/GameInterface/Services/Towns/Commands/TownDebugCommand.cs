@@ -1,22 +1,29 @@
-﻿using GameInterface.Services.GameDebug.Commands;
+﻿using Common.Extensions;
+using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.Heroes.Commands;
+using GameInterface.Services.ObjectManager.Extensions;
+using GameInterface.Services.Towns.Patches;
+using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
 
 public class TownDebugCommand
 {
+    private static readonly Func<Town, Town.SellLog[]> getSoldItems = typeof(Town).GetField("_soldItems", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Town, Town.SellLog[]>();
 
     /// <summary>
     /// Finds a specific town in game.
     /// </summary>
     /// <param name="townId">string id of the town to search</param>
-    /// <returns>Village or null.</returns>
+    /// <returns>Town or null.</returns>
     public static Town findTown(string townId)
     {
         List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
@@ -25,13 +32,25 @@ public class TownDebugCommand
         return town;
     }
 
+    /// <summary>
+    /// Finds a specific item in game.
+    /// </summary>
+    /// <param name="itemId">string id of the item to search</param>
+    /// <returns>ItemCategory or null.</returns>
+    public static ItemCategory findItem(string itemId)
+    {
+        List<ItemCategory> items = Campaign.Current.ObjectManager.GetObjectsOfType<ItemCategory>().Select(obj => (ItemCategory)obj).ToList();
+        ItemCategory item = items.Find(i => i.StringId == itemId);
+        return item;
+    }
+
     // coop.debug.town.list
     /// <summary>
     /// Lists all the towns
     /// </summary>
     /// <param name="args">actually none are being used..</param>
     /// <returns>strings of all the towns</returns>
-    [CommandLineArgumentFunction("list", "coop.debug.town")]
+    [CommandLineArgumentFunction("list_towns", "coop.debug.town")]
     public static string ListTowns(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
@@ -43,6 +62,27 @@ public class TownDebugCommand
         {
             Town t = settlement.Town;
             stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", t.StringId, t.Name));
+        });
+
+        return stringBuilder.ToString();
+    }
+
+    // coop.debug.town.list
+    /// <summary>
+    /// Lists all the items
+    /// </summary>
+    /// <param name="args">actually none are being used..</param>
+    /// <returns>strings of all the items</returns>
+    [CommandLineArgumentFunction("list_items", "coop.debug.town")]
+    public static string ListItems(List<string> args)
+    {
+        StringBuilder stringBuilder = new StringBuilder();
+
+        List<ItemCategory> items = Campaign.Current.ObjectManager.GetObjectsOfType<ItemCategory>().Select(obj => (ItemCategory)obj).ToList();
+
+        items.ForEach((item) =>
+        {
+            stringBuilder.Append(string.Format("ID: '{0}'\n", item.StringId));
         });
 
         return stringBuilder.ToString();
@@ -73,15 +113,23 @@ public class TownDebugCommand
 
         sb.AppendFormat("ID: '{0}'\n", args[0]);
         sb.AppendFormat("Name: '{0}'\n", town.Name);
-        sb.AppendFormat("Governor: '{0}'\n", town.Governor.Name);
-        sb.AppendFormat("LastCapturedBy: '{0}'\n", town.LastCapturedBy.Name);
+        sb.AppendFormat("Governor: '{0}'\n", (town.Governor != null) ? town.Governor.Name : "null");
+        sb.AppendFormat("LastCapturedBy: '{0}'\n", (town.LastCapturedBy != null) ? town.LastCapturedBy.Name : "null");
         sb.AppendFormat("Prosperity: '{0}'\n", town.Prosperity);
         sb.AppendFormat("Loyalty: '{0}'\n", town.Loyalty);
         sb.AppendFormat("Security: '{0}'\n", town.Security);
         sb.AppendFormat("InRebelliousState: '{0}'\n", town.InRebelliousState);
         sb.AppendFormat("GarrisonAutoRecruitmentIsEnabled: '{0}'\n", town.GarrisonAutoRecruitmentIsEnabled);
         sb.AppendFormat("TradeTaxAccumulated: '{0}'\n", town.TradeTaxAccumulated);
-
+        sb.AppendFormat("Sold Items: \n");
+        Town.SellLog[] logList = getSoldItems(town);
+        if (logList != null)
+        {
+            foreach (Town.SellLog log in logList)
+            {
+                sb.AppendFormat("SellLog: {0} {1}\n", log.Category.StringId, log.Number);
+            }
+        }
         return sb.ToString();
     }
 
@@ -112,7 +160,7 @@ public class TownDebugCommand
 
         if (hero == null)
         {
-            return string.Format("Hero with ID: '{0}' not found", args[0]);
+            return string.Format("Hero with ID: '{0}' not found", args[1]);
         }
 
         town.Governor = hero;
@@ -147,12 +195,63 @@ public class TownDebugCommand
 
         if (clan == null)
         {
-            return string.Format("Clan with ID: '{0}' not found", args[0]);
+            return string.Format("Clan with ID: '{0}' not found", args[1]);
         }
 
         town.LastCapturedBy = clan;
 
-        return string.Format("Town Prosperity has changed to: {0} clan with ID: {1}", clan.Name, clan.StringId);
+        return string.Format("Town LastCapturedBy has changed to: {0} clan with ID: {1}", clan.Name, clan.StringId);
+    }
+
+    /// <summary>
+    /// Adds a number of items to the Town sold items list of a specific Town.
+    /// </summary>
+    /// <param name="args">townID and the itemID to add and a number to add.</param>
+    /// <returns>information if it changed</returns>
+    [CommandLineArgumentFunction("add_item_to_sold_items", "coop.debug.town")]
+    public static string AddToTownSoldItems(List<string> args)
+    {
+        if (ModInformation.IsClient)
+            return "Usage: This command can only be used by the server for debugging purposes.";
+
+        if (args.Count < 3)
+        {
+            return "Usage: coop.debug.town.set_last_captured_by <townId> <itemId> <numberOfItems>";
+        }
+
+        Town town = findTown(args[0]);
+
+        if (town == null)
+        {
+            return string.Format("Town with ID: '{0}' not found", args[0]);
+        }
+
+        ItemCategory item = findItem(args[1]);
+
+        if (item == null)
+        {
+            return string.Format("Item with ID: '{0}' not found", args[1]);
+        }
+
+        if (int.TryParse(args[2], out int numberOfItems))
+        {
+            List<Town.SellLog> newSoldItems = new List<Town.SellLog>(getSoldItems(town));
+            int idx = newSoldItems.FindIndex(log => log.Category == item);
+            if (idx != -1 && idx >= 0 && idx < newSoldItems.Count)
+            {
+                newSoldItems[idx] = new Town.SellLog(item, newSoldItems[idx].Number + numberOfItems);
+            }
+            else
+            {
+                newSoldItems.Add(new Town.SellLog(item, numberOfItems));
+            }
+            town.SetSoldItems(newSoldItems);
+            return string.Format("Added {0} number of {1} to Town SoldItems", numberOfItems, item.StringId);
+        }
+        else
+        {
+            return string.Format("Argument3: {0} is not an integer.", args[2]);
+        }
     }
 
     /// <summary>
@@ -284,6 +383,7 @@ public class TownDebugCommand
         if (bool.TryParse(args[1], out bool inRebelliousState))
         {
             town.InRebelliousState = inRebelliousState;
+            TownPatches.PublishTownInRebelliousStateChanged(town, town.InRebelliousState);
             return string.Format("Town InRebelliousState has changed to: {0}.", inRebelliousState);
         }
         else
@@ -318,6 +418,7 @@ public class TownDebugCommand
         if (bool.TryParse(args[1], out bool garrisonAutoRecruitmentIsEnabled))
         {
             town.GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
+            TownPatches.PublishTownGarrisonAutoRecruitmentIsEnabledChanged(town, town.GarrisonAutoRecruitmentIsEnabled);
             return string.Format("Town GarrisonAutoRecruitmentIsEnabled has changed to: {0}.", garrisonAutoRecruitmentIsEnabled);
         }
         else

@@ -216,6 +216,29 @@ namespace GameInterface.Services.Towns.Patches
             MessageBroker.Instance.Publish(__instance, message);
             return true;
         }
+
+        public static void ChangeSetSoldItems(Town town, IEnumerable<Town.SellLog> logList)
+        {
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                using (new AllowedThread())
+                {
+                    town.SetSoldItems(logList);
+                }
+            });
+        }
+
+        public static void PublishTownInRebelliousStateChanged(Town town, bool rebelliousState)
+        {
+            var message = new TownInRebelliousStateChanged(town.StringId, rebelliousState);
+            MessageBroker.Instance.Publish(town, message);
+        }
+
+        public static void PublishTownGarrisonAutoRecruitmentIsEnabledChanged(Town town, bool garrisonAutoRecruitmentIsEnabled)
+        {
+            var message = new TownGarrisonAutoRecruitmentIsEnabledChanged(town.StringId, garrisonAutoRecruitmentIsEnabled);
+            MessageBroker.Instance.Publish(town, message);
+        }
     }
 
     [HarmonyPatch(typeof(ClanVariablesCampaignBehavior))]
@@ -233,8 +256,7 @@ namespace GameInterface.Services.Towns.Patches
                     {
                         Town town = settlement.Town.GarrisonParty.CurrentSettlement.Town;
                         town.GarrisonAutoRecruitmentIsEnabled = true;
-                        var message = new TownGarrisonAutoRecruitmentIsEnabledChanged(town.StringId, town.GarrisonAutoRecruitmentIsEnabled);
-                        MessageBroker.Instance.Publish(town, message);
+                        TownPatches.PublishTownGarrisonAutoRecruitmentIsEnabledChanged(town, town.GarrisonAutoRecruitmentIsEnabled);
                     }
                 }
             }
@@ -250,8 +272,7 @@ namespace GameInterface.Services.Towns.Patches
         private static void ApplyRebellionConsequencesToSettlementPostfix(Settlement settlement)
         {
             Town town = settlement.Town;
-            var message = new TownInRebelliousStateChanged(town.StringId, town.InRebelliousState);
-            MessageBroker.Instance.Publish(town, message);
+            TownPatches.PublishTownInRebelliousStateChanged(town, town.InRebelliousState);
         }
     }
 
@@ -263,8 +284,7 @@ namespace GameInterface.Services.Towns.Patches
         [HarmonyPostfix]
         private static void TownRebelliousStateChangedPostfix(Town town, bool rebelliousState)
         {
-            var message = new TownInRebelliousStateChanged(town.StringId, rebelliousState);
-            MessageBroker.Instance.Publish(town, message);
+            TownPatches.PublishTownInRebelliousStateChanged(town, rebelliousState);
         }
     }
 

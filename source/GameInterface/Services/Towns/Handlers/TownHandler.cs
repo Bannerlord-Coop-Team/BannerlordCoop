@@ -4,8 +4,12 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Messages;
 using GameInterface.Services.Towns.Patches;
 using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Towns.Handlers
 {
@@ -32,6 +36,31 @@ namespace GameInterface.Services.Towns.Handlers
             messageBroker.Subscribe<ChangeTownInRebelliousState>(HandleChangeTownInRebelliousState);
             messageBroker.Subscribe<ChangeTownGarrisonAutoRecruitmentIsEnabled>(HandleChangeTownGarrisonAutoRecruitmentIsEnabled);
             messageBroker.Subscribe<ChangeTownTradeTaxAccumulated>(HandleChangeTownTradeTaxAccumulated);
+            messageBroker.Subscribe<ChangeTownSoldItems>(HandleChangeTownSoldItems);
+        }
+
+        private void HandleChangeTownSoldItems(MessagePayload<ChangeTownSoldItems> payload)
+        {
+            var obj = payload.What;
+
+
+            if (objectManager.TryGetObject<Town>(obj.TownId, out Town town) == false)
+            {
+                Logger.Error("Unable to find Town ({townId})", obj.TownId);
+                return;
+            }
+            List<Town.SellLog> sellLogs = new List<Town.SellLog>();
+            obj.LogList.ForEach(s =>
+            {
+                if (objectManager.TryGetObject<ItemCategory>(s.CategoryID, out ItemCategory itemCategory) == false)
+                {
+                    Logger.Error("Unable to find ItemCategory ({itemCategoryId})", s.CategoryID);
+                    return;
+                }
+                sellLogs.Add(new Town.SellLog(itemCategory,s.Number));
+            });
+
+            TownPatches.ChangeSetSoldItems(town, sellLogs);
         }
 
         private void HandleChangeTownTradeTaxAccumulated(MessagePayload<ChangeTownTradeTaxAccumulated> payload)
@@ -166,6 +195,7 @@ namespace GameInterface.Services.Towns.Handlers
             messageBroker.Unsubscribe<ChangeTownInRebelliousState>(HandleChangeTownInRebelliousState);
             messageBroker.Unsubscribe<ChangeTownGarrisonAutoRecruitmentIsEnabled>(HandleChangeTownGarrisonAutoRecruitmentIsEnabled);
             messageBroker.Unsubscribe<ChangeTownTradeTaxAccumulated>(HandleChangeTownTradeTaxAccumulated);
+            messageBroker.Unsubscribe<ChangeTownSoldItems>(HandleChangeTownSoldItems);
         }
     }
 }

@@ -2,6 +2,8 @@
 using Common.Network;
 using Coop.Core.Server.Services.Towns.Messages;
 using GameInterface.Services.Towns.Messages;
+using System;
+using System.Linq;
 
 namespace Coop.Core.Server.Services.Towns.Handlers
 {
@@ -24,6 +26,16 @@ namespace Coop.Core.Server.Services.Towns.Handlers
             messageBroker.Subscribe<TownInRebelliousStateChanged>(HandleTownInRebelliousState);
             messageBroker.Subscribe<TownLastCapturedByChanged>(HandleTownLastCapturedBy);
             messageBroker.Subscribe<TownGarrisonAutoRecruitmentIsEnabledChanged>(HandleTownGarrisonAutoRecruitmentIsEnabled);
+            messageBroker.Subscribe<TownSoldItemsChanged>(HandleTownSoldItems);
+        }
+
+        private void HandleTownSoldItems(MessagePayload<TownSoldItemsChanged> obj)
+        {
+            TownSoldItemsChanged townSoldItemsChanged = obj.What;
+
+            // Broadcast to all the clients that the state was changed
+            NetworkChangeTownSoldItems networkChangeTownSoldItems = new NetworkChangeTownSoldItems(townSoldItemsChanged.TownId, townSoldItemsChanged.LogList);
+            network.SendAll(networkChangeTownSoldItems);
         }
 
         private void HandleTownGarrisonAutoRecruitmentIsEnabled(MessagePayload<TownGarrisonAutoRecruitmentIsEnabledChanged> obj)
@@ -109,6 +121,7 @@ namespace Coop.Core.Server.Services.Towns.Handlers
             messageBroker.Unsubscribe<TownInRebelliousStateChanged>(HandleTownInRebelliousState);
             messageBroker.Unsubscribe<TownLastCapturedByChanged>(HandleTownLastCapturedBy);
             messageBroker.Unsubscribe<TownGarrisonAutoRecruitmentIsEnabledChanged>(HandleTownGarrisonAutoRecruitmentIsEnabled);
+            messageBroker.Unsubscribe<TownSoldItemsChanged>(HandleTownSoldItems);
         }
     }
 }
