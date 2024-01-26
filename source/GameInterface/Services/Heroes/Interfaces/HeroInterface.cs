@@ -20,6 +20,8 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -193,11 +195,20 @@ internal class HeroInterface : IHeroInterface
         partyBase.SetVisualAsDirty();
     }
 
+    private static MethodInfo TroopRoster_VersionNo => typeof(TroopRoster).GetProperty("VersionNo", BindingFlags.Instance | BindingFlags.Public).GetSetMethod(true);
+    private static readonly Action<TroopRoster, int> TroopRoster_VersionNo_Setter = TroopRoster_VersionNo.BuildDelegate<Action<TroopRoster, int>>();
+    private static FieldInfo TroopRoster_troopRosterElements => typeof(TroopRoster).GetField("_troopRosterElements", BindingFlags.Instance | BindingFlags.NonPublic);
+
     private void SetupNewParty(Hero hero)
     {
         var party = hero.PartyBelongedTo;
         party.IsVisible = true;
         party.Party.SetVisualAsDirty();
+
+        TroopRoster_VersionNo_Setter(party.MemberRoster, 1);
+        TroopRoster_VersionNo_Setter(party.PrisonRoster, 1);
+        TroopRoster_troopRosterElements.SetValue(party.MemberRoster, new MBList<TroopRosterElement> { });
+        TroopRoster_troopRosterElements.SetValue(party.PrisonRoster, new MBList<TroopRosterElement> { });
 
         typeof(MobileParty).GetMethod("RecoverPositionsForNavMeshUpdate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party, null);
         typeof(MobileParty).GetProperty("CurrentNavigationFace").SetValue(
