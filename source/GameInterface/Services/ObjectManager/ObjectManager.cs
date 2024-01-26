@@ -22,7 +22,7 @@ public interface IObjectManager
     bool AddNewObject(object obj, out string newId);
 }
 
-internal class MBObjectManagerAdapter : IObjectManager
+internal class ObjectManager : IObjectManager
 {
     private MBObjectManager objectManager => MBObjectManager.Instance;
 
@@ -30,7 +30,7 @@ internal class MBObjectManagerAdapter : IObjectManager
     private readonly IMobilePartyRegistry partyRegistry;
     private readonly IClanRegistry clanRegistry;
 
-    public MBObjectManagerAdapter(
+    public ObjectManager(
         IHeroRegistry heroRegistry,
         IMobilePartyRegistry partyRegistry, 
         IClanRegistry clanRegistry)
