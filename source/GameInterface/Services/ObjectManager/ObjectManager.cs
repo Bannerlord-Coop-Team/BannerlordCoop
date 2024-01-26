@@ -1,9 +1,8 @@
-﻿using Common.Extensions;
-using GameInterface.Services.Clans;
+﻿using GameInterface.Services.Clans;
 using GameInterface.Services.MobileParties;
+using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -14,14 +13,49 @@ namespace GameInterface.Services.ObjectManager;
 
 public interface IObjectManager
 {
+    /// <summary>
+    /// Determins if an object is stored in the object manager
+    /// </summary>
+    /// <param name="obj">Object to check if stored</param>
+    /// <returns>True if stored, false if not</returns>
     bool Contains(object obj);
+
+    /// <summary>
+    /// Determins if an StringId is stored in the object manager
+    /// </summary>
+    /// <param name="id">StringId to check if stored</param>
+    /// <returns>True if stored, false if not</returns>
     bool Contains(string id);
-    bool TryGetId(object obj, out string id);
-    bool TryGetObject<T>(string id, out T obj);
+
+    /// <summary>
+    /// Attempts to get an object using a StringId and object type
+    /// </summary>
+    /// <typeparam name="T">Type of object</typeparam>
+    /// <param name="id">StringId used to lookup object</param>
+    /// <param name="obj">Out parameter for the object</param>
+    /// <returns>True if successful, false if failed</returns>
+    bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase;
+
+    /// <summary>
+    /// Add an object with already existing StringId
+    /// </summary>
+    /// <param name="id">Id to assosiate with object</param>
+    /// <param name="obj">Object to assosiate with id</param>
+    /// <returns>True if successful, false if failed</returns>
     bool AddExisting(string id, object obj);
+
+    /// <summary>
+    /// Adds an object without a registered StringId
+    /// </summary>
+    /// <param name="obj">Object to register</param>
+    /// <param name="newId">Newly created StringId</param>
+    /// <returns>True if successful, false if failed</returns>
     bool AddNewObject(object obj, out string newId);
 }
 
+/// <summary>
+/// Ground truth for storing and retreiving object and ids
+/// </summary>
 internal class ObjectManager : IObjectManager
 {
     private MBObjectManager objectManager => MBObjectManager.Instance;
@@ -80,15 +114,17 @@ internal class ObjectManager : IObjectManager
         };
     }
 
-    private bool AddNewObjectInternal<T>(T obj, out string id) where T : MBObjectBase
+
+    private static readonly MethodInfo RegisterObject = typeof(MBObjectManager)
+        .GetMethod(nameof(MBObjectManager.RegisterObject));
+    private bool AddNewObjectInternal(object obj, out string id)
     {
         id = null;
 
-        T registeredObject = objectManager?.RegisterObject(obj);
+        if (objectManager == null) return false;
+        if (obj is MBObjectBase mbObject == false) return false;
 
-        if (registeredObject == null) return false;
-
-        id = registeredObject.StringId;
+        RegisterObject.MakeGenericMethod(obj.GetType()).Invoke(objectManager, new object[] { mbObject });
 
         return true;
     }
@@ -128,9 +164,7 @@ internal class ObjectManager : IObjectManager
             return true;
         }
 
-        var adapterList = new ObjectTypeRecordsFacade(objectManager);
-
-        return adapterList.Contains(id);
+        return objectManager.Contains(id);
     }
 
     public bool TryGetId(object obj, out string id)
@@ -145,7 +179,9 @@ internal class ObjectManager : IObjectManager
         return true;
     }
 
-    public bool TryGetObject(string id, out object obj)
+    private static readonly MethodInfo GetObject = typeof(MBObjectManager)
+        .GetMethod(nameof(MBObjectManager.GetObject), new Type[] { typeof(string) });
+    public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
     {
         obj = default;
 
@@ -154,152 +190,24 @@ internal class ObjectManager : IObjectManager
 
         if (partyRegistry.TryGetValue(id, out MobileParty party))
         {
-            obj = party;
-            return true;
+            obj = party as T;
+            return obj != null;
         }
 
         if (heroRegistry.TryGetValue(id, out Hero hero))
         {
-            obj = hero;
-            return true;
+            obj = hero as T;
+            return obj != null;
         }
 
         if (clanRegistry.TryGetValue(id, out Clan clan))
         {
-            obj = clan;
-            return true;
+            obj = clan as T;
+            return obj != null;
         }
 
-        MBObjectBase castedResult;
-
-        var result = TryGetObjectInternal(id, out castedResult);
-
-        obj = castedResult;
-
-        return result;
-    }
-
-    public bool TryGetObject<T>(string id, out T obj)
-    {
-        obj = default;
-
-        if(TryGetObject(id, out object resolvedObj))
-        {
-            if (resolvedObj is T castedObj == false) return false;
-
-            obj = castedObj;
-            return true;
-        }
-
-        return false;
-    }
-
-    private bool TryGetObjectInternal<T>(string id, out T obj) where T : MBObjectBase
-    {
-        obj = default;
-
-        if (string.IsNullOrEmpty(id)) return false;
-
-        obj = objectManager.GetObject<T>(id);
+        obj = (T)GetObject.MakeGenericMethod(typeof(T)).Invoke(objectManager, new object[] { id });
 
         return obj != null;
-    }
-}
-
-internal class ObjectTypeRecordsFacade
-{
-    private static readonly Type ObjectTypeRecordType = typeof(MBObjectManager).GetNestedType("ObjectTypeRecord`1", BindingFlags.NonPublic);
-
-    private readonly Dictionary<Type, ObjectTypeRecordFacade> records = new Dictionary<Type, ObjectTypeRecordFacade>();
-
-    private readonly Func<MBObjectManager, IEnumerable<object>> ObjectTypeRecordsGetter = typeof(MBObjectManager)
-        .GetField("ObjectTypeRecords", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildUntypedGetter<MBObjectManager, IEnumerable<object>>();
-    private readonly MBObjectManager objectManager;
-
-    private IEnumerable<ObjectTypeRecordFacade> objectTypeRecords { get
-        {
-            UpdateRecords();
-            return records.Values;
-        } 
-    }
-
-    public ObjectTypeRecordsFacade(MBObjectManager objectManager) 
-    {
-        this.objectManager = objectManager;
-
-        UpdateRecords();
-    }
-
-    private void UpdateRecords()
-    {
-        foreach (var obj in ObjectTypeRecordsGetter(objectManager))
-        {
-            var type = obj.GetType();
-
-            if (type != ObjectTypeRecordType) continue;
-
-            var handledType = type.GetGenericArguments()[0];
-
-            if (records.ContainsKey(handledType))
-            {
-                if (records[handledType] == obj) continue;
-
-                records[handledType] = new ObjectTypeRecordFacade(obj);
-            }
-
-            records.Add(handledType, new ObjectTypeRecordFacade(obj));
-        }
-    }
-
-    public bool Contains(string id)
-    {
-        return objectTypeRecords.Any(objectTypeRecord => objectTypeRecord.ContainsObject(id));
-    }
-}
-
-internal class ObjectTypeRecordFacade
-{
-    private static readonly Type ObjectTypeRecordType = typeof(MBObjectManager).GetNestedType("ObjectTypeRecord`1", BindingFlags.NonPublic);
-
-    private readonly WeakReference refObjectTypeRecord;
-
-    private readonly Func<object, string, bool> ContainsObjectDelegate;
-
-    public object ObjectTypeRecord 
-    { 
-        get
-        {
-            if (refObjectTypeRecord.IsAlive == false)
-            {
-                return null;
-            }
-
-            return refObjectTypeRecord.Target;
-        } 
-    }
-
-    public ObjectTypeRecordFacade(object objectTypeRecord)
-    {
-        this.refObjectTypeRecord = new WeakReference(objectTypeRecord);
-
-        Type type = objectTypeRecord.GetType();
-
-        if (type.GetGenericTypeDefinition() != ObjectTypeRecordType)
-        {
-            throw new ArgumentException($"Type {type} was not of expected type {ObjectTypeRecordType}");
-        }
-
-        ContainsObjectDelegate = (Func<object, string, bool>)type
-            .GetMethod("ContainsObject")
-            .CreateDelegate(type);
-    }
-
-    public bool ContainsObject(string id)
-    {
-        var objectTypeRecord = ObjectTypeRecord;
-        if (objectTypeRecord == null) return false;
-
-        return ContainsObjectDelegate(objectTypeRecord, id);
     }
 }

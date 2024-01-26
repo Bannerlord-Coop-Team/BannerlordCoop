@@ -4,7 +4,9 @@ using Common.Logging;
 using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Extensions;
@@ -18,9 +20,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.Library;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -41,29 +40,38 @@ internal class HeroInterface : IHeroInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
     private readonly IObjectManager objectManager;
+    private readonly IClanRegistry clanRegistry;
+    private readonly IMobilePartyRegistry mobilePartyRegistry;
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IHeroRegistry heroRegistry;
     private readonly IControlledEntityRegistry entityRegistry;
 
     private static PropertyInfo Campaign_PlayerClan => typeof(Campaign).GetProperty("PlayerDefaultFaction", BindingFlags.Instance | BindingFlags.NonPublic);
 
+
     public HeroInterface(
-        IObjectManager objectManager,
+        IClanRegistry clanRegistry,
+        IMobilePartyRegistry mobilePartyRegistry,
         IBinaryPackageFactory binaryPackageFactory,
         IHeroRegistry heroRegistry,
-        IControlledEntityRegistry entityRegistry)
+        IControlledEntityRegistry entityRegistry,
+        IObjectManager objectManager)
     {
         this.objectManager = objectManager;
+        this.clanRegistry = clanRegistry;
+        this.mobilePartyRegistry = mobilePartyRegistry;
         this.binaryPackageFactory = binaryPackageFactory;
         this.heroRegistry = heroRegistry;
         this.entityRegistry = entityRegistry;
+        this.objectManager = objectManager;
     }
 
     public byte[] PackageMainHero()
     {
         Hero.MainHero.StringId = string.Empty;
         Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
-        Hero.MainHero.Clan.StringId = $"CoopClan_{Guid.NewGuid()}";
+        //Hero.MainHero.Clan.StringId = $"CoopClan_{Guid.NewGuid()}";
+        Hero.MainHero.Clan.StringId = string.Empty;
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
@@ -160,9 +168,9 @@ internal class HeroInterface : IHeroInterface
         .BuildDelegate<Action<CampaignObjectManager, Clan>>();
     private void SetupHeroWithObjectManagers(Hero hero)
     {
-        objectManager.AddNewObject(hero, out string heroId);
-        objectManager.AddNewObject(hero.PartyBelongedTo, out string partyId);
-        objectManager.AddNewObject(hero.Clan, out string clanId);
+        objectManager.AddNewObject(hero, out var _);
+        objectManager.AddNewObject(hero.PartyBelongedTo, out var _);
+        objectManager.AddNewObject(hero.Clan, out var _);
 
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
         if (campaignObjectManager == null)
@@ -185,21 +193,11 @@ internal class HeroInterface : IHeroInterface
         partyBase.SetVisualAsDirty();
     }
 
-    private static MethodInfo TroopRoster_VersionNo => typeof(TroopRoster).GetProperty("VersionNo", BindingFlags.Instance | BindingFlags.Public).GetSetMethod(true);
-    private static readonly Action<TroopRoster, int> TroopRoster_VersionNo_Setter = TroopRoster_VersionNo.BuildDelegate<Action<TroopRoster, int>>();
-    private static FieldInfo TroopRoster_troopRosterElements => typeof(TroopRoster).GetField("_troopRosterElements", BindingFlags.Instance | BindingFlags.NonPublic);
-
-
     private void SetupNewParty(Hero hero)
     {
         var party = hero.PartyBelongedTo;
         party.IsVisible = true;
         party.Party.SetVisualAsDirty();
-
-        TroopRoster_VersionNo_Setter(party.MemberRoster, 1);
-        TroopRoster_VersionNo_Setter(party.PrisonRoster, 1);
-        TroopRoster_troopRosterElements.SetValue(party.MemberRoster, new MBList<TroopRosterElement> { });
-        TroopRoster_troopRosterElements.SetValue(party.PrisonRoster, new MBList<TroopRosterElement> { });
 
         typeof(MobileParty).GetMethod("RecoverPositionsForNavMeshUpdate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party, null);
         typeof(MobileParty).GetProperty("CurrentNavigationFace").SetValue(
