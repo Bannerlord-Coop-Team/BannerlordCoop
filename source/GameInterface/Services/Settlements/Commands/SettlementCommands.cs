@@ -3,6 +3,8 @@ using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.Serialization;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -43,5 +45,51 @@ internal class SettlementCommands
             return $"{settlementId} was in object manager but was not of type Settlement";
 
         return $"Settlement Name: {settlement.Name}";
+    }
+
+    // Located in Modules\SandBox\ModuleData\settlements.xml
+    // POROS EXAMPLE
+    // coop.debug.settlements.info town_ES3 
+    /// <summary>
+    /// Gives a bunch of information on a settlement.
+    /// </summary>
+    /// <param name="args">settlement name</param>
+    /// <returns>info about the settlement</returns>
+    [CommandLineArgumentFunction("info", "coop.debug.settlements")]
+    public static string Info(List<string> args)
+    {
+
+        if (args.Count != 1) return "Invalid usage, expected \"info <settlment id>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+
+        var objectManager = container.Resolve<IObjectManager>();
+
+        string settlementId = args.Single();
+
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+            return $"Settlement: {settlementId} was not found.";
+
+        StringBuilder sb = new();
+
+        string lastAttackerParty = settlement.LastAttackerParty?.ArmyName.ToString() ?? "None";
+
+        sb.AppendLine($"------------------- SETTLEMENT: {settlement.Name} -------------------");
+        sb.AppendLine($"NumberOfEnemiesSpottedAround: '{settlement.NumberOfEnemiesSpottedAround}'");
+        sb.AppendLine($"NumberOfAlliesSpottedAround: '{settlement.NumberOfAlliesSpottedAround}'");
+        sb.AppendLine($"BribePaid: {Convert.ToBoolean(settlement.BribePaid)}");
+        sb.AppendLine($"SettlementHitPoints: '{settlement.SettlementHitPoints}'");
+        sb.AppendLine($"GarrisonWagePaymentLimit: '{settlement.GarrisonWagePaymentLimit}'");
+        sb.AppendLine($"LastAttackerParty: '{lastAttackerParty}'");
+        sb.AppendLine($"LastThreatTime:  '{settlement.LastThreatTime}'");
+        sb.AppendLine($"CurrentSiegeState:   '{settlement.CurrentSiegeState}'");
+        sb.AppendLine($"Militia :   '{settlement.Militia}'");
+        sb.AppendLine($"LastVisitTimeOfOwner  :   '{settlement.LastVisitTimeOfOwner}'");
+        sb.AppendLine($"ClaimedBy   :   '{settlement.ClaimedBy}'");
+        sb.AppendLine($"ClaimValue    :   '{settlement.ClaimValue}'");
+        sb.AppendLine($"CanBeClaimed     :   '{Convert.ToBoolean(settlement.CanBeClaimed)}'");
+        sb.AppendLine($"------------------- SETTLEMENT: {settlement.Name} -------------------");
+
+        return sb.ToString();
     }
 }
