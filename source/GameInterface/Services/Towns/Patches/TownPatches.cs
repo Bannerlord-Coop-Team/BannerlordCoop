@@ -4,11 +4,11 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Towns.Messages;
 using HarmonyLib;
-using Helpers;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Towns.Patches
@@ -227,87 +227,93 @@ namespace GameInterface.Services.Towns.Patches
                 }
             });
         }
-
-        public static void PublishTownInRebelliousStateChanged(Town town, bool rebelliousState)
-        {
-            var message = new TownInRebelliousStateChanged(town.StringId, rebelliousState);
-            MessageBroker.Instance.Publish(town, message);
-        }
-
-        public static void PublishTownGarrisonAutoRecruitmentIsEnabledChanged(Town town, bool garrisonAutoRecruitmentIsEnabled)
-        {
-            var message = new TownGarrisonAutoRecruitmentIsEnabledChanged(town.StringId, garrisonAutoRecruitmentIsEnabled);
-            MessageBroker.Instance.Publish(town, message);
-        }
     }
 
     [HarmonyPatch(typeof(ClanVariablesCampaignBehavior))]
-    internal class ClanVariablesCampaignBehaviorPatches
+    internal class UpdateClanSettlementAutoRecruitmentPatches
     {
+        private static FieldInfo GarrisonAutoRecruitmentIsEnabled => typeof(Town).GetField(nameof(Town.GarrisonAutoRecruitmentIsEnabled));
+        private static MethodInfo PublishTownGarrisonAutoRecruitmentIsEnabledChangedMethod => typeof(UpdateClanSettlementAutoRecruitmentPatches).GetMethod("PublishTownGarrisonAutoRecruitmentIsEnabledChanged", BindingFlags.Static | BindingFlags.NonPublic);
+        
         [HarmonyPatch("UpdateClanSettlementAutoRecruitment")]
-        [HarmonyPrefix]
-        private static bool UpdateClanSettlementAutoRecruitment(Clan clan)
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> UpdateClanSettlementAutoRecruitment(IEnumerable<CodeInstruction> instructions)
         {
-            if (clan.MapFaction != null && clan.MapFaction.IsKingdomFaction)
+            foreach(var instruction in instructions)
             {
-                foreach (Settlement settlement in clan.Settlements)
+                // Replaces stfld     bool TaleWorlds.CampaignSystem.Settlements.Town::GarrisonAutoRecruitmentIsEnabled
+                // With calling PublishTownInRebelliousStateChanged
+                if (instruction.opcode == OpCodes.Stfld && 
+                    instruction.operand as FieldInfo == GarrisonAutoRecruitmentIsEnabled)
                 {
-                    if (settlement.IsFortification && settlement.Town.GarrisonParty != null && !settlement.Town.GarrisonAutoRecruitmentIsEnabled)
-                    {
-                        Town town = settlement.Town.GarrisonParty.CurrentSettlement.Town;
-                        town.GarrisonAutoRecruitmentIsEnabled = true;
-                        TownPatches.PublishTownGarrisonAutoRecruitmentIsEnabledChanged(town, town.GarrisonAutoRecruitmentIsEnabled);
-                    }
+                    yield return new CodeInstruction(OpCodes.Call, PublishTownGarrisonAutoRecruitmentIsEnabledChangedMethod);
+                }
+                else
+                {
+                    yield return instruction;
                 }
             }
-            return false;
+        }
+
+        internal static void PublishTownGarrisonAutoRecruitmentIsEnabledChanged(Town town, bool garrisonAutoRecruitmentIsEnabled)
+        {
+            // Allow setting if original call exists
+            if (PolicyProvider.AllowOriginalCalls)
+            {
+                town.GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
+                return;
+            }
+
+            if (ModInformation.IsClient) return;
+            if (town.GarrisonAutoRecruitmentIsEnabled == garrisonAutoRecruitmentIsEnabled) return;
+
+            town.GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
+            var message = new TownGarrisonAutoRecruitmentIsEnabledChanged(town.StringId, garrisonAutoRecruitmentIsEnabled);
+            MessageBroker.Instance.Publish(town, message);
         }
     }
 
     [HarmonyPatch(typeof(RebellionsCampaignBehavior))]
     internal class RebellionsCampaignBehaviorPatches
     {
+        private static FieldInfo InRebelliousState => typeof(Town).GetField(nameof(Town.InRebelliousState));
+        private static MethodInfo PublishTownInRebelliousStateChangedMethod => typeof(RebellionsCampaignBehaviorPatches).GetMethod("PublishTownInRebelliousStateChanged", BindingFlags.Static | BindingFlags.NonPublic);
+
+        [HarmonyPatch("CheckAndSetTownRebelliousState")]
         [HarmonyPatch("ApplyRebellionConsequencesToSettlement")]
-        [HarmonyPostfix]
-        private static void ApplyRebellionConsequencesToSettlementPostfix(Settlement settlement)
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> ApplyRebellionConsequencesToSettlementPostfix(IEnumerable<CodeInstruction> instructions)
         {
-            Town town = settlement.Town;
-            TownPatches.PublishTownInRebelliousStateChanged(town, town.InRebelliousState);
+            foreach (var instruction in instructions)
+            {
+                // Replaces stfld     bool TaleWorlds.CampaignSystem.Settlements.Town::InRebelliousState
+                // With calling PublishTownInRebelliousStateChanged
+                if (instruction.opcode == OpCodes.Stfld &&
+                    instruction.operand as FieldInfo == InRebelliousState)
+                {
+                    yield return new CodeInstruction(OpCodes.Call, PublishTownInRebelliousStateChangedMethod);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
         }
-    }
 
-
-    [HarmonyPatch(typeof(CampaignEvents))]
-    internal class CampaignEventsPatches
-    {
-        [HarmonyPatch("TownRebelliousStateChanged")]
-        [HarmonyPostfix]
-        private static void TownRebelliousStateChangedPostfix(Town town, bool rebelliousState)
+        internal static void PublishTownInRebelliousStateChanged(Town town, bool rebelliousState)
         {
-            TownPatches.PublishTownInRebelliousStateChanged(town, rebelliousState);
-        }
-    }
+            if (PolicyProvider.AllowOriginalCalls)
+            {
+                town.InRebelliousState = rebelliousState;
+                return;
+            }
 
+            if (ModInformation.IsClient) return;
+            if (town.InRebelliousState == rebelliousState) return;
 
-    [HarmonyPatch(typeof(DefaultSettlementProsperityModel))]
-    internal class DefaultSettlementProsperityModelPatches
-    {
-        [HarmonyPatch(nameof(DefaultSettlementProsperityModel.CalculateProsperityChange))]
-        [HarmonyPrefix]
-        private static bool CalculateProsperityChangePatch()
-        {
-            return false;
-        }
-    }
-
-    [HarmonyPatch(typeof(BuildingHelper))]
-    internal class BuilderHelperPatches
-    {
-        [HarmonyPatch("AddDefaultDailyBonus")]
-        [HarmonyPrefix]
-        private static bool AddDefaultDailyBonusPatch()
-        {
-            return false;
+            town.InRebelliousState = rebelliousState;
+            var message = new TownInRebelliousStateChanged(town.StringId, rebelliousState);
+            MessageBroker.Instance.Publish(town, message);
         }
     }
 }

@@ -8,18 +8,6 @@ namespace GameInterface.Services.Heroes.Commands
 {
     public class HeroDebugCommand
     {
-        /// <summary>
-        /// Finds a specific alive hero in game.
-        /// </summary>
-        /// <param name="heroId">string id of the hero to search</param>
-        /// <returns>Hero or null.</returns>
-        public static Hero findHero(string heroId)
-        {
-            List<Hero> heroes = Campaign.Current.CampaignObjectManager.AliveHeroes.ToList();
-            Hero hero = heroes.Find(h => h.StringId == heroId);
-            return hero;
-        }
-
         // coop.debug.clan.list
         /// <summary>
         /// Lists all the heroes

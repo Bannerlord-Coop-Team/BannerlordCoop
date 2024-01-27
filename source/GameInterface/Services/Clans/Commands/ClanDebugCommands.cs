@@ -10,18 +10,6 @@ namespace GameInterface.Services.GameDebug.Commands
 {
     public class ClanDebugCommands
     {
-        /// <summary>
-        /// Finds a specific clan in game.
-        /// </summary>
-        /// <param name="clanId">string id of the clan to search</param>
-        /// <returns>Clan or null.</returns>
-        public static Clan findClan(string clanId)
-        {
-            List<Clan> clans = Campaign.Current.CampaignObjectManager.Clans.ToList();
-            Clan clan = clans.Find(c => c.StringId == clanId);
-            return clan;
-        }
-
         // coop.debug.clan.list
         /// <summary>
         /// Lists all the clans

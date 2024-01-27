@@ -2,11 +2,14 @@
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
+using GameInterface.Services.Settlements;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ObjectManager;
@@ -179,6 +182,19 @@ internal class ObjectManager : IObjectManager
         return true;
     }
 
+    // TODO refactor
+    private readonly Dictionary<Type, Delegate> BranchLookup = new Dictionary<Type, Delegate>()
+    {
+        { typeof(Hideout), Delegate.CreateDelegate(typeof(GetObjectDelegate), null, typeof(ObjectManager).GetMethod(nameof(TryGetHideout))) }
+    };
+
+    private static readonly HashSet<Type> SettlementTypes = new HashSet<Type>()
+    {
+        typeof(Town),
+        typeof(Village),
+        typeof(Hideout)
+    };
+
     private static readonly MethodInfo GetObject = typeof(MBObjectManager)
         .GetMethod(nameof(MBObjectManager.GetObject), new Type[] { typeof(string) });
     public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
@@ -187,6 +203,7 @@ internal class ObjectManager : IObjectManager
 
         if (string.IsNullOrEmpty(id)) return false;
         if (objectManager == null) return false;
+
 
         if (partyRegistry.TryGetValue(id, out MobileParty party))
         {
@@ -206,8 +223,59 @@ internal class ObjectManager : IObjectManager
             return obj != null;
         }
 
+        if (BranchLookup.TryGetValue(typeof(T), out var @delegate))
+        {
+            return (bool)@delegate.DynamicInvoke(this, id, obj);
+        }
+
+
         obj = (T)GetObject.MakeGenericMethod(typeof(T)).Invoke(objectManager, new object[] { id });
 
-        return obj != null;
+            return obj != null;
+    }
+
+    public delegate bool GetObjectDelegate(ObjectManager instance, string id, out object obj);
+
+    private bool TryGetSettlement(string id, out Settlement settlement)
+    {
+        settlement = objectManager.GetObject<Settlement>(id);
+
+        return settlement != null;
+    }
+
+    private bool TryGetHideout(string id, out object obj)
+    {
+        obj = null;
+        if (TryGetSettlement(id, out var settlement) == false) return false;
+
+        if (settlement.IsHideout == false) return false;
+
+        obj = settlement.Hideout;
+
+        return true;
+    }
+
+    private bool TryGetTown(string id, out object obj)
+    {
+        obj = null;
+        if (TryGetSettlement(id, out var settlement) == false) return false;
+
+        if (settlement.IsHideout == false) return false;
+
+        obj = settlement.Hideout;
+
+        return true;
+    }
+
+    private bool TryGetCastle(string id, out object obj)
+    {
+        obj = null;
+        if (TryGetSettlement(id, out var settlement) == false) return false;
+
+        if (settlement.IsHideout == false) return false;
+
+        obj = settlement.Hideout;
+
+        return true;
     }
 }

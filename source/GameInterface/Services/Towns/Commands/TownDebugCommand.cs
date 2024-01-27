@@ -1,16 +1,20 @@
-﻿using Common.Extensions;
+﻿using Autofac;
+using Common.Extensions;
 using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.Heroes.Commands;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Towns.Patches;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -20,28 +24,16 @@ public class TownDebugCommand
     private static readonly Func<Town, Town.SellLog[]> getSoldItems = typeof(Town).GetField("_soldItems", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Town, Town.SellLog[]>();
 
     /// <summary>
-    /// Finds a specific town in game.
+    /// Attempts to get the ObjectManager
     /// </summary>
-    /// <param name="townId">string id of the town to search</param>
-    /// <returns>Town or null.</returns>
-    public static Town findTown(string townId)
+    /// <param name="objectManager">Resolved ObjectManager, will be null if unable to resolve</param>
+    /// <returns>True if ObjectManager was resolved, otherwise False</returns>
+    private static bool TryGetObjectManager(out IObjectManager objectManager)
     {
-        List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
-            .Where(settlement => settlement.IsTown).ToList();
-        Town town = settlements.Find(e => e.Town.StringId == townId)?.Town;
-        return town;
-    }
+        objectManager = null;
+        if (ContainerProvider.TryGetContainer(out var container) == false) return false;
 
-    /// <summary>
-    /// Finds a specific item in game.
-    /// </summary>
-    /// <param name="itemId">string id of the item to search</param>
-    /// <returns>ItemCategory or null.</returns>
-    public static ItemCategory findItem(string itemId)
-    {
-        List<ItemCategory> items = Campaign.Current.ObjectManager.GetObjectsOfType<ItemCategory>().Select(obj => (ItemCategory)obj).ToList();
-        ItemCategory item = items.Find(i => i.StringId == itemId);
-        return item;
+        return container.TryResolve(out objectManager);
     }
 
     // coop.debug.town.list
@@ -101,11 +93,14 @@ public class TownDebugCommand
             return "Usage: coop.debug.town.info <townId>";
         }
 
-        Town town = findTown(args[0]);
-
-        if (town == null)
+        if (TryGetObjectManager(out var objectManager) == false)
         {
-            return string.Format("ID: '{0}' not found", args[0]);
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
+        {
+            return $"ID: '{args[0]}' not found";
         }
 
 
@@ -138,34 +133,33 @@ public class TownDebugCommand
     /// </summary>
     /// <param name="args">townID and the heroID to set</param>
     /// <returns>information if it changed</returns>
+    /// coop.debug.town.set_governor town_V1 lord_1_1
     [CommandLineArgumentFunction("set_governor", "coop.debug.town")]
     public static string SetTownGovernor(List<string> args)
     {
-        if (ModInformation.IsClient)
-            return "Usage: This command can only be used by the server for debugging purposes.";
-
         if (args.Count < 2)
         {
             return "Usage: coop.debug.town.set_governor <townId> <heroId> ";
         }
 
-        Town town = findTown(args[0]);
-
-        if (town == null)
+        if (TryGetObjectManager(out var objectManager) == false)
         {
-            return string.Format("Town with ID: '{0}' not found", args[0]);
+            return "Unable to resolve ObjectManager";
         }
 
-        Hero hero = HeroDebugCommand.findHero(args[1]);
-
-        if (hero == null)
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
         {
-            return string.Format("Hero with ID: '{0}' not found", args[1]);
+            return $"Town with ID: '{args[0]}' not found";
+        }
+
+        if (objectManager.TryGetObject(args[0], out Hero hero) == false)
+        {
+            return $"Hero with ID: '{args[1]}' not found";
         }
 
         town.Governor = hero;
 
-        return string.Format("Town governor has changed to: {0} hero with ID: {1}", hero.Name, hero.StringId);
+        return $"Town governor has changed to: {town.Governor.Name} hero with ID: {town.Governor.StringId}";
     }
 
     /// <summary>
@@ -176,31 +170,29 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_last_captured_by", "coop.debug.town")]
     public static string SetTownLastCapturedBy(List<string> args)
     {
-        if (ModInformation.IsClient)
-            return "Usage: This command can only be used by the server for debugging purposes.";
-
         if (args.Count < 2)
         {
             return "Usage: coop.debug.town.set_last_captured_by <townId> <clanId> ";
         }
 
-        Town town = findTown(args[0]);
-
-        if (town == null)
+        if (TryGetObjectManager(out var objectManager) == false)
         {
-            return string.Format("Town with ID: '{0}' not found", args[0]);
+            return "Unable to resolve ObjectManager";
         }
 
-        Clan clan = ClanDebugCommands.findClan(args[1]);
-
-        if (clan == null)
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
         {
-            return string.Format("Clan with ID: '{0}' not found", args[1]);
+            return $"{nameof(Town)} with ID: '{args[0]}' not found";
+        }
+
+        if (objectManager.TryGetObject(args[0], out Clan clan) == false)
+        {
+            return $"{nameof(Clan)} with ID: '{args[1]}' not found";
         }
 
         town.LastCapturedBy = clan;
 
-        return string.Format("Town LastCapturedBy has changed to: {0} clan with ID: {1}", clan.Name, clan.StringId);
+        return $"{nameof(Town.LastCapturedBy)} has changed to: {town.LastCapturedBy.Name} clan with ID: {town.LastCapturedBy.StringId}";
     }
 
     /// <summary>
@@ -211,47 +203,53 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("add_item_to_sold_items", "coop.debug.town")]
     public static string AddToTownSoldItems(List<string> args)
     {
-        if (ModInformation.IsClient)
-            return "Usage: This command can only be used by the server for debugging purposes.";
-
         if (args.Count < 3)
         {
             return "Usage: coop.debug.town.set_last_captured_by <townId> <itemId> <numberOfItems>";
         }
 
-        Town town = findTown(args[0]);
-
-        if (town == null)
+        if (TryGetObjectManager(out var objectManager) == false)
         {
-            return string.Format("Town with ID: '{0}' not found", args[0]);
+            return "Unable to resolve ObjectManager";
         }
 
-        ItemCategory item = findItem(args[1]);
-
-        if (item == null)
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
         {
-            return string.Format("Item with ID: '{0}' not found", args[1]);
+            return $"{nameof(Town)} with ID: '{args[0]}' not found";
         }
 
-        if (int.TryParse(args[2], out int numberOfItems))
+        if (objectManager.TryGetObject(args[0], out ItemCategory item) == false)
         {
-            List<Town.SellLog> newSoldItems = new List<Town.SellLog>(getSoldItems(town));
-            int idx = newSoldItems.FindIndex(log => log.Category == item);
-            if (idx != -1 && idx >= 0 && idx < newSoldItems.Count)
-            {
-                newSoldItems[idx] = new Town.SellLog(item, newSoldItems[idx].Number + numberOfItems);
-            }
-            else
-            {
-                newSoldItems.Add(new Town.SellLog(item, numberOfItems));
-            }
-            town.SetSoldItems(newSoldItems);
-            return string.Format("Added {0} number of {1} to Town SoldItems", numberOfItems, item.StringId);
+            return $"{nameof(ItemCategory)} with ID: '{args[1]}' not found";
+        }
+
+        if (int.TryParse(args[2], out int numberOfItems) == false)
+        {
+            return $"Argument3: {args[2]} is not an integer.";
+        }
+
+
+        List<Town.SellLog> newSoldItems = new List<Town.SellLog>(getSoldItems(town));
+        int idx = newSoldItems.FindIndex(log => log.Category == item);
+        if (idx != -1 && idx >= 0 && idx < newSoldItems.Count)
+        {
+            newSoldItems[idx] = new Town.SellLog(item, newSoldItems[idx].Number + numberOfItems);
         }
         else
         {
-            return string.Format("Argument3: {0} is not an integer.", args[2]);
+            newSoldItems.Add(new Town.SellLog(item, numberOfItems));
         }
+        town.SetSoldItems(newSoldItems);
+
+        // Check if item was added
+        if (town.SoldItems.Count(soldItem => soldItem.Category == item) <= 0)
+        {
+            return $"Unable to find {item} in {nameof(Town.SoldItems)}";
+        }
+
+        var newItem = town.SoldItems.First();
+
+        return $"Added {newItem.Number} number of {newItem.Category.StringId} to Town SoldItems";
     }
 
     /// <summary>
@@ -262,30 +260,28 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_prosperity", "coop.debug.town")]
     public static string SetTownProsperity(List<string> args)
     {
-        if (ModInformation.IsClient)
-            return "Usage: This command can only be used by the server for debugging purposes.";
-
         if (args.Count < 2)
         {
             return "Usage: coop.debug.town.set_prosperity <townId> <prosperity> ";
         }
 
-        Town town = findTown(args[0]);
-
-        if (town == null)
+        if (TryGetObjectManager(out var objectManager) == false)
         {
-            return string.Format("Town with ID: '{0}' not found", args[0]);
+            return "Unable to resolve ObjectManager";
         }
 
-        if (int.TryParse(args[1], out int prosperity))
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
         {
-            town.Prosperity = prosperity;
-            return string.Format("Town Prosperity has changed to: {0}.", prosperity);
+            return $"{nameof(Town)} with ID: '{args[0]}' not found";
         }
-        else
+
+        if (int.TryParse(args[1], out int prosperity) == false)
         {
-            return string.Format("Argument2: {0} is not an integer.", args[1]);
+            return $"Argument2: {args[1]} is not an integer.";
         }
+
+        town.Prosperity = prosperity;
+        return $"Town Prosperity has changed to: {town.Prosperity}.";
     }
 
     /// <summary>
@@ -296,30 +292,28 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_loyalty", "coop.debug.town")]
     public static string SetTownLoyalty(List<string> args)
     {
-        if (ModInformation.IsClient)
-            return "Usage: This command can only be used by the server for debugging purposes.";
-
         if (args.Count < 2)
         {
             return "Usage: coop.debug.town.set_loyalty <townId> <loyalty> ";
         }
 
-        Town town = findTown(args[0]);
-
-        if (town == null)
+        if (TryGetObjectManager(out var objectManager) == false)
         {
-            return string.Format("Town with ID: '{0}' not found", args[0]);
+            return "Unable to resolve ObjectManager";
         }
 
-        if (float.TryParse(args[1], out float loyalty))
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
         {
-            town.Loyalty = loyalty;
-            return string.Format("Town Loyalty has changed to: {0}.", loyalty);
+            return $"{nameof(Town)} with ID: '{args[0]}' not found";
         }
-        else
+
+        if (float.TryParse(args[1], out float loyalty) == false)
         {
-            return string.Format("Argument2: {0} is not a float.", args[1]);
+            return $"Argument2: {args[1]} is not a float.";
         }
+
+        town.Loyalty = loyalty;
+        return $"Town Loyalty has changed to: {town.Loyalty}.";
     }
 
     /// <summary>
@@ -330,30 +324,28 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_security", "coop.debug.town")]
     public static string SetTownSecurity(List<string> args)
     {
-        if (ModInformation.IsClient)
-            return "Usage: This command can only be used by the server for debugging purposes.";
-
         if (args.Count < 2)
         {
             return "Usage: coop.debug.town.set_loyalty <townId> <security> ";
         }
 
-        Town town = findTown(args[0]);
-
-        if (town == null)
+        if (TryGetObjectManager(out var objectManager) == false)
         {
-            return string.Format("Town with ID: '{0}' not found", args[0]);
+            return "Unable to resolve ObjectManager";
         }
 
-        if (float.TryParse(args[1], out float security))
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
         {
-            town.Security = security;
-            return string.Format("Town Security has changed to: {0}.", security);
+            return $"{nameof(Town)} with ID: '{args[0]}' not found";
         }
-        else
+
+        if (float.TryParse(args[1], out float security) == false)
         {
-            return string.Format("Argument2: {0} is not a float.", args[1]);
+            return $"Argument2: {args[1]} is not a float.";
         }
+
+        town.Security = security;
+        return $"Town Security has changed to: {town.Security}.";
     }
 
 
@@ -365,31 +357,28 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_in_rebellious_state", "coop.debug.town")]
     public static string SetTownInRebelliousState(List<string> args)
     {
-        if (ModInformation.IsClient)
-            return "Usage: This command can only be used by the server for debugging purposes.";
-
         if (args.Count < 2)
         {
             return "Usage: coop.debug.town.set_in_rebellious_state <townId> <in_rebellious_state> ";
         }
 
-        Town town = findTown(args[0]);
-
-        if (town == null)
+        if (TryGetObjectManager(out var objectManager) == false)
         {
-            return string.Format("Town with ID: '{0}' not found", args[0]);
+            return "Unable to resolve ObjectManager";
         }
 
-        if (bool.TryParse(args[1], out bool inRebelliousState))
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
         {
-            town.InRebelliousState = inRebelliousState;
-            TownPatches.PublishTownInRebelliousStateChanged(town, town.InRebelliousState);
-            return string.Format("Town InRebelliousState has changed to: {0}.", inRebelliousState);
+            return $"{nameof(Town)} with ID: '{args[0]}' not found";
         }
-        else
+
+        if (bool.TryParse(args[1], out bool inRebelliousState) == false)
         {
-            return string.Format("Argument2: {0} is not a boolean.", args[1]);
+            return $"Argument2: {args[1]} is not a boolean.";
         }
+
+        RebellionsCampaignBehaviorPatches.PublishTownInRebelliousStateChanged(town, inRebelliousState);
+        return $"Town InRebelliousState has changed to: {town.InRebelliousState}.";
     }
 
     /// <summary>
@@ -400,31 +389,28 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_garrison_auto_recruitment", "coop.debug.town")]
     public static string SetTownGarrisonAutoRecruitmentIsEnabled(List<string> args)
     {
-        if (ModInformation.IsClient)
-            return "Usage: This command can only be used by the server for debugging purposes.";
-
         if (args.Count < 2)
         {
             return "Usage: coop.debug.town.set_garrison_auto_recruitment <townId> <garrison_auto_recruitment_enabled> ";
         }
 
-        Town town = findTown(args[0]);
-
-        if (town == null)
+        if (TryGetObjectManager(out var objectManager) == false)
         {
-            return string.Format("Town with ID: '{0}' not found", args[0]);
+            return "Unable to resolve ObjectManager";
         }
 
-        if (bool.TryParse(args[1], out bool garrisonAutoRecruitmentIsEnabled))
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
         {
-            town.GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
-            TownPatches.PublishTownGarrisonAutoRecruitmentIsEnabledChanged(town, town.GarrisonAutoRecruitmentIsEnabled);
-            return string.Format("Town GarrisonAutoRecruitmentIsEnabled has changed to: {0}.", garrisonAutoRecruitmentIsEnabled);
+            return $"{nameof(Town)} with ID: '{args[0]}' not found";
         }
-        else
+
+        if (bool.TryParse(args[1], out bool garrisonAutoRecruitmentIsEnabled) == false)
         {
-            return string.Format("Argument2: {0} is not a boolean.", args[1]);
+            return $"Argument2: {args[1]} is not a boolean.";
         }
+
+        UpdateClanSettlementAutoRecruitmentPatches.PublishTownGarrisonAutoRecruitmentIsEnabledChanged(town, garrisonAutoRecruitmentIsEnabled);
+        return $"Town GarrisonAutoRecruitmentIsEnabled has changed to: {town.GarrisonAutoRecruitmentIsEnabled}.";
     }
 
     /// <summary>
@@ -435,29 +421,27 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_trade_tax_acc", "coop.debug.town")]
     public static string SetTradeTaxAccumulated(List<string> args)
     {
-        if (ModInformation.IsClient)
-            return "Usage: This command can only be used by the server for debugging purposes.";
-
         if (args.Count < 2)
         {
             return "Usage: coop.debug.town.set_trade_tax_acc <townId> <0.0> ";
         }
 
-        Town town = findTown(args[0]);
-
-        if (town == null)
+        if (TryGetObjectManager(out var objectManager) == false)
         {
-            return string.Format("ID: '{0}' not found", args[0]);
+            return "Unable to resolve ObjectManager";
         }
 
-        if (int.TryParse(args[1], out int tradeTaxAccumulated))
+        if (objectManager.TryGetObject(args[0], out Town town) == false)
         {
-            town.TradeTaxAccumulated = tradeTaxAccumulated;
-            return string.Format("Town TradeTaxAccumulated has changed to: {0}.", tradeTaxAccumulated);
+            return $"{nameof(Town)} with ID: '{args[0]}' not found";
         }
-        else
+
+        if (int.TryParse(args[1], out int tradeTaxAccumulated) == false)
         {
-            return string.Format("Argument2: {0} is not an integer.", args[1]);
+            return $"Argument2: {args[1]} is not an integer.";
         }
+
+        town.TradeTaxAccumulated = tradeTaxAccumulated;
+        return $"Town TradeTaxAccumulated has changed to: {town.TradeTaxAccumulated}.";
     }
 }
