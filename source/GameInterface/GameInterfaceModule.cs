@@ -7,6 +7,7 @@ using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Registry;
+using GameInterface.Services.Settlements;
 using GameInterface.Services.Time;
 
 namespace GameInterface;
@@ -25,20 +26,22 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
         builder.RegisterModule<ServiceModule>();
 
+        #region Registries
         builder.RegisterType<MobilePartyRegistry>()
-               .As<IMobilePartyRegistry>()
-               .InstancePerLifetimeScope();
+            .As<IMobilePartyRegistry>()
+            .InstancePerLifetimeScope();
 
         builder.RegisterType<HeroRegistry>()
-               .As<IHeroRegistry>()
-               .InstancePerLifetimeScope();
+            .As<IHeroRegistry>()
+            .InstancePerLifetimeScope();
 
         builder.RegisterType<ClanRegistry>()
-               .As<IClanRegistry>()
-               .InstancePerLifetimeScope();
+            .As<IClanRegistry>()
+            .InstancePerLifetimeScope();
+        #endregion
 
         builder.RegisterType<ControlledEntityRegistry>()
-               .As<IControlledEntityRegistry>()
-               .InstancePerLifetimeScope();
+            .As<IControlledEntityRegistry>()
+            .InstancePerLifetimeScope();
     }
 }

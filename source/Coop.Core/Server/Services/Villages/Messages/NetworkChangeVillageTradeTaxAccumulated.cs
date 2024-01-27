@@ -1,8 +1,6 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Server.Services.Villages.Messages;
 
@@ -10,6 +8,7 @@ namespace Coop.Core.Server.Services.Villages.Messages;
 /// message sent for TradeTaxAccumulated changes 
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
+[DontLogMessage]
 internal class NetworkChangeVillageTradeTaxAccumulated : IEvent
 {
     [ProtoMember(1)]

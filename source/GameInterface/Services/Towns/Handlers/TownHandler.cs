@@ -44,7 +44,7 @@ namespace GameInterface.Services.Towns.Handlers
             var obj = payload.What;
 
 
-            if (objectManager.TryGetObject<Town>(obj.TownId, out Town town) == false)
+            if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
@@ -52,7 +52,7 @@ namespace GameInterface.Services.Towns.Handlers
             List<Town.SellLog> sellLogs = new List<Town.SellLog>();
             obj.LogList.ForEach(s =>
             {
-                if (objectManager.TryGetObject<ItemCategory>(s.CategoryID, out ItemCategory itemCategory) == false)
+                if (objectManager.TryGetObject(s.CategoryID, out ItemCategory itemCategory) == false)
                 {
                     Logger.Error("Unable to find ItemCategory ({itemCategoryId})", s.CategoryID);
                     return;
@@ -68,7 +68,7 @@ namespace GameInterface.Services.Towns.Handlers
             var obj = payload.What;
 
 
-            if (objectManager.TryGetObject<Town>(obj.TownId, out Town town) == false)
+            if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
@@ -82,7 +82,7 @@ namespace GameInterface.Services.Towns.Handlers
             var obj = payload.What;
 
 
-            if (objectManager.TryGetObject<Town>(obj.TownId, out Town town) == false)
+            if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
@@ -96,7 +96,7 @@ namespace GameInterface.Services.Towns.Handlers
             var obj = payload.What;
 
 
-            if (objectManager.TryGetObject<Town>(obj.TownId, out Town town) == false)
+            if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
@@ -110,12 +110,12 @@ namespace GameInterface.Services.Towns.Handlers
             var obj = payload.What;
 
 
-            if (objectManager.TryGetObject<Town>(obj.TownId, out Town town) == false)
+            if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
-            if (objectManager.TryGetObject<Clan>(obj.ClanId, out Clan clan) == false)
+            if (objectManager.TryGetObject(obj.ClanId, out Clan clan) == false)
             {
                 Logger.Error("Unable to find Clan ({clanId})", obj.ClanId);
                 return;
@@ -129,7 +129,7 @@ namespace GameInterface.Services.Towns.Handlers
             var obj = payload.What;
 
 
-            if (objectManager.TryGetObject<Town>(obj.TownId, out Town town) == false)
+            if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
@@ -143,7 +143,7 @@ namespace GameInterface.Services.Towns.Handlers
             var obj = payload.What;
 
 
-            if (objectManager.TryGetObject<Town>(obj.TownId, out Town town) == false)
+            if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
@@ -157,7 +157,7 @@ namespace GameInterface.Services.Towns.Handlers
             var obj = payload.What;
 
 
-            if (objectManager.TryGetObject<Town>(obj.TownId, out Town town) == false)
+            if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
@@ -171,12 +171,12 @@ namespace GameInterface.Services.Towns.Handlers
             var obj = payload.What;
 
 
-            if (objectManager.TryGetObject<Town>(obj.TownId, out Town town) == false)
+            if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
-            if (objectManager.TryGetObject<Hero>(obj.GovernorId, out Hero governor) == false)
+            if (objectManager.TryGetObject(obj.GovernorId, out Hero governor) == false)
             {
                 Logger.Error("Unable to find Hero ({governorId})", obj.GovernorId);
                 return;

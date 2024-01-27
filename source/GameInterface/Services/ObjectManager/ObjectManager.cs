@@ -1,8 +1,11 @@
-﻿using GameInterface.Services.Clans;
+﻿using Common;
+using Common.Logging;
+using GameInterface.Services.Clans;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
 using GameInterface.Services.Settlements;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -61,29 +64,41 @@ public interface IObjectManager
 /// </summary>
 internal class ObjectManager : IObjectManager
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ObjectManager>();
+
     private MBObjectManager objectManager => MBObjectManager.Instance;
 
-    private readonly IHeroRegistry heroRegistry;
-    private readonly IMobilePartyRegistry partyRegistry;
-    private readonly IClanRegistry clanRegistry;
+    private readonly Dictionary<Type, IRegistry> RegistryMap = new Dictionary<Type, IRegistry>();
 
     public ObjectManager(
         IHeroRegistry heroRegistry,
         IMobilePartyRegistry partyRegistry, 
         IClanRegistry clanRegistry)
     {
-        this.heroRegistry = heroRegistry;
-        this.partyRegistry = partyRegistry;
-        this.clanRegistry = clanRegistry;
+        RegistryMap.Add(heroRegistry.ManagedType, heroRegistry);
+        RegistryMap.Add(partyRegistry.ManagedType, partyRegistry);
+        RegistryMap.Add(clanRegistry.ManagedType, clanRegistry);
     }
 
     public bool AddExisting(string id, object obj)
     {
         if (string.IsNullOrEmpty(id)) return false;
         if (objectManager == null) return false;
-        if (obj is MBObjectBase mbObject == false) return false;
+        if (TryCastToMBObject(obj, out var mbObject) == false) return false;
 
         return AddExistingInternal(id, mbObject);
+    }
+
+    private bool TryCastToMBObject(object obj, out MBObjectBase mbObject)
+    {
+        mbObject = obj as MBObjectBase;
+
+        if (mbObject == null)
+        {
+            Logger.Error("Attempted to register object with {type} type that does not derive from {mbObject}", obj.GetType(), typeof(MBObjectBase));
+        }
+
+        return mbObject != null;
     }
 
     private bool AddExistingInternal<T>(string id, T obj) where T : MBObjectBase
@@ -92,13 +107,13 @@ internal class ObjectManager : IObjectManager
 
         obj.StringId = id;
 
-        return obj switch
+        if (RegistryMap.TryGetValue(typeof(T), out IRegistry registry))
         {
-            MobileParty party => partyRegistry.RegisterExistingObject(id, party),
-            Hero hero => heroRegistry.RegisterExistingObject(id, hero),
-            Clan clan => clanRegistry.RegisterExistingObject(id, clan),
-            _ => objectManager.RegisterPresumedObject(obj) != null,
-        };
+            return registry.RegisterExistingObject(id, obj);
+        }
+
+        // Use MBObjectManager registry does not exist
+        return objectManager.RegisterPresumedObject(obj) != null;
     }
 
     public bool AddNewObject(object obj, out string newId)
@@ -106,15 +121,15 @@ internal class ObjectManager : IObjectManager
         newId = null;
 
         if (objectManager == null) return false;
-        if (obj is MBObjectBase mbObject == false) return false;
+        if (TryCastToMBObject(obj, out var mbObject) == false) return false;
 
-        return obj switch
+        if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
-            MobileParty party => partyRegistry.RegisterNewObject(party, out newId),
-            Hero hero => heroRegistry.RegisterNewObject(hero, out newId),
-            Clan clan => clanRegistry.RegisterNewObject(clan, out newId),
-            _ => AddNewObjectInternal(mbObject, out newId),
-        };
+            return registry.RegisterNewObject(obj, out newId);
+        }
+
+        // Use MBObjectManager registry does not exist
+        return AddNewObjectInternal(mbObject, out newId);
     }
 
 
@@ -125,9 +140,11 @@ internal class ObjectManager : IObjectManager
         id = null;
 
         if (objectManager == null) return false;
-        if (obj is MBObjectBase mbObject == false) return false;
+        if (TryCastToMBObject(obj, out var mbObject) == false) return false;
 
         RegisterObject.MakeGenericMethod(obj.GetType()).Invoke(objectManager, new object[] { mbObject });
+
+        id = mbObject.StringId;
 
         return true;
     }
@@ -135,15 +152,15 @@ internal class ObjectManager : IObjectManager
     public bool Contains(object obj)
     {
         if (objectManager == null) return false;
-        if (obj is MBObjectBase mbObject == false) return false;
+        if (TryCastToMBObject(obj, out var mbObject) == false) return false;
 
-        return obj switch
+        if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
-            MobileParty party => partyRegistry.TryGetValue(party, out string _),
-            Hero hero => heroRegistry.TryGetValue(hero, out string _),
-            Clan clan => clanRegistry.TryGetValue(clan, out string _),
-            _ => Contains(mbObject.StringId),
-        };
+            return registry.TryGetValue(obj, out _);
+        }
+
+        // Attempt to find using string id instead
+        return Contains(mbObject.StringId);
     }
 
     
@@ -152,21 +169,9 @@ internal class ObjectManager : IObjectManager
         if (string.IsNullOrEmpty(id)) return false;
         if (objectManager == null) return false;
 
-        if(partyRegistry.TryGetValue(id, out MobileParty _))
-        {
-            return true;
-        }
+        if (RegistryMap.Values.Any(registry => registry.TryGetValue(id, out _))) return true;
 
-        if(heroRegistry.TryGetValue(id, out Hero _))
-        {
-            return true;
-        }
-
-        if (clanRegistry.TryGetValue(id, out Clan _))
-        {
-            return true;
-        }
-
+        // Use MBObjectManager registry cannot find value
         return objectManager.Contains(id);
     }
 
@@ -175,25 +180,12 @@ internal class ObjectManager : IObjectManager
         id = null;
 
         if (objectManager == null) return false;
-        if (obj is MBObjectBase mbObject == false) return false;
+        if (TryCastToMBObject(obj, out var mbObject) == false) return false;
 
         id = mbObject.StringId;
 
         return true;
     }
-
-    // TODO refactor
-    private readonly Dictionary<Type, Delegate> BranchLookup = new Dictionary<Type, Delegate>()
-    {
-        { typeof(Hideout), Delegate.CreateDelegate(typeof(GetObjectDelegate), null, typeof(ObjectManager).GetMethod(nameof(TryGetHideout))) }
-    };
-
-    private static readonly HashSet<Type> SettlementTypes = new HashSet<Type>()
-    {
-        typeof(Town),
-        typeof(Village),
-        typeof(Hideout)
-    };
 
     private static readonly MethodInfo GetObject = typeof(MBObjectManager)
         .GetMethod(nameof(MBObjectManager.GetObject), new Type[] { typeof(string) });
@@ -204,78 +196,16 @@ internal class ObjectManager : IObjectManager
         if (string.IsNullOrEmpty(id)) return false;
         if (objectManager == null) return false;
 
-
-        if (partyRegistry.TryGetValue(id, out MobileParty party))
+        if (RegistryMap.TryGetValue(typeof(T), out IRegistry registry))
         {
-            obj = party as T;
+            if (registry.TryGetValue<T>(id, out var registeredObj) == false) return false;
+
+            obj = registeredObj as T;
             return obj != null;
         }
-
-        if (heroRegistry.TryGetValue(id, out Hero hero))
-        {
-            obj = hero as T;
-            return obj != null;
-        }
-
-        if (clanRegistry.TryGetValue(id, out Clan clan))
-        {
-            obj = clan as T;
-            return obj != null;
-        }
-
-        if (BranchLookup.TryGetValue(typeof(T), out var @delegate))
-        {
-            return (bool)@delegate.DynamicInvoke(this, id, obj);
-        }
-
 
         obj = (T)GetObject.MakeGenericMethod(typeof(T)).Invoke(objectManager, new object[] { id });
 
-            return obj != null;
-    }
-
-    public delegate bool GetObjectDelegate(ObjectManager instance, string id, out object obj);
-
-    private bool TryGetSettlement(string id, out Settlement settlement)
-    {
-        settlement = objectManager.GetObject<Settlement>(id);
-
-        return settlement != null;
-    }
-
-    private bool TryGetHideout(string id, out object obj)
-    {
-        obj = null;
-        if (TryGetSettlement(id, out var settlement) == false) return false;
-
-        if (settlement.IsHideout == false) return false;
-
-        obj = settlement.Hideout;
-
-        return true;
-    }
-
-    private bool TryGetTown(string id, out object obj)
-    {
-        obj = null;
-        if (TryGetSettlement(id, out var settlement) == false) return false;
-
-        if (settlement.IsHideout == false) return false;
-
-        obj = settlement.Hideout;
-
-        return true;
-    }
-
-    private bool TryGetCastle(string id, out object obj)
-    {
-        obj = null;
-        if (TryGetSettlement(id, out var settlement) == false) return false;
-
-        if (settlement.IsHideout == false) return false;
-
-        obj = settlement.Hideout;
-
-        return true;
+        return obj != null;
     }
 }

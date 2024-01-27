@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
@@ -48,12 +49,12 @@ namespace GameInterface.Tests.Services.Parties
 
             for (int i = 0; i < NUM_PARTIES; i++)
             {
-                var party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+                var party = ObjectHelper.SkipConstructor<MobileParty>();
                 party.StringId = $"Party {i}";
 
-                objectManager.AddExisting(party.StringId, party);
-
                 parties[i] = party;
+
+                Campaign.Current.CampaignObjectManager.AddMobileParty(party);
             }
 
             var partyRegistry = _container.Resolve<IMobilePartyRegistry>();

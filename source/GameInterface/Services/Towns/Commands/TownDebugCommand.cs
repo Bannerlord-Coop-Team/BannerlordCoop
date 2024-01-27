@@ -128,40 +128,44 @@ public class TownDebugCommand
         return sb.ToString();
     }
 
+    // coop.debug.town.set_governor town_comp_V1 lord_1_1
     /// <summary>
     /// Sets the Town governor of a specific Town.
     /// </summary>
     /// <param name="args">townID and the heroID to set</param>
     /// <returns>information if it changed</returns>
-    /// coop.debug.town.set_governor town_V1 lord_1_1
     [CommandLineArgumentFunction("set_governor", "coop.debug.town")]
     public static string SetTownGovernor(List<string> args)
     {
-        if (args.Count < 2)
+        if (args.Count != 2)
         {
             return "Usage: coop.debug.town.set_governor <townId> <heroId> ";
         }
+
+        string townId = args[0];
+        string heroId = args[1];
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
+        if (objectManager.TryGetObject(townId, out Town town) == false)
         {
-            return $"Town with ID: '{args[0]}' not found";
+            return $"Town with ID: '{townId}' not found";
         }
 
-        if (objectManager.TryGetObject(args[0], out Hero hero) == false)
+        if (objectManager.TryGetObject(heroId, out Hero hero) == false)
         {
-            return $"Hero with ID: '{args[1]}' not found";
+            return $"Hero with ID: '{heroId}' not found";
         }
 
         town.Governor = hero;
 
-        return $"Town governor has changed to: {town.Governor.Name} hero with ID: {town.Governor.StringId}";
+        return $"Town governor has changed to: {town.Governor?.Name} hero with ID: {town.Governor?.StringId}";
     }
 
+    // coop.debug.town.set_last_captured_by town_comp_V1 clan_sturgia_2
     /// <summary>
     /// Sets the Town LastCapturedBy property of a specific Town.
     /// </summary>
@@ -170,24 +174,27 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_last_captured_by", "coop.debug.town")]
     public static string SetTownLastCapturedBy(List<string> args)
     {
-        if (args.Count < 2)
+        if (args.Count != 2)
         {
             return "Usage: coop.debug.town.set_last_captured_by <townId> <clanId> ";
         }
+
+        string townId = args[0];
+        string clanId = args[1];
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
+        if (objectManager.TryGetObject(townId, out Town town) == false)
         {
-            return $"{nameof(Town)} with ID: '{args[0]}' not found";
+            return $"{nameof(Town)} with ID: '{townId}' not found";
         }
 
-        if (objectManager.TryGetObject(args[0], out Clan clan) == false)
+        if (objectManager.TryGetObject(clanId, out Clan clan) == false)
         {
-            return $"{nameof(Clan)} with ID: '{args[1]}' not found";
+            return $"{nameof(Clan)} with ID: '{clanId}' not found";
         }
 
         town.LastCapturedBy = clan;
@@ -195,6 +202,7 @@ public class TownDebugCommand
         return $"{nameof(Town.LastCapturedBy)} has changed to: {town.LastCapturedBy.Name} clan with ID: {town.LastCapturedBy.StringId}";
     }
 
+    // coop.debug.town.add_item_to_sold_items town_comp_V1 noble_horse 100
     /// <summary>
     /// Adds a number of items to the Town sold items list of a specific Town.
     /// </summary>
@@ -203,35 +211,39 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("add_item_to_sold_items", "coop.debug.town")]
     public static string AddToTownSoldItems(List<string> args)
     {
-        if (args.Count < 3)
+        if (args.Count != 3)
         {
-            return "Usage: coop.debug.town.set_last_captured_by <townId> <itemId> <numberOfItems>";
+            return "Usage: coop.debug.town.add_item_to_sold_items <townId> <itemId> <numberOfItems>";
         }
+
+        string townId = args[0];
+        string itemId = args[1];
+        string count = args[2];
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
+        if (objectManager.TryGetObject(townId, out Town town) == false)
         {
-            return $"{nameof(Town)} with ID: '{args[0]}' not found";
+            return $"{nameof(Town)} with ID: '{townId}' not found";
         }
 
-        if (objectManager.TryGetObject(args[0], out ItemCategory item) == false)
+        if (objectManager.TryGetObject(itemId, out ItemCategory item) == false)
         {
-            return $"{nameof(ItemCategory)} with ID: '{args[1]}' not found";
+            return $"{nameof(ItemCategory)} with ID: '{itemId}' not found";
         }
 
-        if (int.TryParse(args[2], out int numberOfItems) == false)
+        if (int.TryParse(count, out int numberOfItems) == false)
         {
-            return $"Argument3: {args[2]} is not an integer.";
+            return $"Argument3: {count} is not an integer.";
         }
 
 
         List<Town.SellLog> newSoldItems = new List<Town.SellLog>(getSoldItems(town));
         int idx = newSoldItems.FindIndex(log => log.Category == item);
-        if (idx != -1 && idx >= 0 && idx < newSoldItems.Count)
+        if (idx != -1)
         {
             newSoldItems[idx] = new Town.SellLog(item, newSoldItems[idx].Number + numberOfItems);
         }
@@ -247,11 +259,12 @@ public class TownDebugCommand
             return $"Unable to find {item} in {nameof(Town.SoldItems)}";
         }
 
-        var newItem = town.SoldItems.First();
+        var newItem = town.SoldItems.First(soldItem => soldItem.Category == item);
 
         return $"Added {newItem.Number} number of {newItem.Category.StringId} to Town SoldItems";
     }
 
+    // coop.debug.town.set_prosperity town_comp_V1 100
     /// <summary>
     /// Sets the Town prosperity of a specific Town.
     /// </summary>
@@ -260,30 +273,34 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_prosperity", "coop.debug.town")]
     public static string SetTownProsperity(List<string> args)
     {
-        if (args.Count < 2)
+        if (args.Count != 2)
         {
             return "Usage: coop.debug.town.set_prosperity <townId> <prosperity> ";
         }
+
+        string townId = args[0];
+        string prosperityValue = args[1];
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
+        if (objectManager.TryGetObject(townId, out Town town) == false)
         {
-            return $"{nameof(Town)} with ID: '{args[0]}' not found";
+            return $"{nameof(Town)} with ID: '{townId}' not found";
         }
 
-        if (int.TryParse(args[1], out int prosperity) == false)
+        if (int.TryParse(prosperityValue, out int prosperity) == false)
         {
-            return $"Argument2: {args[1]} is not an integer.";
+            return $"Argument2: {prosperityValue} is not an integer.";
         }
 
         town.Prosperity = prosperity;
         return $"Town Prosperity has changed to: {town.Prosperity}.";
     }
 
+    // coop.debug.town.set_loyalty town_comp_V1 100
     /// <summary>
     /// Sets the Town loyalty of a specific Town.
     /// </summary>
@@ -292,30 +309,34 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_loyalty", "coop.debug.town")]
     public static string SetTownLoyalty(List<string> args)
     {
-        if (args.Count < 2)
+        if (args.Count != 2)
         {
             return "Usage: coop.debug.town.set_loyalty <townId> <loyalty> ";
         }
+
+        string townId = args[0];
+        string loyaltyValue = args[1];
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
+        if (objectManager.TryGetObject(townId, out Town town) == false)
         {
-            return $"{nameof(Town)} with ID: '{args[0]}' not found";
+            return $"{nameof(Town)} with ID: '{townId}' not found";
         }
 
-        if (float.TryParse(args[1], out float loyalty) == false)
+        if (float.TryParse(loyaltyValue, out float loyalty) == false)
         {
-            return $"Argument2: {args[1]} is not a float.";
+            return $"Argument2: {loyaltyValue} is not a float.";
         }
 
         town.Loyalty = loyalty;
         return $"Town Loyalty has changed to: {town.Loyalty}.";
     }
 
+    // coop.debug.town.set_security town_comp_V1 100
     /// <summary>
     /// Sets the Town security of a specific Town.
     /// </summary>
@@ -324,24 +345,27 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_security", "coop.debug.town")]
     public static string SetTownSecurity(List<string> args)
     {
-        if (args.Count < 2)
+        if (args.Count != 2)
         {
             return "Usage: coop.debug.town.set_loyalty <townId> <security> ";
         }
+
+        string townId = args[0];
+        string securityValue = args[1];
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
+        if (objectManager.TryGetObject(townId, out Town town) == false)
         {
-            return $"{nameof(Town)} with ID: '{args[0]}' not found";
+            return $"{nameof(Town)} with ID: '{townId}' not found";
         }
 
-        if (float.TryParse(args[1], out float security) == false)
+        if (float.TryParse(securityValue, out float security) == false)
         {
-            return $"Argument2: {args[1]} is not a float.";
+            return $"Argument2: {securityValue} is not a float.";
         }
 
         town.Security = security;
@@ -349,6 +373,7 @@ public class TownDebugCommand
     }
 
 
+    // coop.debug.town.set_in_rebellious_state town_comp_V1 true
     /// <summary>
     /// Sets the Town rebellious state of a specific Town.
     /// </summary>
@@ -357,30 +382,34 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_in_rebellious_state", "coop.debug.town")]
     public static string SetTownInRebelliousState(List<string> args)
     {
-        if (args.Count < 2)
+        if (args.Count != 2)
         {
             return "Usage: coop.debug.town.set_in_rebellious_state <townId> <in_rebellious_state> ";
         }
+
+        string townId = args[0];
+        string rebellionStateValue = args[1];
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
+        if (objectManager.TryGetObject(townId, out Town town) == false)
         {
-            return $"{nameof(Town)} with ID: '{args[0]}' not found";
+            return $"{nameof(Town)} with ID: '{townId}' not found";
         }
 
-        if (bool.TryParse(args[1], out bool inRebelliousState) == false)
+        if (bool.TryParse(rebellionStateValue, out bool inRebelliousState) == false)
         {
-            return $"Argument2: {args[1]} is not a boolean.";
+            return $"Argument2: {rebellionStateValue} is not a boolean.";
         }
 
         RebellionsCampaignBehaviorPatches.PublishTownInRebelliousStateChanged(town, inRebelliousState);
         return $"Town InRebelliousState has changed to: {town.InRebelliousState}.";
     }
 
+    // coop.debug.town.set_garrison_auto_recruitment town_comp_V1 false
     /// <summary>
     /// Sets the Town GarrisonAutoRecruitmentIsEnabled property of a specific Town.
     /// </summary>
@@ -389,30 +418,34 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_garrison_auto_recruitment", "coop.debug.town")]
     public static string SetTownGarrisonAutoRecruitmentIsEnabled(List<string> args)
     {
-        if (args.Count < 2)
+        if (args.Count != 2)
         {
             return "Usage: coop.debug.town.set_garrison_auto_recruitment <townId> <garrison_auto_recruitment_enabled> ";
         }
+
+        string townId = args[0];
+        string garrisonRecruitmentValue = args[1];
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
+        if (objectManager.TryGetObject(townId, out Town town) == false)
         {
-            return $"{nameof(Town)} with ID: '{args[0]}' not found";
+            return $"{nameof(Town)} with ID: '{townId}' not found";
         }
 
-        if (bool.TryParse(args[1], out bool garrisonAutoRecruitmentIsEnabled) == false)
+        if (bool.TryParse(garrisonRecruitmentValue, out bool garrisonAutoRecruitmentIsEnabled) == false)
         {
-            return $"Argument2: {args[1]} is not a boolean.";
+            return $"Argument2: {garrisonRecruitmentValue} is not a boolean.";
         }
 
         UpdateClanSettlementAutoRecruitmentPatches.PublishTownGarrisonAutoRecruitmentIsEnabledChanged(town, garrisonAutoRecruitmentIsEnabled);
         return $"Town GarrisonAutoRecruitmentIsEnabled has changed to: {town.GarrisonAutoRecruitmentIsEnabled}.";
     }
 
+    // coop.debug.town.set_trade_tax_acc town_comp_V1 100
     /// <summary>
     /// sets the tradetaxaccumulated value for a town.
     /// </summary>
@@ -421,24 +454,27 @@ public class TownDebugCommand
     [CommandLineArgumentFunction("set_trade_tax_acc", "coop.debug.town")]
     public static string SetTradeTaxAccumulated(List<string> args)
     {
-        if (args.Count < 2)
+        if (args.Count != 2)
         {
             return "Usage: coop.debug.town.set_trade_tax_acc <townId> <0.0> ";
         }
+
+        string townId = args[0];
+        string tradeTaxAccumulatedValue = args[1];
 
         if (TryGetObjectManager(out var objectManager) == false)
         {
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(args[0], out Town town) == false)
+        if (objectManager.TryGetObject(townId, out Town town) == false)
         {
-            return $"{nameof(Town)} with ID: '{args[0]}' not found";
+            return $"{nameof(Town)} with ID: '{townId}' not found";
         }
 
-        if (int.TryParse(args[1], out int tradeTaxAccumulated) == false)
+        if (int.TryParse(tradeTaxAccumulatedValue, out int tradeTaxAccumulated) == false)
         {
-            return $"Argument2: {args[1]} is not an integer.";
+            return $"Argument2: {tradeTaxAccumulatedValue} is not an integer.";
         }
 
         town.TradeTaxAccumulated = tradeTaxAccumulated;
