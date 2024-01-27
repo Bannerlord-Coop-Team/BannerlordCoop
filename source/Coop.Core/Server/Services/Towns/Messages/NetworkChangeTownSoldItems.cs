@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Towns.ProtoSerializers;
+using GameInterface.Services.Towns.Data;
 using ProtoBuf;
 using System.Collections.Generic;
 
@@ -12,9 +12,9 @@ namespace Coop.Core.Server.Services.Towns.Messages
         public string TownId { get; }
 
         [ProtoMember(2)]
-        public List<SellLogSerializer> LogList { get; }
+        public SellLogData[] LogList { get; }
 
-        public NetworkChangeTownSoldItems(string townId, List<SellLogSerializer> logList)
+        public NetworkChangeTownSoldItems(string townId, SellLogData[] logList)
         {
             TownId = townId;
             LogList = logList;

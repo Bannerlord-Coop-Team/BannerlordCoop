@@ -7,6 +7,9 @@ using System.Linq;
 
 namespace Coop.Core.Server.Services.Towns.Handlers
 {
+    /// <summary>
+    /// Handles network related data for Towns
+    /// </summary>
     public class ServerTownHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;

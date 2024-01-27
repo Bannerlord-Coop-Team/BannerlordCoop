@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Towns.ProtoSerializers;
+using GameInterface.Services.Towns.Data;
 using System.Collections.Generic;
 
 namespace GameInterface.Services.Towns.Messages
@@ -10,9 +10,9 @@ namespace GameInterface.Services.Towns.Messages
     public record ChangeTownSoldItems : ICommand
     {
         public string TownId { get; }
-        public List<SellLogSerializer> LogList { get; }
+        public SellLogData[] LogList { get; }
 
-        public ChangeTownSoldItems(string townId, List<SellLogSerializer> logList)
+        public ChangeTownSoldItems(string townId, SellLogData[] logList)
         {
             TownId = townId;
             LogList = logList;

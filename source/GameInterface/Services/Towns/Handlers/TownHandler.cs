@@ -43,22 +43,21 @@ namespace GameInterface.Services.Towns.Handlers
         {
             var obj = payload.What;
 
-
             if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
-            List<Town.SellLog> sellLogs = new List<Town.SellLog>();
-            obj.LogList.ForEach(s =>
+
+            var sellLogs = obj.LogList.Select(log =>
             {
-                if (objectManager.TryGetObject(s.CategoryID, out ItemCategory itemCategory) == false)
+                if (objectManager.TryGetObject(log.CategoryID, out ItemCategory itemCategory) == false)
                 {
-                    Logger.Error("Unable to find ItemCategory ({itemCategoryId})", s.CategoryID);
-                    return;
+                    Logger.Error("Unable to find ItemCategory ({itemCategoryId})", log.CategoryID);
+                    return default;
                 }
-                sellLogs.Add(new Town.SellLog(itemCategory,s.Number));
-            });
+                return new Town.SellLog(itemCategory, log.Number);
+            }).Where(log => log.Equals(default) == false);
 
             TownPatches.ChangeSetSoldItems(town, sellLogs);
         }
