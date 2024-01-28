@@ -37,25 +37,7 @@ namespace GameInterface.Services.Towns.Handlers
             messageBroker.Subscribe<ChangeTownGarrisonAutoRecruitmentIsEnabled>(HandleChangeTownGarrisonAutoRecruitmentIsEnabled);
             messageBroker.Subscribe<ChangeTownTradeTaxAccumulated>(HandleChangeTownTradeTaxAccumulated);
             messageBroker.Subscribe<ChangeTownSoldItems>(HandleChangeTownSoldItems);
-            messageBroker.Subscribe<ChangeTownFoodStock>(HandleChangeTownFoodStock);
-
         }
-
-
-        private void HandleChangeTownFoodStock(MessagePayload<ChangeTownFoodStock> payload)
-        {
-            var obj = payload.What;
-
-            if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
-            {
-                Logger.Error("Unable to find Town ({townId})", obj.TownId);
-                return;
-            }
-
-            //TownPatches.ChangeTownFoodStock(town, obj.FoodStock);
-        }
-
-
 
         private void HandleChangeTownSoldItems(MessagePayload<ChangeTownSoldItems> payload)
         {
@@ -213,7 +195,6 @@ namespace GameInterface.Services.Towns.Handlers
             messageBroker.Unsubscribe<ChangeTownGarrisonAutoRecruitmentIsEnabled>(HandleChangeTownGarrisonAutoRecruitmentIsEnabled);
             messageBroker.Unsubscribe<ChangeTownTradeTaxAccumulated>(HandleChangeTownTradeTaxAccumulated);
             messageBroker.Unsubscribe<ChangeTownSoldItems>(HandleChangeTownSoldItems);
-            messageBroker.Unsubscribe<ChangeTownFoodStock>(HandleChangeTownFoodStock);
         }
     }
 }

@@ -30,18 +30,7 @@ namespace Coop.Core.Server.Services.Towns.Handlers
             messageBroker.Subscribe<TownLastCapturedByChanged>(HandleTownLastCapturedBy);
             messageBroker.Subscribe<TownGarrisonAutoRecruitmentIsEnabledChanged>(HandleTownGarrisonAutoRecruitmentIsEnabled);
             messageBroker.Subscribe<TownSoldItemsChanged>(HandleTownSoldItems);
-            messageBroker.Subscribe<TownFoodStockChanged>(HandleTownFoodStock);
         }
-
-        private void HandleTownFoodStock(MessagePayload<TownFoodStockChanged> obj)
-        {
-            TownFoodStockChanged townFoodStockChanged = obj.What;
-
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeTownFoodStock networkChangeTownFoodStock = new NetworkChangeTownFoodStock(townFoodStockChanged.TownId, townFoodStockChanged.FoodStockQuantity);
-            network.SendAll(networkChangeTownFoodStock);
-        }
-
 
         private void HandleTownSoldItems(MessagePayload<TownSoldItemsChanged> obj)
         {
@@ -136,8 +125,6 @@ namespace Coop.Core.Server.Services.Towns.Handlers
             messageBroker.Unsubscribe<TownLastCapturedByChanged>(HandleTownLastCapturedBy);
             messageBroker.Unsubscribe<TownGarrisonAutoRecruitmentIsEnabledChanged>(HandleTownGarrisonAutoRecruitmentIsEnabled);
             messageBroker.Unsubscribe<TownSoldItemsChanged>(HandleTownSoldItems);
-            messageBroker.Unsubscribe<TownFoodStockChanged>(HandleTownFoodStock);
-
         }
     }
 }
