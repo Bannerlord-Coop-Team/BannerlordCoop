@@ -1,6 +1,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Fiefs.Messages;
+using GameInterface.Services.Fiefs.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -37,7 +38,7 @@ namespace GameInterface.Services.Fiefs.Handlers
                 return;
             }
 
-            //TownPatches.ChangeFiefFoodStock(town, obj.FoodStock);
+            FiefPatches.ChangeFiefFoodStock(fief, obj.FoodStockQuantity);
         }
 
 
