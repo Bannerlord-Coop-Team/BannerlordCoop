@@ -18,13 +18,24 @@ internal class ClientSettlementHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<NetworkChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
+        messageBroker.Subscribe<NetworkChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
+
+    }
+
+    private void HandleNumberOfAlliesSpottedAround(MessagePayload<NetworkChangeSettlementAlliesSpotted> payload)
+    {
+        var obj = payload.What;
+
+        var message = new ChangeSettlementAlliesSpotted(obj.SettlementId, obj.NumberOfAlliesSpottedAround);
+
+        messageBroker.Publish(this, message);
     }
 
     private void HandleNumberOfEnemiesSpottedAround(MessagePayload<NetworkChangeSettlementEnemiesSpotted> payload)
     {
         var obj = payload.What;
 
-        var message = new ChangeSettlementEnemiesSpotted(obj.SettlementID, obj.NumberOfEnemiesSpottedAround);
+        var message = new ChangeSettlementEnemiesSpotted(obj.SettlementId, obj.NumberOfEnemiesSpottedAround);
 
         messageBroker.Publish(this, message);
     }
@@ -32,5 +43,7 @@ internal class ClientSettlementHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
+        messageBroker.Unsubscribe<NetworkChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
+
     }
 }
