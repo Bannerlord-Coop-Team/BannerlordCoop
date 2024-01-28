@@ -11,8 +11,6 @@ namespace GameInterface.Services.Registry;
 internal interface IHeroRegistry : IRegistry<Hero>
 {
     void RegisterAllHeroes();
-    bool RegisterHero(Hero hero);
-    bool RemoveHero(Hero hero);
 }
 
 /// <inheritdoc cref="IHeroRegistry"/>
@@ -31,46 +29,10 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
         var heroes = campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes).ToArray();
         foreach (var hero in heroes)
         {
-            RegisterHero(hero);
+            RegisterExistingObject(hero.StringId, hero);
         }
     }
-
-    public bool RegisterHero(Hero hero)
-    {
-        if (RegisterExistingObject(hero.StringId, hero) == false)
-        {
-            Logger.Warning("Unable to register hero: {object}", hero.Name);
-            return false;
-        }
-
-        return true;
-    }
-
-    public bool RemoveHero(Hero hero) => Remove(hero.StringId);
-
 
     public static readonly string HeroStringIdPrefix = "CoopHero";
-    public override bool RegisterNewObject(Hero obj, out string id)
-    {
-        id = null;
-
-        // Input validation
-        if (obj == null) return false;
-
-        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (campaignObjectManager == null) return false;
-
-        var newId = campaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
-
-        if (objIds.ContainsKey(newId)) return false;
-
-        obj.StringId = newId;
-
-        objIds.Add(newId, obj);
-
-        id = newId;
-
-        return true;
-    }
+    public override bool RegisterNewObject(object obj, out string id) => RegisterNewObject(obj, HeroStringIdPrefix, out id);
 }

@@ -56,7 +56,7 @@ namespace GameInterface.Services.MobileParties.Handlers
 
         public void Handle_MobilePartyCreated(MobileParty party)
         {
-            mobilePartyRegistry.RegisterParty(party);
+            mobilePartyRegistry.RegisterExistingObject(party.StringId, party);
 
             messageBroker.Publish(this, new MobilePartyCreated(party));
 
