@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Messages;
+using System;
 
 namespace Coop.Core.Server.Services.Settlements.Handlers;
 
@@ -19,6 +20,15 @@ internal class ServerSettlementHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<SettlementChangedEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
+        messageBroker.Subscribe<SettlementChangeAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
+    }
+
+    private void HandleNumberOfAlliesSpottedAround(MessagePayload<SettlementChangeAlliesSpotted> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeSettlementAlliesSpotted(obj.SettlementId, obj.NumberOfAlliesSpottedAround);
+
+        network.SendAll(message);
     }
 
     private void HandleNumberOfEnemiesSpottedAround(MessagePayload<SettlementChangedEnemiesSpotted> payload)
@@ -33,6 +43,6 @@ internal class ServerSettlementHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<SettlementChangedEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
-
+        messageBroker.Unsubscribe<SettlementChangeAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
     }
 }

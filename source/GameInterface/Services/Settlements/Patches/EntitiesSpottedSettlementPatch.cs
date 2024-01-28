@@ -33,6 +33,35 @@ internal class EntitiesSpottedSettlementPatch
         return true;
     }
 
+    [HarmonyPatch(nameof(Settlement.NumberOfAlliesSpottedAround), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static bool NumberAlliesSpottedPrefix(ref Settlement __instance, ref float value)
+    {
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+        if (PolicyProvider.AllowOriginalCalls) return true;
+
+        if (ModInformation.IsClient) return false;
+
+        // pub
+        if (__instance.NumberOfAlliesSpottedAround == value) return false;
+
+        var message = new SettlementChangeAlliesSpotted(__instance.StringId, value);
+        MessageBroker.Instance.Publish(__instance, message);
+
+        return true;
+    }
+
+    internal static void RunNumberOfAlliesSpottedChange(Settlement settlement, float numberOfAlliesSpottedAround)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                settlement.NumberOfAlliesSpottedAround = numberOfAlliesSpottedAround;
+            }
+        });
+    }
+
     internal static void RunNumberOfEnemiesSpottedChange(Settlement settlement, float numberOfEnemiesSpottedAround)
     {
         GameLoopRunner.RunOnMainThread(() =>

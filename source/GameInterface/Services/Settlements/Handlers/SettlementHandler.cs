@@ -20,6 +20,21 @@ public class SettlementHandler : IHandler
         this.objectManager = objectManager;
 
         messageBroker.Subscribe<ChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
+        messageBroker.Subscribe<ChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
+
+    }
+
+    private void HandleNumberOfAlliesSpottedAround(MessagePayload<ChangeSettlementAlliesSpotted> payload)
+    {
+        var obj = payload.What;
+
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            return;
+        }
+        EntitiesSpottedSettlementPatch.RunNumberOfAlliesSpottedChange(settlement, obj.NumberOfAlliesSpottedAround);
+
     }
 
     private void HandleNumberOfEnemiesSpottedAround(MessagePayload<ChangeSettlementEnemiesSpotted> payload)
@@ -38,5 +53,7 @@ public class SettlementHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<ChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
+        messageBroker.Unsubscribe<ChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
+
     }
 }
