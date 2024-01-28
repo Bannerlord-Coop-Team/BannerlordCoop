@@ -47,6 +47,39 @@ internal class SettlementCommands
         return $"Settlement Name: {settlement.Name}";
     }
 
+    // coop.debug.settlements.set_enemies_spotted town_ES3 45.4
+    /// <summary>
+    /// Changes the NumberOfEnemiesSpottedAround
+    /// </summary>
+    /// <param name="args">the settlement and float value</param>
+    /// <returns>info that is was succesfull</returns>
+    [CommandLineArgumentFunction("set_enemies_spotted", "coop.debug.settlements")]
+    public static string SetEnemiesSpotted(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"set_enemies_spotted <settlment id> <float_value>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+
+        var objectManager = container.Resolve<IObjectManager>();
+
+        string settlementId = args[0];
+
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+            return $"Settlement: {settlementId} was not found.";
+
+        try
+        {
+            settlement.NumberOfEnemiesSpottedAround = float.Parse(args[1]);
+        } catch (Exception ex)
+        {
+            return $"Error setting the value: {args[1]} to a float.";
+        }
+
+        return $"Successfully set the Settlement ({settlementId}) NumberOfEnemiesSpottedAround to '{args[1]}'";
+    }
+
     // Located in Modules\SandBox\ModuleData\settlements.xml
     // POROS EXAMPLE
     // coop.debug.settlements.info town_ES3 
