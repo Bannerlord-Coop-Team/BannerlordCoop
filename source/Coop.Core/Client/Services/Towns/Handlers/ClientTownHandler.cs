@@ -27,8 +27,17 @@ namespace Coop.Core.Client.Services.Towns.Handlers
             messageBroker.Subscribe<NetworkChangeTownGarrisonAutoRecruitmentIsEnabled>(HandleTownGarrisonAutoRecruitmentIsEnabled);
             messageBroker.Subscribe<NetworkChangeTownTradeTaxAccumulated>(HandleTownTradeTaxAccumulated);
             messageBroker.Subscribe<NetworkChangeTownSoldItems>(HandleTownSoldItems);
+            messageBroker.Subscribe<NetworkChangeTownFoodStock>(HandleFoodStock);
         }
 
+
+        private void HandleFoodStock(MessagePayload<NetworkChangeTownFoodStock> payload)
+        {
+            NetworkChangeTownFoodStock networkChangeTownFoodStock = payload.What;
+            ChangeTownFoodStock message = new ChangeTownFoodStock(networkChangeTownFoodStock.TownId, networkChangeTownFoodStock.FoodStockQuantity);
+            messageBroker.Publish(this, message);
+
+        }
         private void HandleTownSoldItems(MessagePayload<NetworkChangeTownSoldItems> payload)
         {
             NetworkChangeTownSoldItems networkChangeTownSoldItems = payload.What;
@@ -103,6 +112,7 @@ namespace Coop.Core.Client.Services.Towns.Handlers
             messageBroker.Unsubscribe<NetworkChangeTownGarrisonAutoRecruitmentIsEnabled>(HandleTownGarrisonAutoRecruitmentIsEnabled);
             messageBroker.Unsubscribe<NetworkChangeTownTradeTaxAccumulated>(HandleTownTradeTaxAccumulated);
             messageBroker.Unsubscribe<NetworkChangeTownSoldItems>(HandleTownSoldItems);
+            messageBroker.Subscribe<NetworkChangeTownFoodStock>(HandleFoodStock);
         }
     }
 }
