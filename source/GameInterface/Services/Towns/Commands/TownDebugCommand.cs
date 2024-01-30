@@ -103,6 +103,7 @@ public class TownDebugCommand
             return $"ID: '{args[0]}' not found";
         }
 
+        Fief fief = town.Settlement.SettlementComponent as Fief;
 
         StringBuilder sb = new();
 
@@ -115,6 +116,7 @@ public class TownDebugCommand
         sb.AppendFormat("Security: '{0}'\n", town.Security);
         sb.AppendFormat("InRebelliousState: '{0}'\n", town.InRebelliousState);
         sb.AppendFormat("GarrisonAutoRecruitmentIsEnabled: '{0}'\n", town.GarrisonAutoRecruitmentIsEnabled);
+        sb.AppendFormat("Food stock '{0}' : \n", fief.FoodStocks);
         sb.AppendFormat("TradeTaxAccumulated: '{0}'\n", town.TradeTaxAccumulated);
         sb.AppendFormat("Sold Items: \n");
         Town.SellLog[] logList = getSoldItems(town);
@@ -126,6 +128,44 @@ public class TownDebugCommand
             }
         }
         return sb.ToString();
+    }
+
+    // coop.debug.town.set_foodStocks
+    /// <summary>
+    /// Set the food stocks for a Town
+    /// </summary>
+    /// <param name="args">first arg : townId ; second arg : stock value</param>
+    /// <returns></returns>
+    [CommandLineArgumentFunction("set_foodStocks", "coop.debug.town")]
+    public static string SetFoodStocks(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.town.set_foodStocks <townId> <foodStocks> ";
+        }
+
+        string townId = args[0];
+        string foodStocksString = args[1];
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+        if (objectManager.TryGetObject(townId, out Town town) == false)
+        {
+            return $"Town with ID: '{townId}' not found";
+        }
+        
+        Fief fief = town.Settlement.SettlementComponent as Fief;
+
+        if (float.TryParse(foodStocksString, out float foodStocks) == false)
+        {
+            return $"Argument2: {foodStocksString} is not a float.";
+        }
+
+        fief.FoodStocks = foodStocks;
+
+        return $"Town food stocks has changed to: {fief.FoodStocks}";
     }
 
     // coop.debug.town.set_governor town_comp_V1 lord_1_1
