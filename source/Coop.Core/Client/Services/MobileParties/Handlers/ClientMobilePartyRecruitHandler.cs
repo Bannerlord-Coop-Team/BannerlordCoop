@@ -24,16 +24,16 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
             messageBroker.Subscribe<NewTroopAdded>(Handle);
-            messageBroker.Subscribe<NetworkNewTroopAdded>(Handle);
+            messageBroker.Subscribe<NetworkAddNewTroop>(Handle);
             messageBroker.Subscribe<TroopIndexAdded>(Handle);
-            messageBroker.Subscribe<NetworkTroopIndexAdded>(Handle);
+            messageBroker.Subscribe<NetworkAddTroopIndex>(Handle);
         }
         public void Dispose()
         {
             messageBroker.Unsubscribe<NewTroopAdded>(Handle);
-            messageBroker.Unsubscribe<NetworkNewTroopAdded>(Handle);
+            messageBroker.Unsubscribe<NetworkAddNewTroop>(Handle);
             messageBroker.Unsubscribe<TroopIndexAdded>(Handle);
-            messageBroker.Unsubscribe<NetworkTroopIndexAdded>(Handle);
+            messageBroker.Unsubscribe<NetworkAddTroopIndex>(Handle);
         }
 
         internal void Handle(MessagePayload<NewTroopAdded> obj)
@@ -42,7 +42,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
 
             network.SendAll(new NetworkNewTroopRequest(payload.CharacterId, payload.PartyId, payload.isPrisonerRoster, payload.InsertAtFront, payload.InsertionIndex));
         }
-        internal void Handle(MessagePayload<NetworkNewTroopAdded> obj)
+        internal void Handle(MessagePayload<NetworkAddNewTroop> obj)
         {
             var payload = obj.What;
 
@@ -55,7 +55,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
 
             network.SendAll(new NetworkTroopIndexAddRequest(payload.PartyId, payload.IsPrisonerRoster, payload.Index, payload.CountChange, payload.WoundedCountChange, payload.XpChange, payload.RemoveDepleted));
         }
-        internal void Handle(MessagePayload<NetworkTroopIndexAdded> obj)
+        internal void Handle(MessagePayload<NetworkAddTroopIndex> obj)
         {
             var payload = obj.What;
 

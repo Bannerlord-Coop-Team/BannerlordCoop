@@ -10,7 +10,7 @@ namespace Coop.Core.Server.Services.MobileParties.Messages
     /// Network command for recruited unit
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record NetworkTroopIndexAdded : ICommand
+    public record NetworkAddTroopIndex : ICommand
     {
         [ProtoMember(1)]
         public string PartyId;
@@ -27,7 +27,7 @@ namespace Coop.Core.Server.Services.MobileParties.Messages
         [ProtoMember(7)]
         public bool RemoveDepleted;
 
-        public NetworkTroopIndexAdded(string partyId, bool isPrisonerRoster, int index, int countChange, int woundedCountChange, int xpChange, bool removeDepleted)
+        public NetworkAddTroopIndex(string partyId, bool isPrisonerRoster, int index, int countChange, int woundedCountChange, int xpChange, bool removeDepleted)
         {
             PartyId = partyId;
             IsPrisonerRoster = isPrisonerRoster;

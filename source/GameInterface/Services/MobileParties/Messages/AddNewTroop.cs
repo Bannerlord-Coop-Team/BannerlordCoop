@@ -3,9 +3,9 @@
 namespace GameInterface.Services.MobileParties.Messages
 {
     /// <summary>
-    /// Event to tell GameInterface to handle unit being recruited
+    /// Command to tell GameInterface to handle unit being recruited
     /// </summary>
-    public record AddNewTroop : IEvent
+    public record AddNewTroop : ICommand
     {
         public string CharacterId { get; }
         public string PartyId { get; }

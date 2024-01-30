@@ -1,29 +1,24 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.Clans.Handler;
 using Coop.Core.Client.Services.MapEvent.Messages;
-using Coop.Core.Server.Services.Clans.Messages;
 using Coop.Core.Server.Services.MapEvent.Messages;
-using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.MapEvents.Messages;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Client.Services.MapEvent.Handlers
 {
     /// <summary>
     /// Client handler for Starting Map Events
     /// </summary>
-    public class StartBattleClientHandler : IHandler
+    public class ClientStartBattleHandler : IHandler
     {
+        private readonly ILogger Logger = LogManager.GetLogger<ClientStartBattleHandler>();
+
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
-        private readonly ILogger Logger = LogManager.GetLogger<StartBattleClientHandler>();
 
-        public StartBattleClientHandler(IMessageBroker messageBroker, INetwork network)
+        public ClientStartBattleHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.network = network;

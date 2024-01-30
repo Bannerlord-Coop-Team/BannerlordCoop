@@ -57,7 +57,7 @@ namespace GameInterface.Services.MapEvents.Patches
                 {
                     MapEvent_FinishBattle.Invoke(mapEvent, new object[] { });
                 }
-            }, true);
+            });
         }
     }
 }

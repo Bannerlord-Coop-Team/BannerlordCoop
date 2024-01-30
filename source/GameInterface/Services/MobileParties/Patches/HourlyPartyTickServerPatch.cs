@@ -10,17 +10,6 @@ internal class HourlyPartyTickServerPatch
 {
     [HarmonyPrefix]
     [HarmonyPatch("HourlyTickParty")]
-    private static bool HourlyTickPartyPrefix(ref MobileParty mobileParty)
-    {
-        if (ModInformation.IsServer)
-        {
-            if (mobileParty.IsPartyControlled())
-            {
-                return true;
-            }
-            return false;
-        }
-        return false;
-    }
+    private static bool HourlyTickPartyPrefix(ref MobileParty mobileParty) => ModInformation.IsServer;
 
 }

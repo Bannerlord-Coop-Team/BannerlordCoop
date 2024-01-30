@@ -12,12 +12,18 @@ namespace GameInterface.Services.MapEvents.Patches
     [HarmonyPatch(typeof(EncounterManager))]
     public class StartBattleActionPatch
     {
+
+        private static string lastAttackerPartyId;
+
         [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
         static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
             
             if (ModInformation.IsClient) return false;
+
+            if (lastAttackerPartyId == attackerParty.MobileParty.StringId) return false;
+            lastAttackerPartyId = attackerParty.MobileParty.StringId;
 
             //Disables interaction between players, this will be handled in a future issue
             if (!attackerParty.MobileParty.IsPartyControlled() && !defenderParty.MobileParty.IsPartyControlled()) { return false; } 

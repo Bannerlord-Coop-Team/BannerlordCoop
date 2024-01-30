@@ -38,7 +38,7 @@ namespace GameInterface.Services.Clans.Patches
                 {
                     ChangeClanInfluenceAction.Apply(clan, amount);
                 }
-            }, true);
+            });
         }
     }
 }

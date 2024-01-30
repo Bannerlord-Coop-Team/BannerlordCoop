@@ -23,11 +23,11 @@ namespace GameInterface.Services.MapEvents.Handlers
     /// </summary>
     public class EndBattleHandler : IHandler
     {
-        private readonly IMessageBroker messageBroker;
-        private readonly IObjectManager objectManager;
         private readonly ILogger Logger = LogManager.GetLogger<EndBattleHandler>();
 
-        
+        private readonly IMessageBroker messageBroker;
+        private readonly IObjectManager objectManager;
+
         public EndBattleHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
@@ -50,7 +50,11 @@ namespace GameInterface.Services.MapEvents.Handlers
                 return;
             }
 
-            if (party.MapEvent == null) return;
+            if (party.MapEvent == null)
+            {
+                Logger.Error("Party ({partyName}) has no MapEvent but tried to end a MapEvent", party.Name.ToString());
+                return;
+            }
 
             MapEventUpdatePatch.OverrideFinishBattle(party.MapEvent);
         }

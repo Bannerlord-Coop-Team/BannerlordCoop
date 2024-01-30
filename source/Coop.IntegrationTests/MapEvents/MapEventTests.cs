@@ -38,7 +38,7 @@ namespace Coop.IntegrationTests.MapEvents
             var server = TestEnvironment.Server;
 
             // Act
-            client1.SimulateMessage(this, message);
+            server.SimulateMessage(this, message);
 
             // Assert
             Assert.Equal(1, server.InternalMessages.GetMessageCount<StartBattle>());
@@ -68,7 +68,7 @@ namespace Coop.IntegrationTests.MapEvents
             var server = TestEnvironment.Server;
 
             // Act
-            client1.SimulateMessage(this, message);
+            server.SimulateMessage(this, message);
 
             // Assert
             Assert.Equal(1, server.InternalMessages.GetMessageCount<EndBattle>());

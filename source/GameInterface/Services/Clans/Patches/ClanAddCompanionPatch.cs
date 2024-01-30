@@ -34,7 +34,7 @@ namespace GameInterface.Services.Clans.Patches
                 {
                     AddCompanionAction.Apply(clan, companion);
                 }
-            }, true);
+            });
         }
     }
 }

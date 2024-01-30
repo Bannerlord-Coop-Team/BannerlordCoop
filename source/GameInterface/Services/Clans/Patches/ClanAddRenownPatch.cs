@@ -36,7 +36,7 @@ namespace GameInterface.Services.Clans.Patches
                     {
                         clan.AddRenown(amount, shouldNotify);
                     }
-                }, true);
+                });
         }
     }
 }

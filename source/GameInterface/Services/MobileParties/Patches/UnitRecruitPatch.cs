@@ -4,28 +4,29 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.MobileParties.Extensions;
-using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using Serilog;
-using Serilog.Core;
 using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
 
 namespace GameInterface.Services.MobileParties.Patches
 {
     [HarmonyPatch(typeof(TroopRoster))]
     public class UnitRecruitPatch
     {
-        private static PropertyInfo TroopRoster_OwnerParty => typeof(TroopRoster).GetProperty("OwnerParty", BindingFlags.Instance | BindingFlags.NonPublic);
+        static readonly Func<TroopRoster, PartyBase> TroopRoster_OwnerParty = 
+            typeof(TroopRoster)
+        .GetProperty("OwnerParty", BindingFlags.Instance | BindingFlags.NonPublic)
+        .BuildUntypedGetter<TroopRoster, PartyBase>();
 
-        private static readonly MethodInfo TroopRoster_AddNewElement = typeof(TroopRoster).GetMethod("AddNewElement", BindingFlags.NonPublic | BindingFlags.Instance);
+        static readonly Action<TroopRoster, CharacterObject, bool, int> TroopRoster_AddNewElement = 
+            typeof(TroopRoster)
+            .GetMethod("AddNewElement", BindingFlags.Instance | BindingFlags.NonPublic)
+            .BuildDelegate<Action<TroopRoster, CharacterObject, bool, int>>();
 
         private static readonly ILogger Logger = LogManager.GetLogger<UnitRecruitPatch>();
 
@@ -37,7 +38,7 @@ namespace GameInterface.Services.MobileParties.Patches
 
             if (PolicyProvider.AllowOriginalCalls) return true;
 
-            PartyBase ownerParty = (PartyBase)TroopRoster_OwnerParty.GetValue(__instance);
+            PartyBase ownerParty = TroopRoster_OwnerParty(__instance);
 
             if (ownerParty == null) return false;
 
@@ -48,7 +49,7 @@ namespace GameInterface.Services.MobileParties.Patches
                 insertAtFront, 
                 insertionIndex));
 
-            return false;
+            return ModInformation.IsServer;
         }
 
         [HarmonyPrefix]
@@ -59,7 +60,7 @@ namespace GameInterface.Services.MobileParties.Patches
 
             if (PolicyProvider.AllowOriginalCalls) return true;
 
-            PartyBase ownerParty = (PartyBase)TroopRoster_OwnerParty.GetValue(__instance);
+            PartyBase ownerParty = TroopRoster_OwnerParty(__instance);
 
             if (ownerParty == null) return false;
 
@@ -72,7 +73,7 @@ namespace GameInterface.Services.MobileParties.Patches
                 xpChange,
                 removeDepleted));
 
-            return false;
+            return ModInformation.IsServer;
         }
 
         public static void RunOriginalAddNewElement(CharacterObject character, MobileParty party, bool isPrisonerRoster, bool insertAtFront = false, int insertionIndex = -1)
@@ -81,14 +82,16 @@ namespace GameInterface.Services.MobileParties.Patches
             {
                 using (new AllowedThread())
                 {
+                    TroopRoster roster;
                     if (isPrisonerRoster)
                     {
-                        TroopRoster_AddNewElement.Invoke(party.PrisonRoster, new object[] { character, insertAtFront, insertionIndex });
+                        roster = party.PrisonRoster;
                     }
                     else
                     {
-                        TroopRoster_AddNewElement.Invoke(party.MemberRoster, new object[] { character, insertAtFront, insertionIndex });
+                        roster = party.MemberRoster;
                     }
+                    TroopRoster_AddNewElement(roster, character, insertAtFront, insertionIndex);
                 }
             }, true);
         }
