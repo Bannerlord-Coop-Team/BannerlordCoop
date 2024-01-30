@@ -32,7 +32,7 @@ namespace Coop.Core.Client.Services.Fiefs.Handlers
 
         public void Dispose()
         {
-            messageBroker.Subscribe<NetworkChangeFiefFoodStock>(HandleFoodStock);
+            messageBroker.Unsubscribe<NetworkChangeFiefFoodStock>(HandleFoodStock);
         }
     }
 }
