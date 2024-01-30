@@ -155,7 +155,7 @@ public class TownDebugCommand
         {
             return $"Town with ID: '{townId}' not found";
         }
-
+        
         Fief fief = town.Settlement.SettlementComponent as Fief;
 
         if (float.TryParse(foodStocksString, out float foodStocks) == false)
