@@ -23,10 +23,10 @@ namespace GameInterface.Services.MobileParties.Patches
         .GetProperty("OwnerParty", BindingFlags.Instance | BindingFlags.NonPublic)
         .BuildUntypedGetter<TroopRoster, PartyBase>();
 
-        static readonly Action<TroopRoster, CharacterObject, bool, int> TroopRoster_AddNewElement = 
+        static readonly Func<TroopRoster, CharacterObject, bool, int, int> TroopRoster_AddNewElement = 
             typeof(TroopRoster)
             .GetMethod("AddNewElement", BindingFlags.Instance | BindingFlags.NonPublic)
-            .BuildDelegate<Action<TroopRoster, CharacterObject, bool, int>>();
+            .BuildDelegate<Func<TroopRoster, CharacterObject, bool, int, int>>();
 
         private static readonly ILogger Logger = LogManager.GetLogger<UnitRecruitPatch>();
 
