@@ -18,14 +18,13 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Armies.Patches
 {
-    [HarmonyPatch(typeof(Army), "OnAddPartyInternal")]
+    [HarmonyPatch(typeof(Army))]
     public class ArmyPatches
     {
-        private static Action<Army, MobileParty> OnAddPartyInternal = typeof(Army).GetMethod("OnAddPartyInternal", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildDelegate<Action<Army, MobileParty>>();
 
-
-        static bool Prefix(ref Army __instance, MobileParty mobileParty)
+        [HarmonyPatch(typeof(Army), "OnAddPartyInternal")]
+        [HarmonyPrefix]
+        static bool OnAddPartyInternalPrefix(ref Army __instance, ref MobileParty mobileParty)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
             if (PolicyProvider.AllowOriginalCalls) return true;
