@@ -26,12 +26,12 @@ namespace GameInterface.Services.Armies.Handlers
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
 
-            messageBroker.Subscribe<AddMobilePartyInArmy>(HandleAddMobilePartyInArmy);
+            messageBroker.Subscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
 
         }
 
         //Generate Handler Methods
-        private void HandleAddMobilePartyInArmy(MessagePayload<AddMobilePartyInArmy> payload)
+        private void HandleChangeAddMobilePartyInArmy(MessagePayload<AddMobilePartyInArmy> payload)
         {
             var obj = payload.What;
 
@@ -53,7 +53,7 @@ namespace GameInterface.Services.Armies.Handlers
         }
         public void Dispose()
         {
-            messageBroker.Unsubscribe<AddMobilePartyInArmy>(HandleAddMobilePartyInArmy);
+            messageBroker.Unsubscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
         }
 
     }
