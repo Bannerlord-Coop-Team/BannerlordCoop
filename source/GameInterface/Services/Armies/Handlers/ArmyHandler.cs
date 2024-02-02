@@ -27,6 +27,29 @@ namespace GameInterface.Services.Armies.Handlers
             this.objectManager = objectManager;
 
             messageBroker.Subscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
+            messageBroker.Subscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+
+        }
+
+        private void HandleChangeRemoveMobilePartyInArmy(MessagePayload<RemoveMobilePartyInArmy> payload)
+        {
+            var obj = payload.What;
+
+            if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
+            {
+                Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
+                return;
+            }
+
+            if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
+            {
+                Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
+                return;
+            }
+
+            //TODO: Wait for Amry creation / deletion sync add, cannot call the ArmyPach because army will be null
+
+            //ArmyPatches.RemoveMobilePartyInArmy(mobileParty, leaderMobileParty.Army);
 
         }
 
@@ -55,6 +78,7 @@ namespace GameInterface.Services.Armies.Handlers
         public void Dispose()
         {
             messageBroker.Unsubscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
+            messageBroker.Unsubscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
         }
 
     }

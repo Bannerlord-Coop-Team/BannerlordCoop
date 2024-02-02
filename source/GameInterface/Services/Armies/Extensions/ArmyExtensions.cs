@@ -10,9 +10,16 @@ namespace GameInterface.Services.Armies.Extensions
     {
         private static Action<Army, MobileParty> Army_OnAddPartyInternal = typeof(Army).GetMethod("OnAddPartyInternal", BindingFlags.NonPublic | BindingFlags.Instance)
             .BuildDelegate<Action<Army, MobileParty>>();
+        private static Action<Army, MobileParty> Army_OnRemovePartyInternal = typeof(Army).GetMethod("OnRemovePartyInternal", BindingFlags.NonPublic | BindingFlags.Instance)
+            .BuildDelegate<Action<Army, MobileParty>>();
+        
         internal static void OnAddPartyInternal(this MobileParty mobileParty, Army army)
         {
             Army_OnAddPartyInternal(army,mobileParty);
+        }
+        internal static void OnRemovePartyInternal(this MobileParty mobileParty, Army army)
+        {
+            Army_OnRemovePartyInternal(army,mobileParty);
         }
     }
 }

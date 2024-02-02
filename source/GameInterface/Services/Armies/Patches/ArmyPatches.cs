@@ -37,6 +37,21 @@ namespace GameInterface.Services.Armies.Patches
             return true;
         }
 
+        [HarmonyPatch(typeof(Army), "OnRemovePartyInternal")]
+        [HarmonyPrefix]
+        static bool OnRemovePartyInternalPrefix(ref Army __instance, ref MobileParty mobileParty)
+        {
+            if (AllowedThread.IsThisThreadAllowed()) return true;
+            if (PolicyProvider.AllowOriginalCalls) return true;
+
+            if (ModInformation.IsClient) return false;
+
+            var message = new MobilePartyInArmyRemoved(mobileParty.StringId, __instance.LeaderParty.StringId);
+            
+            MessageBroker.Instance.Publish(mobileParty, message);
+
+            return true;
+        }
 
         public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
         {
@@ -48,6 +63,17 @@ namespace GameInterface.Services.Armies.Patches
                 }
             });
 
+        }
+
+        public static void RemoveMobilePartyInArmy(MobileParty mobileParty, Army army)
+        {
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                using (new AllowedThread())
+                {
+                    ArmyExtensions.OnRemovePartyInternal(mobileParty, army);
+                }
+            });
         }
     }
 }
