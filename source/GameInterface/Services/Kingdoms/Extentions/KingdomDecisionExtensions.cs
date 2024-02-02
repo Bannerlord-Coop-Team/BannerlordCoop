@@ -1,8 +1,6 @@
 ﻿using GameInterface.Services.Kingdoms.Data;
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Text;
 using TaleWorlds.CampaignSystem.Election;
 
 namespace GameInterface.Services.Kingdoms.Extentions

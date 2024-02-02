@@ -1,13 +1,12 @@
-﻿using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using GameInterface.Services.ObjectManager;
+using ProtoBuf;
+using TaleWorlds.CampaignSystem.Election;
 
 namespace GameInterface.Services.Kingdoms.Data
 {
     [ProtoContract(SkipConstructor = true)]
     [ProtoInclude(0, nameof(DeclareWarDecisionData))]
-    public class KingdomDecisionData
+    public abstract class KingdomDecisionData
     {
         [ProtoMember(1)]
         public string ProposerClanId { get; }
@@ -28,5 +27,15 @@ namespace GameInterface.Services.Kingdoms.Data
             NotifyPlayer = notifyPlayer;
             PlayerExamined = playerExamined;
         }
+
+        protected void SetKingdomDecisionProperties(KingdomDecision kingdomDecision)
+        {
+            kingdomDecision.IsEnforced = IsEnforced;
+            kingdomDecision.NotifyPlayer = NotifyPlayer;
+            kingdomDecision.PlayerExamined = PlayerExamined;
+        }
+
+
+        public abstract bool TryGetKingdomDecision(IObjectManager objectManager,out KingdomDecision kingdomDecision);
     }
 }
