@@ -1,18 +1,18 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Kingdoms.Data;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using ProtoBuf;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
-    public record DecisionRemoved : IEvent
+    [ProtoContract(SkipConstructor = true)]
+    public class RemoveDecision: ICommand
     {
+        [ProtoMember(1)]
         public string KingdomId { get; }
-
+        [ProtoMember(2)]
         public KingdomDecisionData Data { get; }
 
-        public DecisionRemoved(string kingdomId, KingdomDecisionData data)
+        public RemoveDecision(string kingdomId, KingdomDecisionData data)
         {
             KingdomId = kingdomId;
             Data = data;

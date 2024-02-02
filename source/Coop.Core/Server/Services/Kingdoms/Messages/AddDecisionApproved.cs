@@ -1,20 +1,21 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Kingdoms.Data;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using ProtoBuf;
 
-namespace GameInterface.Services.Kingdoms.Messages
+namespace Coop.Core.Server.Services.Kingdoms.Messages
 {
-    public record DecisionAdded: IEvent
+    [ProtoContract(SkipConstructor = true)]
+    public class AddDecisionApproved : ICommand
     {
+        [ProtoMember(1)]
         public string KingdomId { get; }
-
+        [ProtoMember(2)]
         public KingdomDecisionData Data { get; }
 
+        [ProtoMember(3, IsRequired = true)]
         public bool IgnoreInfluenceCost { get; }
 
-        public DecisionAdded(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost)
+        public AddDecisionApproved(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost)
         {
             KingdomId = kingdomId;
             Data = data;

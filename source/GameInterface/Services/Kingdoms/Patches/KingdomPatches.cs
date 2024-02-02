@@ -3,13 +3,9 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
-using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
-using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.CampaignSystem.Actions.ChangeOwnerOfSettlementAction;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
@@ -29,7 +25,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (AllowedInstance.IsAllowed(__instance)) return true;
 
             MessageBroker.Instance.Publish(__instance,
-                new DecisionAdded(__instance.StringId, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost));
+                new LocalDecisionAdded(__instance.StringId, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost));
 
             return false;
         }
@@ -54,7 +50,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (AllowedInstance.IsAllowed(__instance)) return true;
 
             MessageBroker.Instance.Publish(__instance,
-                new DecisionRemoved(__instance.StringId, kingdomDecision.ToKingdomDecisionData()));
+                new LocalDecisionRemoved(__instance.StringId, kingdomDecision.ToKingdomDecisionData()));
 
             return false;
         }
