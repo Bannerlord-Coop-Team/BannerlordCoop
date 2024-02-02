@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-
+#nullable enable
 namespace GameInterface.Services.Towns.Messages
 {
     /// <summary>
@@ -9,9 +9,9 @@ namespace GameInterface.Services.Towns.Messages
     {
 
         public string TownId { get; }
-        public string GovernorId { get; }
+        public string? GovernorId { get; }
 
-        public ChangeTownGovernor(string townId, string governorId)
+        public ChangeTownGovernor(string townId, string? governorId)
         {
             TownId = townId;
             GovernorId = governorId;

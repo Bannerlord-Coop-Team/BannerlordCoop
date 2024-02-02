@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-
+#nullable enable
 namespace Coop.Core.Server.Services.Towns.Messages
 {
     /// <summary>
@@ -12,9 +12,9 @@ namespace Coop.Core.Server.Services.Towns.Messages
         [ProtoMember(1)]
         public string TownId { get; }
         [ProtoMember(2)]
-        public string GovernorId { get; }
+        public string? GovernorId { get; }
 
-        public NetworkChangeTownGovernor(string townId, string governorId)
+        public NetworkChangeTownGovernor(string townId, string? governorId)
         {
             TownId = townId;
             GovernorId = governorId;
