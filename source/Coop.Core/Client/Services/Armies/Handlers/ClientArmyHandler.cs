@@ -20,6 +20,7 @@ namespace Coop.Core.Client.Services.Army.Handlers
             this.network = network;
 
             messageBroker.Subscribe<NetworkChangeAddMobilePartyInArmy>(HandleMobilePartyInArmyAdd);
+            messageBroker.Subscribe<NetworkChangeRemoveMobilePartyInArmy>(HandleMobilePartyInArmyRemove);
         }
 
 
@@ -33,9 +34,19 @@ namespace Coop.Core.Client.Services.Army.Handlers
 
         }
 
+        private void HandleMobilePartyInArmyRemove(MessagePayload<NetworkChangeRemoveMobilePartyInArmy> payload)
+        {
+            NetworkChangeRemoveMobilePartyInArmy networkRemoveMobilePartyInArmy = payload.What;
+            RemoveMobilePartyInArmy message =
+                new RemoveMobilePartyInArmy(networkRemoveMobilePartyInArmy.MobilePartyId, networkRemoveMobilePartyInArmy.LeaderMobilePartyId);
+
+            messageBroker.Publish(this, message);
+        }
+
         public void Dispose()
         {
             messageBroker.Unsubscribe<NetworkChangeAddMobilePartyInArmy>(HandleMobilePartyInArmyAdd);
+            messageBroker.Unsubscribe<NetworkChangeRemoveMobilePartyInArmy>(HandleMobilePartyInArmyRemove);
         }
     }
 }
