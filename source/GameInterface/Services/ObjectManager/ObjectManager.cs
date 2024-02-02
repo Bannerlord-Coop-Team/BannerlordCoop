@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Logging;
+using GameInterface.Services.Armies;
 using GameInterface.Services.Clans;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager.Extensions;
@@ -73,11 +74,13 @@ internal class ObjectManager : IObjectManager
     public ObjectManager(
         IHeroRegistry heroRegistry,
         IMobilePartyRegistry partyRegistry, 
-        IClanRegistry clanRegistry)
+        IClanRegistry clanRegistry,
+        IArmyRegistry armyRegistry)
     {
         RegistryMap.Add(heroRegistry.ManagedType, heroRegistry);
         RegistryMap.Add(partyRegistry.ManagedType, partyRegistry);
         RegistryMap.Add(clanRegistry.ManagedType, clanRegistry);
+        RegistryMap.Add(armyRegistry.ManagedType, armyRegistry);
     }
 
     public bool AddExisting(string id, object obj)
