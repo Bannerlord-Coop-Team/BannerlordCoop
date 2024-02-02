@@ -21,6 +21,8 @@ namespace Coop.Core.Server.Services.Armies.Handlers
 
             // This handles an internal message
             messageBroker.Subscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
+            messageBroker.Subscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
+
         }
 
         private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
@@ -34,11 +36,23 @@ namespace Coop.Core.Server.Services.Armies.Handlers
             network.SendAll(networkChangeAddMobilePartyInArmy);
         }
 
+        private void HandleRemoveMobilePartyInArmy(MessagePayload<MobilePartyInArmyRemoved> obj)
+        {
+            MobilePartyInArmyRemoved mobilePartyInArmyRemoved = obj.What;
+
+            // Broadcast to all the clients that the state was changed
+            NetworkChangeRemoveMobilePartyInArmy networkChangeRemoveMobilePartyInArmy = 
+                new NetworkChangeRemoveMobilePartyInArmy(mobilePartyInArmyRemoved.MobilePartyId, mobilePartyInArmyRemoved.LeaderMobilePartyId);
+            
+            network.SendAll(networkChangeRemoveMobilePartyInArmy);
+        }
+
        
         public void Dispose()
         {
            
             messageBroker.Unsubscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
+            messageBroker.Unsubscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
         }
     }
 }
