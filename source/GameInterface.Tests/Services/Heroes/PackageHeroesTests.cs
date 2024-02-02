@@ -51,7 +51,7 @@ namespace GameInterface.Tests.Services.Heroes
             // Verification
             foreach (var hero in heroes)
             {
-                Assert.True(heroRegistry.TryGetValue(hero, out string _));
+                Assert.True(heroRegistry.TryGetId(hero, out string _));
             }
         }
     }

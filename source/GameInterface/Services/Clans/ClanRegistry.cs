@@ -32,5 +32,10 @@ internal class ClanRegistry : RegistryBase<Clan>, IClanRegistry
     }
 
     private const string ClanStringIdPrefix = "CoopClan";
-    public override bool RegisterNewObject(object obj, out string id) => RegisterNewObject(obj, ClanStringIdPrefix, out id);
+    protected override string GetNewId(Clan party)
+    {
+        party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Clan>(ClanStringIdPrefix);
+        return party.StringId;
+    }
+
 }

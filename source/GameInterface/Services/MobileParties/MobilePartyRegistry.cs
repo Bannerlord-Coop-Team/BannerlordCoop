@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Services.Registry;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -30,5 +31,9 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegi
     }
 
     private const string PartyStringIdPrefix = "CoopParty";
-    public override bool RegisterNewObject(object obj, out string id) => RegisterNewObject(obj, PartyStringIdPrefix, out id);
+    protected override string GetNewId(MobileParty party)
+    {
+        party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>(PartyStringIdPrefix);
+        return party.StringId;
+    }
 }

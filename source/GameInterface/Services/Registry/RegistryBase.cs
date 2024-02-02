@@ -4,16 +4,19 @@ using Serilog;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Registry;
 
-internal abstract class RegistryBase<T> : IRegistry<T> where T : MBObjectBase
+internal abstract class RegistryBase<T> : IRegistry<T> where T : class
 {
     protected readonly ILogger Logger = LogManager.GetLogger<RegistryBase<T>>();
 
     protected readonly Dictionary<string, T> objIds = new Dictionary<string, T>();
+    protected readonly ConditionalWeakTable<T, string> idObjs = new ConditionalWeakTable<T, string>();
+
+    protected abstract string GetNewId(T obj);
 
     public int Count => objIds.Count;
 
@@ -30,7 +33,7 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : MBObjectBase
 
         if (objIds.ContainsKey(id))
         {
-            Logger.Warning("{id} already exists in {type} Registry", castedObj.StringId, typeof(T));
+            Logger.Warning("{id} already exists in {type} Registry", id, typeof(T));
             return false;
         }
 
@@ -39,8 +42,6 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : MBObjectBase
         return true;
     }
 
-
-    public abstract bool RegisterNewObject(object obj, out string id);
     /// <summary>
     /// Handles common functionality of registering new <see cref="T"/>
     /// </summary>
@@ -48,18 +49,16 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : MBObjectBase
     /// <param name="stringIdPrefix">Prefix of <see cref="T.StringId"/></param>
     /// <param name="id">Out parameter of newly created <see cref="T.StringId"/></param>
     /// <returns>True if creation was successful, otherwise false</returns>
-    protected virtual bool RegisterNewObject(object obj, string stringIdPrefix, out string id)
+    public virtual bool RegisterNewObject(object obj, out string id)
     {
         id = null;
 
         if (Campaign.Current?.CampaignObjectManager == null) return false;
         if (TryCast(obj, out T castedObj) == false) return false;
 
-        var newId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>(stringIdPrefix);
+        var newId = GetNewId(castedObj);
 
         if (objIds.ContainsKey(newId)) return false;
-
-        castedObj.StringId = newId;
 
         objIds.Add(newId, castedObj);
 
@@ -70,20 +69,21 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : MBObjectBase
 
     public virtual bool Remove(object obj) {
         if (TryCast(obj, out var castedObj) == false) return false;
-        return objIds.Remove(castedObj.StringId);
+
+        if (idObjs.TryGetValue(castedObj, out var id) == false) return false;
+
+        return objIds.Remove(id);
     }
 
     public virtual bool Remove(string id) => objIds.Remove(id);
 
-    public virtual bool TryGetValue(object obj, out string id)
+    public virtual bool TryGetId(object obj, out string id)
     {
         id = null;
 
         if (TryCast(obj, out var castedObj) == false) return false;
-        if (objIds.ContainsKey(castedObj.StringId) == false) return false;
 
-        id = castedObj.StringId;
-        return true;
+        return idObjs.TryGetValue(castedObj, out id);
     }
 
     public virtual bool TryGetValue<T1>(string id, out T1 obj) where T1 : class

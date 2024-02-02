@@ -62,7 +62,7 @@ public interface IRegistry
     /// <param name="obj">Object to get id for</param>
     /// <param name="id">Stored id, will be default if no id/obj exists</param>
     /// <returns>True if retrieval was successful, otherwise false</returns>
-    bool TryGetValue(object obj, out string id);
+    bool TryGetId(object obj, out string id);
 
 
     /// <summary>

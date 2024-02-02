@@ -156,7 +156,7 @@ internal class ObjectManager : IObjectManager
 
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
-            return registry.TryGetValue(obj, out _);
+            return registry.TryGetId(obj, out _);
         }
 
         // Attempt to find using string id instead
@@ -169,7 +169,7 @@ internal class ObjectManager : IObjectManager
         if (string.IsNullOrEmpty(id)) return false;
         if (objectManager == null) return false;
 
-        if (RegistryMap.Values.Any(registry => registry.TryGetValue(id, out _))) return true;
+        if (RegistryMap.Values.Any(registry => registry.TryGetId(id, out _))) return true;
 
         // Use MBObjectManager registry cannot find value
         return objectManager.Contains(id);

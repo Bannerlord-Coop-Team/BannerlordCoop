@@ -66,7 +66,7 @@ namespace GameInterface.Tests.Services.Parties
             for (int i = 0; i < NUM_PARTIES; i++)
             {
                 var party = parties[i];
-                Assert.True(partyRegistry.TryGetValue(party, out string _));
+                Assert.True(partyRegistry.TryGetId(party, out string _));
             }
         }
     }

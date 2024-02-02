@@ -1,6 +1,7 @@
 ﻿using Common;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Registry;
 
@@ -34,5 +35,9 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
     }
 
     public static readonly string HeroStringIdPrefix = "CoopHero";
-    public override bool RegisterNewObject(object obj, out string id) => RegisterNewObject(obj, HeroStringIdPrefix, out id);
+    protected override string GetNewId(Hero party)
+    {
+        party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
+        return party.StringId;
+    }
 }
