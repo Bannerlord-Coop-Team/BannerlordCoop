@@ -47,8 +47,9 @@ namespace GameInterface.Services.Armies.Handlers
                 return;
             }
 
-                
-            ArmyPatches.AddMobilePartyInArmy(mobileParty, leaderMobileParty.Army);
+            //TODO: Wait for Amry creation / deletion sync add, cannot call the ArmyPach because army will be null
+
+            //ArmyPatches.AddMobilePartyInArmy(mobileParty, leaderMobileParty.Army);
               
         }
         public void Dispose()
