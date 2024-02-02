@@ -33,6 +33,7 @@ namespace GameInterface.Services.Heroes.Commands
             return stringBuilder.ToString();
         }
 
+        // coop.debug.hero.info
         [CommandLineArgumentFunction("info", "coop.debug.hero")]
         public static string Info(List<string> args)
         {
@@ -64,6 +65,7 @@ namespace GameInterface.Services.Heroes.Commands
         }
 
         // TODO move
+        // coop.debug.characterObjects.list
         [CommandLineArgumentFunction("list", "coop.debug.characterObjects")]
         public static string ListCharacterObjects(List<string> args)
         {
@@ -79,6 +81,7 @@ namespace GameInterface.Services.Heroes.Commands
         }
 
 
+        // coop.debug.hero.createHero lord_2_7
         [CommandLineArgumentFunction("createHero", "coop.debug.hero")]
         public static string CreateNewHero(List<string> args)
         {
@@ -100,7 +103,7 @@ namespace GameInterface.Services.Heroes.Commands
 
             string characterObjectId = args[0];
 
-            if (objectManager.TryGetObject<CharacterObject>(characterObjectId, out var template))
+            if (objectManager.TryGetObject<CharacterObject>(characterObjectId, out var template) == false)
             {
                 return $"Unable to get {typeof(CharacterObject)} with id: {characterObjectId}";
             }

@@ -13,7 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Heroes.Handlers;
-internal class CreateHeroHandler
+internal class CreateHeroHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CreateHeroHandler>();
 
