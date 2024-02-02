@@ -34,7 +34,8 @@ namespace GameInterface.Services.Kingdoms.Handlers
         {
             var obj = payload.What;
 
-            if (objectManager.TryGetObject(obj.KingdomId, out Kingdom kingdom) == false)
+            Kingdom kingdom = Campaign.Current.CampaignObjectManager.Kingdoms.Find(k => k.StringId == obj.KingdomId);
+            if (kingdom == null)
             {
                 Logger.Error("Unable to find Kingdom ({kingdomId})", obj.KingdomId);
                 return;
