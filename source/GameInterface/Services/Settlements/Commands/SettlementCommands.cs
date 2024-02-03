@@ -115,6 +115,41 @@ internal class SettlementCommands
         return $"Successfully set the Settlement ({settlementId}) NumberOfAlliesSpottedAround to '{args[1]}'";
     }
 
+
+    // coop.debug.settlements.set_bribe_paid town_ES3 50.0
+    /// <summary>
+    /// Changes the BribePaid
+    /// </summary>
+    /// <param name="args">the settlement and int value</param>
+    /// <returns>info that is was succesful</returns>
+    [CommandLineArgumentFunction("set_bribe_paid", "coop.debug.settlements")]
+    public static string SetBribePaid(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"set_bribe_paid <settlment id> <int_value>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+
+        var objectManager = container.Resolve<IObjectManager>();
+
+        string settlementId = args[0];
+
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+            return $"Settlement: {settlementId} was not found.";
+
+        try
+        {
+            settlement.BribePaid = int.Parse(args[1]);
+        }
+        catch (Exception ex)
+        {
+            return $"Error setting the value: {args[1]} to a int.";
+        }
+
+        return $"Successfully set the Settlement ({settlementId}) BribePaid to '{args[1]}'";
+    }
+
     // Located in Modules\SandBox\ModuleData\settlements.xml
     // POROS EXAMPLE
     // coop.debug.settlements.info town_ES3 
@@ -145,7 +180,7 @@ internal class SettlementCommands
         sb.AppendLine($"------------------- SETTLEMENT: {settlement.Name} -------------------");
         sb.AppendLine($"NumberOfEnemiesSpottedAround: '{settlement.NumberOfEnemiesSpottedAround}'");
         sb.AppendLine($"NumberOfAlliesSpottedAround: '{settlement.NumberOfAlliesSpottedAround}'");
-        sb.AppendLine($"BribePaid: {Convert.ToBoolean(settlement.BribePaid)}");
+        sb.AppendLine($"BribePaid: {settlement.BribePaid}");
         sb.AppendLine($"SettlementHitPoints: '{settlement.SettlementHitPoints}'");
         sb.AppendLine($"GarrisonWagePaymentLimit: '{settlement.GarrisonWagePaymentLimit}'");
         sb.AppendLine($"LastAttackerParty: '{lastAttackerParty}'");
