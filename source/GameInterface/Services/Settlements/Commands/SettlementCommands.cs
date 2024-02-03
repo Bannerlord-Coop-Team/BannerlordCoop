@@ -3,6 +3,7 @@ using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -145,6 +146,44 @@ internal class SettlementCommands
         catch (Exception ex)
         {
             return $"Error setting the value: {args[1]} to a int.";
+        }
+
+        return $"Successfully set the Settlement ({settlementId}) BribePaid to '{args[1]}'";
+    }
+
+
+
+    private static readonly PropertyInfo SettlementHitPoints = typeof(Settlement).GetProperty(nameof(Settlement.SettlementHitPoints));
+
+    // coop.debug.settlements.set_hit_points town_ES3 50.4
+    /// <summary>
+    /// Changes the SettlementHitPoints
+    /// </summary>
+    /// <param name="args">the settlement and float value</param>
+    /// <returns>info that is was succesful</returns>
+    [CommandLineArgumentFunction("set_hit_points", "coop.debug.settlements")]
+    public static string SetHitPoints(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"set_bribe_paid <settlment id> <int_value>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+
+        var objectManager = container.Resolve<IObjectManager>();
+
+        string settlementId = args[0];
+
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+            return $"Settlement: {settlementId} was not found.";
+
+        try
+        {
+            SettlementHitPoints.SetValue(settlement, float.Parse(args[1]));
+        }
+        catch (Exception ex)
+        {
+            return $"Error setting the value: {args[1]} to a float.";
         }
 
         return $"Successfully set the Settlement ({settlementId}) BribePaid to '{args[1]}'";

@@ -17,11 +17,18 @@ internal class ClientSettlementHandler : IHandler
         this.messageBroker = messageBroker;
         this.network = network;
 
-        messageBroker.Subscribe<NetworkChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
-        messageBroker.Subscribe<NetworkChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
         messageBroker.Subscribe<NetworkChangeSettlementBribePaid>(HandleBribePaid);
+        messageBroker.Subscribe<NetworkChangeSettlementHitPoints>(HandleHitPoints);
 
+    }
 
+    private void HandleHitPoints(MessagePayload<NetworkChangeSettlementHitPoints> payload)
+    {
+        var obj = payload.What;
+
+        var message = new ChangeSettlementHitPoints(obj.SettlementId, obj.SettlementHitPoints);
+
+        messageBroker.Publish(this, message);
     }
 
     private void HandleBribePaid(MessagePayload<NetworkChangeSettlementBribePaid> payload)
@@ -33,29 +40,10 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Publish(this, message);
     }
 
-    private void HandleNumberOfAlliesSpottedAround(MessagePayload<NetworkChangeSettlementAlliesSpotted> payload)
-    {
-        var obj = payload.What;
-
-        var message = new ChangeSettlementAlliesSpotted(obj.SettlementId, obj.NumberOfAlliesSpottedAround);
-
-        messageBroker.Publish(this, message);
-    }
-
-    private void HandleNumberOfEnemiesSpottedAround(MessagePayload<NetworkChangeSettlementEnemiesSpotted> payload)
-    {
-        var obj = payload.What;
-
-        var message = new ChangeSettlementEnemiesSpotted(obj.SettlementId, obj.NumberOfEnemiesSpottedAround);
-
-        messageBroker.Publish(this, message);
-    }
-
     public void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
-        messageBroker.Unsubscribe<NetworkChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
         messageBroker.Unsubscribe<NetworkChangeSettlementBribePaid>(HandleBribePaid);
+        messageBroker.Unsubscribe<NetworkChangeSettlementHitPoints>(HandleHitPoints);
 
 
     }

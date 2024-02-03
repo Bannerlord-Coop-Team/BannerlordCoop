@@ -19,11 +19,22 @@ public class SettlementHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
 
-        messageBroker.Subscribe<ChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
-        messageBroker.Subscribe<ChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
         messageBroker.Subscribe<ChangeSettlementBribePaid>(HandleBribePaid);
+        messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
 
+    }
 
+    private void HandleHitPoints(MessagePayload<ChangeSettlementHitPoints> payload)
+    {
+        var obj = payload.What;
+
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        SettlementHitPointsPatch.RunSettlementHitPointsChange(settlement, obj.SettlementHitPoints);
     }
 
     private void HandleBribePaid(MessagePayload<ChangeSettlementBribePaid> payload)
@@ -38,37 +49,11 @@ public class SettlementHandler : IHandler
         BribePaidSettlementPatch.RunBribePaidChange(settlement, obj.BribePaid);
     }
 
-    private void HandleNumberOfAlliesSpottedAround(MessagePayload<ChangeSettlementAlliesSpotted> payload)
-    {
-        var obj = payload.What;
-
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
-            return;
-        }
-        EntitiesSpottedSettlementPatch.RunNumberOfAlliesSpottedChange(settlement, obj.NumberOfAlliesSpottedAround);
-
-    }
-
-    private void HandleNumberOfEnemiesSpottedAround(MessagePayload<ChangeSettlementEnemiesSpotted> payload)
-    {
-        var obj = payload.What;
-
-        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
-        {
-            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
-            return;
-        }
-
-        EntitiesSpottedSettlementPatch.RunNumberOfEnemiesSpottedChange(settlement, obj.NumberOfEnemiesSpottedAround);
-    }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<ChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
-        messageBroker.Unsubscribe<ChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
         messageBroker.Unsubscribe<ChangeSettlementBribePaid>(HandleBribePaid);
+        messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
 
     }
 }

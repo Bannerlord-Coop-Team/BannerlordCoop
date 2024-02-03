@@ -19,10 +19,18 @@ internal class ServerSettlementHandler : IHandler
         this.messageBroker = messageBroker;
         this.network = network;
 
-        messageBroker.Subscribe<SettlementChangedEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
-        messageBroker.Subscribe<SettlementChangeAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
         messageBroker.Subscribe<SettlementChangedBribePaid>(HandleBribePaid);
+        messageBroker.Subscribe<SettlementChangedSettlementHitPoints>(HandleHitPoints);
 
+
+    }
+
+    private void HandleHitPoints(MessagePayload<SettlementChangedSettlementHitPoints> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeSettlementHitPoints(obj.SettlementId, obj.SettlementHitPoints);
+
+        network.SendAll(message);
     }
 
     private void HandleBribePaid(MessagePayload<SettlementChangedBribePaid> payload)
@@ -33,28 +41,10 @@ internal class ServerSettlementHandler : IHandler
         network.SendAll(message);
     }
 
-    private void HandleNumberOfAlliesSpottedAround(MessagePayload<SettlementChangeAlliesSpotted> payload)
-    {
-        var obj = payload.What;
-        var message = new NetworkChangeSettlementAlliesSpotted(obj.SettlementId, obj.NumberOfAlliesSpottedAround);
-
-        network.SendAll(message);
-    }
-
-    private void HandleNumberOfEnemiesSpottedAround(MessagePayload<SettlementChangedEnemiesSpotted> payload)
-    {
-        var obj = payload.What;
-
-        var message = new NetworkChangeSettlementEnemiesSpotted(obj.SettlementId, obj.NumberOfEnemiesSpottedAround);
-
-        network.SendAll(message);
-    }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<SettlementChangedEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
-        messageBroker.Unsubscribe<SettlementChangeAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
         messageBroker.Unsubscribe<SettlementChangedBribePaid>(HandleBribePaid);
-
+        messageBroker.Unsubscribe<SettlementChangedSettlementHitPoints>(HandleHitPoints);
     }
 }
