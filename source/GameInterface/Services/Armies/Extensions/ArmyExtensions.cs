@@ -1,5 +1,6 @@
 ﻿using Common.Extensions;
 using Common.Logging;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using Serilog.Core;
 using System;
@@ -29,13 +30,13 @@ namespace GameInterface.Services.Armies.Extensions
 
         public static string GetStringId(this Army army)
         {
-            if (ContainerProvider.TryResolve<IArmyRegistry>(out var registry) == false)
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
             {
-                Logger.Error("Unable to get Id for {army}", army.Name);
+                Logger.Error("Unable to get {objectManager}", nameof(IObjectManager));
                 return null;
             }
 
-            if (registry.TryGetId(army, out var id))
+            if (objectManager.TryGetId(army, out var id) == false)
             {
                 Logger.Error("{army} was not properly registered", army.Name);
             }

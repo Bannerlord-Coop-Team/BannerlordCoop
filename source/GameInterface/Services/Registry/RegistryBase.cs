@@ -6,6 +6,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
+using static HarmonyLib.Code;
 
 namespace GameInterface.Services.Registry;
 
@@ -38,6 +39,7 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
         }
 
         objIds.Add(id, castedObj);
+        idObjs.Add(castedObj, id);
 
         return true;
     }
@@ -61,6 +63,7 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
         if (objIds.ContainsKey(newId)) return false;
 
         objIds.Add(newId, castedObj);
+        idObjs.Add(castedObj, newId);
 
         id = newId;
 
