@@ -26,8 +26,7 @@ namespace Coop.Core.Client.Services.Army.Handlers
 
         private void HandleArmyDisbanded(MessagePayload<NetworkChangeDisbandArmy> payload)
         {
-            NetworkChangeDisbandArmy networkChangeDisbandArmy = payload.What;
-            DisbandArmy message = new DisbandArmy(networkChangeDisbandArmy.ArmyId, networkChangeDisbandArmy.Reason);
+            var message = new DisbandArmy(payload.What.Data);
 
             messageBroker.Publish(this, message);
         }

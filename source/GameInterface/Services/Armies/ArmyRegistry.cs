@@ -11,14 +11,15 @@ using System.Collections;
 using System.Threading;
 
 namespace GameInterface.Services.Armies;
-internal interface IArmyRegistry : IRegistry<Army>
-{
-    void RegisterAllArmies();
-}
 
-internal class ArmyRegistry : RegistryBase<Army>, IArmyRegistry
+internal class ArmyRegistry : RegistryBase<Army>
 {
-    public void RegisterAllArmies()
+    private const string ArmyStringIdPrefix = "CoopArmy";
+    private static int ArmyCounter = 0;
+
+    public ArmyRegistry(IRegistryCollection collection) : base(collection) { }
+
+    public override void RegisterAll()
     {
         IEnumerable<Kingdom> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
 
@@ -35,8 +36,6 @@ internal class ArmyRegistry : RegistryBase<Army>, IArmyRegistry
         }
     }
 
-    private const string ArmyStringIdPrefix = "CoopArmy";
-    private static int ArmyCounter = 0;
     protected override string GetNewId(Army obj)
     {
         return $"{ArmyStringIdPrefix}_{Interlocked.Increment(ref ArmyCounter)}";

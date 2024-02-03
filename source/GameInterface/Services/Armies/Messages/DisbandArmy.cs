@@ -1,17 +1,15 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Armies.Data;
 
 namespace GameInterface.Services.Armies.Messages
 {
     public record DisbandArmy : ICommand
     {
-        public string ArmyId { get; }
-        public string Reason { get; }
+        public ArmyDeletionData Data { get; }
 
-        public DisbandArmy(string armyId, string reason)
+        public DisbandArmy(ArmyDeletionData armyDeletionData)
         {
-            ArmyId = armyId;
-            Reason = reason;
+            Data = armyDeletionData;
         }
-
     }
 }

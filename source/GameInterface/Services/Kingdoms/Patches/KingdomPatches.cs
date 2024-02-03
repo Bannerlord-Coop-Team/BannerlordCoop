@@ -45,31 +45,5 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             return false;
         }
-
-
-        [HarmonyPatch(nameof(Kingdom.CreateArmy), MethodType.Normal)]
-        [HarmonyPrefix]
-        public static bool CreateArmyPrefix(ref Kingdom __instance, ref Hero armyLeader, ref Settlement targetSettlement, Army.ArmyTypes selectedArmyType)
-        {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
-
-            if (ModInformation.IsClient) return false;
-            var message = new ArmyInKingdomCreated(__instance.StringId, armyLeader.StringId, targetSettlement.StringId, selectedArmyType.ToString());
-            MessageBroker.Instance.Publish(__instance, message);
-
-            return true;
-        }
-
-        public static void CreateArmyInKingdom(Kingdom kingdom, Hero armyLeader, Settlement targetSettlement, Army.ArmyTypes selectedArmyType)
-        {
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                using (new AllowedThread())
-                {
-                    kingdom.CreateArmy(armyLeader, targetSettlement, selectedArmyType);
-                }
-            });
-        }
     }
 }

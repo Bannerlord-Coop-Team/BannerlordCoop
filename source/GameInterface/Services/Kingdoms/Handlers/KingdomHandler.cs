@@ -1,7 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.Kingdoms.Messages;
-using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Handlers;
 using Serilog;
@@ -32,30 +32,29 @@ namespace GameInterface.Services.Kingdoms.Handlers
 
         private void HandleCreateArmyInKingdom(MessagePayload<CreateArmyInKingdom> payload)
         {
-            var obj = payload.What;
+            var data = payload.What.Data;
 
-            Kingdom kingdom = Campaign.Current.CampaignObjectManager.Kingdoms.Find(k => k.StringId == obj.KingdomId);
-            if (kingdom == null)
+            if (objectManager.TryGetObject<Kingdom>(data.KingdomStringId, out var kingdom) == false)
             {
-                Logger.Error("Unable to find Kingdom ({kingdomId})", obj.KingdomId);
+                Logger.Error("Unable to find Kingdom ({kingdomId})", data.KingdomStringId);
                 return;
             }
 
-            if (objectManager.TryGetObject(obj.ArmyLeaderId, out Hero armyLeader) == false)
+            if (objectManager.TryGetObject<Hero>(data.LeaderHeroStringId, out var armyLeader) == false)
             {
-                Logger.Error("Unable to find MobileParty ({armyLeaderId})", obj.ArmyLeaderId);
+                Logger.Error("Unable to find MobileParty ({armyLeaderId})", data.LeaderHeroStringId);
                 return;
             }
 
-            if (objectManager.TryGetObject(obj.TargetSettlement, out Settlement targetSettlement) == false)
+            if (objectManager.TryGetObject<Settlement>(data.TargetSettlementStringId, out var targetSettlement) == false)
             {
-                Logger.Error("Unable to find Settlement ({targetSettlement})", obj.TargetSettlement);
+                Logger.Error("Unable to find Settlement ({targetSettlement})", data.TargetSettlementStringId);
                 return;
             }
             
-            Army.ArmyTypes arselectedArmyTypeyType = (Army.ArmyTypes)Army.ArmyTypes.Parse(typeof(Army.ArmyTypes), obj.SelectedArmyType);
-            
-            KingdomPatches.CreateArmyInKingdom(kingdom, armyLeader, targetSettlement, arselectedArmyTypeyType);
+            Army.ArmyTypes armyType = (Army.ArmyTypes)data.SelectedArmyType;
+
+            ArmyCreationPatch.CreateArmyInKingdom(kingdom, armyLeader, targetSettlement, armyType, data.ArmyStringId);
         }
 
         public void Dispose()

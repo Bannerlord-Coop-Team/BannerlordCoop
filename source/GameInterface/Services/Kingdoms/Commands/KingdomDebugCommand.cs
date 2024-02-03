@@ -6,6 +6,13 @@ using System.Text;
 using static TaleWorlds.Library.CommandLineFunctionality;
 using TaleWorlds.CampaignSystem;
 using System.Linq;
+using TaleWorlds.CampaignSystem.Settlements;
+using Common.Extensions;
+using System.Threading.Tasks;
+using Common.Messaging;
+using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.Armies.Extensions;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Kingdoms.Commands
 {

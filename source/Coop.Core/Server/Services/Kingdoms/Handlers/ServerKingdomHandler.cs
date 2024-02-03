@@ -27,13 +27,10 @@ namespace Coop.Core.Server.Services.Kingdoms.Handlers
 
         private void HandleServerCreateArmyInKingdom(MessagePayload<ArmyInKingdomCreated> obj)
         {
-            ArmyInKingdomCreated armyInKingdomCreated = obj.What;
-
             // Broadcast to all the clients that the state was changed
-            NetworkChangeCreateArmyInKingdom networkChangeCreateArmyInKingdom = 
-                new NetworkChangeCreateArmyInKingdom(armyInKingdomCreated.KingdomId, armyInKingdomCreated.ArmyLeaderId, armyInKingdomCreated.TargetSettlement, armyInKingdomCreated.SelectedArmyType);
+            var message =  new NetworkChangeCreateArmyInKingdom(obj.What.Data);
             
-            network.SendAll(networkChangeCreateArmyInKingdom);
+            network.SendAll(message);
         }
 
        

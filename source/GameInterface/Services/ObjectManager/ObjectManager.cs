@@ -11,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -34,6 +35,12 @@ public interface IObjectManager
     /// <returns>True if stored, false if not</returns>
     bool Contains(string id);
 
+    /// <summary>
+    /// Attempts to get an object's StringId from the object itself
+    /// </summary>
+    /// <param name="obj">Object to get StringId from</param>
+    /// <param name="id">Out parameter for string id (null if not found)</param>
+    /// <returns>True if successful, false if failed</returns>
     bool TryGetId(object obj, out string id);
 
     /// <summary>
@@ -41,7 +48,7 @@ public interface IObjectManager
     /// </summary>
     /// <typeparam name="T">Type of object</typeparam>
     /// <param name="id">StringId used to lookup object</param>
-    /// <param name="obj">Out parameter for the object</param>
+    /// <param name="obj">Out parameter for the object (null if not found)</param>
     /// <returns>True if successful, false if failed</returns>
     bool TryGetObject<T>(string id, out T obj) where T : class;
 
@@ -60,6 +67,13 @@ public interface IObjectManager
     /// <param name="newId">Newly created StringId</param>
     /// <returns>True if successful, false if failed</returns>
     bool AddNewObject(object obj, out string newId);
+
+    /// <summary>
+    /// Removes an object from the <see cref="IObjectManager"/>
+    /// </summary>
+    /// <param name="obj">Object to remove</param>
+    /// <returns>True if successful, false if failed</returns>
+    bool Remove(object obj);
 }
 
 /// <summary>
@@ -69,123 +83,68 @@ internal class ObjectManager : IObjectManager
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ObjectManager>();
 
-    private MBObjectManager objectManager => MBObjectManager.Instance;
+    private readonly GameObjectManager defaultObjectManager = new GameObjectManager();
 
     private readonly Dictionary<Type, IRegistry> RegistryMap = new Dictionary<Type, IRegistry>();
 
-    public ObjectManager(
-        IHeroRegistry heroRegistry,
-        IMobilePartyRegistry partyRegistry, 
-        IClanRegistry clanRegistry,
-        IArmyRegistry armyRegistry)
+    public ObjectManager(IRegistryCollection registryCollection)
     {
-        RegistryMap.Add(heroRegistry.ManagedType, heroRegistry);
-        RegistryMap.Add(partyRegistry.ManagedType, partyRegistry);
-        RegistryMap.Add(clanRegistry.ManagedType, clanRegistry);
-        RegistryMap.Add(armyRegistry.ManagedType, armyRegistry);
+        foreach (var registry in registryCollection)
+        {
+            RegistryMap.Add(registry.ManagedType, registry);
+        }
     }
 
     public bool AddExisting(string id, object obj)
     {
         if (string.IsNullOrEmpty(id)) return false;
-        if (objectManager == null) return false;
-        if (TryCastToMBObject(obj, out var mbObject) == false) return false;
 
-        return AddExistingInternal(id, mbObject);
-    }
-
-    private bool TryCastToMBObject(object obj, out MBObjectBase mbObject)
-    {
-        mbObject = obj as MBObjectBase;
-
-        if (mbObject == null)
-        {
-            Logger.Error("Attempted to register object with {type} type that does not derive from {mbObject}", obj.GetType(), typeof(MBObjectBase));
-        }
-
-        return mbObject != null;
-    }
-
-    private bool AddExistingInternal<T>(string id, T obj) where T : MBObjectBase
-    {
-        if (string.IsNullOrEmpty(id)) return false;
-
-        obj.StringId = id;
-
-        if (RegistryMap.TryGetValue(typeof(T), out IRegistry registry))
+        if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
             return registry.RegisterExistingObject(id, obj);
         }
 
-        // Use MBObjectManager registry does not exist
-        return objectManager.RegisterPresumedObject(obj) != null;
+        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
+        return defaultObjectManager.AddExisting(id, obj);
     }
 
     public bool AddNewObject(object obj, out string newId)
     {
         newId = null;
 
-        if (objectManager == null) return false;
-        
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
             return registry.RegisterNewObject(obj, out newId);
         }
 
-        // Use MBObjectManager registry does not exist
-        return AddNewObjectInternal(obj, out newId);
-    }
-
-
-    private static readonly MethodInfo RegisterObject = typeof(MBObjectManager)
-        .GetMethod(nameof(MBObjectManager.RegisterObject));
-    private bool AddNewObjectInternal(object obj, out string id)
-    {
-        id = null;
-
-        if (objectManager == null) return false;
-
         /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-        if (TryCastToMBObject(obj, out var mbObject) == false) return false;
-
-        RegisterObject.MakeGenericMethod(obj.GetType()).Invoke(objectManager, new object[] { mbObject });
-
-        id = mbObject.StringId;
-
-        return true;
+        return defaultObjectManager.AddNewObject(obj, out newId);
     }
 
     public bool Contains(object obj)
     {
-        if (objectManager == null) return false;
-        if (TryCastToMBObject(obj, out var mbObject) == false) return false;
-
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
             return registry.TryGetId(obj, out _);
         }
 
-        // Attempt to find using string id instead
-        return Contains(mbObject.StringId);
+        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
+        return defaultObjectManager.Contains(obj);
     }
 
-    
     public bool Contains(string id)
     {
         if (string.IsNullOrEmpty(id)) return false;
-        if (objectManager == null) return false;
 
         if (RegistryMap.Values.Any(registry => registry.TryGetId(id, out _))) return true;
 
-        // Use MBObjectManager registry cannot find value
-        return objectManager.Contains(id);
+        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
+        return defaultObjectManager.Contains(id);
     }
 
     public bool TryGetId(object obj, out string id)
     {
         id = null;
-
-        if (objectManager == null) return false;
 
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
@@ -193,11 +152,7 @@ internal class ObjectManager : IObjectManager
         }
 
         /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-        if (TryCastToMBObject(obj, out var mbObject) == false) return false;
-
-        id = mbObject.StringId;
-
-        return true;
+        return defaultObjectManager.TryGetId(obj, out id);
     }
 
     private static readonly MethodInfo GetObject = typeof(MBObjectManager)
@@ -207,7 +162,6 @@ internal class ObjectManager : IObjectManager
         obj = default;
 
         if (string.IsNullOrEmpty(id)) return false;
-        if (objectManager == null) return false;
 
         if (RegistryMap.TryGetValue(typeof(T), out IRegistry registry))
         {
@@ -218,10 +172,115 @@ internal class ObjectManager : IObjectManager
         }
 
         /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-        if (typeof(MBObjectBase).IsAssignableFrom(typeof(T)) == false) return false;
+        return defaultObjectManager.TryGetObject(id, out obj);
+    }
 
-        obj = (T)GetObject.MakeGenericMethod(typeof(T)).Invoke(objectManager, new object[] { id });
+    public bool Remove(object obj)
+    {
+        if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
+        {
+            return registry.Remove(obj);
+        }
 
-        return obj != null;
+        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
+        return defaultObjectManager.Remove(obj);
+    }
+
+
+    /// <summary>
+    /// Bannerlord internal object manager
+    /// </summary>
+    private class GameObjectManager : IObjectManager
+    {
+        private MBObjectManager objectManager => MBObjectManager.Instance;
+
+        private static readonly MethodInfo RegisterObject = typeof(MBObjectManager)
+            .GetMethod(nameof(MBObjectManager.RegisterObject));
+
+        public bool AddExisting(string id, object obj)
+        {
+            if (objectManager == null) return false;
+
+            if (TryCastToMBObject(obj, out var mbObject) == false) return false;
+            mbObject.StringId = id;
+
+            return objectManager.RegisterPresumedObject(mbObject) != null;
+        }
+
+        public bool AddNewObject(object obj, out string newId)
+        {
+            newId = null;
+            if (objectManager == null) return false;
+
+            /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
+            if (TryCastToMBObject(obj, out var mbObject) == false) return false;
+
+            RegisterObject.MakeGenericMethod(obj.GetType()).Invoke(objectManager, new object[] { mbObject });
+
+            newId = mbObject.StringId;
+
+            return true;
+        }
+
+        public bool Contains(object obj)
+        {
+            if (objectManager == null) return false;
+
+            if (TryCastToMBObject(obj, out var mbObject) == false) return false;
+
+            // Attempt to find using string id instead
+            return Contains(mbObject.StringId);
+        }
+
+        public bool Contains(string id) => objectManager?.Contains(id) ?? false;
+
+        public bool Remove(object obj)
+        {
+            if (objectManager == null) return false;
+
+            /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
+            if (TryCastToMBObject(obj, out var mbObject) == false) return false;
+            objectManager.UnregisterObject(mbObject);
+
+            return true;
+        }
+
+
+        public bool TryGetId(object obj, out string id)
+        {
+            id = null;
+            if (objectManager == null) return false;
+
+            /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
+            if (TryCastToMBObject(obj, out var mbObject) == false) return false;
+
+            id = mbObject.StringId;
+
+            return true;
+        }
+
+        public bool TryGetObject<T>(string id, out T obj) where T : class
+        {
+            obj = null;
+            if (objectManager == null) return false;
+
+            if (typeof(MBObjectBase).IsAssignableFrom(typeof(T)) == false) return false;
+
+            obj = (T)GetObject.MakeGenericMethod(typeof(T)).Invoke(objectManager, new object[] { id });
+
+            return obj != null;
+        }
+
+        private bool TryCastToMBObject(object obj, out MBObjectBase mbObject)
+        {
+            mbObject = obj as MBObjectBase;
+
+            if (mbObject == null)
+            {
+                Logger.Error("Attempted to register object with {type} type that does not derive from {mbObject}", obj.GetType(), typeof(MBObjectBase));
+            }
+
+            return mbObject != null;
+        }
     }
 }

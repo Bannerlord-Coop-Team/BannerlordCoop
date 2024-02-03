@@ -35,19 +35,15 @@ namespace GameInterface.Services.Armies.Handlers
 
         private void HandleChangeDisbandArmy(MessagePayload<DisbandArmy> payload)
         {
-            var obj = payload.What;
+            var data = payload.What.Data;
 
-
-            IArmyRegistry armyRegistry = new ArmyRegistry();
-            armyRegistry.TryGetValue(obj.ArmyId, out Army army);
-            
-            if (armyRegistry != null)
+            if (objectManager.TryGetObject<Army>(data.ArmyId, out var army) == false)
             {
-                Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
+                Logger.Error("Unable to find Army ({armyId})", data.ArmyId);
                 return;
             }
-            Army.ArmyDispersionReason armyReason = (Army.ArmyDispersionReason)Army.ArmyDispersionReason.Parse(typeof(Army.ArmyDispersionReason), obj.Reason);
-            DisbandArmyPatch.DisbandArmy(army, armyReason);
+            Army.ArmyDispersionReason armyReason = (Army.ArmyDispersionReason)data.Reason;
+            ArmyDeletionPatch.DisbandArmy(army, armyReason);
         }
 
 

@@ -32,7 +32,7 @@ namespace GameInterface.Tests.Services.Heroes
         public void RegisterHeroes()
         {
             // Setup
-            var heroRegistry = _container.Resolve<IHeroRegistry>();
+            var heroRegistry = _container.Resolve<HeroRegistry>();
             var heroes = new Hero[NUM_HEROES];
 
             for (int i = 0; i < NUM_HEROES; i++)
@@ -46,7 +46,7 @@ namespace GameInterface.Tests.Services.Heroes
             }
 
             // Execution
-            heroRegistry.RegisterAllHeroes();
+            heroRegistry.RegisterAll();
 
             // Verification
             foreach (var hero in heroes)

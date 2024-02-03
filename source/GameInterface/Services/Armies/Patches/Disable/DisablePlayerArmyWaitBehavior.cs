@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.Armies.Patches;
+namespace GameInterface.Services.Armies.Patches.Disable;
 
 [HarmonyPatch(typeof(PlayerArmyWaitBehavior))]
 internal class DisablePlayerArmyWaitBehavior

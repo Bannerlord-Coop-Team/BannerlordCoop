@@ -5,19 +5,16 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Registry;
 
-
 /// <summary>
 /// Registry for identifying ownership of <see cref="Hero"/> objects
 /// </summary>
-internal interface IHeroRegistry : IRegistry<Hero>
+internal class HeroRegistry : RegistryBase<Hero>
 {
-    void RegisterAllHeroes();
-}
+    public static readonly string HeroStringIdPrefix = "CoopHero";
 
-/// <inheritdoc cref="IHeroRegistry"/>
-internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
-{
-    public void RegisterAllHeroes()
+    public HeroRegistry(IRegistryCollection collection) : base(collection) { }
+
+    public override void RegisterAll()
     {
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -34,7 +31,6 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
         }
     }
 
-    public static readonly string HeroStringIdPrefix = "CoopHero";
     protected override string GetNewId(Hero party)
     {
         party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);

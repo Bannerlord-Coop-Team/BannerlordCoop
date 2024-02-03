@@ -1,21 +1,17 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Armies.Data;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
     public record ArmyInKingdomCreated : ICommand
     {
+        public ArmyCreationData Data { get; }
 
-        public string KingdomId { get; }
-        public string ArmyLeaderId { get; }
-        public string TargetSettlement { get; }
-        public string SelectedArmyType { get; }
-
-        public ArmyInKingdomCreated(string kingdomId, string armyLeaderId, string targetSettlement, string selectedArmyType)
+        public ArmyInKingdomCreated(ArmyCreationData armyCreationData)
         {
-            KingdomId = kingdomId;
-            ArmyLeaderId = armyLeaderId;
-            TargetSettlement = targetSettlement;
-            SelectedArmyType = selectedArmyType;
+            Data = armyCreationData;
         }
     }
 }

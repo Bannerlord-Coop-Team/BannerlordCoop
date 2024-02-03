@@ -6,15 +6,13 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties;
 
-internal interface IMobilePartyRegistry : IRegistry<MobileParty>
+internal class MobilePartyRegistry : RegistryBase<MobileParty>
 {
-    void RegisterAllParties();
-}
+    private const string PartyStringIdPrefix = "CoopParty";
 
-internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegistry
-{
+    public MobilePartyRegistry(IRegistryCollection collection) : base(collection) { }
 
-    public void RegisterAllParties()
+    public override void RegisterAll()
     {
         var objectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -30,7 +28,6 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>, IMobilePartyRegi
         }
     }
 
-    private const string PartyStringIdPrefix = "CoopParty";
     protected override string GetNewId(MobileParty party)
     {
         party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>(PartyStringIdPrefix);

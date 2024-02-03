@@ -1,17 +1,15 @@
 using Common.Messaging;
+using GameInterface.Services.Armies.Data;
+using ProtoBuf;
 
+[ProtoContract(SkipConstructor = true)]
 public class NetworkChangeCreateArmyInKingdom : IEvent
 {
-    public string KingdomId { get; }
-    public string ArmyLeaderId { get; }
-    public string TargetSettlement { get; }
-    public string SelectedArmyType { get; }
+    [ProtoMember(1)]
+    public ArmyCreationData Data { get; }
 
-    public NetworkChangeCreateArmyInKingdom(string kingdomId, string armyLeaderId, string targetSettlement, string selectedArmyType)
+    public NetworkChangeCreateArmyInKingdom(ArmyCreationData armyCreationData)
     {
-        KingdomId = kingdomId;
-        ArmyLeaderId = armyLeaderId;
-        TargetSettlement = targetSettlement;
-        SelectedArmyType = selectedArmyType;
+        Data = armyCreationData;
     }
 }

@@ -1,20 +1,17 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Armies.Data;
 using ProtoBuf;
 
-namespace Coop.Core.Server.Services.Armies.Messages
-{
-    [ProtoContract(SkipConstructor = true)]
-    public class NetworkChangeDisbandArmy : IEvent
-    {
-        [ProtoMember(1)]
-        public string ArmyId { get; }
-        [ProtoMember(2, IsRequired = true)]
-        public string Reason { get; }
+namespace Coop.Core.Server.Services.Armies.Messages;
 
-        public NetworkChangeDisbandArmy(string armyId, string reason)
-        {
-            ArmyId = armyId;
-            Reason = reason;
-        }
+[ProtoContract(SkipConstructor = true)]
+public class NetworkChangeDisbandArmy : IEvent
+{
+    [ProtoMember(1)]
+    public ArmyDeletionData Data { get; }
+
+    public NetworkChangeDisbandArmy(ArmyDeletionData armyDeletionData)
+    {
+        Data = armyDeletionData;
     }
 }

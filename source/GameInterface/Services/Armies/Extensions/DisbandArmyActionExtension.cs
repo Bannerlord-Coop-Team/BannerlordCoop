@@ -13,20 +13,13 @@ namespace GameInterface.Services.Armies.Extensions
 {
     internal static class DisbandArmyActionExtension
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<Army>();
-
-        private static Action<Army, Army.ArmyDispersionReason> DisbandArmyAction_ApplyInternal = typeof(DisbandArmyAction).GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
+        private static Action<Army, Army.ArmyDispersionReason> DisbandArmyAction_ApplyInternal = typeof(DisbandArmyAction)
+            .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
             .BuildDelegate<Action<Army, Army.ArmyDispersionReason>>();
 
-        internal static void ApplyInternal(this Army army, Army.ArmyDispersionReason reason)
+        internal static void DisbandArmy(this Army army, Army.ArmyDispersionReason reason)
         {
             DisbandArmyAction_ApplyInternal(army, reason);
         }
     }
-
-
-
-
-
-
 }

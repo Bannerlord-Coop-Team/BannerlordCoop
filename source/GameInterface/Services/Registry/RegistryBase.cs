@@ -16,7 +16,27 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
 
     protected readonly Dictionary<string, T> objIds = new Dictionary<string, T>();
     protected readonly ConditionalWeakTable<T, string> idObjs = new ConditionalWeakTable<T, string>();
+    private readonly IRegistryCollection collection;
 
+    protected RegistryBase(IRegistryCollection collection)
+    {
+        this.collection = collection;
+
+        collection.AddRegistry(this);
+    }
+
+    public void Dispose()
+    {
+        collection.RemoveRegistry(this);
+    }
+
+    /// <inheritdoc cref="IRegistry.RegisterAll"/>
+    public abstract void RegisterAll();
+    /// <summary>
+    /// Generator function for unique object Ids
+    /// </summary>
+    /// <param name="obj">Object to create Id for</param>
+    /// <returns>New unique id</returns>
     protected abstract string GetNewId(T obj);
 
     public int Count => objIds.Count;
@@ -44,13 +64,6 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
         return true;
     }
 
-    /// <summary>
-    /// Handles common functionality of registering new <see cref="T"/>
-    /// </summary>
-    /// <param name="obj">Object to register</param>
-    /// <param name="stringIdPrefix">Prefix of <see cref="T.StringId"/></param>
-    /// <param name="id">Out parameter of newly created <see cref="T.StringId"/></param>
-    /// <returns>True if creation was successful, otherwise false</returns>
     public virtual bool RegisterNewObject(object obj, out string id)
     {
         id = null;

@@ -11,23 +11,14 @@ namespace GameInterface.Services.Registry.Handlers;
 internal class RegistryHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
-    private readonly IHeroRegistry heroRegistry;
-    private readonly IMobilePartyRegistry partyRegistry;
-    private readonly IClanRegistry clanRegistry;
-    private readonly IArmyRegistry armyRegistry;
+    private readonly IRegistryCollection registryCollection;
 
     public RegistryHandler(
         IMessageBroker messageBroker,
-        IHeroRegistry heroRegistry,
-        IMobilePartyRegistry partyRegistry,
-        IClanRegistry clanRegistry,
-        IArmyRegistry armyRegistry)
+        IRegistryCollection registryCollection)
     {
         this.messageBroker = messageBroker;
-        this.heroRegistry = heroRegistry;
-        this.partyRegistry = partyRegistry;
-        this.clanRegistry = clanRegistry;
-        this.armyRegistry = armyRegistry;
+        this.registryCollection = registryCollection;
         messageBroker.Subscribe<RegisterAllGameObjects>(Handle);
     }
 
@@ -38,10 +29,10 @@ internal class RegistryHandler : IHandler
 
     private void Handle(MessagePayload<RegisterAllGameObjects> obj)
     {
-        heroRegistry.RegisterAllHeroes();
-        partyRegistry.RegisterAllParties();
-        clanRegistry.RegisterAllClans();
-        armyRegistry.RegisterAllArmies();
+        foreach (var registry in registryCollection)
+        {
+            registry.RegisterAll();
+        }
 
         messageBroker.Publish(this, new AllGameObjectsRegistered());
     }

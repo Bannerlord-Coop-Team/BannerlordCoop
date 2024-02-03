@@ -6,6 +6,7 @@ using Serilog;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.GameState.Messages;
 using System;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
@@ -17,12 +18,12 @@ namespace GameInterface.Services.MobileParties.Handlers
         private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyLifecycleHandler>();
 
         private readonly IMessageBroker messageBroker;
-        private readonly IMobilePartyRegistry mobilePartyRegistry;
+        private readonly IObjectManager objectManager;
 
-        public MobilePartyLifecycleHandler(IMessageBroker messageBroker, IMobilePartyRegistry mobilePartyRegistry) 
+        public MobilePartyLifecycleHandler(IMessageBroker messageBroker, IObjectManager objectManager) 
         {
             this.messageBroker = messageBroker;
-            this.mobilePartyRegistry = mobilePartyRegistry;
+            this.objectManager = objectManager;
 
             messageBroker.Subscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
         }
@@ -56,7 +57,7 @@ namespace GameInterface.Services.MobileParties.Handlers
 
         public void Handle_MobilePartyCreated(MobileParty party)
         {
-            mobilePartyRegistry.RegisterExistingObject(party.StringId, party);
+            objectManager.AddExisting(party.StringId, party);
 
             messageBroker.Publish(this, new MobilePartyCreated(party));
 
@@ -65,7 +66,7 @@ namespace GameInterface.Services.MobileParties.Handlers
 
         public void Handle_MobilePartyDestroyed(MobileParty party, PartyBase partyBase)
         {
-            mobilePartyRegistry.Remove(party);
+            objectManager.Remove(party);
 
             messageBroker.Publish(this, new MobilePartyDestroyed(party, partyBase));
 

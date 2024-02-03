@@ -7,15 +7,13 @@ namespace GameInterface.Services.Clans;
 /// <summary>
 /// Registry class that assosiates <see cref="Clan"/> and a <see cref="string"/> id
 /// </summary>
-internal interface IClanRegistry : IRegistry<Clan>
+internal class ClanRegistry : RegistryBase<Clan>
 {
-    void RegisterAllClans();
-}
+    private const string ClanStringIdPrefix = "CoopClan";
 
-/// <inheritdoc cref="IClanRegistry"/>
-internal class ClanRegistry : RegistryBase<Clan>, IClanRegistry
-{
-    public void RegisterAllClans()
+    public ClanRegistry(IRegistryCollection collection) : base(collection) { }
+
+    public override void RegisterAll()
     {
         var objectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -31,7 +29,6 @@ internal class ClanRegistry : RegistryBase<Clan>, IClanRegistry
         }
     }
 
-    private const string ClanStringIdPrefix = "CoopClan";
     protected override string GetNewId(Clan party)
     {
         party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Clan>(ClanStringIdPrefix);
