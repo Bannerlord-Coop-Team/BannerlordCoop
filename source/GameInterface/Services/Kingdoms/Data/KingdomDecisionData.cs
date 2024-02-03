@@ -8,6 +8,10 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoInclude(6, nameof(DeclareWarDecisionData))]
     [ProtoInclude(7, nameof(ExpelClanFromKingdomDecisionData))]
     [ProtoInclude(8, nameof(KingdomPolicyDecisionData))]
+    [ProtoInclude(9, nameof(KingSelectionKingdomDecisionData))]
+    [ProtoInclude(10, nameof(MakePeaceKingdomDecisionData))]
+    [ProtoInclude(11, nameof(SettlementClaimantDecisionData))]
+    [ProtoInclude(12, nameof(SettlementClaimantPreliminaryDecisionData))]
     public abstract class KingdomDecisionData
     {
         [ProtoMember(1)]
