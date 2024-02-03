@@ -1,7 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.Kingdoms.Messages;
-using Coop.Core.Server.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Messages;
 
 namespace Coop.Core.Client.Services.Kingdoms.Handlers
@@ -18,22 +17,6 @@ namespace Coop.Core.Client.Services.Kingdoms.Handlers
 
             messageBroker.Subscribe<LocalDecisionAdded>(HandleLocalDecisionAdded);
             messageBroker.Subscribe<LocalDecisionRemoved>(HandleLocalDecisionRemoved);
-            messageBroker.Subscribe<AddDecisionApproved>(HandleAddDecisionApproved);
-            messageBroker.Subscribe<RemoveDecisionApproved>(HandleRemoveDecisionApproved);
-        }
-
-        private void HandleRemoveDecisionApproved(MessagePayload<RemoveDecisionApproved> obj)
-        {
-            var payload = obj.What;
-            var removeDecisionEvent = new RemoveDecision(payload.KingdomId, payload.Data);
-            messageBroker.Publish(this, removeDecisionEvent);
-        }
-
-        private void HandleAddDecisionApproved(MessagePayload<AddDecisionApproved> obj)
-        {
-            var payload = obj.What;
-            var addDecisionEvent = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost);
-            messageBroker.Publish(this, addDecisionEvent);
         }
 
         private void HandleLocalDecisionRemoved(MessagePayload<LocalDecisionRemoved> obj)
@@ -54,8 +37,6 @@ namespace Coop.Core.Client.Services.Kingdoms.Handlers
         {
             messageBroker.Unsubscribe<LocalDecisionAdded>(HandleLocalDecisionAdded);
             messageBroker.Unsubscribe<LocalDecisionRemoved>(HandleLocalDecisionRemoved);
-            messageBroker.Unsubscribe<AddDecisionApproved>(HandleAddDecisionApproved);
-            messageBroker.Unsubscribe<RemoveDecisionApproved>(HandleRemoveDecisionApproved);
         }
     }
 }

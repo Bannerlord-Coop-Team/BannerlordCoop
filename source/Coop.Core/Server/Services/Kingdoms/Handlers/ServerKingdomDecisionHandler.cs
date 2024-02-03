@@ -1,9 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.Kingdoms.Messages;
-using Coop.Core.Server.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Messages;
-using System;
 
 namespace Coop.Core.Server.Services.Kingdoms.Handlers
 {
@@ -29,9 +27,7 @@ namespace Coop.Core.Server.Services.Kingdoms.Handlers
 
             var removeDecisionEvent = new RemoveDecision(payload.KingdomId, payload.Data);
             messageBroker.Publish(this, removeDecisionEvent);
-
-            var message = new RemoveDecisionApproved(payload.KingdomId, payload.Data);
-            network.SendAll(message);
+            network.SendAll(removeDecisionEvent);
         }
 
         private void HandleAddDecisionRequest(MessagePayload<AddDecisionRequest> obj)
@@ -40,9 +36,7 @@ namespace Coop.Core.Server.Services.Kingdoms.Handlers
 
             var addDecisionEvent = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost);
             messageBroker.Publish(this, addDecisionEvent);
-
-            var message = new AddDecisionApproved(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost);
-            network.SendAll(message);
+            network.SendAll(addDecisionEvent);
         }
 
         private void HandleLocalDecisionRemoved(MessagePayload<LocalDecisionRemoved> obj)
