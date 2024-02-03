@@ -15,7 +15,7 @@ namespace GameInterface.Services.Kingdoms.Patches
     [HarmonyPatch(typeof(CampaignEventReceiver))] 
     internal class OnArmyCreatedPatch
     {
-
+        
         [HarmonyPatch("OnArmyCreated")]
         [HarmonyPrefix]
         public static bool OnArmyCreatedPrefix(ref Army army)
@@ -24,11 +24,17 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             if(AllowedThread.IsThisThreadAllowed()) { return true; }
             if (PolicyProvider.AllowOriginalCalls) { return true; }
+
             if (ModInformation.IsClient) { return false; }
 
-            IArmyRegistry armyRegistry = new ArmyRegistry();
-            armyRegistry.RegisterNewObject(army, out var newId);
-           
+            ContainerProvider.TryResolve<IArmyRegistry>(out var registry);
+            registry.RegisterNewObject(army, out var newId);
+
+
+            //registry.TryGetValue(newId, out Army new_Army);
+            //army = new_Army;
+            
+            
             return true;
         }
     }
