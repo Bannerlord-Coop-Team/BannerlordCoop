@@ -9,6 +9,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Armies.Handlers
@@ -28,8 +29,27 @@ namespace GameInterface.Services.Armies.Handlers
 
             messageBroker.Subscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
             messageBroker.Subscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
-
+            messageBroker.Subscribe<DisbandArmy>(HandleChangeDisbandArmy);
         }
+
+
+        private void HandleChangeDisbandArmy(MessagePayload<DisbandArmy> payload)
+        {
+            var obj = payload.What;
+
+
+            IArmyRegistry armyRegistry = new ArmyRegistry();
+            armyRegistry.TryGetValue(obj.ArmyId, out Army army);
+            
+            if (armyRegistry != null)
+            {
+                Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
+                return;
+            }
+            Army.ArmyDispersionReason armyReason = (Army.ArmyDispersionReason)Army.ArmyDispersionReason.Parse(typeof(Army.ArmyDispersionReason), obj.Reason);
+            DisbandArmyPatch.DisbandArmy(army, armyReason);
+        }
+
 
         private void HandleChangeRemoveMobilePartyInArmy(MessagePayload<RemoveMobilePartyInArmy> payload)
         {
@@ -79,6 +99,7 @@ namespace GameInterface.Services.Armies.Handlers
         {
             messageBroker.Unsubscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
             messageBroker.Unsubscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+            messageBroker.Unsubscribe<DisbandArmy>(HandleChangeDisbandArmy);
         }
 
     }
