@@ -15,10 +15,10 @@ public class SettlementBribePaidTest
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
     /// <summary>
-    /// Used to Test that client recieves NumberOfEnemiesSpottedAround messsages.
+    /// Used to Test that client recieves BribePaid messsages.
     /// </summary>
     [Fact]
-    public void ServerVillageStateChanged_Publishes_AllClients()
+    public void ServerSettlementBribePaidChanged_Publishes_AllClients()
     {
         // Arrange
         string settlementId = "Settlement1";

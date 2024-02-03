@@ -2,24 +2,27 @@
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace Coop.IntegrationTests.Settlement;
-public class SettlementNumberOfAlliesSpottedTest
+public class SettlementHitPointsTest
 {
-    // Creates a test environment with 1 server and 2 clients by default
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
-
     /// <summary>
-    /// Used to test that the client recieves NumberOfAlliesSpottedAround messages.
+    /// Used to Test that client recieves SettlementHitPoints messsages.
     /// </summary>
     [Fact]
-    public void ServerVillageStateChanged_Publishes_AllClients()
+    public void ServerSettlementHitPointsChanged_Publishes_AllClients()
     {
         // Arrange
         string settlementId = "Settlement1";
-        float NumberOfAlliesSpottedAround = 15.4f;
-        var triggerMessage = new SettlementChangeAlliesSpotted(settlementId, NumberOfAlliesSpottedAround);
+        float hitPoints = 99.5f;
+        var triggerMessage = new SettlementChangedSettlementHitPoints(settlementId, hitPoints);
 
         var server = TestEnvironment.Server;
 
@@ -28,12 +31,12 @@ public class SettlementNumberOfAlliesSpottedTest
 
         // Assert
         // Verify the server sends a single message to it's game interface
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementAlliesSpotted>());
+        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementHitPoints>());
 
         // Verify the all clients send a single message to their game interfaces
         foreach (EnvironmentInstance client in TestEnvironment.Clients)
         {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementAlliesSpotted>());
+            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementHitPoints>());
         }
     }
 }
