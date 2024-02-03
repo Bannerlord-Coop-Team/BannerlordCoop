@@ -5,7 +5,9 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Armies.Data;
 
-
+/// <summary>
+/// Data required for creating an Army
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class ArmyCreationData
 {

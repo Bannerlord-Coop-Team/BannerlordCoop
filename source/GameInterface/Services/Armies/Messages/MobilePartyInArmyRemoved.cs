@@ -1,17 +1,19 @@
 ﻿using Common.Messaging;
 
-namespace GameInterface.Services.Armies.Messages
+namespace GameInterface.Services.Armies.Messages;
+
+/// <summary>
+/// Event for when a MobileParty is removed from an Army
+/// </summary>
+public record MobilePartyInArmyRemoved : IEvent
 {
-    public record MobilePartyInArmyRemoved : ICommand
+    public string MobilePartyId { get; }
+    public string LeaderMobilePartyId { get; }
+
+    public MobilePartyInArmyRemoved(string mobilePartyId, string leaderMobilePartyId)
     {
-        public string MobilePartyId { get; }
-        public string LeaderMobilePartyId { get; }
-
-        public MobilePartyInArmyRemoved(string mobilePartyId, string leaderMobilePartyId)
-        {
-            MobilePartyId = mobilePartyId;
-            LeaderMobilePartyId = leaderMobilePartyId;
-        }
-
+        MobilePartyId = mobilePartyId;
+        LeaderMobilePartyId = leaderMobilePartyId;
     }
+
 }

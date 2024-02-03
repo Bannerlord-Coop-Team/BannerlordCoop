@@ -15,6 +15,9 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Armies.Patches
 {
+    /// <summary>
+    /// Patches required for creating an Army
+    /// </summary>
     [HarmonyPatch]
     internal class ArmyCreationPatch
     {

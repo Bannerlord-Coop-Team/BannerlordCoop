@@ -19,7 +19,7 @@ namespace Coop.Core.Client.Services.Kingdoms
         }
         private void HandleChangeCreateArmyInKingdom(MessagePayload<NetworkChangeCreateArmyInKingdom> payload)
         {
-            var message = new CreateArmyInKingdom(payload.What.Data);
+            var message = new CreateArmy(payload.What.Data);
             messageBroker.Publish(this, message);
         }
         public void Dispose()

@@ -2,101 +2,127 @@
 using Common.Messaging;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
-using GameInterface.Services.Fiefs.Handlers;
-using GameInterface.Services.Fiefs.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Armies.Handlers
+namespace GameInterface.Services.Armies.Handlers;
+
+/// <summary>
+/// Handler for <see cref="Army"/> messages
+/// </summary>
+public class ArmyHandler : IHandler
 {
-    public class ArmyHandler : IHandler
+    
+    private static readonly ILogger Logger = LogManager.GetLogger<ArmyHandler>();
+
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+
+    public ArmyHandler(IMessageBroker messageBroker, IObjectManager objectManager)
     {
-        
-        private static readonly ILogger Logger = LogManager.GetLogger<ArmyHandler>();
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
 
-        private readonly IMessageBroker messageBroker;
-        private readonly IObjectManager objectManager;
+        messageBroker.Subscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
+        messageBroker.Subscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+        messageBroker.Subscribe<DestroyArmy>(HandleChangeDisbandArmy);
+        messageBroker.Subscribe<CreateArmy>(HandleCreateArmy);
+    }
 
-        public ArmyHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+
+    private void HandleChangeDisbandArmy(MessagePayload<DestroyArmy> payload)
+    {
+        var data = payload.What.Data;
+
+        if (objectManager.TryGetObject<Army>(data.ArmyId, out var army) == false)
         {
-            this.messageBroker = messageBroker;
-            this.objectManager = objectManager;
+            Logger.Error("Unable to find Army ({armyId})", data.ArmyId);
+            return;
+        }
+        Army.ArmyDispersionReason armyReason = (Army.ArmyDispersionReason)data.Reason;
+        ArmyDeletionPatch.DisbandArmy(army, armyReason);
+    }
 
-            messageBroker.Subscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
-            messageBroker.Subscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
-            messageBroker.Subscribe<DisbandArmy>(HandleChangeDisbandArmy);
+    private void HandleCreateArmy(MessagePayload<CreateArmy> payload)
+    {
+        var data = payload.What.Data;
+
+        if (objectManager.TryGetObject<Kingdom>(data.KingdomStringId, out var kingdom) == false)
+        {
+            Logger.Error("Unable to find Kingdom ({kingdomId})", data.KingdomStringId);
+            return;
         }
 
-
-        private void HandleChangeDisbandArmy(MessagePayload<DisbandArmy> payload)
+        if (objectManager.TryGetObject<Hero>(data.LeaderHeroStringId, out var armyLeader) == false)
         {
-            var data = payload.What.Data;
-
-            if (objectManager.TryGetObject<Army>(data.ArmyId, out var army) == false)
-            {
-                Logger.Error("Unable to find Army ({armyId})", data.ArmyId);
-                return;
-            }
-            Army.ArmyDispersionReason armyReason = (Army.ArmyDispersionReason)data.Reason;
-            ArmyDeletionPatch.DisbandArmy(army, armyReason);
+            Logger.Error("Unable to find MobileParty ({armyLeaderId})", data.LeaderHeroStringId);
+            return;
         }
 
-
-        private void HandleChangeRemoveMobilePartyInArmy(MessagePayload<RemoveMobilePartyInArmy> payload)
+        if (objectManager.TryGetObject<Settlement>(data.TargetSettlementStringId, out var targetSettlement) == false)
         {
-            var obj = payload.What;
-
-            if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
-            {
-                Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
-                return;
-            }
-
-            if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
-            {
-                Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
-                return;
-            }
-
-            //TODO: Wait for Amry creation / deletion sync add, cannot call the ArmyPach because army will be null
-
-            //ArmyPatches.RemoveMobilePartyInArmy(mobileParty, leaderMobileParty.Army);
-
+            Logger.Error("Unable to find Settlement ({targetSettlement})", data.TargetSettlementStringId);
+            return;
         }
 
-        //Generate Handler Methods
-        private void HandleChangeAddMobilePartyInArmy(MessagePayload<AddMobilePartyInArmy> payload)
+        Army.ArmyTypes armyType = (Army.ArmyTypes)data.SelectedArmyType;
+
+        ArmyCreationPatch.CreateArmyInKingdom(kingdom, armyLeader, targetSettlement, armyType, data.ArmyStringId);
+    }
+
+
+    private void HandleChangeRemoveMobilePartyInArmy(MessagePayload<RemoveMobilePartyInArmy> payload)
+    {
+        var obj = payload.What;
+
+        if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
         {
-            var obj = payload.What;
-
-            if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
-            {
-                Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
-                return;
-            }
-        
-            if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
-            {
-                Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
-                return;
-            }
-
-            //TODO: Wait for Amry creation / deletion sync add, cannot call the ArmyPach because army will be null
-
-            //ArmyPatches.AddMobilePartyInArmy(mobileParty, leaderMobileParty.Army);
-              
-        }
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
-            messageBroker.Unsubscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
-            messageBroker.Unsubscribe<DisbandArmy>(HandleChangeDisbandArmy);
+            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
+            return;
         }
 
+        if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
+        {
+            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
+            return;
+        }
+
+        //TODO: Wait for Amry creation / deletion sync add, cannot call the ArmyPach because army will be null
+
+        //ArmyPatches.RemoveMobilePartyInArmy(mobileParty, leaderMobileParty.Army);
+
+    }
+
+    //Generate Handler Methods
+    private void HandleChangeAddMobilePartyInArmy(MessagePayload<AddMobilePartyInArmy> payload)
+    {
+        var obj = payload.What;
+
+        if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
+        {
+            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
+            return;
+        }
+    
+        if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
+        {
+            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
+            return;
+        }
+
+        //TODO: Wait for Amry creation / deletion sync add, cannot call the ArmyPach because army will be null
+
+        //ArmyPatches.AddMobilePartyInArmy(mobileParty, leaderMobileParty.Army);
+          
+    }
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
+        messageBroker.Unsubscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+        messageBroker.Unsubscribe<DestroyArmy>(HandleChangeDisbandArmy);
+        messageBroker.Unsubscribe<CreateArmy>(HandleCreateArmy);
     }
 }

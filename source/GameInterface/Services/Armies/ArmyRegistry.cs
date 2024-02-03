@@ -12,6 +12,9 @@ using System.Threading;
 
 namespace GameInterface.Services.Armies;
 
+/// <summary>
+/// Registry for <see cref="Army"/> type
+/// </summary>
 internal class ArmyRegistry : RegistryBase<Army>
 {
     private const string ArmyStringIdPrefix = "CoopArmy";

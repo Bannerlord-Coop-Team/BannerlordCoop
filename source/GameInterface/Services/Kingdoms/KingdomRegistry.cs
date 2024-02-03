@@ -9,6 +9,9 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Kingdoms;
 
+/// <summary>
+/// Registry for <see cref="Kingdom"/> type
+/// </summary>
 internal class KingdomRegistry : RegistryBase<Kingdom>
 {
     private const string PartyStringIdPrefix = "CoopKingdom";

@@ -5,6 +5,9 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Armies.Data;
 
 
+/// <summary>
+/// Data required for deleting an Army
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class ArmyDeletionData
 {

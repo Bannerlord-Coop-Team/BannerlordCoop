@@ -23,8 +23,6 @@ public class ArmyDebugCommand
     /// <summary>
     /// Lists all the current Army
     /// </summary>
-    /// <param name="args">actually none are being used..</param>
-    /// <returns>strings of all the army</returns>
     [CommandLineArgumentFunction("list", "coop.debug.army")]
     public static string ListArmy(List<string> args)
     {
@@ -45,9 +43,17 @@ public class ArmyDebugCommand
     }
 
     // coop.debug.army.create empire town_V1 lord_1_1 Patrolling
+    /// <summary>
+    /// Creates a new army on the server and clients
+    /// </summary>
     [CommandLineArgumentFunction("create", "coop.debug.army")]
     public static string CreateArmy(List<string> args)
     {
+        if (ModInformation.IsClient)
+        {
+            return "Command is only available to run on the server";
+        }
+
         if (args.Count != 4)
         {
             var stringBuilder = new StringBuilder();
@@ -117,9 +123,17 @@ public class ArmyDebugCommand
     }
 
     // coop.debug.army.destroy CoopArmy_1 NotEnoughParty
+    /// <summary>
+    /// Deletes an army on the server and clients
+    /// </summary>
     [CommandLineArgumentFunction("destroy", "coop.debug.army")]
     public static string DestroyArmy(List<string> args)
     {
+        if (ModInformation.IsClient)
+        {
+            return "Command is only available to run on the server";
+        }
+
         if (args.Count != 2)
         {
             return "Usage: coop.debug.kingdom.destroy <armyId> <disbandArmyReason>";

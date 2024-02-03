@@ -4,15 +4,14 @@ using GameInterface.Services.Armies.Data;
 namespace GameInterface.Services.Armies.Messages;
 
 /// <summary>
-/// Event for when an Army is destroyed
+/// Command to destroy an Army
 /// </summary>
-public record ArmyDisbanded : IEvent
+public record DestroyArmy : ICommand
 {
     public ArmyDeletionData Data { get; }
 
-    public ArmyDisbanded(ArmyDeletionData armyDeletionData)
+    public DestroyArmy(ArmyDeletionData armyDeletionData)
     {
         Data = armyDeletionData;
     }
-
 }
