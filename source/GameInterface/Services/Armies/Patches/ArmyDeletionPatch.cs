@@ -31,7 +31,7 @@ internal class ArmyDeletionPatch
         if (ModInformation.IsClient) return false;
 
         var data = new ArmyDeletionData(army, reason);
-        var message = new ArmyDisbanded(data);
+        var message = new ArmyDestroyed(data);
 
         MessageBroker.Instance.Publish(army, message);
         return true;
@@ -66,7 +66,7 @@ internal class ArmyDeletionPatch
         {
             using (new AllowedThread())
             {
-                DisbandArmyActionExtension.DisbandArmy(army, reason);
+                army.DisbandArmy(reason);
             }
         });
     }

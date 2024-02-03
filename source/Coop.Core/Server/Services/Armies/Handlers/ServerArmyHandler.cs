@@ -1,65 +1,72 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Coop.Core.Server.Services.Armies.Messages;
+using Coop.Core.Client.Services.Armies.Messages;
 using GameInterface.Services.Armies.Messages;
 
 
-namespace Coop.Core.Server.Services.Armies.Handlers
+namespace Coop.Core.Server.Services.Armies.Handlers;
+
+/// <summary>
+/// Server side handler for Kingdom internal and network messages
+/// </summary>
+public class ServerArmyHandler : IHandler
 {
-    /// <summary>
-    /// Handles network related data for Armies
-    /// </summary>
-    public class ServerArmyHandler : IHandler
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+
+    public ServerArmyHandler(IMessageBroker messageBroker, INetwork network)
     {
-        private readonly IMessageBroker messageBroker;
-        private readonly INetwork network;
+        this.messageBroker = messageBroker;
+        this.network = network;
 
-        public ServerArmyHandler(IMessageBroker messageBroker, INetwork network)
-        {
-            this.messageBroker = messageBroker;
-            this.network = network;
+        // This handles an internal message
+        messageBroker.Subscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
+        messageBroker.Subscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
+        messageBroker.Subscribe<ArmyCreated>(HandleArmyCreated);
+        messageBroker.Subscribe<ArmyDestroyed>(HandleArmyDisband);
+    }
 
-            // This handles an internal message
-            messageBroker.Subscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
-            messageBroker.Subscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
-            messageBroker.Subscribe<ArmyDisbanded>(HandleDisbandArmy);
-        }
+    private void HandleArmyCreated(MessagePayload<ArmyCreated> obj)
+    {
+        // Broadcast to all the clients that the state was changed
+        var message = new NetworkCreateArmy(obj.What.Data);
 
-        private void HandleDisbandArmy(MessagePayload<ArmyDisbanded> obj)
-        {
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeDisbandArmy networkChangeDisbandArmy = new NetworkChangeDisbandArmy(obj.What.Data);
-            
-            network.SendAll(networkChangeDisbandArmy);
-        }
-        private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
-        {
-            MobilePartyInArmyAdded mobilePartyInArmyAdded = obj.What;
+        network.SendAll(message);
+    }
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeAddMobilePartyInArmy networkChangeAddMobilePartyInArmy = 
-                new NetworkChangeAddMobilePartyInArmy(mobilePartyInArmyAdded.MobilePartyId, mobilePartyInArmyAdded.LeaderMobilePartyId);
-            
-            network.SendAll(networkChangeAddMobilePartyInArmy);
-        }
+    private void HandleArmyDisband(MessagePayload<ArmyDestroyed> obj)
+    {
+        // Broadcast to all the clients that the state was changed
+        var message = new NetworkDestroyArmy(obj.What.Data);
+        
+        network.SendAll(message);
+    }
+    private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
+    {
+        MobilePartyInArmyAdded mobilePartyInArmyAdded = obj.What;
 
-        private void HandleRemoveMobilePartyInArmy(MessagePayload<MobilePartyInArmyRemoved> obj)
-        {
-            MobilePartyInArmyRemoved mobilePartyInArmyRemoved = obj.What;
+        // Broadcast to all the clients that the state was changed
+        var message = new NetworkAddMobilePartyInArmy(mobilePartyInArmyAdded.MobilePartyId, mobilePartyInArmyAdded.LeaderMobilePartyId);
+        
+        network.SendAll(message);
+    }
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeRemoveMobilePartyInArmy networkChangeRemoveMobilePartyInArmy = 
-                new NetworkChangeRemoveMobilePartyInArmy(mobilePartyInArmyRemoved.MobilePartyId, mobilePartyInArmyRemoved.LeaderMobilePartyId);
-            
-            network.SendAll(networkChangeRemoveMobilePartyInArmy);
-        }
+    private void HandleRemoveMobilePartyInArmy(MessagePayload<MobilePartyInArmyRemoved> obj)
+    {
+        MobilePartyInArmyRemoved mobilePartyInArmyRemoved = obj.What;
 
-       
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
-            messageBroker.Unsubscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
-            messageBroker.Unsubscribe<ArmyDisbanded>(HandleDisbandArmy);
-        }
+        // Broadcast to all the clients that the state was changed
+        var message = new NetworkRemoveMobilePartyInArmy(mobilePartyInArmyRemoved.MobilePartyId, mobilePartyInArmyRemoved.LeaderMobilePartyId);
+        
+        network.SendAll(message);
+    }
+
+   
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
+        messageBroker.Unsubscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
+        messageBroker.Unsubscribe<ArmyCreated>(HandleArmyCreated);
+        messageBroker.Unsubscribe<ArmyDestroyed>(HandleArmyDisband);
     }
 }

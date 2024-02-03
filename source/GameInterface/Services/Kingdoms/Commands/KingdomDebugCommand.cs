@@ -1,21 +1,16 @@
 ﻿using Autofac;
 using GameInterface.Services.ObjectManager;
-using System;
 using System.Collections.Generic;
-using System.Text;
-using static TaleWorlds.Library.CommandLineFunctionality;
-using TaleWorlds.CampaignSystem;
 using System.Linq;
-using TaleWorlds.CampaignSystem.Settlements;
-using Common.Extensions;
-using System.Threading.Tasks;
-using Common.Messaging;
-using GameInterface.Services.Kingdoms.Messages;
-using GameInterface.Services.Armies.Extensions;
-using TaleWorlds.Library;
+using System.Text;
+using TaleWorlds.CampaignSystem;
+using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Kingdoms.Commands;
 
+/// <summary>
+/// Commands for <see cref="Kingdom"/>
+/// </summary>
 public class KingdomDebugCommand
 {
 

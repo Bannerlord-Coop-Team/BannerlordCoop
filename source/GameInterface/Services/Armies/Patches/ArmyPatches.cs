@@ -1,20 +1,12 @@
 ﻿using Common;
-using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.Fiefs.Messages;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Armies.Patches;
 

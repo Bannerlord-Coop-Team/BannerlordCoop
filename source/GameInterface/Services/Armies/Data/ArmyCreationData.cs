@@ -1,5 +1,4 @@
-﻿using GameInterface.Services.Armies.Extensions;
-using ProtoBuf;
+﻿using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -9,7 +8,7 @@ namespace GameInterface.Services.Armies.Data;
 /// Data required for creating an Army
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public class ArmyCreationData
+public record ArmyCreationData
 {
     internal ArmyCreationData(Kingdom instance, Hero armyLeader, Settlement targetSettlement, Army.ArmyTypes selectedArmyType, string newArmyId)
     {

@@ -1,13 +1,5 @@
-﻿using Common;
-using Common.Messaging;
-using Common.Util;
-using GameInterface.Policies;
-using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.Kingdoms.Messages;
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {

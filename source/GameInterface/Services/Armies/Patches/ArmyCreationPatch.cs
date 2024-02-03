@@ -5,7 +5,7 @@ using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Data;
 using GameInterface.Services.Armies.Extensions;
-using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -60,7 +60,7 @@ namespace GameInterface.Services.Armies.Patches
             var armyType = army.ArmyType;
 
             var data = new ArmyCreationData(kingdom, leader, targetSettlement, armyType, newArmyId);
-            var message = new ArmyInKingdomCreated(data);
+            var message = new ArmyCreated(data);
             MessageBroker.Instance.Publish(army, message);
         }
 

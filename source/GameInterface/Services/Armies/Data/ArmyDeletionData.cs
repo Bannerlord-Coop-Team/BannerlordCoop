@@ -9,7 +9,7 @@ namespace GameInterface.Services.Armies.Data;
 /// Data required for deleting an Army
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public class ArmyDeletionData
+public record ArmyDeletionData
 {
     public ArmyDeletionData(Army army, Army.ArmyDispersionReason reason)
     {

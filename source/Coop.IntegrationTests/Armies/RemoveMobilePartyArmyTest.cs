@@ -1,4 +1,4 @@
-﻿using Coop.Core.Server.Services.Armies.Messages;
+﻿using Coop.Core.Client.Services.Armies.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Armies.Messages;
@@ -29,11 +29,11 @@ namespace Coop.IntegrationTests.Armies
 
             // Assert
             // Verify the server sends a single message to its game interface
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeRemoveMobilePartyInArmy>());
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkRemoveMobilePartyInArmy>());
 
             //Verify if the server is sending the same mobilePartyId and leaderMobilePartyId value
-            Assert.Equal(mobilePartyId, server.NetworkSentMessages.GetMessages<NetworkChangeRemoveMobilePartyInArmy>().First().MobilePartyId);
-            Assert.Equal(leaderMobilePartyId, server.NetworkSentMessages.GetMessages<NetworkChangeRemoveMobilePartyInArmy>().First().LeaderMobilePartyId);
+            Assert.Equal(mobilePartyId, server.NetworkSentMessages.GetMessages<NetworkRemoveMobilePartyInArmy>().First().MobilePartyId);
+            Assert.Equal(leaderMobilePartyId, server.NetworkSentMessages.GetMessages<NetworkRemoveMobilePartyInArmy>().First().LeaderMobilePartyId);
 
 
             // Verify all clients receive a single message to their game interfaces

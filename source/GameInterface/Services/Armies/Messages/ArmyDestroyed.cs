@@ -6,11 +6,11 @@ namespace GameInterface.Services.Armies.Messages;
 /// <summary>
 /// Event for when an Army is destroyed
 /// </summary>
-public record ArmyDisbanded : IEvent
+public record ArmyDestroyed : IEvent
 {
     public ArmyDeletionData Data { get; }
 
-    public ArmyDisbanded(ArmyDeletionData armyDeletionData)
+    public ArmyDestroyed(ArmyDeletionData armyDeletionData)
     {
         Data = armyDeletionData;
     }

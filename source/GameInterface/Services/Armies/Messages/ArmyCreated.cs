@@ -4,13 +4,13 @@ using GameInterface.Services.Armies.Data;
 namespace GameInterface.Services.Armies.Messages;
 
 /// <summary>
-/// Command to create an Army
+/// Event for when an Army is created
 /// </summary>
-public record CreateArmy : ICommand
+public record ArmyCreated : IEvent
 {
     public ArmyCreationData Data { get; }
 
-    public CreateArmy(ArmyCreationData armyCreationData)
+    public ArmyCreated(ArmyCreationData armyCreationData)
     {
         Data = armyCreationData;
     }

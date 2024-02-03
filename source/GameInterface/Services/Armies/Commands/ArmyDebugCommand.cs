@@ -1,8 +1,7 @@
-﻿using Autofac;
-using Common.Extensions;
+﻿using Common.Extensions;
 using Common.Messaging;
 using GameInterface.Services.Armies.Extensions;
-using GameInterface.Services.Kingdoms.Messages;
+using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
@@ -10,13 +9,15 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.CampaignSystem.Army;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Armies.Commands;
 
+/// <summary>
+/// Commands for <see cref="Army"/>
+/// </summary>
 public class ArmyDebugCommand
 {
     // coop.debug.army.list
@@ -96,7 +97,7 @@ public class ArmyDebugCommand
 
         var tcs = new TaskCompletionSource<string>();
 
-        MessageBroker.Instance.Subscribe<ArmyInKingdomCreated>((msg) =>
+        MessageBroker.Instance.Subscribe<ArmyCreated>((msg) =>
         {
             tcs.SetResult(msg.What.Data.ArmyStringId);
         });
