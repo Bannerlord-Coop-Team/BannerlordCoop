@@ -19,7 +19,18 @@ internal class ClientSettlementHandler : IHandler
 
         messageBroker.Subscribe<NetworkChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
         messageBroker.Subscribe<NetworkChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
+        messageBroker.Subscribe<NetworkChangeSettlementBribePaid>(HandleBribePaid);
 
+
+    }
+
+    private void HandleBribePaid(MessagePayload<NetworkChangeSettlementBribePaid> payload)
+    {
+        var obj = payload.What;
+
+        var message = new ChangeSettlementBribePaid(obj.SettlementId, obj.BribePaid);
+
+        messageBroker.Publish(this, message);
     }
 
     private void HandleNumberOfAlliesSpottedAround(MessagePayload<NetworkChangeSettlementAlliesSpotted> payload)
@@ -44,6 +55,8 @@ internal class ClientSettlementHandler : IHandler
     {
         messageBroker.Unsubscribe<NetworkChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
         messageBroker.Unsubscribe<NetworkChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
+        messageBroker.Unsubscribe<NetworkChangeSettlementBribePaid>(HandleBribePaid);
+
 
     }
 }

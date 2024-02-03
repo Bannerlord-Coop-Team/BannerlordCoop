@@ -21,7 +21,21 @@ public class SettlementHandler : IHandler
 
         messageBroker.Subscribe<ChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
         messageBroker.Subscribe<ChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
+        messageBroker.Subscribe<ChangeSettlementBribePaid>(HandleBribePaid);
 
+
+    }
+
+    private void HandleBribePaid(MessagePayload<ChangeSettlementBribePaid> payload)
+    {
+        var obj = payload.What;
+
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            return;
+        }
+        BribePaidSettlementPatch.RunBribePaidChange(settlement, obj.BribePaid);
     }
 
     private void HandleNumberOfAlliesSpottedAround(MessagePayload<ChangeSettlementAlliesSpotted> payload)
@@ -54,6 +68,7 @@ public class SettlementHandler : IHandler
     {
         messageBroker.Unsubscribe<ChangeSettlementEnemiesSpotted>(HandleNumberOfEnemiesSpottedAround);
         messageBroker.Unsubscribe<ChangeSettlementAlliesSpotted>(HandleNumberOfAlliesSpottedAround);
+        messageBroker.Unsubscribe<ChangeSettlementBribePaid>(HandleBribePaid);
 
     }
 }
