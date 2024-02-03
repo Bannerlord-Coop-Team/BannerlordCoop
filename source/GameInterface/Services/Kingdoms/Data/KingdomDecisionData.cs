@@ -5,7 +5,9 @@ using TaleWorlds.CampaignSystem.Election;
 namespace GameInterface.Services.Kingdoms.Data
 {
     [ProtoContract(SkipConstructor = true)]
-    [ProtoInclude(0, nameof(DeclareWarDecisionData))]
+    [ProtoInclude(6, nameof(DeclareWarDecisionData))]
+    [ProtoInclude(7, nameof(ExpelClanFromKingdomDecisionData))]
+    [ProtoInclude(8, nameof(KingdomPolicyDecisionData))]
     public abstract class KingdomDecisionData
     {
         [ProtoMember(1)]
