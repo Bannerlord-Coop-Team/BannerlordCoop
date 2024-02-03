@@ -13,7 +13,7 @@ public interface IRegistry<T> : IEnumerable<KeyValuePair<string, T>>, IRegistry
 /// <summary>
 /// Registry for storing objects with an associated identifier
 /// </summary>
-public interface IRegistry
+public interface IRegistry : IDisposable
 {
     /// <summary>
     /// Count of registered objects
@@ -24,6 +24,11 @@ public interface IRegistry
     /// Type the registry manages
     /// </summary>
     Type ManagedType { get; }
+
+    /// <summary>
+    /// Registers all existing objects
+    /// </summary>
+    void RegisterAll();
 
     /// <summary>
     /// Register an object with a new <see cref="ObjectId"/>
@@ -62,7 +67,7 @@ public interface IRegistry
     /// <param name="obj">Object to get id for</param>
     /// <param name="id">Stored id, will be default if no id/obj exists</param>
     /// <returns>True if retrieval was successful, otherwise false</returns>
-    bool TryGetValue(object obj, out string id);
+    bool TryGetId(object obj, out string id);
 
 
     /// <summary>

@@ -36,7 +36,8 @@ namespace GameInterface.Services.Towns.Patches
             if (ModInformation.IsClient) return false;
             if (__instance.Governor == value) return false;
 
-            var message = new TownGovernorChanged(__instance.StringId, value.StringId);
+            
+            var message = new TownGovernorChanged(__instance.StringId, value?.StringId);
             MessageBroker.Instance.Publish(__instance, message);
             return true;
         }

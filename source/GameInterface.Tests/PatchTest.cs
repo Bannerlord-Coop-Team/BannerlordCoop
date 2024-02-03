@@ -1,10 +1,8 @@
 ﻿using HarmonyLib;
-using System.Collections.Generic;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
-using static GameInterface.Services.ObjectManager.ObjectManager;
-using Xunit.Sdk;
 
 namespace GameInterface.Tests
 {
