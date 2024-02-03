@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -43,5 +44,21 @@ namespace GameInterface.Services.MobileParties.Commands
             return String.Format("MobileParty info for: '{0}':\nStringID: {1}\nSpeed: {2}\nDefaultInventoryCapacityModel: {3}\nWeight Carried: {4}\nLastCalculated Speed: {5}\nBaseSpeed: {6}\nPlayer Skills:\nExplanations:\n{7}\n",
                owner, mobileParty.StringId, mobileParty.Speed, mobileParty.InventoryCapacity, mobileParty.TotalWeightCarried, _lastCalculatedSpeed, skillsStr, explanations);
         }
+
+        [CommandLineArgumentFunction("list", "coop.debug.mobileparty")]
+        public static string ListMobileParties(List<string> args)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+
+            List<MobileParty> mobileParty = Campaign.Current.CampaignObjectManager.MobileParties.ToList();
+
+            mobileParty.ForEach((party) =>
+            {
+                stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", party.StringId, party.Name));
+            });
+
+            return stringBuilder.ToString();
+        }
+
     }
 }

@@ -186,8 +186,44 @@ internal class SettlementCommands
             return $"Error setting the value: {args[1]} to a float.";
         }
 
-        return $"Successfully set the Settlement ({settlementId}) BribePaid to '{args[1]}'";
+        return $"Successfully set the Settlement ({settlementId}) SettlementHitPoints to '{args[1]}'";
     }
+
+    // coop.debug.settlements.last_attacker town_ES3 CoopParty
+    // coop.debug.settlements.last_attacker town_ES3 lord_2_8_party_1
+    /// <summary>
+    /// Changes the LastAttackerParty
+    /// </summary>
+    /// <param name="args">the settlementid and last_attacker</param>
+    /// <returns>info that is was succesful</returns>
+    [CommandLineArgumentFunction("last_attacker", "coop.debug.settlements")]
+    public static string SetLastAttackerParty(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"last_attacker <settlementId> <last_attacker_id>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+
+        var objectManager = container.Resolve<IObjectManager>();
+
+        string settlementId = args[0];
+        string mobilePartyId = args[1];
+
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+            return $"Settlement: {settlementId} was not found.";
+
+
+        if (objectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty) == false)
+            return $"Settlement: {mobilePartyId} was not found.";
+
+
+        settlement.LastAttackerParty = mobileParty;
+
+
+        return $"Successfully set the Settlement ({settlementId}) MobileParty to '{mobileParty.StringId}'";
+    }
+
 
     // Located in Modules\SandBox\ModuleData\settlements.xml
     // POROS EXAMPLE

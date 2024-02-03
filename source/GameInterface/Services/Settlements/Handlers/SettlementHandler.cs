@@ -5,6 +5,7 @@ using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Handlers;
@@ -21,6 +22,26 @@ public class SettlementHandler : IHandler
 
         messageBroker.Subscribe<ChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
+        messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
+        messageBroker.Subscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
+
+    }
+
+    private void HandleLastAttackerParty(MessagePayload<ChangeSettlementLastAttackerParty> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            return;
+        }
+        if (objectManager.TryGetObject<MobileParty>(obj.AttackerPartyId, out var mobileParty) == false)
+        {
+            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        LastAttackerPartySettlementPatch.RunLastAttackerPartyChange(settlement, mobileParty);
 
     }
 
@@ -54,6 +75,8 @@ public class SettlementHandler : IHandler
     {
         messageBroker.Unsubscribe<ChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
+        messageBroker.Unsubscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
+
 
     }
 }
