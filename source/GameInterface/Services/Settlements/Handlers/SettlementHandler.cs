@@ -28,8 +28,21 @@ public class SettlementHandler : IHandler
         messageBroker.Subscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Subscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
 
+        messageBroker.Subscribe<ChangeSettlementMilitia>(HandleMilitia);
 
 
+    }
+
+    private void HandleMilitia(MessagePayload<ChangeSettlementMilitia> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        MilitiaSettlementPatch.RunMiltiiaChange(settlement, obj.Militia);
     }
 
     private void HandleCurrentSiegeState(MessagePayload<ChangeSettlementCurrentSiegeState> payload)
@@ -37,7 +50,7 @@ public class SettlementHandler : IHandler
         var obj = payload.What;
         if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
         {
-            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
             return;
         }
 
@@ -49,7 +62,7 @@ public class SettlementHandler : IHandler
         var obj = payload.What;
         if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
         {
-            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
             return;
         }
 
@@ -61,12 +74,12 @@ public class SettlementHandler : IHandler
         var obj = payload.What;
         if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
         {
-            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
             return;
         }
         if (objectManager.TryGetObject<MobileParty>(obj.AttackerPartyId, out var mobileParty) == false)
         {
-            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
             return;
         }
 
@@ -80,7 +93,7 @@ public class SettlementHandler : IHandler
 
         if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
         {
-            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
             return;
         }
 
@@ -93,7 +106,7 @@ public class SettlementHandler : IHandler
 
         if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
         {
-            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
             return;
         }
         BribePaidSettlementPatch.RunBribePaidChange(settlement, obj.BribePaid);
