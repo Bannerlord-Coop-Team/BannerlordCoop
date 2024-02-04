@@ -1,9 +1,10 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.Settlements.Messages;
+
+/// <summary>
+/// Notify gameinterface to change miltiia
+/// </summary>
 public record ChangeSettlementMilitia : ICommand
 {
     public string SettlementId { get; }

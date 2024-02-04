@@ -4,6 +4,11 @@ using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
 namespace Coop.IntegrationTests.Settlement;
+
+
+/// <summary>
+/// Test Settlement Militia Value changed for all clients
+/// </summary>
 public class SettlementMiltiaTest
 {
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
