@@ -4,6 +4,7 @@ using System.Threading;
 namespace Common.Util;
 
 /// <summary>
+/// DEPRECATED: Use <see cref="AllowedThread"/> instead <br/>
 /// Class allowing for atomic operations on the given object
 /// Primarily used for overriding values during a Harmony patch
 /// </summary>
