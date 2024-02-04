@@ -19,6 +19,15 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<NetworkChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Subscribe<NetworkChangeSettlementLastThreatTime>(HandleLastThreatTime);
+        messageBroker.Subscribe<NetworkChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
+
+    }
+
+    private void HandleCurrentSiegeState(MessagePayload<NetworkChangeSettlementCurrentSiegeState> payload)
+    {
+        var obj = payload.What;
+        var message = new ChangeSettlementCurrentSiegeState(obj.SettlementId, obj.CurrentSiegeState);
+        messageBroker.Publish(this, message);
     }
 
     private void HandleLastThreatTime(MessagePayload<NetworkChangeSettlementLastThreatTime> payload)

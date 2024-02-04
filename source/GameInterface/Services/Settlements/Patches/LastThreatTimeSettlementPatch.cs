@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using Coop.Mod.Extentions;
+using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
@@ -18,8 +19,6 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(Settlement))]
 internal class LastThreatTimeSettlementPatch
 {
-    private static readonly PropertyInfo LastThreatTime = typeof(Settlement).GetProperty(nameof(Settlement.LastThreatTime));
-
     [HarmonyPatch(nameof(Settlement.LastThreatTime), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool LastThreatTimePrefix(ref Settlement __instance, ref CampaignTime value)
@@ -47,12 +46,7 @@ internal class LastThreatTimeSettlementPatch
         {
             using (new AllowedThread())
             {
-                // only thing that essentially happens is it calls CampaignTime.Now which creates new CampaignTime(numTicks)
-                // only updates ticks so just set tick value.
-                if(lastThreatTime.HasValue)
-                    settlement.LastThreatTime.SetNumTicks(lastThreatTime.Value);    
-                else
-                    LastThreatTime.SetValue(settlement, lastThreatTime);
+                settlement.SetLastThreatTimeChanged(lastThreatTime);
             }
         });
 

@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using GameInterface.Extentions;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
@@ -9,6 +10,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using static TaleWorlds.CampaignSystem.Settlements.Settlement;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Template.Commands;
@@ -189,7 +191,7 @@ internal class SettlementCommands
         return $"Successfully set the Settlement ({settlementId}) SettlementHitPoints to '{args[1]}'";
     }
 
-    // coop.debug.settlements.last_attacker town_ES3 CoopParty
+    // coop.debug.settlements.last_attacker town_ES1 CoopParty
     // coop.debug.settlements.last_attacker town_ES3 lord_2_8_party_1
     /// <summary>
     /// Changes the LastAttackerParty
@@ -223,6 +225,63 @@ internal class SettlementCommands
 
         return $"Successfully set the Settlement ({settlementId}) MobileParty to '{mobileParty.StringId}'";
     }
+
+    // coop.debug.settlements.list_siege_state
+    /// <summary>
+    // Lists all the possible siege states
+    /// </summary>
+    /// <returns>all the siegeStates</returns>
+    [CommandLineArgumentFunction("list_siege_state", "coop.debug.settlements")]
+    public static string ListSiegeStates(List<string> args)
+    {
+
+        StringBuilder sb = new();
+
+        foreach(int i in Enum.GetValues(typeof(Settlement.SiegeState))) {
+            sb.AppendLine($"{i}: {Enum.GetName(typeof(Settlement.SiegeState), i)}");
+        }
+        return sb.ToString();
+    }
+
+    // coop.debug.settlements.set_siege_state town_ES1 InTheLordsHall
+    /// <summary>
+    /// Changes the SiegeState
+    /// </summary>
+    /// <param name="args">the settlementid and SiegeState</param>
+    /// <returns>info that is was succesful</returns>
+    [CommandLineArgumentFunction("set_siege_state", "coop.debug.settlements")]
+    public static string SetSiegeState(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <siege_state>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+
+        var objectManager = container.Resolve<IObjectManager>();
+
+        string settlementId = args[0];
+        string siegeState = args[1];
+
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+            return $"Settlement: {settlementId} was not found.";
+
+        SiegeState state;
+        try
+        {
+            state =  (SiegeState)Enum.Parse(typeof(SiegeState), siegeState, true);
+        } catch (Exception ex)
+        {
+            return ex.ToString();
+        }
+
+        settlement.SetSiegeState(state);
+
+
+        return $"Successfully set the Settlement ({settlementId}) SiegeState to '{siegeState}'";
+    }
+
+
 
 
     // Located in Modules\SandBox\ModuleData\settlements.xml
