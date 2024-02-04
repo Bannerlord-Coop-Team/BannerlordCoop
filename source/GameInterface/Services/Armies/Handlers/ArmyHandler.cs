@@ -72,7 +72,7 @@ public class ArmyHandler : IHandler
         //Army.ArmyTypes armyType = (Army.ArmyTypes)data.SelectedArmyType;
 
 
-        Army.ArmyTypes armyType = (Army.ArmyTypes)Enum.Parse(typeof(Army.ArmyTypes), data.SelectedArmyType);
+        Army.ArmyTypes armyType = (Army.ArmyTypes)data.SelectedArmyType;
         ArmyCreationPatch.CreateArmyInKingdom(kingdom, armyLeader, targetSettlement, armyType, data.ArmyStringId);
     }
 
@@ -87,9 +87,9 @@ public class ArmyHandler : IHandler
             return;
         }
 
-        if (objectManager.TryGetObject(obj.ArmyId, out MobileParty leaderMobileParty) == false)
+        if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
         {
-            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.ArmyId);
+            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
             return;
         }
 
@@ -110,9 +110,9 @@ public class ArmyHandler : IHandler
             return;
         }
     
-        if (objectManager.TryGetObject(obj.ArmyId, out MobileParty leaderMobileParty) == false)
+        if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
         {
-            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.ArmyId);
+            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
             return;
         }
 
