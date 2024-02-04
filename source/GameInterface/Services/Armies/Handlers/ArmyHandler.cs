@@ -29,7 +29,6 @@ public class ArmyHandler : IHandler
         messageBroker.Subscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
         messageBroker.Subscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
         messageBroker.Subscribe<DestroyArmy>(HandleChangeDisbandArmy);
-        messageBroker.Subscribe<CreateArmy>(HandleCreateArmy);
         messageBroker.Subscribe<CreateArmy>(HandleChangeCreateArmy);
     }
 
@@ -47,7 +46,6 @@ public class ArmyHandler : IHandler
         ArmyDeletionPatch.DisbandArmy(army, armyReason);
     }
 
-    private void HandleCreateArmy(MessagePayload<CreateArmy> payload)
     private void HandleChangeCreateArmy(MessagePayload<CreateArmy> payload)
     {
         var data = payload.What.Data;
@@ -86,15 +84,13 @@ public class ArmyHandler : IHandler
             return;
         }
 
-        if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
+        if (objectManager.TryGetObject(obj.ArmyId, out Army army) == false)
         {
-            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
-            return;
+            Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
         }
 
-        //TODO: Wait for Amry creation / deletion sync add, cannot call the ArmyPach because army will be null
 
-        //ArmyPatches.RemoveMobilePartyInArmy(mobileParty, leaderMobileParty.Army);
+        ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army);
 
     }
 
@@ -108,16 +104,14 @@ public class ArmyHandler : IHandler
             Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
             return;
         }
-    
-        if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
+
+        if (objectManager.TryGetObject<Army>(obj.ArmyId, out var army) == false)
         {
-            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
+            Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
             return;
         }
 
-        //TODO: Wait for Amry creation / deletion sync add, cannot call the ArmyPach because army will be null
-
-        //ArmyPatches.AddMobilePartyInArmy(mobileParty, leaderMobileParty.Army);
+        ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
           
     }
     public void Dispose()
@@ -125,7 +119,6 @@ public class ArmyHandler : IHandler
         messageBroker.Unsubscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
         messageBroker.Unsubscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
         messageBroker.Unsubscribe<DestroyArmy>(HandleChangeDisbandArmy);
-        messageBroker.Unsubscribe<CreateArmy>(HandleCreateArmy);
         messageBroker.Unsubscribe<CreateArmy>(HandleChangeCreateArmy);
     }
 }
