@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
@@ -16,7 +17,6 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(Settlement))]
 internal class SettlementHitPointsPatch
 {
-    private static readonly PropertyInfo SettlementHitPoints = typeof(Settlement).GetProperty(nameof(Settlement.SettlementHitPoints));
 
     [HarmonyPatch(nameof(Settlement.SettlementHitPoints), MethodType.Setter)]
     [HarmonyPrefix]
@@ -42,7 +42,7 @@ internal class SettlementHitPointsPatch
         {
             using (new AllowedThread())
             {
-                SettlementHitPoints.SetValue(settlement, settlementHitPoints);  
+                settlement.SetHitPointsChanged(settlementHitPoints);
             }
         });
     }

@@ -7,6 +7,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using static TaleWorlds.CampaignSystem.Settlements.Settlement;
 
 namespace GameInterface.Services.Settlements.Handlers;
 public class SettlementHandler : IHandler
@@ -25,8 +26,22 @@ public class SettlementHandler : IHandler
         messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Subscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
+        messageBroker.Subscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
 
 
+
+    }
+
+    private void HandleCurrentSiegeState(MessagePayload<ChangeSettlementCurrentSiegeState> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        CurrentSiegeStateSettlementPatch.RunCurrentSiegeStateChange(settlement, (SiegeState)obj.CurrentSiegeState);
     }
 
     private void HandleLastThreatTime(MessagePayload<ChangeSettlementLastThreatTime> payload)
@@ -91,5 +106,7 @@ public class SettlementHandler : IHandler
         messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Unsubscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Unsubscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
+        messageBroker.Unsubscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
+
     }
 }
