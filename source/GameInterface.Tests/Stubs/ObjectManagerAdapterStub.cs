@@ -61,9 +61,19 @@ namespace GameInterface.Tests.Stubs
             throw new NotImplementedException();
         }
 
+        public bool Remove(object obj)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryGetId(object obj, out string id)
+        {
+            throw new NotImplementedException();
+        }
+
         public bool TryGetObject(string id, out object obj) => registry.TryGetValue(id, out obj);
 
-        public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
+        public bool TryGetObject<T>(string id, out T obj) where T : class
         {
             obj = default;
 

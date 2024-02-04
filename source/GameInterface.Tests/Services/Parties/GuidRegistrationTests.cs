@@ -57,16 +57,16 @@ namespace GameInterface.Tests.Services.Parties
                 Campaign.Current.CampaignObjectManager.AddMobileParty(party);
             }
 
-            var partyRegistry = _container.Resolve<IMobilePartyRegistry>();
+            var partyRegistry = _container.Resolve<MobilePartyRegistry>();
 
             // Execution
-            partyRegistry.RegisterAllParties();
+            partyRegistry.RegisterAll();
 
             // Verification
             for (int i = 0; i < NUM_PARTIES; i++)
             {
                 var party = parties[i];
-                Assert.True(partyRegistry.TryGetValue(party, out string _));
+                Assert.True(partyRegistry.TryGetId(party, out string _));
             }
         }
     }
