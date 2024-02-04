@@ -4,7 +4,6 @@ using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -43,7 +42,7 @@ public class ArmyHandler : IHandler
             Logger.Error("Unable to find Army ({armyId})", data.ArmyId);
             return;
         }
-        Army.ArmyDispersionReason armyReason = (Army.ArmyDispersionReason)Enum.Parse(typeof(Army.ArmyDispersionReason), data.Reason);
+        Army.ArmyDispersionReason armyReason = (Army.ArmyDispersionReason)data.Reason;
         ArmyDeletionPatch.DisbandArmy(army, armyReason);
     }
 
@@ -69,10 +68,8 @@ public class ArmyHandler : IHandler
             return;
         }
 
-        //Army.ArmyTypes armyType = (Army.ArmyTypes)data.SelectedArmyType;
-
-
         Army.ArmyTypes armyType = (Army.ArmyTypes)data.SelectedArmyType;
+
         ArmyCreationPatch.CreateArmyInKingdom(kingdom, armyLeader, targetSettlement, armyType, data.ArmyStringId);
     }
 
