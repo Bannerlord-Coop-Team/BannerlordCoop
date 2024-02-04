@@ -24,6 +24,15 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<SettlementChangedLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Subscribe<SettlementChangedLastThreatTime>(HandleLastThreatTime);
         messageBroker.Subscribe<SettlementChangedCurrentSiegeState>(HandleCurrentSiegeState);
+        messageBroker.Subscribe<SettlementChangedMilitia>(HandleMilitia);
+
+    }
+
+    private void HandleMilitia(MessagePayload<SettlementChangedMilitia> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeSettlementMilitia(obj.SettlementId, obj.Militia);
+        network.SendAll(message);
     }
 
     private void HandleCurrentSiegeState(MessagePayload<SettlementChangedCurrentSiegeState> payload)
@@ -72,6 +81,7 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Unsubscribe<SettlementChangedLastThreatTime>(HandleLastThreatTime);
         messageBroker.Unsubscribe<SettlementChangedCurrentSiegeState>(HandleCurrentSiegeState);
+        messageBroker.Unsubscribe<SettlementChangedMilitia>(HandleMilitia);
 
     }
 }
