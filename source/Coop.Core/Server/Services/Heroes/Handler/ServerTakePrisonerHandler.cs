@@ -1,14 +1,8 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.Clans.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
-using Coop.Core.Server.Services.Clans.Messages;
 using Coop.Core.Server.Services.Heroes.Messages;
-using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Messages;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Server.Services.Heroes.Handler
 {
@@ -37,23 +31,20 @@ namespace Coop.Core.Server.Services.Heroes.Handler
         {
             var payload = obj.What;
 
-            Send(payload.PartyId, payload.CharacterId, payload.IsEventCalled);
+            NetworkTakePrisonerApproved takePrisonerApproved = new NetworkTakePrisonerApproved(payload.PartyId, payload.CharacterId, payload.IsEventCalled);
+
+            network.SendAll(takePrisonerApproved);
         }
 
         private void Handle(MessagePayload<NetworkTakePrisonerRequest> obj)
         {
             var payload = obj.What;
 
-            Send(payload.PartyId, payload.CharacterId, payload.IsEventCalled);
-        }
-
-        private void Send(string partyId, string characterId, bool isEventCalled)
-        {
-            TakePrisoner takePrisoner = new TakePrisoner(partyId, characterId, isEventCalled);
+            TakePrisoner takePrisoner = new TakePrisoner(payload.PartyId, payload.CharacterId, payload.IsEventCalled);
 
             messageBroker.Publish(this, takePrisoner);
 
-            NetworkTakePrisonerApproved takePrisonerApproved = new NetworkTakePrisonerApproved(partyId, characterId, isEventCalled);
+            NetworkTakePrisonerApproved takePrisonerApproved = new NetworkTakePrisonerApproved(payload.PartyId, payload.CharacterId, payload.IsEventCalled);
 
             network.SendAll(takePrisonerApproved);
         }

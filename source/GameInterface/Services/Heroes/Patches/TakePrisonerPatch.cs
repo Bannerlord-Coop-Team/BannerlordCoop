@@ -36,7 +36,7 @@ namespace GameInterface.Services.Heroes.Patches
                 prisonerCharacter.StringId,
                 isEventCalled));
 
-            return false;
+            return ModInformation.IsServer;
         }
 
         public static void RunOriginalApplyInternal(PartyBase capturerParty, Hero prisonerCharacter, bool isEventCalled)
