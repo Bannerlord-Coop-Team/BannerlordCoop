@@ -21,7 +21,7 @@ internal class ClientCreateHeroHandler : IHandler
 
     private void Handle_NetworkCreateHero(MessagePayload<NetworkCreateHero> payload)
     {
-        var message = new CreateHero(payload.What.HeroData);
+        var message = new CreateHero(payload.What.Data);
         messageBroker.Publish(this, message);
     }
 }

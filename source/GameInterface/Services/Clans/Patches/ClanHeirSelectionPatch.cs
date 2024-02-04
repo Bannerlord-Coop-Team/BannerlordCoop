@@ -21,7 +21,7 @@ namespace GameInterface.Services.Clans.Patches
     {
         public static bool Prefix(Hero heir, bool isRetirement = false)
         {
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             string playerHeroId = Hero.MainHero.StringId;
 

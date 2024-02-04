@@ -9,9 +9,9 @@ public record NetworkCreateHero : ICommand
 {
     public NetworkCreateHero(HeroCreationData heroData)
     {
-        HeroData = heroData;
+        Data = heroData;
     }
 
     [ProtoMember(1)]
-    public HeroCreationData HeroData { get; }
+    public HeroCreationData Data { get; }
 }

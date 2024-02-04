@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using SandBox.CampaignBehaviors;
 
-namespace GameInterface.Services.Heroes.Patches;
+namespace GameInterface.Services.Heroes.Patches.Disable;
 
 [HarmonyPatch(typeof(HeirSelectionCampaignBehavior))]
 internal class DisableHeirSelectionCampaignBehavior

@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.Heroes.Patches;
+namespace GameInterface.Services.Heroes.Patches.Disable;
 
 /// <summary>
 /// NOT Disabled since this spawns parties and heroes at the beginning of the game

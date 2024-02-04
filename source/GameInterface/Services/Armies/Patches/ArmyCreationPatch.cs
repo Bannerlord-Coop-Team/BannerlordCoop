@@ -28,7 +28,7 @@ namespace GameInterface.Services.Armies.Patches
         private static bool CreateArmyPrefix()
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             return ModInformation.IsServer;
         }

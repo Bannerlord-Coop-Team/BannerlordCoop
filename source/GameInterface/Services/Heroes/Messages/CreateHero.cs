@@ -6,8 +6,8 @@ public record CreateHero : ICommand
 {
     public CreateHero(HeroCreationData heroCreationData)
     {
-        HeroCreationData = heroCreationData;
+        Data = heroCreationData;
     }
 
-    public HeroCreationData HeroCreationData { get; }
+    public HeroCreationData Data { get; }
 }

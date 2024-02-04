@@ -22,7 +22,7 @@ class TemplatePatch
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
         // returns true if when the client state is not in Campaign or Mission to allow original calls
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         // Publishing a message to all internal software is done using the message broker
         // This type of message should be IEvent since it is a reaction to something

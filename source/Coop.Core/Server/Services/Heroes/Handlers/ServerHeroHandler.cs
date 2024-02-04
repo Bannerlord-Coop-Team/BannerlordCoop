@@ -30,7 +30,7 @@ internal class ServerHeroHandler : IHandler
     {
         var payload = obj.What;
 
-        var message = new NetworkCreateHero(payload.HeroCreatedData);
+        var message = new NetworkCreateHero(payload.Data);
 
         network.SendAll(message);
     }

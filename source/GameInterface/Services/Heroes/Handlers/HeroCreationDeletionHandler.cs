@@ -13,15 +13,15 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Heroes.Handlers;
-internal class CreateHeroHandler : IHandler
+internal class HeroCreationDeletionHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<CreateHeroHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<HeroCreationDeletionHandler>();
 
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
-    public CreateHeroHandler(
+    public HeroCreationDeletionHandler(
         IHeroInterface heroInterface,
         IMessageBroker messageBroker,
         IObjectManager objectManager)
@@ -39,7 +39,7 @@ internal class CreateHeroHandler : IHandler
 
     private void Handle(MessagePayload<CreateHero> obj)
     {
-        var data = obj.What.HeroCreationData;
+        var data = obj.What.Data;
 
         if (objectManager.TryGetObject(data.TemplateStringId, out CharacterObject template) == false)
         {
@@ -50,11 +50,12 @@ internal class CreateHeroHandler : IHandler
         {
             Logger.Error("Unable to get {type} from {id}", typeof(Settlement).Name, data.BornSettlementId);
         }
-
         
         CampaignTime birthDay = new CampaignTime();
         birthDay.SetNumTicks(data.Birthday);
 
-        HeroCreationDeletionPatches.OverrideCreateNewHero(template, data.Age, birthDay, bornSettlement);
+        Hero newHero = HeroCreationDeletionPatches.OverrideCreateNewHero(template, data.Age, birthDay, bornSettlement);
+
+        objectManager.AddExisting(data.HeroStringId, newHero);
     }
 }

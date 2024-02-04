@@ -17,7 +17,7 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(Clan clan, float amount)
         {
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (amount == 0f) return false;
 

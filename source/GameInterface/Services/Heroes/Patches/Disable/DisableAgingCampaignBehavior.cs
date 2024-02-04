@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.Heroes.Patches;
+namespace GameInterface.Services.Heroes.Patches.Disable;
 
 [HarmonyPatch(typeof(AgingCampaignBehavior))]
 internal class DisableAgingCampaignBehavior
