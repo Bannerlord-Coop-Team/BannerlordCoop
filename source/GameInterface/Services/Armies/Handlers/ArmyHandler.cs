@@ -30,6 +30,7 @@ public class ArmyHandler : IHandler
         messageBroker.Subscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
         messageBroker.Subscribe<DestroyArmy>(HandleChangeDisbandArmy);
         messageBroker.Subscribe<CreateArmy>(HandleCreateArmy);
+        messageBroker.Subscribe<CreateArmy>(HandleChangeCreateArmy);
     }
 
 
@@ -47,6 +48,7 @@ public class ArmyHandler : IHandler
     }
 
     private void HandleCreateArmy(MessagePayload<CreateArmy> payload)
+    private void HandleChangeCreateArmy(MessagePayload<CreateArmy> payload)
     {
         var data = payload.What.Data;
 
@@ -124,5 +126,6 @@ public class ArmyHandler : IHandler
         messageBroker.Unsubscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
         messageBroker.Unsubscribe<DestroyArmy>(HandleChangeDisbandArmy);
         messageBroker.Unsubscribe<CreateArmy>(HandleCreateArmy);
+        messageBroker.Unsubscribe<CreateArmy>(HandleChangeCreateArmy);
     }
 }
