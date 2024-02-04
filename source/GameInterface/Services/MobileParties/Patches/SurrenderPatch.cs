@@ -12,27 +12,23 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Common.Extensions;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.MobileParties.Patches
 {
     /// <summary>
     /// Patches the surrender of the player party, only runs on local client
     /// </summary>
-    [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
+    [HarmonyPatch(typeof(PlayerEncounter))]
     public class SurrenderPatch
     {
-        private static readonly Action<EncounterGameMenuBehavior, MenuCallbackArgs> SurrenderOnConsequence =
-            typeof(EncounterGameMenuBehavior)
-            .GetMethod("game_menu_encounter_surrender_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance)
-            .BuildDelegate<Action<EncounterGameMenuBehavior, MenuCallbackArgs>>();
+        private static readonly Action<PlayerEncounter> PlayerSurrenderInternal =
+            typeof(PlayerEncounter)
+            .GetMethod("PlayerSurrenderInternal", BindingFlags.NonPublic | BindingFlags.Instance)
+            .BuildDelegate<Action<PlayerEncounter>>();
 
         [HarmonyPrefix]
-        [HarmonyPatch("game_menu_encounter_surrender_on_consequence")]
-        public static bool Prefix(MenuCallbackArgs args)
+        [HarmonyPatch("PlayerSurrenderInternal")]
+        public static bool Prefix()
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
 
@@ -63,9 +59,7 @@ namespace GameInterface.Services.MobileParties.Patches
             {
                 using (new AllowedThread())
                 {
-                    SurrenderOnConsequence.Invoke(
-                        Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>(), 
-                        new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, new TextObject()));
+                    PlayerSurrenderInternal.Invoke(PlayerEncounter.Current);
                 }
             });
         }
