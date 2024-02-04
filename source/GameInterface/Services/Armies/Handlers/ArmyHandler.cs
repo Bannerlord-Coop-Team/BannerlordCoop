@@ -72,7 +72,7 @@ public class ArmyHandler : IHandler
         //Army.ArmyTypes armyType = (Army.ArmyTypes)data.SelectedArmyType;
 
 
-        Army.ArmyTypes armyType = (Army.ArmyTypes)Enum.Parse(typeof(Army.ArmyTypes), data.SelectedArmyType);
+        Army.ArmyTypes armyType = (Army.ArmyTypes)data.SelectedArmyType;
         ArmyCreationPatch.CreateArmyInKingdom(kingdom, armyLeader, targetSettlement, armyType, data.ArmyStringId);
     }
 

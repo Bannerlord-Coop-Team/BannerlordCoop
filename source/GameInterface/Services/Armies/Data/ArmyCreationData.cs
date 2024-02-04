@@ -15,7 +15,7 @@ public record ArmyCreationData
         KingdomStringId = instance.StringId;
         LeaderHeroStringId = armyLeader.StringId;
         TargetSettlementStringId = targetSettlement.StringId;
-        SelectedArmyType = selectedArmyType.ToString();
+        SelectedArmyType = (short)selectedArmyType;
         ArmyStringId = newArmyId;
     }
 
@@ -26,7 +26,7 @@ public record ArmyCreationData
     [ProtoMember(3)]
     public string TargetSettlementStringId { get; }
     [ProtoMember(4)]
-    public string SelectedArmyType { get; }
+    public short SelectedArmyType { get; }
     [ProtoMember(5)]
     public string ArmyStringId { get; }
 }
