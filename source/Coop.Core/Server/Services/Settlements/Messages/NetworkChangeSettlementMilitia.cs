@@ -3,7 +3,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Settlements.Messages;
 
-
+/// <summary>
+/// Notify client of Militia Change.
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 public record NetworkChangeSettlementMilitia : IEvent
 {
