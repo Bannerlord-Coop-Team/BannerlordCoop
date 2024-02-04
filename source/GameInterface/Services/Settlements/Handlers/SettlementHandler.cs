@@ -24,7 +24,21 @@ public class SettlementHandler : IHandler
         messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
+        messageBroker.Subscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
 
+
+    }
+
+    private void HandleLastThreatTime(MessagePayload<ChangeSettlementLastThreatTime> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Village ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        LastThreatTimeSettlementPatch.LastThreatTimeChange(settlement, obj.LastThreatTimeTicks);
     }
 
     private void HandleLastAttackerParty(MessagePayload<ChangeSettlementLastAttackerParty> payload)
@@ -76,7 +90,6 @@ public class SettlementHandler : IHandler
         messageBroker.Unsubscribe<ChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Unsubscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
-
-
+        messageBroker.Unsubscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
     }
 }

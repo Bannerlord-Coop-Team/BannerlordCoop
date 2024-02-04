@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Messages;
+using System;
 
 namespace Coop.Core.Client.Services.Settlements.Handlers;
 internal class ClientSettlementHandler : IHandler
@@ -17,7 +18,14 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Subscribe<NetworkChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<NetworkChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
+        messageBroker.Subscribe<NetworkChangeSettlementLastThreatTime>(HandleLastThreatTime);
+    }
 
+    private void HandleLastThreatTime(MessagePayload<NetworkChangeSettlementLastThreatTime> payload)
+    {
+        var obj = payload.What;
+        var message = new ChangeSettlementLastThreatTime(obj.SettlementId, obj.LastThreatTimeTicks);
+        messageBroker.Publish(this, message);
 
     }
 
@@ -53,6 +61,7 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Unsubscribe<NetworkChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Unsubscribe<NetworkChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
+        messageBroker.Unsubscribe<NetworkChangeSettlementLastThreatTime>(HandleLastThreatTime);
 
 
 

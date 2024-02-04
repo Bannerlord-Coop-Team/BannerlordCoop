@@ -22,9 +22,18 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<SettlementChangedBribePaid>(HandleBribePaid);
         messageBroker.Subscribe<SettlementChangedSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<SettlementChangedLastAttackerParty>(HandleLastAttackerParty);
+        messageBroker.Subscribe<SettlementChangedLastThreatTime>(HandleLastThreatTime);
 
 
 
+
+    }
+
+    private void HandleLastThreatTime(MessagePayload<SettlementChangedLastThreatTime> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeSettlementLastThreatTime(obj.SettlementId, obj.LastThreatTimeTicks);
+        network.SendAll(message);
     }
 
     private void HandleLastAttackerParty(MessagePayload<SettlementChangedLastAttackerParty> payload)
@@ -57,6 +66,7 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedBribePaid>(HandleBribePaid);
         messageBroker.Unsubscribe<SettlementChangedSettlementHitPoints>(HandleHitPoints);
         messageBroker.Unsubscribe<SettlementChangedLastAttackerParty>(HandleLastAttackerParty);
+        messageBroker.Unsubscribe<SettlementChangedLastThreatTime>(HandleLastThreatTime);
 
     }
 }
