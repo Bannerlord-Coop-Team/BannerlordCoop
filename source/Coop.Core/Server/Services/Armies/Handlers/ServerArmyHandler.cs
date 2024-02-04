@@ -46,7 +46,7 @@ public class ServerArmyHandler : IHandler
         MobilePartyInArmyAdded mobilePartyInArmyAdded = obj.What;
 
         // Broadcast to all the clients that the state was changed
-        var message = new NetworkAddMobilePartyInArmy(mobilePartyInArmyAdded.MobilePartyId, mobilePartyInArmyAdded.LeaderMobilePartyId);
+        var message = new NetworkAddMobilePartyInArmy(mobilePartyInArmyAdded.MobilePartyId, mobilePartyInArmyAdded.ArmyId);
         
         network.SendAll(message);
     }
@@ -56,7 +56,7 @@ public class ServerArmyHandler : IHandler
         MobilePartyInArmyRemoved mobilePartyInArmyRemoved = obj.What;
 
         // Broadcast to all the clients that the state was changed
-        var message = new NetworkRemoveMobilePartyInArmy(mobilePartyInArmyRemoved.MobilePartyId, mobilePartyInArmyRemoved.LeaderMobilePartyId);
+        var message = new NetworkRemoveMobilePartyInArmy(mobilePartyInArmyRemoved.MobilePartyId, mobilePartyInArmyRemoved.ArmyId);
         
         network.SendAll(message);
     }

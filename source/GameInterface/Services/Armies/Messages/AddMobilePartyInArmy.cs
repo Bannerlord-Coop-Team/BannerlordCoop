@@ -8,12 +8,12 @@ namespace GameInterface.Services.Armies.Messages;
 public record AddMobilePartyInArmy : ICommand
 {
     public string MobilePartyId { get; }
-    public string LeaderMobilePartyId { get; }
+    public string ArmyId { get; }
 
-    public AddMobilePartyInArmy(string mobilePartyId, string leaderMobilePartyId)
+    public AddMobilePartyInArmy(string mobilePartyId, string armyId)
     {
         MobilePartyId = mobilePartyId;
-        LeaderMobilePartyId = leaderMobilePartyId;
+        ArmyId = armyId;
     }
 
 }

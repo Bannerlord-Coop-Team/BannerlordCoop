@@ -26,6 +26,7 @@ public class ArmyPatches
 
         if (ModInformation.IsClient) return false;
 
+
         var message = new MobilePartyInArmyAdded(mobileParty.StringId, __instance.LeaderParty.StringId);
         MessageBroker.Instance.Publish(mobileParty, message);
 

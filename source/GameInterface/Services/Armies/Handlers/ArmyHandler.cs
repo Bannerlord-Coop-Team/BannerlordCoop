@@ -87,9 +87,9 @@ public class ArmyHandler : IHandler
             return;
         }
 
-        if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
+        if (objectManager.TryGetObject(obj.ArmyId, out MobileParty leaderMobileParty) == false)
         {
-            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
+            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.ArmyId);
             return;
         }
 
@@ -110,9 +110,9 @@ public class ArmyHandler : IHandler
             return;
         }
     
-        if (objectManager.TryGetObject(obj.LeaderMobilePartyId, out MobileParty leaderMobileParty) == false)
+        if (objectManager.TryGetObject(obj.ArmyId, out MobileParty leaderMobileParty) == false)
         {
-            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.LeaderMobilePartyId);
+            Logger.Error("Unable to find MobileParty ({leaderMobilePartyId})", obj.ArmyId);
             return;
         }
 

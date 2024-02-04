@@ -19,8 +19,8 @@ namespace Coop.IntegrationTests.Armies
         {
             // Arrange
             string mobilePartyId = "vassal_v2"; 
-            string leaderMobilePartyId = "lord_v1";
-            var triggerMessage = new MobilePartyInArmyAdded(mobilePartyId, leaderMobilePartyId);
+            string armyId = "CoopArmy_1";
+            var triggerMessage = new MobilePartyInArmyAdded(mobilePartyId, armyId);
 
             var server = TestEnvironment.Server;
 
@@ -33,7 +33,7 @@ namespace Coop.IntegrationTests.Armies
 
             //Verify if the server is sending the same mobilePartyId and leaderMobilePartyId value
             Assert.Equal(mobilePartyId, server.NetworkSentMessages.GetMessages<NetworkAddMobilePartyInArmy>().First().MobilePartyId);
-            Assert.Equal(leaderMobilePartyId, server.NetworkSentMessages.GetMessages<NetworkAddMobilePartyInArmy>().First().LeaderMobilePartyId);
+            Assert.Equal(armyId, server.NetworkSentMessages.GetMessages<NetworkAddMobilePartyInArmy>().First().ArmyId);
 
 
             // Verify all clients receive a single message to their game interfaces
@@ -46,7 +46,7 @@ namespace Coop.IntegrationTests.Armies
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
             {
                 Assert.Equal(mobilePartyId, client.InternalMessages.GetMessages<AddMobilePartyInArmy>().First().MobilePartyId);
-                Assert.Equal(leaderMobilePartyId, client.InternalMessages.GetMessages<AddMobilePartyInArmy>().First().LeaderMobilePartyId);
+                Assert.Equal(armyId, client.InternalMessages.GetMessages<AddMobilePartyInArmy>().First().ArmyId);
             }
 
 

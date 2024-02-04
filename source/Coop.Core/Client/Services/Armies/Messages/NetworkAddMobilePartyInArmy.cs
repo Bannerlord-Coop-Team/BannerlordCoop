@@ -12,11 +12,11 @@ public record NetworkAddMobilePartyInArmy : ICommand
     [ProtoMember(1)]
     public string MobilePartyId { get; }
     [ProtoMember(2)]
-    public string LeaderMobilePartyId { get; }
+    public string ArmyId { get; }
 
-    public NetworkAddMobilePartyInArmy(string mobilePartyId, string leaderMobilePartyId)
+    public NetworkAddMobilePartyInArmy(string mobilePartyId, string armyId)
     {
         MobilePartyId = mobilePartyId;
-        LeaderMobilePartyId = leaderMobilePartyId;
+        ArmyId = armyId;
     }
 }
