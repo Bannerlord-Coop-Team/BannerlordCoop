@@ -4,20 +4,20 @@ using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
 namespace Coop.IntegrationTests.Settlement;
-public class SettlementHitPointsTest
+public class SettlementGarrisonWageLimitTest
 {
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
     /// <summary>
-    /// Used to Test that client recieves SettlementHitPoints messsages.
+    /// Used to test that the client recieves GarrisonWageLimit changes
     /// </summary>
     [Fact]
-    public void ServerSettlementHitPointsChanged_Publishes_AllClients()
+    public void ServerSettlementGarrisonWageLimitChanged_Publishes_AllClients()
     {
         // Arrange
         string settlementId = "Settlement1";
-        float hitPoints = 99.5f;
-        var triggerMessage = new SettlementChangedSettlementHitPoints(settlementId, hitPoints);
+        int wageLimit = 45;
+        var triggerMessage = new SettlementChangedGarrisonWageLimit(settlementId, wageLimit);
 
         var server = TestEnvironment.Server;
 
@@ -26,12 +26,13 @@ public class SettlementHitPointsTest
 
         // Assert
         // Verify the server sends a single message to it's game interface
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementHitPoints>());
+        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementGarrisonWagePaymentLimit>());
 
         // Verify the all clients send a single message to their game interfaces
         foreach (EnvironmentInstance client in TestEnvironment.Clients)
         {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementHitPoints>());
+            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementGarrisonWagePaymentLimit>());
         }
     }
+
 }

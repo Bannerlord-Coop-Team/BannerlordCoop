@@ -320,6 +320,47 @@ internal class SettlementCommands
     }
 
 
+    // coop.debug.settlements.set_garrison_pay_limit town_ES3 23
+    /// <summary>
+    /// Changes the SiegeState
+    /// </summary>
+    /// <param name="args">the settlementid and float of how many troops (negative or pos)</param>
+    /// <returns>info that is was succesful</returns>
+    [CommandLineArgumentFunction("set_garrison_pay_limit", "coop.debug.settlements")]
+    public static string SetGarrisonWageLimit(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <militia_float>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+
+        var objectManager = container.Resolve<IObjectManager>();
+
+        string settlementId = args[0];
+        string garrisonInt = args[1];
+
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+            return $"Settlement: {settlementId} was not found.";
+
+        int wageLimit;
+        try
+        {
+            wageLimit = int.Parse(garrisonInt);
+        }
+        catch (Exception ex)
+        {
+            return ex.ToString();
+        }
+
+        settlement.SetGarrisonWagePaymentLimit(wageLimit);
+
+
+        return $"Successfully set the Settlement ({settlementId}) GarrisonWagePaymentLimit to '{wageLimit}'";
+    }
+
+
+
 
 
     // Located in Modules\SandBox\ModuleData\settlements.xml

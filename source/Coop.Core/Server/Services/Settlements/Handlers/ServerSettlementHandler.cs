@@ -2,7 +2,6 @@
 using Common.Network;
 using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Messages;
-using System;
 
 namespace Coop.Core.Server.Services.Settlements.Handlers;
 
@@ -25,6 +24,16 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<SettlementChangedLastThreatTime>(HandleLastThreatTime);
         messageBroker.Subscribe<SettlementChangedCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Subscribe<SettlementChangedMilitia>(HandleMilitia);
+        messageBroker.Subscribe<SettlementChangedGarrisonWageLimit>(HandleGarrisonWageLimit);
+
+        
+    }
+
+    private void HandleGarrisonWageLimit(MessagePayload<SettlementChangedGarrisonWageLimit> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeSettlementGarrisonWagePaymentLimit(obj.SettlementId, obj.GarrisonWagePaymentLimit);
+        network.SendAll(message);
 
     }
 
@@ -82,6 +91,6 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedLastThreatTime>(HandleLastThreatTime);
         messageBroker.Unsubscribe<SettlementChangedCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Unsubscribe<SettlementChangedMilitia>(HandleMilitia);
-
+        messageBroker.Unsubscribe<SettlementChangedGarrisonWageLimit>(HandleGarrisonWageLimit);
     }
 }

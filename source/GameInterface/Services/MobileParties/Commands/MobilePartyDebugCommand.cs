@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GameInterface.Services.MobileParties.Patches;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -60,5 +61,26 @@ namespace GameInterface.Services.MobileParties.Commands
             return stringBuilder.ToString();
         }
 
+
+        [CommandLineArgumentFunction("set_wage_limit_test", "coop.debug.mobileparty")]
+        public static string SetWagePaymentLimit(List<string> args)
+        {
+            if (args.Count < 1)
+            {
+                return "Usage: coop.debug.mobileparty.set_wage_limit <PartyStringID>";
+            }
+
+            MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
+
+            if (mobileParty == null)
+            {
+                return string.Format("ID: '{0}' not found", args[0]);
+            }
+
+            WageChangesSettlementPatch.SetWagePaymentLimitOverrideTest(mobileParty, 2000);
+
+
+            return "SetWagePaymentLimit Tested Should invoke both";
+        }
     }
 }
