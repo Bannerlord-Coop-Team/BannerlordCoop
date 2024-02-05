@@ -42,7 +42,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                 return;
             }
 
-            SurrenderPatch.RunStartPlayerCaptivity(captorParty.Party);
+            PlayerSurrenderPatch.RunStartPlayerCaptivity(captorParty.Party);
         }
     }
 }

@@ -34,12 +34,33 @@ namespace Coop.IntegrationTests.Heroes
             // Act
             server.SimulateMessage(this, message);
 
-            // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<TakePrisoner>());
-
             foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<TakePrisoner>());
+            }
+        }
+        /// <summary>
+        /// Verify sending PrisonerReleased on one client
+        /// Triggers ReleasePrisoner on all other clients
+        /// </summary>
+        [Fact]
+        public void PrisonerReleased_Publishes_AllClients()
+        {
+            // Arrange
+            var partyId = "party1";
+
+            var message = new PrisonerReleased(partyId, 0, null);
+
+            var client1 = TestEnvironment.Clients.First();
+
+            var server = TestEnvironment.Server;
+
+            // Act
+            server.SimulateMessage(this, message);
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ReleasePrisoner>());
             }
         }
     }

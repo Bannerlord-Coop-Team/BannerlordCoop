@@ -8,7 +8,6 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.MountAndBlade.Diamond.Lobby.LocalData;
 
 namespace GameInterface.Services.MapEvents.Patches
 {

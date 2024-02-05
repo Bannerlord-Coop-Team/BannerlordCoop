@@ -1,14 +1,8 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.Clans.Messages;
 using Coop.Core.Client.Services.Heroes.Messages;
-using Coop.Core.Server.Services.Clans.Messages;
 using Coop.Core.Server.Services.Heroes.Messages;
-using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Heroes.Messages;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Client.Services.Heroes.Handler
 {

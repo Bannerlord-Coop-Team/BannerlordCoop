@@ -1,20 +1,17 @@
 ﻿using Common;
+using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
-using System.Reflection;
 using System;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
-using Common.Extensions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameMenus;
-using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.MobileParties.Patches
@@ -23,7 +20,7 @@ namespace GameInterface.Services.MobileParties.Patches
     /// Patches the surrender of the player party, only runs on local client
     /// </summary>
     [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
-    public class SurrenderPatch
+    public class PlayerSurrenderPatch
     {
         private static readonly Action<EncounterGameMenuBehavior, MenuCallbackArgs> SurrenderOnConsequence =
             typeof(EncounterGameMenuBehavior)

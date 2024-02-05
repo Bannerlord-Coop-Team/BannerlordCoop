@@ -1,22 +1,19 @@
 ﻿using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands
 {
     internal class ClanDebugCommands
     {
-        [CommandLineArgumentFunction("change_clan_leader", "coop.debug")]
+        [CommandLineArgumentFunction("mapevents", "coop.debug")]
         public static string ChangeClanLeader(List<string> strings)
         {
-            Clan clan = Clan.All[int.Parse(strings[0])];
+            List<MobileParty> parties = MobileParty.AllBanditParties;
 
-            Hero newLeader = clan.Heroes[int.Parse(strings[1])];
-
-            ChangeClanLeaderAction.ApplyWithSelectedNewLeader(clan, newLeader);
-
-            return clan.Name.ToString() + " has a new leader: " + newLeader.Name.ToString();
+            return "command ran";
         }
 
         [CommandLineArgumentFunction("change_clan_kingdom", "coop.debug")]
