@@ -84,11 +84,11 @@ public class ArmyHandler : IHandler
             return;
         }
 
-        if (objectManager.TryGetObject(obj.ArmyId, out Army army) == false)
+        if (objectManager.TryGetObject<Army>(obj.ArmyId, out var army) == false)
         {
             Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
+            return;
         }
-
 
         ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army);
 

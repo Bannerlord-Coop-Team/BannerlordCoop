@@ -31,7 +31,15 @@ internal static class ArmyExtensions
     }
     internal static void RemovePartyInternal(this MobileParty mobileParty, Army army)
     {
-        Army_OnRemovePartyInternal(army,mobileParty);
+        try
+        {
+            //Need to catch null reference exception because when an army is disbanded, it will remove all parties from it
+            Army_OnRemovePartyInternal(army, mobileParty);
+        }
+        catch (System.NullReferenceException)
+        {
+            Logger.Error("NullReferenceException caught while removing {mobileParty} from {army}", mobileParty.Name, army.Name);
+        }
     }
 
     internal static void DisbandArmy(this Army army, Army.ArmyDispersionReason reason)

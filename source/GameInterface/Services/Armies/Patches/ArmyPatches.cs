@@ -10,6 +10,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Common.Logging;
 using Serilog;
+using Newtonsoft.Json.Linq;
+using System.Text;
 namespace GameInterface.Services.Armies.Patches;
 
 /// <summary>
@@ -22,56 +24,74 @@ public class ArmyPatches
 
     [HarmonyPatch(typeof(Army), "OnAddPartyInternal")]
     [HarmonyPrefix]
-    static bool OnAddPartyInternalPrefix(ref Army __instance, ref MobileParty mobileParty)
+    static bool OnAddPartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
         if (PolicyProvider.AllowOriginalCalls) return true;
 
         if (ModInformation.IsClient) return false;
-
-        return true;
-    }
-
-    [HarmonyPatch(typeof(Army), "OnAddPartyInternal")]
-    [HarmonyPostfix]
-    static void OnAddPartyInternalPostfix(MobileParty mobileParty)
-    {
-        if (ModInformation.IsClient) return;
+        
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
             Logger.Error("Unable to resolve {objectManager}", typeof(IObjectManager));
-            return;
+            return false;
         }
-        string armyId = mobileParty.Army.GetStringId();
+
+        foreach (var mobileParty_local in __instance.Parties)
+        {
+            if (mobileParty_local.StringId == mobileParty.StringId)
+            {
+                return false;
+            }
+        }
+
+        string armyId = __instance.GetStringId();
         if (armyId == null)
         {
             Logger.Error("{army} was not properly registered", mobileParty.Army.Name);
-            return;
+            return false;
         }
 
         var message = new MobilePartyInArmyAdded(mobileParty.StringId, armyId);
         MessageBroker.Instance.Publish(mobileParty, message);
 
-        return;
+        return true;
     }
 
 
     [HarmonyPatch(typeof(Army), "OnRemovePartyInternal")]
     [HarmonyPrefix]
-    static bool OnRemovePartyInternalPrefix(ref Army __instance, ref MobileParty mobileParty)
+    static bool OnRemovePartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
         if (PolicyProvider.AllowOriginalCalls) return true;
 
         if (ModInformation.IsClient) return false;
-
-        var message = new MobilePartyInArmyRemoved(mobileParty.StringId, __instance.LeaderParty.StringId);
         
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            Logger.Error("Unable to resolve {objectManager}", typeof(IObjectManager));
+            return false;
+        }
+        
+        
+        string armyId = __instance.GetStringId();
+        if (armyId == null)
+        {
+            Logger.Error("{army} was not properly registered", mobileParty.Army.Name);
+            return false;
+        }
+
+        var message = new MobilePartyInArmyRemoved(mobileParty.StringId, armyId);
+
         MessageBroker.Instance.Publish(mobileParty, message);
+        
 
         return true;
     }
+
 
     public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
@@ -79,7 +99,15 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
+                foreach (var mobileParty_local in army.Parties)
+                {
+                    if (mobileParty_local.StringId == mobileParty.StringId)
+                    {
+                        return;
+                    }
+                }
                 ArmyExtensions.AddPartyInternal(mobileParty, army);
+
             }
         });
     }
