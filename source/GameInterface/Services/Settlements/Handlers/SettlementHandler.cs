@@ -29,8 +29,22 @@ public class SettlementHandler : IHandler
         messageBroker.Subscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
 
         messageBroker.Subscribe<ChangeSettlementMilitia>(HandleMilitia);
+        messageBroker.Subscribe<ChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
 
 
+
+    }
+
+    private void HandleGarrisonWageLimit(MessagePayload<ChangeSettlementGarrisonWagePaymentLimit> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        GarrisonWagePaymentLimitSettlementPatch.RunGarrisonWagePaymentLimitChange(settlement, obj.GarrisonWagePaymentLimit);
     }
 
     private void HandleMilitia(MessagePayload<ChangeSettlementMilitia> payload)
@@ -117,9 +131,14 @@ public class SettlementHandler : IHandler
     {
         messageBroker.Unsubscribe<ChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
+        messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Unsubscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Unsubscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Unsubscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
+
+        messageBroker.Unsubscribe<ChangeSettlementMilitia>(HandleMilitia);
+        messageBroker.Unsubscribe<ChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
+
 
     }
 }

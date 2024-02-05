@@ -10,6 +10,8 @@ internal static class SettlementExtension
     private static readonly PropertyInfo Settlement_HitPoints = typeof(Settlement).GetProperty(nameof(Settlement.SettlementHitPoints));
 
     private static readonly PropertyInfo Settlement_CurrentSiegeState = typeof(Settlement).GetProperty(nameof(Settlement.CurrentSiegeState));
+    private static readonly PropertyInfo Settlemnent_GarrisonWagePaymentLimit = typeof(Settlement).GetProperty(nameof(Settlement.GarrisonWagePaymentLimit));
+
 
 
     public static void SetLastThreatTimeChanged(this Settlement component, long? lastThreatTime)

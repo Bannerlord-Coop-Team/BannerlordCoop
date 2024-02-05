@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.Settlements.Messages;
 using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Messages;
 using System;
@@ -21,6 +22,15 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Subscribe<NetworkChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Subscribe<NetworkChangeSettlementMilitia>(HandleMiltia);
+        messageBroker.Subscribe<NetworkChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
+
+    }
+
+    private void HandleGarrisonWageLimit(MessagePayload<NetworkChangeSettlementGarrisonWagePaymentLimit> payload)
+    {
+        var obj = payload.What;
+        var message = new ChangeSettlementGarrisonWagePaymentLimit(obj.SettlementId, obj.GarrisonWagePaymentLimit);
+        messageBroker.Publish(this, message);
     }
 
     private void HandleMiltia(MessagePayload<NetworkChangeSettlementMilitia> payload)
@@ -80,5 +90,7 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Unsubscribe<NetworkChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Unsubscribe<NetworkChangeSettlementMilitia>(HandleMiltia);
+        messageBroker.Unsubscribe<NetworkChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
+
     }
 }
