@@ -1,5 +1,9 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using Common.Extensions;
+using GameInterface.Services.ObjectManager;
 using ProtoBuf;
+using System;
+using System.Reflection;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 
@@ -8,30 +12,35 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class ExpelClanFromKingdomDecisionData : KingdomDecisionData
     {
+        private static Action<ExpelClanFromKingdomDecision, Clan> SetClanToExpel = typeof(ExpelClanFromKingdomDecision).GetField(nameof(ExpelClanFromKingdomDecision.ClanToExpel), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<ExpelClanFromKingdomDecision, Clan>();
+        private static Action<ExpelClanFromKingdomDecision, Kingdom> SetOldKingdom = typeof(ExpelClanFromKingdomDecision).GetField(nameof(ExpelClanFromKingdomDecision.OldKingdom), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<ExpelClanFromKingdomDecision, Kingdom>();
+
         [ProtoMember(1)]
         public string ClanToExpelId { get; }
+        [ProtoMember(2)]
+        public string OldKingdomId { get; }
 
-        public ExpelClanFromKingdomDecisionData(string proposedClanId, int triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string clanToExpelId) : base(proposedClanId, triggerTime, isEnforced, notifyPlayer, playerExamined)
+        public ExpelClanFromKingdomDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string clanToExpelId, string oldKingdomId) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
         {
             ClanToExpelId = clanToExpelId;
+            OldKingdomId = oldKingdomId;
         }
 
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
-            if (!objectManager.TryGetObject(ProposerClanId, out Clan proposerClan))
+            if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) ||
+                !objectManager.TryGetObject(ClanToExpelId, out Clan clanToExpel) ||
+                !objectManager.TryGetObject(OldKingdomId, out Kingdom oldKingdom))
             {
                 kingdomDecision = null;
                 return false;
             }
 
-            if (!objectManager.TryGetObject(ClanToExpelId, out Clan clanToExpel))
-            {
-                kingdomDecision = null;
-                return false;
-            }
-
-            kingdomDecision = new ExpelClanFromKingdomDecision(proposerClan, clanToExpel);
-            SetKingdomDecisionProperties(kingdomDecision);
+            ExpelClanFromKingdomDecision expelClanFromKingdomDecision = (ExpelClanFromKingdomDecision)FormatterServices.GetUninitializedObject(typeof(ExpelClanFromKingdomDecision));
+            SetKingdomDecisionProperties(expelClanFromKingdomDecision, proposerClan, kingdom);
+            SetClanToExpel(expelClanFromKingdomDecision, clanToExpel);
+            SetOldKingdom(expelClanFromKingdomDecision, oldKingdom);
+            kingdomDecision = expelClanFromKingdomDecision;
             return true;
         }
     }
