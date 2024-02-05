@@ -25,21 +25,13 @@ internal static class ArmyExtensions
             .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
             .BuildDelegate<Action<Army, Army.ArmyDispersionReason>>();
 
-    internal static void AddPartyInternal(this MobileParty mobileParty, Army army)
+    internal static void AddPartyInternal(MobileParty mobileParty, Army army)
     {
         Army_OnAddPartyInternal(army,mobileParty);
     }
-    internal static void RemovePartyInternal(this MobileParty mobileParty, Army army)
+    internal static void RemovePartyInternal(MobileParty mobileParty, Army army)
     {
-        try
-        {
-            //Need to catch null reference exception because when an army is disbanded, it will remove all parties from it
-            Army_OnRemovePartyInternal(army, mobileParty);
-        }
-        catch (System.NullReferenceException)
-        {
-            Logger.Error("NullReferenceException caught while removing {mobileParty} from {army}", mobileParty.Name, army.Name);
-        }
+        Army_OnRemovePartyInternal(army, mobileParty);
     }
 
     internal static void DisbandArmy(this Army army, Army.ArmyDispersionReason reason)

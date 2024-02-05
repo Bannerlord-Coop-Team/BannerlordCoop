@@ -38,14 +38,6 @@ public class ArmyPatches
             return false;
         }
 
-        foreach (var mobileParty_local in __instance.Parties)
-        {
-            if (mobileParty_local.StringId == mobileParty.StringId)
-            {
-                return false;
-            }
-        }
-
         string armyId = __instance.GetStringId();
         if (armyId == null)
         {
@@ -99,13 +91,14 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
-                foreach (var mobileParty_local in army.Parties)
+                /*foreach (var mobileParty_local in army.Parties)
                 {
+                    // Apply this code if duplication found
                     if (mobileParty_local.StringId == mobileParty.StringId)
                     {
                         return;
                     }
-                }
+                }*/
                 ArmyExtensions.AddPartyInternal(mobileParty, army);
 
             }
