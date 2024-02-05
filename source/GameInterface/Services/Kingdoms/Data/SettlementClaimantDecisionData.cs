@@ -1,7 +1,10 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using Common.Extensions;
+using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
@@ -12,6 +15,11 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class SettlementClaimantDecisionData : KingdomDecisionData
     {
+        private static Action<SettlementClaimantDecision, Settlement> SetSettlement = typeof(SettlementClaimantDecision).GetField(nameof(SettlementClaimantDecision.Settlement), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<SettlementClaimantDecision, Settlement>();
+        private static Action<SettlementClaimantDecision, Clan> SetClanToExclude = typeof(SettlementClaimantDecision).GetField(nameof(SettlementClaimantDecision.ClanToExclude), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<SettlementClaimantDecision, Clan>();
+        private static Action<SettlementClaimantDecision, Hero> SetCapturerHero = typeof(SettlementClaimantDecision).GetField("_capturerHero", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<SettlementClaimantDecision, Hero>();
+
+
         [ProtoMember(1)]
         public string SettlementId { get; }
         [ProtoMember(2)]
@@ -19,7 +27,7 @@ namespace GameInterface.Services.Kingdoms.Data
         [ProtoMember(3)]
         public string ClanToExcludeId { get; }
 
-        public SettlementClaimantDecisionData(string proposedClanId, int triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string settlementId, string capturerHeroId, string clanToExcludeId) : base(proposedClanId, triggerTime, isEnforced, notifyPlayer, playerExamined)
+        public SettlementClaimantDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string settlementId, string capturerHeroId, string clanToExcludeId) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
         {
             SettlementId = settlementId;
             CapturerHeroId = capturerHeroId;
@@ -28,7 +36,7 @@ namespace GameInterface.Services.Kingdoms.Data
 
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
-            if (!objectManager.TryGetObject(ProposerClanId, out Clan proposerClan) || 
+            if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) || 
                 !objectManager.TryGetObject(ClanToExcludeId, out Clan clanToExclude) ||
                 !objectManager.TryGetObject(SettlementId, out Settlement settlement) ||
                 !objectManager.TryGetObject(CapturerHeroId, out Hero capturerHero))
@@ -37,8 +45,12 @@ namespace GameInterface.Services.Kingdoms.Data
                 return false;
             }
 
-            kingdomDecision = new SettlementClaimantDecision(proposerClan, settlement, capturerHero ,clanToExclude);
-            SetKingdomDecisionProperties(kingdomDecision);
+            SettlementClaimantDecision settlementClaimantDecision = (SettlementClaimantDecision)FormatterServices.GetUninitializedObject(typeof(SettlementClaimantDecision));
+            SetKingdomDecisionProperties(settlementClaimantDecision, proposerClan, kingdom);
+            SetClanToExclude(settlementClaimantDecision, clanToExclude);
+            SetSettlement(settlementClaimantDecision, settlement);
+            SetCapturerHero(settlementClaimantDecision, capturerHero);
+            kingdomDecision = settlementClaimantDecision;
             return true;
         }
     }
