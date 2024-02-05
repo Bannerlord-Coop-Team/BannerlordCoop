@@ -262,7 +262,9 @@ public class ArmyDebugCommand
         }
 
         ArmyExtensions.AddPartyInternal(mobileParty, army);
-
+        
+        stringBuilder.AppendLine($"Added {mobileParty.Name} to {armyId}");
+        
         return stringBuilder.ToString();
     }
 
@@ -306,7 +308,9 @@ public class ArmyDebugCommand
         }
 
         ArmyExtensions.RemovePartyInternal(mobileParty, army);
-
+        
+        stringBuilder.AppendLine($"Removed {mobileParty.Name} from {armyId}");
+        
         return stringBuilder.ToString();
     }
 
