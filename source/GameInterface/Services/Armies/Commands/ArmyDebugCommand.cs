@@ -6,6 +6,8 @@ using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
@@ -175,6 +177,36 @@ public class ArmyDebugCommand
         }
 
         stringBuilder.Append("\t]");
+
+        return stringBuilder.ToString();
+    }
+
+    // coop.debug.army.get_mobile_party_list
+    /// <summary>
+    /// Lists all the current Mobile Parties for an Army
+    /// </summary>
+    /// 
+    [CommandLineArgumentFunction("get_mobile_party_list", "coop.debug.army")]
+    public static string GetMobilePartyList(List<string> args)
+    {
+        var stringBuilder = new StringBuilder();
+        string armyId = args[0];
+
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
+        {
+            return $"Unable to get {nameof(Army)} with {armyId}";
+        }
+
+        foreach (var mobileParty in army.Parties)
+        {
+            stringBuilder.AppendLine($"Name: {mobileParty.Name}\nStringId: {mobileParty.StringId}");
+        }
 
         return stringBuilder.ToString();
     }
