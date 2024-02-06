@@ -28,7 +28,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             DeclareWarDecision declareWarDecision = decision as DeclareWarDecision;
             if (declareWarDecision != null)
             {
-                return new DeclareWarDecisionData(declareWarDecision.ProposerClan.StringId,
+                return new DeclareWarDecisionData(declareWarDecision.ProposerClan.StringId, declareWarDecision.Kingdom.StringId,
                     declareWarDecision.TriggerTime.GetDayOfSeason, declareWarDecision.IsEnforced, declareWarDecision.NotifyPlayer, declareWarDecision.PlayerExamined, null);
             }
             else

@@ -11,6 +11,11 @@ namespace GameInterface.Services.Kingdoms.Data.IFactionDatas
         [ProtoMember(1)]
         public string ClanId { get; }
 
+        public ClanFactionData(string clanId)
+        {
+            ClanId = clanId;
+        }
+
         public override bool TryGetIFaction(IObjectManager objectManager, out IFaction faction)
         {
             if (objectManager.TryGetObject(ClanId, out Clan clan))
