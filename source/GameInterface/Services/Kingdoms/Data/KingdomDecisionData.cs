@@ -9,14 +9,14 @@ using TaleWorlds.CampaignSystem.Election;
 
 namespace GameInterface.Services.Kingdoms.Data
 {
-    [ProtoContract(SkipConstructor = true)]
-    [ProtoInclude(6, nameof(DeclareWarDecisionData))]
-    [ProtoInclude(7, nameof(ExpelClanFromKingdomDecisionData))]
-    [ProtoInclude(8, nameof(KingdomPolicyDecisionData))]
-    [ProtoInclude(9, nameof(KingSelectionKingdomDecisionData))]
-    [ProtoInclude(10, nameof(MakePeaceKingdomDecisionData))]
-    [ProtoInclude(11, nameof(SettlementClaimantDecisionData))]
-    [ProtoInclude(12, nameof(SettlementClaimantPreliminaryDecisionData))]
+    [ProtoContract]
+    [ProtoInclude(100, nameof(DeclareWarDecisionData))]
+    [ProtoInclude(101, nameof(ExpelClanFromKingdomDecisionData))]
+    [ProtoInclude(102, nameof(KingdomPolicyDecisionData))]
+    [ProtoInclude(103, nameof(KingSelectionKingdomDecisionData))]
+    [ProtoInclude(104, nameof(MakePeaceKingdomDecisionData))]
+    [ProtoInclude(105, nameof(SettlementClaimantDecisionData))]
+    [ProtoInclude(106, nameof(SettlementClaimantPreliminaryDecisionData))]
     public abstract class KingdomDecisionData
     {
         private static Action<KingdomDecision, Kingdom> SetKingdomMethod = typeof(KingdomDecision).GetField("_kingdom", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<KingdomDecision, Kingdom>();
@@ -37,7 +37,9 @@ namespace GameInterface.Services.Kingdoms.Data
         [ProtoMember(6)]
         public bool PlayerExamined { get; }
 
-        public KingdomDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined)
+        protected KingdomDecisionData() { }
+
+        protected KingdomDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined)
         {
             ProposerClanId = proposedClanId;
             KingdomId = kingdomId;
@@ -68,6 +70,6 @@ namespace GameInterface.Services.Kingdoms.Data
         }
 
 
-        public abstract bool TryGetKingdomDecision(IObjectManager objectManager,out KingdomDecision kingdomDecision);
+        public abstract bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision);
     }
 }
