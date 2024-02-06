@@ -22,7 +22,7 @@ namespace Coop.Core.Client.Services.Kingdoms.Handlers
         private void HandleLocalDecisionRemoved(MessagePayload<LocalDecisionRemoved> obj)
         {
             var payload = obj.What;
-            var message = new RemoveDecisionRequest(payload.KingdomId, payload.Data);
+            var message = new RemoveDecisionRequest(payload.KingdomId, payload.Index);
             network.SendAll(message);
         }
 

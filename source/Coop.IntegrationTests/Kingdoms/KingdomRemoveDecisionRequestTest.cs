@@ -18,7 +18,7 @@ namespace Coop.IntegrationTests.Kingdoms
         public void ClientKingdom_RemoveDecisionRequest_Publishes_ToServer()
         {
             // Arrange
-            var triggerMessage = new LocalDecisionRemoved("Kingdom1", new DeclareWarDecisionData("ProposerClan", "Kingdom", 10, true, true, true, "ClanFaction"));
+            var triggerMessage = new LocalDecisionRemoved("Kingdom1", 10);
 
             var server = TestEnvironment.Server;
             var client1 = TestEnvironment.Clients.First();
