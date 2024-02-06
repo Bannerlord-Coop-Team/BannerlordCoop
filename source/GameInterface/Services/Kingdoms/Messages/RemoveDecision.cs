@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Kingdoms.Data;
 using ProtoBuf;
 
 namespace GameInterface.Services.Kingdoms.Messages
@@ -10,12 +9,12 @@ namespace GameInterface.Services.Kingdoms.Messages
         [ProtoMember(1)]
         public string KingdomId { get; }
         [ProtoMember(2)]
-        public KingdomDecisionData Data { get; }
+        public int Index { get; }
 
-        public RemoveDecision(string kingdomId, KingdomDecisionData data)
+        public RemoveDecision(string kingdomId, int index)
         {
             KingdomId = kingdomId;
-            Data = data;
+            Index = index;
         }
     }
 }

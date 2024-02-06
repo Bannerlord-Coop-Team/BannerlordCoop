@@ -4,13 +4,18 @@ using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System.Reflection;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.Library;
+using Common.Extensions;
 
 namespace GameInterface.Services.Kingdoms.Handlers
 {
     public class KingdomDecisionHandler : IHandler
     {
+        private static Func<Kingdom, MBList<KingdomDecision>> GetUnresolvedDecisions = typeof(Kingdom).GetField("_unresolvedDecisions", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Kingdom, MBList<KingdomDecision>>();
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private static readonly ILogger Logger = LogManager.GetLogger<KingdomDecisionHandler>();
@@ -33,13 +38,16 @@ namespace GameInterface.Services.Kingdoms.Handlers
                 return;
             }
 
-            if (!payload.Data.TryGetKingdomDecision(objectManager, out KingdomDecision kingdomDecision))
+            var decisions = GetUnresolvedDecisions(kingdom);
+            if (payload.Index >= 0 && decisions.Count > payload.Index)
             {
-                Logger.Verbose("KingdomDecision could not be deserialized in KingdomDecisionHandler.");
+                KingdomPatches.RunOriginalRemoveDecision(kingdom, decisions[payload.Index]);
+            }
+            else
+            {
+                Logger.Verbose("Index is out of bounds of the list.");
                 return;
             }
-
-            KingdomPatches.RunOriginalRemoveDecision(kingdom, kingdomDecision);
         }
 
         private void HandleAddDecision(MessagePayload<AddDecision> obj)

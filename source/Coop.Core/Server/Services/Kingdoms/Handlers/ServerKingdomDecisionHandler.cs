@@ -25,7 +25,7 @@ namespace Coop.Core.Server.Services.Kingdoms.Handlers
         {
             var payload = obj.What;
 
-            var removeDecisionEvent = new RemoveDecision(payload.KingdomId, payload.Data);
+            var removeDecisionEvent = new RemoveDecision(payload.KingdomId, payload.Index);
             messageBroker.Publish(this, removeDecisionEvent);
             network.SendAll(removeDecisionEvent);
         }
@@ -42,7 +42,7 @@ namespace Coop.Core.Server.Services.Kingdoms.Handlers
         private void HandleLocalDecisionRemoved(MessagePayload<LocalDecisionRemoved> obj)
         {
             var payload = obj.What;
-            var message = new RemoveDecision(payload.KingdomId, payload.Data);
+            var message = new RemoveDecision(payload.KingdomId, payload.Index);
             network.SendAll(message);
         }
 

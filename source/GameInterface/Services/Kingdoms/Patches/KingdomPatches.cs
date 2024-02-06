@@ -4,8 +4,12 @@ using Common.Util;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
+using System.Reflection;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.Library;
+using Common.Extensions;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
@@ -16,6 +20,8 @@ namespace GameInterface.Services.Kingdoms.Patches
     [HarmonyPatch(typeof(Kingdom))]
     internal class KingdomPatches
     {
+
+        private static Func<Kingdom, MBList<KingdomDecision>> GetUnresolvedDecisions = typeof(Kingdom).GetField("_unresolvedDecisions", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Kingdom, MBList<KingdomDecision>>();
         private static readonly AllowedInstance<Kingdom> AllowedInstance = new AllowedInstance<Kingdom>();
 
         [HarmonyPatch(nameof(Kingdom.AddDecision))]
@@ -49,8 +55,10 @@ namespace GameInterface.Services.Kingdoms.Patches
         {
             if (AllowedInstance.IsAllowed(__instance)) return true;
 
+            var index = GetUnresolvedDecisions(__instance).FindIndex(decision => decision == kingdomDecision);
+
             MessageBroker.Instance.Publish(__instance,
-                new LocalDecisionRemoved(__instance.StringId, kingdomDecision.ToKingdomDecisionData()));
+                new LocalDecisionRemoved(__instance.StringId, index));
 
             return false;
         }

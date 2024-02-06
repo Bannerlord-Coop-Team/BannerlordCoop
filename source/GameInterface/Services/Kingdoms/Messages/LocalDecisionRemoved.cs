@@ -1,8 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Kingdoms.Data;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
@@ -10,12 +6,12 @@ namespace GameInterface.Services.Kingdoms.Messages
     {
         public string KingdomId { get; }
 
-        public KingdomDecisionData Data { get; }
+        public int Index { get; }
 
-        public LocalDecisionRemoved(string kingdomId, KingdomDecisionData data)
+        public LocalDecisionRemoved(string kingdomId, int index)
         {
             KingdomId = kingdomId;
-            Data = data;
+            Index = index;
         }
     }
 }
