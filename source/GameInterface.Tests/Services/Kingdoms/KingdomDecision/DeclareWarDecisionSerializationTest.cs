@@ -1,12 +1,6 @@
 ﻿using GameInterface.Services.Kingdoms.Data;
-using GameInterface.Services.Kingdoms.Data.IFactionDatas;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
@@ -16,29 +10,24 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
     /// </summary>
     public class DeclareWarDecisionSerializationTest
     {
-        DeclareWarDecisionData DeclareWarDecisionClan { get; }
-        DeclareWarDecisionData DeclareWarDecisionKingdom { get; }
-        public DeclareWarDecisionSerializationTest() 
-        {
-            DeclareWarDecisionClan = new DeclareWarDecisionData("ProposerClan", "Kingdom", 10, true, true, true, new ClanFactionData("ClanFaction"));
-            DeclareWarDecisionKingdom = new DeclareWarDecisionData("ProposerClan", "Kingdom", 10, true, true, true, new KingdomFactionData("KingdomFaction"));
-        }
-
         [Fact]
         public void SerializeDeclareWarDecisionDataWithClanFaction()
         {
+            DeclareWarDecisionData DeclareWarDecision = new DeclareWarDecisionData("ProposerClan", "Kingdom", 10, true, true, true, "Clan1");
+            KingdomDecisionData kingdomDecisionData = DeclareWarDecision;
             MemoryStream memoryStream = new MemoryStream();
-            Serializer.Serialize(memoryStream,DeclareWarDecisionClan);
-            DeclareWarDecisionData deserializedObj = Serializer.Deserialize<DeclareWarDecisionData>(memoryStream);
-            Assert.Equal(DeclareWarDecisionClan.ProposerClanId, deserializedObj.ProposerClanId);
-            Assert.Equal(DeclareWarDecisionClan.KingdomId, deserializedObj.KingdomId);
-            Assert.Equal(DeclareWarDecisionClan.PlayerExamined, deserializedObj.PlayerExamined);
-            Assert.Equal(DeclareWarDecisionClan.TriggerTime, deserializedObj.TriggerTime);
-            Assert.Equal(DeclareWarDecisionClan.NotifyPlayer, deserializedObj.NotifyPlayer);
-            Assert.Equal(DeclareWarDecisionClan.IsEnforced, deserializedObj.IsEnforced);
-            Assert.IsType(DeclareWarDecisionClan.FactionToDeclareWarOn.GetType() , deserializedObj.FactionToDeclareWarOn);
-            Assert.Equal(((ClanFactionData)DeclareWarDecisionClan.FactionToDeclareWarOn).ClanId, ((ClanFactionData)deserializedObj.FactionToDeclareWarOn).ClanId);
-
+            Serializer.Serialize(memoryStream, kingdomDecisionData);
+            memoryStream.Position = 0;
+            KingdomDecisionData obj = Serializer.Deserialize<KingdomDecisionData>(memoryStream);
+            Assert.True(obj is DeclareWarDecisionData);
+            DeclareWarDecisionData deserializedObj = (DeclareWarDecisionData)obj;
+            Assert.Equal(DeclareWarDecision.ProposerClanId, deserializedObj.ProposerClanId);
+            Assert.Equal(DeclareWarDecision.KingdomId, deserializedObj.KingdomId);
+            Assert.Equal(DeclareWarDecision.PlayerExamined, deserializedObj.PlayerExamined);
+            Assert.Equal(DeclareWarDecision.TriggerTime, deserializedObj.TriggerTime);
+            Assert.Equal(DeclareWarDecision.NotifyPlayer, deserializedObj.NotifyPlayer);
+            Assert.Equal(DeclareWarDecision.IsEnforced, deserializedObj.IsEnforced);
+            Assert.Equal(DeclareWarDecision.FactionToDeclareWarOnId, deserializedObj.FactionToDeclareWarOnId);
         }
     }
 }

@@ -1,5 +1,4 @@
 ﻿using Common.Extensions;
-using GameInterface.Services.Kingdoms.Data.IFactionDatas;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using System;
@@ -7,6 +6,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Kingdoms.Data
 {
@@ -16,17 +16,18 @@ namespace GameInterface.Services.Kingdoms.Data
         private static Action<DeclareWarDecision, IFaction> SetFactionToDeclareWarOn = typeof(DeclareWarDecision).GetField(nameof(DeclareWarDecision.FactionToDeclareWarOn), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<DeclareWarDecision, IFaction>();
 
         [ProtoMember(1)]
-        public IFactionData FactionToDeclareWarOn { get; }
+        public string FactionToDeclareWarOnId { get; }
 
-        public DeclareWarDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, IFactionData factionToDeclareWarOn) :base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
+        public DeclareWarDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string factionToDeclareWarOnId) :base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)
         {
-            FactionToDeclareWarOn = factionToDeclareWarOn;
+            FactionToDeclareWarOnId = factionToDeclareWarOnId;
         }
 
         public override bool TryGetKingdomDecision(IObjectManager objectManager,out KingdomDecision kingdomDecision)
         {
             if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) ||
-                !FactionToDeclareWarOn.TryGetIFaction(objectManager, out IFaction factionToDeclareWarOn))
+                !objectManager.TryGetObject(FactionToDeclareWarOnId, out MBObjectBase factionToDeclareWarOn) ||
+                !(factionToDeclareWarOn is IFaction))
             {
                 kingdomDecision = null;
                 return false;
@@ -34,7 +35,7 @@ namespace GameInterface.Services.Kingdoms.Data
 
             DeclareWarDecision declareWarDecision = (DeclareWarDecision)FormatterServices.GetUninitializedObject(typeof(DeclareWarDecision));
             SetKingdomDecisionProperties(declareWarDecision, proposerClan, kingdom);
-            SetFactionToDeclareWarOn(declareWarDecision, factionToDeclareWarOn);
+            SetFactionToDeclareWarOn(declareWarDecision, (IFaction)factionToDeclareWarOn);
             kingdomDecision = declareWarDecision;
             return true;
         }

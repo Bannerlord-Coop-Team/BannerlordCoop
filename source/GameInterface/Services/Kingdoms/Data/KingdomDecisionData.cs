@@ -3,20 +3,19 @@ using GameInterface.Services.ObjectManager;
 using ProtoBuf;
 using System;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 
 namespace GameInterface.Services.Kingdoms.Data
 {
-    [ProtoContract]
-    [ProtoInclude(100, nameof(DeclareWarDecisionData))]
-    [ProtoInclude(101, nameof(ExpelClanFromKingdomDecisionData))]
-    [ProtoInclude(102, nameof(KingdomPolicyDecisionData))]
-    [ProtoInclude(103, nameof(KingSelectionKingdomDecisionData))]
-    [ProtoInclude(104, nameof(MakePeaceKingdomDecisionData))]
-    [ProtoInclude(105, nameof(SettlementClaimantDecisionData))]
-    [ProtoInclude(106, nameof(SettlementClaimantPreliminaryDecisionData))]
+    [ProtoContract(SkipConstructor = true)]
+    [ProtoInclude(100, typeof(DeclareWarDecisionData))]
+    [ProtoInclude(101, typeof(ExpelClanFromKingdomDecisionData))]
+    [ProtoInclude(102, typeof(KingdomPolicyDecisionData))]
+    [ProtoInclude(103, typeof(KingSelectionKingdomDecisionData))]
+    [ProtoInclude(104, typeof(MakePeaceKingdomDecisionData))]
+    [ProtoInclude(105, typeof(SettlementClaimantDecisionData))]
+    [ProtoInclude(106, typeof(SettlementClaimantPreliminaryDecisionData))]
     public abstract class KingdomDecisionData
     {
         private static Action<KingdomDecision, Kingdom> SetKingdomMethod = typeof(KingdomDecision).GetField("_kingdom", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<KingdomDecision, Kingdom>();
@@ -36,8 +35,6 @@ namespace GameInterface.Services.Kingdoms.Data
         public bool NotifyPlayer { get; }
         [ProtoMember(6)]
         public bool PlayerExamined { get; }
-
-        protected KingdomDecisionData() { }
 
         protected KingdomDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined)
         {
