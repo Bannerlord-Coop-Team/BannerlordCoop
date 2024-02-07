@@ -19,7 +19,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
-
+#nullable enable
 namespace GameInterface.Services.Towns.Commands;
 
 public class TownAuditorDebugCommand
@@ -53,27 +53,46 @@ public class TownAuditorDebugCommand
         if(!ModInformation.IsClient)
         {
             stringBuilder.Append("The town Auditor debug command can only be called by a Client.");
+            //return stringBuilder.ToString();
         }
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
 
+            stringBuilder.Append("Unable to resolve ObjectManager");
+            return stringBuilder.ToString();
+        }
         List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
             .Where(settlement => settlement.IsTown).ToList();
 
         List<TownAuditorData> auditorDatas = new List<TownAuditorData>();
         settlements.ForEach((settlement) =>
         {
-            Town t = settlement.Town;
-            Fief fief = t.Settlement.SettlementComponent as Fief;
-            TownAuditorData auditorData = new TownAuditorData(
-                t.StringId, t.Name.ToString(), t.Governor.Name.ToString(), t.LastCapturedBy.Name.ToString(),
-                t.Prosperity, t.Loyalty, t.Security, t.InRebelliousState, t.GarrisonAutoRecruitmentIsEnabled,
-               fief.FoodStocks, t.TradeTaxAccumulated, getSoldItems(t));
-            
-            stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", t.StringId, t.Name));
-        });
 
-        var message = new SendTownAuditor(auditorDatas);
+            if (objectManager.TryGetObject(settlement.Town.StringId, out Town t) == false)
+            {
+                stringBuilder.Append($"ID: '{args[0]}' not found");
+                
+            }
+            else
+            {
+                Fief fief = t.Settlement.SettlementComponent as Fief;
+
+                TownAuditorData auditorData = new TownAuditorData(
+                    t.StringId, t.Name.ToString(), (t.Governor != null) ? t.Governor.Name.ToString() : "null",
+                    (t.LastCapturedBy != null) ? t.LastCapturedBy.Name.ToString() : "null",
+                    t.Prosperity, t.Loyalty, t.Security, t.InRebelliousState, t.GarrisonAutoRecruitmentIsEnabled,
+                   fief.FoodStocks, t.TradeTaxAccumulated, getSoldItems(t));
+
+                auditorDatas.Add(auditorData);
+            }
+            
+            
+        });
+        
+        var message = new TownAuditorSent(auditorDatas);
         MessageBroker.Instance.Publish(settlements.First().Town, message);
 
+        stringBuilder.Append("Found " + settlements.Count + " settlements\n");
         return stringBuilder.ToString();
 
     }

@@ -9,10 +9,10 @@ namespace GameInterface.Services.Towns.Messages;
 /// </summary>
 public record SendTownAuditor : ICommand
 {
-    public List<TownAuditorData> Datas { get; }
+    public TownAuditorData[] Datas { get; }
 
-    public SendTownAuditor(List<TownAuditorData> townAuditorDatas)
+    public SendTownAuditor(TownAuditorData[] townAuditorDatas)
     {
-        Data = townAuditorDatas;
+        Datas = townAuditorDatas;
     }
 }
