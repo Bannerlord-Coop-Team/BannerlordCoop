@@ -1,5 +1,6 @@
 using Common.Messaging;
 using GameInterface.Services.Towns.Data;
+using System.Collections.Generic;
 
 namespace GameInterface.Services.Towns.Messages;
 

@@ -1,9 +1,12 @@
 using Autofac;
 using Common.Extensions;
+using Common.Messaging;
 using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
+using GameInterface.Services.Towns.Data;
+using GameInterface.Services.Towns.Messages;
 using GameInterface.Services.Towns.Patches;
 using System;
 using System.Collections.Generic;
@@ -55,21 +58,21 @@ public class TownAuditorDebugCommand
         List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
             .Where(settlement => settlement.IsTown).ToList();
 
-        List<AuditorData> auditorDatas = new List<AuditorData>()
+        List<TownAuditorData> auditorDatas = new List<TownAuditorData>();
         settlements.ForEach((settlement) =>
         {
             Town t = settlement.Town;
-            Fief fief = town.Settlement.SettlementComponent as Fief;
+            Fief fief = t.Settlement.SettlementComponent as Fief;
             TownAuditorData auditorData = new TownAuditorData(
-                t.StringId,t.Name,t.Governor.Name,t.LastCapturedBy.Name,
-                t.Prosperity,t.Loyalty,t.Security,t.InRebelliousState,t.GarrisonAutoRecruitmentIsEnabled,
-                t.fief.FoodStocks,t.TradeTaxAccumulated,getSoldItems(town).ToString())
+                t.StringId, t.Name.ToString(), t.Governor.Name.ToString(), t.LastCapturedBy.Name.ToString(),
+                t.Prosperity, t.Loyalty, t.Security, t.InRebelliousState, t.GarrisonAutoRecruitmentIsEnabled,
+               fief.FoodStocks, t.TradeTaxAccumulated, getSoldItems(t));
             
             stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", t.StringId, t.Name));
         });
-        
-        var message = new SendTownAuditor(auditorDatas)
-        MessageBroker.Instance.Publish(settlements.First().Town, message)
+
+        var message = new SendTownAuditor(auditorDatas);
+        MessageBroker.Instance.Publish(settlements.First().Town, message);
 
         return stringBuilder.ToString();
 

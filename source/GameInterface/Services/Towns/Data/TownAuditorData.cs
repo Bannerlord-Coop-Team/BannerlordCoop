@@ -1,4 +1,8 @@
 using ProtoBuf;
+using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem.Settlements;
+using static TaleWorlds.CampaignSystem.Settlements.Town;
 
 namespace GameInterface.Services.Towns.Data;
 
@@ -17,21 +21,21 @@ public class TownAuditorData
     [ProtoMember(4)]
     public string LastCapturedBy { get; }
     [ProtoMember(5)]
-    public string Prosperity { get; }
+    public float Prosperity { get; }
     [ProtoMember(6)]
-    public string Loyalty { get; }
+    public float Loyalty { get; }
     [ProtoMember(7)]
-    public string Security { get; }
+    public float Security { get; }
     [ProtoMember(8)]
-    public string InRebelliousState { get; }
+    public bool InRebelliousState { get; }
     [ProtoMember(9)]
-    public string GarrisonAutoRecruitmentIsEnabled { get; }
+    public bool GarrisonAutoRecruitmentIsEnabled { get; }
     [ProtoMember(10)]
-    public string FoodStocks { get; }
+    public float FoodStocks { get; }
     [ProtoMember(11)]
-    public string TradeTaxAccumulated { get; }
+    public int TradeTaxAccumulated { get; }
     [ProtoMember(12)]
-    public string SoldItems { get; }
+    public SellLogData[] SellLogList { get; }
 
 
     public TownAuditorData(
@@ -39,14 +43,14 @@ public class TownAuditorData
         string name,
         string governor,
         string lastCapturedBy,
-        string prosperity,
-        string loyalty,
-        string security,
-        string inRebelliousState,
-        string garrisonAutoRecruitmentIsEnabled,
-        string foodStocks,
-        string tradeTaxAccumulated,
-        string soldItems)
+        float prosperity,
+        float loyalty,
+        float security,
+        bool inRebelliousState,
+        bool garrisonAutoRecruitmentIsEnabled,
+        float foodStocks,
+        int tradeTaxAccumulated,
+        IEnumerable<Town.SellLog> logList)
     {
         TownStringId = townStringId;
         Name = name;
@@ -59,7 +63,6 @@ public class TownAuditorData
         GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
         FoodStocks = foodStocks;
         TradeTaxAccumulated = tradeTaxAccumulated;
-        SoldItems = soldItems;
-
+        SellLogList = logList.Select(sellLog => new SellLogData(sellLog.Number, sellLog.Category.StringId)).ToArray();
     }
 }
