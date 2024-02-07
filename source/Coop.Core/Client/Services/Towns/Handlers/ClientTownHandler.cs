@@ -19,7 +19,7 @@ namespace Coop.Core.Client.Services.Towns.Handlers
             this.network = network;
 
             messageBroker.Subscribe<NetworkChangeTownLoyalty>(HandleTownLoyalty);
-            messageBroker.Subscribe<NetworkChangeTownProsperity>(HandleTownProsperity);
+            messageBroker.Subscribe<NetworkChangeTownProsperity>(HandleProsperityTown);
             messageBroker.Subscribe<NetworkChangeTownSecurity>(HandleTownSecurity);
             messageBroker.Subscribe<NetworkChangeTownLastCapturedBy>(HandleTownLastCapturedBy);
             messageBroker.Subscribe<NetworkChangeTownInRebelliousState>(HandleTownInRebelliousState);
@@ -88,7 +88,7 @@ namespace Coop.Core.Client.Services.Towns.Handlers
             messageBroker.Publish(this, message);
         }
 
-        private void HandleTownProsperity(MessagePayload<NetworkChangeTownProsperity> payload)
+        private void HandleProsperityTown(MessagePayload<NetworkChangeTownProsperity> payload)
         {
             NetworkChangeTownProsperity networkChangeTownProsperity = payload.What;
             ChangeTownProsperity message = new ChangeTownProsperity(networkChangeTownProsperity.TownId, networkChangeTownProsperity.Prosperity);
@@ -105,7 +105,7 @@ namespace Coop.Core.Client.Services.Towns.Handlers
         public void Dispose()
         {
             messageBroker.Unsubscribe<NetworkChangeTownLoyalty>(HandleTownLoyalty);
-            messageBroker.Unsubscribe<NetworkChangeTownProsperity>(HandleTownProsperity);
+            messageBroker.Unsubscribe<NetworkChangeTownProsperity>(HandleProsperityTown);
             messageBroker.Unsubscribe<NetworkChangeTownSecurity>(HandleTownSecurity);
             messageBroker.Unsubscribe<NetworkChangeTownLastCapturedBy>(HandleTownLastCapturedBy);
             messageBroker.Unsubscribe<NetworkChangeTownInRebelliousState>(HandleTownInRebelliousState);
