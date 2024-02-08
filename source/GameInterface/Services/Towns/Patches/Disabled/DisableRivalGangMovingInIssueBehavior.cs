@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using SandBox.Issues;
 
-namespace GameInterface.Services.Towns.Patches;
+namespace GameInterface.Services.Towns.Patches.Disabled;
 
 [HarmonyPatch(typeof(RivalGangMovingInIssueBehavior))]
 internal class DisableRivalGangMovingInIssueBehavior

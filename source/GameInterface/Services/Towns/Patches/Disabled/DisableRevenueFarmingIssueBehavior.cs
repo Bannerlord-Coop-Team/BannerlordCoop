@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
 
-namespace GameInterface.Services.Towns.Patches;
+namespace GameInterface.Services.Towns.Patches.Disabled;
 
 [HarmonyPatch(typeof(RevenueFarmingIssueBehavior))]
 internal class DisableRevenueFarmingIssueBehavior
