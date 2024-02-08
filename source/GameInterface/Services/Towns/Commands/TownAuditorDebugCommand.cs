@@ -19,7 +19,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
-#nullable enable
+
 namespace GameInterface.Services.Towns.Commands;
 
 public class TownAuditorDebugCommand
@@ -53,7 +53,7 @@ public class TownAuditorDebugCommand
         if(!ModInformation.IsClient)
         {
             stringBuilder.Append("The town Auditor debug command can only be called by a Client.");
-            //return stringBuilder.ToString();
+            return stringBuilder.ToString();
         }
         if (TryGetObjectManager(out var objectManager) == false)
         {
