@@ -145,6 +145,8 @@ namespace GameInterface.Services.Towns.Handlers
         }
         public void Dispose()
         {
+            messageBroker.Unsubscribe<SendTownAuditor>(HandleSendTownAuditor);
+
         }
     }
 }
