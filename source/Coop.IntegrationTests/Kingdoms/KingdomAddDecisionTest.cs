@@ -6,13 +6,16 @@ using GameInterface.Services.Kingdoms.Messages;
 
 namespace Coop.IntegrationTests.Kingdoms
 {
+    /// <summary>
+    /// Test class for NetworkAddDecision message handling.
+    /// </summary>
     public class KingdomAddDecisionTest
     {
         // Creates a test environment with 1 server and 2 clients by default
         internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
         /// <summary>
-        /// Used to Test that client recieves AddDecision messages.
+        /// Used to Test that client recieves NetworkAddDecision messages.
         /// </summary>
         [Fact]
         public void ServerKingdom_AddDecision_Publishes_AllClients()

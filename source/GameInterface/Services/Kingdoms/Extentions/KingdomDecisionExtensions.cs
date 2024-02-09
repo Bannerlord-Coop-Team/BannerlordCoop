@@ -10,6 +10,9 @@ using TaleWorlds.CampaignSystem.Election;
 
 namespace GameInterface.Services.Kingdoms.Extentions
 {
+    /// <summary>
+    /// Class for extension methods for KingdomDecision class.
+    /// </summary>
     public static class KingdomDecisionExtensions
     {
         private static Func<KingdomPolicyDecision, bool> GetIsInvertedDecision = typeof(KingdomPolicyDecision).GetField("_isInvertedDecision", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<KingdomPolicyDecision, bool>();
@@ -30,6 +33,12 @@ namespace GameInterface.Services.Kingdoms.Extentions
             { typeof(SettlementClaimantPreliminaryDecision), ConvertSettlementClaimantPreliminaryDecision },
         };
         
+        /// <summary>
+        /// Converts a KingdomDecision object to a serializable KingdomDecisionData object.
+        /// </summary>
+        /// <param name="kingdomDecision">kingdom decision to convert.</param>
+        /// <returns>A KingdomDecisionData object.</returns>
+        /// <exception cref="InvalidOperationException">If KingdomDecision object is not convertable.</exception>
         public static KingdomDecisionData ToKingdomDecisionData(this KingdomDecision kingdomDecision)
         {
             if (SupportedConversions.ContainsKey(kingdomDecision.GetType()))

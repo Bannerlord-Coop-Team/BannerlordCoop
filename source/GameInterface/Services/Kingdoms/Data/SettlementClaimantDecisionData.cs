@@ -10,6 +10,9 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Kingdoms.Data
 {
+    /// <summary>
+    /// Class for serializing <see cref="SettlementClaimantDecision"> class.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public class SettlementClaimantDecisionData : KingdomDecisionData
     {
@@ -32,6 +35,7 @@ namespace GameInterface.Services.Kingdoms.Data
             ClanToExcludeId = clanToExcludeId;
         }
 
+        /// <inheritdoc/>
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
             if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) || 
