@@ -11,26 +11,27 @@ namespace GameInterface.Services.Template.Patches;
 /// TODO fill me out and uncomment HarmonyPatch attributes
 /// </summary>
 //[HarmonyPatch(typeof(Campaign))]
-class TemplatePatch
+class TemplateServerControlledPatch
 {
     // See https://harmony.pardeike.net/articles/intro.html on how to use harmony patches
     //[HarmonyPatch("TimeControlMode")]
     //[HarmonyPatch(MethodType.Setter)]
+    //[HarmonyPrefix]
     private static bool Prefix(ref Campaign __instance)
     {
-        // Returning true in a prefix calls the original function (after all other patches)
-        if (AllowedThread.IsThisThreadAllowed()) return true;
-
-        // returns true if when the client state is not in Campaign or Mission to allow original calls
+        // Allows original method call when called by OverrideTemplateFn 
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        // Skip method if called from client and allow origin
+        if (ModInformation.IsClient) return false;
 
         // Publishing a message to all internal software is done using the message broker
         // This type of message should be IEvent since it is a reaction to something
         // Normally sent to a handler in Coop.Core
         MessageBroker.Instance.Publish(__instance, new TemplateEventMessage());
 
-        // Returning false in a prefix will skip the original
-        return false;
+        // Returning true allows original on the server to run
+        return true;
     }
 
     public static void OverrideTemplateFn()

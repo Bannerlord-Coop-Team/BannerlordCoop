@@ -40,22 +40,6 @@ internal class HeroCreationDeletionHandler : IHandler
     private void Handle(MessagePayload<CreateHero> obj)
     {
         var data = obj.What.Data;
-
-        if (objectManager.TryGetObject(data.TemplateStringId, out CharacterObject template) == false)
-        {
-            Logger.Error("Unable to get {type} from {id}", typeof(Settlement).Name, data.BornSettlementId);
-        }
-
-        if (objectManager.TryGetObject(data.BornSettlementId, out Settlement bornSettlement) == false)
-        {
-            Logger.Error("Unable to get {type} from {id}", typeof(Settlement).Name, data.BornSettlementId);
-        }
-        
-        CampaignTime birthDay = new CampaignTime();
-        birthDay.SetNumTicks(data.Birthday);
-
-        Hero newHero = HeroCreationDeletionPatches.OverrideCreateNewHero(template, data.Age, birthDay, bornSettlement);
-
-        objectManager.AddExisting(data.HeroStringId, newHero);
+        HeroCreationDeletionPatches.OverrideCreateNewHero(data.HeroStringId);
     }
 }

@@ -12,6 +12,7 @@ internal class ClientCreateHeroHandler : IHandler
         this.messageBroker = messageBroker;
 
         messageBroker.Subscribe<NetworkCreateHero>(Handle_NetworkCreateHero);
+        messageBroker.Subscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
     }
 
     public void Dispose()
@@ -22,6 +23,12 @@ internal class ClientCreateHeroHandler : IHandler
     private void Handle_NetworkCreateHero(MessagePayload<NetworkCreateHero> payload)
     {
         var message = new CreateHero(payload.What.Data);
+        messageBroker.Publish(this, message);
+    }
+
+    private void Handle_NetworkChangeHeroName(MessagePayload<NetworkChangeHeroName> payload)
+    {
+        var message = new ChangeHeroName(payload.What.Data);
         messageBroker.Publish(this, message);
     }
 }

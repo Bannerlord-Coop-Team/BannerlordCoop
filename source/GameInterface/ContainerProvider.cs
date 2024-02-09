@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Util;
 using System;
 using System.Threading;
 
@@ -47,8 +48,8 @@ public static class ContainerProvider
 
         public SafeUse()
         {
-            _sem.Wait();
-        }
+                _sem.Wait();
+            }
 
         public void Dispose()
         {

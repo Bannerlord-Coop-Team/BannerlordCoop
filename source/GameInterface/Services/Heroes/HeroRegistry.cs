@@ -31,9 +31,9 @@ internal class HeroRegistry : RegistryBase<Hero>
         }
     }
 
-    protected override string GetNewId(Hero party)
+    protected override string GetNewId(Hero hero)
     {
-        party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
-        return party.StringId;
+        hero.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
+        return hero.StringId;
     }
 }

@@ -70,6 +70,9 @@
 	<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
 		<_Parameter1>Coop.IntegrationTests</_Parameter1>
 	</AssemblyAttribute>
+	<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+		<_Parameter1>E2E.Tests</_Parameter1>
+	</AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
 	  <Reference Include="TaleWorlds.Library">
