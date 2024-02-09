@@ -45,12 +45,6 @@ public class SetWageLimitTest
         Assert.Equal(1, client2.InternalMessages.GetMessageCount<WagePaymentApprovedOthers>());
 
 
-        // Client Sender -> recieves NetworkSetWagePaymentLimitApproved its done -> SetWagePaymentApproved
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkSetWagePaymentLimitApproved>());
-        Assert.Equal(1, client.InternalMessages.GetMessageCount<NetworkSetWagePaymentLimitApproved>());
-        Assert.Equal(1, client.InternalMessages.GetMessageCount<SetWagePaymentLimitApproved>());
-
-
         // server updates itself via -> ChangeWagePaymentLimit
         Assert.Equal(1, server.InternalMessages.GetMessageCount<ChangeWagePaymentLimit>());
     }

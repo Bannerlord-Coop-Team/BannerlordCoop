@@ -53,9 +53,6 @@ public class ServerMobilePartyBehaviorHandler : IHandler
         var allOtherPeersMessage = new NetworkChangeWagePaymentLimit(obj.MobilePartyId, obj.WageAmount);
         network.SendAllBut(peer, allOtherPeersMessage);
 
-        var clientRecvMessage = new NetworkSetWagePaymentLimitApproved(obj.MobilePartyId, obj.WageAmount);
-        network.Send(peer, clientRecvMessage);
-
         var updateServerMessage = new ChangeWagePaymentLimit(obj.MobilePartyId, obj.WageAmount);
         messageBroker.Publish(this, updateServerMessage); // sub on MobileParty
     }

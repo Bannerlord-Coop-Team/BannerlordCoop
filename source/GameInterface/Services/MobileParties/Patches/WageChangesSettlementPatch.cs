@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
@@ -42,11 +43,6 @@ internal class WageChangesSettlementPatch
     }
 
 
-    public static void SetWagePaymentLimitOverrideTest(MobileParty instance, int newValue)
-    {
-        SetWagePaymentLimitOverride(instance, newValue);
-    }
-
     private static void SetWagePaymentLimitOverride(MobileParty instance, int newValue)
     {
         if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed())
@@ -54,25 +50,21 @@ internal class WageChangesSettlementPatch
             instance.SetWagePaymentLimit(newValue);
             return;
         }
-        TaskCompletionSource<int> tcs = new TaskCompletionSource<int>();
 
-        // Publish -> ClientHandler -> ServerHandler -> ClientHandler (SetWagePaymentLimitApproved)
+        // Publish -> ClientHandler -> ServerHandler -> ClientHandler (SetWagePaymentcooLimitApproved)
 
         // This event doesn't exist and should be a IResponse from the server, there will also need to be a network message
-        MessageBroker.Instance.Subscribe<SetWagePaymentLimitApproved>((payload) =>
-        {
-            tcs.SetResult(payload.What.WageAmount);
-        });
 
-        // publish to client
         var message = new ChangedWagePaymentLimit(instance.StringId, newValue);
         MessageBroker.Instance.Publish(instance, message);
 
-        using (new AllowedThread())
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            instance.SetWagePaymentLimit(tcs.Task.Result);
-        }
-
+            using (new AllowedThread())
+            {
+                instance.SetWagePaymentLimit(newValue);
+            }
+        });
 
     }
 
