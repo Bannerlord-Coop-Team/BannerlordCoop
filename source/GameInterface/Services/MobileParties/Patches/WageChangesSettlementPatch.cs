@@ -17,7 +17,6 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// Used to allow a party to modify wages
 /// </summary>
 [HarmonyPatch(typeof(ClanFinanceExpenseItemVM))]
-[HarmonyDebug]
 internal class WageChangesSettlementPatch
 {
     private static MethodInfo MobileParty_SetWagePaymentLimit = typeof(MobileParty).GetMethod(nameof(MobileParty.SetWagePaymentLimit));
@@ -51,7 +50,7 @@ internal class WageChangesSettlementPatch
             return;
         }
 
-        // Publish -> ClientHandler -> ServerHandler -> ClientHandler (SetWagePaymentcooLimitApproved)
+        // Publish -> ClientHandler -> ServerHandler -> OtherClientHandle
 
         // This event doesn't exist and should be a IResponse from the server, there will also need to be a network message
 

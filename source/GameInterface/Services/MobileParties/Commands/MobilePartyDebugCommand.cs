@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MobileParties.Patches;
+﻿using GameInterface.Extentions;
+using GameInterface.Services.MobileParties.Patches;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -62,24 +63,83 @@ namespace GameInterface.Services.MobileParties.Commands
             return stringBuilder.ToString();
         }
 
-        //TODO: I have no idea how to porperly test ClanFinanceExpenseItemVM
-        [CommandLineArgumentFunction("set_wage_limit_test", "coop.debug.mobileparty")]
+        // coop.debug.mobileparty.set_wage_limit_updated CoopParty 45
+        /// <summary>
+        /// Just to set unlimited wage change test
+        /// </summary>
+        /// <param name="args">mobile party and value</param>
+        /// <returns>success message</returns>
+        [CommandLineArgumentFunction("set_wage_limit_updated", "coop.debug.mobileparty")]
         public static string SetWagePaymentLimit(List<string> args)
         {
-            if (args.Count < 1)
+            if (args.Count < 2)
             {
-                return "Usage: coop.debug.mobileparty.set_wage_limit <PartyStringID>";
+                return "Usage: coop.debug.mobileparty.set_wage_limit <PartyStringID> <value>";
+            }
+
+            int newValue = 0;
+            try
+            {
+                newValue = int.Parse(args[1]);
+            }
+            catch (Exception e)
+            {
+                return $"Error setting int: {e}";
             }
 
             MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
+
 
             if (mobileParty == null)
             {
                 return string.Format("ID: '{0}' not found", args[0]);
             }
 
+            var obj = new ClanFinanceExpenseItemVM(mobileParty);
 
-            return "SetWagePaymentLimit Tested Should invoke both";
+            obj.OnCurrentWageLimitUpdated(newValue);
+
+            return $"Successfully called OnCurrentWageLimitUpdated({newValue});";
+        }
+
+
+        // coop.debug.mobileparty.set_wage_unlimited CoopParty true
+        /// <summary>
+        /// Just to set unlimited wage change test
+        /// </summary>
+        /// <param name="args">mobile party and value</param>
+        /// <returns>success message</returns>
+        [CommandLineArgumentFunction("set_wage_unlimited", "coop.debug.mobileparty")]
+        public static string SetUnlimitedWageToggle(List<string> args)
+        {
+            if (args.Count < 2)
+            {
+                return "Usage: coop.debug.mobileparty.set_wage_limit <PartyStringID> <value>";
+            }
+
+            bool newValue = false;
+            try
+            {
+                newValue = bool.Parse(args[1]);
+            }
+            catch (Exception e)
+            {
+                return $"Error setting bool: {e}";
+            }
+
+            MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
+
+
+            if (mobileParty == null)
+            {
+                return string.Format("ID: '{0}' not found", args[0]);
+            }
+
+            var obj = new ClanFinanceExpenseItemVM(mobileParty);
+
+            obj.OnUnlimitedWageToggled(newValue);
+
+            return $"Successfully called OnUnlimitedWageToggled({newValue});";
         }
     }
 }
