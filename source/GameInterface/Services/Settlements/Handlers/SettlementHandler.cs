@@ -4,9 +4,10 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
-using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 using static TaleWorlds.CampaignSystem.Settlements.Settlement;
 
 namespace GameInterface.Services.Settlements.Handlers;
@@ -31,8 +32,32 @@ public class SettlementHandler : IHandler
         messageBroker.Subscribe<ChangeSettlementMilitia>(HandleMilitia);
         messageBroker.Subscribe<ChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
 
+        messageBroker.Subscribe<ChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
 
 
+    }
+
+    private void HandleCollectNotablesToCache(MessagePayload<ChangeSettlementNotablesCache> payload)
+    {
+        var obj = payload.What;
+
+        MBList<Hero> notablesCache = new();
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        foreach (string heroStringId in obj.NotablesCache) {
+            if (objectManager.TryGetObject<Hero>(heroStringId, out var hero) == false)
+            {
+                Logger.Error("Unable to find Hero ({HeroStringId})", heroStringId);
+                return;
+            }
+            notablesCache.Add(hero);
+        }
+
+        CollectNotablesToCachePatch.RunNotablesCacheChange(settlement, notablesCache);
     }
 
     private void HandleGarrisonWageLimit(MessagePayload<ChangeSettlementGarrisonWagePaymentLimit> payload)

@@ -360,6 +360,34 @@ internal class SettlementCommands
     }
 
 
+    // coop.debug.settlements.collect_cache_notables town_ES3
+    /// <summary>
+    /// Tests collecting of notables to cache.
+    /// </summary>
+    /// <param name="args">the settlementid </param>
+    /// <returns>info that is was successful</returns>
+    [CommandLineArgumentFunction("collect_cache_notables", "coop.debug.settlements")]
+    public static string CollectCacheNotables(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 1) return "Invalid usage, expected \"collect_cache_notables <settlementId>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get Settlement";
+
+        var objectManager = container.Resolve<IObjectManager>();
+
+        string settlementId = args[0];
+
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+            return $"Settlement: {settlementId} was not found.";
+
+
+        settlement.CollectNotablesToCache();
+
+
+        return $"Successfully called settlement.CollectNotablesToCache() for {settlementId}.";
+    }
 
 
 
