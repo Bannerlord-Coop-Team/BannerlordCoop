@@ -2,6 +2,7 @@
 using ProtoBuf;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
@@ -28,6 +29,23 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Equal(kingdomPolicyDecisionData.PolicyObjectId, deserializedObj.PolicyObjectId);
             Assert.Equal(kingdomPolicyDecisionData.KingdomPolicies, deserializedObj.KingdomPolicies);
             Assert.Equal(kingdomPolicyDecisionData.IsInvertedDecision, deserializedObj.IsInvertedDecision);
+        }
+
+        [Fact]
+        public void KingdomPolicyDecisionDataReflectionTests()
+        {
+            FieldInfo? fieldInfo = typeof(KingdomPolicyDecisionData).GetField("PolicyField", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(fieldInfo);
+            FieldInfo? fieldInfo2 = typeof(KingdomPolicyDecisionData).GetField("IsInvertedDecisionField", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(fieldInfo2);
+            FieldInfo? fieldInfo3 = typeof(KingdomPolicyDecisionData).GetField("KingdomPoliciesField", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(fieldInfo3);
+            object? obj = fieldInfo?.GetValue(null);
+            Assert.NotNull(obj);
+            object? obj2 = fieldInfo2?.GetValue(null);
+            Assert.NotNull(obj2);
+            object? obj3 = fieldInfo3?.GetValue(null);
+            Assert.NotNull(obj3);
         }
     }
 }

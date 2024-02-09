@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.Kingdoms.Data;
 using ProtoBuf;
 using System.IO;
+using System.Reflection;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
@@ -26,6 +27,19 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Equal(expelClanFromKingdomDecisionData.IsEnforced, deserializedObj.IsEnforced);
             Assert.Equal(expelClanFromKingdomDecisionData.ClanToExpelId, deserializedObj.ClanToExpelId);
             Assert.Equal(expelClanFromKingdomDecisionData.OldKingdomId, deserializedObj.OldKingdomId);
+        }
+
+        [Fact]
+        public void ExpelClanFromKingdomDecisionDataReflectionTests()
+        {
+            FieldInfo? fieldInfo = typeof(ExpelClanFromKingdomDecisionData).GetField("ClanToExpelField", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(fieldInfo);
+            FieldInfo? fieldInfo2 = typeof(ExpelClanFromKingdomDecisionData).GetField("OldKingdomField", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(fieldInfo2);
+            object? obj = fieldInfo?.GetValue(null);
+            Assert.NotNull(obj);
+            object? obj2 = fieldInfo2?.GetValue(null);
+            Assert.NotNull(obj2);
         }
     }
 }

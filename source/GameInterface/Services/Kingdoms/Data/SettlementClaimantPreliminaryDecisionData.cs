@@ -13,8 +13,8 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class SettlementClaimantPreliminaryDecisionData : KingdomDecisionData
     {
-        private static Action<SettlementClaimantPreliminaryDecision, Settlement> SetSettlement = typeof(SettlementClaimantPreliminaryDecision).GetField(nameof(SettlementClaimantPreliminaryDecision.Settlement), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<SettlementClaimantPreliminaryDecision, Settlement>();
-        private static Action<SettlementClaimantPreliminaryDecision, Clan> SetOwnerClan = typeof(SettlementClaimantPreliminaryDecision).GetField("_ownerClan", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<SettlementClaimantPreliminaryDecision, Clan>();
+        private static readonly FieldInfo SettlementField = typeof(SettlementClaimantPreliminaryDecision).GetField(nameof(SettlementClaimantPreliminaryDecision.Settlement), BindingFlags.Instance | BindingFlags.Public);
+        private static readonly FieldInfo OwnerClanField = typeof(SettlementClaimantPreliminaryDecision).GetField("_ownerClan", BindingFlags.Instance | BindingFlags.NonPublic);
         
         [ProtoMember(1)]
         public string SettlementId { get; }
@@ -38,8 +38,8 @@ namespace GameInterface.Services.Kingdoms.Data
 
             SettlementClaimantPreliminaryDecision settlementClaimantPreliminaryDecision = (SettlementClaimantPreliminaryDecision)FormatterServices.GetUninitializedObject(typeof(SettlementClaimantPreliminaryDecision));
             SetKingdomDecisionProperties(settlementClaimantPreliminaryDecision, proposerClan, kingdom);
-            SetSettlement(settlementClaimantPreliminaryDecision, settlement);
-            SetOwnerClan(settlementClaimantPreliminaryDecision, ownerClan);
+            SettlementField.SetValue(settlementClaimantPreliminaryDecision, settlement);
+            OwnerClanField.SetValue(settlementClaimantPreliminaryDecision, ownerClan);
             kingdomDecision = settlementClaimantPreliminaryDecision;
             return true;
         }

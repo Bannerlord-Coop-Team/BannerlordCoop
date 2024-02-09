@@ -13,7 +13,7 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class DeclareWarDecisionData : KingdomDecisionData
     {
-        private static Action<DeclareWarDecision, IFaction> SetFactionToDeclareWarOn = typeof(DeclareWarDecision).GetField(nameof(DeclareWarDecision.FactionToDeclareWarOn), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<DeclareWarDecision, IFaction>();
+        private static readonly FieldInfo FactionToDeclareWarOnField = typeof(DeclareWarDecision).GetField(nameof(DeclareWarDecision.FactionToDeclareWarOn), BindingFlags.Instance | BindingFlags.Public);
 
         [ProtoMember(1)]
         public string FactionToDeclareWarOnId { get; }
@@ -26,16 +26,26 @@ namespace GameInterface.Services.Kingdoms.Data
         public override bool TryGetKingdomDecision(IObjectManager objectManager,out KingdomDecision kingdomDecision)
         {
             if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) ||
-                !objectManager.TryGetObject(FactionToDeclareWarOnId, out MBObjectBase factionToDeclareWarOn) ||
-                !(factionToDeclareWarOn is IFaction))
+                (!objectManager.TryGetObject(FactionToDeclareWarOnId, out Kingdom factionKingdomToDeclareWarOn) &
+                !objectManager.TryGetObject(FactionToDeclareWarOnId, out Clan factionClanToDeclareWarOn)))
             {
                 kingdomDecision = null;
                 return false;
             }
 
+            IFaction faction;
+            if (factionKingdomToDeclareWarOn != null)
+            {
+                faction = factionKingdomToDeclareWarOn;
+            }
+            else
+            {
+                faction = factionClanToDeclareWarOn;
+            }
+
             DeclareWarDecision declareWarDecision = (DeclareWarDecision)FormatterServices.GetUninitializedObject(typeof(DeclareWarDecision));
             SetKingdomDecisionProperties(declareWarDecision, proposerClan, kingdom);
-            SetFactionToDeclareWarOn(declareWarDecision, (IFaction)factionToDeclareWarOn);
+            FactionToDeclareWarOnField.SetValue(declareWarDecision, faction);
             kingdomDecision = declareWarDecision;
             return true;
         }

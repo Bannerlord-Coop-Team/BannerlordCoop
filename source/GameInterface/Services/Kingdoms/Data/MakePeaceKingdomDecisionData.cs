@@ -13,9 +13,9 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class MakePeaceKingdomDecisionData : KingdomDecisionData
     {
-        private static Action<MakePeaceKingdomDecision, IFaction> SetFactionToMakePeaceWith = typeof(MakePeaceKingdomDecision).GetField(nameof(MakePeaceKingdomDecision.FactionToMakePeaceWith), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<MakePeaceKingdomDecision, IFaction>();
-        private static Action<MakePeaceKingdomDecision, int> SetDailyTributeToBePaid = typeof(MakePeaceKingdomDecision).GetField(nameof(MakePeaceKingdomDecision.DailyTributeToBePaid), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<MakePeaceKingdomDecision, int>();
-        private static Action<MakePeaceKingdomDecision, bool> SetApplyResults = typeof(MakePeaceKingdomDecision).GetField("_applyResults", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<MakePeaceKingdomDecision, bool>();
+        private static readonly FieldInfo FactionToMakePeaceWithField = typeof(MakePeaceKingdomDecision).GetField(nameof(MakePeaceKingdomDecision.FactionToMakePeaceWith), BindingFlags.Instance | BindingFlags.Public);
+        private static readonly FieldInfo DailyTributeToBePaidField = typeof(MakePeaceKingdomDecision).GetField(nameof(MakePeaceKingdomDecision.DailyTributeToBePaid), BindingFlags.Instance | BindingFlags.Public);
+        private static readonly FieldInfo ApplyResultsField = typeof(MakePeaceKingdomDecision).GetField("_applyResults", BindingFlags.Instance | BindingFlags.NonPublic);
 
         [ProtoMember(1)]
         public string FactionToMakePeaceWithId { get; }
@@ -34,18 +34,28 @@ namespace GameInterface.Services.Kingdoms.Data
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
             if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) ||
-                !objectManager.TryGetObject(FactionToMakePeaceWithId, out MBObjectBase factionToMakePeaceWith) ||
-                !(factionToMakePeaceWith is IFaction))
+                (!objectManager.TryGetObject(FactionToMakePeaceWithId, out Kingdom factionKingdomToMakePeaceWith) &
+                !objectManager.TryGetObject(FactionToMakePeaceWithId, out Clan factionClanToMakePeaceWith)))
             {
                 kingdomDecision = null;
                 return false;
             }
 
+            IFaction faction;
+            if (factionKingdomToMakePeaceWith != null)
+            {
+                faction = factionKingdomToMakePeaceWith;
+            }
+            else
+            {
+                faction = factionClanToMakePeaceWith;
+            }
+
             MakePeaceKingdomDecision makePeaceKingdomDecision = (MakePeaceKingdomDecision)FormatterServices.GetUninitializedObject(typeof(MakePeaceKingdomDecision));
             SetKingdomDecisionProperties(makePeaceKingdomDecision, proposerClan, kingdom);
-            SetFactionToMakePeaceWith(makePeaceKingdomDecision, (IFaction)factionToMakePeaceWith);
-            SetDailyTributeToBePaid(makePeaceKingdomDecision, DailyTributeToBePaid);
-            SetApplyResults(makePeaceKingdomDecision, ApplyResults);
+            FactionToMakePeaceWithField.SetValue(makePeaceKingdomDecision, faction);
+            DailyTributeToBePaidField.SetValue(makePeaceKingdomDecision, DailyTributeToBePaid);
+            ApplyResultsField.SetValue(makePeaceKingdomDecision, ApplyResults);
             kingdomDecision = makePeaceKingdomDecision;
             return true;
         }

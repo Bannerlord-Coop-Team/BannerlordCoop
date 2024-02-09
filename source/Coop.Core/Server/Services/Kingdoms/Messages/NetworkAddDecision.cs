@@ -2,20 +2,19 @@
 using GameInterface.Services.Kingdoms.Data;
 using ProtoBuf;
 
-namespace Coop.Core.Client.Services.Kingdoms.Messages
+namespace Coop.Core.Server.Services.Kingdoms.Messages
 {
     [ProtoContract(SkipConstructor = true)]
-    public class AddDecisionRequest: ICommand
+    public class NetworkAddDecision : ICommand
     {
         [ProtoMember(1)]
         public string KingdomId { get; }
         [ProtoMember(2)]
         public KingdomDecisionData Data { get; }
-
         [ProtoMember(3, IsRequired = true)]
         public bool IgnoreInfluenceCost { get; }
 
-        public AddDecisionRequest(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost)
+        public NetworkAddDecision(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost)
         {
             KingdomId = kingdomId;
             Data = data;

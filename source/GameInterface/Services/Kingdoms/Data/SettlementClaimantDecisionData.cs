@@ -13,9 +13,9 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class SettlementClaimantDecisionData : KingdomDecisionData
     {
-        private static Action<SettlementClaimantDecision, Settlement> SetSettlement = typeof(SettlementClaimantDecision).GetField(nameof(SettlementClaimantDecision.Settlement), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<SettlementClaimantDecision, Settlement>();
-        private static Action<SettlementClaimantDecision, Clan> SetClanToExclude = typeof(SettlementClaimantDecision).GetField(nameof(SettlementClaimantDecision.ClanToExclude), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<SettlementClaimantDecision, Clan>();
-        private static Action<SettlementClaimantDecision, Hero> SetCapturerHero = typeof(SettlementClaimantDecision).GetField("_capturerHero", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<SettlementClaimantDecision, Hero>();
+        private static readonly FieldInfo SettlementField = typeof(SettlementClaimantDecision).GetField(nameof(SettlementClaimantDecision.Settlement), BindingFlags.Instance | BindingFlags.Public);
+        private static readonly FieldInfo ClanToExcludeField = typeof(SettlementClaimantDecision).GetField(nameof(SettlementClaimantDecision.ClanToExclude), BindingFlags.Instance | BindingFlags.Public);
+        private static readonly FieldInfo CapturerHeroField = typeof(SettlementClaimantDecision).GetField("_capturerHero", BindingFlags.Instance | BindingFlags.NonPublic);
 
 
         [ProtoMember(1)]
@@ -45,9 +45,9 @@ namespace GameInterface.Services.Kingdoms.Data
 
             SettlementClaimantDecision settlementClaimantDecision = (SettlementClaimantDecision)FormatterServices.GetUninitializedObject(typeof(SettlementClaimantDecision));
             SetKingdomDecisionProperties(settlementClaimantDecision, proposerClan, kingdom);
-            SetClanToExclude(settlementClaimantDecision, clanToExclude);
-            SetSettlement(settlementClaimantDecision, settlement);
-            SetCapturerHero(settlementClaimantDecision, capturerHero);
+            ClanToExcludeField.SetValue(settlementClaimantDecision, clanToExclude);
+            SettlementField.SetValue(settlementClaimantDecision, settlement);
+            CapturerHeroField.SetValue(settlementClaimantDecision, capturerHero);
             kingdomDecision = settlementClaimantDecision;
             return true;
         }
