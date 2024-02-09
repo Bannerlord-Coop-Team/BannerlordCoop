@@ -8,6 +8,9 @@ using TaleWorlds.CampaignSystem.Election;
 
 namespace GameInterface.Services.Kingdoms.Data
 {
+    /// <summary>
+    /// Class for serializing <see cref="KingdomPolicyDecision"> class.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public class KingdomPolicyDecisionData : KingdomDecisionData
     {
@@ -31,6 +34,7 @@ namespace GameInterface.Services.Kingdoms.Data
             KingdomPolicies = kingdomPolicies;
         }
 
+        /// <inheritdoc/>
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
             if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) ||

@@ -3,6 +3,9 @@ using GameInterface.Services.Kingdoms.Data;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
+    /// <summary>
+    /// Event that is handled on client side, when Server sends NetworkAddDecision message to clients.
+    /// </summary>
     public class AddDecision: IEvent
     {
         public string KingdomId { get; }

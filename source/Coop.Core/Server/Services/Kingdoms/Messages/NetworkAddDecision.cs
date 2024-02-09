@@ -4,6 +4,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Kingdoms.Messages
 {
+    /// <summary>
+    /// Add decision network message.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public class NetworkAddDecision : ICommand
     {

@@ -8,6 +8,9 @@ using TaleWorlds.CampaignSystem.Election;
 
 namespace GameInterface.Services.Kingdoms.Data
 {
+    /// <summary>
+    /// Base class for serializing <see cref="KingdomDecision"> class.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     [ProtoInclude(100, typeof(DeclareWarDecisionData))]
     [ProtoInclude(101, typeof(ExpelClanFromKingdomDecisionData))]
@@ -46,6 +49,13 @@ namespace GameInterface.Services.Kingdoms.Data
             PlayerExamined = playerExamined;
         }
 
+        /// <summary>
+        /// Tries to get the proposerClan and kingdom based on the deserialized Ids.
+        /// </summary>
+        /// <param name="objectManager">object manager.</param>
+        /// <param name="proposerClan">proposer clan.</param>
+        /// <param name="kingdom">kingdom.</param>
+        /// <returns>True if proposerClan and kingdom is successfully received from the object manager, else false.</returns>
         protected bool TryGetProposerClanAndKingdom(IObjectManager objectManager, out Clan proposerClan, out Kingdom kingdom)
         {
             if (!objectManager.TryGetObject(ProposerClanId, out proposerClan) |
@@ -56,6 +66,12 @@ namespace GameInterface.Services.Kingdoms.Data
             return true;
         }
 
+        /// <summary>
+        /// Sets the base class's properties for the KingdomDecision object.
+        /// </summary>
+        /// <param name="kingdomDecision">kingdom decision object.</param>
+        /// <param name="proposerClan">proposer clan.</param>
+        /// <param name="kingdom">kingdom.</param>
         protected void SetKingdomDecisionProperties(KingdomDecision kingdomDecision, Clan proposerClan, Kingdom kingdom)
         {
             SetProposerClanMethod(kingdomDecision, proposerClan);
@@ -66,7 +82,10 @@ namespace GameInterface.Services.Kingdoms.Data
             SetTriggerTimeMethod(kingdomDecision, (CampaignTime)CampaignTimeCtr.Invoke(new object[] { TriggerTime }));
         }
 
-
+        /// <summary>
+        /// Tries to get/create the kingdom decision object from the current KingdomDecisionData object.
+        /// Implemented in derived class.
+        /// </summary>
         public abstract bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision);
     }
 }

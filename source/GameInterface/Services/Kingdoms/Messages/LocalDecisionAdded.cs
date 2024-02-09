@@ -6,6 +6,9 @@ using System.Text;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
+    /// <summary>
+    /// Event that is handled on server side, when Kingdom.AddDecision method is called.
+    /// </summary>
     public record LocalDecisionAdded: IEvent
     {
         public string KingdomId { get; }

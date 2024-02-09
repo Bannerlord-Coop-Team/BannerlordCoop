@@ -6,13 +6,16 @@ using GameInterface.Services.Kingdoms.Messages;
 
 namespace Coop.IntegrationTests.Kingdoms
 {
+    /// <summary>
+    /// Test class for NetworkRemoveDecision message handling.
+    /// </summary>
     public class KingdomRemoveDecisionTest
     {
         // Creates a test environment with 1 server and 2 clients by default
         internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
         /// <summary>
-        /// Used to Test that client recieves RemoveDecision messages.
+        /// Used to Test that client recieves NetworkRemoveDecision messages.
         /// </summary>
         [Fact]
         public void ServerKingdom_RemoveDecision_Publishes_AllClients()

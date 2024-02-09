@@ -10,6 +10,9 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Kingdoms.Data
 {
+    /// <summary>
+    /// Class for serializing <see cref="MakePeaceKingdomDecision"> class.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public class MakePeaceKingdomDecisionData : KingdomDecisionData
     {
@@ -31,6 +34,7 @@ namespace GameInterface.Services.Kingdoms.Data
             ApplyResults= applyResults;
         }
 
+        /// <inheritdoc/>
         public override bool TryGetKingdomDecision(IObjectManager objectManager, out KingdomDecision kingdomDecision)
         {
             if (!TryGetProposerClanAndKingdom(objectManager, out Clan proposerClan, out Kingdom kingdom) ||

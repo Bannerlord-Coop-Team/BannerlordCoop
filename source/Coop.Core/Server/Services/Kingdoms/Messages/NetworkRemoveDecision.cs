@@ -3,6 +3,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Kingdoms.Messages
 {
+    /// <summary>
+    /// Remove decision network message.
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public class NetworkRemoveDecision : ICommand
     {
