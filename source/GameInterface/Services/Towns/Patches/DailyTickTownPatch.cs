@@ -26,22 +26,12 @@ public static class TownDailyTickPatch
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instrs)
     {
-        //List<CodeInstruction> instructions = instrs.ToList();
-        //int setterLastIdx = instructions.FindLastIndex(i => i.opcode == Call.opcode && i.operand as MethodInfo == foodStocksSetter);
-        //if (setterLastIdx == -1) return instrs;
+        
         foreach (var instruction in instrs)
         {
             if (instruction.opcode == Call.opcode && instruction.operand as MethodInfo == foodStocksSetter)
             {
-                //instructions.RemoveAt(i);
-                //instructions.RemoveAt(i-1);
-                //instructions.InsertRange(i, new CodeInstruction[]
-                //{
-                //   new CodeInstruction(OpCodes.Ldarg_0),
-                //  new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TownDailyTickPatch), "LogFoodStock"))
-                //});
-
-                //yield return new CodeInstruction(OpCodes.Ldarg_0);
+                
                 yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TownDailyTickPatch), "InterceptSetFoodStock"));
                 
                 continue;
@@ -53,13 +43,8 @@ public static class TownDailyTickPatch
 
     public static void InterceptSetFoodStock(Fief fief, float value)
     {
-        // If it's the client, return
-        fief.FoodStocks = value;
-        //FiefPatches.ChangeFiefFoodStock(fief, value);
-        //Console.WriteLine("FoodStocks changed to " + value + "for the fief " + fief.StringId);
-        //var message = new FiefFoodStockChanged(fief.StringId,value);
-        //MessageBroker.Instance.Publish(fief, message);
-
+ 
         if (ModInformation.IsClient) return;
+        fief.FoodStocks = value; // The message broker will be called by the prefix patch
     }
 }
