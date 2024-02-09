@@ -1,6 +1,11 @@
 ﻿using Coop.Mod.Extentions;
+using HarmonyLib;
+using System.ComponentModel;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
+using TaleWorlds.Library;
 using static TaleWorlds.CampaignSystem.Settlements.Settlement;
 
 namespace GameInterface.Extentions;
@@ -12,7 +17,8 @@ internal static class SettlementExtension
     private static readonly PropertyInfo Settlement_CurrentSiegeState = typeof(Settlement).GetProperty(nameof(Settlement.CurrentSiegeState));
     private static readonly PropertyInfo Settlemnent_GarrisonWagePaymentLimit = typeof(Settlement).GetProperty(nameof(Settlement.GarrisonWagePaymentLimit));
 
-
+    private static readonly FieldInfo _notablesCache = typeof(Settlement).GetField("_notablesCache", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static MethodInfo Settlement_CollectNotablesToCache = AccessTools.Method(typeof(Settlement), "CollectNotablesToCache");
 
     public static void SetLastThreatTimeChanged(this Settlement component, long? lastThreatTime)
     {
@@ -31,4 +37,20 @@ internal static class SettlementExtension
     {
         Settlement_CurrentSiegeState.SetValue(component, siegeState);
     }
+
+    public static MBList<Hero> GetNotablesCache(this Settlement component)
+    {
+        return (MBList<Hero>)_notablesCache.GetValue(component);
+    }
+
+    public static void SetNotableCache(this Settlement component, MBList<Hero> heros)
+    {
+        _notablesCache.SetValue(component, heros);
+    }
+
+    public static void CollectNotablesToCache(this Settlement component)
+    {
+        Settlement_CollectNotablesToCache.Invoke(component, new object[] { });
+    }
+
 }

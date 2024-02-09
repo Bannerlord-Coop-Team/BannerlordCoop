@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Messages;
+using System;
 
 namespace Coop.Core.Server.Services.Settlements.Handlers;
 
@@ -25,8 +26,17 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<SettlementChangedCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Subscribe<SettlementChangedMilitia>(HandleMilitia);
         messageBroker.Subscribe<SettlementChangedGarrisonWageLimit>(HandleGarrisonWageLimit);
+        messageBroker.Subscribe<SettlementChangedNotablesCache>(HandleCollectNotablesToCache);
 
-        
+
+
+    }
+
+    private void HandleCollectNotablesToCache(MessagePayload<SettlementChangedNotablesCache> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeSettlementNotablesCache(obj.SettlementId, obj.NotablesCache);
+        network.SendAll(message);
     }
 
     private void HandleGarrisonWageLimit(MessagePayload<SettlementChangedGarrisonWageLimit> payload)
@@ -92,5 +102,7 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedCurrentSiegeState>(HandleCurrentSiegeState);
         messageBroker.Unsubscribe<SettlementChangedMilitia>(HandleMilitia);
         messageBroker.Unsubscribe<SettlementChangedGarrisonWageLimit>(HandleGarrisonWageLimit);
+        messageBroker.Unsubscribe<SettlementChangedNotablesCache>(HandleCollectNotablesToCache);
+
     }
 }
