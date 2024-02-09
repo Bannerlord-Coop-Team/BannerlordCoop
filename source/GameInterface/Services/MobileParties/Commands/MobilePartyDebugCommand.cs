@@ -7,6 +7,7 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -61,7 +62,7 @@ namespace GameInterface.Services.MobileParties.Commands
             return stringBuilder.ToString();
         }
 
-
+        //TODO: I have no idea how to porperly test ClanFinanceExpenseItemVM
         [CommandLineArgumentFunction("set_wage_limit_test", "coop.debug.mobileparty")]
         public static string SetWagePaymentLimit(List<string> args)
         {
@@ -76,8 +77,6 @@ namespace GameInterface.Services.MobileParties.Commands
             {
                 return string.Format("ID: '{0}' not found", args[0]);
             }
-
-            WageChangesSettlementPatch.SetWagePaymentLimitOverrideTest(mobileParty, 2000);
 
 
             return "SetWagePaymentLimit Tested Should invoke both";

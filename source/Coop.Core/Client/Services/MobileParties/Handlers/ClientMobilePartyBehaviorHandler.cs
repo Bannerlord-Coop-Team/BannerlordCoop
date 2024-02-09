@@ -28,18 +28,6 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
             messageBroker.Subscribe<ChangedWagePaymentLimit>(HandleChangedWagePaymentLimit);
             // other clients
             messageBroker.Subscribe<NetworkChangeWagePaymentLimit>(HandleChangeWageOtherClients);
-            // sending client when approved
-            messageBroker.Subscribe<NetworkSetWagePaymentLimitApproved>(HandleChangeSenderClient);
-        }
-
-        private void HandleChangeSenderClient(MessagePayload<NetworkSetWagePaymentLimitApproved> payload)
-        {
-            // TODO for specific client
-            var obj = payload.What;
-
-            var message = new SetWagePaymentLimitApproved(obj.MobilePartyId, obj.WageAmount);
-
-            messageBroker.Publish(this, message);
         }
 
         private void HandleChangeWageOtherClients(MessagePayload<NetworkChangeWagePaymentLimit> payload)
@@ -73,8 +61,6 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
             //Transpiler
             // other clients
             messageBroker.Unsubscribe<NetworkChangeWagePaymentLimit>(HandleChangeWageOtherClients);
-            // sending client
-            messageBroker.Unsubscribe<NetworkSetWagePaymentLimitApproved>(HandleChangeSenderClient);
         }
     }
 }
