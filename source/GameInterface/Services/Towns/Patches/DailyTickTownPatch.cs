@@ -54,12 +54,12 @@ public static class TownDailyTickPatch
     public static void InterceptSetFoodStock(Fief fief, float value)
     {
         // If it's the client, return
-        if (!ModInformation.IsServer) return;
         fief.FoodStocks = value;
         //FiefPatches.ChangeFiefFoodStock(fief, value);
         //Console.WriteLine("FoodStocks changed to " + value + "for the fief " + fief.StringId);
         //var message = new FiefFoodStockChanged(fief.StringId,value);
         //MessageBroker.Instance.Publish(fief, message);
 
+        if (ModInformation.IsClient) return;
     }
 }
