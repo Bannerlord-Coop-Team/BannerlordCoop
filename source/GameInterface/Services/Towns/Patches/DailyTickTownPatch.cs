@@ -12,6 +12,7 @@ using GameInterface.Services.Fiefs.Messages;
 using Newtonsoft.Json.Linq;
 using Autofac.Core.Activators;
 using GameInterface;
+using GameInterface.Services.Fiefs.Patches;
 
 [HarmonyPatch(typeof(Town), "DailyTick")]
 public static class TownDailyTickPatch
@@ -22,30 +23,43 @@ public static class TownDailyTickPatch
     // Get the setter method for the FoodStocks property
     private static MethodInfo foodStocksSetter = foodStocksProperty.GetSetMethod(true);
 
-    [HarmonyPatch(typeof(Town), "DailyTick")]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instrs)
     {
-        List<CodeInstruction> instructions = instrs.ToList();
-        int setterLastIdx = instructions.FindLastIndex(i => i.opcode == Call.opcode && i.operand as MethodInfo == foodStocksSetter);
-        if (setterLastIdx == -1) return instrs;
-
-        instructions.InsertRange(setterLastIdx, new CodeInstruction[]
+        //List<CodeInstruction> instructions = instrs.ToList();
+        //int setterLastIdx = instructions.FindLastIndex(i => i.opcode == Call.opcode && i.operand as MethodInfo == foodStocksSetter);
+        //if (setterLastIdx == -1) return instrs;
+        foreach (var instruction in instrs)
         {
-            new CodeInstruction(OpCodes.Ldarg_0),
-            new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TownDailyTickPatch), "LogFoodStock"))
-        });
-        
-        return instructions;
+            if (instruction.opcode == Call.opcode && instruction.operand as MethodInfo == foodStocksSetter)
+            {
+                //instructions.RemoveAt(i);
+                //instructions.RemoveAt(i-1);
+                //instructions.InsertRange(i, new CodeInstruction[]
+                //{
+                //   new CodeInstruction(OpCodes.Ldarg_0),
+                //  new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TownDailyTickPatch), "LogFoodStock"))
+                //});
+
+                //yield return new CodeInstruction(OpCodes.Ldarg_0);
+                yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TownDailyTickPatch), "InterceptSetFoodStock"));
+                
+                continue;
+            }
+            yield return instruction;
+        }
         
     }
 
-    public static void LogFoodStock(Fief fief)
+    public static void InterceptSetFoodStock(Fief fief, float value)
     {
         // If it's the client, return
         if (!ModInformation.IsServer) return;
-        
-        var message = new FiefFoodStockChanged(fief.StringId, fief.FoodStocks);
-        MessageBroker.Instance.Publish(fief, message);
+        fief.FoodStocks = value;
+        //FiefPatches.ChangeFiefFoodStock(fief, value);
+        //Console.WriteLine("FoodStocks changed to " + value + "for the fief " + fief.StringId);
+        //var message = new FiefFoodStockChanged(fief.StringId,value);
+        //MessageBroker.Instance.Publish(fief, message);
+
     }
 }
