@@ -1,7 +1,5 @@
-﻿using Common.Extensions;
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using ProtoBuf;
-using System;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -12,8 +10,8 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class ExpelClanFromKingdomDecisionData : KingdomDecisionData
     {
-        private static Action<ExpelClanFromKingdomDecision, Clan> SetClanToExpel = typeof(ExpelClanFromKingdomDecision).GetField(nameof(ExpelClanFromKingdomDecision.ClanToExpel), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<ExpelClanFromKingdomDecision, Clan>();
-        private static Action<ExpelClanFromKingdomDecision, Kingdom> SetOldKingdom = typeof(ExpelClanFromKingdomDecision).GetField(nameof(ExpelClanFromKingdomDecision.OldKingdom), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<ExpelClanFromKingdomDecision, Kingdom>();
+        private static readonly FieldInfo ClanToExpelField = typeof(ExpelClanFromKingdomDecision).GetField(nameof(ExpelClanFromKingdomDecision.ClanToExpel), BindingFlags.Instance | BindingFlags.Public);
+        private static readonly FieldInfo OldKingdomField = typeof(ExpelClanFromKingdomDecision).GetField(nameof(ExpelClanFromKingdomDecision.OldKingdom), BindingFlags.Instance | BindingFlags.Public);
 
         [ProtoMember(1)]
         public string ClanToExpelId { get; }
@@ -38,8 +36,8 @@ namespace GameInterface.Services.Kingdoms.Data
 
             ExpelClanFromKingdomDecision expelClanFromKingdomDecision = (ExpelClanFromKingdomDecision)FormatterServices.GetUninitializedObject(typeof(ExpelClanFromKingdomDecision));
             SetKingdomDecisionProperties(expelClanFromKingdomDecision, proposerClan, kingdom);
-            SetClanToExpel(expelClanFromKingdomDecision, clanToExpel);
-            SetOldKingdom(expelClanFromKingdomDecision, oldKingdom);
+            ClanToExpelField.SetValue(expelClanFromKingdomDecision, clanToExpel);
+            OldKingdomField.SetValue(expelClanFromKingdomDecision, oldKingdom);
             kingdomDecision = expelClanFromKingdomDecision;
             return true;
         }

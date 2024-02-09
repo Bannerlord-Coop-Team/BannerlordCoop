@@ -1,7 +1,5 @@
-﻿using Common.Extensions;
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using ProtoBuf;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Runtime.Serialization;
@@ -13,9 +11,9 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class KingdomPolicyDecisionData : KingdomDecisionData
     {
-        private static Action<KingdomPolicyDecision, PolicyObject> SetPolicyMethod = typeof(KingdomPolicyDecision).GetField(nameof(KingdomPolicyDecision.Policy), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<KingdomPolicyDecision, PolicyObject>();
-        private static Action<KingdomPolicyDecision, bool> SetIsInvertedDecisionMethod = typeof(KingdomPolicyDecision).GetField("_isInvertedDecision", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<KingdomPolicyDecision, bool>();
-        private static Action<KingdomPolicyDecision, List<PolicyObject>> SetKingdomPolicies = typeof(KingdomPolicyDecision).GetField("_kingdomPolicies", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<KingdomPolicyDecision, List<PolicyObject>>();
+        private static readonly FieldInfo PolicyField = typeof(KingdomPolicyDecision).GetField(nameof(KingdomPolicyDecision.Policy), BindingFlags.Instance | BindingFlags.Public);
+        private static readonly FieldInfo IsInvertedDecisionField = typeof(KingdomPolicyDecision).GetField("_isInvertedDecision", BindingFlags.Instance | BindingFlags.NonPublic);
+        private static readonly FieldInfo KingdomPoliciesField = typeof(KingdomPolicyDecision).GetField("_kingdomPolicies", BindingFlags.Instance | BindingFlags.NonPublic);
 
 
         [ProtoMember(1)]
@@ -55,9 +53,9 @@ namespace GameInterface.Services.Kingdoms.Data
 
             KingdomPolicyDecision kingdomPolicyDecision = (KingdomPolicyDecision)FormatterServices.GetUninitializedObject(typeof(KingdomPolicyDecision));
             SetKingdomDecisionProperties(kingdomPolicyDecision, proposerClan, kingdom);
-            SetPolicyMethod(kingdomPolicyDecision, policyObject);
-            SetIsInvertedDecisionMethod(kingdomPolicyDecision, IsInvertedDecision);
-            SetKingdomPolicies(kingdomPolicyDecision, kingdomPolicies);
+            PolicyField.SetValue(kingdomPolicyDecision, policyObject);
+            IsInvertedDecisionField.SetValue(kingdomPolicyDecision, IsInvertedDecision);
+            KingdomPoliciesField.SetValue(kingdomPolicyDecision, kingdomPolicies);
             kingdomDecision = kingdomPolicyDecision;
             return true;
         }

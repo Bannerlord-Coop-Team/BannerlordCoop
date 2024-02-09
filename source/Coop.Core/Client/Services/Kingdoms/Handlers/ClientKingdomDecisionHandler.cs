@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.Kingdoms.Messages;
+using Coop.Core.Server.Services.Kingdoms.Messages;
 using GameInterface.Services.Kingdoms.Messages;
 
 namespace Coop.Core.Client.Services.Kingdoms.Handlers
@@ -15,28 +15,28 @@ namespace Coop.Core.Client.Services.Kingdoms.Handlers
             this.messageBroker = messageBroker;
             this.network = network;
 
-            messageBroker.Subscribe<LocalDecisionAdded>(HandleLocalDecisionAdded);
-            messageBroker.Subscribe<LocalDecisionRemoved>(HandleLocalDecisionRemoved);
+            messageBroker.Subscribe<NetworkAddDecision>(HandleNetworkAddDecision);
+            messageBroker.Subscribe<NetworkRemoveDecision>(HandleNetworkRemoveDecision);
         }
 
-        private void HandleLocalDecisionRemoved(MessagePayload<LocalDecisionRemoved> obj)
+        private void HandleNetworkRemoveDecision(MessagePayload<NetworkRemoveDecision> obj)
         {
             var payload = obj.What;
-            var message = new RemoveDecisionRequest(payload.KingdomId, payload.Index);
-            network.SendAll(message);
+            var message = new RemoveDecision(payload.KingdomId, payload.Index);
+            messageBroker.Publish(this, message);
         }
 
-        private void HandleLocalDecisionAdded(MessagePayload<LocalDecisionAdded> obj)
+        private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
         {
             var payload = obj.What;
-            var message = new AddDecisionRequest(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost);
-            network.SendAll(message);
+            var message = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost);
+            messageBroker.Publish(this, message);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<LocalDecisionAdded>(HandleLocalDecisionAdded);
-            messageBroker.Unsubscribe<LocalDecisionRemoved>(HandleLocalDecisionRemoved);
+            messageBroker.Unsubscribe<NetworkAddDecision>(HandleNetworkAddDecision);
+            messageBroker.Unsubscribe<NetworkRemoveDecision>(HandleNetworkRemoveDecision);
         }
     }
 }

@@ -10,6 +10,13 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 using TaleWorlds.Library;
 using Common.Extensions;
+using GameInterface.Policies;
+using System.Linq;
+using TaleWorlds.CampaignSystem.Actions;
+using System.Runtime.CompilerServices;
+using TaleWorlds.CampaignSystem.Party;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Extentions;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
@@ -28,52 +35,89 @@ namespace GameInterface.Services.Kingdoms.Patches
         [HarmonyPrefix]
         public static bool AddDecisionPrefix(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
         {
-            if (AllowedInstance.IsAllowed(__instance)) return true;
+            if (AllowedThread.IsThisThreadAllowed())
+            {
+                ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
+                return false;
+            }
+            if (PolicyProvider.AllowOriginalCalls) return true;
 
+            if (ModInformation.IsClient) return false;
+
+            ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
             MessageBroker.Instance.Publish(__instance,
                 new LocalDecisionAdded(__instance.StringId, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost));
-
             return false;
         }
 
         public static void RunOriginalAddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
         {
-            using (AllowedInstance)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AllowedInstance.Instance = kingdom;
-
-                GameLoopRunner.RunOnMainThread(() =>
+                using (new AllowedThread())
                 {
                     kingdom.AddDecision(kingdomDecision, ignoreInfluenceCost);
-                }, true);
+                }
+            }, true); 
+        }
+
+        private static void ModifiedAddDecision(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
+        {
+            if (!ignoreInfluenceCost)
+            {
+                Clan proposerClan = kingdomDecision.ProposerClan;
+                int influenceCost = kingdomDecision.GetInfluenceCost(proposerClan);
+                ChangeClanInfluenceAction.Apply(proposerClan, (float)(-(float)influenceCost));
             }
+            bool flag;
+            if (!kingdomDecision.DetermineChooser().Leader.IsHumanPlayerCharacter)
+            {
+                flag = kingdomDecision.DetermineSupporters().Any((Supporter x) => x.IsPlayer);
+            }
+            else
+            {
+                flag = true;
+            }
+
+            bool isPlayerInvolved = flag;
+            CampaignEventDispatcher.Instance.OnKingdomDecisionAdded(kingdomDecision, isPlayerInvolved);
+
+            var playerParties = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties();
+            if (playerParties.All(party => party.ActualClan.Kingdom != kingdomDecision.Kingdom))
+            {
+                new KingdomElection(kingdomDecision).StartElection();
+                return;
+            }
+
+            GetUnresolvedDecisions(__instance).Add(kingdomDecision);
         }
 
         [HarmonyPatch(nameof(Kingdom.RemoveDecision))]
         [HarmonyPrefix]
         public static bool RemoveDecisionPrefix(Kingdom __instance, KingdomDecision kingdomDecision)
         {
-            if (AllowedInstance.IsAllowed(__instance)) return true;
+            if (AllowedThread.IsThisThreadAllowed()) return true;
+            if (PolicyProvider.AllowOriginalCalls) return true;
+
+            if (ModInformation.IsClient) return false;
 
             var index = GetUnresolvedDecisions(__instance).FindIndex(decision => decision == kingdomDecision);
 
             MessageBroker.Instance.Publish(__instance,
                 new LocalDecisionRemoved(__instance.StringId, index));
 
-            return false;
+            return true;
         }
 
         public static void RunOriginalRemoveDecision(Kingdom kingdom, KingdomDecision kingdomDecision)
         {
-            using (AllowedInstance)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AllowedInstance.Instance = kingdom;
-
-                GameLoopRunner.RunOnMainThread(() =>
+                using (new AllowedThread())
                 {
                     kingdom.RemoveDecision(kingdomDecision);
-                }, true);
-            }
+                }
+            }, true);
         }
 
         [HarmonyPatch("AddPolicy")]

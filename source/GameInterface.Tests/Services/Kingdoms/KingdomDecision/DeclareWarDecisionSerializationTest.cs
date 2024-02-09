@@ -1,6 +1,8 @@
 ﻿using GameInterface.Services.Kingdoms.Data;
 using ProtoBuf;
 using System.IO;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.Election;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
@@ -28,6 +30,15 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Equal(DeclareWarDecision.NotifyPlayer, deserializedObj.NotifyPlayer);
             Assert.Equal(DeclareWarDecision.IsEnforced, deserializedObj.IsEnforced);
             Assert.Equal(DeclareWarDecision.FactionToDeclareWarOnId, deserializedObj.FactionToDeclareWarOnId);
+        }
+
+        [Fact]
+        public void DeclareWarDecisionReflectionTests()
+        {
+            FieldInfo? fieldInfo = typeof(DeclareWarDecisionData).GetField("FactionToDeclareWarOnField", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(fieldInfo);
+            object? obj = fieldInfo?.GetValue(null);
+            Assert.NotNull(obj);
         }
     }
 }

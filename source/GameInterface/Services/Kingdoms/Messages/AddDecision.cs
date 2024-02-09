@@ -1,17 +1,12 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Kingdoms.Data;
-using ProtoBuf;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
-    [ProtoContract(SkipConstructor = true)]
-    public class AddDecision: ICommand
+    public class AddDecision: IEvent
     {
-        [ProtoMember(1)]
         public string KingdomId { get; }
-        [ProtoMember(2)]
         public KingdomDecisionData Data { get; }
-        [ProtoMember(3, IsRequired = true)]
         public bool IgnoreInfluenceCost { get; }
 
         public AddDecision(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost)

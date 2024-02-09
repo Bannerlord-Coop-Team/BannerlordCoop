@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.Kingdoms.Data;
 using ProtoBuf;
 using System.IO;
+using System.Reflection;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
@@ -27,6 +28,23 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Equal(settlementClaimantDecisionData.SettlementId, deserializedObj.SettlementId);
             Assert.Equal(settlementClaimantDecisionData.CapturerHeroId, deserializedObj.CapturerHeroId);
             Assert.Equal(settlementClaimantDecisionData.ClanToExcludeId, deserializedObj.ClanToExcludeId);
+        }
+
+        [Fact]
+        public void SettlementClaimantDecisionDataReflectionTests()
+        {
+            FieldInfo? fieldInfo = typeof(SettlementClaimantDecisionData).GetField("SettlementField", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(fieldInfo);
+            FieldInfo? fieldInfo2 = typeof(SettlementClaimantDecisionData).GetField("ClanToExcludeField", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(fieldInfo2);
+            FieldInfo? fieldInfo3 = typeof(SettlementClaimantDecisionData).GetField("CapturerHeroField", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(fieldInfo3);
+            object? obj = fieldInfo?.GetValue(null);
+            Assert.NotNull(obj);
+            object? obj2 = fieldInfo2?.GetValue(null);
+            Assert.NotNull(obj2);
+            object? obj3 = fieldInfo3?.GetValue(null);
+            Assert.NotNull(obj3);
         }
     }
 }

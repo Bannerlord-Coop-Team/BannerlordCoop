@@ -1,6 +1,7 @@
 ﻿using GameInterface.Services.Kingdoms.Data;
 using ProtoBuf;
 using System.IO;
+using System.Reflection;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
@@ -26,6 +27,15 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Equal(kingSelectionKingdomDecisionData.IsEnforced, deserializedObj.IsEnforced);
             Assert.Equal(kingSelectionKingdomDecisionData.ClanToExcludeId, deserializedObj.ClanToExcludeId);
 
+        }
+
+        [Fact]
+        public void KingSelectionKingdomDecisionDataReflectionTests()
+        {
+            FieldInfo? fieldInfo = typeof(KingSelectionKingdomDecisionData).GetField("SetClanToExclude", BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.NotNull(fieldInfo);
+            object? obj = fieldInfo?.GetValue(null);
+            Assert.NotNull(obj);
         }
     }
 }

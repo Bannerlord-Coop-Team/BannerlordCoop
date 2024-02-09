@@ -18,10 +18,10 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoInclude(106, typeof(SettlementClaimantPreliminaryDecisionData))]
     public abstract class KingdomDecisionData
     {
-        private static Action<KingdomDecision, Kingdom> SetKingdomMethod = typeof(KingdomDecision).GetField("_kingdom", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<KingdomDecision, Kingdom>();
-        private static Action<KingdomDecision, Clan> SetProposerClanMethod = typeof(KingdomDecision).GetProperty(nameof(KingdomDecision.ProposerClan), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<KingdomDecision, Clan>();
-        private static Action<KingdomDecision, CampaignTime> SetTriggerTimeMethod = typeof(KingdomDecision).GetProperty(nameof(KingdomDecision.TriggerTime), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<KingdomDecision, CampaignTime>();
-        private static ConstructorInfo CampaignTimeCtr = typeof(CampaignTime).GetConstructor(BindingFlags.NonPublic, null, new Type[] { typeof(long) }, null);
+        private static readonly Action<KingdomDecision, Kingdom> SetKingdomMethod = typeof(KingdomDecision).GetField("_kingdom", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<KingdomDecision, Kingdom>();
+        private static readonly Action<KingdomDecision, Clan> SetProposerClanMethod = typeof(KingdomDecision).GetProperty(nameof(KingdomDecision.ProposerClan), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<KingdomDecision, Clan>();
+        private static readonly Action<KingdomDecision, CampaignTime> SetTriggerTimeMethod = typeof(KingdomDecision).GetProperty(nameof(KingdomDecision.TriggerTime), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<KingdomDecision, CampaignTime>();
+        private static readonly ConstructorInfo CampaignTimeCtr = typeof(CampaignTime).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(long) }, null);
 
         [ProtoMember(1)]
         public string ProposerClanId { get; }

@@ -1,4 +1,5 @@
-﻿using Coop.IntegrationTests.Environment;
+﻿using Coop.Core.Server.Services.Kingdoms.Messages;
+using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Kingdoms.Data;
 using GameInterface.Services.Kingdoms.Messages;
@@ -26,7 +27,7 @@ namespace Coop.IntegrationTests.Kingdoms
 
             // Assert
             // Verify the server sends a single message to it's game interface
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<AddDecision>());
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkAddDecision>());
 
             // Verify the all clients send a single message to their game interfaces
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
