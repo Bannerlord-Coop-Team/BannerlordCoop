@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Villages.Messages;
@@ -7,6 +8,7 @@ namespace Coop.Core.Server.Services.Villages.Messages;
 /// Server sends this data when a Village Changes State
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
+[BatchLogMessage]
 public record NetworkChangeVillageState : IEvent
 {
     [ProtoMember(1)]

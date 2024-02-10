@@ -18,9 +18,11 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(Settlement))]
 public class CollectNotablesToCachePatch
 {
+    // only server needs to know about this..
     [HarmonyPatch("CollectNotablesToCache")]
     [HarmonyPrefix]
-    private static bool CollectNotablesToCachePrefix(ref Settlement __instance)
+    private static bool CollectNotablesToCachePrefix(ref Settlement __instance) => ModInformation.IsServer;
+    /*
     {
 
         if (AllowedThread.IsThisThreadAllowed()) return true;
@@ -50,7 +52,7 @@ public class CollectNotablesToCachePatch
         MessageBroker.Instance.Publish(__instance, message);
         return false;
     }
-
+    */
 
     internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heros)
     {

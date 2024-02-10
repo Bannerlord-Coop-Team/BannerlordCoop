@@ -1,24 +1,25 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
 using ProtoBuf;
+using System;
+using System.Collections.Generic;
+using System.Text;
 
 namespace Coop.Core.Server.Services.Settlements.Messages;
 
-/// <summary>
-/// Notify client of Militia Change.
-/// </summary>
 [ProtoContract(SkipConstructor = true)]
 [BatchLogMessage]
-public record NetworkChangeSettlementMilitia : IEvent
+public record NetworkChangeSettlementRemoveHeroWithoutParty : IEvent
 {
     [ProtoMember(1)]
     public string SettlementId { get; }
-    [ProtoMember(2)]
-    public float Militia { get; }
 
-    public NetworkChangeSettlementMilitia(string settlementId, float militia)
+    [ProtoMember(2)]
+    public string HeroId { get; }
+
+    public NetworkChangeSettlementRemoveHeroWithoutParty(string settlementId, string heroId)
     {
         SettlementId = settlementId;
-        Militia = militia;
+        HeroId = heroId;
     }
 }

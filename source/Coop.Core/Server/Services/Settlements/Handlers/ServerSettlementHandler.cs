@@ -27,9 +27,26 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<SettlementChangedMilitia>(HandleMilitia);
         messageBroker.Subscribe<SettlementChangedGarrisonWageLimit>(HandleGarrisonWageLimit);
         messageBroker.Subscribe<SettlementChangedNotablesCache>(HandleCollectNotablesToCache);
+        messageBroker.Subscribe<SettlementChangedAddHeroWithoutParty>(HandleAddHeroWithoutParty);
+        messageBroker.Subscribe<SettlementChangedRemoveHeroWithoutParty>(HandleRemoveHeroWithoutParty);
 
 
+    }
 
+    private void HandleRemoveHeroWithoutParty(MessagePayload<SettlementChangedRemoveHeroWithoutParty> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeSettlementRemoveHeroWithoutParty(obj.SettlementId, obj.HeroId);
+
+        network.SendAll(message);
+    }
+
+    private void HandleAddHeroWithoutParty(MessagePayload<SettlementChangedAddHeroWithoutParty> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeSettlementAddHeroWithoutParty(obj.SettlementId, obj.HeroId);
+
+        network.SendAll(message);
     }
 
     private void HandleCollectNotablesToCache(MessagePayload<SettlementChangedNotablesCache> payload)
@@ -103,6 +120,7 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedMilitia>(HandleMilitia);
         messageBroker.Unsubscribe<SettlementChangedGarrisonWageLimit>(HandleGarrisonWageLimit);
         messageBroker.Unsubscribe<SettlementChangedNotablesCache>(HandleCollectNotablesToCache);
+        messageBroker.Unsubscribe<SettlementChangedAddHeroWithoutParty>(HandleAddHeroWithoutParty);
 
     }
 }

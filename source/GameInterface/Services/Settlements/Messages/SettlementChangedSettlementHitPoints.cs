@@ -1,10 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
 /// When the Settlement Hit points changes.
 /// </summary>
+[BatchLogMessage]
 public record SettlementChangedSettlementHitPoints : ICommand
 {
 

@@ -7,14 +7,14 @@ using System.Text;
 namespace GameInterface.Services.Settlements.Messages;
 
 [BatchLogMessage]
-public record SettlementChangedGarrisonWageLimit : ICommand
+public record SettlementChangedRemoveHeroWithoutParty : ICommand
 {
     public string SettlementId { get; }
-    public int GarrisonWagePaymentLimit { get; }
+    public string HeroId { get; }
 
-    public SettlementChangedGarrisonWageLimit(string settlementId, int garrisonWagePaymentLimit)
+    public SettlementChangedRemoveHeroWithoutParty(string settlementId, string heroId)
     {
         SettlementId = settlementId;
-        GarrisonWagePaymentLimit = garrisonWagePaymentLimit;
+        HeroId = heroId;
     }
 }

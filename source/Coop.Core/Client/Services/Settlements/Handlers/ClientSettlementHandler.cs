@@ -23,7 +23,29 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeSettlementMilitia>(HandleMiltia);
         messageBroker.Subscribe<NetworkChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
         messageBroker.Subscribe<NetworkChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
+        messageBroker.Subscribe<NetworkChangeSettlementAddHeroWithoutParty>(HandleAddHeroWithoutParty);
+        messageBroker.Subscribe<NetworkChangeSettlementRemoveHeroWithoutParty>(HandleRemoveHeroWithoutParty);
 
+
+
+    }
+
+    private void HandleRemoveHeroWithoutParty(MessagePayload<NetworkChangeSettlementRemoveHeroWithoutParty> payload)
+    {
+        var obj = payload.What;
+
+        var message = new ChangeSettlementHeroWithoutPartyRemove(obj.SettlementId, obj.HeroId);
+
+        messageBroker.Publish(this, message);
+    }
+
+    private void HandleAddHeroWithoutParty(MessagePayload<NetworkChangeSettlementAddHeroWithoutParty> payload)
+    {
+        var obj = payload.What;
+
+        var message = new ChangeSettlementHeroWithoutParty(obj.SettlementId, obj.HeroId);
+
+        messageBroker.Publish(this, message);
     }
 
     private void HandleCollectNotablesToCache(MessagePayload<NetworkChangeSettlementNotablesCache> payload)
