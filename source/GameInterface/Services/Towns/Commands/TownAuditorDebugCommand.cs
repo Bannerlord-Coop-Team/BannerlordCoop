@@ -50,51 +50,65 @@ public class TownAuditorDebugCommand
     {
         StringBuilder stringBuilder = new StringBuilder();
 
-        if(!ModInformation.IsClient)
+        if (ModInformation.IsServer)
         {
-            stringBuilder.Append("The town Auditor debug command can only be called by a Client.");
-            return stringBuilder.ToString();
+            return "The town Auditor debug command can only be called by a Client";
         }
         if (TryGetObjectManager(out var objectManager) == false)
         {
+            return "Unable to resolve ObjectManager";
 
-            stringBuilder.Append("Unable to resolve ObjectManager");
-            return stringBuilder.ToString();
         }
-        List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
-            .Where(settlement => settlement.IsTown).ToList();
+        Settlement first_settlement = Campaign.Current.CampaignObjectManager.Settlements
+                    .First();
 
-        List<TownAuditorData> auditorDatas = new List<TownAuditorData>();
-        settlements.ForEach((settlement) =>
-        {
+        var message = new TownAuditorSent(getAllTownInfo(objectManager, stringBuilder));
+        MessageBroker.Instance.Publish(first_settlement, message);
 
-            if (objectManager.TryGetObject(settlement.Town.StringId, out Town t) == false)
-            {
-                stringBuilder.Append($"ID: '{args[0]}' not found");
-                
-            }
-            else
-            {
-                Fief fief = t.Settlement.SettlementComponent as Fief;
-
-                TownAuditorData auditorData = new TownAuditorData(
-                    t.StringId, t.Name.ToString(), (t.Governor != null) ? t.Governor.Name.ToString() : "null",
-                    (t.LastCapturedBy != null) ? t.LastCapturedBy.Name.ToString() : "null",
-                    t.Prosperity, t.Loyalty, t.Security, t.InRebelliousState, t.GarrisonAutoRecruitmentIsEnabled,
-                   fief.FoodStocks, t.TradeTaxAccumulated, getSoldItems(t));
-
-                auditorDatas.Add(auditorData);
-            }
-            
-            
-        });
-        
-        var message = new TownAuditorSent(auditorDatas);
-        MessageBroker.Instance.Publish(settlements.First().Town, message);
-
-        stringBuilder.Append("Found " + settlements.Count + " settlements\n");
+        stringBuilder.Append("Debug command done.");
         return stringBuilder.ToString();
 
     }
 
+    public static List<TownAuditorData> getAllTownInfo(IObjectManager objectManager, StringBuilder stringBuilder = null)
+    {
+        List<TownAuditorData> auditorDatas;
+        List<Settlement> settlements;
+        settlements = Campaign.Current.CampaignObjectManager.Settlements
+                    .Where(settlement => settlement.IsTown).ToList();
+        auditorDatas = new List<TownAuditorData>();
+        settlements.ForEach((settlement) =>
+        {
+
+            if (objectManager.TryGetObject(settlement.Town.StringId, out Town town) == false)
+            {
+                stringBuilder.Append($"ID: '{settlement.Town.StringId}' not found");
+
+            }
+            else
+            {
+                Fief fief = town.Settlement.SettlementComponent as Fief;
+
+                TownAuditorData auditorData = new TownAuditorData(
+                    townStringId :town.StringId, 
+                    name : town.Name.ToString(), 
+                    governor : (town.Governor != null) ? town.Governor.Name.ToString() : "null",
+                    lastCapturedBy : (town.LastCapturedBy != null) ? town.LastCapturedBy.Name.ToString() : "null",
+                    prosperity : town.Prosperity, 
+                    loyalty : town.Loyalty, 
+                    security : town.Security, 
+                    inRebelliousState : town.InRebelliousState, 
+                    garrisonAutoRecruitmentIsEnabled : town.GarrisonAutoRecruitmentIsEnabled,
+                    foodStocks : fief.FoodStocks, 
+                    tradeTaxAccumulated : town.TradeTaxAccumulated,
+                    sellLogList : getSoldItems(town));
+
+                auditorDatas.Add(auditorData);
+            }
+
+
+        });
+
+        return auditorDatas;
+    }
 }

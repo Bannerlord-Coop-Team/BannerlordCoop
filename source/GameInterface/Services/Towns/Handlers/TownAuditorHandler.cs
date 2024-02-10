@@ -2,6 +2,7 @@ using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Towns.Commands;
 using GameInterface.Services.Towns.Data;
 using GameInterface.Services.Towns.Messages;
 using GameInterface.Services.Towns.Patches;
@@ -44,29 +45,7 @@ namespace GameInterface.Services.Towns.Handlers
             List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
             .Where(settlement => settlement.IsTown).ToList();
 
-            List<TownAuditorData> serverTownAuditorDatas = new List<TownAuditorData>();
-            settlements.ForEach((settlement) =>
-            {
-
-                if (objectManager.TryGetObject(settlement.Town.StringId, out Town t) == false)
-                {
-                    Logger.Error("TownAuditorHandler: Town not found on server: " + settlement.Town.StringId);
-                }
-                else
-                {
-                    Fief fief = t.Settlement.SettlementComponent as Fief;
-
-                    TownAuditorData auditorData = new TownAuditorData(
-                        t.StringId, t.Name.ToString(), (t.Governor != null) ? t.Governor.Name.ToString() : "null",
-                        (t.LastCapturedBy != null) ? t.LastCapturedBy.Name.ToString() : "null",
-                        t.Prosperity, t.Loyalty, t.Security, t.InRebelliousState, t.GarrisonAutoRecruitmentIsEnabled,
-                       fief.FoodStocks, t.TradeTaxAccumulated, getSoldItems(t));
-
-                    serverTownAuditorDatas.Add(auditorData);
-                }
-
-
-            });
+            List<TownAuditorData> serverTownAuditorDatas = TownAuditorDebugCommand.getAllTownInfo(objectManager);
 
             // Compare client and server values
             foreach (var clientTownAuditorData in clientTownAuditorDatas)

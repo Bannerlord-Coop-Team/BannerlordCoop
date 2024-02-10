@@ -50,7 +50,7 @@ public class TownAuditorData
         bool garrisonAutoRecruitmentIsEnabled,
         float foodStocks,
         int tradeTaxAccumulated,
-        IEnumerable<Town.SellLog> logList)
+        IEnumerable<Town.SellLog> sellLogList)
     {
         TownStringId = townStringId;
         Name = name;
@@ -63,6 +63,6 @@ public class TownAuditorData
         GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
         FoodStocks = foodStocks;
         TradeTaxAccumulated = tradeTaxAccumulated;
-        SellLogList = logList.Select(sellLog => new SellLogData(sellLog.Number, sellLog.Category.StringId)).ToArray();
+        SellLogList = sellLogList.Select(sellLog => new SellLogData(sellLog.Number, sellLog.Category.StringId)).ToArray();
     }
 }
