@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Settlements.Messages;
@@ -6,6 +7,7 @@ namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
 /// When the LastThreatTime has been changed or is elapsed for so long its null.
 /// </summary>
+[BatchLogMessage]
 public record SettlementChangedLastThreatTime : ICommand
 {
     public string SettlementId { get; }

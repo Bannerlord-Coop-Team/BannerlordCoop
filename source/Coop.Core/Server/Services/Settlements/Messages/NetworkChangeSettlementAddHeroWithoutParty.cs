@@ -4,21 +4,22 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Settlements.Messages;
 
+
 /// <summary>
-/// Notify client of Militia Change.
+/// Notifies clients of settlement addherowithout party change
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 [BatchLogMessage]
-public record NetworkChangeSettlementMilitia : IEvent
+public record NetworkChangeSettlementAddHeroWithoutParty : IEvent
 {
     [ProtoMember(1)]
     public string SettlementId { get; }
     [ProtoMember(2)]
-    public float Militia { get; }
+    public string HeroId { get; }
 
-    public NetworkChangeSettlementMilitia(string settlementId, float militia)
+    public NetworkChangeSettlementAddHeroWithoutParty(string settlementId, string heroId)
     {
         SettlementId = settlementId;
-        Militia = militia;
+        HeroId = heroId;
     }
 }

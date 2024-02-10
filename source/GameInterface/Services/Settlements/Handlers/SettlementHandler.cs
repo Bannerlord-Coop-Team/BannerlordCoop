@@ -4,6 +4,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -28,13 +29,47 @@ public class SettlementHandler : IHandler
         messageBroker.Subscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Subscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Subscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
-
         messageBroker.Subscribe<ChangeSettlementMilitia>(HandleMilitia);
         messageBroker.Subscribe<ChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
-
         messageBroker.Subscribe<ChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
+        messageBroker.Subscribe<ChangeSettlementHeroWithoutParty>(HandleHeroWithoutParty);
+        messageBroker.Subscribe<ChangeSettlementHeroWithoutPartyRemove>(HandleHeroRemoveWithoutParty);
+    }
 
+    private void HandleHeroRemoveWithoutParty(MessagePayload<ChangeSettlementHeroWithoutPartyRemove> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
 
+        if (objectManager.TryGetObject<Hero>(obj.HeroId, out var hero) == false)
+        {
+            Logger.Error("Unable to find Hero ({HeroStringId})", obj.HeroId);
+            return;
+        }
+        //HeroWithoutPartyPatch.RunRemoveHeroWithoutParty(settlement, hero);
+
+    }
+
+    private void HandleHeroWithoutParty(MessagePayload<ChangeSettlementHeroWithoutParty> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        if (objectManager.TryGetObject<Hero>(obj.HeroId, out var hero) == false)
+        {
+            Logger.Error("Unable to find Hero ({HeroStringId})", obj.HeroId);
+            return;
+        }
+
+        //HeroWithoutPartyPatch.RunAddHeroWithoutParty(settlement, hero);
     }
 
     private void HandleCollectNotablesToCache(MessagePayload<ChangeSettlementNotablesCache> payload)
@@ -160,10 +195,10 @@ public class SettlementHandler : IHandler
         messageBroker.Unsubscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Unsubscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Unsubscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
-
         messageBroker.Unsubscribe<ChangeSettlementMilitia>(HandleMilitia);
         messageBroker.Unsubscribe<ChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
-
-
+        messageBroker.Unsubscribe<ChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
+        messageBroker.Unsubscribe<ChangeSettlementHeroWithoutParty>(HandleHeroWithoutParty);
+        messageBroker.Unsubscribe<ChangeSettlementHeroWithoutPartyRemove>(HandleHeroRemoveWithoutParty);
     }
 }

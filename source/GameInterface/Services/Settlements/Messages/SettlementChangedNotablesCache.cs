@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 using System.Collections.Generic;
 
 namespace GameInterface.Services.Settlements.Messages;
@@ -7,6 +8,8 @@ namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
 /// When the settlement notable cache changes
 /// </summary>
+/// 
+[BatchLogMessage]
 public record SettlementChangedNotablesCache : ICommand
 {
     public string SettlementId { get; }

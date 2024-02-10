@@ -2,18 +2,20 @@
 using Common.Messaging;
 
 namespace GameInterface.Services.Settlements.Messages;
+
 /// <summary>
-/// Notify server of Militia value change
+/// When a hero is attached to hero cache
 /// </summary>
+/// 
 [BatchLogMessage]
-public record SettlementChangedMilitia : ICommand
+public record SettlementChangedAddHeroWithoutParty : ICommand
 {
     public string SettlementId { get; }
-    public float Militia { get; }
+    public string HeroId {  get; }
 
-    public SettlementChangedMilitia(string settlementId, float militia)
+    public SettlementChangedAddHeroWithoutParty(string settlementId, string heroId)
     {
         SettlementId = settlementId;
-        Militia = militia;
+        HeroId = heroId;
     }
 }

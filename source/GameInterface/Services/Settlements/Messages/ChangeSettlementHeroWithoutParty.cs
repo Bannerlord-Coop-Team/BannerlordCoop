@@ -3,17 +3,17 @@ using Common.Messaging;
 
 namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
-/// Notify server of Militia value change
+/// change herowithoutparty
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedMilitia : ICommand
+public record ChangeSettlementHeroWithoutParty : ICommand
 {
     public string SettlementId { get; }
-    public float Militia { get; }
+    public string HeroId { get; }
 
-    public SettlementChangedMilitia(string settlementId, float militia)
+    public ChangeSettlementHeroWithoutParty(string settlementId, string heroId)
     {
         SettlementId = settlementId;
-        Militia = militia;
+        HeroId = heroId;
     }
 }

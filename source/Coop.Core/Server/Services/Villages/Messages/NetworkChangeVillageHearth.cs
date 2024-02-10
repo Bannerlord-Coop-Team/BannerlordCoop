@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -10,6 +11,7 @@ namespace Coop.Core.Server.Services.Villages.Messages;
 /// Server sends this data when a Village Hearth's value changes.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
+[BatchLogMessage]
 public record NetworkChangeVillageHearth : IEvent
 {
     [ProtoMember(1)]

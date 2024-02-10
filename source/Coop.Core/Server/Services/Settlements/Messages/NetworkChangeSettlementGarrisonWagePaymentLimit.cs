@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Settlements.Messages;
@@ -7,6 +8,7 @@ namespace Coop.Core.Server.Services.Settlements.Messages;
 /// Used to notify client that the GarrisonWagePaymentLimit needs to be changed.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
+[BatchLogMessage]
 public record NetworkChangeSettlementGarrisonWagePaymentLimit : IEvent
 {
     [ProtoMember(1)]
