@@ -73,12 +73,12 @@ public class TownAuditorDebugCommand
     public static List<TownAuditorData> getAllTownInfo(IObjectManager objectManager, StringBuilder stringBuilder = null)
     {
         List<TownAuditorData> auditorDatas;
-        List<Settlement> settlements;
-        settlements = Campaign.Current.CampaignObjectManager.Settlements
-                    .Where(settlement => settlement.IsTown).ToList();
+        IEnumerable<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
+                    .Where(settlement => settlement.IsTown);
         auditorDatas = new List<TownAuditorData>();
-        settlements.ForEach((settlement) =>
+        foreach (Settlement settlement in settlements)
         {
+           
 
             if (objectManager.TryGetObject(settlement.Town.StringId, out Town town) == false)
             {
@@ -90,24 +90,23 @@ public class TownAuditorDebugCommand
                 Fief fief = town.Settlement.SettlementComponent as Fief;
 
                 TownAuditorData auditorData = new TownAuditorData(
-                    townStringId :town.StringId, 
-                    name : town.Name.ToString(), 
-                    governor : (town.Governor != null) ? town.Governor.Name.ToString() : "null",
-                    lastCapturedBy : (town.LastCapturedBy != null) ? town.LastCapturedBy.Name.ToString() : "null",
-                    prosperity : town.Prosperity, 
-                    loyalty : town.Loyalty, 
-                    security : town.Security, 
-                    inRebelliousState : town.InRebelliousState, 
-                    garrisonAutoRecruitmentIsEnabled : town.GarrisonAutoRecruitmentIsEnabled,
-                    foodStocks : fief.FoodStocks, 
-                    tradeTaxAccumulated : town.TradeTaxAccumulated,
-                    sellLogList : getSoldItems(town));
+                    townStringId: town.StringId,
+                    name: town.Name.ToString(),
+                    governor: (town.Governor != null) ? town.Governor.Name.ToString() : "null",
+                    lastCapturedBy: (town.LastCapturedBy != null) ? town.LastCapturedBy.Name.ToString() : "null",
+                    prosperity: town.Prosperity,
+                    loyalty: town.Loyalty,
+                    security: town.Security,
+                    inRebelliousState: town.InRebelliousState,
+                    garrisonAutoRecruitmentIsEnabled: town.GarrisonAutoRecruitmentIsEnabled,
+                    foodStocks: fief.FoodStocks,
+                    tradeTaxAccumulated: town.TradeTaxAccumulated,
+                    sellLogList: getSoldItems(town));
 
                 auditorDatas.Add(auditorData);
             }
 
-
-        });
+        }
 
         return auditorDatas;
     }
