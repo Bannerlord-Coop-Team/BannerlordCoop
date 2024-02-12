@@ -3,9 +3,12 @@ using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Messages;
-using System;
 
 namespace Coop.Core.Client.Services.Heroes.Handlers;
+
+/// <summary>
+/// Client side handler for hero related messages.
+/// </summary>
 internal class ClientCreateHeroHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;

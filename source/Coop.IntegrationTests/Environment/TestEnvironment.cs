@@ -29,7 +29,7 @@ public class TestEnvironment
     /// Constructor for TestEnvironment
     /// </summary>
     /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
-    public TestEnvironment(int numClients = 2)
+    public TestEnvironment(int numClients = 2, bool registerGameInterface = false)
     {
         Server = CreateServer();
 
@@ -43,12 +43,14 @@ public class TestEnvironment
         }
 
         Clients = clients;
+        this.registerGameInterface = registerGameInterface;
     }
 
     public IEnumerable<EnvironmentInstance> Clients { get; }
     public EnvironmentInstance Server { get; }
 
     private TestNetworkRouter networkOrchestrator = new TestNetworkRouter();
+    private readonly bool registerGameInterface;
 
     private EnvironmentInstance CreateClient()
     {
@@ -100,7 +102,10 @@ public class TestEnvironment
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
     {
-        builder.RegisterModule<GameInterfaceModule>();
+        if (registerGameInterface)
+        {
+            builder.RegisterModule<GameInterfaceModule>();
+        }
 
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();
 

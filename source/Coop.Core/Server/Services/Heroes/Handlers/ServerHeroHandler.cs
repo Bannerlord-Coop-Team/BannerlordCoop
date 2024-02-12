@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 namespace Coop.Core.Server.Services.Heroes.Handlers;
 
 /// <summary>
-/// TODO describe class
+/// Server side handler for hero related messages.
 /// </summary>
 internal class ServerHeroHandler : IHandler
 {

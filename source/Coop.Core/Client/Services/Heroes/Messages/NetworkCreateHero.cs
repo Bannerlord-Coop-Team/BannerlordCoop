@@ -4,6 +4,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Client.Services.Heroes.Messages;
 
+/// <summary>
+/// Command to create a new hero.
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 public record NetworkCreateHero : ICommand
 {

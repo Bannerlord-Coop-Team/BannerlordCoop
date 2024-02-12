@@ -5,7 +5,7 @@ using ProtoBuf;
 namespace Coop.Core.Client.Services.Heroes.Messages;
 
 /// <summary>
-/// Command for the server 
+/// Command to change the name of a hero.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 public record NetworkChangeHeroName : ICommand

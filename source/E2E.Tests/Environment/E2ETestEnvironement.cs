@@ -24,7 +24,7 @@ internal class E2ETestEnvironement
     public E2ETestEnvironement(ITestOutputHelper output, int numClients = 2)
     {
         GameBootStrap.Initialize();
-        IntegrationEnvironment = new TestEnvironment(numClients);
+        IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         var gameInterface = Server.Container.Resolve<IGameInterface>();
