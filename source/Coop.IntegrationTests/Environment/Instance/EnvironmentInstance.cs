@@ -8,6 +8,8 @@ using Coop.IntegrationTests.Environment.Mock;
 using GameInterface;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
+using System.Net.Sockets;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.IntegrationTests.Environment.Instance;
@@ -51,13 +53,7 @@ public abstract class EnvironmentInstance
     /// <param name="message">Received Message</param>
     public void SimulateMessage<T>(object source, T message) where T : IMessage
     {
-        ModInformation.IsServer = GetType() == typeof(ServerInstance);
-
-        var messageBroker = Resolve<TestMessageBroker>();
-
-        messageBroker.SetStaticInstance();
-
-        using (GameInterface.ContainerProvider.UseContainerThreadSafe(Container))
+        using (new StaticScope(this))
         {
             messageBroker.Publish(source, message);
         }
@@ -70,13 +66,7 @@ public abstract class EnvironmentInstance
     /// <param name="packet">Received Packet</param>
     public void SimulatePacket(NetPeer source, IPacket packet)
     {
-        ModInformation.IsServer = GetType() == typeof(ServerInstance);
-
-        var messageBroker = Resolve<TestMessageBroker>();
-
-        messageBroker.SetStaticInstance();
-
-        using (GameInterface.ContainerProvider.UseContainerThreadSafe(Container))
+        using(new StaticScope(this))
         {
             mockNetwork.ReceiveFromNetwork(source, packet);
         }
@@ -90,11 +80,10 @@ public abstract class EnvironmentInstance
     public void Call(Action callFunction)
     {
         _sem.Wait();
-        ModInformation.IsServer = GetType() == typeof(ServerInstance);
-
-        GameInterface.ContainerProvider.SetContainer(Container);
-        Resolve<TestMessageBroker>().SetStaticInstance();
-        callFunction();
+        using (new StaticScope(this))
+        {
+            callFunction();
+        }
         _sem.Release();
     }
 
@@ -122,5 +111,36 @@ public abstract class EnvironmentInstance
         objectManager.AddExisting(stringId, obj);
 
         return obj;
+    }
+
+    private class StaticScope : IDisposable
+    {
+        private readonly ILifetimeScope previousContainer;
+        private readonly bool wasServer;
+
+        public StaticScope(EnvironmentInstance instance)
+        {
+            // Save previous static values
+            wasServer = ModInformation.IsServer;
+            if(GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
+            {
+                // If no previous container is set, set it to the current container
+                previousContainer = instance.Container;
+            }
+
+            // Set new static values
+            ModInformation.IsServer = instance is ServerInstance;
+            instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
+            GameInterface.ContainerProvider.SetContainer(instance.Container);
+            
+        }
+
+        public void Dispose()
+        {
+            // Restore previous static values
+            ModInformation.IsServer = wasServer;
+            GameInterface.ContainerProvider.SetContainer(previousContainer);
+            previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
+        }
     }
 }

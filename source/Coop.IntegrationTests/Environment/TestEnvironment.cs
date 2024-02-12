@@ -33,10 +33,13 @@ public class TestEnvironment
     {
         Server = CreateServer();
 
+        var serverNetwork = Server.Container.Resolve<MockServer>();
+
         var clients = new EnvironmentInstance[numClients];
         for (int i = 0; i < numClients; i++)
         {
             clients[i] = CreateClient();
+            serverNetwork.AddPeer(clients[i].NetPeer);
         }
 
         Clients = clients;

@@ -13,13 +13,17 @@ public class MockServer : MockNetworkBase, ICoopServer
     {
     }
 
-    public IEnumerable<NetPeer> ConnectedPeers => throw new NotImplementedException();
+    public IEnumerable<NetPeer> ConnectedPeers => peers;
+    private List<NetPeer> peers = new List<NetPeer>();
 
-    public string ServerId => throw new NotImplementedException();
-
-    public void AllowJoining()
+    public void AddPeer(NetPeer peer)
     {
-        throw new NotImplementedException();
+        peers.Add(peer);
+    }
+
+    public void RemovePeer(NetPeer peer)
+    {
+        peers.Remove(peer);
     }
 
     public void Dispose()

@@ -1,4 +1,6 @@
 ﻿using Autofac;
+using Common.Messaging;
+using Common.Tests.Utils;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface;
@@ -24,6 +26,7 @@ internal class E2ETestEnvironement
         GameBootStrap.Initialize();
         IntegrationEnvironment = new TestEnvironment(numClients);
 
+        Server.Resolve<TestMessageBroker>().SetStaticInstance();
         var gameInterface = Server.Container.Resolve<IGameInterface>();
 
         gameInterface.PatchAll();

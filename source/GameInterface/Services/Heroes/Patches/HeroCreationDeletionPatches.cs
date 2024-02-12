@@ -19,104 +19,75 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Diamond;
 using TaleWorlds.MountAndBlade.GauntletUI.Widgets.Map;
 
 namespace GameInterface.Services.Heroes.Patches;
 
-[HarmonyPatch(typeof(HeroCreator), "CreateNewHero")]
+[HarmonyPatch]
 internal class HeroCreationDeletionPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroCreationDeletionPatches>();
-    private static bool Prefix() => ModInformation.IsServer;
+    private static IEnumerable<MethodBase> TargetMethods => typeof(Hero).GetConstructors(BindingFlags.NonPublic | BindingFlags.Public);
 
-    private static ConstructorInfo ctor_Hero => typeof(Hero).GetConstructors().First();
-    private static MethodInfo intercept_Method => typeof(HeroCreationDeletionPatches)
-        .GetMethod(nameof(CreateHeroIntecept), BindingFlags.NonPublic | BindingFlags.Static);
-    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+    [HarmonyPatch(typeof(Hero), MethodType.Constructor, typeof(string))]
+    private static bool Prefix(ref Hero __instance, ref string stringID)
     {
-        foreach (var instruction in instructions)
-        {
-            if (instruction.opcode == OpCodes.Newobj && instruction.operand as ConstructorInfo == ctor_Hero)
-            {
-                yield return new CodeInstruction(OpCodes.Call, intercept_Method);
-                continue;
-            }
-
-            yield return instruction;
-        }
-    }
-
-    private static Hero CreateHeroIntecept(string stringId)
-    {
-        Hero newHero;
-
         // Skip if we called it
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            if (SharedThreadData.TryGetValue(AllowedThread.CurrentThreadId, out newHero) == false)
-            {
-                Logger.Error("Data was not shared between threads");
-                newHero = ObjectHelper.SkipConstructor<Hero>();
-            }
-            SharedThreadData.Remove(AllowedThread.CurrentThreadId);
-            return newHero;
-        }
-        else
-        {
-            if (ModInformation.IsClient)
-            {
-                Logger.Fatal("Client created unregistered {name}", typeof(Hero));
-            }
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            newHero = ObjectHelper.SkipConstructor<Hero>();
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}", typeof(Hero));
+            return true;
         }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
             Logger.Error("Unable to reslove {name}", nameof(IObjectManager));
-            return newHero;
+            return true;
         }
 
-        if (objectManager.AddNewObject(newHero, out var newId) == false)
+        if (objectManager.AddNewObject(__instance, out stringID) == false)
         {
-            Logger.Error("Unable to register {name} with {objectManager}", newHero.Name, nameof(IObjectManager));
-            return newHero;
+            Logger.Error("Unable to register {name} with {objectManager}", __instance.Name, nameof(IObjectManager));
+            return true;
         }
 
-        var data = new HeroCreationData(newId);
+        var data = new HeroCreationData(stringID);
         var message = new HeroCreated(data);
 
-        MessageBroker.Instance.Publish(newHero, message);
+        MessageBroker.Instance.Publish(__instance, message);
 
-        return newHero;
+        return true;
     }
 
-    internal static Func<CharacterObject, int, Hero> CreateNewHero = typeof(HeroCreator)
-        .GetMethod("CreateNewHero", BindingFlags.Static | BindingFlags.NonPublic)
-        .BuildDelegate<Func<CharacterObject, int, Hero>>();
-
-    private static Dictionary<int, Hero> SharedThreadData = new Dictionary<int, Hero>();
-    public static Hero OverrideCreateNewHero(string heroId)
+    [HarmonyPatch(typeof(Hero), MethodType.Constructor)]
+    private static bool Prefix(ref Hero __instance)
     {
-        using(new AllowedThread())
+        throw new NotImplementedException();
+    }
+
+    private static ConstructorInfo ctor_Hero = typeof(Hero).GetConstructor(new Type[] { typeof(string) });
+    public static void OverrideCreateNewHero(string heroId)
+    {
+        Hero newHero = ObjectHelper.SkipConstructor<Hero>();
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
-            Hero newHero = ObjectHelper.SkipConstructor<Hero>();
+            Logger.Error("Unable to reslove {name}", nameof(IObjectManager));
+            return;
+        }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-            {
-                Logger.Error("Unable to reslove {name}", nameof(IObjectManager));
-                return newHero;
-            }
+        if (objectManager.AddExisting(heroId, newHero) == false)
+        {
+            Logger.Error("Unable to register {name} with {objectManager}", newHero.Name, nameof(IObjectManager));
+            return;
+        }
 
-            if (objectManager.AddExisting(heroId, newHero) == false)
-            {
-                Logger.Error("Unable to register {name} with {objectManager}", newHero.Name, nameof(IObjectManager));
-                return newHero;
-            }
-
-            SharedThreadData.Add(AllowedThread.CurrentThreadId, newHero);
-
-            return newHero;
+        using (new AllowedThread())
+        {
+            ctor_Hero.Invoke(newHero, new object[] { heroId });
         }
     }
 }

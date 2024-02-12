@@ -40,6 +40,8 @@ public class HeroCreationTests
 
             hero.BornSettlement = Settlement.GetFirst;
             serverHero = hero;
+
+            hero.SetName(new TextObject("Test Name"), new TextObject("Name"));
         });
 
         // Assert
@@ -55,43 +57,33 @@ public class HeroCreationTests
     }
 
     [Fact]
-    public void ClineSetName_DoesNothing()
+    public void ClientCreateHero_DoesNothing()
     {
+        // Arrange
         var server = TestEnvironement.Server;
         var client1 = TestEnvironement.Clients.First();
 
-        var networkId = "CoopHero_1";
-        var serverHero = TestEnvironement.Server.CreateRegisteredObject<Hero>(networkId);
-        var clientHeroes = new List<Hero>();
+        var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+        MBObjectManager.Instance.RegisterObject(characterObject);
+
+        // Act
+        Hero? clientHero = null;
+        client1.Call(() =>
+        {
+            var hero = HeroCreator.CreateSpecialHero(characterObject);
+
+            hero.BornSettlement = Settlement.GetFirst;
+            clientHero = hero;
+        });
+
+        var newHeroStringId = clientHero?.StringId;
+
+        // Assert
+        Assert.False(server.ObjectManager.TryGetObject<Hero>(newHeroStringId, out var _));
 
         foreach (var client in TestEnvironement.Clients)
         {
-            clientHeroes.Add(client.CreateRegisteredObject<Hero>(networkId));
-        }
-
-        var originalFullName = new TextObject("Test Name");
-        var originalFirstName = new TextObject("Name");
-
-        server.Call(() =>
-        {
-            serverHero.SetName(originalFullName, originalFirstName);
-        });
-
-        var differentFullName = new TextObject("Dont set me");
-        var differentFirstName = new TextObject("Dont set me");
-
-        client1.Call(() =>
-        {
-            clientHeroes.First().SetName(differentFullName, differentFirstName);
-        });
-
-        foreach (var clientHero in clientHeroes)
-        {
-            Assert.Equal(originalFullName.Value, clientHero.Name.Value);
-            Assert.Equal(originalFirstName.Value, clientHero.FirstName.Value);
-
-            Assert.NotEqual(differentFullName.Value, clientHero.Name.Value);
-            Assert.NotEqual(differentFirstName.Value, clientHero.FirstName.Value);
+            Assert.False(client.ObjectManager.TryGetObject<Hero>(newHeroStringId, out var _));
         }
     }
 }

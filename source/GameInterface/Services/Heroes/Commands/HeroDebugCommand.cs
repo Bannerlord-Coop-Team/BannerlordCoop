@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
+using Helpers;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -23,9 +24,7 @@ namespace GameInterface.Services.Heroes.Commands
         {
             StringBuilder stringBuilder = new StringBuilder();
 
-            List<Hero> heroes = Campaign.Current.CampaignObjectManager.AliveHeroes.ToList();
-
-            heroes.ForEach((hero) =>
+            Campaign.Current.CampaignObjectManager.AliveHeroes.ForEach((hero) =>
             {
                 stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", hero.StringId, hero.Name));
             });
@@ -108,7 +107,7 @@ namespace GameInterface.Services.Heroes.Commands
                 return $"Unable to get {typeof(CharacterObject)} with id: {characterObjectId}";
             }
 
-            var newHero = HeroCreationDeletionPatches.CreateNewHero(template, age);
+            HeroCreator.CreateBasicHero(template, out var newHero);
 
             return $"Created new hero with string id: {newHero.StringId}";
         }

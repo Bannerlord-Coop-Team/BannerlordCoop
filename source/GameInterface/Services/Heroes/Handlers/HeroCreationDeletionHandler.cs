@@ -41,5 +41,7 @@ internal class HeroCreationDeletionHandler : IHandler
     {
         var data = obj.What.Data;
         HeroCreationDeletionPatches.OverrideCreateNewHero(data.HeroStringId);
+
+        messageBroker.Publish(this, new HeroCreated(data));
     }
 }
