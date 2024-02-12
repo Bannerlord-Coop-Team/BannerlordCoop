@@ -31,6 +31,8 @@ public class TestEnvironment
     /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
     public TestEnvironment(int numClients = 2, bool registerGameInterface = false)
     {
+        this.registerGameInterface = registerGameInterface;
+
         Server = CreateServer();
 
         var serverNetwork = Server.Container.Resolve<MockServer>();
@@ -43,7 +45,6 @@ public class TestEnvironment
         }
 
         Clients = clients;
-        this.registerGameInterface = registerGameInterface;
     }
 
     public IEnumerable<EnvironmentInstance> Clients { get; }

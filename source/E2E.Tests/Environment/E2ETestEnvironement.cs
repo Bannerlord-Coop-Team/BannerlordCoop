@@ -13,7 +13,7 @@ namespace E2E.Tests.Environment;
 /// <summary>
 /// Testing environment for End to End testing
 /// </summary>
-internal class E2ETestEnvironement
+internal class E2ETestEnvironement : IDisposable
 {
     public TestEnvironment IntegrationEnvironment { get; }
 
@@ -21,8 +21,14 @@ internal class E2ETestEnvironement
 
     public IEnumerable<EnvironmentInstance> Clients => IntegrationEnvironment.Clients;
     public EnvironmentInstance Server => IntegrationEnvironment.Server;
+    private static readonly SemaphoreSlim _sem = new SemaphoreSlim(1);
     public E2ETestEnvironement(ITestOutputHelper output, int numClients = 2)
     {
+        if (_sem.Wait(TimeSpan.FromSeconds(5)) == false)
+        {
+            throw new TimeoutException("Failed to acquire semaphore");
+        }
+
         GameBootStrap.Initialize();
         IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
 
@@ -37,5 +43,16 @@ internal class E2ETestEnvironement
         }
 
         Output = output;
+
+    }
+
+    ~E2ETestEnvironement()
+    {
+        Dispose();
+    }
+
+    public void Dispose()
+    {
+        _sem.Release();
     }
 }

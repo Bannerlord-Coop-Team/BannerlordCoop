@@ -5,12 +5,17 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Heroes;
 
-public class HeroSetNameTests
+public class HeroSetNameTests : IDisposable
 {
     E2ETestEnvironement TestEnvironement { get; }
     public HeroSetNameTests(ITestOutputHelper output)
     {
         TestEnvironement = new E2ETestEnvironement(output);
+    }
+
+    public void Dispose()
+    {
+        //TestEnvironement.Dispose();
     }
 
     [Fact]
