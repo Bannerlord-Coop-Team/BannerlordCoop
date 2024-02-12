@@ -15,7 +15,7 @@ public class HeroSetNameTests : IDisposable
 
     public void Dispose()
     {
-        //TestEnvironement.Dispose();
+        TestEnvironement.Dispose();
     }
 
     [Fact]

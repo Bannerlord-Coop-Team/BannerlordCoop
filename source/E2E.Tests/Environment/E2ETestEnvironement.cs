@@ -24,7 +24,7 @@ internal class E2ETestEnvironement : IDisposable
     private static readonly SemaphoreSlim _sem = new SemaphoreSlim(1);
     public E2ETestEnvironement(ITestOutputHelper output, int numClients = 2)
     {
-        if (_sem.Wait(TimeSpan.FromSeconds(5)) == false)
+        if (_sem.Wait(TimeSpan.FromMinutes(5)) == false)
         {
             throw new TimeoutException("Failed to acquire semaphore");
         }
