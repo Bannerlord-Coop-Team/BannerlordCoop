@@ -78,17 +78,14 @@ public class TownAuditorDebugCommand
         auditorDatas = new List<TownAuditorData>();
         foreach (Settlement settlement in settlements)
         {
-           
-
             if (objectManager.TryGetObject(settlement.Town.StringId, out Town town) == false)
             {
                 stringBuilder.Append($"ID: '{settlement.Town.StringId}' not found");
-
             }
             else
             {
                 Fief fief = town.Settlement.SettlementComponent as Fief;
-
+                
                 TownAuditorData auditorData = new TownAuditorData(
                     townStringId: town.StringId,
                     name: town.Name.ToString(),
@@ -105,9 +102,7 @@ public class TownAuditorDebugCommand
 
                 auditorDatas.Add(auditorData);
             }
-
         }
-
         return auditorDatas;
     }
 }
