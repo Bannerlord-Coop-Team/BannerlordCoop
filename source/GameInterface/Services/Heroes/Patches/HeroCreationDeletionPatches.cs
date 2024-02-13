@@ -16,7 +16,9 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
+using System.Transactions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Diamond;
@@ -48,6 +50,12 @@ internal class HeroCreationDeletionPatches
             return true;
         }
 
+        if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) == false)
+        {
+            Logger.Error("Unable to reslove {name}", nameof(IMessageBroker));
+            return true;
+        }
+
         if (objectManager.AddNewObject(__instance, out stringID) == false)
         {
             Logger.Error("Unable to register {name} with {objectManager}", __instance.Name, nameof(IObjectManager));
@@ -57,10 +65,15 @@ internal class HeroCreationDeletionPatches
         var data = new HeroCreationData(stringID);
         var message = new HeroCreated(data);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        using(new MessageTransaction<NewHeroSynced>(messageBroker, TimeSpan.FromSeconds(5)))
+        {
+            MessageBroker.Instance.Publish(__instance, message);
+        }
 
         return true;
     }
+
+    
 
     [HarmonyPatch(typeof(Hero), MethodType.Constructor)]
     private static bool Prefix(ref Hero __instance)
