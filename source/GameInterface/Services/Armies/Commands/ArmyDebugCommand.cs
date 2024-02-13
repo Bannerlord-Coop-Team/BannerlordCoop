@@ -236,8 +236,7 @@ public class ArmyDebugCommand
         if (args.Count != 2)
         {
 
-            stringBuilder.AppendLine("Usage: coop.debug.army.mobile_party_add <ArmyId> <MobilePartyId>");
-            return stringBuilder.ToString();
+            return "Usage: coop.debug.army.mobile_party_add <ArmyId> <MobilePartyId>";
         }
 
         string armyId = args[0];
