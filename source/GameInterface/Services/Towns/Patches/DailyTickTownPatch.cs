@@ -17,11 +17,6 @@ using GameInterface.Services.Fiefs.Patches;
 [HarmonyPatch(typeof(Town), "DailyTick")]
 public static class TownDailyTickPatch
 {
-    // Get the PropertyInfo for the FoodStocks property
-    private static PropertyInfo foodStocksProperty = typeof(Fief).GetProperty("FoodStocks");
-
-    // Get the setter method for the FoodStocks property
-    private static MethodInfo foodStocksSetter = foodStocksProperty.GetSetMethod(true);
 
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instrs)
