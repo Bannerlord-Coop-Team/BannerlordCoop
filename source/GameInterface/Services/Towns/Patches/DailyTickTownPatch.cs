@@ -2,17 +2,10 @@
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using System.Reflection;
-using System;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Encounters;
-using System.Linq;
 using static HarmonyLib.Code;
-using Common.Messaging;
-using GameInterface.Services.Fiefs.Messages;
-using Newtonsoft.Json.Linq;
-using Autofac.Core.Activators;
 using GameInterface;
-using GameInterface.Services.Fiefs.Patches;
+
 
 [HarmonyPatch(typeof(Town), "DailyTick")]
 public static class TownDailyTickPatch
