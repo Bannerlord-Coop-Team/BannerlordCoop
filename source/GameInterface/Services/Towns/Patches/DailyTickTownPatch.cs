@@ -31,6 +31,14 @@ public static class TownDailyTickPatch
                 
                 continue;
             }
+            
+            if (instruction.opcode == Call.opcode && instruction.operand as MethodInfo == AccessTools.PropertySetter(typeof(Town), "Prosperity"))
+            {
+
+                yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TownDailyTickPatch), "InterceptSetProsperity"));
+
+                continue;
+            }
             yield return instruction;
         }
         
@@ -41,5 +49,11 @@ public static class TownDailyTickPatch
  
         if (ModInformation.IsClient) return;
         fief.FoodStocks = value; // The message broker will be called by the prefix patch
+    }
+
+    public static void InterceptSetProsperity(Town town, float value)
+    {
+        if (ModInformation.IsClient) return;
+        town.Prosperity = value; // The message broker will be called by the prefix patch
     }
 }
