@@ -10,8 +10,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Common.Logging;
 using Serilog;
-using Newtonsoft.Json.Linq;
-using System.Text;
 namespace GameInterface.Services.Armies.Patches;
 
 /// <summary>
@@ -91,14 +89,6 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
-                /*foreach (var mobileParty_local in army.Parties)
-                {
-                    // Apply this code if duplication found
-                    if (mobileParty_local.StringId == mobileParty.StringId)
-                    {
-                        return;
-                    }
-                }*/
                 army.AddPartyInternal(mobileParty);
 
             }
