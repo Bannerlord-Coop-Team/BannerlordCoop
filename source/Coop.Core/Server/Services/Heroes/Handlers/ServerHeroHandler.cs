@@ -77,11 +77,9 @@ internal class ServerHeroHandler : IHandler
     {
         private readonly ILogger Logger = LogManager.GetLogger<ServerHeroHandler>();
 
-        
         public Task Task { get; private set; }
 
         private readonly IMessageBroker messageBroker;
-        private readonly Action<MessagePayload<T>> targetMethod;
         private readonly NetPeer peer;
         private readonly TaskCompletionSource<bool> tcs;
 
