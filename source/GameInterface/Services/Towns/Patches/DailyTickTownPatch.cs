@@ -29,7 +29,7 @@ public static class TownDailyTickPatch
         
         foreach (var instruction in instrs)
         {
-            if (instruction.opcode == Call.opcode && instruction.operand as MethodInfo == foodStocksSetter)
+            if (instruction.opcode == Call.opcode && instruction.operand as MethodInfo == AccessTools.PropertySetter(typeof(Fief), "FoodStocks"))
             {
                 
                 yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(TownDailyTickPatch), "InterceptSetFoodStock"));
