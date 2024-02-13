@@ -99,7 +99,7 @@ public class ArmyPatches
                         return;
                     }
                 }*/
-                ArmyExtensions.AddPartyInternal(mobileParty, army);
+                army.AddPartyInternal(mobileParty);
 
             }
         });
@@ -111,7 +111,7 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
-                ArmyExtensions.RemovePartyInternal(mobileParty, army);
+                army.RemovePartyInternal(mobileParty);
             }
         });
     }

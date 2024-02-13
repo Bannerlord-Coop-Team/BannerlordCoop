@@ -259,7 +259,7 @@ public class ArmyDebugCommand
             return $"Unable to get {nameof(Army)} with {armyId}";
         }
 
-        ArmyExtensions.AddPartyInternal(mobileParty, army);
+        army.AddPartyInternal(mobileParty);
         
         stringBuilder.AppendLine($"Added {mobileParty.Name} to {armyId}");
         
@@ -304,7 +304,7 @@ public class ArmyDebugCommand
             return $"Unable to get {nameof(Army)} with {armyId}";
         }
 
-        ArmyExtensions.RemovePartyInternal(mobileParty, army);
+        army.RemovePartyInternal(mobileParty);
         
         stringBuilder.AppendLine($"Removed {mobileParty.Name} from {armyId}");
         

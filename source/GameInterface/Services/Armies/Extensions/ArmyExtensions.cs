@@ -25,11 +25,11 @@ internal static class ArmyExtensions
             .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
             .BuildDelegate<Action<Army, Army.ArmyDispersionReason>>();
 
-    internal static void AddPartyInternal(MobileParty mobileParty, Army army)
+    internal static void AddPartyInternal(this Army army, MobileParty mobileParty)
     {
         Army_OnAddPartyInternal(army,mobileParty);
     }
-    internal static void RemovePartyInternal(MobileParty mobileParty, Army army)
+    internal static void RemovePartyInternal(this Army army, MobileParty mobileParty)
     {
         Army_OnRemovePartyInternal(army, mobileParty);
     }
