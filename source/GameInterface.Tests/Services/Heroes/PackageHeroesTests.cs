@@ -1,5 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
+using Coop.Tests.Mocks;
 using GameInterface.Services.Registry;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Extensions;
@@ -24,6 +26,7 @@ namespace GameInterface.Tests.Services.Heroes
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
+            builder.RegisterType<TestNetwork>().As<INetwork>().SingleInstance();
             builder.RegisterModule<GameInterfaceModule>();
             _container = builder.Build();
         }

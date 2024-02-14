@@ -1,5 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
+using Coop.Tests.Mocks;
 using System;
 
 namespace GameInterface.Tests.Bootstrap;
@@ -17,8 +19,11 @@ internal class PatchBootstrap : IDisposable
 
     public PatchBootstrap()
     {
+        GameBootStrap.Initialize();
+
         ContainerBuilder builder = new ContainerBuilder();
         builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
+        builder.RegisterType<TestNetwork>().As<INetwork>().SingleInstance();
         builder.RegisterModule<GameInterfaceModule>();
         Container = builder.Build();
 

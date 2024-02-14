@@ -1,6 +1,8 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
+using Coop.Tests.Mocks;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
@@ -30,6 +32,7 @@ namespace GameInterface.Tests.Services.Parties
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
+            builder.RegisterType<TestNetwork>().As<INetwork>().SingleInstance();
             builder.RegisterModule<GameInterfaceModule>();
             _container = builder.Build();
 
