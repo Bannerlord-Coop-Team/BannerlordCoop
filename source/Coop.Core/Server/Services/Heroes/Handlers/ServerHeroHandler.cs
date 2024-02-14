@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Data;
@@ -21,12 +22,13 @@ internal class ServerHeroHandler : IHandler
     private readonly ILogger Logger = LogManager.GetLogger<ServerHeroHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly ICoopServer server;
+    private readonly INetworkConfiguration configuration;
 
-    public ServerHeroHandler(IMessageBroker messageBroker, ICoopServer server)
+    public ServerHeroHandler(IMessageBroker messageBroker, ICoopServer server, INetworkConfiguration configuration)
     {
         this.messageBroker = messageBroker;
         this.server = server;
-
+        this.configuration = configuration;
         messageBroker.Subscribe<HeroCreated>(Handle_HeroCreated);
         messageBroker.Subscribe<HeroNameChanged>(Handle_HeroNameChanged);
     }
@@ -46,8 +48,9 @@ internal class ServerHeroHandler : IHandler
 
     private void WaitForAllClientsToCreateHero(HeroCreationData heroCreationData)
     {
-        // TODO move timeout to config
-        var responseProtocol = new ResponseProtocol<NetworkHeroCreated>(server, messageBroker, TimeSpan.FromSeconds(5));
+        // Allow response protocol extra time to account for network latency
+        var timeout = configuration.ObjectCreationTimeout + TimeSpan.FromSeconds(1);
+        var responseProtocol = new ResponseProtocol<NetworkHeroCreated>(server, messageBroker, timeout);
 
         var triggerMessage = new NetworkCreateHero(heroCreationData);
         var notifyMessage = new NewHeroSynced();

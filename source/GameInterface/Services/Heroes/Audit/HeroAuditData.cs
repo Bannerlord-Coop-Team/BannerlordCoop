@@ -15,6 +15,6 @@ internal record HeroAuditData
     public HeroAuditData(Hero h)
     {
         StringId = h.StringId;
-        Name = h.Name.ToString();
+        Name = h.Name?.ToString();
     }
 }

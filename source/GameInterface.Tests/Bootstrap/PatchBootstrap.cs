@@ -19,8 +19,6 @@ internal class PatchBootstrap : IDisposable
 
     public PatchBootstrap()
     {
-        GameBootStrap.Initialize();
-
         ContainerBuilder builder = new ContainerBuilder();
         builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
         builder.RegisterType<TestNetwork>().As<INetwork>().SingleInstance();

@@ -19,21 +19,20 @@ namespace Coop.Core
     public class CoopartiveMultiplayerExperience
     {
         private readonly IMessageBroker messageBroker;
+        private INetworkConfiguration configuration;
         private IContainer container;
         private INetwork network;
 
-        public CoopartiveMultiplayerExperience(IMessageBroker messageBroker)
+        public CoopartiveMultiplayerExperience()
         {
-            this.messageBroker = messageBroker;
-
-            
+            // TODO use DI maybe?
+            messageBroker = MessageBroker.Instance;
+            configuration = new NetworkConfiguration();
             SurrogateCollection.AssignSurrogates();
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
             messageBroker.Subscribe<EndCoopMode>(Handle);
-
-
         }
 
         private Thread UpdateThread { get; set; }
@@ -49,10 +48,10 @@ namespace Coop.Core
         {
             CancellationTokenSource?.Cancel();
             CancellationTokenSource?.Dispose();
-            // TODO move timeout to config
-            UpdateThread?.Join(TimeSpan.FromSeconds(5));
+            UpdateThread?.Join(configuration.ObjectCreationTimeout);
         }
         
+        // TODO move to PeriodicTimer
         private void UpdateThreadMethod()
         {
             var lastTime = DateTime.Now;
@@ -62,8 +61,7 @@ namespace Coop.Core
                 TimeSpan deltaTime = now - lastTime;
                 lastTime = now;
                 network?.Update(deltaTime);
-                // TODO move to config
-                Thread.Sleep(TimeSpan.FromMilliseconds(50));
+                Thread.Sleep(configuration.NetworkPollInterval);
             }
         }
 
@@ -71,13 +69,13 @@ namespace Coop.Core
         {
             var connectMessage = obj.What;
 
-            var config = new NetworkConfiguration()
+            configuration = new NetworkConfiguration()
             {
                 Address = connectMessage.Address.ToString(),
                 Port = connectMessage.Port,
             };
 
-            StartAsClient(config);
+            StartAsClient(configuration);
         }
 
         private void Handle(MessagePayload<HostSaveGame> obj)

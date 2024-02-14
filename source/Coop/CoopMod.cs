@@ -89,7 +89,7 @@ namespace Coop
         
         public override void NoHarmonyLoad()
         {
-            Coop  = new CoopartiveMultiplayerExperience(MessageBroker.Instance);
+            Coop  = new CoopartiveMultiplayerExperience();
 
             Updateables.Add(GameLoopRunner.Instance);
 

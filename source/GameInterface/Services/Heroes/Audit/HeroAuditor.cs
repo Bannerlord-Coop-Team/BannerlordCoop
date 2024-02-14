@@ -3,10 +3,12 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -22,19 +24,21 @@ internal class HeroAuditor : IAuditor
     private readonly INetwork network;
     private readonly HeroRegistry heroRegistry;
     private readonly IObjectManager objectManager;
-
+    private readonly INetworkConfiguration configuration;
     private TaskCompletionSource<string> tcs;
 
     public HeroAuditor(
         IMessageBroker messageBroker,
         INetwork network,
         HeroRegistry heroRegistry,
-        IObjectManager objectManager)
+        IObjectManager objectManager,
+        INetworkConfiguration configuration)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.heroRegistry = heroRegistry;
         this.objectManager = objectManager;
+        this.configuration = configuration;
         messageBroker.Subscribe<RequestHeroAudit>(Handle_Request);
         messageBroker.Subscribe<HeroAuditResponse>(Handle_Response);
     }
@@ -50,7 +54,10 @@ internal class HeroAuditor : IAuditor
         var stringBuilder = new StringBuilder();
         var auditDatas = payload.What.Data;
 
+        stringBuilder.AppendLine("Server Audit Result:");
         stringBuilder.AppendLine(payload.What.ServerAuditResult);
+
+        stringBuilder.AppendLine("Client Audit Result:");
         stringBuilder.AppendLine(AuditData(auditDatas));
 
         tcs.SetResult(stringBuilder.ToString());
@@ -72,8 +79,7 @@ internal class HeroAuditor : IAuditor
             return errorMsg;
         }
 
-        // TODO move timeout to config
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var cts = new CancellationTokenSource(configuration.AuditTimeout);
         tcs = new TaskCompletionSource<string>();
 
         cts.Token.Register(() =>
@@ -100,13 +106,14 @@ internal class HeroAuditor : IAuditor
         }
     }
 
+    private IEnumerable<Hero> GetHeros()
+    {
+        return Campaign.Current.CampaignObjectManager.GetAllHeroes();
+    }
+
     private HeroAuditData[] GetAuditData()
     {
-        var aliveHeros = Campaign.Current.CampaignObjectManager.AliveHeroes;
-        var deadHeros = Campaign.Current.CampaignObjectManager.DeadOrDisabledHeroes;
-        var heroes = aliveHeros.Concat(deadHeros);
-
-        return heroRegistry.Objects.Values.Select(h => new HeroAuditData(h)).ToArray();
+        return GetHeros().Select(h => new HeroAuditData(h)).ToArray();
     }
 
     private string AuditData(HeroAuditData[] dataToAudit)
@@ -115,7 +122,15 @@ internal class HeroAuditor : IAuditor
 
         var errorCount = 0;
 
-        stringBuilder.AppendLine($"Auditing {dataToAudit.Length} objects");
+        var heroCount = GetHeros().Count();
+        stringBuilder.AppendLine($"Auditing {heroCount} objects");
+
+        if (heroCount != dataToAudit.Length)
+        {
+            Logger.Error("Hero count mismatch: {heroCount} != {dataToAudit.Length}", heroCount, dataToAudit.Length);
+            stringBuilder.AppendLine($"Hero count mismatch: {heroCount} != {dataToAudit.Length}");
+        }
+        
         foreach (var audit in dataToAudit)
         {
             if (objectManager.TryGetObject<Hero>(audit.StringId, out var _) == false)
