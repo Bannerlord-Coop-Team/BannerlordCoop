@@ -42,6 +42,8 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <ProjectReference Include="..\Common\Common.csproj" />
+    <ProjectReference Include="..\GameInterface\GameInterface.csproj" />
     <Reference Include="SandBox, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
@@ -74,15 +76,5 @@
     <Reference Include="TaleWorlds.SaveSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
     </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
-      <Name>Common</Name>
-    </ProjectReference>
-    <ProjectReference Include="..\GameInterface\GameInterface.csproj">
-      <Project>{d22cb8fa-40cc-4f47-986f-1c5a4415980b}</Project>
-      <Name>GameInterface</Name>
-    </ProjectReference>
   </ItemGroup>
   </Project>

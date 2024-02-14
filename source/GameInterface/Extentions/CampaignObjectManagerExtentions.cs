@@ -2,6 +2,8 @@
 using TaleWorlds.CampaignSystem;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
+using System.Linq;
+using GameInterface.Services.MobileParties.Extensions;
 
 namespace GameInterface.Extentions
 {
@@ -11,6 +13,11 @@ namespace GameInterface.Extentions
         {
             FieldInfo field = typeof(CampaignObjectManager).GetField("_mobileParties", BindingFlags.Instance | BindingFlags.NonPublic);
             return (List<MobileParty>)field.GetValue(campaignObjectManager);
+        }
+
+        public static List<MobileParty> GetPlayerMobileParties(this CampaignObjectManager campaignObjectManager)
+        {
+            return GetMobileParties(campaignObjectManager).Where(party => party.IsPlayerParty()).ToList();
         }
 
         public static List<Hero> GetDeadOrDisabledHeros(this CampaignObjectManager campaignObjectManager)
