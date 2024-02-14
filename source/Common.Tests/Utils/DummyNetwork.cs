@@ -4,7 +4,7 @@ using Common.PacketHandlers;
 using LiteNetLib;
 
 namespace Common.Tests.Utils;
-internal class TestNetwork : INetwork
+internal class DummyNetwork : INetwork
 {
     public INetworkConfiguration Configuration => throw new NotImplementedException();
 
