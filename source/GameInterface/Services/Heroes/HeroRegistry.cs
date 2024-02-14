@@ -18,7 +18,6 @@ internal class HeroRegistry : RegistryBase<Hero>
 
     public HeroRegistry(IRegistryCollection collection) : base(collection) { }
 
-
     public override void RegisterAll()
     {
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;

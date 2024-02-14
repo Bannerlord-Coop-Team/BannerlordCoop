@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Common.Configuration;
 using Coop.Tests.Mocks;
 using GameInterface.Services.Registry;
 using GameInterface.Tests.Bootstrap;
@@ -13,29 +14,26 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Heroes
 {
-    public class RetrieveHeroAssociationsTests
+    public class RetrieveHeroAssociationsTests : IDisposable
     {
         // Number of heroes to create for each test
         // Must be greater than 0
         private const int NUM_HEROES = 2;
 
-        readonly IContainer _container;
+        private readonly PatchBootstrap bootstrap;
+        private IContainer Container => bootstrap.Container;
         public RetrieveHeroAssociationsTests()
         {
-            GameBootStrap.Initialize();
-
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
-            builder.RegisterType<TestNetwork>().As<INetwork>().SingleInstance();
-            builder.RegisterModule<GameInterfaceModule>();
-            _container = builder.Build();
+            bootstrap = new PatchBootstrap();
         }
+
+        public void Dispose() => bootstrap.Dispose();
 
         [Fact]
         public void RegisterHeroes()
         {
             // Setup
-            var heroRegistry = _container.Resolve<HeroRegistry>();
+            var heroRegistry = Container.Resolve<HeroRegistry>();
             var heroes = new Hero[NUM_HEROES];
 
             for (int i = 0; i < NUM_HEROES; i++)
