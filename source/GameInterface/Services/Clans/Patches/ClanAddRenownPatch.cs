@@ -34,15 +34,12 @@ namespace GameInterface.Services.Clans.Patches
 
         public static void RunOriginalAddRenown(Clan clan, float amount, bool shouldNotify)
         {
-            using (AllowedInstance)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AllowedInstance.Instance = clan;
+                using (new AllowedThread());
 
-                GameLoopRunner.RunOnMainThread(() =>
-                {
-                    clan.AddRenown(amount, shouldNotify);
-                }, true);
-            }
+                clan.AddRenown(amount, shouldNotify);
+            });
         }
     }
 }

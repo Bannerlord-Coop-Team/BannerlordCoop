@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Heroes.Patches;
+﻿using GameInterface.Services.Heroes.Audit;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using Helpers;
 using System.Collections.Generic;
@@ -13,7 +14,7 @@ namespace GameInterface.Services.Heroes.Commands
 {
     public class HeroDebugCommand
     {
-        // coop.debug.clan.list
+        // coop.debug.hero.list
         /// <summary>
         /// Lists all the heroes
         /// </summary>
@@ -63,23 +64,6 @@ namespace GameInterface.Services.Heroes.Commands
             return stringBuilder.ToString();
         }
 
-        // TODO move
-        // coop.debug.characterObjects.list
-        [CommandLineArgumentFunction("list", "coop.debug.characterObjects")]
-        public static string ListCharacterObjects(List<string> args)
-        {
-            var characters = MBObjectManager.Instance.GetObjectTypeList<CharacterObject>();
-
-            var stringBuilder = new StringBuilder();
-            foreach (var character in characters)
-            {
-                stringBuilder.AppendLine(character.StringId);
-            }
-
-            return stringBuilder.ToString();
-        }
-
-
         // coop.debug.hero.createHero lord_2_7
         [CommandLineArgumentFunction("createHero", "coop.debug.hero")]
         public static string CreateNewHero(List<string> args)
@@ -110,6 +94,18 @@ namespace GameInterface.Services.Heroes.Commands
             HeroCreator.CreateBasicHero(template, out var newHero);
 
             return $"Created new hero with string id: {newHero.StringId}";
+        }
+
+        // coop.debug.hero.audit
+        [CommandLineArgumentFunction("audit", "coop.debug.hero")]
+        public static string AuditHeroes(List<string> args)
+        {
+            if (ContainerProvider.TryResolve<HeroAuditor>(out var auditor) == false)
+            {
+                return $"Unable to get {nameof(HeroAuditor)}";
+            }
+            
+            return auditor.Audit();
         }
     }
 }

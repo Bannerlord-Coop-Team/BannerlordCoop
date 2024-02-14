@@ -1,6 +1,4 @@
-﻿using Common;
-using Common.Extensions;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
@@ -10,19 +8,8 @@ using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Transactions;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Diamond;
-using TaleWorlds.MountAndBlade.GauntletUI.Widgets.Map;
 
 namespace GameInterface.Services.Heroes.Patches;
 
@@ -30,7 +17,6 @@ namespace GameInterface.Services.Heroes.Patches;
 internal class HeroCreationDeletionPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroCreationDeletionPatches>();
-    private static IEnumerable<MethodBase> TargetMethods => typeof(Hero).GetConstructors(BindingFlags.NonPublic | BindingFlags.Public);
 
     [HarmonyPatch(typeof(Hero), MethodType.Constructor, typeof(string))]
     private static bool Prefix(ref Hero __instance, ref string stringID)
@@ -44,17 +30,9 @@ internal class HeroCreationDeletionPatches
             return true;
         }
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-        {
-            Logger.Error("Unable to reslove {name}", nameof(IObjectManager));
-            return true;
-        }
-
-        if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) == false)
-        {
-            Logger.Error("Unable to reslove {name}", nameof(IMessageBroker));
-            return true;
-        }
+        // Allow method if container is not setup
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
+        if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) == false) return true;
 
         if (objectManager.AddNewObject(__instance, out stringID) == false)
         {
@@ -73,12 +51,15 @@ internal class HeroCreationDeletionPatches
         return true;
     }
 
-    
-
     [HarmonyPatch(typeof(Hero), MethodType.Constructor)]
     private static bool Prefix(ref Hero __instance)
     {
-        throw new NotImplementedException();
+        // Allow method if it was determined to be allowed
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        Logger.Error("Creation of Hero object is unmanaged");
+
+        return true;
     }
 
     private static ConstructorInfo ctor_Hero = typeof(Hero).GetConstructor(new Type[] { typeof(string) });
@@ -86,17 +67,9 @@ internal class HeroCreationDeletionPatches
     {
         Hero newHero = ObjectHelper.SkipConstructor<Hero>();
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-        {
-            Logger.Error("Unable to reslove {name}", nameof(IObjectManager));
-            return;
-        }
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return;
 
-        if (objectManager.AddExisting(heroId, newHero) == false)
-        {
-            Logger.Error("Unable to register {name} with {objectManager}", newHero.Name, nameof(IObjectManager));
-            return;
-        }
+        if (objectManager.AddExisting(heroId, newHero) == false) return;
 
         using (new AllowedThread())
         {

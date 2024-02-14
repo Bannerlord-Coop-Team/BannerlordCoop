@@ -112,7 +112,6 @@ namespace GameInterface.Services.Towns.Patches
         [HarmonyPrefix]
         private static bool TownSecurityPrefix(ref Town __instance, ref float value)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
@@ -132,7 +131,6 @@ namespace GameInterface.Services.Towns.Patches
                     town.Security = security;
                 }
             });
-
         }
 
         [HarmonyPatch(nameof(Town.LastCapturedBy), MethodType.Setter)]

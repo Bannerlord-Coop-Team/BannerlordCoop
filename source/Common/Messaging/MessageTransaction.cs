@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,9 +12,10 @@ namespace Common.Messaging;
 /// <typeparam name="T">Message to wait for</typeparam>
 public class MessageTransaction<T> : IDisposable where T : IMessage
 {
+    private readonly ILogger Logger = LogManager.GetLogger<MessageTransaction<T>>();
+
     private readonly CancellationTokenSource cts;
     private readonly TaskCompletionSource<bool> tcs;
-    private readonly Task waitTask;
     private readonly IMessageBroker messageBroker;
     private readonly Action<MessagePayload<T>> targetMethod;
 
@@ -36,24 +39,35 @@ public class MessageTransaction<T> : IDisposable where T : IMessage
 
         messageBroker.Subscribe(targetMethod);
 
-        waitTask = Task.Run(async () => await tcs.Task, cts.Token);
+        cts.Token.Register(() =>
+        {
+            tcs.TrySetCanceled();
+        });
     }
 
     public void Wait()
     {
-        waitTask.Wait();
+        try
+        {
+            tcs.Task.Wait();
+        }
+        catch(AggregateException ex)
+        {
+            // Raise exception if it's not a TaskCanceledException
+            if (ex.InnerException is TaskCanceledException == false) throw ex;
+
+            Logger.Error("Could not sync new hero on all clients");
+        }
     }
 
     private void TargetMessageProcessed(MessagePayload<T> payload)
     {
-        tcs.SetResult(true);
+        tcs.TrySetResult(true);
     }
 
     public void Dispose()
     {
         Wait();
         messageBroker.Unsubscribe(targetMethod);
-        cts.Cancel();
-        cts.Dispose();
     }
 }

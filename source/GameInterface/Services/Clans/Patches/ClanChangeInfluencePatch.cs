@@ -21,12 +21,8 @@ namespace GameInterface.Services.Clans.Patches
 
             if (amount == 0f) return false;
 
-            if (AllowedInstance.IsAllowed(clan)) return true;
-
             // If not controlled by client skip call
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
-
-            CallStackValidator.Validate(clan, AllowedInstance);
 
             MessageBroker.Instance.Publish(clan, new ClanInfluenceChanged(clan.StringId, amount));
 
@@ -35,15 +31,13 @@ namespace GameInterface.Services.Clans.Patches
 
         public static void RunOriginalChangeClanInfluence(Clan clan, float amount)
         {
-            using (AllowedInstance)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AllowedInstance.Instance = clan;
-
-                GameLoopRunner.RunOnMainThread(() =>
+                using (new AllowedThread())
                 {
                     ChangeClanInfluenceAction.Apply(clan, amount);
-                }, true);
-            }
+                }
+            });
         }
     }
 }

@@ -5,15 +5,15 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
-using static HarmonyLib.Code;
 
 namespace GameInterface.Services.Registry;
 
 internal abstract class RegistryBase<T> : IRegistry<T> where T : class
 {
     protected readonly ILogger Logger = LogManager.GetLogger<RegistryBase<T>>();
+
+    public IReadOnlyDictionary<string, T> Objects => objIds;
 
     protected readonly Dictionary<string, T> objIds = new Dictionary<string, T>();
     protected readonly ConditionalWeakTable<T, string> idObjs = new ConditionalWeakTable<T, string>();

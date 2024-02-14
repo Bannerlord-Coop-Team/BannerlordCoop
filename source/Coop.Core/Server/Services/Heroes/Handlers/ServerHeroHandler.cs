@@ -1,21 +1,15 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Services.Heroes.Messages;
-using Coop.Core.Server.Services.Template.Messages;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using Serilog;
-using Serilog.Core;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
-using TaleWorlds.Library;
 
 namespace Coop.Core.Server.Services.Heroes.Handlers;
 
@@ -52,20 +46,51 @@ internal class ServerHeroHandler : IHandler
 
     private void WaitForAllClientsToCreateHero(HeroCreationData heroCreationData)
     {
-        var targetFunctions = new List<Action<MessagePayload<NetworkHeroCreated>>>();
-        var waitingPeers = new List<WaitingPeer<NetworkHeroCreated>>();
-        foreach (var peer in server.ConnectedPeers)
+        // TODO move timeout to config
+        var responseProtocol = new ResponseProtocol<NetworkHeroCreated>(server, messageBroker, TimeSpan.FromSeconds(5));
+
+        var triggerMessage = new NetworkCreateHero(heroCreationData);
+        var notifyMessage = new NewHeroSynced();
+        responseProtocol.FireAndForget(triggerMessage, notifyMessage);
+    }
+
+    class ResponseProtocol<ResponseType> where ResponseType : IMessage
+    {
+        private readonly ICoopServer server;
+        private readonly IMessageBroker messageBroker;
+        private readonly Task[] responseTasks;
+
+        public ResponseProtocol(
+            ICoopServer server,
+            IMessageBroker messageBroker,
+            TimeSpan timeout)
         {
-            waitingPeers.Add(new WaitingPeer<NetworkHeroCreated>(messageBroker, peer, TimeSpan.FromSeconds(200)));
+            this.server = server;
+            this.messageBroker = messageBroker;
+
+            responseTasks = server.ConnectedPeers.Select(peer =>
+            {
+                var responseTask = new PeerResponse<ResponseType>(messageBroker, peer, timeout);
+
+                return responseTask.Task;
+            }).ToArray();
         }
 
-        var message = new NetworkCreateHero(heroCreationData);
-        server.SendAll(message);
+        public void FireAndForget<TriggerType, NotifyType>(TriggerType triggerMessage, NotifyType notifyMessage)
+            where TriggerType : IMessage 
+            where NotifyType : IMessage
+        {
+            // Send trigger message -> clients respond with response message -> notify message is sent internally
 
-        // Waits for all clients to create a hero
-        Task.WaitAll(waitingPeers.Select(waiter => waiter.Task).ToArray());
+            // Wait for responses from all clients (cancles after timeout)
+            Task.WhenAll(responseTasks).ContinueWith(_ =>
+            {
+                messageBroker.Publish(this, notifyMessage);
+            });
 
-        messageBroker.Publish(this, new NewHeroSynced());
+            // Send message to trigger 
+            server.SendAll(triggerMessage);
+        }
     }
 
     /// <summary>
@@ -73,9 +98,9 @@ internal class ServerHeroHandler : IHandler
     /// Timeout is supported.
     /// </summary>
     /// <typeparam name="T">Message to wait for</typeparam>
-    class WaitingPeer<T> : IDisposable where T : IMessage
+    class PeerResponse<T> : IDisposable where T : IMessage
     {
-        private readonly ILogger Logger = LogManager.GetLogger<ServerHeroHandler>();
+        private readonly ILogger Logger = LogManager.GetLogger<PeerResponse<T>>();
 
         public Task Task { get; private set; }
 
@@ -83,7 +108,7 @@ internal class ServerHeroHandler : IHandler
         private readonly NetPeer peer;
         private readonly TaskCompletionSource<bool> tcs;
 
-        public WaitingPeer(IMessageBroker messageBroker, NetPeer peer, TimeSpan timeout)
+        public PeerResponse(IMessageBroker messageBroker, NetPeer peer, TimeSpan timeout)
         {
             this.peer = peer;
             this.messageBroker = messageBroker;
@@ -94,10 +119,10 @@ internal class ServerHeroHandler : IHandler
 
             cts.Token.Register(() =>
             {
-                Logger.Error("Timeout waiting for peer {peer} to create hero", peer);
-                tcs.SetCanceled();
-
-                Dispose();
+                if (tcs.TrySetCanceled())
+                {
+                    Logger.Error("Timeout waiting for peer {peer} to create hero", peer);
+                }
             });
 
             Task = tcs.Task;

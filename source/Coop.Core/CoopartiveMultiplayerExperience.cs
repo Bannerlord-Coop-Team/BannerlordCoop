@@ -12,10 +12,11 @@ using GameInterface;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
 using System;
+using System.Threading;
 
 namespace Coop.Core
 {
-    public class CoopartiveMultiplayerExperience : IUpdateable
+    public class CoopartiveMultiplayerExperience
     {
         private readonly IMessageBroker messageBroker;
         private IContainer container;
@@ -31,6 +32,39 @@ namespace Coop.Core
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
             messageBroker.Subscribe<EndCoopMode>(Handle);
+
+
+        }
+
+        private Thread UpdateThread { get; set; }
+        private CancellationTokenSource CancellationTokenSource;
+        private void StartUpdateThread()
+        {
+            CancellationTokenSource = new CancellationTokenSource();
+            UpdateThread = new Thread(UpdateThreadMethod);
+            UpdateThread.Start();
+        }
+
+        private void StopUpdateThread()
+        {
+            CancellationTokenSource?.Cancel();
+            CancellationTokenSource?.Dispose();
+            // TODO move timeout to config
+            UpdateThread?.Join(TimeSpan.FromSeconds(5));
+        }
+        
+        private void UpdateThreadMethod()
+        {
+            var lastTime = DateTime.Now;
+            while (CancellationTokenSource.IsCancellationRequested == false)
+            {
+                var now = DateTime.Now;
+                TimeSpan deltaTime = now - lastTime;
+                lastTime = now;
+                network?.Update(deltaTime);
+                // TODO move to config
+                Thread.Sleep(TimeSpan.FromMilliseconds(50));
+            }
         }
 
         private void Handle(MessagePayload<AttemptJoin> obj)
@@ -62,14 +96,11 @@ namespace Coop.Core
 
         public int Priority => 0;
 
-        public void Update(TimeSpan deltaTime)
-        {
-            network?.Update(deltaTime);
-        }
-
         public void StartAsServer()
         {
             DestroyContainer();
+
+            StartUpdateThread();
 
             var containerProvider = new ContainerProvider();
 
@@ -95,6 +126,8 @@ namespace Coop.Core
         public void StartAsClient(INetworkConfiguration configuration = null)
         {
             DestroyContainer();
+
+            StartUpdateThread();
 
             var containerProvider = new ContainerProvider();
 
@@ -125,6 +158,7 @@ namespace Coop.Core
 
         private void DestroyContainer()
         {
+            StopUpdateThread();
             container?.Dispose();
             container = null;
         }
