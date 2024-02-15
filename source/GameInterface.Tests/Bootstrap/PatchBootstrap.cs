@@ -18,9 +18,8 @@ internal class PatchBootstrap : IDisposable
 {
     private static readonly SemaphoreSlim _sem = new SemaphoreSlim(1);
     public IContainer Container { get; }
-    private readonly IDisposable containerLock;
 
-    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
     public PatchBootstrap()
     {
@@ -39,8 +38,7 @@ internal class PatchBootstrap : IDisposable
         Container = builder.Build();
 
         // This will not allow changing of the container in ContainerProvider until containerLock is disposed
-        // Remember to dispose
-        containerLock = ContainerProvider.UseContainerThreadSafe(Container);
+        ContainerProvider.SetContainer(Container);
     }
 
     ~PatchBootstrap()
@@ -50,8 +48,6 @@ internal class PatchBootstrap : IDisposable
 
     public void Dispose()
     {
-        containerLock.Dispose();
-
         _sem.Release();
     }
 }

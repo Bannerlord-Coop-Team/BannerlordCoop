@@ -8,15 +8,15 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
-internal class NewMobilePartyHandler : IHandler
+internal class NewPlayerPartyHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<NewMobilePartyHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<NewPlayerPartyHandler>();
 
     private readonly IMobilePartyInterface partyInterface;
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
-    public NewMobilePartyHandler(
+    public NewPlayerPartyHandler(
         IMobilePartyInterface partyInterface,
         IMessageBroker messageBroker,
         IObjectManager objectManager)
@@ -40,6 +40,6 @@ internal class NewMobilePartyHandler : IHandler
             return;
         }
 
-        partyInterface.ManageNewParty(party);
+        partyInterface.ManageNewPlayerParty(party);
     }
 }

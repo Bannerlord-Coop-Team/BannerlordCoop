@@ -38,7 +38,7 @@ internal interface IMobilePartyInterface : IGameAbstraction
     /// Handles the initialization of a newly transfered party
     /// </summary>
     /// <param name="party"></param>
-    void ManageNewParty(MobileParty party);
+    void ManageNewPlayerParty(MobileParty party);
     /// <summary>
     /// Registers all parties in the game as controlled by <paramref name="ownerId"/>.
     /// </summary>
@@ -71,7 +71,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
         this.controlledEntityRegistry = controlledEntityRegistry;
     }
 
-    public void ManageNewParty(MobileParty party)
+    public void ManageNewPlayerParty(MobileParty party)
     {
         party.IsVisible = true;
 

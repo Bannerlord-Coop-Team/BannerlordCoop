@@ -2,6 +2,7 @@
 using Common.Extensions;
 using Common.Logging;
 using Common.Serialization;
+using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Clans;
@@ -74,7 +75,10 @@ internal class HeroInterface : IHeroInterface
         Hero hero = null;
 
         GameLoopRunner.RunOnMainThread(() => {
-            hero = UnpackMainHeroInternal(bytes);
+            using(new AllowedThread())
+            {
+                hero = UnpackMainHeroInternal(bytes);
+            }
         },
         blocking: true);
 

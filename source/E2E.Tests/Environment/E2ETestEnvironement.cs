@@ -3,9 +3,12 @@ using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
+using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.Tests.Bootstrap;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Environment;
@@ -37,13 +40,26 @@ internal class E2ETestEnvironement : IDisposable
 
         gameInterface.PatchAll();
 
-        foreach(var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
             Server.ObjectManager.AddExisting(settlement.StringId, settlement);
         }
 
         Output = output;
 
+        SetupMainHero();
+    }
+
+    public void SetupMainHero()
+    {
+        // Setup main hero
+        Server.Call(() =>
+        {
+            var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            MBObjectManager.Instance.RegisterObject(characterObject);
+            var mainHero = HeroCreator.CreateSpecialHero(characterObject);
+            Game.Current.PlayerTroop = characterObject;
+        });
     }
 
     ~E2ETestEnvironement()

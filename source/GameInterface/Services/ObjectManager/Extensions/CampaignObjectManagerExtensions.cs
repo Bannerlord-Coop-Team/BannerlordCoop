@@ -4,14 +4,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.ObjectManager.Extensions;
+
+/// <summary>
+/// Extension methods for <see cref="CampaignObjectManager"/>
+/// </summary>
 internal static class CampaignObjectManagerExtensions
 {
-    private static readonly Action<CampaignObjectManager, Hero> OnHeroAddedDelegate = typeof(CampaignObjectManager)
-        .GetMethod("OnHeroAdded", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildDelegate<Action<CampaignObjectManager, Hero>>();
-
     public static IEnumerable<Hero> GetAllHeroes(this CampaignObjectManager campaignObjectManager)
     {
         return campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes);
@@ -21,4 +22,17 @@ internal static class CampaignObjectManagerExtensions
     {
         OnHeroAddedDelegate(campaignObjectManager, hero);
     }
+
+    public static void AddMobileParty(this CampaignObjectManager campaignObjectManager, MobileParty party)
+    {
+        AddMobilePartyDelegate(campaignObjectManager, party);
+    }
+
+    private static readonly Action<CampaignObjectManager, Hero> OnHeroAddedDelegate = typeof(CampaignObjectManager)
+        .GetMethod("OnHeroAdded", BindingFlags.NonPublic | BindingFlags.Instance)
+        .BuildDelegate<Action<CampaignObjectManager, Hero>>();
+
+    private static readonly Action<CampaignObjectManager, MobileParty> AddMobilePartyDelegate = typeof(CampaignObjectManager)
+        .GetMethod("AddMobileParty", BindingFlags.NonPublic | BindingFlags.Instance)
+        .BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
 }
