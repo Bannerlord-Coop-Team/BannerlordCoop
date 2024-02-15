@@ -18,7 +18,7 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Parties
 {
-    public class GuidRegistrationTests
+    public class GuidRegistrationTests : IDisposable
     {
         // Number of parties to create for each test
         // Must be greater than 0
@@ -31,6 +31,7 @@ namespace GameInterface.Tests.Services.Parties
             bootstrap = new PatchBootstrap();
         }
 
+        public void Dispose() => bootstrap.Dispose();
 
         [Fact]
         public void RegisterParties()

@@ -7,25 +7,44 @@ using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.GameState.Messages;
 using System;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.MobileParties.Messages.Lifetime;
+using GameInterface.Services.MobileParties.Patches;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
     /// <summary>
     /// Listens to Bannerlord party lifecycle events and relays them to the <see cref="MessageBroker"/> system.
     /// </summary>
-    internal class MobilePartyLifecycleHandler : IHandler
+    internal class PartyLifetimeHandler : IHandler
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyLifecycleHandler>();
+        private static readonly ILogger Logger = LogManager.GetLogger<PartyLifetimeHandler>();
 
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
 
-        public MobilePartyLifecycleHandler(IMessageBroker messageBroker, IObjectManager objectManager) 
+        public PartyLifetimeHandler(IMessageBroker messageBroker, IObjectManager objectManager) 
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
 
             messageBroker.Subscribe<CampaignStateEntered>(Handle_CampaignStateEntered);
+
+            messageBroker.Subscribe<CreateParty>(Handle_CreateParty);
+            messageBroker.Subscribe<DestroyParty>(Handle_DestroyParty);
+        }
+
+        private void Handle_DestroyParty(MessagePayload<DestroyParty> payload)
+        {
+            var stringId = payload.What.Data.StringId;
+
+            PartyCreationDeletionPatches.OverrideRemoveParty(stringId);
+        }
+
+        private void Handle_CreateParty(MessagePayload<CreateParty> payload)
+        {
+            var stringId = payload.What.Data.StringId;
+
+            PartyCreationDeletionPatches.OverrideCreateNewParty(stringId);
         }
 
         public void Dispose()
@@ -46,31 +65,13 @@ namespace GameInterface.Services.MobileParties.Handlers
                 return;
             }
 
-            CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, Handle_MobilePartyCreated);
-            CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, Handle_MobilePartyDestroyed);
+            //CampaignEvents.MobilePartyCreated.AddNonSerializedListener(this, Handle_MobilePartyCreated);
+            //CampaignEvents.MobilePartyDestroyed.AddNonSerializedListener(this, Handle_MobilePartyDestroyed);
         }
 
         public void Handle_CampaignStateEntered(MessagePayload<CampaignStateEntered> obj)
         {
             RegisterPartyListeners();
-        }
-
-        public void Handle_MobilePartyCreated(MobileParty party)
-        {
-            objectManager.AddExisting(party.StringId, party);
-
-            messageBroker.Publish(this, new MobilePartyCreated(party));
-
-            Logger.Verbose("Created party from {callstack}", Environment.StackTrace);
-        }
-
-        public void Handle_MobilePartyDestroyed(MobileParty party, PartyBase partyBase)
-        {
-            objectManager.Remove(party);
-
-            messageBroker.Publish(this, new MobilePartyDestroyed(party, partyBase));
-
-            Logger.Verbose("Destroyed party from {callstack}", Environment.StackTrace);
         }
     }
 }

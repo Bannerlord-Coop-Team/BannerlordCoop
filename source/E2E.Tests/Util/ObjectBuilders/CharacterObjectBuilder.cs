@@ -44,7 +44,6 @@ internal class CharacterObjectBuilder : IObjectBuilder
 
         AccessTools.Field(typeof(MBEquipmentRoster), "_equipments").SetValue(equipmentRoster, equipment);
 
-
         AccessTools.Field(typeof(BasicCharacterObject), "_equipmentRoster").SetValue(characterObject, equipmentRoster);
         AccessTools.Property(typeof(BasicCharacterObject), "BodyPropertyRange").SetValue(characterObject, new MBBodyProperty());
 
