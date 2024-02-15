@@ -92,8 +92,11 @@ namespace GameInterface.Services.Armies.Patches
 
         private static Army ConstructArmy(Army uninitializedArmy, Kingdom kingdom, MobileParty party, ArmyTypes armyType)
         {
-            ctor_Army.Invoke(uninitializedArmy, new object[] { kingdom, party, armyType });
-            return uninitializedArmy;
+            using (new AllowedThread())
+            {
+                ctor_Army.Invoke(uninitializedArmy, new object[] { kingdom, party, armyType });
+                return uninitializedArmy;
+            }
         }
 
         //[HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnArmyCreated))]

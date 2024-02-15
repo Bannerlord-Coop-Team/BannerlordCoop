@@ -96,6 +96,7 @@ public class ArmyHandler : IHandler
             Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
             return;
         }
+        queueManager.Enqueue(obj.ArmyId, obj.MobilePartyIds);
         ArmyPatches.SetMobilePartyListInArmy(mobilePartyList, army);
 
     }
@@ -121,9 +122,10 @@ public class ArmyHandler : IHandler
             Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
             
             // We add the mobile party to the queue to be processed later when the army is created
-            queueManager.Enqueue(obj.ArmyId, obj.MobilePartyId);
+            queueManager.Enqueue(obj.ArmyId, obj.MobilePartyListId);
             return;
         }
+        queueManager.Enqueue(obj.ArmyId, obj.MobilePartyListId);
         ArmyPatches.SetMobilePartyListInArmy(mobilePartyList, army);
           
     }
