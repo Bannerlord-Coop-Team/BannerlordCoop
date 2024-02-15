@@ -92,12 +92,40 @@ namespace GameInterface.Services.Armies.Patches
 
         private static Army ConstructArmy(Army uninitializedArmy, Kingdom kingdom, MobileParty party, ArmyTypes armyType)
         {
-            using(new AllowedThread())
-            {
-                ctor_Army.Invoke(uninitializedArmy, new object[] { kingdom, party, armyType });
-                return uninitializedArmy;
-            }
+            ctor_Army.Invoke(uninitializedArmy, new object[] { kingdom, party, armyType });
+            return uninitializedArmy;
         }
+
+        //[HarmonyPatch(typeof(CampaignEventDispatcher), nameof(CampaignEventDispatcher.OnArmyCreated))]
+        //[HarmonyPrefix]
+        //private static void OnArmyCreatedPrefix(ref Army army)
+        //{
+        //    // Client functionality
+        //    if (AllowedThread.IsThisThreadAllowed())
+        //    {
+        //        ClientRegisterNewArmy(army);
+
+        //        return;
+        //    }
+
+        //    if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        //    {
+        //        Logger.Error("Unable to resolve {objectManager}", typeof(IObjectManager));
+        //        return;
+        //    }
+
+        //    objectManager.AddNewObject(army, out string newArmyId);
+
+        //    // Server functionality
+        //    var kingdom = army.Kingdom;
+        //    var leader = army.LeaderParty.LeaderHero;
+        //    var targetSettlement = army.AiBehaviorObject as Settlement;
+        //    var armyType = army.ArmyType;
+
+        //    var data = new ArmyCreationData(kingdom, leader, targetSettlement, armyType, newArmyId);
+        //    var message = new ArmyCreated(data);
+        //    MessageBroker.Instance.Publish(army, message);
+        //}
 
         private static void ClientRegisterNewArmy(Army newArmy)
         {
