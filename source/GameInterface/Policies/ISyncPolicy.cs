@@ -9,6 +9,5 @@
 /// </remarks>
 public interface ISyncPolicy
 {
-    bool AllowOriginalCalls { get; }
-    bool EnforceSyncing { get; }
+    bool AllowOriginal();
 }

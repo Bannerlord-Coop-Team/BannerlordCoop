@@ -1,13 +1,14 @@
-﻿using Common.Messaging;
+﻿using Common.Tests.Utils;
+using Coop.Core;
 using Coop.IntegrationTests.Environment.Mock;
 
 namespace Coop.IntegrationTests.Environment.Instance;
 
 /// <inheritdoc cref="EnvironmentInstance"/>
-internal class ClientInstance : EnvironmentInstance
+public class ClientInstance : EnvironmentInstance
 {
-    public ClientInstance(IMessageBroker messageBroker, MockClient client) :
-        base(messageBroker, client)
+    public ClientInstance(TestMessageBroker messageBroker, MockClient client, IContainerProvider containerProvider) :
+        base(messageBroker, client, containerProvider)
     {
     }
 }

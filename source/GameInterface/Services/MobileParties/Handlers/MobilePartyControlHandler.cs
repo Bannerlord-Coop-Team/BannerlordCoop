@@ -4,6 +4,7 @@ using GameInterface.Services.Entity.Data;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Control;
+using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -37,15 +38,15 @@ internal class MobilePartyControlHandler : IHandler
         this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Subscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
-        messageBroker.Subscribe<MobilePartyCreated>(Handle_MobilePartyCreated);
-        messageBroker.Subscribe<MobilePartyDestroyed>(Handle_MobilePartyDestroyed);
+        messageBroker.Subscribe<PartyCreated>(Handle_MobilePartyCreated);
+        messageBroker.Subscribe<PartyDestroyed>(Handle_MobilePartyDestroyed);
     }
     public void Dispose()
     {
         messageBroker.Unsubscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Unsubscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
-        messageBroker.Unsubscribe<MobilePartyCreated>(Handle_MobilePartyCreated);
-        messageBroker.Unsubscribe<MobilePartyDestroyed>(Handle_MobilePartyDestroyed);
+        messageBroker.Unsubscribe<PartyCreated>(Handle_MobilePartyCreated);
+        messageBroker.Unsubscribe<PartyDestroyed>(Handle_MobilePartyDestroyed);
     }
 
     private void Handle_RegisterAllPartiesAsControlled(MessagePayload<RegisterAllPartiesAsControlled> obj)
@@ -78,19 +79,20 @@ internal class MobilePartyControlHandler : IHandler
         }
     }
 
-    private void Handle_MobilePartyCreated(MessagePayload<MobilePartyCreated> obj)
+    private void Handle_MobilePartyCreated(MessagePayload<PartyCreated> obj)
     {
         if (!controlPartiesByDefault) return;
 
-        MobileParty party = obj.What.Party;
-        controlledEntityRegistry.RegisterAsControlled(ownerId, party.StringId);
+        var stringId = obj.What.Data.StringId;
+
+        controlledEntityRegistry.RegisterAsControlled(ownerId, stringId);
     }
 
-    private void Handle_MobilePartyDestroyed(MessagePayload<MobilePartyDestroyed> obj)
+    private void Handle_MobilePartyDestroyed(MessagePayload<PartyDestroyed> obj)
     {
-        MobileParty party = obj.What.Party;
+        var stringId = obj.What.Data.StringId;
 
-        if (!controlledEntityRegistry.TryGetControlledEntity(party.StringId, out var controlledEntity))
+        if (!controlledEntityRegistry.TryGetControlledEntity(stringId, out var controlledEntity))
             return;
 
         controlledEntityRegistry.RemoveAsControlled(controlledEntity);

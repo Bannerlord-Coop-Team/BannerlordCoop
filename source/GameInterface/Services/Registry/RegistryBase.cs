@@ -5,14 +5,15 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using TaleWorlds.CampaignSystem;
-using static HarmonyLib.Code;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Registry;
 
 internal abstract class RegistryBase<T> : IRegistry<T> where T : class
 {
     protected readonly ILogger Logger = LogManager.GetLogger<RegistryBase<T>>();
+
+    public IReadOnlyDictionary<string, T> Objects => objIds;
 
     protected readonly Dictionary<string, T> objIds = new Dictionary<string, T>();
     protected readonly ConditionalWeakTable<T, string> idObjs = new ConditionalWeakTable<T, string>();
@@ -58,6 +59,11 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
             return false;
         }
 
+        if (obj is MBObjectBase mbObject)
+        {
+            mbObject.StringId = id;
+        }
+
         objIds.Add(id, castedObj);
         idObjs.Add(castedObj, id);
 
@@ -68,12 +74,16 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
     {
         id = null;
 
-        if (Campaign.Current?.CampaignObjectManager == null) return false;
         if (TryCast(obj, out T castedObj) == false) return false;
 
         var newId = GetNewId(castedObj);
 
         if (objIds.ContainsKey(newId)) return false;
+
+        if (obj is MBObjectBase mbObject)
+        {
+            mbObject.StringId = newId;
+        }
 
         objIds.Add(newId, castedObj);
         idObjs.Add(castedObj, newId);

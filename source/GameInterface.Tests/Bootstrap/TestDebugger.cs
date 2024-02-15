@@ -53,7 +53,6 @@ namespace GameInterface.Tests.Bootstrap
 
         public void Print(string message, int logLevel = 0, Debug.DebugColor color = Debug.DebugColor.White, ulong debugFilter = 17592186044416)
         {
-            throw new NotImplementedException();
         }
 
         public void PrintError(string error, string stackTrace, ulong debugFilter = 17592186044416)

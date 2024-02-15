@@ -62,6 +62,9 @@
     <Reference Include="TaleWorlds.Localization">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.ModuleManager">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
@@ -80,6 +83,7 @@
       <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
       <Name>Common</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Coop.Tests\Coop.Tests.csproj" />
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">
       <Project>{d22cb8fa-40cc-4f47-986f-1c5a4415980b}</Project>
       <Name>GameInterface</Name>

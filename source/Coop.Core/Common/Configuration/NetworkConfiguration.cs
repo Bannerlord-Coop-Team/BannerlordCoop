@@ -25,6 +25,12 @@ public class NetworkConfiguration : INetworkConfiguration
 
     public int MaxPacketsInQueue => 1000;
 
+    public TimeSpan AuditTimeout => TimeSpan.FromSeconds(15);
+
+    public TimeSpan ObjectCreationTimeout => TimeSpan.FromSeconds(5);
+
+    public TimeSpan NetworkPollInterval => TimeSpan.FromMilliseconds(50);
+
     public void LoadFromFile()
     {
         throw new NotImplementedException();

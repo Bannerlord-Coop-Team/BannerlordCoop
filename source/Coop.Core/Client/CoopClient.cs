@@ -43,8 +43,8 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
 
-        // TODO add configuration
         netManager = new NetManager(this);
+        netManager.DisconnectTimeout = config.ConnectionTimeout.Milliseconds;
 
 #if DEBUG
         // Increase disconnect timeout to prevent disconnect during debugging

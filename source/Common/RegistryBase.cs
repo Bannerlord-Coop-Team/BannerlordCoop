@@ -8,6 +8,7 @@ namespace Common;
 /// <typeparam name="T">Object type to store</typeparam>
 public interface IRegistry<T> : IEnumerable<KeyValuePair<string, T>>, IRegistry
 {
+    IReadOnlyDictionary<string, T> Objects { get;}
 }
 
 /// <summary>

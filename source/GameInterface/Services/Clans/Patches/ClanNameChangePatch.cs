@@ -25,7 +25,7 @@ namespace GameInterface.Services.Clans.Patches
 
         static bool Prefix(ref Clan __instance, TextObject name, TextObject informalName)
         {
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && __instance != Clan.PlayerClan) return false;
 

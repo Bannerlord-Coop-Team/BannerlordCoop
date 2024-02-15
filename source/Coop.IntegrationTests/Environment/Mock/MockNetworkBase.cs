@@ -7,7 +7,7 @@ using LiteNetLib;
 
 namespace Coop.IntegrationTests.Environment.Mock;
 
-internal abstract class MockNetworkBase : INetwork
+public abstract class MockNetworkBase : INetwork
 {
     private readonly TestNetworkRouter networkOrchestrator;
     private readonly IPacketManager packetManager;

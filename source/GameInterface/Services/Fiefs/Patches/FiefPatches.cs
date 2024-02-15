@@ -21,7 +21,7 @@ namespace GameInterface.Services.Fiefs.Patches
         private static bool FiefFoodStocksPrefix(ref Fief __instance, ref float value)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
             if (__instance.FoodStocks == value) return false;
