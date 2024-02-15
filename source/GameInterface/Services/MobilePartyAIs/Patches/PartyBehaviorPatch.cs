@@ -5,8 +5,12 @@ using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
+using SandBox.View.Map;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -148,4 +152,41 @@ static class PartyBehaviorPatch
     static readonly Action<MobileParty, Vec2> TargetPosition = typeof(MobileParty)
         .GetProperty(nameof(MobileParty.TargetPosition)).GetSetMethod(true)
         .BuildDelegate<Action<MobileParty, Vec2>>();
+}
+
+
+/// <summary>
+/// Patches for the methods of MapCameraView class.
+/// </summary>
+[HarmonyPatch(typeof(MapCameraView))]
+public static class MapCameraViewPatches
+{
+    private static readonly FieldInfo LabelNumberField = typeof(Label).GetField("m_label", BindingFlags.NonPublic | BindingFlags.Instance);
+
+    /// <summary>
+    /// Replaces the instructions in the else if (mainParty.Ai.ForceAiNoPathMode) block with Nop instructions.
+    /// </summary>
+    /// <param name="instructions">instructions of the patched method.</param>
+    /// <returns></returns>
+    [HarmonyPatch(nameof(MapCameraView.OnBeforeTick))]
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> OnBeforeTickPatch(IEnumerable<CodeInstruction> instructions)
+    {
+        bool FoundGoTo = false;
+        bool FoundLabel = false;
+        foreach (CodeInstruction instruction in instructions)
+        {
+            bool isGoTo33 = (instruction.opcode == OpCodes.Brfalse_S && instruction.operand is Label && (int)LabelNumberField.GetValue(instruction.operand) == 33);
+            FoundGoTo = FoundGoTo || isGoTo33;
+            FoundLabel = FoundLabel || (instruction.opcode == OpCodes.Ldarg_0 && instruction.labels.Any(label=> (int)LabelNumberField.GetValue(label) == 33));
+            if (FoundGoTo && !FoundLabel && !isGoTo33)
+            {
+                yield return new CodeInstruction(OpCodes.Nop);
+            }
+            else
+            {
+                yield return instruction;
+            }
+        }
+    }
 }

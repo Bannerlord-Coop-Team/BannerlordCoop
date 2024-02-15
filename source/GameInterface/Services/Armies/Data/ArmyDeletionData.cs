@@ -14,11 +14,11 @@ public record ArmyDeletionData
     public ArmyDeletionData(Army army, Army.ArmyDispersionReason reason)
     {
         ArmyId = army.GetStringId();
-        Reason = (short)reason;
+        Reason = reason.ToString();
     }
 
     [ProtoMember(1)]
     public string ArmyId { get; }
     [ProtoMember(2)]
-    public short Reason { get; }
+    public string Reason { get; }
 }
