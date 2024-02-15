@@ -3,9 +3,12 @@ using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages.Lifetime;
 using Coop.Core.Server.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
-using System;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers;
+
+/// <summary>
+/// Handles the lifetime of a party on the client
+/// </summary>
 internal class ClientPartyLifetimeHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;

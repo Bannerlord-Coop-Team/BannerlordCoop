@@ -4,6 +4,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Client.Services.MobileParties.Messages.Lifetime;
 
+/// <summary>
+/// Command to create a party
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal record NetworkCreateParty : ICommand
 {

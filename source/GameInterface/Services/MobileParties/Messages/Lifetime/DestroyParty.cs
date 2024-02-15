@@ -2,7 +2,11 @@
 using GameInterface.Services.MobileParties.Data;
 
 namespace GameInterface.Services.MobileParties.Messages.Lifetime;
-public class DestroyParty : ICommand
+
+/// <summary>
+/// Command to destroy a party.
+/// </summary>
+public record DestroyParty : ICommand
 {
     public PartyDestructionData Data { get; }
 

@@ -17,8 +17,11 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
+/// <summary>
+/// Patches for lifecycle of <see cref="MobileParty"/> objects.
+/// </summary>
 [HarmonyPatch(typeof(MobileParty))]
-internal class PartyCreationDeletionPatches
+internal class PartyLifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroCreationDeletionPatches>();
 
@@ -127,13 +130,19 @@ internal class PartyCreationDeletionPatches
         {
             if (instr.opcode == OpCodes.Callvirt && instr.operand as MethodInfo == set_stringId)
             {
-                yield return new CodeInstruction(OpCodes.Pop);
-                yield return new CodeInstruction(OpCodes.Pop);
-
+                yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(PartyLifetimePatches), "SetStringIdIntercept"));
                 continue;
             }
 
             yield return instr;
+        }
+    }
+
+    private static void SetStringIdIntercept(MobileParty instance, string value)
+    {
+        if (instance.StringId == null)
+        {
+            instance.StringId = value;
         }
     }
 }

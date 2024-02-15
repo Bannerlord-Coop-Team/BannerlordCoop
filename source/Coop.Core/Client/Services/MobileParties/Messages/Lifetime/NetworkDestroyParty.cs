@@ -4,8 +4,12 @@ using GameInterface.Services.MobileParties.Data;
 using ProtoBuf;
 
 namespace Coop.Core.Client.Services.MobileParties.Messages.Lifetime;
+
+/// <summary>
+/// Command to destroy a party
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
-public class NetworkDestroyParty : ICommand
+public record NetworkDestroyParty : ICommand
 {
     [ProtoMember(1)]
     public PartyDestructionData Data { get; }

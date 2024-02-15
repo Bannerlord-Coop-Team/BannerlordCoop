@@ -1,21 +1,19 @@
-﻿using GameInterface.Services.Heroes.Audit;
-using GameInterface.Services.MobileParties.Audit;
+﻿using GameInterface.Services.MobileParties.Audit;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
-using System;
+using Helpers;
 using System.Collections.Generic;
-using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MobileParties.Commands;
 
-internal class MobilePartyDebugCommand
+internal static class MobilePartyDebugCommand
 {
     [CommandLineArgumentFunction("info", "coop.debug.mobileparty")]
     public static string Info(List<string> args)
@@ -55,8 +53,8 @@ internal class MobilePartyDebugCommand
         return stringBuilder.ToString();
     }
 
-    // coop.debug.mobileParty.createParty tbd
-    [CommandLineArgumentFunction("createParty", "coop.debug.mobileParty")]
+    // coop.debug.mobileparty.createParty lord_1_1 town_V1
+    [CommandLineArgumentFunction("createParty", "coop.debug.mobileparty")]
     public static string CreateNewParty(List<string> args)
     {
         if (ModInformation.IsClient)
@@ -64,9 +62,9 @@ internal class MobilePartyDebugCommand
             return "Create party is only to be called on the server";
         }
 
-        if (args.Count < 1 || args.Count > 2)
+        if (args.Count != 2)
         {
-            return "Usage: coop.debug.mobileParty.createParty <CharacterObject.StringId> <optional age>";
+            return "Usage: coop.debug.mobileParty.createParty <Hero.StringId> <Settlment.StringId>";
         }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
@@ -74,27 +72,58 @@ internal class MobilePartyDebugCommand
             return $"Unable to get {nameof(IObjectManager)}";
         }
 
-        var age = -1;
-        if (args.Count == 2 && int.TryParse(args[1], out age) == false)
+        string heroStringId = args[0];
+        string settlementId = args[1];
+
+        if (objectManager.TryGetObject<Hero>(heroStringId, out var hero) == false)
         {
-            return $"{args[1].GetType().Name} was not of type int";
+            return $"Unable to get {typeof(Hero)} with id: {heroStringId}";
         }
 
-        string characterObjectId = args[0];
-
-        if (objectManager.TryGetObject<CharacterObject>(characterObjectId, out var template) == false)
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
         {
-            return $"Unable to get {typeof(CharacterObject)} with id: {characterObjectId}";
+            return $"Unable to get {typeof(Settlement)} with id: {settlementId}";
         }
 
-        HeroCreator.CreateBasicHero(template, out var newHero);
+        var newParty = MobilePartyHelper.SpawnLordParty(hero, settlement);
 
-        return $"Created new hero with string id: {newHero.StringId}";
+        return $"Created new {nameof(MobileParty)} with string id: {newParty.StringId}";
+    }
+
+    // coop.debug.mobileParty.destroyParty tbd
+    [CommandLineArgumentFunction("destroyParty", "coop.debug.mobileparty")]
+    public static string DestroyParty(List<string> args)
+    {
+        if (ModInformation.IsClient)
+        {
+            return "Create party is only to be called on the server";
+        }
+
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mobileParty.destroyParty <MobileParty.StringId>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        string partyId = args[0];
+
+        if (objectManager.TryGetObject<MobileParty>(partyId, out var party) == false)
+        {
+            return $"Unable to get {typeof(MobileParty)} with id: {partyId}";
+        }
+
+        party.RemoveParty();
+
+        return $"Destroyed {nameof(MobileParty)} with string id: {partyId}";
     }
 
     // coop.debug.mobileParty.audit
-    [CommandLineArgumentFunction("audit", "coop.debug.mobileParty")]
-    public static string AuditHeroes(List<string> args)
+    [CommandLineArgumentFunction("audit", "coop.debug.mobileparty")]
+    public static string AuditParties(List<string> args)
     {
         if (ContainerProvider.TryResolve<MobilePartyAuditor>(out var auditor) == false)
         {

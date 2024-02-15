@@ -1,18 +1,14 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Client.Services.MobileParties.Messages.Lifetime;
-using Coop.Core.Server.Services.Heroes.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages.Lifetime;
-using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.Heroes.Data;
-using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Server.Services.MobileParties.Handlers;
+
+/// <summary>
+/// Handler for party lifetime messages on the server.
+/// </summary>
 internal class ServerPartyLifetimeHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;

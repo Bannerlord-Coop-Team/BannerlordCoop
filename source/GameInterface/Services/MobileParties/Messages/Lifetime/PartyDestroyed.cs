@@ -2,7 +2,11 @@
 using GameInterface.Services.MobileParties.Data;
 
 namespace GameInterface.Services.MobileParties.Messages.Lifetime;
-public class PartyDestroyed : IEvent
+
+/// <summary>
+/// Event that is published when a party is destroyed on the server.
+/// </summary>
+public record PartyDestroyed : IEvent
 {
     public PartyDestructionData Data { get; }
 
