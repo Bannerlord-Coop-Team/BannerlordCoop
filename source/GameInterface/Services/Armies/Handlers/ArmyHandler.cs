@@ -17,7 +17,7 @@ public class ArmyHandler : IHandler
 {
     
     private static readonly ILogger Logger = LogManager.GetLogger<ArmyHandler>();
-
+    private ArmyQueueManager queueManager = new ArmyQueueManager();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
@@ -108,6 +108,9 @@ public class ArmyHandler : IHandler
         if (objectManager.TryGetObject<Army>(obj.ArmyId, out var army) == false)
         {
             Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
+            
+            // We add the mobile party to the queue to be processed later when the army is created
+            queueManager.Enqueue(obj.ArmyId, obj.MobilePartyId);
             return;
         }
 
