@@ -31,7 +31,7 @@ namespace GameInterface.Services.Towns.Patches
         private static bool TownGovernorPrefix(ref Town __instance, ref Hero value)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
             if (__instance.Governor == value) return false;
@@ -59,7 +59,7 @@ namespace GameInterface.Services.Towns.Patches
         private static bool TownProsperityPrefix(ref Town __instance, ref float value)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
             if (__instance.Prosperity == value) return false;
@@ -86,7 +86,7 @@ namespace GameInterface.Services.Towns.Patches
         private static bool TownLoyaltyPrefix(ref Town __instance, ref float value)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
             if (__instance.Loyalty == value) return false;
@@ -112,8 +112,7 @@ namespace GameInterface.Services.Towns.Patches
         [HarmonyPrefix]
         private static bool TownSecurityPrefix(ref Town __instance, ref float value)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
             if (__instance.Security == value) return false;
@@ -132,7 +131,6 @@ namespace GameInterface.Services.Towns.Patches
                     town.Security = security;
                 }
             });
-
         }
 
         [HarmonyPatch(nameof(Town.LastCapturedBy), MethodType.Setter)]
@@ -140,7 +138,7 @@ namespace GameInterface.Services.Towns.Patches
         private static bool TownLastCapturedByPrefix(ref Town __instance, ref Clan value)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
             if (__instance.LastCapturedBy == value) return false;
@@ -183,7 +181,7 @@ namespace GameInterface.Services.Towns.Patches
         private static bool TownTradeTaxAccumulatedPrefix(ref Town __instance, ref int value)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
             if (__instance.TradeTaxAccumulated == value) return false;
@@ -209,7 +207,7 @@ namespace GameInterface.Services.Towns.Patches
         private static bool SetSoldItemsPrefix(Town __instance, IEnumerable<Town.SellLog> logList)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
 
@@ -259,7 +257,7 @@ namespace GameInterface.Services.Towns.Patches
         internal static void PublishTownGarrisonAutoRecruitmentIsEnabledChanged(Town town, bool garrisonAutoRecruitmentIsEnabled)
         {
             // Allow setting if original call exists
-            if (PolicyProvider.AllowOriginalCalls)
+            if (CallOriginalPolicy.IsOriginalAllowed())
             {
                 town.GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
                 return;
@@ -303,7 +301,7 @@ namespace GameInterface.Services.Towns.Patches
 
         internal static void PublishTownInRebelliousStateChanged(Town town, bool rebelliousState)
         {
-            if (PolicyProvider.AllowOriginalCalls)
+            if (CallOriginalPolicy.IsOriginalAllowed())
             {
                 town.InRebelliousState = rebelliousState;
                 return;

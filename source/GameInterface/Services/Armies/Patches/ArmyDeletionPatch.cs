@@ -27,7 +27,7 @@ internal class ArmyDeletionPatch
     public static bool DisbandArmyApplyInternal(ref Army army, Army.ArmyDispersionReason reason)
     {
         if(AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient) return false;
 
         var data = new ArmyDeletionData(army, reason);

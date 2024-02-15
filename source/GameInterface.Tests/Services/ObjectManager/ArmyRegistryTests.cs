@@ -1,6 +1,8 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
+using Coop.Tests.Mocks;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.ObjectManager;
@@ -12,29 +14,19 @@ using Xunit;
 namespace GameInterface.Tests.Services.ObjectManager;
 public class ArmyRegistryTests : IDisposable
 {
-    readonly IContainer container;
-    readonly IDisposable containerProvider;
+    private readonly PatchBootstrap bootstrap;
+    private IContainer Container => bootstrap.Container;
     public ArmyRegistryTests()
     {
-        GameBootStrap.Initialize();
-
-        ContainerBuilder builder = new ContainerBuilder();
-        builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
-        builder.RegisterModule<GameInterfaceModule>();
-        container = builder.Build();
-
-        containerProvider = ContainerProvider.UseContainerThreadSafe(container);
+        bootstrap = new PatchBootstrap();
     }
 
-    public void Dispose()
-    {
-        containerProvider.Dispose();
-    }
+    public void Dispose() => bootstrap.Dispose();
 
     [Fact]
     public void RegisterArmy()
     {
-        var objectManager = container.Resolve<IObjectManager>();
+        var objectManager = Container.Resolve<IObjectManager>();
 
         var army = ObjectHelper.SkipConstructor<Army>();
 

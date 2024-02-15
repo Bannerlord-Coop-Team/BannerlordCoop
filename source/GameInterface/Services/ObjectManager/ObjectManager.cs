@@ -6,6 +6,7 @@ using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
 using GameInterface.Services.Settlements;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -101,24 +102,30 @@ internal class ObjectManager : IObjectManager
 
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
-            return registry.RegisterExistingObject(id, obj);
+            return LogIfRegistrationError(
+                registry.RegisterExistingObject(id, obj),
+                obj);
         }
 
         /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-        return defaultObjectManager.AddExisting(id, obj);
+        return LogIfRegistrationError(
+            defaultObjectManager.AddExisting(id, obj),
+            obj);
     }
 
     public bool AddNewObject(object obj, out string newId)
     {
-        newId = null;
-
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
-            return registry.RegisterNewObject(obj, out newId);
+            return LogIfRegistrationError(
+                registry.RegisterNewObject(obj, out newId),
+                obj);
         }
 
         /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-        return defaultObjectManager.AddNewObject(obj, out newId);
+        return LogIfRegistrationError(
+            defaultObjectManager.AddNewObject(obj, out newId),
+            obj);
     }
 
     public bool Contains(object obj)
@@ -144,8 +151,6 @@ internal class ObjectManager : IObjectManager
 
     public bool TryGetId(object obj, out string id)
     {
-        id = null;
-
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
             return registry.TryGetId(obj, out id);
@@ -165,10 +170,7 @@ internal class ObjectManager : IObjectManager
 
         if (RegistryMap.TryGetValue(typeof(T), out IRegistry registry))
         {
-            if (registry.TryGetValue<T>(id, out var registeredObj) == false) return false;
-
-            obj = registeredObj as T;
-            return obj != null;
+            return registry.TryGetValue(id, out obj);
         }
 
         /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
@@ -185,6 +187,61 @@ internal class ObjectManager : IObjectManager
         /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
         return defaultObjectManager.Remove(obj);
     }
+
+    #region LogHelpers
+    private bool LogIfRegistrationError(bool result, object registerObject)
+    {
+        if (result) return true;
+
+        var objectType = registerObject.GetType();
+        var className = nameof(ObjectManager);
+        var stackTrace = Environment.StackTrace;
+
+        Logger.Error("Unable to register {name} with {objectManager}\n" +
+                     "StackTrace: {stackTrace}",
+                     objectType,
+                     className,
+                     stackTrace);
+
+        return false;
+    }
+
+    private bool LogIfGetError(bool result, object objToGet)
+    {
+        if (result) return true;
+
+        var objectType = objToGet.GetType();
+        var className = nameof(ObjectManager);
+        var stackTrace = Environment.StackTrace;
+
+        Logger.Error("Unable to get {name} with {objectManager}\n" +
+                     "StackTrace: {stackTrace}",
+                     objectType,
+                     className,
+                     stackTrace);
+
+        return false;
+    }
+
+    private bool LogIfGetError<T>(bool result, string id) where T : class
+    {
+        if (result) return true;
+
+        var objectType = typeof(T);
+        var stringId = id;
+        var className = nameof(ObjectManager);
+        var stackTrace = Environment.StackTrace;
+
+        Logger.Error("Unable to get {name} with {stringId} in {objectManager}\n" +
+                     "StackTrace: {stackTrace}",
+                     objectType,
+                     stringId,
+                     className,
+                     stackTrace);
+
+        return false;
+    }
+    #endregion
 
 
     /// <summary>

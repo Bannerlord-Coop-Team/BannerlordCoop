@@ -1,5 +1,9 @@
 ﻿using Common;
+using Common.Extensions;
+using GameInterface.Services.ObjectManager.Extensions;
+using System;
 using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -27,13 +31,33 @@ internal class HeroRegistry : RegistryBase<Hero>
         var heroes = campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes).ToArray();
         foreach (var hero in heroes)
         {
-            RegisterExistingObject(hero.StringId, hero);
+            base.RegisterExistingObject(hero.StringId, hero);
         }
     }
 
-    protected override string GetNewId(Hero party)
+    public override bool RegisterExistingObject(string id, object obj)
     {
-        party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
-        return party.StringId;
+        var result = base.RegisterExistingObject(id, obj);
+
+        AddToCampaignObjectManager(obj);
+
+        return result;
+    }
+
+    protected override string GetNewId(Hero hero)
+    {
+        hero.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
+        return hero.StringId;
+    }
+
+    private void AddToCampaignObjectManager(object obj)
+    {
+        if (TryCast(obj, out var castedObj) == false) return;
+
+        var objectManager = Campaign.Current?.CampaignObjectManager;
+
+        if (objectManager == null) return;
+
+        objectManager.OnHeroAdded(castedObj);
     }
 }

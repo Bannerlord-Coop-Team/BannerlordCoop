@@ -10,7 +10,7 @@ namespace Coop.IntegrationTests.Environment;
 /// <summary>
 /// Network message router for simulating messages across the network
 /// </summary>
-internal class TestNetworkRouter
+public class TestNetworkRouter
 {
     private ServerInstance Server;
     private List<ClientInstance> Clients = new List<ClientInstance>();
