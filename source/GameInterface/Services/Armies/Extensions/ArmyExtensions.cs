@@ -3,10 +3,12 @@ using Common.Logging;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Armies.Extensions;
 
@@ -25,9 +27,26 @@ internal static class ArmyExtensions
             .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
             .BuildDelegate<Action<Army, Army.ArmyDispersionReason>>();
 
+    internal static void SetPartyList(this Army army, List<MobileParty> mobilePartyListToUpdate)
+    {
+        //Army_OnAddPartyInternal(army,mobileParty);
+        
+        // Get the _parties field using reflection
+        FieldInfo partiesField = typeof(Army).GetField("_parties", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        
+        MBList<MobileParty> newList = new MBList<MobileParty>();
+        foreach (MobileParty party in mobilePartyListToUpdate)
+        {
+            newList.Add(party);
+        }
+        partiesField.SetValue(army, newList);
+        
+    }
+
     internal static void AddPartyInternal(this Army army, MobileParty mobileParty)
     {
-        Army_OnAddPartyInternal(army,mobileParty);
+        Army_OnAddPartyInternal(army, mobileParty);
     }
     internal static void RemovePartyInternal(this Army army, MobileParty mobileParty)
     {

@@ -4,6 +4,7 @@ using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -78,10 +79,16 @@ public class ArmyHandler : IHandler
     {
         var obj = payload.What;
 
-        if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
+        List<MobileParty> mobilePartyList = new List<MobileParty>();
+        foreach (var mobilePartyId in obj.MobilePartyIds)
         {
-            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
-            return;
+            if (objectManager.TryGetObject(mobilePartyId, out MobileParty mobileParty) == false)
+            {
+                Logger.Error("Unable to find MobileParty ({mobilePartyId})", mobilePartyId);
+                return;
+            }
+
+            mobilePartyList.Add(mobileParty);
         }
 
         if (objectManager.TryGetObject<Army>(obj.ArmyId, out var army) == false)
@@ -89,8 +96,7 @@ public class ArmyHandler : IHandler
             Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
             return;
         }
-
-        ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army);
+        ArmyPatches.SetMobilePartyListInArmy(mobilePartyList, army);
 
     }
 
@@ -98,11 +104,16 @@ public class ArmyHandler : IHandler
     private void HandleChangeAddMobilePartyInArmy(MessagePayload<AddMobilePartyInArmy> payload)
     {
         var obj = payload.What;
-
-        if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
+        List<MobileParty> mobilePartyList = new List<MobileParty>();
+        foreach(var mobilePartyId in obj.MobilePartyListId)
         {
-            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
-            return;
+            if (objectManager.TryGetObject(mobilePartyId, out MobileParty mobileParty) == false)
+            {
+                Logger.Error("Unable to find MobileParty ({mobilePartyId})", mobilePartyId);
+                return;
+            }
+
+            mobilePartyList.Add(mobileParty);
         }
 
         if (objectManager.TryGetObject<Army>(obj.ArmyId, out var army) == false)
@@ -113,8 +124,7 @@ public class ArmyHandler : IHandler
             queueManager.Enqueue(obj.ArmyId, obj.MobilePartyId);
             return;
         }
-
-        ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
+        ArmyPatches.SetMobilePartyListInArmy(mobilePartyList, army);
           
     }
     public void Dispose()

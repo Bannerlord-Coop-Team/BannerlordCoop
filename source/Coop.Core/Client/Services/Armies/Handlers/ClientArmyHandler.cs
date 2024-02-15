@@ -40,7 +40,7 @@ public class ClientArmyHandler : IHandler
     private void HandleMobilePartyInArmyAdd(MessagePayload<NetworkAddMobilePartyInArmy> payload)
     {
         var obj = payload.What;
-        var message = new AddMobilePartyInArmy(obj.MobilePartyId, obj.ArmyId);
+        var message = new AddMobilePartyInArmy(obj.MobilePartyListId, obj.ArmyId);
 
         messageBroker.Publish(this, message);
     }
@@ -48,7 +48,7 @@ public class ClientArmyHandler : IHandler
     private void HandleMobilePartyInArmyRemove(MessagePayload<NetworkRemoveMobilePartyInArmy> payload)
     {
         var obj = payload.What;
-        var message = new RemoveMobilePartyInArmy(obj.MobilePartyId, obj.ArmyId);
+        var message = new RemoveMobilePartyInArmy(obj.MobilePartyIds, obj.ArmyId);
 
         messageBroker.Publish(this, message);
     }

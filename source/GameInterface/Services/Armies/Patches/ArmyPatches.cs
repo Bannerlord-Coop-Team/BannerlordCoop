@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using Common.Logging;
 using Serilog;
+using System.Collections.Generic;
 namespace GameInterface.Services.Armies.Patches;
 
 /// <summary>
@@ -43,7 +44,19 @@ public class ArmyPatches
             return false;
         }
 
-        var message = new MobilePartyInArmyAdded(mobileParty.StringId, armyId);
+        // Get a list of the string id of the parties in the army
+        List<string> partyStringIds = new List<string>();
+        foreach (MobileParty party in __instance.Parties)
+        {
+            partyStringIds.Add(party.StringId);
+        }
+        //if the list does not contain the party, add it
+        if (!partyStringIds.Contains(mobileParty.StringId))
+        {
+            partyStringIds.Add(mobileParty.StringId);
+        }
+
+        var message = new MobilePartyInArmyAdded(partyStringIds, armyId);
         MessageBroker.Instance.Publish(mobileParty, message);
 
         return true;
@@ -73,11 +86,23 @@ public class ArmyPatches
             Logger.Error("{army} was not properly registered", mobileParty.Army.Name);
             return false;
         }
+        //Get a list of the string id of the parties in the army
+        
+        List<string> partyStringIds = new List<string>();
+        foreach (MobileParty party in __instance.Parties)
+        {
+            partyStringIds.Add(party.StringId);
+        }
 
-        var message = new MobilePartyInArmyRemoved(mobileParty.StringId, armyId);
+        if (partyStringIds.Contains(mobileParty.StringId))
+        {
+            partyStringIds.Remove(mobileParty.StringId);
+        }
+
+        var message = new MobilePartyInArmyRemoved(partyStringIds, armyId);
 
         MessageBroker.Instance.Publish(mobileParty, message);
-        
+
 
         return true;
     }
@@ -91,6 +116,17 @@ public class ArmyPatches
             {
                 army.AddPartyInternal(mobileParty);
 
+            }
+        });
+    }
+
+    public static void SetMobilePartyListInArmy(List<MobileParty> mobilePartyList, Army army)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                army.SetPartyList(mobilePartyList);
             }
         });
     }
