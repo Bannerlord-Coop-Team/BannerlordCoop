@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using System.Collections.Generic;
 
 namespace Coop.Core.Client.Services.Armies.Messages;
 
@@ -10,13 +11,13 @@ namespace Coop.Core.Client.Services.Armies.Messages;
 public record NetworkRemoveMobilePartyInArmy : ICommand
 {
     [ProtoMember(1)]
-    public string MobilePartyId { get; }
+    public List<string> MobilePartyIds { get; }
     [ProtoMember(2)]
     public string ArmyId { get; }
 
-    public NetworkRemoveMobilePartyInArmy(string mobilePartyId, string armyId)
+    public NetworkRemoveMobilePartyInArmy(List<string> mobilePartyIds, string armyId)
     {
-        MobilePartyId = mobilePartyId;
+        MobilePartyIds = mobilePartyIds;
         ArmyId = armyId;
     }
 }

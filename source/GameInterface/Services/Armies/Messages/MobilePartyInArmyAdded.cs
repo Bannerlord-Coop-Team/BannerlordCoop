@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using System.Collections.Generic;
 
 namespace GameInterface.Services.Armies.Messages;
 
@@ -7,12 +8,12 @@ namespace GameInterface.Services.Armies.Messages;
 /// </summary>
 public record MobilePartyInArmyAdded : IEvent
 {
-    public string MobilePartyId { get; }
+    public List<string> MobilePartyListId { get; }
     public string ArmyId { get; }
 
-    public MobilePartyInArmyAdded(string mobilePartyId, string armyId)
+    public MobilePartyInArmyAdded(List<string> mobilePartyListId, string armyId)
     {
-        MobilePartyId = mobilePartyId;
+        MobilePartyListId = mobilePartyListId;
         ArmyId = armyId;
     }
 

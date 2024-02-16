@@ -18,9 +18,9 @@ namespace Coop.IntegrationTests.Armies
         public void ServerMobilePartyInArmyAdded_Publishes_AllClients()
         {
             // Arrange
-            string mobilePartyId = "vassal_v2"; 
+            List<string> mobilePartyListId = new List<string> { "MobileParty_1", "MobileParty_2" };
             string armyId = "CoopArmy_1";
-            var triggerMessage = new MobilePartyInArmyAdded(mobilePartyId, armyId);
+            var triggerMessage = new MobilePartyInArmyAdded(mobilePartyListId, armyId);
 
             var server = TestEnvironment.Server;
 
@@ -32,9 +32,10 @@ namespace Coop.IntegrationTests.Armies
             Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkAddMobilePartyInArmy>());
 
             //Verify if the server is sending the same mobilePartyId and leaderMobilePartyId value
-            Assert.Equal(mobilePartyId, server.NetworkSentMessages.GetMessages<NetworkAddMobilePartyInArmy>().First().MobilePartyId);
+            Assert.Equal(mobilePartyListId, server.NetworkSentMessages.GetMessages<NetworkAddMobilePartyInArmy>().First().MobilePartyListId);
             Assert.Equal(armyId, server.NetworkSentMessages.GetMessages<NetworkAddMobilePartyInArmy>().First().ArmyId);
 
+            
 
             // Verify all clients receive a single message to their game interfaces
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
@@ -45,7 +46,7 @@ namespace Coop.IntegrationTests.Armies
             // Verify all clients receive the same mobilePartyId and leaderMobilePartyId value
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
             {
-                Assert.Equal(mobilePartyId, client.InternalMessages.GetMessages<AddMobilePartyInArmy>().First().MobilePartyId);
+                Assert.Equal(mobilePartyListId, client.InternalMessages.GetMessages<AddMobilePartyInArmy>().First().MobilePartyListId);
                 Assert.Equal(armyId, client.InternalMessages.GetMessages<AddMobilePartyInArmy>().First().ArmyId);
             }
 
