@@ -36,7 +36,7 @@ namespace GameInterface.Services.MobileParties.Patches
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
 
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             PartyBase ownerParty = TroopRoster_OwnerParty(__instance);
 
@@ -58,7 +58,7 @@ namespace GameInterface.Services.MobileParties.Patches
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
 
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             PartyBase ownerParty = TroopRoster_OwnerParty(__instance);
 

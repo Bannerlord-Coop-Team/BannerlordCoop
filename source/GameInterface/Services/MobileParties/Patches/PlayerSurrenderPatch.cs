@@ -33,7 +33,7 @@ namespace GameInterface.Services.MobileParties.Patches
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
 
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             BattleSideEnum enemySide = BattleSideEnum.None;
 

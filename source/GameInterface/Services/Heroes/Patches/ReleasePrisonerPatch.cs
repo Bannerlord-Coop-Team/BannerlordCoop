@@ -26,7 +26,7 @@ namespace GameInterface.Services.Heroes.Patches
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
 
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && prisoner != Hero.MainHero) return false;
 
