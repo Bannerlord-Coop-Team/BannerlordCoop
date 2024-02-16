@@ -9,28 +9,39 @@ using Coop.Core.Server;
 using Coop.Core.Server.Services.Save;
 using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment.Mock;
+using GameInterface;
+using GameInterface.Policies;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
+using System.Runtime.CompilerServices;
 
 namespace Coop.IntegrationTests.Environment;
 
 /// <summary>
 /// Environment used for integration testing
 /// </summary>
-internal class TestEnvironment
+public class TestEnvironment
 {
+    private Core.ContainerProvider containerProvider;
+    public IContainer Container => containerProvider.GetContainer();
+
     /// <summary>
     /// Constructor for TestEnvironment
     /// </summary>
     /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
-    public TestEnvironment(int numClients = 2)
+    public TestEnvironment(int numClients = 2, bool registerGameInterface = false)
     {
+        this.registerGameInterface = registerGameInterface;
+
         Server = CreateServer();
+
+        var serverNetwork = Server.Container.Resolve<MockServer>();
 
         var clients = new EnvironmentInstance[numClients];
         for (int i = 0; i < numClients; i++)
         {
             clients[i] = CreateClient();
+            serverNetwork.AddPeer(clients[i].NetPeer);
         }
 
         Clients = clients;
@@ -40,10 +51,11 @@ internal class TestEnvironment
     public EnvironmentInstance Server { get; }
 
     private TestNetworkRouter networkOrchestrator = new TestNetworkRouter();
+    private readonly bool registerGameInterface;
 
     private EnvironmentInstance CreateClient()
     {
-        var containerProvider = new ContainerProvider();
+        containerProvider = new Core.ContainerProvider();
 
         var builder = new ContainerBuilder();
 
@@ -67,7 +79,7 @@ internal class TestEnvironment
 
     private EnvironmentInstance CreateServer()
     {
-        var containerProvider = new ContainerProvider();
+        containerProvider = new Core.ContainerProvider();
 
         var builder = new ContainerBuilder();
 
@@ -91,14 +103,15 @@ internal class TestEnvironment
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
     {
+        if (registerGameInterface)
+        {
+            builder.RegisterModule<GameInterfaceModule>();
+        }
+
         builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();
 
-        builder.RegisterType<TestMessageBroker>().As<IMessageBroker>().SingleInstance();
-        builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
-        builder.RegisterType<MockObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
-        builder.RegisterType<CoopSaveManager>().As<ICoopSaveManager>().InstancePerLifetimeScope();
-        builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
-        builder.RegisterType<MockControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
+        builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
 
         return builder;
     }

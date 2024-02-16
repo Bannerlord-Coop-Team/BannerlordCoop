@@ -17,7 +17,7 @@ namespace GameInterface.Services.Clans.Patches
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
 
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
 

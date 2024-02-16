@@ -2,6 +2,7 @@
 using Common.Extensions;
 using Common.Logging;
 using Common.Serialization;
+using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.Clans;
@@ -42,28 +43,19 @@ internal class HeroInterface : IHeroInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
     private readonly IObjectManager objectManager;
-    private readonly IClanRegistry clanRegistry;
-    private readonly IMobilePartyRegistry mobilePartyRegistry;
     private readonly IBinaryPackageFactory binaryPackageFactory;
-    private readonly IHeroRegistry heroRegistry;
     private readonly IControlledEntityRegistry entityRegistry;
 
     private static PropertyInfo Campaign_PlayerClan => typeof(Campaign).GetProperty("PlayerDefaultFaction", BindingFlags.Instance | BindingFlags.NonPublic);
 
 
     public HeroInterface(
-        IClanRegistry clanRegistry,
-        IMobilePartyRegistry mobilePartyRegistry,
         IBinaryPackageFactory binaryPackageFactory,
-        IHeroRegistry heroRegistry,
         IControlledEntityRegistry entityRegistry,
         IObjectManager objectManager)
     {
         this.objectManager = objectManager;
-        this.clanRegistry = clanRegistry;
-        this.mobilePartyRegistry = mobilePartyRegistry;
         this.binaryPackageFactory = binaryPackageFactory;
-        this.heroRegistry = heroRegistry;
         this.entityRegistry = entityRegistry;
         this.objectManager = objectManager;
     }
@@ -85,7 +77,10 @@ internal class HeroInterface : IHeroInterface
         Hero hero = null;
 
         GameLoopRunner.RunOnMainThread(() => {
-            hero = UnpackMainHeroInternal(bytes);
+            using(new AllowedThread())
+            {
+                hero = UnpackMainHeroInternal(bytes);
+            }
         },
         blocking: true);
 

@@ -38,7 +38,7 @@ internal interface IMobilePartyInterface : IGameAbstraction
     /// Handles the initialization of a newly transfered party
     /// </summary>
     /// <param name="party"></param>
-    void ManageNewParty(MobileParty party);
+    void ManageNewPlayerParty(MobileParty party);
     /// <summary>
     /// Registers all parties in the game as controlled by <paramref name="ownerId"/>.
     /// </summary>
@@ -57,12 +57,12 @@ internal class MobilePartyInterface : IMobilePartyInterface
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyInterface>();
     private static readonly MethodInfo PartyBase_OnFinishLoadState = typeof(PartyBase).GetMethod("OnFinishLoadState", BindingFlags.NonPublic | BindingFlags.Instance);
 
-    private readonly IMobilePartyRegistry partyRegistry;
+    private readonly MobilePartyRegistry partyRegistry;
     private readonly IObjectManager objectManager;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
 
     public MobilePartyInterface(
-        IMobilePartyRegistry partyRegistry,
+        MobilePartyRegistry partyRegistry,
         IObjectManager objectManager,
         IControlledEntityRegistry controlledEntityRegistry)
     {
@@ -71,7 +71,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
         this.controlledEntityRegistry = controlledEntityRegistry;
     }
 
-    public void ManageNewParty(MobileParty party)
+    public void ManageNewPlayerParty(MobileParty party)
     {
         party.IsVisible = true;
 

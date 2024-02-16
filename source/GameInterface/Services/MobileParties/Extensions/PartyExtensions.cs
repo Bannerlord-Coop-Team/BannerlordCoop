@@ -45,12 +45,6 @@ internal static class PartyExtensions
     public static bool IsPlayerParty(this MobileParty party)
     {
         // Allow method if container or registry cannot be resolved
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-        {
-            Logger.Error("Unable to resolve {name}", nameof(IObjectManager));
-            return false;
-
-        }
         if (ContainerProvider.TryResolve<IPlayerRegistry>(out var playerRegistry) == false)
         {
             Logger.Error("Unable to resolve {name}", nameof(IPlayerRegistry));

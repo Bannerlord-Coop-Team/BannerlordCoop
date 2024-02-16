@@ -1,5 +1,9 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
+using Common.Util;
+using Coop.Core.Common.Configuration;
+using Coop.Tests.Mocks;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
@@ -14,58 +18,48 @@ using Xunit;
 
 namespace GameInterface.Tests.Services.Parties
 {
-    public class GuidRegistrationTests
+    public class GuidRegistrationTests : IDisposable
     {
         // Number of parties to create for each test
         // Must be greater than 0
         private const int NUM_PARTIES = 2;
 
-        readonly IContainer _container;
-        readonly IMessageBroker _messageBroker;
-        readonly Harmony harmony;
+        private readonly PatchBootstrap bootstrap;
+        private IContainer Container => bootstrap.Container;
         public GuidRegistrationTests()
         {
-            GameBootStrap.Initialize();
-
-            ContainerBuilder builder = new ContainerBuilder();
-            builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
-            builder.RegisterModule<GameInterfaceModule>();
-            _container = builder.Build();
-
-            _messageBroker = _container.Resolve<IMessageBroker>();
-
-            harmony = new Harmony("com.Coop.GameInterface");
-            harmony.PatchAll(typeof(GameInterface).Assembly);
+            bootstrap = new PatchBootstrap();
         }
 
+        public void Dispose() => bootstrap.Dispose();
 
         [Fact]
         public void RegisterParties()
         {
             // Setup
-            var objectManager = _container.Resolve<IObjectManager>();
+            var objectManager = Container.Resolve<IObjectManager>();
             var parties = new MobileParty[NUM_PARTIES];
 
             for (int i = 0; i < NUM_PARTIES; i++)
             {
-                var party = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
+                var party = ObjectHelper.SkipConstructor<MobileParty>();
                 party.StringId = $"Party {i}";
 
-                objectManager.AddExisting(party.StringId, party);
-
                 parties[i] = party;
+
+                Campaign.Current.CampaignObjectManager.AddMobileParty(party);
             }
 
-            var partyRegistry = _container.Resolve<IMobilePartyRegistry>();
+            var partyRegistry = Container.Resolve<MobilePartyRegistry>();
 
             // Execution
-            partyRegistry.RegisterAllParties();
+            partyRegistry.RegisterAll();
 
             // Verification
             for (int i = 0; i < NUM_PARTIES; i++)
             {
                 var party = parties[i];
-                Assert.True(partyRegistry.TryGetValue(party, out string _));
+                Assert.True(partyRegistry.TryGetId(party, out string _));
             }
         }
     }

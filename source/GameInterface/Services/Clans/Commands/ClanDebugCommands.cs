@@ -1,19 +1,47 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands
 {
-    internal class ClanDebugCommands
+    public class ClanDebugCommands
     {
-        [CommandLineArgumentFunction("mapevents", "coop.debug")]
+        // coop.debug.clan.list
+        /// <summary>
+        /// Lists all the clans
+        /// </summary>
+        /// <param name="args">actually none are being used..</param>
+        /// <returns>strings of all the clans</returns>
+        [CommandLineArgumentFunction("list", "coop.debug.clan")]
+        public static string ListClans(List<string> args)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+
+            List<Clan> clans = Campaign.Current.CampaignObjectManager.Clans.ToList();
+
+            clans.ForEach((clan) =>
+            {
+                stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", clan.StringId, clan.Name));
+            });
+
+            return stringBuilder.ToString();
+        }
+
+
+        [CommandLineArgumentFunction("change_clan_leader", "coop.debug")]
         public static string ChangeClanLeader(List<string> strings)
         {
-            List<MobileParty> parties = MobileParty.AllBanditParties;
+            Clan clan = Clan.All[int.Parse(strings[0])];
 
-            return "command ran";
+            Hero newLeader = clan.Heroes[int.Parse(strings[1])];
+
+            ChangeClanLeaderAction.ApplyWithSelectedNewLeader(clan, newLeader);
+
+            return clan.Name.ToString() + " has a new leader: " + newLeader.Name.ToString();
         }
 
         [CommandLineArgumentFunction("change_clan_kingdom", "coop.debug")]

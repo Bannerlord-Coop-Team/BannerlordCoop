@@ -13,13 +13,13 @@ namespace GameInterface.Services.Clans.Patches
     [HarmonyPatch(typeof(ChangeClanInfluenceAction), "ApplyInternal")]
     public class ClanChangeInfluencePatch
     {
+        private static readonly AllowedInstance<Clan> AllowedInstance = new AllowedInstance<Clan>();
+
         static bool Prefix(Clan clan, float amount)
         {
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (amount == 0f) return false;
-
-            if (AllowedThread.IsThisThreadAllowed()) return true;
 
             // If not controlled by client skip call
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
@@ -31,7 +31,6 @@ namespace GameInterface.Services.Clans.Patches
 
         public static void RunOriginalChangeClanInfluence(Clan clan, float amount)
         {
-
             GameLoopRunner.RunOnMainThread(() =>
             {
                 using (new AllowedThread())

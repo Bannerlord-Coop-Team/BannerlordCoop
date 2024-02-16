@@ -43,6 +43,6 @@ public class TemplateHandler : IHandler
     {
         // TODO remove explanitory comments
         // Run unpatched version of the intercepted method
-        TemplatePatch.OverrideTemplateFn();
+        TemplateServerControlledPatch.OverrideTemplateFn();
     }
 }

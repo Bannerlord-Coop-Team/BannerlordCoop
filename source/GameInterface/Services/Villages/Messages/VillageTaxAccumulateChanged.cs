@@ -1,13 +1,12 @@
-﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 
 namespace GameInterface.Services.Villages.Messages;
 
 /// <summary>
 /// When Village Tax has changed
 /// </summary>
+[BatchLogMessage]
 public record VillageTaxAccumulateChanged : ICommand
 {
     public string VilageId { get; }

@@ -216,4 +216,12 @@
     <PackageReference Include="Bannerlord.Lib.Harmony" Version="2.2.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Services\Kingdoms\Messages\" />
+  </ItemGroup>
+    <ItemGroup>
+	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+		    <_Parameter1>E2E.Tests</_Parameter1>
+	    </AssemblyAttribute>
+    </ItemGroup>
 </Project>

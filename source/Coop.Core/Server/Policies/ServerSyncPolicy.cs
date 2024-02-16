@@ -9,7 +9,5 @@ namespace Coop.Core.Server.Policies;
 /// <inheritdoc cref="ISyncPolicy"/>
 internal class ServerSyncPolicy : ISyncPolicy
 {
-    public bool AllowOriginalCalls => false;
-
-    public bool EnforceSyncing => !AllowOriginalCalls;
+    public bool AllowOriginal() => false;
 }

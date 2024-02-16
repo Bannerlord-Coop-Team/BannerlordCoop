@@ -33,7 +33,7 @@ internal class VillagePatches
     private static bool VillageStatePrefix(ref Village __instance, ref VillageStates value)
     {
         if(AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
         if (get_villageState(__instance) == value) return false;
@@ -69,7 +69,7 @@ internal class VillagePatches
     private static bool HearthPrefix(ref Village __instance, ref float value)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
@@ -104,7 +104,7 @@ internal class VillagePatches
     private static bool TradeBoundPrefix(ref Village __instance, ref Settlement value)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
@@ -135,7 +135,7 @@ internal class VillagePatches
     private static bool TradeTaxAccumulatedPrefix(ref Village __instance, ref int value)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
@@ -163,7 +163,7 @@ internal class VillagePatches
     private static bool LastDemandSatisifiedTimePrefix(ref Village __instance, ref float value)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 

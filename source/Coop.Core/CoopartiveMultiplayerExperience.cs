@@ -12,20 +12,22 @@ using GameInterface;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
 using System;
+using System.Threading;
 
 namespace Coop.Core
 {
-    public class CoopartiveMultiplayerExperience : IUpdateable
+    public class CoopartiveMultiplayerExperience
     {
         private readonly IMessageBroker messageBroker;
+        private INetworkConfiguration configuration;
         private IContainer container;
         private INetwork network;
 
-        public CoopartiveMultiplayerExperience(IMessageBroker messageBroker)
+        public CoopartiveMultiplayerExperience()
         {
-            this.messageBroker = messageBroker;
-
-            
+            // TODO use DI maybe?
+            messageBroker = MessageBroker.Instance;
+            configuration = new NetworkConfiguration();
             SurrogateCollection.AssignSurrogates();
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
@@ -33,17 +35,47 @@ namespace Coop.Core
             messageBroker.Subscribe<EndCoopMode>(Handle);
         }
 
+        private Thread UpdateThread { get; set; }
+        private CancellationTokenSource CancellationTokenSource;
+        private void StartUpdateThread()
+        {
+            CancellationTokenSource = new CancellationTokenSource();
+            UpdateThread = new Thread(UpdateThreadMethod);
+            UpdateThread.Start();
+        }
+
+        private void StopUpdateThread()
+        {
+            CancellationTokenSource?.Cancel();
+            CancellationTokenSource?.Dispose();
+            UpdateThread?.Join(configuration.ObjectCreationTimeout);
+        }
+        
+        // TODO move to PeriodicTimer
+        private void UpdateThreadMethod()
+        {
+            var lastTime = DateTime.Now;
+            while (CancellationTokenSource.IsCancellationRequested == false)
+            {
+                var now = DateTime.Now;
+                TimeSpan deltaTime = now - lastTime;
+                lastTime = now;
+                network?.Update(deltaTime);
+                Thread.Sleep(configuration.NetworkPollInterval);
+            }
+        }
+
         private void Handle(MessagePayload<AttemptJoin> obj)
         {
             var connectMessage = obj.What;
 
-            var config = new NetworkConfiguration()
+            configuration = new NetworkConfiguration()
             {
                 Address = connectMessage.Address.ToString(),
                 Port = connectMessage.Port,
             };
 
-            StartAsClient(config);
+            StartAsClient(configuration);
         }
 
         private void Handle(MessagePayload<HostSaveGame> obj)
@@ -62,14 +94,11 @@ namespace Coop.Core
 
         public int Priority => 0;
 
-        public void Update(TimeSpan deltaTime)
-        {
-            network?.Update(deltaTime);
-        }
-
         public void StartAsServer()
         {
             DestroyContainer();
+
+            StartUpdateThread();
 
             var containerProvider = new ContainerProvider();
 
@@ -95,6 +124,8 @@ namespace Coop.Core
         public void StartAsClient(INetworkConfiguration configuration = null)
         {
             DestroyContainer();
+
+            StartUpdateThread();
 
             var containerProvider = new ContainerProvider();
 
@@ -125,6 +156,7 @@ namespace Coop.Core
 
         private void DestroyContainer()
         {
+            StopUpdateThread();
             container?.Dispose();
             container = null;
         }
