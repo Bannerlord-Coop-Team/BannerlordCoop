@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Client.Services.Armies.Messages;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Armies.Messages.Lifetime;
 
 
 namespace Coop.Core.Server.Services.Armies.Handlers;
@@ -22,25 +23,14 @@ public class ServerArmyHandler : IHandler
         // This handles an internal message
         messageBroker.Subscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
         messageBroker.Subscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
-        messageBroker.Subscribe<ArmyCreated>(HandleArmyCreated);
-        messageBroker.Subscribe<ArmyDestroyed>(HandleArmyDisband);
     }
 
-    private void HandleArmyCreated(MessagePayload<ArmyCreated> obj)
+    public void Dispose()
     {
-        // Broadcast to all the clients that the state was changed
-        var message = new NetworkCreateArmy(obj.What.Data);
-
-        network.SendAll(message);
+        messageBroker.Unsubscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
+        messageBroker.Unsubscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
     }
 
-    private void HandleArmyDisband(MessagePayload<ArmyDestroyed> obj)
-    {
-        // Broadcast to all the clients that the state was changed
-        var message = new NetworkDestroyArmy(obj.What.Data);
-        
-        network.SendAll(message);
-    }
     private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
     {
         MobilePartyInArmyAdded mobilePartyInArmyAdded = obj.What;
@@ -59,14 +49,5 @@ public class ServerArmyHandler : IHandler
         var message = new NetworkRemoveMobilePartyInArmy(mobilePartyInArmyRemoved.MobilePartyId, mobilePartyInArmyRemoved.ArmyId);
         
         network.SendAll(message);
-    }
-
-   
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
-        messageBroker.Unsubscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
-        messageBroker.Unsubscribe<ArmyCreated>(HandleArmyCreated);
-        messageBroker.Unsubscribe<ArmyDestroyed>(HandleArmyDisband);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Patches;
@@ -23,7 +24,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyLifetimePatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<HeroCreationDeletionPatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<HeroLifetimePatches>();
 
     [HarmonyPatch(typeof(MobileParty), MethodType.Constructor)]
     private static bool Prefix(ref MobileParty __instance)
@@ -43,13 +44,14 @@ internal class PartyLifetimePatches
         // Allow method if container is not setup
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
         if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) == false) return true;
+        if (ContainerProvider.TryResolve<INetworkConfiguration>(out var configuration) == false) return true;
 
         if (objectManager.AddNewObject(__instance, out var stringID) == false) return true;
 
         var data = new PartyCreationData(__instance);
         var message = new PartyCreated(data);
 
-        using (new MessageTransaction<NewPartySynced>(messageBroker, TimeSpan.FromSeconds(5)))
+        using (new MessageTransaction<NewPartySynced>(messageBroker, configuration.ObjectCreationTimeout))
         {
             MessageBroker.Instance.Publish(__instance, message);
         }

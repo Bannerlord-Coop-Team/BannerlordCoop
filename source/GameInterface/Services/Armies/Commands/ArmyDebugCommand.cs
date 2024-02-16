@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
@@ -102,7 +103,7 @@ public class ArmyDebugCommand
 
         MessageBroker.Instance.Subscribe<ArmyCreated>((msg) =>
         {
-            tcs.SetResult(msg.What.Data.ArmyStringId);
+            tcs.SetResult(msg.What.Data.StringId);
         });
 
         kingdom.CreateArmy(armyLeader, targetSettlment, armyType);

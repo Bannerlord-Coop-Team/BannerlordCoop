@@ -3,6 +3,7 @@ using Common.Messaging;
 using Coop.Mod.Extentions;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Messages.Lifetime;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -40,7 +41,7 @@ internal class HeroCreationDeletionHandler : IHandler
     private void Handle(MessagePayload<CreateHero> obj)
     {
         var data = obj.What.Data;
-        HeroCreationDeletionPatches.OverrideCreateNewHero(data.HeroStringId);
+        HeroLifetimePatches.OverrideCreateNewHero(data.HeroStringId);
 
         messageBroker.Publish(this, new HeroCreated(data));
     }

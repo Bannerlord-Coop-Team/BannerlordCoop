@@ -1,17 +1,17 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Armies.Data;
 
-namespace GameInterface.Services.Armies.Messages;
+namespace GameInterface.Services.Armies.Messages.Lifetime;
 
 /// <summary>
-/// Event for when an Army is created
+/// Event that is published when a party is created on the server.
 /// </summary>
 public record ArmyCreated : IEvent
 {
     public ArmyCreationData Data { get; }
 
-    public ArmyCreated(ArmyCreationData armyCreationData)
+    public ArmyCreated(ArmyCreationData data)
     {
-        Data = armyCreationData;
+        Data = data;
     }
 }

@@ -17,7 +17,6 @@ public class ArmyHandler : IHandler
 {
     
     private static readonly ILogger Logger = LogManager.GetLogger<ArmyHandler>();
-    private ArmyQueueManager queueManager = new ArmyQueueManager();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
@@ -28,49 +27,6 @@ public class ArmyHandler : IHandler
 
         messageBroker.Subscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
         messageBroker.Subscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
-        messageBroker.Subscribe<DestroyArmy>(HandleChangeDisbandArmy);
-        messageBroker.Subscribe<CreateArmy>(HandleChangeCreateArmy);
-    }
-
-
-    private void HandleChangeDisbandArmy(MessagePayload<DestroyArmy> payload)
-    {
-        var data = payload.What.Data;
-
-        if (objectManager.TryGetObject<Army>(data.ArmyId, out var army) == false)
-        {
-            Logger.Error("Unable to find Army ({armyId})", data.ArmyId);
-            return;
-        }
-        Army.ArmyDispersionReason armyReason = (Army.ArmyDispersionReason)data.Reason;
-        ArmyDeletionPatch.DisbandArmy(army, armyReason);
-    }
-
-    private void HandleChangeCreateArmy(MessagePayload<CreateArmy> payload)
-    {
-        var data = payload.What.Data;
-
-        if (objectManager.TryGetObject<Kingdom>(data.KingdomStringId, out var kingdom) == false)
-        {
-            Logger.Error("Unable to find Kingdom ({kingdomId})", data.KingdomStringId);
-            return;
-        }
-
-        if (objectManager.TryGetObject<Hero>(data.LeaderHeroStringId, out var armyLeader) == false)
-        {
-            Logger.Error("Unable to find MobileParty ({armyLeaderId})", data.LeaderHeroStringId);
-            return;
-        }
-
-        if (objectManager.TryGetObject<Settlement>(data.TargetSettlementStringId, out var targetSettlement) == false)
-        {
-            Logger.Error("Unable to find Settlement ({targetSettlement})", data.TargetSettlementStringId);
-            return;
-        }
-
-        Army.ArmyTypes armyType = (Army.ArmyTypes)data.SelectedArmyType;
-
-        ArmyCreationPatch.CreateArmyInKingdom(kingdom, armyLeader, targetSettlement, armyType, data.ArmyStringId);
     }
 
 
@@ -108,9 +64,6 @@ public class ArmyHandler : IHandler
         if (objectManager.TryGetObject<Army>(obj.ArmyId, out var army) == false)
         {
             Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
-            
-            // We add the mobile party to the queue to be processed later when the army is created
-            queueManager.Enqueue(obj.ArmyId, obj.MobilePartyId);
             return;
         }
 
@@ -121,7 +74,5 @@ public class ArmyHandler : IHandler
     {
         messageBroker.Unsubscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
         messageBroker.Unsubscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
-        messageBroker.Unsubscribe<DestroyArmy>(HandleChangeDisbandArmy);
-        messageBroker.Unsubscribe<CreateArmy>(HandleChangeCreateArmy);
     }
 }
