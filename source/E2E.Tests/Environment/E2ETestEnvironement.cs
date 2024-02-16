@@ -19,8 +19,6 @@ namespace E2E.Tests.Environment;
 /// </summary>
 internal class E2ETestEnvironement : IDisposable
 {
-    private static readonly SemaphoreSlim _sem = new SemaphoreSlim(1);
-
     public TestEnvironment IntegrationEnvironment { get; }
 
     public ITestOutputHelper Output { get; }
@@ -30,11 +28,6 @@ internal class E2ETestEnvironement : IDisposable
     
     public E2ETestEnvironement(ITestOutputHelper output, int numClients = 2)
     {
-        if (_sem.Wait(TimeSpan.FromMinutes(5)) == false)
-        {
-            throw new TimeoutException("Failed to acquire semaphore");
-        }
-
         GameBootStrap.Initialize();
         IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
 
@@ -66,13 +59,7 @@ internal class E2ETestEnvironement : IDisposable
         });
     }
 
-    ~E2ETestEnvironement()
-    {
-        Dispose();
-    }
-
     public void Dispose()
     {
-        _sem.Release();
     }
 }

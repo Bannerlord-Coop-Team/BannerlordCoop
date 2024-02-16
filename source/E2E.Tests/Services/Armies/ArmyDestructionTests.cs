@@ -40,6 +40,17 @@ public class ArmyDestructionTests : IDisposable
 
         SetupKingdom(kingdom, hero, settlement);
 
+        server.ObjectManager.AddNewObject(kingdom, out string kingdomStringId);
+        server.ObjectManager.AddNewObject(hero, out string heroStringId);
+        server.ObjectManager.AddNewObject(hero.PartyBelongedTo, out string partyStringId);
+
+        foreach (var client in TestEnvironement.Clients)
+        {
+            client.ObjectManager.AddExisting(kingdomStringId, kingdom);
+            client.ObjectManager.AddExisting(heroStringId, hero);
+            client.ObjectManager.AddExisting(partyStringId, hero.PartyBelongedTo);
+        }
+
         // Act
         Army? army = null;
         server.Call(() =>
@@ -78,6 +89,17 @@ public class ArmyDestructionTests : IDisposable
         var serverMessageBroker = server.Container.Resolve<IMessageBroker>();
 
         SetupKingdom(kingdom, hero, settlement);
+
+        server.ObjectManager.AddNewObject(kingdom, out string kingdomStringId);
+        server.ObjectManager.AddNewObject(hero, out string heroStringId);
+        server.ObjectManager.AddNewObject(hero.PartyBelongedTo, out string partyStringId);
+
+        foreach (var client in TestEnvironement.Clients)
+        {
+            client.ObjectManager.AddExisting(kingdomStringId, kingdom);
+            client.ObjectManager.AddExisting(heroStringId, hero);
+            client.ObjectManager.AddExisting(partyStringId, hero.PartyBelongedTo);
+        }
 
         // Act
         string? armyId = null;

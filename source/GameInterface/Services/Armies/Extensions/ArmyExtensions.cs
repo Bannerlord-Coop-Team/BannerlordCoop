@@ -18,10 +18,9 @@ internal static class ArmyExtensions
 {
     private static readonly ILogger Logger = LogManager.GetLogger<Army>();
 
-
     internal static void AddPartyInternal(this Army army, MobileParty mobileParty)
     {
-        Army_OnAddPartyInternal(army,mobileParty);
+        Army_OnAddPartyInternal(army, mobileParty);
     }
     internal static void RemovePartyInternal(this Army army, MobileParty mobileParty)
     {

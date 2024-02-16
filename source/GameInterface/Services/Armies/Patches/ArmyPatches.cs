@@ -90,7 +90,6 @@ public class ArmyPatches
             using (new AllowedThread())
             {
                 army.AddPartyInternal(mobileParty);
-
             }
         });
     }

@@ -39,9 +39,7 @@ public class ArmyLifetimeHandler : IHandler
 
     private void Handle_CreateArmy(MessagePayload<CreateArmy> payload)
     {
-        var stringId = payload.What.Data.StringId;
-
-        ArmyLifetimePatches.OverrideCreateArmy(stringId);
+        ArmyLifetimePatches.OverrideCreateArmy(payload.What.Data);
     }
 
     private void Handle_DestroyArmy(MessagePayload<DestroyArmy> payload)

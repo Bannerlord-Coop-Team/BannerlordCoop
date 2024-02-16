@@ -10,6 +10,8 @@ using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using System;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -28,7 +30,7 @@ internal class ArmyLifetimePatches
 
     [HarmonyPatch(typeof(Army), MethodType.Constructor, typeof(Kingdom), typeof(MobileParty), typeof(ArmyTypes))]
     [HarmonyPrefix]
-    private static bool CreateArmyPrefix(ref Army __instance)
+    private static bool CreateArmyPrefix(ref Army __instance, Kingdom kingdom, MobileParty leaderParty, Army.ArmyTypes armyType)
     {
         // Skip if we called it
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -46,7 +48,7 @@ internal class ArmyLifetimePatches
 
         if (objectManager.AddNewObject(__instance, out var stringID) == false) return true;
 
-        var data = new ArmyCreationData(__instance);
+        var data = new ArmyCreationData(__instance, kingdom, leaderParty, armyType);
         var message = new ArmyCreated(data);
 
         using (new MessageTransaction<NewArmySynced>(messageBroker, configuration.ObjectCreationTimeout))
@@ -57,22 +59,31 @@ internal class ArmyLifetimePatches
         return true;
     }
 
-    public static void OverrideCreateArmy(string armyId)
+    private static ConstructorInfo ctor_Army = AccessTools.Constructor(typeof(Army), new Type[] { typeof(Kingdom), typeof(MobileParty), typeof(ArmyTypes) });
+    public static void OverrideCreateArmy(ArmyCreationData creationData)
     {
+        var armyId = creationData.StringId;
+        
+
         var army = ObjectHelper.SkipConstructor<Army>();
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return;
 
+
         if (objectManager.AddExisting(armyId, army) == false) return;
 
-        army.SetParties(new MBList<MobileParty>());
-
-        AccessTools.Field(typeof(Army), "_tickEvent").SetValue(army, ObjectHelper.SkipConstructor<MBCampaignEvent>());
-        AccessTools.Field(typeof(Army), "_hourlyTickEvent").SetValue(army, ObjectHelper.SkipConstructor<MBCampaignEvent>());
-
-        var data = new ArmyCreationData(army);
-        var message = new ArmyCreated(data);
+        var message = new ArmyCreated(null);
         MessageBroker.Instance.Publish(army, message);
+
+        // TODO sync fields instead of calling constructor
+        var kingdomId = creationData.KingdomId;
+        var leaderPartyId = creationData.LeaderPartyId;
+        var armyType = creationData.ArmyType;
+
+        if (objectManager.TryGetObject(kingdomId, out Kingdom kingdom) == false) return;
+        if (objectManager.TryGetObject(leaderPartyId, out MobileParty leaderParty) == false) return;
+
+        ctor_Army.Invoke(army, new object[] { kingdom, leaderParty, armyType });
     }
 
     [HarmonyPatch(typeof(Army), "DisperseInternal")]
