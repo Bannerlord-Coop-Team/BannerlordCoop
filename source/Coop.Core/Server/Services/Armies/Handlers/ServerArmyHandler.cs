@@ -22,31 +22,27 @@ public class ServerArmyHandler : IHandler
 
         // This handles an internal message
         messageBroker.Subscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
-        messageBroker.Subscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
+        messageBroker.Subscribe<ArmyPartyRemoved>(HandleRemoveMobilePartyInArmy);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
-        messageBroker.Unsubscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
+        messageBroker.Unsubscribe<ArmyPartyRemoved>(HandleRemoveMobilePartyInArmy);
     }
 
     private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
     {
-        MobilePartyInArmyAdded mobilePartyInArmyAdded = obj.What;
-
         // Broadcast to all the clients that the state was changed
-        var message = new NetworkAddMobilePartyInArmy(mobilePartyInArmyAdded.MobilePartyListId, mobilePartyInArmyAdded.ArmyId);
+        var message = new NetworkAddMobilePartyInArmy(obj.What.Data);
         
         network.SendAll(message);
     }
 
-    private void HandleRemoveMobilePartyInArmy(MessagePayload<MobilePartyInArmyRemoved> obj)
+    private void HandleRemoveMobilePartyInArmy(MessagePayload<ArmyPartyRemoved> obj)
     {
-        MobilePartyInArmyRemoved mobilePartyInArmyRemoved = obj.What;
-
         // Broadcast to all the clients that the state was changed
-        var message = new NetworkRemoveMobilePartyInArmy(mobilePartyInArmyRemoved.MobilePartyIds, mobilePartyInArmyRemoved.ArmyId);
+        var message = new NetworkRemovePartyInArmy(obj.What.Data);
         
         network.SendAll(message);
     }

@@ -20,27 +20,25 @@ public class ClientArmyHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<NetworkAddMobilePartyInArmy>(HandleMobilePartyInArmyAdd);
-        messageBroker.Subscribe<NetworkRemoveMobilePartyInArmy>(HandleMobilePartyInArmyRemove);
+        messageBroker.Subscribe<NetworkRemovePartyInArmy>(HandleMobilePartyInArmyRemove);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAddMobilePartyInArmy>(HandleMobilePartyInArmyAdd);
-        messageBroker.Unsubscribe<NetworkRemoveMobilePartyInArmy>(HandleMobilePartyInArmyRemove);
+        messageBroker.Unsubscribe<NetworkRemovePartyInArmy>(HandleMobilePartyInArmyRemove);
     }
 
     private void HandleMobilePartyInArmyAdd(MessagePayload<NetworkAddMobilePartyInArmy> payload)
     {
-        var obj = payload.What;
-        var message = new AddMobilePartyInArmy(obj.MobilePartyListId, obj.ArmyId);
+        var message = new AddMobilePartyInArmy(payload.What.Data);
 
         messageBroker.Publish(this, message);
     }
 
-    private void HandleMobilePartyInArmyRemove(MessagePayload<NetworkRemoveMobilePartyInArmy> payload)
+    private void HandleMobilePartyInArmyRemove(MessagePayload<NetworkRemovePartyInArmy> payload)
     {
-        var obj = payload.What;
-        var message = new RemoveMobilePartyInArmy(obj.MobilePartyIds, obj.ArmyId);
+        var message = new RemovePartyInArmy(payload.What.Data);
 
         messageBroker.Publish(this, message);
     }

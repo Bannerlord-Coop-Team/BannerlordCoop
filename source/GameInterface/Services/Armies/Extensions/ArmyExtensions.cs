@@ -39,6 +39,8 @@ internal static class ArmyExtensions
 
     public static string GetStringId(this Army army)
     {
+        if (army == null) return null;
+
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
             Logger.Error("Unable to get {objectManager}", nameof(IObjectManager));

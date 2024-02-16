@@ -1,6 +1,7 @@
 ﻿using Coop.Core.Client.Services.Armies.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
+using GameInterface.Services.Armies.Data;
 using GameInterface.Services.Armies.Messages;
 
 
@@ -18,9 +19,11 @@ namespace Coop.IntegrationTests.Armies
         public void ServerMobilePartyInArmyAdded_Publishes_AllClients()
         {
             // Arrange
-            List<string> mobilePartyListId = new List<string> { "MobileParty_1", "MobileParty_2" };
-            string armyId = "CoopArmy_1";
-            var triggerMessage = new MobilePartyInArmyAdded(mobilePartyListId, armyId);
+            var mobilePartyId = "MobileParty_1";
+            var armyId = "CoopArmy_1";
+
+            var data = new ArmyAddPartyData(armyId, mobilePartyId);
+            var triggerMessage = new MobilePartyInArmyAdded(data);
 
             var server = TestEnvironment.Server;
 
@@ -32,8 +35,7 @@ namespace Coop.IntegrationTests.Armies
             Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkAddMobilePartyInArmy>());
 
             //Verify if the server is sending the same mobilePartyId and leaderMobilePartyId value
-            Assert.Equal(mobilePartyListId, server.NetworkSentMessages.GetMessages<NetworkAddMobilePartyInArmy>().First().MobilePartyListId);
-            Assert.Equal(armyId, server.NetworkSentMessages.GetMessages<NetworkAddMobilePartyInArmy>().First().ArmyId);
+            Assert.Equal(data, server.NetworkSentMessages.GetMessages<NetworkAddMobilePartyInArmy>().First().Data);
 
             
 
@@ -41,16 +43,8 @@ namespace Coop.IntegrationTests.Armies
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<AddMobilePartyInArmy>());
+                Assert.Equal(data, client.InternalMessages.GetMessages<AddMobilePartyInArmy>().First().Data);
             }
-
-            // Verify all clients receive the same mobilePartyId and leaderMobilePartyId value
-            foreach (EnvironmentInstance client in TestEnvironment.Clients)
-            {
-                Assert.Equal(mobilePartyListId, client.InternalMessages.GetMessages<AddMobilePartyInArmy>().First().MobilePartyListId);
-                Assert.Equal(armyId, client.InternalMessages.GetMessages<AddMobilePartyInArmy>().First().ArmyId);
-            }
-
-
         }
     }
 }

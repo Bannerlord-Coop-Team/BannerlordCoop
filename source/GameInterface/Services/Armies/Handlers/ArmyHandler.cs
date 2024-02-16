@@ -26,23 +26,23 @@ public class ArmyHandler : IHandler
         this.objectManager = objectManager;
 
         messageBroker.Subscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
-        messageBroker.Subscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+        messageBroker.Subscribe<RemovePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
     }
 
 
-    private void HandleChangeRemoveMobilePartyInArmy(MessagePayload<RemoveMobilePartyInArmy> payload)
+    private void HandleChangeRemoveMobilePartyInArmy(MessagePayload<RemovePartyInArmy> payload)
     {
-        var obj = payload.What;
+        var data = payload.What.Data;
 
-        if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
+        if (objectManager.TryGetObject(data.PartyStringId, out MobileParty mobileParty) == false)
         {
-            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
+            Logger.Error("Unable to find MobileParty ({mobilePartyId})", data.PartyStringId);
             return;
         }
 
-        if (objectManager.TryGetObject<Army>(obj.ArmyId, out var army) == false)
+        if (objectManager.TryGetObject<Army>(data.ArmyStringId, out var army) == false)
         {
-            Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
+            Logger.Error("Unable to find Army ({armyId})", data.ArmyStringId);
             return;
         }
 
@@ -53,17 +53,17 @@ public class ArmyHandler : IHandler
     //Generate Handler Methods
     private void HandleChangeAddMobilePartyInArmy(MessagePayload<AddMobilePartyInArmy> payload)
     {
-        var obj = payload.What;
+        var obj = payload.What.Data;
 
-        if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
+        if (objectManager.TryGetObject(obj.PartyStringId, out MobileParty mobileParty) == false)
         {
-            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
+            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.PartyStringId);
             return;
         }
 
-        if (objectManager.TryGetObject<Army>(obj.ArmyId, out var army) == false)
+        if (objectManager.TryGetObject<Army>(obj.ArmyStringId, out var army) == false)
         {
-            Logger.Error("Unable to find Army ({armyId})", obj.ArmyId);
+            Logger.Error("Unable to find Army ({armyId})", obj.ArmyStringId);
             return;
         }
 
@@ -73,6 +73,6 @@ public class ArmyHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
-        messageBroker.Unsubscribe<RemoveMobilePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+        messageBroker.Unsubscribe<RemovePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
     }
 }

@@ -15,7 +15,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Library;
 using static TaleWorlds.CampaignSystem.Army;
 
 namespace GameInterface.Services.Armies.Patches;

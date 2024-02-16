@@ -5,13 +5,13 @@ using System.Collections.Generic;
 namespace GameInterface.Services.Armies.Messages;
 
 /// <summary>
-/// Event for when a MobileParty is added to an Army
+/// Command to remove a MobileParty from an Army
 /// </summary>
-public record MobilePartyInArmyAdded : IEvent
+public record RemovePartyInArmy : ICommand
 {
-    public ArmyAddPartyData Data { get; }
+    public ArmyRemovePartyData Data { get; }
 
-    public MobilePartyInArmyAdded(ArmyAddPartyData data)
+    public RemovePartyInArmy(ArmyRemovePartyData data)
     {
         Data = data;
     }
