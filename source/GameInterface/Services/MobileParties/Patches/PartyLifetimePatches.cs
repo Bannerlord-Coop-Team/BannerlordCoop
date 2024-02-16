@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -37,7 +38,8 @@ internal class PartyLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}", typeof(MobileParty));
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
             return true;
         }
 
@@ -69,10 +71,13 @@ internal class PartyLifetimePatches
 
         if (objectManager.AddExisting(partyId, newParty) == false) return;
 
-        using (new AllowedThread())
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            MobileParty_ctor.Invoke(newParty, Array.Empty<object>());
-        }
+            using (new AllowedThread())
+            {
+                MobileParty_ctor.Invoke(newParty, Array.Empty<object>());
+            }
+        });
 
         var data = new PartyCreationData(newParty);
         var message = new PartyCreated(data);
@@ -89,7 +94,8 @@ internal class PartyLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client destroyed unmanaged {name}", typeof(MobileParty));
+            Logger.Error("Client destroyed unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
             return true;
         }
 
@@ -112,10 +118,13 @@ internal class PartyLifetimePatches
 
         if (objectManager.TryGetObject<MobileParty>(partyId, out var party) == false) return;
 
-        using (new AllowedThread())
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            party.RemoveParty();
-        }
+            using (new AllowedThread())
+            {
+                party.RemoveParty();
+            }
+        });
 
         var data = new PartyDestructionData(party);
         var message = new PartyDestroyed(data);

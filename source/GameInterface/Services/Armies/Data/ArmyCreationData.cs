@@ -14,9 +14,12 @@ public record ArmyCreationData
 {
     [ProtoMember(1)]
     public string StringId { get; }
-    public string KingdomId { get; internal set; }
-    public string LeaderPartyId { get; internal set; }
-    public short ArmyType { get; internal set; }
+    [ProtoMember(2)]
+    public string KingdomId { get; }
+    [ProtoMember(3)]
+    public string LeaderPartyId { get; }
+    [ProtoMember(4)]
+    public short ArmyType { get; }
 
     internal ArmyCreationData(Army instance, Kingdom kingdom, MobileParty party, Army.ArmyTypes armyType)
     {

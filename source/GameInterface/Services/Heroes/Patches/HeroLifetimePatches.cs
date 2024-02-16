@@ -27,7 +27,8 @@ internal class HeroLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}", typeof(Hero));
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
             return true;
         }
 
@@ -56,7 +57,8 @@ internal class HeroLifetimePatches
         // Allow method if it was determined to be allowed
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        Logger.Error("Creation of Hero object is unmanaged");
+        Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
 
         return true;
     }

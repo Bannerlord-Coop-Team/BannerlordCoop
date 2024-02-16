@@ -37,7 +37,8 @@ internal class ArmyLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}", typeof(Army));
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Army), Environment.StackTrace);
             return true;
         }
 
@@ -63,7 +64,6 @@ internal class ArmyLifetimePatches
     public static void OverrideCreateArmy(ArmyCreationData creationData)
     {
         var armyId = creationData.StringId;
-        
 
         var army = ObjectHelper.SkipConstructor<Army>();
 
@@ -80,10 +80,22 @@ internal class ArmyLifetimePatches
         var leaderPartyId = creationData.LeaderPartyId;
         var armyType = creationData.ArmyType;
 
-        if (objectManager.TryGetObject(kingdomId, out Kingdom kingdom) == false) return;
-        if (objectManager.TryGetObject(leaderPartyId, out MobileParty leaderParty) == false) return;
+        if (objectManager.TryGetObject(kingdomId, out Kingdom kingdom) == false)
+        {
+            Logger.Error("Failed to find {name} with id {id}", nameof(Kingdom), kingdomId);
+            return;
+        }
+             
+        if (objectManager.TryGetObject(leaderPartyId, out MobileParty leaderParty) == false)
+        {
+            Logger.Error("Failed to find {name} with id {id}", nameof(MobileParty), leaderPartyId);
+            return;
+        }
 
-        ctor_Army.Invoke(army, new object[] { kingdom, leaderParty, armyType });
+        using (new AllowedThread())
+        {
+            ctor_Army.Invoke(army, new object[] { kingdom, leaderParty, armyType });
+        }
     }
 
     [HarmonyPatch(typeof(Army), "DisperseInternal")]
@@ -126,9 +138,12 @@ internal class ArmyLifetimePatches
 
     public static void OverrideDestroyArmy(Army army, ArmyDispersionReason reason)
     {
-        using (new AllowedThread())
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            army.DisbandArmy(reason);
-        }
+            using (new AllowedThread())
+            {
+                army.DisbandArmy(reason);
+            }
+        });
     }
 }

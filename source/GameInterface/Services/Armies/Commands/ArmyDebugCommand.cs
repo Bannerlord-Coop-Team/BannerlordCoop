@@ -33,7 +33,6 @@ public class ArmyDebugCommand
     {
         StringBuilder stringBuilder = new StringBuilder();
 
-
         if (ContainerProvider.TryResolve<ArmyRegistry>(out var armyRegistry) == false)
         {
             return $"Unable to resolve {nameof(ArmyRegistry)}";
