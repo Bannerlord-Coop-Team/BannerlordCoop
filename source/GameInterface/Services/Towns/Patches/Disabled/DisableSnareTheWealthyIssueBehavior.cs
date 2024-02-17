@@ -2,7 +2,7 @@
 using SandBox.Issues;
 using TaleWorlds.CampaignSystem.Issues;
 
-namespace GameInterface.Services.Towns.Patches;
+namespace GameInterface.Services.Towns.Patches.Disabled;
 
 [HarmonyPatch(typeof(SnareTheWealthyIssueBehavior))]
 internal class DisableSnareTheWealthyIssueBehavior

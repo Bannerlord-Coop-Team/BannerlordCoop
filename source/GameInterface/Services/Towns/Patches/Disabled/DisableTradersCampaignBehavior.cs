@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using SandBox.CampaignBehaviors;
 
-namespace GameInterface.Services.Towns.Patches;
+namespace GameInterface.Services.Towns.Patches.Disabled;
 
 [HarmonyPatch(typeof(TradersCampaignBehavior))]
 internal class DisableTradersCampaignBehavior
