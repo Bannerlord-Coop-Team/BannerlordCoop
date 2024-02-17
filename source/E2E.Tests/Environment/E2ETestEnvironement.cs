@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.IntegrationTests.Environment;
@@ -28,6 +29,8 @@ internal class E2ETestEnvironement : IDisposable
     
     public E2ETestEnvironement(ITestOutputHelper output, int numClients = 2)
     {
+        GameLoopRunner.Instance.SetGameLoopThread();
+
         GameBootStrap.Initialize();
         IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
 
