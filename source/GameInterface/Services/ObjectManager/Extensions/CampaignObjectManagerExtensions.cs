@@ -1,4 +1,5 @@
-﻿using Common.Extensions;
+﻿using Common;
+using Common.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -20,12 +21,18 @@ internal static class CampaignObjectManagerExtensions
 
     public static void OnHeroAdded(this CampaignObjectManager campaignObjectManager, Hero hero)
     {
-        OnHeroAddedDelegate(campaignObjectManager, hero);
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            OnHeroAddedDelegate(campaignObjectManager, hero);
+        });
     }
 
     public static void AddMobileParty(this CampaignObjectManager campaignObjectManager, MobileParty party)
     {
-        AddMobilePartyDelegate(campaignObjectManager, party);
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            AddMobilePartyDelegate(campaignObjectManager, party);
+        });
     }
 
     private static readonly Action<CampaignObjectManager, Hero> OnHeroAddedDelegate = typeof(CampaignObjectManager)

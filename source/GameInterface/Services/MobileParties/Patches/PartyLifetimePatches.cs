@@ -1,5 +1,7 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Patches;
@@ -23,7 +25,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyLifetimePatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<HeroCreationDeletionPatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<HeroLifetimePatches>();
 
     [HarmonyPatch(typeof(MobileParty), MethodType.Constructor)]
     private static bool Prefix(ref MobileParty __instance)
@@ -36,20 +38,22 @@ internal class PartyLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}", typeof(MobileParty));
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
             return true;
         }
 
         // Allow method if container is not setup
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
         if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) == false) return true;
+        if (ContainerProvider.TryResolve<INetworkConfiguration>(out var configuration) == false) return true;
 
         if (objectManager.AddNewObject(__instance, out var stringID) == false) return true;
 
         var data = new PartyCreationData(__instance);
         var message = new PartyCreated(data);
 
-        using (new MessageTransaction<NewPartySynced>(messageBroker, TimeSpan.FromSeconds(5)))
+        using (new MessageTransaction<NewPartySynced>(messageBroker, configuration.ObjectCreationTimeout))
         {
             MessageBroker.Instance.Publish(__instance, message);
         }
@@ -67,10 +71,13 @@ internal class PartyLifetimePatches
 
         if (objectManager.AddExisting(partyId, newParty) == false) return;
 
-        using (new AllowedThread())
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            MobileParty_ctor.Invoke(newParty, Array.Empty<object>());
-        }
+            using (new AllowedThread())
+            {
+                MobileParty_ctor.Invoke(newParty, Array.Empty<object>());
+            }
+        });
 
         var data = new PartyCreationData(newParty);
         var message = new PartyCreated(data);
@@ -87,7 +94,8 @@ internal class PartyLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client destroyed unmanaged {name}", typeof(MobileParty));
+            Logger.Error("Client destroyed unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
             return true;
         }
 
@@ -110,10 +118,13 @@ internal class PartyLifetimePatches
 
         if (objectManager.TryGetObject<MobileParty>(partyId, out var party) == false) return;
 
-        using (new AllowedThread())
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            party.RemoveParty();
-        }
+            using (new AllowedThread())
+            {
+                party.RemoveParty();
+            }
+        });
 
         var data = new PartyDestructionData(party);
         var message = new PartyDestroyed(data);

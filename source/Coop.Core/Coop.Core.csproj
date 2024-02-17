@@ -80,7 +80,6 @@
 	  </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Server\Services\Armies\Messages\" />
     <Folder Include="Server\Services\Kingdoms\Messages\" />
   </ItemGroup>
 </Project>

@@ -74,27 +74,6 @@ namespace GameInterface.Tests.Bootstrap
         }
 
         private static readonly PropertyInfo Campaign_Current = typeof(Campaign).GetProperty(nameof(Campaign.Current))!;
-        //private static readonly PropertyInfo Campaign_CampaignEvents = typeof(Campaign).GetProperty("CampaignEvents", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        //private static readonly PropertyInfo Campaign_CustomPeriodicCampaignEvents = typeof(Campaign).GetProperty("CustomPeriodicCampaignEvents", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        //private static readonly PropertyInfo Campaign_CampaignEventDispatcher = typeof(Campaign).GetProperty("CampaignEventDispatcher", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        //private static Action<Campaign> Campaign_OnInitialize = typeof(Campaign).GetMethod("OnInitialize", BindingFlags.NonPublic | BindingFlags.Instance)!.CreateDelegate<Action<Campaign>>();
-        //private static readonly MethodInfo InitializeManagerObjectLists =
-        //    typeof(CampaignObjectManager).GetMethod("InitializeManagerObjectLists", BindingFlags.NonPublic | BindingFlags.Instance)!;
-
-        //private static void InitializeCampaign()
-        //{
-        //    Debug.DebugManager = new TestDebugger();
-
-        //    //var current = Campaign.Current;
-        //    //Campaign_CampaignEvents.SetValue(current, new CampaignEvents());
-        //    //Campaign_CustomPeriodicCampaignEvents.SetValue(current, new List<MBCampaignEvent>());
-
-        //    //var ctor = typeof(CampaignEventDispatcher).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, new[] { typeof(IEnumerable<CampaignEventReceiver>) })!;
-        //    //CampaignEventDispatcher eventDispatcher = (CampaignEventDispatcher)ctor.Invoke(new object[] { Array.Empty<CampaignEventReceiver>() })!;
-        //    //Campaign_CampaignEventDispatcher.SetValue(current, eventDispatcher);
-        //    //InitializeManagerObjectLists.Invoke(current.CampaignObjectManager, null);
-        //    Campaign_OnInitialize.Invoke(Campaign.Current);
-        //}
 
         private static void InitializeGame()
         {
@@ -110,6 +89,8 @@ namespace GameInterface.Tests.Bootstrap
             Game game = Game.CreateGame(campaign, gameManager);
 
             game.Initialize();
+
+            AccessTools.Field(typeof(Campaign), "_mapSceneWrapper").SetValue(campaign, new MapScene());
         }
     }
 }

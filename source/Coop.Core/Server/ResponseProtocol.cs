@@ -3,13 +3,19 @@ using Common.Messaging;
 using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Coop.Core.Server;
+
+/// <summary>
+/// Protocol for sending a trigger message to all clients and waiting for a response from all clients.
+/// </summary>
+/// <remarks>
+/// Timeout is supported.
+/// </remarks>
+/// <typeparam name="ResponseType">Expected response message type to wait for</typeparam>
 internal class ResponseProtocol<ResponseType> where ResponseType : IMessage
 {
     private readonly ICoopServer server;
@@ -32,7 +38,14 @@ internal class ResponseProtocol<ResponseType> where ResponseType : IMessage
         }).ToArray();
     }
 
-    public void FireAndForget<TriggerType, NotifyType>(TriggerType triggerMessage, NotifyType notifyMessage)
+    /// <summary>
+    /// Sends a trigger message to all clients, waits for a response from all clients (or timeout), and then sends a single notify completion message internally.
+    /// </summary>
+    /// <typeparam name="TriggerType">Message type to send to all clients</typeparam>
+    /// <typeparam name="NotifyType">Message type to send internally after all clients have responeded (or timeout)</typeparam>
+    /// <param name="triggerMessage">Message to send to all clients</param>
+    /// <param name="notifyMessage">Message to send internally after all clients have responeded (or timeout)</param>
+    public void StartResponseProtocol<TriggerType, NotifyType>(TriggerType triggerMessage, NotifyType notifyMessage)
         where TriggerType : IMessage
         where NotifyType : IMessage
     {

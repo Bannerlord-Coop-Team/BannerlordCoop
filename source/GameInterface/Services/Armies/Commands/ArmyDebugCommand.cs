@@ -2,13 +2,17 @@
 using Common.Messaging;
 using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.CampaignSystem.Army;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -28,7 +32,6 @@ public class ArmyDebugCommand
     public static string ListArmy(List<string> args)
     {
         StringBuilder stringBuilder = new StringBuilder();
-
 
         if (ContainerProvider.TryResolve<ArmyRegistry>(out var armyRegistry) == false)
         {
@@ -99,7 +102,7 @@ public class ArmyDebugCommand
 
         MessageBroker.Instance.Subscribe<ArmyCreated>((msg) =>
         {
-            tcs.SetResult(msg.What.Data.ArmyStringId);
+            tcs.SetResult(msg.What.Data.StringId);
         });
 
         kingdom.CreateArmy(armyLeader, targetSettlment, armyType);
@@ -178,4 +181,135 @@ public class ArmyDebugCommand
 
         return stringBuilder.ToString();
     }
+
+    // coop.debug.army.mobile_party_list CoopArmy_1
+    /// <summary>
+    /// Lists all the current Mobile Parties for an Army
+    /// </summary>
+    /// 
+    [CommandLineArgumentFunction("mobile_party_list", "coop.debug.army")]
+    public static string GetMobilePartyList(List<string> args)
+    {
+
+        var stringBuilder = new StringBuilder();
+
+
+        if (args.Count != 1)
+        {
+
+            return "Usage: coop.debug.army.mobile_party_list <ArmyId>";
+        }
+
+        string armyId = args[0];
+
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
+        {
+            return $"Unable to get {nameof(Army)} with {armyId}";
+        }
+
+        foreach (var mobileParty in army.Parties)
+        {
+            stringBuilder.AppendLine($"Name: {mobileParty.Name}\nStringId: {mobileParty.StringId}");
+        }
+
+        return stringBuilder.ToString();
+    }
+
+    // coop.debug.army.mobile_party_add CoopArmy_1 lord_1_34_party_1
+    /// <summary>
+    /// Add a Mobile Party to an Army
+    /// </summary>
+    /// 
+    [CommandLineArgumentFunction("mobile_party_add", "coop.debug.army")]
+    public static string AddMobileParty(List<string> args)
+    {
+
+        var stringBuilder = new StringBuilder();
+
+
+        if (args.Count != 2)
+        {
+
+            return "Usage: coop.debug.army.mobile_party_add <ArmyId> <MobilePartyId>";
+        }
+
+        string armyId = args[0];
+        string mobilePartyId = args[1];
+
+        
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject(mobilePartyId, out MobileParty mobileParty) == false)
+        { 
+            return $"Unable to get {nameof(MobileParty)} with {mobilePartyId}";
+        }
+
+
+        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
+        {
+            return $"Unable to get {nameof(Army)} with {armyId}";
+        }
+
+        army.AddPartyInternal(mobileParty);
+        
+        stringBuilder.AppendLine($"Added {mobileParty.Name} to {armyId}");
+        
+        return stringBuilder.ToString();
+    }
+
+    // coop.debug.army.mobile_party_remove CoopArmy_1 lord_1_34_party_1
+    /// <summary>
+    /// Add a Mobile Party to an Army
+    /// </summary>
+    /// 
+    [CommandLineArgumentFunction("mobile_party_remove", "coop.debug.army")]
+    public static string RemoveMobileParty(List<string> args)
+    {
+
+        var stringBuilder = new StringBuilder();
+
+
+        if (args.Count != 2)
+        {
+
+            return "Usage: coop.debug.army.mobile_party_remove <ArmyId> <MobilePartyId>";
+        }
+
+        string armyId = args[0];
+        string mobilePartyId = args[1];
+
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject(mobilePartyId, out MobileParty mobileParty) == false)
+        {
+            return $"Unable to get {nameof(MobileParty)} with {mobilePartyId}";
+        }
+
+
+        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
+        {
+            return $"Unable to get {nameof(Army)} with {armyId}";
+        }
+
+        army.RemovePartyInternal(mobileParty);
+        
+        stringBuilder.AppendLine($"Removed {mobileParty.Name} from {armyId}");
+        
+        return stringBuilder.ToString();
+    }
+
+
 }

@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.ItemRosters.Messages;
 using HarmonyLib;
 using Serilog;
@@ -19,7 +20,8 @@ namespace GameInterface.Services.ItemRosters.Patches
         [HarmonyPrefix]
         public static bool AddToCountsPrefix(ItemRoster __instance, ref int __result, EquipmentElement rosterElement, int number)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true; // Run if allowed
+            // Skip if we called it
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient)
             {
@@ -34,6 +36,9 @@ namespace GameInterface.Services.ItemRosters.Patches
         [HarmonyPostfix]
         public static void AddToCountsPostfix(ItemRoster __instance, ref int __result, EquipmentElement rosterElement, int number)
         {
+            // Skip if we called it
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
             if (ModInformation.IsClient)
             {
                 return;

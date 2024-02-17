@@ -5,6 +5,7 @@ using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Messages.Lifetime;
 using LiteNetLib;
 using Serilog;
 using System;
@@ -53,7 +54,7 @@ internal class ServerHeroHandler : IHandler
 
         var triggerMessage = new NetworkCreateHero(heroCreationData);
         var notifyMessage = new NewHeroSynced();
-        responseProtocol.FireAndForget(triggerMessage, notifyMessage);
+        responseProtocol.StartResponseProtocol(triggerMessage, notifyMessage);
     }
 
     private void Handle_HeroNameChanged(MessagePayload<HeroNameChanged> obj)

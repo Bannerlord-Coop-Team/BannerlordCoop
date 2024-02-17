@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MobileParties.Audit;
+﻿using GameInterface.Services.Armies.Audit;
+using GameInterface.Services.MobileParties.Audit;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;

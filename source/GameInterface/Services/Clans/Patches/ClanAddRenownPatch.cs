@@ -36,9 +36,10 @@ namespace GameInterface.Services.Clans.Patches
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
-                using (new AllowedThread());
-
-                clan.AddRenown(amount, shouldNotify);
+                using (new AllowedThread())
+                {
+                    clan.AddRenown(amount, shouldNotify);
+                }
             });
         }
     }
