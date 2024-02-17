@@ -1,17 +1,17 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Data;
-using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
+
+/// <summary>
+/// Handler for party related messages.
+/// </summary>
 internal class MobilePartyDataHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PartyLifetimeHandler>();

@@ -14,6 +14,9 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
+/// <summary>
+/// Patches for setting a party's army
+/// </summary>
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyArmyPatches
 {

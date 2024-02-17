@@ -2,8 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.MobileParties;
-using GameInterface.Services.MobileParties.Audit;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;
@@ -14,9 +12,12 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Armies.Audit;
+
+/// <summary>
+/// Auditor for <see cref="Army"/> objects
+/// </summary>
 internal class ArmyAuditor : IAuditor
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ArmyAuditor>();

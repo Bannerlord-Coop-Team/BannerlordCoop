@@ -14,6 +14,9 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Patches;
 
+/// <summary>
+/// Patches for the lifetime of <see cref="Hero"/> objects.
+/// </summary>
 [HarmonyPatch]
 internal class HeroLifetimePatches
 {

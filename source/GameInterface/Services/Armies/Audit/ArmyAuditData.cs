@@ -4,6 +4,9 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Armies.Audit;
 
+/// <summary>
+/// Audit data for an army.
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal record ArmyAuditData
 {

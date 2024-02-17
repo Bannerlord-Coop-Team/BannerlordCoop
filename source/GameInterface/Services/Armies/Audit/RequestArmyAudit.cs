@@ -4,6 +4,9 @@ using ProtoBuf;
 
 namespace GameInterface.Services.Armies.Audit;
 
+/// <summary>
+/// Command to request an army audit.
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal record RequestArmyAudit : ICommand
 {

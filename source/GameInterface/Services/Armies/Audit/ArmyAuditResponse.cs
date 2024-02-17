@@ -3,6 +3,9 @@ using ProtoBuf;
 
 namespace GameInterface.Services.Armies.Audit;
 
+/// <summary>
+/// Response message for the army audit.
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 internal record ArmyAuditResponse : IEvent
 {

@@ -1,10 +1,10 @@
 ﻿using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.MobileParties.Data;
 
+/// <summary>
+/// Data for changing the army of a party.
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 public class PartyArmyChangeData
 {

@@ -2,6 +2,10 @@
 using GameInterface.Services.MobileParties.Data;
 
 namespace GameInterface.Services.MobileParties.Messages.Data;
+
+/// <summary>
+/// Event for when the army of a party has changed.
+/// </summary>
 public class PartyArmyChanged : IEvent
 {
     public PartyArmyChangeData Data { get; }

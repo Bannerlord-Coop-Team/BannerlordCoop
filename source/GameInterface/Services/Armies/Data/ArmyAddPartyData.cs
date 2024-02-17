@@ -1,9 +1,10 @@
 ﻿using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.Armies.Data;
+
+/// <summary>
+/// Data for adding a party to an army.
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 public record ArmyAddPartyData
 {

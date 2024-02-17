@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Client.Services.MobileParties.Messages.Data;
 using GameInterface.Services.MobileParties.Messages.Data;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Server.Services.MobileParties.Handlers;
-internal class MobilePartyDataHandler : IHandler
+
+/// <summary>
+/// Server side handler for party related messages.
+/// </summary>
+internal class ServerPartyDataHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
 
-    public MobilePartyDataHandler(
+    public ServerPartyDataHandler(
         IMessageBroker messageBroker,
         INetwork network)
     {

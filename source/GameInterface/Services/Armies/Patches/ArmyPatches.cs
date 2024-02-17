@@ -12,6 +12,7 @@ using Common.Logging;
 using Serilog;
 using System.Collections.Generic;
 using GameInterface.Services.Armies.Data;
+using System;
 namespace GameInterface.Services.Armies.Patches;
 
 /// <summary>
@@ -62,13 +63,18 @@ public class ArmyPatches
         if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
-        
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
+            return true;
+        }
+
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
             Logger.Error("Unable to resolve {objectManager}", typeof(IObjectManager));
-            return false;
+            return true;
         }
         
         
@@ -76,7 +82,7 @@ public class ArmyPatches
         if (armyId == null)
         {
             Logger.Error("{army} was not properly registered", mobileParty.Army.Name);
-            return false;
+            return true;
         }
 
         var partyId = mobileParty.StringId;
