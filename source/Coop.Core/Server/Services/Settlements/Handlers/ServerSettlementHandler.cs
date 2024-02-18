@@ -30,7 +30,17 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<SettlementChangedAddHeroWithoutParty>(HandleAddHeroWithoutParty);
         messageBroker.Subscribe<SettlementChangedRemoveHeroWithoutParty>(HandleRemoveHeroWithoutParty);
 
+        messageBroker.Subscribe<SettlementChangedMobileParty>(HandleChangedMobileParty);
 
+
+
+    }
+
+    private void HandleChangedMobileParty(MessagePayload<SettlementChangedMobileParty> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeSettlementMobileParty(obj.SettlementId, obj.MobilePartyId, obj.NumberOfLordParties, obj.AddMobileParty);
+        network.SendAll(message);
     }
 
     private void HandleRemoveHeroWithoutParty(MessagePayload<SettlementChangedRemoveHeroWithoutParty> payload)
@@ -121,6 +131,8 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedGarrisonWageLimit>(HandleGarrisonWageLimit);
         messageBroker.Unsubscribe<SettlementChangedNotablesCache>(HandleCollectNotablesToCache);
         messageBroker.Unsubscribe<SettlementChangedAddHeroWithoutParty>(HandleAddHeroWithoutParty);
+
+        messageBroker.Unsubscribe<SettlementChangedMobileParty>(HandleChangedMobileParty);
 
     }
 }
