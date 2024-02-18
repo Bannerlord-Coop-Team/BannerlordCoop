@@ -2,6 +2,7 @@
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using static TaleWorlds.CampaignSystem.Settlements.Settlement;
@@ -21,6 +22,13 @@ internal static class SettlementExtension
 
     private static readonly FieldInfo _heroesWithoutPartyCache = typeof(Settlement).GetField("_heroesWithoutPartyCache", BindingFlags.NonPublic | BindingFlags.Instance);
     private static MethodInfo Settlement_AddHeroWithoutParty = AccessTools.Method(typeof(Settlement), "AddHeroWithoutParty");
+
+
+    private static readonly FieldInfo _partiesCache = typeof(Settlement).GetField("_partiesCache", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static MethodInfo Settlement_AddMobileParty = AccessTools.Method(typeof(Settlement), "AddMobileParty");
+
+    private static readonly FieldInfo _numberOfLordPartiesAt = typeof(Settlement).GetField("_numberOfLordPartiesAt", BindingFlags.NonPublic | BindingFlags.Instance);
+
 
     public static void SetLastThreatTimeChanged(this Settlement component, long? lastThreatTime)
     {
@@ -70,4 +78,28 @@ internal static class SettlementExtension
         Settlement_AddHeroWithoutParty.Invoke(component, new object[] { hero });
     }
 
+
+    public static MBList<MobileParty> GetPartiesCache(this Settlement component)
+    {
+        return (MBList<MobileParty>)_partiesCache.GetValue(component);
+    }
+    public static void SetPartiesCache(this Settlement component, MBList<MobileParty> mobileParties)
+    {
+        _partiesCache.SetValue(component, mobileParties);
+    }
+
+    public static void AddMobileParty(this Settlement component, MobileParty party)
+    {
+        Settlement_AddMobileParty.Invoke(component, new object[] { party });
+    }
+
+    public static int GetNumberOfLordPartiesAt(this Settlement component)
+    {
+        return (int)_numberOfLordPartiesAt.GetValue(component);
+    }
+
+    public static void SetNumberOfLordPartiesAt(this Settlement component, int lordParties)
+    {
+        _numberOfLordPartiesAt.SetValue(component, lordParties);
+    }
 }

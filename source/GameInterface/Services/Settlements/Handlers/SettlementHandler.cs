@@ -4,7 +4,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -34,6 +33,27 @@ public class SettlementHandler : IHandler
         messageBroker.Subscribe<ChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
         messageBroker.Subscribe<ChangeSettlementHeroWithoutParty>(HandleHeroWithoutParty);
         messageBroker.Subscribe<ChangeSettlementHeroWithoutPartyRemove>(HandleHeroRemoveWithoutParty);
+        messageBroker.Subscribe<ChangeMobileParty>(HandleMobileParty);
+
+    }
+
+    private void HandleMobileParty(MessagePayload<ChangeMobileParty> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+
+        if (objectManager.TryGetObject<MobileParty>(obj.MobilePartyId, out var mobileParty) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        MobilePartyCachePatch.RunMobileParty(settlement, mobileParty, obj.NumberOfLordParties, obj.AddMobileParty);
     }
 
     private void HandleHeroRemoveWithoutParty(MessagePayload<ChangeSettlementHeroWithoutPartyRemove> payload)

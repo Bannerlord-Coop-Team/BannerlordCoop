@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Services.Settlements.Messages;
+using GameInterface.Services.Settlements;
 using GameInterface.Services.Settlements.Messages;
 using System;
 
@@ -25,8 +26,16 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
         messageBroker.Subscribe<NetworkChangeSettlementAddHeroWithoutParty>(HandleAddHeroWithoutParty);
         messageBroker.Subscribe<NetworkChangeSettlementRemoveHeroWithoutParty>(HandleRemoveHeroWithoutParty);
+        messageBroker.Subscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
 
+    }
 
+    private void HandleMobileParty(MessagePayload<NetworkChangeSettlementMobileParty> payload)
+    {
+        var obj = payload.What;
+
+        var message = new ChangeMobileParty(obj.SettlementId, obj.MobilePartyId, obj.NumberOfLordParties, obj.AddMobileParty);
+        messageBroker.Publish(this, message);
 
     }
 
@@ -121,6 +130,7 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSettlementMilitia>(HandleMiltia);
         messageBroker.Unsubscribe<NetworkChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
         messageBroker.Unsubscribe<NetworkChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
+        messageBroker.Unsubscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
 
     }
 }

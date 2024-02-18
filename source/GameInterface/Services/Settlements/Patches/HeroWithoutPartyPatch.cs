@@ -1,10 +1,4 @@
-﻿using Common;
-using Common.Messaging;
-using Common.Util;
-using GameInterface.Extentions;
-using GameInterface.Policies;
-using GameInterface.Services.Settlements.Messages;
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -17,7 +11,9 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(Settlement))]
 public class HeroWithoutPartyPatch
 {
-    // only server needs to know about these.
+    // TODO: discuss and test if needed, not sure...
+    // only server needs to know about this..
+    // may not be needed but for now if it does the code is here.
     [HarmonyPatch("AddHeroWithoutParty")]
     [HarmonyPrefix]
     private static bool AddHeroWithoutPartyPrefix(ref Settlement __instance, Hero individual) => ModInformation.IsServer;
