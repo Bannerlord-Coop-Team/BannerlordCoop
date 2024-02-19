@@ -1,11 +1,11 @@
-﻿using Common.Util;
-using GameInterface.Services.MobileParties.Patches;
+﻿using Common;
+using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -13,7 +13,9 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Patches;
 
-[HarmonyDebug]
+/// <summary>
+/// Patches EnterSettlementAction.ApplyInternal(Hero, MobileParty, Settlement, EnterSettlementDetail, obj, bool)
+/// </summary>
 [HarmonyPatch(typeof(EnterSettlementAction))]
 public class LastVisitTimeOwnerSettlementActionPatch
 {
@@ -42,11 +44,9 @@ public class LastVisitTimeOwnerSettlementActionPatch
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
 
-        int i = -1;
         foreach (var instruction in instructions)
         {
             // 67
-            i++;
             if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == Settlement_LastVisitTimeOwner)
             {
                 yield return new CodeInstruction(OpCodes.Call, SettlementActionSetLastVisitTimeOfOwnerOverride);
@@ -56,15 +56,26 @@ public class LastVisitTimeOwnerSettlementActionPatch
         }
     }
 
+    internal static void RunLastVisitTimeOfOwner(Settlement settlement, float currentTime)
+    {
+        using (new AllowedThread())
+        {
+            settlement.LastVisitTimeOfOwner = currentTime;
+        }
+    }
 
     private static void SetLastVisitTimeOfOwner(Settlement instance, float newValue)
-    { 
+    {
 
-        if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed())
+        if (AllowedThread.IsThisThreadAllowed())
         {
             instance.LastVisitTimeOfOwner = newValue;
-            // TODO: publish to clients.
             return;
         }
+        if (ModInformation.IsClient) return;
+
+
+        instance.LastVisitTimeOfOwner = newValue;
+        MessageBroker.Instance.Publish(instance, new SettlementChangedLastVisitTimeOfOwner(instance.StringId, newValue));
     }
 }

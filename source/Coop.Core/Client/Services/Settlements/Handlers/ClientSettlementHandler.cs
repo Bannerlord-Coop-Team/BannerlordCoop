@@ -29,8 +29,16 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
 
         messageBroker.Subscribe<NetworkChangeWallHitPointsRatio>(HandleHitPointsRatio);
+        messageBroker.Subscribe<NetworkChangeLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 
 
+
+    }
+
+    private void HandleLastVisitTimeOfOwner(MessagePayload<NetworkChangeLastVisitTimeOfOwner> payload)
+    {
+        var obj = payload.What;
+        messageBroker.Publish(this, new ChangeSettlementLastVisitTimeOfOwner(obj.SettlementID,obj.CurrentTime));
     }
 
     private void HandleHitPointsRatio(MessagePayload<NetworkChangeWallHitPointsRatio> payload)
@@ -142,6 +150,7 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSettlementGarrisonWagePaymentLimit>(HandleGarrisonWageLimit);
         messageBroker.Unsubscribe<NetworkChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
         messageBroker.Unsubscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
+        messageBroker.Unsubscribe<NetworkChangeLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 
     }
 }
