@@ -39,11 +39,22 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<SettlementChangedLastVisitTimeOfOwner>(HandleLastVisitOfOwner);
 
         messageBroker.Subscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
+        messageBroker.Subscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
 
 
 
 
 
+    }
+
+    private void HandleLordConversationCampaignBehaviorPlayerClaimValue(MessagePayload<ClientChangeLordConversationCampaignBehaviorPlayerClaimValue> payload)
+    {
+        var obj = payload.What;
+        // send to server GI
+        messageBroker.Publish(this, new ChangeLordConversationCampaignBehaviourPlayerClaimValue(obj.SettlementId, obj.ClaimValue));
+
+        // send to other clients
+        network.SendAllBut(payload.Who as NetPeer, new NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther(obj.SettlementId, obj.ClaimValue));
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaim(MessagePayload<ClientChangeLordConversationCampaignBehaviorPlayerClaim> payload)

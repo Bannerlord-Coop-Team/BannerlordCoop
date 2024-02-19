@@ -32,12 +32,28 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeWallHitPointsRatio>(HandleHitPointsRatio);
         messageBroker.Subscribe<NetworkChangeLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 
+        //ClaimBY Hero
         messageBroker.Subscribe<LordConversationCampaignBehaviourPlayerChangedClaim>(HandleClientCampaignBehaviorClaim);
-
-        messageBroker.Subscribe<LordConversationCampaignBehaviourPlayerChangedClaim>(HandleClientCampaignBehaviorClaim);
-
         messageBroker.Subscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther>(HandleClientOthersCampaignBehaviorClaim);
 
+        //ClaimBY Value
+        messageBroker.Subscribe<LordConversationCampaignBehaviourPlayerChangedClaimValue>(HandleClientOthersCampaignBehaviorClaimValue);
+        messageBroker.Subscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther>(HandleClientOthersCampaignBehaviorClaimValue);
+
+
+    }
+
+    private void HandleClientOthersCampaignBehaviorClaimValue(MessagePayload<NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther> payload)
+    {
+        var obj = payload.What;
+        messageBroker.Publish(this, new ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers(obj.SettlementId, obj.ClaimValue));
+
+    }
+
+    private void HandleClientOthersCampaignBehaviorClaimValue(MessagePayload<LordConversationCampaignBehaviourPlayerChangedClaimValue> payload)
+    {
+        var obj = payload.What;
+        network.SendAll(new ClientChangeLordConversationCampaignBehaviorPlayerClaimValue(obj.SettlementId, obj.ClaimValue));
     }
 
     private void HandleClientOthersCampaignBehaviorClaim(MessagePayload<NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther> payload)
@@ -170,6 +186,10 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
         messageBroker.Unsubscribe<NetworkChangeLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
         messageBroker.Unsubscribe<LordConversationCampaignBehaviourPlayerChangedClaim>(HandleClientCampaignBehaviorClaim);
+
+
+        messageBroker.Unsubscribe<LordConversationCampaignBehaviourPlayerChangedClaimValue>(HandleClientOthersCampaignBehaviorClaimValue);
+        messageBroker.Unsubscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther>(HandleClientOthersCampaignBehaviorClaimValue);
 
     }
 }

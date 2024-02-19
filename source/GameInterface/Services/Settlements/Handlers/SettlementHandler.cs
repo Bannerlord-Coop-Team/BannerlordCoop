@@ -43,6 +43,35 @@ public class SettlementHandler : IHandler
         //other clients ChangeLordConversationCampaignBehaviorPlayerClaimOthers
         messageBroker.Subscribe<ChangeLordConversationCampaignBehaviorPlayerClaimOthers>(HandleLordConversationCampaignBehaviorPlayerClaimOthers);
 
+        //server claimvalue behave
+        messageBroker.Subscribe<ChangeLordConversationCampaignBehaviourPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
+        //other clients
+        messageBroker.Subscribe<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers>(HandleLordConversationCampaignBehaviorPlayerClaimValueOthers);
+
+
+    }
+
+    private void HandleLordConversationCampaignBehaviorPlayerClaimValueOthers(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
+    }
+
+    private void HandleLordConversationCampaignBehaviorPlayerClaimValue(MessagePayload<ChangeLordConversationCampaignBehaviourPlayerClaimValue> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaimOthers(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaimOthers> payload)
@@ -290,6 +319,15 @@ public class SettlementHandler : IHandler
         messageBroker.Unsubscribe<ChangeSettlementHeroWithoutPartyRemove>(HandleHeroRemoveWithoutParty);
         messageBroker.Unsubscribe<ChangeSettlementWallHitPointsRatio>(HandleHitPointsRatio);
         messageBroker.Unsubscribe<ChangeSettlementLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
+
+
+        messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
+        //other clients ChangeLordConversationCampaignBehaviorPlayerClaimOthers
+        messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviorPlayerClaimOthers>(HandleLordConversationCampaignBehaviorPlayerClaimOthers);
+
+        messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviourPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
+        messageBroker.Unsubscribe<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers>(HandleLordConversationCampaignBehaviorPlayerClaimValueOthers);
+
 
     }
 }
