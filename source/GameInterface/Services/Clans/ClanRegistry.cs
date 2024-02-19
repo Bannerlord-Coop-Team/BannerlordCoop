@@ -7,33 +7,13 @@ namespace GameInterface.Services.Clans;
 /// <summary>
 /// Registry class that assosiates <see cref="Clan"/> and a <see cref="string"/> id
 /// </summary>
-internal interface IClanRegistry : IRegistry<Clan>
+internal class ClanRegistry : RegistryBase<Clan>
 {
-    bool RegisterClan(Clan clan);
-    bool RemoveClan(Clan clan);
-    void RegisterAllClans();
-}
+    private const string ClanStringIdPrefix = "CoopClan";
 
-/// <inheritdoc cref="IClanRegistry"/>
-internal class ClanRegistry : RegistryBase<Clan>, IClanRegistry
-{
-    public bool RegisterClan(Clan clan)
-    {
-        if (RegisterExistingObject(clan.StringId, clan) == false)
-        {
-            Logger.Warning("Unable to register clan: {object}", clan.Name);
-            return false;
-        }
+    public ClanRegistry(IRegistryCollection collection) : base(collection) { }
 
-        return true;
-    }
-
-    public bool RemoveClan(Clan clan)
-    {
-        return Remove(clan.StringId);
-    }
-
-    public void RegisterAllClans()
+    public override void RegisterAll()
     {
         var objectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -45,27 +25,14 @@ internal class ClanRegistry : RegistryBase<Clan>, IClanRegistry
 
         foreach (var clan in objectManager.Clans)
         {
-            RegisterClan(clan);
+            RegisterExistingObject(clan.StringId, clan);
         }
     }
 
-    private const string ClanStringIdPrefix = "CoopClan";
-    public override bool RegisterNewObject(Clan obj, out string id)
+    protected override string GetNewId(Clan party)
     {
-        id = null;
-
-        if (Campaign.Current?.CampaignObjectManager == null) return false;
-
-        var newId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Clan>(ClanStringIdPrefix);
-
-        if (objIds.ContainsKey(newId)) return false;
-
-        obj.StringId = newId;
-
-        objIds.Add(newId, obj);
-
-        id = newId;
-
-        return true;
+        party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Clan>(ClanStringIdPrefix);
+        return party.StringId;
     }
+
 }

@@ -13,7 +13,7 @@ namespace GameInterface.Services.Clans.Patches
     {
         public static bool Prefix(Hero adoptedHero)
         {
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             string playerClanId = Clan.PlayerClan.StringId;
 

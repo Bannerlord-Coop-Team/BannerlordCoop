@@ -20,7 +20,7 @@ namespace GameInterface.Services.Clans.Patches
 
             if (AllowedInstance.IsAllowed(__instance)) return true;
 
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             // On the client if it is not the player client skip the call
             if (ModInformation.IsClient && __instance != Clan.PlayerClan) return false;
@@ -34,15 +34,13 @@ namespace GameInterface.Services.Clans.Patches
 
         public static void RunOriginalAddRenown(Clan clan, float amount, bool shouldNotify)
         {
-            using (AllowedInstance)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AllowedInstance.Instance = clan;
-
-                GameLoopRunner.RunOnMainThread(() =>
+                using (new AllowedThread())
                 {
                     clan.AddRenown(amount, shouldNotify);
-                }, true);
-            }
+                }
+            });
         }
     }
 }

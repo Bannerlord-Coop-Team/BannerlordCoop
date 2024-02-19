@@ -12,7 +12,7 @@ namespace Common.Util;
 /// </remarks>
 public class AllowedThread : IDisposable
 {
-    private static int CurrentThreadId => Thread.CurrentThread.ManagedThreadId;
+    public static int CurrentThreadId => Thread.CurrentThread.ManagedThreadId;
     private static readonly HashSet<int> AllowedThreadIds = new HashSet<int>();
 
     public AllowedThread()

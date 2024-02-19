@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
@@ -15,15 +16,12 @@ internal class NewHeroHandler : IHandler
 
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
-    private readonly IHeroRegistry heroRegistry;
     public NewHeroHandler(
         IHeroInterface heroInterface,
-        IMessageBroker messageBroker,
-        IHeroRegistry heroRegistry)
+        IMessageBroker messageBroker)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
-        this.heroRegistry = heroRegistry;
         messageBroker.Subscribe<PackageMainHero>(Handle);
         messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
     }

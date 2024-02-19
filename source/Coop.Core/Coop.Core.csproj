@@ -70,10 +70,16 @@
 	<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
 		<_Parameter1>Coop.IntegrationTests</_Parameter1>
 	</AssemblyAttribute>
+	<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+		<_Parameter1>E2E.Tests</_Parameter1>
+	</AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
 	  <Reference Include="TaleWorlds.Library">
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
 	  </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Server\Services\Kingdoms\Messages\" />
   </ItemGroup>
 </Project>

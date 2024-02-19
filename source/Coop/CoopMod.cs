@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
-using Coop.UI.LoadGameUI;
 using GameInterface.Services.UI;
 using Serilog;
 using System;
@@ -88,14 +87,11 @@ namespace Coop
         }
 
         
-
         public override void NoHarmonyLoad()
         {
-            Coop  = new CoopartiveMultiplayerExperience(MessageBroker.Instance);
+            Coop  = new CoopartiveMultiplayerExperience();
 
             Updateables.Add(GameLoopRunner.Instance);
-            Updateables.Add(Coop);
-
 
 
             // Skip startup splash screen

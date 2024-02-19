@@ -1,12 +1,37 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.GameDebug.Commands
 {
-    internal class ClanDebugCommands
+    public class ClanDebugCommands
     {
+        // coop.debug.clan.list
+        /// <summary>
+        /// Lists all the clans
+        /// </summary>
+        /// <param name="args">actually none are being used..</param>
+        /// <returns>strings of all the clans</returns>
+        [CommandLineArgumentFunction("list", "coop.debug.clan")]
+        public static string ListClans(List<string> args)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+
+            List<Clan> clans = Campaign.Current.CampaignObjectManager.Clans.ToList();
+
+            clans.ForEach((clan) =>
+            {
+                stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", clan.StringId, clan.Name));
+            });
+
+            return stringBuilder.ToString();
+        }
+
+
         [CommandLineArgumentFunction("change_clan_leader", "coop.debug")]
         public static string ChangeClanLeader(List<string> strings)
         {
