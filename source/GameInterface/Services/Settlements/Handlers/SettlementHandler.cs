@@ -39,8 +39,46 @@ public class SettlementHandler : IHandler
 
         messageBroker.Subscribe<ChangeSettlementLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 
+        messageBroker.Subscribe<ChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
+        //other clients ChangeLordConversationCampaignBehaviorPlayerClaimOthers
+        messageBroker.Subscribe<ChangeLordConversationCampaignBehaviorPlayerClaimOthers>(HandleLordConversationCampaignBehaviorPlayerClaimOthers);
 
+    }
 
+    private void HandleLordConversationCampaignBehaviorPlayerClaimOthers(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaimOthers> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        if (objectManager.TryGetObject<Hero>(obj.HeroId, out var hero) == false)
+        {
+            Logger.Error("Unable to find Settlement ({HeroId})", obj.HeroId);
+            return;
+        }
+
+        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
+    }
+
+    private void HandleLordConversationCampaignBehaviorPlayerClaim(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaim> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        if (objectManager.TryGetObject<Hero>(obj.HeroId, out var hero) == false)
+        {
+            Logger.Error("Unable to find Settlement ({HeroId})", obj.HeroId);
+            return;
+        }
+
+        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
     }
 
     private void HandleLastVisitTimeOfOwner(MessagePayload<ChangeSettlementLastVisitTimeOfOwner> payload)

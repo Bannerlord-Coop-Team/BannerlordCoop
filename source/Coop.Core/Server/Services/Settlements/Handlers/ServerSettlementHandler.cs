@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.Settlements.Messages;
 using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Messages;
+using LiteNetLib;
 using System;
 
 namespace Coop.Core.Server.Services.Settlements.Handlers;
@@ -36,10 +38,21 @@ internal class ServerSettlementHandler : IHandler
 
         messageBroker.Subscribe<SettlementChangedLastVisitTimeOfOwner>(HandleLastVisitOfOwner);
 
+        messageBroker.Subscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
 
 
 
 
+
+    }
+
+    private void HandleLordConversationCampaignBehaviorPlayerClaim(MessagePayload<ClientChangeLordConversationCampaignBehaviorPlayerClaim> payload)
+    {
+        var obj = payload.What;
+        messageBroker.Publish(this, new ChangeLordConversationCampaignBehaviorPlayerClaim(obj.SettlementId, obj.HeroId));
+
+        // notify other clients of what player did
+        network.SendAllBut(payload.Who as NetPeer, new NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther(obj.SettlementId, obj.HeroId));
     }
 
     private void HandleLastVisitOfOwner(MessagePayload<SettlementChangedLastVisitTimeOfOwner> payload)
@@ -154,6 +167,7 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedMobileParty>(HandleChangedMobileParty);
         messageBroker.Unsubscribe<SettlementWallHitPointsRatioChanged>(HandleWallRatio);
         messageBroker.Unsubscribe<SettlementChangedLastVisitTimeOfOwner>(HandleLastVisitOfOwner);
+        messageBroker.Unsubscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
 
 
     }
