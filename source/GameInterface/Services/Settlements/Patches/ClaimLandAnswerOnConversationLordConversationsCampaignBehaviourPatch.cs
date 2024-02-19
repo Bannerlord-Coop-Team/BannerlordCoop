@@ -1,9 +1,7 @@
 ﻿using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using System.Reflection.Emit;
 using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem;

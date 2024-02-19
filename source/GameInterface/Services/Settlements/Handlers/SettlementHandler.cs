@@ -48,7 +48,21 @@ public class SettlementHandler : IHandler
         //other clients
         messageBroker.Subscribe<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers>(HandleLordConversationCampaignBehaviorPlayerClaimValueOthers);
 
+        //Settlement.CanBeClaimed
+        messageBroker.Subscribe<ChangeSettlementClaimantCanBeClaimed>(HandleSettlementClaimaintCanBeClaimed);
 
+    }
+
+    private void HandleSettlementClaimaintCanBeClaimed(MessagePayload<ChangeSettlementClaimantCanBeClaimed> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        SettlementClaimantCampaignBehaviorOnOwnerChangedPatch.RunCanBeClaimed(settlement, obj.CanBeClaimed);
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaimValueOthers(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers> payload)

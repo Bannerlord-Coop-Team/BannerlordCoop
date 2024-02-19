@@ -40,7 +40,18 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<LordConversationCampaignBehaviourPlayerChangedClaimValue>(HandleClientOthersCampaignBehaviorClaimValue);
         messageBroker.Subscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther>(HandleClientOthersCampaignBehaviorClaimValue);
 
+        // Settlement.CanBeClaimed
+        messageBroker.Subscribe<NetworkChangeSettlementClaimantCanBeClaimed>(HandleSettlementClaimaintCanBeClaimed);
 
+
+
+    }
+
+    private void HandleSettlementClaimaintCanBeClaimed(MessagePayload<NetworkChangeSettlementClaimantCanBeClaimed> payload)
+    {
+        var obj = payload.What;
+
+        messageBroker.Publish(this, new ChangeSettlementClaimantCanBeClaimed(obj.SettlementId, obj.CanBeClaimed));
     }
 
     private void HandleClientOthersCampaignBehaviorClaimValue(MessagePayload<NetworkChangeLordConverationCampaignBehaviorPlayerClaimValueOther> payload)
