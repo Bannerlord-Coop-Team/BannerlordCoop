@@ -4,6 +4,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -34,7 +35,22 @@ public class SettlementHandler : IHandler
         messageBroker.Subscribe<ChangeSettlementHeroWithoutParty>(HandleHeroWithoutParty);
         messageBroker.Subscribe<ChangeSettlementHeroWithoutPartyRemove>(HandleHeroRemoveWithoutParty);
         messageBroker.Subscribe<ChangeMobileParty>(HandleMobileParty);
+        messageBroker.Subscribe<ChangeSettlementWallHitPointsRatio>(HandleHitPointsRatio);
 
+
+    }
+
+    private void HandleHitPointsRatio(MessagePayload<ChangeSettlementWallHitPointsRatio> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+            return;
+        }
+
+        SetWallHitPointsSettlementPatch.RunSetWallSectionHitPointsRatioAtIndex(settlement, obj.index, obj.hitPointsRatio);
+        
     }
 
     private void HandleMobileParty(MessagePayload<ChangeMobileParty> payload)
@@ -220,5 +236,7 @@ public class SettlementHandler : IHandler
         messageBroker.Unsubscribe<ChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
         messageBroker.Unsubscribe<ChangeSettlementHeroWithoutParty>(HandleHeroWithoutParty);
         messageBroker.Unsubscribe<ChangeSettlementHeroWithoutPartyRemove>(HandleHeroRemoveWithoutParty);
+        messageBroker.Unsubscribe<ChangeSettlementWallHitPointsRatio>(HandleHitPointsRatio);
+
     }
 }

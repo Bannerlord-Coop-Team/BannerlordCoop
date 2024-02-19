@@ -28,6 +28,17 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeSettlementRemoveHeroWithoutParty>(HandleRemoveHeroWithoutParty);
         messageBroker.Subscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
 
+        messageBroker.Subscribe<NetworkChangeWallHitPointsRatio>(HandleHitPointsRatio);
+
+
+    }
+
+    private void HandleHitPointsRatio(MessagePayload<NetworkChangeWallHitPointsRatio> payload)
+    {
+        var obj = payload.What;
+        var message = new ChangeSettlementWallHitPointsRatio(obj.SettlementId, obj.index, obj.hitPointsRatio);
+        messageBroker.Publish(this, message);
+
     }
 
     private void HandleMobileParty(MessagePayload<NetworkChangeSettlementMobileParty> payload)

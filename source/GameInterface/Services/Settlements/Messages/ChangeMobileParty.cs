@@ -1,14 +1,14 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
 
-namespace GameInterface.Services.Settlements;
+namespace GameInterface.Services.Settlements.Messages;
 
 
 /// <summary>
 /// Notify GameInterface to change value.
 /// </summary>
 [BatchLogMessage]
-public record  ChangeMobileParty : ICommand
+public record ChangeMobileParty : ICommand
 {
     public string SettlementId { get; }
     public string MobilePartyId { get; }
