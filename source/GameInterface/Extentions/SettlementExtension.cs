@@ -29,6 +29,9 @@ internal static class SettlementExtension
 
     private static readonly FieldInfo _numberOfLordPartiesAt = typeof(Settlement).GetField("_numberOfLordPartiesAt", BindingFlags.NonPublic | BindingFlags.Instance);
 
+    private static readonly FieldInfo _settlementWallSectionHitPointsRatioList = typeof(Settlement).GetField("._settlementWallSectionHitPointsRatioList", BindingFlags.NonPublic | BindingFlags.Instance);
+
+
 
     public static void SetLastThreatTimeChanged(this Settlement component, long? lastThreatTime)
     {
@@ -101,5 +104,10 @@ internal static class SettlementExtension
     public static void SetNumberOfLordPartiesAt(this Settlement component, int lordParties)
     {
         _numberOfLordPartiesAt.SetValue(component, lordParties);
+    }
+
+    public static MBList<float> GetSettlementWallSectionHitPointsRatioList(this Settlement component)
+    {
+        return (MBList<float>)_settlementWallSectionHitPointsRatioList.GetValue(component);
     }
 }

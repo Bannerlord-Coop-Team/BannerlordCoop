@@ -32,8 +32,18 @@ internal class ServerSettlementHandler : IHandler
 
         messageBroker.Subscribe<SettlementChangedMobileParty>(HandleChangedMobileParty);
 
+        messageBroker.Subscribe<SettlementWallHitPointsRatioChanged>(HandleWallRatio);
 
 
+
+
+    }
+
+    private void HandleWallRatio(MessagePayload<SettlementWallHitPointsRatioChanged> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeWallHitPointsRatio(obj.SettlementId, obj.index, obj.hitPointsRatio);
+        network.SendAll(message);
     }
 
     private void HandleChangedMobileParty(MessagePayload<SettlementChangedMobileParty> payload)
@@ -133,6 +143,7 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedAddHeroWithoutParty>(HandleAddHeroWithoutParty);
 
         messageBroker.Unsubscribe<SettlementChangedMobileParty>(HandleChangedMobileParty);
+        messageBroker.Unsubscribe<SettlementWallHitPointsRatioChanged>(HandleWallRatio);
 
     }
 }
