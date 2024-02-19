@@ -86,10 +86,15 @@ public class ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatc
         if (ModInformation.IsServer) return;
 
         instance.ClaimValue = claimValue;
+        MessageBroker.Instance.Publish(instance, new LordConversationCampaignBehaviourPlayerChangedClaimValue(instance.StringId, claimValue));
+    }
 
-
-
-
+    internal static void RunClaimedValue(Settlement settlement, float newValue)
+    {
+        using (new AllowedThread())
+        {
+            settlement.ClaimValue = newValue;
+        }
     }
 
 }
