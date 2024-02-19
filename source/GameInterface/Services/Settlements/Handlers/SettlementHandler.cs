@@ -37,7 +37,21 @@ public class SettlementHandler : IHandler
         messageBroker.Subscribe<ChangeMobileParty>(HandleMobileParty);
         messageBroker.Subscribe<ChangeSettlementWallHitPointsRatio>(HandleHitPointsRatio);
 
+        messageBroker.Subscribe<ChangeSettlementLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 
+
+
+    }
+
+    private void HandleLastVisitTimeOfOwner(MessagePayload<ChangeSettlementLastVisitTimeOfOwner> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Settlement>(obj.SettlementID, out var settlement) == false)
+        {
+            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementID);
+            return;
+        }
+        LastVisitTimeOwnerSettlementActionPatch.RunLastVisitTimeOfOwner(settlement, obj.CurrentTime);
     }
 
     private void HandleHitPointsRatio(MessagePayload<ChangeSettlementWallHitPointsRatio> payload)
@@ -237,6 +251,7 @@ public class SettlementHandler : IHandler
         messageBroker.Unsubscribe<ChangeSettlementHeroWithoutParty>(HandleHeroWithoutParty);
         messageBroker.Unsubscribe<ChangeSettlementHeroWithoutPartyRemove>(HandleHeroRemoveWithoutParty);
         messageBroker.Unsubscribe<ChangeSettlementWallHitPointsRatio>(HandleHitPointsRatio);
+        messageBroker.Unsubscribe<ChangeSettlementLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 
     }
 }

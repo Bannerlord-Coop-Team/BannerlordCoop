@@ -49,7 +49,6 @@ internal class LastThreatTimeSettlementPatch
                 settlement.SetLastThreatTimeChanged(lastThreatTime);
             }
         });
-
     }
 
 

@@ -34,9 +34,18 @@ internal class ServerSettlementHandler : IHandler
 
         messageBroker.Subscribe<SettlementWallHitPointsRatioChanged>(HandleWallRatio);
 
+        messageBroker.Subscribe<SettlementChangedLastVisitTimeOfOwner>(HandleLastVisitOfOwner);
 
 
 
+
+
+    }
+
+    private void HandleLastVisitOfOwner(MessagePayload<SettlementChangedLastVisitTimeOfOwner> payload)
+    {
+        var obj = payload.What;
+        network.SendAll(new NetworkChangeLastVisitTimeOfOwner(obj.SettlementID, obj.CurrentTime));
     }
 
     private void HandleWallRatio(MessagePayload<SettlementWallHitPointsRatioChanged> payload)
@@ -144,6 +153,8 @@ internal class ServerSettlementHandler : IHandler
 
         messageBroker.Unsubscribe<SettlementChangedMobileParty>(HandleChangedMobileParty);
         messageBroker.Unsubscribe<SettlementWallHitPointsRatioChanged>(HandleWallRatio);
+        messageBroker.Unsubscribe<SettlementChangedLastVisitTimeOfOwner>(HandleLastVisitOfOwner);
+
 
     }
 }
