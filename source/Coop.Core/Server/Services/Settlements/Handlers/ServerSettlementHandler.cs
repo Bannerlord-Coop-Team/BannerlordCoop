@@ -41,10 +41,18 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
         messageBroker.Subscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaimValue>(HandleLordConversationCampaignBehaviorPlayerClaimValue);
 
+        //Settlement.CanBeClaimed
+        messageBroker.Subscribe<SettlementClaimantCanBeClaimedChanged>(HandleSettlementClaimaintCanBeClaimed);
 
 
 
 
+    }
+
+    private void HandleSettlementClaimaintCanBeClaimed(MessagePayload<SettlementClaimantCanBeClaimedChanged> payload)
+    {
+        var obj = payload.What;
+        network.SendAll(new NetworkChangeSettlementClaimantCanBeClaimed(obj.SettlementId, obj.CanBeClaimed)); 
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaimValue(MessagePayload<ClientChangeLordConversationCampaignBehaviorPlayerClaimValue> payload)
@@ -180,6 +188,8 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Unsubscribe<SettlementChangedLastVisitTimeOfOwner>(HandleLastVisitOfOwner);
         messageBroker.Unsubscribe<ClientChangeLordConversationCampaignBehaviorPlayerClaim>(HandleLordConversationCampaignBehaviorPlayerClaim);
 
+        //Settlement.CanBeClaimed
+        messageBroker.Unsubscribe<SettlementClaimantCanBeClaimedChanged>(HandleSettlementClaimaintCanBeClaimed);
 
     }
 }
