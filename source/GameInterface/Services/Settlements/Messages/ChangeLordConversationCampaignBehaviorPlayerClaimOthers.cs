@@ -4,6 +4,9 @@ using System.Collections.Generic;
 using System.Text;
 
 namespace GameInterface.Services.Settlements.Messages;
+/// <summary>
+/// Changes other clients claim
+/// </summary>
 public record class ChangeLordConversationCampaignBehaviorPlayerClaimOthers : ICommand
 {
     public string SettlementId { get; }
