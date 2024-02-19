@@ -4,6 +4,9 @@ using ProtoBuf;
 
 namespace Coop.Core.Client.Services.Settlements.Messages;
 
+/// <summary>
+/// Client notifies server of claim request
+/// </summary>
 [BatchLogMessage]
 [ProtoContract(SkipConstructor = true)] 
 public record ClientChangeLordConversationCampaignBehaviorPlayerClaim : IEvent

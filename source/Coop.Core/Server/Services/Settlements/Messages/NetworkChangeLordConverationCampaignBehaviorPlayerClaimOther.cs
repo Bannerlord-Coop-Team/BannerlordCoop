@@ -7,6 +7,9 @@ using System.Text;
 
 namespace Coop.Core.Server.Services.Settlements.Messages;
 
+/// <summary>
+/// Server notifies other clients of request.
+/// </summary>
 [BatchLogMessage]
 [ProtoContract(SkipConstructor = true)]
 public record NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther : IEvent

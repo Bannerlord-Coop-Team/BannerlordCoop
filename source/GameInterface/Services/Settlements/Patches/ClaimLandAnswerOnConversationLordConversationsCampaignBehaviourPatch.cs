@@ -13,6 +13,9 @@ using GameInterface.Services.Settlements.Messages;
 
 namespace GameInterface.Services.Settlements.Patches;
 
+/// <summary>
+/// Transpiler to patch Settlement.Claimedby and Settlement.ClaimValue
+/// </summary>
 [HarmonyPatch(typeof(LordConversationsCampaignBehavior))]
 public class ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch
 {

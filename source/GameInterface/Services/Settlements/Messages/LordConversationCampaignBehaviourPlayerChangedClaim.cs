@@ -2,7 +2,9 @@
 using Common.Messaging;
 
 namespace GameInterface.Services.Settlements.Messages;
-
+/// <summary>
+/// When client requests to change claim
+/// </summary>
 [BatchLogMessage]
 public record LordConversationCampaignBehaviourPlayerChangedClaim : ICommand
 {
