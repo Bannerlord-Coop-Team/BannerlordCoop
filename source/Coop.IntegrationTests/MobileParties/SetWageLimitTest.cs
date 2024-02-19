@@ -13,7 +13,7 @@ public class SetWageLimitTest
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
     [Fact]
-    public void ServerMobilePartyWageLimitOverride_Publishes_Server_ToClients()
+    public void ClientMobilePartyWageLimitOverride_Publishes_Server_ToClients()
     {
         string mobilePartyId = "MobileParty1";
         int newValue = 20;

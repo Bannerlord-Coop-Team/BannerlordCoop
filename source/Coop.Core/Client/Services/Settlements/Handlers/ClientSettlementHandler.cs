@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.Services.Settlements.Messages;
 using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.Settlements;
 using GameInterface.Services.Settlements.Messages;
@@ -31,8 +32,25 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Subscribe<NetworkChangeWallHitPointsRatio>(HandleHitPointsRatio);
         messageBroker.Subscribe<NetworkChangeLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
 
+        messageBroker.Subscribe<LordConversationCampaignBehaviourPlayerChangedClaim>(HandleClientCampaignBehaviorClaim);
 
+        messageBroker.Subscribe<LordConversationCampaignBehaviourPlayerChangedClaim>(HandleClientCampaignBehaviorClaim);
 
+        messageBroker.Subscribe<NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther>(HandleClientOthersCampaignBehaviorClaim);
+
+    }
+
+    private void HandleClientOthersCampaignBehaviorClaim(MessagePayload<NetworkChangeLordConverationCampaignBehaviorPlayerClaimOther> payload)
+    {
+        var obj = payload.What;
+
+        messageBroker.Publish(this, new ChangeLordConversationCampaignBehaviorPlayerClaimOthers(obj.SettlementId, obj.HeroId));
+    }
+
+    private void HandleClientCampaignBehaviorClaim(MessagePayload<LordConversationCampaignBehaviourPlayerChangedClaim> payload)
+    {
+        var obj = payload.What;
+        network.SendAll(new ClientChangeLordConversationCampaignBehaviorPlayerClaim(obj.SettlementId, obj.HeroId));
     }
 
     private void HandleLastVisitTimeOfOwner(MessagePayload<NetworkChangeLastVisitTimeOfOwner> payload)
@@ -151,6 +169,7 @@ internal class ClientSettlementHandler : IHandler
         messageBroker.Unsubscribe<NetworkChangeSettlementNotablesCache>(HandleCollectNotablesToCache);
         messageBroker.Unsubscribe<NetworkChangeSettlementMobileParty>(HandleMobileParty);
         messageBroker.Unsubscribe<NetworkChangeLastVisitTimeOfOwner>(HandleLastVisitTimeOfOwner);
+        messageBroker.Unsubscribe<LordConversationCampaignBehaviourPlayerChangedClaim>(HandleClientCampaignBehaviorClaim);
 
     }
 }
