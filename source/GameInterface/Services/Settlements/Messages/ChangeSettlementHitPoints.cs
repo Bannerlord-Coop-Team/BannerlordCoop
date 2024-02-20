@@ -3,7 +3,7 @@
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// Le tthe client know to change Settlement hit points
+/// Let the client know to change Settlement hit points
 /// </summary>
 public record ChangeSettlementHitPoints : ICommand
 {
