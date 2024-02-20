@@ -7,7 +7,7 @@ namespace GameInterface.Services.Settlements.Messages;
 /// Notify server to send Settlement.LastVistTimeOfOwner change.
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedLastVisitTimeOfOwner : ICommand
+public record SettlementChangedLastVisitTimeOfOwner : IEvent
 {
     public string SettlementID { get; }
     public float CurrentTime { get; }

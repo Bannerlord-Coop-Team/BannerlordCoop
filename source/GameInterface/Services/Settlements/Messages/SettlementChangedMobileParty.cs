@@ -8,7 +8,7 @@ namespace GameInterface.Services.Settlements.Messages;
 /// Notify Server to send message about mobileparty cache change
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedMobileParty : ICommand
+public record SettlementChangedMobileParty : IEvent
 {
     public string SettlementId { get; }
     public string MobilePartyId { get; }

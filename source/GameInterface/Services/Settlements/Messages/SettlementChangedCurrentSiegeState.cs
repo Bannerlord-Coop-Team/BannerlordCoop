@@ -6,9 +6,8 @@ namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
 /// Used to let server send message when seigestate changes.
 /// </summary>
-/// 
 [BatchLogMessage]
-public record SettlementChangedCurrentSiegeState : ICommand
+public record SettlementChangedCurrentSiegeState : IEvent
 {
     public string SettlementId { get; }
     public short CurrentSiegeState { get; }

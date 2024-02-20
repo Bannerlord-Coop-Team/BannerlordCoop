@@ -6,7 +6,7 @@ namespace GameInterface.Services.Settlements.Messages;
 /// Notify server of Militia value change
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedMilitia : ICommand
+public record SettlementChangedMilitia : IEvent
 {
     public string SettlementId { get; }
     public float Militia { get; }

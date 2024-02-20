@@ -3,9 +3,9 @@
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// When the server changes BribePaid
+/// When the npc pays a BribePaid
 /// </summary>
-public record SettlementChangedBribePaid : ICommand
+public record SettlementChangedBribePaid : IEvent
 {
 
     public string SettlementId { get; }

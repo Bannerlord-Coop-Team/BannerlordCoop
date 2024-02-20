@@ -3,7 +3,7 @@
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// 
+///  Change ticks of last attacker (time)
 /// </summary>
 public record ChangeSettlementLastThreatTime : ICommand
 {

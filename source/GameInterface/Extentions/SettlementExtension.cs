@@ -8,6 +8,10 @@ using TaleWorlds.Library;
 using static TaleWorlds.CampaignSystem.Settlements.Settlement;
 
 namespace GameInterface.Extentions;
+
+/// <summary>
+/// Adds additional reflection functions for Settlements
+/// </summary>
 internal static class SettlementExtension
 {
     private static readonly PropertyInfo Settlement_LastThreatTime = typeof(Settlement).GetProperty(nameof(Settlement.LastThreatTime));

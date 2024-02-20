@@ -6,8 +6,11 @@ using System.Text;
 
 namespace GameInterface.Services.Settlements.Messages;
 
+/// <summary>
+/// Settlement Client changed garrison wage
+/// </summary>
 [BatchLogMessage]
-public record SettlementChangedGarrisonWageLimit : ICommand
+public record SettlementChangedGarrisonWageLimit : IEvent
 {
     public string SettlementId { get; }
     public int GarrisonWagePaymentLimit { get; }

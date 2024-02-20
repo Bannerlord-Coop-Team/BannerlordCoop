@@ -3,7 +3,7 @@ using Common.Messaging;
 
 namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
-/// change herowithoutparty
+/// Notify clients to Add a HeroWithoutParty to Cache.
 /// </summary>
 [BatchLogMessage]
 public record ChangeSettlementHeroWithoutParty : ICommand

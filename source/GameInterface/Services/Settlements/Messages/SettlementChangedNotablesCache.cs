@@ -10,7 +10,7 @@ namespace GameInterface.Services.Settlements.Messages;
 /// </summary>
 /// 
 [BatchLogMessage]
-public record SettlementChangedNotablesCache : ICommand
+public record SettlementChangedNotablesCache : IEvent
 {
     public string SettlementId { get; }
     public List<string> NotablesCache { get; }

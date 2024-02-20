@@ -57,14 +57,6 @@ internal class WageChangesSettlementPatch
         var message = new ChangedWagePaymentLimit(instance.StringId, newValue);
         MessageBroker.Instance.Publish(instance, message);
 
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            using (new AllowedThread())
-            {
-                instance.SetWagePaymentLimit(newValue);
-            }
-        });
-
     }
 
 }

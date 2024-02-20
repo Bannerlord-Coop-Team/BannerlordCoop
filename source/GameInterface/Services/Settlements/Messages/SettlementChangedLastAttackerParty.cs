@@ -5,7 +5,7 @@ namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
 ///  Changed of Settlement.LastAttackerParty
 /// </summary>
-public record SettlementChangedLastAttackerParty : ICommand
+public record SettlementChangedLastAttackerParty : IEvent
 {
     public string SettlementId { get; }
 

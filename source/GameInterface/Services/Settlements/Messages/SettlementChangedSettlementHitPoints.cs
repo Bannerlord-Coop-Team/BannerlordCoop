@@ -7,7 +7,7 @@ namespace GameInterface.Services.Settlements.Messages;
 /// When the Settlement Hit points changes.
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedSettlementHitPoints : ICommand
+public record SettlementChangedSettlementHitPoints : IEvent
 {
 
     public string SettlementId { get; }

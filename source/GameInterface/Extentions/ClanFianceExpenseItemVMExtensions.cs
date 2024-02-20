@@ -6,6 +6,10 @@ using System.Text;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 
 namespace GameInterface.Extentions;
+
+/// <summary>
+/// Function extensions for  ClanFianceExpenseItemVM
+/// </summary>
 public static class ClanFianceExpenseItemVMExtensions
 {
     public static void OnCurrentWageLimitUpdated(this ClanFinanceExpenseItemVM vm, int newValue)

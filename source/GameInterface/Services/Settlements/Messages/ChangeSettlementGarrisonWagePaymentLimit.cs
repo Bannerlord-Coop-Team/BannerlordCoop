@@ -7,9 +7,8 @@ using System.Text;
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// sent to client
+/// Change Garrison Wage Limit once approved by server
 /// </summary>
-/// 
 [BatchLogMessage]
 public record ChangeSettlementGarrisonWagePaymentLimit : ICommand
 {
