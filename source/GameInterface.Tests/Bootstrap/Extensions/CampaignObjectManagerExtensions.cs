@@ -12,11 +12,8 @@ namespace GameInterface.Tests.Bootstrap.Extensions
 {
     internal static class CampaignObjectManagerExtensions
     {
-        private static readonly MethodInfo CampaignObjectManager_AddMobileParty = 
-            typeof(CampaignObjectManager)
-            .GetMethod("AddMobileParty", 
-                BindingFlags.NonPublic | 
-                BindingFlags.Instance);
+        private static readonly MethodInfo CampaignObjectManager_AddMobileParty = typeof(CampaignObjectManager)
+            .GetMethod("AddMobileParty", BindingFlags.NonPublic |  BindingFlags.Instance)!;
 
         private static Action<CampaignObjectManager, MobileParty> AddMobileParty_Delegate = 
             (Action<CampaignObjectManager, MobileParty>)Delegate.CreateDelegate(typeof(Action<CampaignObjectManager, MobileParty>), 
@@ -27,11 +24,8 @@ namespace GameInterface.Tests.Bootstrap.Extensions
             AddMobileParty_Delegate(objectManager, party);
         }
 
-        private static readonly MethodInfo CampaignObjectManager_AddHero =
-            typeof(CampaignObjectManager)
-            .GetMethod("AddHero",
-                BindingFlags.NonPublic |
-                BindingFlags.Instance);
+        private static readonly MethodInfo CampaignObjectManager_AddHero = typeof(CampaignObjectManager)
+            .GetMethod("AddHero", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         private static Action<CampaignObjectManager, Hero> AddHero_Delegate =
             (Action<CampaignObjectManager, Hero>)Delegate.CreateDelegate(typeof(Action<CampaignObjectManager, Hero>),

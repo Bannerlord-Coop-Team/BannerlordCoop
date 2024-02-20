@@ -1,11 +1,17 @@
 ﻿using Autofac;
+using Common.Logging;
+using Common.Messaging;
+using Common.Util;
+using Serilog;
 using System;
 using System.Threading;
 
 namespace GameInterface;
 
-public static class ContainerProvider
+public class ContainerProvider
 {
+    private static ILogger Logger = LogManager.GetLogger<ContainerProvider>();
+
     private static ILifetimeScope _lifetimeScope;
 
     public static void SetContainer(ILifetimeScope lifetimeScope)
@@ -20,7 +26,18 @@ public static class ContainerProvider
     {
         lifetimeScope = _lifetimeScope;
 
-        return lifetimeScope != null;
+        if (lifetimeScope == null)
+        {
+            var callStack = Environment.StackTrace;
+            Logger.Error("{name} was not setup properly, try using {setupFnName}\n" +
+                "CallStack: {callStack}",
+                nameof(ContainerProvider),
+                nameof(SetContainer),
+                callStack);
+            return false;
+        }
+
+        return true;
     }
 
     public static bool TryResolve<T>(out T instance) where T : class
@@ -29,7 +46,17 @@ public static class ContainerProvider
 
         if (TryGetContainer(out var container) == false) return false;
 
-        return container.TryResolve(out instance);
+        if (container.TryResolve(out instance) == false)
+        {
+            var callStack = Environment.StackTrace;
+            Logger.Error("Unable to reslove {name}\n" + 
+                "CallStack: {callStack}",
+                typeof(T).Name,
+                callStack);
+            return false;
+        }
+
+        return true;
     }
 
     public static IDisposable UseContainerThreadSafe(ILifetimeScope lifetimeScope)

@@ -42,8 +42,8 @@ internal class SettlementCommands
 
         if (objectManager.Contains(settlementId) == false) return $"{settlementId} does not exist";
 
-        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false) 
-            throw new Exception($"{settlementId} was in object manager but was unable to be resolved");
+        if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
+            return $"{settlementId} was in object manager but was not of type Settlement";
 
         return $"Settlement Name: {settlement.Name}";
     }
