@@ -1,4 +1,4 @@
-﻿using Common.Logging.Attributes;
+using Common.Logging.Attributes;
 using Common.Messaging;
 
 namespace GameInterface.Services.Villages.Messages;
