@@ -24,6 +24,15 @@ internal class WageChangesSettlementPatch
     private static MethodInfo MobileParty_SetWagePaymentLimitOverride =
         typeof(WageChangesSettlementPatch).GetMethod(nameof(SetWagePaymentLimitOverride), BindingFlags.NonPublic | BindingFlags.Static);
 
+    // TODO: Needs more testing to verify it works
+    static IEnumerable<MethodBase> TargetMethods()
+    {
+        // if possible use nameof() or SymbolExtensions.GetMethodInfo() here
+        yield return AccessTools.Method(typeof(ClanFinanceExpenseItemVM), "OnUnlimitedWageToggled");
+        yield return AccessTools.Method(typeof(ClanFinanceExpenseItemVM), "OnCurrentWageLimitUpdated");
+
+    }
+
 
     [HarmonyPatch("OnUnlimitedWageToggled")]
     [HarmonyPatch("OnCurrentWageLimitUpdated")]

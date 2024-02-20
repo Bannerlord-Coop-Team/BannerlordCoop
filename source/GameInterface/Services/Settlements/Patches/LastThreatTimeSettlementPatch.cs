@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using Coop.Mod.Extentions;
@@ -6,6 +7,7 @@ using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -19,14 +21,23 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(Settlement))]
 internal class LastThreatTimeSettlementPatch
 {
+    private static ILogger Logger = LogManager.GetLogger<Settlement>();
+
+
+
     [HarmonyPatch(nameof(Settlement.LastThreatTime), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool LastThreatTimePrefix(ref Settlement __instance, ref CampaignTime value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Settlement), Environment.StackTrace);
+            return true;
+        }
+
 
 
         // can pass null so always ensure to just set the value

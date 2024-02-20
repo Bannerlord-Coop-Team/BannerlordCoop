@@ -1,9 +1,14 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
+using Serilog;
+using Serilog.Core;
+using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Patches;
@@ -15,13 +20,21 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(Settlement))]
 internal class BribePaidSettlementPatch
 {
+
+    private static ILogger Logger = LogManager.GetLogger<Settlement>();
+
     [HarmonyPatch(nameof(Settlement.BribePaid),MethodType.Setter)]
     [HarmonyPrefix]
     private static bool BribePaidPrefix(ref Settlement __instance, ref int value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-        if (ModInformation.IsClient) return false;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Settlement), Environment.StackTrace);
+            return true;
+        }
 
         if (__instance.BribePaid == value) return false;
 

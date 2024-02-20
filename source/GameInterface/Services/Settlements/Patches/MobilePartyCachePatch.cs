@@ -1,10 +1,13 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
+using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -16,15 +19,21 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(Settlement))]
 public class MobilePartyCachePatch
 {
+    private static ILogger Logger = LogManager.GetLogger<Settlement>();
+
 
     [HarmonyPatch("AddMobileParty")]
     [HarmonyPrefix]
     private static bool AddMobilePartyPrefix(ref Settlement __instance, ref MobileParty mobileParty)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Settlement), Environment.StackTrace);
+            return true;
+        }
 
         var partiesCache = __instance.GetPartiesCache();
 

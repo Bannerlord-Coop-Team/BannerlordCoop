@@ -185,6 +185,7 @@ public class SettlementHandler : IHandler
             Logger.Error("Unable to find Hero ({HeroStringId})", obj.HeroId);
             return;
         }
+        // may not need to run because its cached ~100ms
         //HeroWithoutPartyPatch.RunRemoveHeroWithoutParty(settlement, hero);
 
     }
@@ -203,7 +204,7 @@ public class SettlementHandler : IHandler
             Logger.Error("Unable to find Hero ({HeroStringId})", obj.HeroId);
             return;
         }
-
+        // may not need to run because its cached ~100ms
         //HeroWithoutPartyPatch.RunAddHeroWithoutParty(settlement, hero);
     }
 

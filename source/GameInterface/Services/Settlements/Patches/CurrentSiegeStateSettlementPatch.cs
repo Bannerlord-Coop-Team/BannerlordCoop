@@ -8,6 +8,10 @@ using Common.Messaging;
 using Common;
 using System.Reflection;
 using GameInterface.Extentions;
+using System;
+using Common.Logging;
+using Serilog;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Settlements.Patches;
 
@@ -18,15 +22,20 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(Settlement))]
 public class CurrentSiegeStateSettlementPatch
 {
+    private static ILogger Logger = LogManager.GetLogger<Settlement>();
 
     [HarmonyPatch(nameof(Settlement.CurrentSiegeState), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool CurrentSiegeStatePrefix(ref Settlement __instance, ref SiegeState value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Settlement), Environment.StackTrace);
+            return true;
+        }
 
         var message = new SettlementChangedCurrentSiegeState(__instance.StringId, (short)value);
 
