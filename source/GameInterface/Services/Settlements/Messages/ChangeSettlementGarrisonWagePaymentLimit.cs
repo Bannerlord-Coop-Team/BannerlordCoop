@@ -9,7 +9,6 @@ namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
 /// sent to client
 /// </summary>
-/// 
 [BatchLogMessage]
 public record ChangeSettlementGarrisonWagePaymentLimit : ICommand
 {
