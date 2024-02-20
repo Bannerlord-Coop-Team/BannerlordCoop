@@ -1,5 +1,4 @@
 ﻿using GameInterface.Extentions;
-using GameInterface.Services.MobileParties.Patches;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,7 +9,6 @@ using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.ClanManagement;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MobileParties.Commands
