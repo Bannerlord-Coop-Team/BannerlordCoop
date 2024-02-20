@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Enum;
 using ProtoBuf;
 
@@ -8,6 +9,7 @@ namespace Coop.Core.Server.Services.Time.Messages;
 /// Request time speed change command from a client
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
+[BatchLogMessage]
 public record NetworkRequestTimeSpeedChange : ICommand
 {
     [ProtoMember(1)]

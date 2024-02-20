@@ -2,7 +2,6 @@
 using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Template.Messages;
-
 /// <summary>
 /// TODO describe what message does
 /// </summary>

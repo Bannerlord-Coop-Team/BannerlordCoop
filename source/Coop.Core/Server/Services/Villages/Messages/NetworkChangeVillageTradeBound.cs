@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -10,6 +11,7 @@ namespace Coop.Core.Server.Services.Villages.Messages;
 /// Used to notify of TradeBound changes
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
+[BatchLogMessage]
 internal class NetworkChangeVillageTradeBound : IEvent
 {
     [ProtoMember(1)]
