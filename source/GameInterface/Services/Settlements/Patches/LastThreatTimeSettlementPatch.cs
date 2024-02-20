@@ -17,7 +17,9 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Patches;
 
-
+/// <summary>
+/// Patch for Settlement.LastThreatTime
+/// </summary>
 [HarmonyPatch(typeof(Settlement))]
 internal class LastThreatTimeSettlementPatch
 {
