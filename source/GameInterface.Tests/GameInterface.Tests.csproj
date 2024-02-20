@@ -83,6 +83,7 @@
       <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
       <Name>Common</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Coop.Core\Coop.Core.csproj" />
     <ProjectReference Include="..\Coop.Tests\Coop.Tests.csproj" />
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">
       <Project>{d22cb8fa-40cc-4f47-986f-1c5a4415980b}</Project>
