@@ -7,6 +7,9 @@ using System.Text;
 
 namespace Coop.Core.Server.Services.Settlements.Messages;
 
+/// <summary>
+/// Notify clients to remove hero without party
+/// </summary>
 [ProtoContract(SkipConstructor = true)]
 [BatchLogMessage]
 public record NetworkChangeSettlementRemoveHeroWithoutParty : IEvent
