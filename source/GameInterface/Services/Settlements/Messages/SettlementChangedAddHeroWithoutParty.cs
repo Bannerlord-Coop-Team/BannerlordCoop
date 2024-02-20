@@ -7,7 +7,7 @@ namespace GameInterface.Services.Settlements.Messages;
 /// When a hero is attached to hero cache
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedAddHeroWithoutParty : ICommand
+public record SettlementChangedAddHeroWithoutParty : IEvent
 {
     public string SettlementId { get; }
     public string HeroId {  get; }
