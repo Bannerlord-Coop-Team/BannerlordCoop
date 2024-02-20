@@ -22,7 +22,7 @@ public class MobilePartyCachePatch
     private static bool AddMobilePartyPrefix(ref Settlement __instance, ref MobileParty mobileParty)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
@@ -52,7 +52,7 @@ public class MobilePartyCachePatch
     private static bool RemoveMobilePartyPrefix(ref Settlement __instance, ref MobileParty mobileParty)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 

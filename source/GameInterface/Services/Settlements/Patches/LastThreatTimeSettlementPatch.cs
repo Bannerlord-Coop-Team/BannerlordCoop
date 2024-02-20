@@ -24,7 +24,7 @@ internal class LastThreatTimeSettlementPatch
     private static bool LastThreatTimePrefix(ref Settlement __instance, ref CampaignTime value)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 

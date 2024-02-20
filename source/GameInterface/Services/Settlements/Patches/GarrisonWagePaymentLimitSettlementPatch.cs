@@ -22,7 +22,7 @@ public class GarrisonWagePaymentLimitSettlementPatch
     private static bool GarrisonWagePaymentLimitPrefix(ref Settlement __instance, ref int value)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 

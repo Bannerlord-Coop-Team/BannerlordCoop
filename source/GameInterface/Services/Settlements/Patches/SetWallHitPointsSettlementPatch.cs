@@ -24,7 +24,7 @@ internal class SetWallHitPointsSettlementPatch
     private static bool SetWallSectionHitPointsRatioAtIndexPrefix(ref Settlement __instance, ref int index, ref float hitPointsRatio)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient) return false;
 
         var wallSectionHitPointsRatioList = __instance.GetSettlementWallSectionHitPointsRatioList();

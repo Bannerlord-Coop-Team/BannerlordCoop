@@ -21,7 +21,7 @@ public class LastAttackerPartySettlementPatch
     private static bool LastAttackerPartyPrefix(ref Settlement __instance, ref MobileParty value)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 

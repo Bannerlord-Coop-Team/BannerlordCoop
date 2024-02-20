@@ -24,7 +24,7 @@ public class CurrentSiegeStateSettlementPatch
     private static bool CurrentSiegeStatePrefix(ref Settlement __instance, ref SiegeState value)
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (PolicyProvider.AllowOriginalCalls) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
