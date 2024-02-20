@@ -18,3 +18,4 @@ public record NetworkServerMessageTemplate : IEvent
         SomeData = someData;
     }
 }
+}
