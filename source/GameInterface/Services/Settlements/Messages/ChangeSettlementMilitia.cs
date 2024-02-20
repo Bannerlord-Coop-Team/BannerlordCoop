@@ -6,7 +6,6 @@ namespace GameInterface.Services.Settlements.Messages;
 /// <summary>
 /// Notify gameinterface to change miltiia
 /// </summary>
-/// 
 [BatchLogMessage]
 public record ChangeSettlementMilitia : ICommand
 {
