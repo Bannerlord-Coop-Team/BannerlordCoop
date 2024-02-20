@@ -21,8 +21,18 @@ internal class ServerSettlementHandler : IHandler
 
         messageBroker.Subscribe<SettlementChangedBribePaid>(HandleBribePaid);
         messageBroker.Subscribe<SettlementChangedSettlementHitPoints>(HandleHitPoints);
+        messageBroker.Subscribe<SettlementChangedLastAttackerParty>(HandleLastAttackerParty);
 
 
+
+    }
+
+    private void HandleLastAttackerParty(MessagePayload<SettlementChangedLastAttackerParty> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeSettlementLastAttackerParty(obj.SettlementId, obj.AttackerPartyId);
+
+        network.SendAll(message);   
     }
 
     private void HandleHitPoints(MessagePayload<SettlementChangedSettlementHitPoints> payload)
@@ -46,5 +56,7 @@ internal class ServerSettlementHandler : IHandler
     {
         messageBroker.Unsubscribe<SettlementChangedBribePaid>(HandleBribePaid);
         messageBroker.Unsubscribe<SettlementChangedSettlementHitPoints>(HandleHitPoints);
+        messageBroker.Unsubscribe<SettlementChangedLastAttackerParty>(HandleLastAttackerParty);
+
     }
 }

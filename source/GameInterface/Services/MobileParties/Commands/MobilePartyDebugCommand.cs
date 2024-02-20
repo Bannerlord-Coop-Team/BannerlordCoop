@@ -4,6 +4,11 @@ using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;
 using System.Collections.Generic;
+<<<<<<< HEAD
+=======
+using System.Linq;
+using System.Reflection;
+>>>>>>> 32d693e6 (LastAttackerParty Patched)
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Extensions;
@@ -24,6 +29,7 @@ internal static class MobilePartyDebugCommand
             return "Usage: coop.debug.mobileparty.info <PartyStringID>";
         }
 
+<<<<<<< HEAD
         MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
 
         if(mobileParty == null )
@@ -132,5 +138,22 @@ internal static class MobilePartyDebugCommand
         }
 
         return auditor.Audit();
+=======
+        [CommandLineArgumentFunction("list", "coop.debug.mobileparty")]
+        public static string ListMobileParties(List<string> args)
+        {
+            StringBuilder stringBuilder = new StringBuilder();
+
+            List<MobileParty> mobileParty = Campaign.Current.CampaignObjectManager.MobileParties.ToList();
+
+            mobileParty.ForEach((party) =>
+            {
+                stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", party.StringId, party.Name));
+            });
+
+            return stringBuilder.ToString();
+        }
+
+>>>>>>> 32d693e6 (LastAttackerParty Patched)
     }
 }
