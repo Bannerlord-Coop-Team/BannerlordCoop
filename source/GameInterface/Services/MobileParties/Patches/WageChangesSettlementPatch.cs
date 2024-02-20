@@ -33,9 +33,6 @@ internal class WageChangesSettlementPatch
 
     }
 
-
-    [HarmonyPatch("OnUnlimitedWageToggled")]
-    [HarmonyPatch("OnCurrentWageLimitUpdated")]
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
