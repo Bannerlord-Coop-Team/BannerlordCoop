@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.Armies.Data;
 using ProtoBuf;
+using System.Collections.Generic;
 
 namespace Coop.Core.Client.Services.Armies.Messages;
 
@@ -10,13 +12,10 @@ namespace Coop.Core.Client.Services.Armies.Messages;
 public record NetworkAddMobilePartyInArmy : ICommand
 {
     [ProtoMember(1)]
-    public string MobilePartyId { get; }
-    [ProtoMember(2)]
-    public string LeaderMobilePartyId { get; }
+    public ArmyAddPartyData Data { get; }
 
-    public NetworkAddMobilePartyInArmy(string mobilePartyId, string leaderMobilePartyId)
+    public NetworkAddMobilePartyInArmy(ArmyAddPartyData data)
     {
-        MobilePartyId = mobilePartyId;
-        LeaderMobilePartyId = leaderMobilePartyId;
+        Data = data;
     }
 }

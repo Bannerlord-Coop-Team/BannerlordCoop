@@ -27,8 +27,18 @@ namespace Coop.Core.Client.Services.Towns.Handlers
             messageBroker.Subscribe<NetworkChangeTownGarrisonAutoRecruitmentIsEnabled>(HandleTownGarrisonAutoRecruitmentIsEnabled);
             messageBroker.Subscribe<NetworkChangeTownTradeTaxAccumulated>(HandleTownTradeTaxAccumulated);
             messageBroker.Subscribe<NetworkChangeTownSoldItems>(HandleTownSoldItems);
+            
+            messageBroker.Subscribe<TownAuditorSent>(HandleTownAuditor);
         }
 
+        private void HandleTownAuditor(MessagePayload<TownAuditorSent> obj)
+        {
+            TownAuditorSent townAuditorSent = obj.What;
+
+            // Broadcast to all the clients that the state was changed
+            NetworkChangeTownAuditor networkChangeTownAuditor = new NetworkChangeTownAuditor(townAuditorSent.Datas);
+            network.SendAll(networkChangeTownAuditor);
+        }
         private void HandleTownSoldItems(MessagePayload<NetworkChangeTownSoldItems> payload)
         {
             NetworkChangeTownSoldItems networkChangeTownSoldItems = payload.What;
@@ -103,6 +113,7 @@ namespace Coop.Core.Client.Services.Towns.Handlers
             messageBroker.Unsubscribe<NetworkChangeTownGarrisonAutoRecruitmentIsEnabled>(HandleTownGarrisonAutoRecruitmentIsEnabled);
             messageBroker.Unsubscribe<NetworkChangeTownTradeTaxAccumulated>(HandleTownTradeTaxAccumulated);
             messageBroker.Unsubscribe<NetworkChangeTownSoldItems>(HandleTownSoldItems);
+            messageBroker.Unsubscribe<TownAuditorSent>(HandleTownAuditor);
         }
     }
 }

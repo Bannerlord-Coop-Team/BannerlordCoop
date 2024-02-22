@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages.Lifetime;
 using Coop.Core.Server.Services.MobileParties.Messages.Lifetime;
+using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers;

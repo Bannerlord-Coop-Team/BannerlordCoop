@@ -11,9 +11,9 @@ namespace Coop.Core.Client.Services.Armies.Messages;
 public record NetworkDestroyArmy : ICommand
 {
     [ProtoMember(1)]
-    public ArmyDeletionData Data { get; }
+    public ArmyDestructionData Data { get; }
 
-    public NetworkDestroyArmy(ArmyDeletionData armyDeletionData)
+    public NetworkDestroyArmy(ArmyDestructionData armyDeletionData)
     {
         Data = armyDeletionData;
     }

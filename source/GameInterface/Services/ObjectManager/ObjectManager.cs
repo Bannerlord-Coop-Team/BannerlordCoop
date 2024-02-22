@@ -151,6 +151,9 @@ internal class ObjectManager : IObjectManager
 
     public bool TryGetId(object obj, out string id)
     {
+        id = null;
+        if (obj == null) return false;
+
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
             return registry.TryGetId(obj, out id);

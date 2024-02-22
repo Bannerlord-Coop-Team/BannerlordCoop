@@ -1,16 +1,12 @@
-using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.Partyes;
+namespace E2E.Tests.Services.MobileParties;
 
 public class PartyCreationTests : IDisposable
 {
@@ -34,23 +30,24 @@ public class PartyCreationTests : IDisposable
         var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
 
         // Act
-        MobileParty? serverParty = null;
+        string? partyId = null;
         server.Call(() =>
         {
-            serverParty = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
+            var party = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
             {
                 AccessTools.Method(typeof(LordPartyComponent), "InitializeLordPartyProperties")
                     .Invoke(partyComponent, new object[] { party, Vec2.Zero, 0, null });
             });
+
+            partyId = party.StringId;
         });
 
         // Assert
-        var newPartyStringId = serverParty?.StringId;
-        Assert.NotNull(newPartyStringId);
+        Assert.NotNull(partyId);
 
         foreach (var client in TestEnvironement.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(newPartyStringId, out var newParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
         }
     }
 
@@ -64,24 +61,24 @@ public class PartyCreationTests : IDisposable
         var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
 
         // Act
-        MobileParty? clientParty = null;
+        string? partyId = null;
         client1.Call(() =>
         {
-            clientParty = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
+            var clientParty = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
             {
                 AccessTools.Method(typeof(LordPartyComponent), "InitializeLordPartyProperties")
                     .Invoke(partyComponent, new object[] { party, Vec2.Zero, 0, null });
             });
+
+            partyId = clientParty.StringId;
         });
 
-        var newPartyStringId = clientParty?.StringId;
-
         // Assert
-        Assert.False(server.ObjectManager.TryGetObject<MobileParty>(newPartyStringId, out var _));
+        Assert.False(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
 
         foreach (var client in TestEnvironement.Clients)
         {
-            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(newPartyStringId, out var _));
+            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
         }
     }
 }

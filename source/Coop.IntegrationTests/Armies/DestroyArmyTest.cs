@@ -3,6 +3,7 @@ using Coop.Core.Client.Services.Armies.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Armies.Messages;
+using GameInterface.Services.Armies.Messages.Lifetime;
 using System.Runtime.Remoting;
 
 

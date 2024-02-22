@@ -1,6 +1,9 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 
 namespace GameInterface.Services.Villages.Messages;
+
+[BatchLogMessage]
 public record VillageTradeBoundChanged : IEvent
 {
     public string VillageId { get; }

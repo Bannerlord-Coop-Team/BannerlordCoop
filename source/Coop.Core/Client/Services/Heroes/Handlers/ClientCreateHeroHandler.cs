@@ -3,6 +3,7 @@ using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using Coop.Core.Server.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Messages.Lifetime;
 
 namespace Coop.Core.Client.Services.Heroes.Handlers;
 

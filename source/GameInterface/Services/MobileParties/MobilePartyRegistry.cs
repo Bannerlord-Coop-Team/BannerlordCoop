@@ -70,6 +70,4 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>
 
         Remove(stringId);
     }
-
-    
 }

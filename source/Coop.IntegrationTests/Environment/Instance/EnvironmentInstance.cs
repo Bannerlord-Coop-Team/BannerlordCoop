@@ -72,19 +72,16 @@ public abstract class EnvironmentInstance
         }
     }
 
-    private static SemaphoreSlim _sem = new SemaphoreSlim(1);
     /// <summary>
     /// Calls a given action with correctly setup static variables used by the patches
     /// </summary>
     /// <param name="callFunction">Function to call</param>
     public void Call(Action callFunction)
     {
-        _sem.Wait();
         using (new StaticScope(this))
         {
             callFunction();
         }
-        _sem.Release();
     }
 
     /// <summary>

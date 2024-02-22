@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using static TaleWorlds.CampaignSystem.Hero;
 
 namespace E2E.Tests.Util.ObjectBuilders;
 internal class HeroBuilder : IObjectBuilder
@@ -14,9 +11,15 @@ internal class HeroBuilder : IObjectBuilder
         var clan = GameObjectCreator.CreateInitializedObject<Clan>();
 
         var hero = HeroCreator.CreateSpecialHero(characterObject);
-
+        hero.ChangeState(CharacterStates.Active);
         hero.Clan = clan;
 
+        var partyBuilder = new MobilePartyBuilder();
+        var party = partyBuilder.BuildWithHero(hero);
+
+        AccessTools.Method(typeof(Hero), "SetPartyBelongedTo").Invoke(hero, new object[] { party });
+
+        
         return hero;
     }
 }

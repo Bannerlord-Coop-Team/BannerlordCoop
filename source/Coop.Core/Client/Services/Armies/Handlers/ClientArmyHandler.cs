@@ -20,44 +20,26 @@ public class ClientArmyHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<NetworkAddMobilePartyInArmy>(HandleMobilePartyInArmyAdd);
-        messageBroker.Subscribe<NetworkRemoveMobilePartyInArmy>(HandleMobilePartyInArmyRemove);
-        messageBroker.Subscribe<NetworkCreateArmy>(HandleCreateArmy);
-        messageBroker.Subscribe<NetworkDestroyArmy>(HandleDisbandArmy);
-    }
-
-    private void HandleDisbandArmy(MessagePayload<NetworkDestroyArmy> payload)
-    {
-        var message = new DestroyArmy(payload.What.Data);
-        messageBroker.Publish(this, message);
-    }
-
-    private void HandleCreateArmy(MessagePayload<NetworkCreateArmy> payload)
-    {
-        var message = new CreateArmy(payload.What.Data);
-        messageBroker.Publish(this, message);
-    }
-
-    private void HandleMobilePartyInArmyAdd(MessagePayload<NetworkAddMobilePartyInArmy> payload)
-    {
-        var obj = payload.What;
-        var message = new AddMobilePartyInArmy(obj.MobilePartyId, obj.LeaderMobilePartyId);
-
-        messageBroker.Publish(this, message);
-    }
-
-    private void HandleMobilePartyInArmyRemove(MessagePayload<NetworkRemoveMobilePartyInArmy> payload)
-    {
-        var obj = payload.What;
-        var message = new RemoveMobilePartyInArmy(obj.MobilePartyId, obj.LeaderMobilePartyId);
-
-        messageBroker.Publish(this, message);
+        messageBroker.Subscribe<NetworkRemovePartyInArmy>(HandleMobilePartyInArmyRemove);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkAddMobilePartyInArmy>(HandleMobilePartyInArmyAdd);
-        messageBroker.Unsubscribe<NetworkRemoveMobilePartyInArmy>(HandleMobilePartyInArmyRemove);
-        messageBroker.Unsubscribe<NetworkCreateArmy>(HandleCreateArmy);
-        messageBroker.Unsubscribe<NetworkDestroyArmy>(HandleDisbandArmy);
+        messageBroker.Unsubscribe<NetworkRemovePartyInArmy>(HandleMobilePartyInArmyRemove);
+    }
+
+    private void HandleMobilePartyInArmyAdd(MessagePayload<NetworkAddMobilePartyInArmy> payload)
+    {
+        var message = new AddMobilePartyInArmy(payload.What.Data);
+
+        messageBroker.Publish(this, message);
+    }
+
+    private void HandleMobilePartyInArmyRemove(MessagePayload<NetworkRemovePartyInArmy> payload)
+    {
+        var message = new RemovePartyInArmy(payload.What.Data);
+
+        messageBroker.Publish(this, message);
     }
 }

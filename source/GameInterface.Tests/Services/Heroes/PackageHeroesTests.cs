@@ -1,13 +1,8 @@
 ﻿using Autofac;
-using Common.Messaging;
-using Common.Network;
-using Coop.Core.Common.Configuration;
-using Coop.Tests.Mocks;
 using GameInterface.Services.Registry;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Extensions;
 using System;
-using System.Collections.Generic;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using Xunit;
