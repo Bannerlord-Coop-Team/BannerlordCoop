@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Client.Services.Settlements.Messages;
 using Coop.Core.Server.Services.Settlements.Messages;
+using GameInterface.Services.Settlements.Audit;
 using GameInterface.Services.Settlements.Messages;
 using LiteNetLib;
 using System;
@@ -45,7 +46,27 @@ internal class ServerSettlementHandler : IHandler
         messageBroker.Subscribe<SettlementClaimantCanBeClaimedChanged>(HandleSettlementClaimaintCanBeClaimed);
 
 
+        // auditor
+        messageBroker.Subscribe<RequestSettlementAudit>(Handle_Request);
+        // send back to client
+        messageBroker.Subscribe<SettlementAuditResponse>(Handle_Respond);
 
+
+
+
+    }
+
+    private void Handle_Respond(MessagePayload<SettlementAuditResponse> payload)
+    {
+        var obj = payload.What;
+        network.SendAll(new NetworkSettlementAuditResults(obj.Data, obj.ServerAuditResults));
+    }
+
+    private void Handle_Request(MessagePayload<RequestSettlementAudit> payload)
+    {
+
+        var message = new ProcessSettlementAudit(payload.What.Data);
+        messageBroker.Publish(this, message);
 
     }
 

@@ -11,7 +11,7 @@ namespace GameInterface.Services.Settlements.Audit;
 /// </summary>
 /// 
 [ProtoContract(SkipConstructor = true)]
-internal record SettlementAuditResponse : IEvent
+public record SettlementAuditResponse : IEvent
 {
     [ProtoMember(1)]
     public SettlementAuditData[] Data { get; }
