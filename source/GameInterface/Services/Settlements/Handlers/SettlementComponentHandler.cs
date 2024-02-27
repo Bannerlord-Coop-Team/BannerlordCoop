@@ -22,6 +22,17 @@ namespace GameInterface.Services.Settlements.Handlers
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             messageBroker.Subscribe<SettlementComponentChangedGold>(GoldChanged);
+            messageBroker.Subscribe<SettlementComponentChangedIsOwnerUnassigned>(IsOwnerUnassignedChanged);
+        }
+
+        private void IsOwnerUnassignedChanged(MessagePayload<SettlementComponentChangedIsOwnerUnassigned> payload)
+        {
+            if (!objectManager.TryGetObject<SettlementComponent>(payload.What.SettlementComponentId, out var obj))
+            {
+                Logger.Error("Unable to find SettlementComponent ({SettlementComponentId})", obj.StringId);
+                return;
+            }
+            IsOwnerUnassignedSettlementComponentPatch.RunSettlementComponentIsOwnerUnassignedChanged(obj, payload.What.IsOwnerUnassigned);
         }
 
         private void GoldChanged(MessagePayload<SettlementComponentChangedGold> payload)
