@@ -281,7 +281,6 @@
     <Publicize Include="TaleWorlds.PlayerServices"/>
     <Publicize Include="TaleWorlds.PSAI"/>
     <Publicize Include="TaleWorlds.SaveSystem"/>
-    <Publicize Include="TaleWorlds.ScreenSystem"/>
     <Publicize Include="TaleWorlds.Starter.Library"/>
     <Publicize Include="TaleWorlds.TwoDimension"/>
     <Publicize Include="TaleWorlds.TwoDimension.Standalone"/>
