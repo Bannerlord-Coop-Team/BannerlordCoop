@@ -2,54 +2,71 @@
 using System;
 using System.IO;
 
-namespace Common.Serialization
+namespace Common.Serialization;
+
+public interface ICommonSerializer
 {
+    T Deserialize<T>(byte[] data);
+    object Deserialize(byte[] data);
+    byte[] Serialize(object obj);
+}
+
+public class ProtoBufSerializer : ICommonSerializer
+{
+    private readonly ISerializableTypeMapper typeMapper;
+
+    public ProtoBufSerializer(ISerializableTypeMapper typeMapper)
+    {
+        this.typeMapper = typeMapper;
+    }
+
+    public T Deserialize<T>(byte[] data)
+    {
+        return (T)Deserialize(data);
+    }
+
+    public object Deserialize(byte[] data)
+    {
+        using(var ms = new MemoryStream(data))
+        {
+            ProtoMessageWrapper wrapper = Serializer.Deserialize<ProtoMessageWrapper>(ms);
+
+            using (var internalStream = new MemoryStream(wrapper.Data))
+            {
+                if (typeMapper.TryGetType(wrapper.TypeId, out Type type) == false) return null;
+                return Serializer.NonGeneric.Deserialize(type, internalStream);
+            }
+        }
+    }
+
+    public byte[] Serialize(object obj)
+    {
+        if (typeMapper.TryGetId(obj.GetType(), out int typeId) == false) return null;
+        
+        using (MemoryStream memoryStream = new MemoryStream())
+        {
+            Serializer.Serialize(memoryStream, obj);
+            var wrapper = new ProtoMessageWrapper(typeId, memoryStream.ToArray());
+            using (MemoryStream internalStream = new MemoryStream())
+            {
+                Serializer.Serialize(internalStream, wrapper);
+                return internalStream.ToArray();
+            }
+        }
+    }
+
     [ProtoContract]
     internal readonly struct ProtoMessageWrapper
     {
         [ProtoMember(1)]
-        public Type Type { get; }
+        public int TypeId { get; }
         [ProtoMember(2)]
-        public byte[] ContractData { get; }
+        public byte[] Data { get; }
 
-        public ProtoMessageWrapper(Type type, byte[] contractData)
+        public ProtoMessageWrapper(int typeId, byte[] data)
         {
-            Type = type;
-            ContractData = contractData;
-        }
-    }
-
-    public class ProtoBufSerializer
-    {
-        public static T Deserialize<T>(byte[] data)
-        {
-            return (T)Deserialize(data);
-        }
-
-        public static object Deserialize(byte[] data)
-        {
-            using(var ms = new MemoryStream(data))
-            {
-                ProtoMessageWrapper wrapper = Serializer.Deserialize<ProtoMessageWrapper>(ms);
-                using (var internalStream = new MemoryStream(wrapper.ContractData))
-                {
-                    return Serializer.Deserialize(wrapper.Type, internalStream);
-                }
-            }
-        }
-
-        public static byte[] Serialize(object obj)
-        {
-            using (MemoryStream WrapperStream = new MemoryStream())
-            {
-                Serializer.Serialize(WrapperStream, obj);
-                var wrapper = new ProtoMessageWrapper(obj.GetType(), WrapperStream.ToArray());
-                using (MemoryStream InternalStream = new MemoryStream())
-                {
-                    Serializer.Serialize(InternalStream, wrapper);
-                    return InternalStream.ToArray();
-                }
-            }
+            TypeId = typeId;
+            Data = data;
         }
     }
 }

@@ -13,7 +13,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Xunit;
 
-namespace Coop.Tests.AutoSync;
+namespace GameInterface.Tests.AutoSync;
 public class EventGeneratorTests
 {
     private int TestInt { get; set; } = 5;
@@ -33,7 +33,7 @@ public class EventGeneratorTests
 
         // Act
         var dataType = dataClassCreator.GenerateClass(testIntProperty.PropertyType, testIntProperty.Name);
-        var eventType = eventClassCreator.GenerateEvent(moduleBuilder, dataType);
+        var eventType = eventClassCreator.GenerateEvent(moduleBuilder, testIntProperty.PropertyType);
 
         var dataClassInstance = Activator.CreateInstance(dataType, new object[] { "MyData", testIntProperty.GetValue(this)! });
         var eventInstance = Activator.CreateInstance(eventType, new object[] { dataClassInstance! });

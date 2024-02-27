@@ -38,7 +38,8 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     public CoopClient(
         INetworkConfiguration config,
         IMessageBroker messageBroker,
-        IPacketManager packetManager) : base(config)
+        IPacketManager packetManager,
+        ICommonSerializer serializer) : base(config, serializer)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
@@ -79,7 +80,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
+        IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
         packetManager.HandleReceive(peer, packet);
     }
 

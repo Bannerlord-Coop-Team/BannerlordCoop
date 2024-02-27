@@ -18,10 +18,10 @@ public class HarmonyPatchGenerator
     private readonly DataClassGenerator dataClassGenerator;
     private readonly TypeBuilder autoPatchType;
 
-    public HarmonyPatchGenerator(ModuleBuilder moduleBuilder, TypeBuilder autoPatchType)
+    public HarmonyPatchGenerator(ModuleBuilder moduleBuilder, PropertyInfo propertyInfo)
     {
         dataClassGenerator = new DataClassGenerator(moduleBuilder);
-        this.autoPatchType = autoPatchType;
+        autoPatchType = moduleBuilder.DefineType($"AutoSync_{propertyInfo.PropertyType.Name}_{propertyInfo.Name}_Patches");
     }
 
     public MethodInfo GenerateSetterPrefixPatch<T>(MethodInfo setMethod, Func<T, string> idGetterMethod) where T : class
@@ -55,7 +55,7 @@ public class HarmonyPatchGenerator
 
 
         ilGenerator.Emit(OpCodes.Call, AccessTools.Method(typeof(CallOriginalPolicy), nameof(CallOriginalPolicy.IsOriginalAllowed)));
-        ilGenerator.Emit(OpCodes.Brtrue, jumpTable[0]); ;
+        ilGenerator.Emit(OpCodes.Brtrue, jumpTable[0]);
 
         ilGenerator.Emit(OpCodes.Ldstr, valueType.Name);
         ilGenerator.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(IsClient)));

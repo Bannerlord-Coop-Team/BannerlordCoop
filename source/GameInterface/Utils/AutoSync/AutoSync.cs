@@ -2,6 +2,9 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Policies;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.AutoSync.Dynamic;
+using GameInterface.Utils.AutoSync.Template;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -14,69 +17,90 @@ using TaleWorlds.MountAndBlade.GauntletUI.Widgets.Map;
 
 namespace GameInterface.Utils.AutoSync;
 
-internal interface IAutoSync
+internal interface IAutoSync : IDisposable
 {
-    public void SyncProperty(PropertyInfo property);
+    public void SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetter) where T : class;
 }
 internal class AutoSync : IAutoSync
 {
     private readonly Harmony harmony;
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
-    private readonly PropertySync propertySync = new PropertySync();
+    private readonly IObjectManager objectManager;
+    private readonly ModuleBuilder moduleBuilder;
 
-    public AutoSync(Harmony harmony, INetwork network, IMessageBroker messageBroker)
+    private readonly List<IDisposable> disposables = new List<IDisposable>();
+
+    public AutoSync(Harmony harmony, INetwork network, IMessageBroker messageBroker, IObjectManager objectManager)
     {
         this.harmony = harmony;
         this.network = network;
         this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+        var assemblyName = new AssemblyName("AutoSyncDynamicAssembly");
+        AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
+        moduleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
     }
 
-    public void SyncProperty(PropertyInfo property)
+    public void Dispose()
     {
-        //propertySync.SyncProperty(property);
-
-
-
-        //var type = property.DeclaringType;
-        //var methodName = property.Name;
-        //var method = type.GetMethod("set_" + methodName);
-        //if (method == null)
-        //{
-        //    throw new Exception($"Property {methodName} does not have a setter");
-        //}
-        //var originalMethod = method.GetMethodBody().GetILAsByteArray();
-        //var prefix = new HarmonyMethod(typeof(AutoSync), nameof(Prefix));
-        //harmony.Patch(method, prefix: prefix);
+        disposables.ForEach(d => d.Dispose());
     }
 
-    private void ValidateProperty(PropertyInfo property)
+    public void SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetter) where T : class
     {
-        if (property.GetSetMethod() == null)
-        {
-            throw new Exception($"Property {property.Name} does not have a setter, try using a p");
-        }
+        var propertySync = new PropertySync(harmony, moduleBuilder, messageBroker, objectManager, network);
+
+        propertySync.SyncProperty(property, stringIdGetter);
+
+        disposables.Add(propertySync);
     }
-
-
-
 }
 
-public class PropertySync
+public class PropertySync : IDisposable
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PropertySync>();
+    private readonly Harmony harmony;
+    private readonly ModuleBuilder moduleBuilder;
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+    private readonly INetwork network;
+    private IDisposable handler;
 
-    private readonly Module AutoSyncModule = typeof(PropertySync).Module;
-
-    public void SyncProperty(PropertyInfo property)
+    public PropertySync(
+        Harmony harmony,
+        ModuleBuilder moduleBuilder,
+        IMessageBroker messageBroker,
+        IObjectManager objectManager, 
+        INetwork network)
     {
-        ValidateProperty(property);
-
-        var setMethod = property.GetSetMethod() ?? property.GetSetMethod(true);
-        var declaringType = property.DeclaringType;
+        this.harmony = harmony;
+        this.moduleBuilder = moduleBuilder;
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+        this.network = network;
     }
 
-    private void ValidateProperty(PropertyInfo property)
+    public void Dispose()
+    {
+        handler?.Dispose();
+    }
+
+    public void SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetterFn) where T : class
+    {
+        var setMethod = GetSetMethod(property);
+
+        var dataClassType = GenerateDataClass(property.PropertyType, property.Name);
+        var eventMessageType = GenerateEventMessage(dataClassType);
+        var patchMethod = GeneratePatch(property, stringIdGetterFn);
+        var handlerType = GenerateHandler(property, eventMessageType);
+
+        handler = (IDisposable)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network, Logger, property });
+
+        harmony.Patch(setMethod, prefix: new HarmonyMethod(patchMethod));
+    }
+
+    private MethodInfo GetSetMethod(PropertyInfo property)
     {
         var setMethod = property.GetSetMethod() ?? property.GetSetMethod(true);
 
@@ -84,5 +108,30 @@ public class PropertySync
         {
             throw new Exception($"Property {property.Name} does not have a setter, try looking for where the data comes from in the property getter");
         }
+
+        return setMethod;
+    }
+
+    private MethodInfo GeneratePatch<T>(PropertyInfo property, Func<T, string> stringIdGetterFn) where T : class
+    {
+        var patchGenerator = new HarmonyPatchGenerator(moduleBuilder, property);
+        return patchGenerator.GenerateSetterPrefixPatch(property.GetSetMethod(), stringIdGetterFn);
+    }
+
+    private Type GenerateDataClass(Type dataType, string propertyName)
+    {
+        var dataClassGenerator = new DataClassGenerator(moduleBuilder);
+        return dataClassGenerator.GenerateClass(dataType, propertyName);
+    }
+
+    private Type GenerateEventMessage(Type dataClassType)
+    {
+        var eventMessageGenerator = new EventMessageGenerator();
+        return eventMessageGenerator.GenerateEvent(moduleBuilder, dataClassType);
+    }
+
+    private Type GenerateHandler(PropertyInfo property, Type eventMessageType)
+    {
+        return typeof(AutoSyncHandlerTemplate<,,>).MakeGenericType(property.DeclaringType, property.PropertyType, eventMessageType);
     }
 }

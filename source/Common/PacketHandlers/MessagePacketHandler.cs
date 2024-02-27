@@ -22,20 +22,20 @@ namespace Common.PacketHandlers
 
         public PacketType PacketType => PacketType.Message;
 
-        private readonly IMessageBroker _messageBroker;
-        private readonly IPacketManager _packetManager;
+        private readonly IMessageBroker messageBroker;
+        private readonly IPacketManager packetManager;
 
         public MessagePacketHandler(IMessageBroker messageBroker, IPacketManager packetManager)
         {
-            _messageBroker = messageBroker;
-            _packetManager = packetManager;
+            this.messageBroker = messageBroker;
+            this.packetManager = packetManager;
 
-            _packetManager.RegisterPacketHandler(this);
+            this.packetManager.RegisterPacketHandler(this);
         }
 
         public virtual void Dispose()
         {
-            _packetManager.RemovePacketHandler(this);
+            packetManager.RemovePacketHandler(this);
         }
 
         protected static readonly MethodInfo Publish = typeof(IMessageBroker).GetMethod(nameof(IMessageBroker.Publish));
@@ -52,46 +52,35 @@ namespace Common.PacketHandlers
 
             PublishEvent(peer, networkEvent);
         }
-        private Dictionary<Type, Action<IMessageBroker, object, object>> publishFunctionLookup = new Dictionary<Type, Action<IMessageBroker, object, object>>();
+        private Dictionary<string, Action<IMessageBroker, object, object>> publishFunctionCache = new Dictionary<string, Action<IMessageBroker, object, object>>();
         internal virtual void PublishEvent(NetPeer peer, IMessage message)
         {
             var msgType = message.GetType();
-            if (publishFunctionLookup.TryGetValue(msgType, out var action))
+            if (publishFunctionCache.TryGetValue(msgType.FullName, out var action))
             {
-                action.Invoke(_messageBroker, peer, message);
+                action.Invoke(messageBroker, peer, message);
             }
             else
             {
                 var castedPublish = Publish.MakeGenericMethod(message.GetType());
-                publishFunctionLookup.Add(msgType, 
+                publishFunctionCache.Add(msgType.FullName, 
                     (messageBrokerParam, peerParam, messageParam) => castedPublish.Invoke(messageBrokerParam, new object[] { peerParam, messageParam }));
 
-                castedPublish.Invoke(_messageBroker, new object[] { peer, message });
+                castedPublish.Invoke(messageBroker, new object[] { peer, message });
             }
         }
     }
 
     [ProtoContract(SkipConstructor = true)]
-    public class MessagePacket : IPacket
+    public readonly struct MessagePacket : IPacket
     {
         public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
 
         public PacketType PacketType => PacketType.Message;
 
-        public IMessage Message
-        {
-            get
-            {
-                return (IMessage)ProtoBufSerializer.Deserialize(_message);
-            }
-            set
-            {
-                _message = ProtoBufSerializer.Serialize(value);
-            }
-        }
 
         [ProtoMember(1)]
-        private byte[] _message;
+        public IMessage Message { get; }
 
         public MessagePacket(IMessage message)
         {

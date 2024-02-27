@@ -1,9 +1,8 @@
 ﻿using Common.Util;
 using Serilog;
-using Serilog.Events;
 using System;
+using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Common.Logging;
 
@@ -11,7 +10,7 @@ namespace Common.Logging;
 /// A class for logging batches of messages of type T.
 /// </summary>
 public sealed class BatchLogger : IDisposable
-	{
+{
     private readonly string messageName;
     private int messageCount = 0;
 	// A logger to log the messages.

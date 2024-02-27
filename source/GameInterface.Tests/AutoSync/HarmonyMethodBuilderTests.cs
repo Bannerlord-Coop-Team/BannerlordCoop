@@ -2,12 +2,12 @@
 using Common.Extensions;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using Coop.Core.Server.Policies;
 using GameInterface;
 using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.AutoSync.Dynamic;
-using GameInterface.Utils.AutoSync.Example;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -17,7 +17,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using Xunit;
 
-namespace Coop.Tests.AutoSync;
+namespace GameInterface.Tests.AutoSync;
 public class HarmonyMethodBuilderTests
 {
     private int TestInt { get; set; } = 5;
@@ -28,7 +28,7 @@ public class HarmonyMethodBuilderTests
     {
         var containerBuilder = new ContainerBuilder();
 
-        containerBuilder.RegisterType<ServerSyncPolicy>().As<ISyncPolicy>();
+        containerBuilder.RegisterType<DummyPolicy>().As<ISyncPolicy>();
 
         var container = containerBuilder.Build();
 
@@ -37,6 +37,8 @@ public class HarmonyMethodBuilderTests
         var methods = typeof(ILogger).GetMethods().Where(m => m.Name.Contains("Error")).ToArray();
 
         var m = methods[2];
+
+        var testIntProperty = AccessTools.Property(typeof(HarmonyMethodBuilderTests), nameof(TestInt));
 
         // Arrange
         var assemblyName = new AssemblyName("AutoSyncDynamicAssembly");
@@ -60,13 +62,12 @@ public class HarmonyMethodBuilderTests
         ilGenerator.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
         ilGenerator.Emit(OpCodes.Ret);
 
-        var methodGenerator = new HarmonyPatchGenerator(moduleBuilder, typeBuilder);
+        var methodGenerator = new HarmonyPatchGenerator(moduleBuilder, testIntProperty);
 
         Assert.NotNull(AccessTools.Field(GetType(), "StringId"));
 
 
         // Act
-        var testIntProperty = AccessTools.Property(typeof(HarmonyMethodBuilderTests), nameof(TestInt));
         var patchMethod = methodGenerator.GenerateSetterPrefixPatch<HarmonyMethodBuilderTests>(
             testIntProperty.GetSetMethod(true), IdGetterMethod);
 
@@ -87,16 +88,16 @@ public class HarmonyMethodBuilderTests
     [Fact]
     public void SandboxTranspiler()
     {
-        var harmony = new Harmony("asdfasdfasdf");
+        //var harmony = new Harmony("asdfasdfasdf");
 
-        var targetMethod = AccessTools.Constructor(typeof(HandlerExample), new Type[] { 
-            typeof(IMessageBroker),
-            typeof(INetwork),
-            typeof(IObjectManager),
-            typeof(ILogger), });
-        var transpilerMethod = new HarmonyMethod(GetType(), nameof(Transpiler));
+        //var targetMethod = AccessTools.Constructor(typeof(HandlerExample), new Type[] { 
+        //    typeof(IMessageBroker),
+        //    typeof(INetwork),
+        //    typeof(IObjectManager),
+        //    typeof(ILogger), });
+        //var transpilerMethod = new HarmonyMethod(GetType(), nameof(Transpiler));
         
-        harmony.Patch(targetMethod, transpiler: transpilerMethod);
+        //harmony.Patch(targetMethod, transpiler: transpilerMethod);
     }
 
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
@@ -104,5 +105,11 @@ public class HarmonyMethodBuilderTests
         var instrs = instructions.ToList();
 
         return instrs;
+    }
+
+    class DummyPolicy : ISyncPolicy
+    {
+        /// When true this skips patch functionality <see cref="IPolicyProvider"/>
+        public bool AllowOriginal() => false;
     }
 }

@@ -1,12 +1,10 @@
-﻿using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using GameInterface.Utils.AutoSync.Template;
+using ProtoBuf;
 
 namespace GameInterface.Utils.AutoSync.Example;
 
 [ProtoContract(SkipConstructor = true)]
-public record MessageData
+public record MessageData : IAutoSyncData<int>
 {
     public MessageData(string stringId, int value)
     {

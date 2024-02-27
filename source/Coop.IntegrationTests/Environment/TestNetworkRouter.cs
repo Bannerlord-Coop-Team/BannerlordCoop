@@ -14,6 +14,13 @@ public class TestNetworkRouter
 {
     private ServerInstance Server;
     private List<ClientInstance> Clients = new List<ClientInstance>();
+    private readonly ICommonSerializer serializer;
+
+    public TestNetworkRouter(ICommonSerializer serializer)
+    {
+        this.serializer = serializer;
+    }
+
     public void AddServer(ServerInstance instance)
     {
         Server = instance;
@@ -126,8 +133,8 @@ public class TestNetworkRouter
 
     public T EnsureSerializable<T>(T obj) where T : class
     {
-        byte[] bytes = ProtoBufSerializer.Serialize(obj);
+        byte[] bytes = serializer.Serialize(obj);
 
-        return (T)ProtoBufSerializer.Deserialize(bytes);
+        return serializer.Deserialize<T>(bytes);
     }
 }
