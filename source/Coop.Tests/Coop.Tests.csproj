@@ -28,6 +28,10 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="7.0.1" />
+    <PackageReference Include="Krafs.Publicizer" Version="2.2.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="7.0.1" />
     <PackageReference Include="MonoMod.RuntimeDetour" Version="22.7.31.1" />
     <PackageReference Include="MonoMod.Utils" Version="22.7.31.1" />
@@ -65,5 +69,9 @@
     <Reference Include="TaleWorlds.Library">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
     </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Publicize Include="TaleWorlds.CampaignSystem"/>
+    <Publicize Include="TaleWorlds.Library"/>
   </ItemGroup>
 </Project>
