@@ -13,7 +13,7 @@ namespace GameInterface.Services.Settlements.Audit;
 /// Audit data for a settlement
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-internal record SettlementAuditData
+public record SettlementAuditData
 {
     [ProtoMember(1)]
     public string StringId { get; }
@@ -60,7 +60,7 @@ internal record SettlementAuditData
         SettlementHitPoints = settlement.SettlementHitPoints;
         GarrisonWagePaymentLimit = settlement.GarrisonWagePaymentLimit;
         // mobileParty StringID
-        LastAttackerParty = settlement.LastAttackerParty.StringId;
+        LastAttackerParty = settlement.LastAttackerParty?.StringId ?? "";
         LastThreatTime = settlement.LastThreatTime.GetNumTicks();
         CurrentSiegeState = (short)settlement.CurrentSiegeState;
         Militia = settlement.Militia;
@@ -75,7 +75,7 @@ internal record SettlementAuditData
 
         LastVisitTimeOfOwner = settlement.LastVisitTimeOfOwner;
 
-        ClaimedBy = settlement.ClaimedBy.StringId;
+        ClaimedBy = settlement.ClaimedBy?.StringId ?? "";
         ClaimValue = settlement.ClaimValue;
 
 

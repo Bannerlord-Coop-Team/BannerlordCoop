@@ -153,7 +153,7 @@ internal class SettlementAuditor : IAuditor
             if(objectManager.TryGetObject<Settlement>(audit.StringId, out var settlement) == false)
             {
                 Logger.Error("Settlement {name} not found in {objectManager}", audit.StringId, nameof(IObjectManager));
-                sb.AppendLine($"Settlement {audit.StringId} not found in {nameof(IObjectManager)}");3
+                sb.AppendLine($"Settlement {audit.StringId} not found in {nameof(IObjectManager)}");
                 sb.AppendLine($"Audit for Settlement {audit.StringId} done\n");
                 errorCountObjectFound++;
                 continue; 
@@ -163,8 +163,8 @@ internal class SettlementAuditor : IAuditor
             {
                 Logger.Error($"settlement.NumberOfEnemiesSpottedAround mistmatch: {settlement.NumberOfEnemiesSpottedAround}!={audit.NumberOfEnemiesSpottedAround}");
                 sb.AppendLine($"settlement.NumberOfEnemiesSpottedAround {settlement.NumberOfEnemiesSpottedAround}!= {audit.NumberOfEnemiesSpottedAround}");
+            };
                 errorNumberOfEnemiesSpottedAround++;
-            }
 
             if (settlement.NumberOfAlliesSpottedAround != audit.NumberOfAlliesSpottedAround)
             {
@@ -196,7 +196,10 @@ internal class SettlementAuditor : IAuditor
                 errGarrisonWagePaymentLimit++;
             }
 
-            if (settlement.LastAttackerParty.StringId != audit.LastAttackerParty)
+
+            //check if null
+            var lastAttackerParty = settlement.LastAttackerParty?.StringId ?? "";
+            if (lastAttackerParty != audit.LastAttackerParty)
             {
                 Logger.Error($"settlement.LastAttackerParty mistmatch: {settlement.LastAttackerParty.StringId}!={audit.LastAttackerParty}");
                 sb.AppendLine($"settlement.LastAttackerParty {settlement.LastAttackerParty.StringId}!= {audit.LastAttackerParty}");
@@ -218,14 +221,6 @@ internal class SettlementAuditor : IAuditor
                 sb.AppendLine($"settlement.CurrentSiegeState {currentSiegeState}!= {audit.CurrentSiegeState}");
                 errCurrentSiegeState++;
             }
-
-            if (settlement.Militia != audit.Militia)
-            {
-                Logger.Error($"settlement.Militia mistmatch: {settlement.Militia}!={audit.Militia}");
-                sb.AppendLine($"settlement.Militia {settlement.Militia}!= {audit.Militia}");
-                errLastAttackerParty++;
-            }
-
 
             if (settlement.Militia != audit.Militia)
             {
@@ -274,8 +269,8 @@ internal class SettlementAuditor : IAuditor
                 errLastVisitTimeOfOwner++;
             }
 
-
-            if (settlement.ClaimedBy.StringId != audit.ClaimedBy)
+            var claimedBy = settlement.ClaimedBy?.StringId ?? "";
+            if (claimedBy != audit.ClaimedBy)
             {
                 Logger.Error($"settlement.ClaimedBy mistmatch: {settlement.ClaimedBy.StringId}!={audit.ClaimedBy}");
                 sb.AppendLine($"settlement.ClaimedBy {settlement.ClaimedBy.StringId}!= {audit.ClaimedBy}");
