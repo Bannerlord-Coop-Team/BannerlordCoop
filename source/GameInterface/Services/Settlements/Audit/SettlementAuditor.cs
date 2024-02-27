@@ -301,11 +301,6 @@ internal class SettlementAuditor : IAuditor
                 errClaimValue
             );
 
-
-
-            sb.AppendLine($"Audit for Settlement {audit.StringId} done\n");
-
-
         }
 
         sb.AppendLine($"Found {errorCountObjectFound} errors in {dataToAudit.Length} objects");

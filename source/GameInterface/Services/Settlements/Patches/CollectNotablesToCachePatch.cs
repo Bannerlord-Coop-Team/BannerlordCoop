@@ -18,13 +18,12 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(Settlement))]
 public class CollectNotablesToCachePatch
 {
-    /*
     // only server needs to know about this..
     // may not be needed but for now if it does the code is here.
     [HarmonyPatch("CollectNotablesToCache")]
     [HarmonyPrefix]
     private static bool CollectNotablesToCachePrefix(ref Settlement __instance) => ModInformation.IsServer;
-    */
+
     internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heros)
     {
 
@@ -36,5 +35,4 @@ public class CollectNotablesToCachePatch
             }
         });
     }
-    
 }

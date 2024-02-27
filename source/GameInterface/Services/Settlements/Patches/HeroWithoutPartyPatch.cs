@@ -14,7 +14,6 @@ public class HeroWithoutPartyPatch
     // TODO: discuss and test if needed, not sure...
     // only server needs to know about this..
     // may not be needed but for now if it does the code is here.
-    /*
     [HarmonyPatch("AddHeroWithoutParty")]
     [HarmonyPrefix]
     private static bool AddHeroWithoutPartyPrefix(ref Settlement __instance, Hero individual) => ModInformation.IsServer;
@@ -23,5 +22,4 @@ public class HeroWithoutPartyPatch
     [HarmonyPatch("RemoveHeroWithoutParty")]
     [HarmonyPrefix]
     private static bool RemoveHeroWithoutPartyPrefix(ref Settlement __instance, Hero individual) => ModInformation.IsServer;
-    */
 }
