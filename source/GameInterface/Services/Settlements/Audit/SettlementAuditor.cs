@@ -4,8 +4,6 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Mod.Extentions;
 using GameInterface.Extentions;
-using GameInterface.Services.Armies;
-using GameInterface.Services.Armies.Audit;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;
@@ -17,7 +15,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.Settlements.Audit;
 
@@ -153,7 +150,7 @@ internal class SettlementAuditor : IAuditor
             if(objectManager.TryGetObject<Settlement>(audit.StringId, out var settlement) == false)
             {
                 Logger.Error("Settlement {name} not found in {objectManager}", audit.StringId, nameof(IObjectManager));
-                sb.AppendLine($"Settlement {audit.StringId} not found in {nameof(IObjectManager)}");3
+                sb.AppendLine($"Settlement {audit.StringId} not found in {nameof(IObjectManager)}");
                 sb.AppendLine($"Audit for Settlement {audit.StringId} done\n");
                 errorCountObjectFound++;
                 continue; 
