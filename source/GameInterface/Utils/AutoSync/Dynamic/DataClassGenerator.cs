@@ -1,7 +1,9 @@
 ﻿using GameInterface.Utils.AutoSync.Template;
+using HarmonyLib;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
+using System.IO.Pipes;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -22,12 +24,14 @@ public class DataClassGenerator
     {
         var attributeBuilder = new CustomAttributeBuilder(
             typeof(ProtoContractAttribute).GetConstructor(Type.EmptyTypes),
-            new object[0]);
+            new object[0],
+            new PropertyInfo[] { AccessTools.Property(typeof(ProtoContractAttribute), "SkipConstructor") },
+            new object[] { true });
 
         TypeBuilder typeBuilder = moduleBuilder.DefineType(
             $"{name}Data",
-            TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.SequentialLayout | TypeAttributes.BeforeFieldInit,
-            typeof(ValueType)
+            TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
+            null
         );
 
         typeBuilder.AddInterfaceImplementation(typeof(IEquatable<>).MakeGenericType(typeBuilder));
@@ -50,7 +54,10 @@ public class DataClassGenerator
 
     private ConstructorBuilder BuildContructor(TypeBuilder tb, FieldInfo[] fields)
     {
-        ConstructorBuilder constructor = tb.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, fields.Select(field => field.FieldType).ToArray());
+        ConstructorBuilder constructor = tb.DefineConstructor(
+            MethodAttributes.Public | MethodAttributes.HideBySig, 
+            CallingConventions.Standard, 
+            fields.Select(field => field.FieldType).ToArray());
         ILGenerator il = constructor.GetILGenerator();
 
         il.Emit(OpCodes.Ldarg_0);

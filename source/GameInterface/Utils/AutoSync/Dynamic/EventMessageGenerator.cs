@@ -23,7 +23,8 @@ public class EventMessageGenerator
     public ConstructorInfo GenerateConstructor(TypeBuilder typeBuilder, FieldInfo[] fields)
     {
         ConstructorBuilder constructor = typeBuilder.DefineConstructor(
-            MethodAttributes.Public, CallingConventions.Standard,
+            MethodAttributes.Public | MethodAttributes.HideBySig,
+            CallingConventions.Standard,
             fields.Select(field => field.FieldType).ToArray());
         ILGenerator il = constructor.GetILGenerator();
 
@@ -66,4 +67,5 @@ public class EventMessageGenerator
         // Return the fieldBuilder, which may be useful if you want to further modify the field
         return fieldBuilder;
     }
+       
 }

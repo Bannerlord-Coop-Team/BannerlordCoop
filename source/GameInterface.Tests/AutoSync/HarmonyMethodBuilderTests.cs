@@ -38,31 +38,20 @@ public class HarmonyMethodBuilderTests
 
         var m = methods[2];
 
-        var testIntProperty = AccessTools.Property(typeof(HarmonyMethodBuilderTests), nameof(TestInt));
+        ModInformation.IsServer = true;
 
         // Arrange
         var assemblyName = new AssemblyName("AutoSyncDynamicAssembly");
         AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
         ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
 
+        var testIntProperty = AccessTools.Property(typeof(HarmonyMethodBuilderTests), nameof(TestInt));
+        var eventClassCreator = new EventMessageGenerator();
 
-        var typeBuilder = moduleBuilder.DefineType(
-            "TestClass",
-            TypeAttributes.Public |
-            TypeAttributes.Class |
-            TypeAttributes.AnsiClass |
-            TypeAttributes.AutoLayout |
-            TypeAttributes.BeforeFieldInit |
-            TypeAttributes.AutoLayout,
-            null);
+        var dataClassType = new DataClassGenerator(moduleBuilder).GenerateClass(testIntProperty.PropertyType, "TestObjectData");
+        var eventType = eventClassCreator.GenerateEvent(moduleBuilder, testIntProperty.PropertyType);
 
-        ConstructorBuilder constructor = typeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, Type.EmptyTypes);
-        ILGenerator ilGenerator = constructor.GetILGenerator();
-        ilGenerator.Emit(OpCodes.Ldarg_0);
-        ilGenerator.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
-        ilGenerator.Emit(OpCodes.Ret);
-
-        var methodGenerator = new HarmonyPatchGenerator(moduleBuilder, testIntProperty);
+        var methodGenerator = new HarmonyPatchGenerator(moduleBuilder, testIntProperty, dataClassType, eventType);
 
         Assert.NotNull(AccessTools.Field(GetType(), "StringId"));
 
@@ -71,18 +60,19 @@ public class HarmonyMethodBuilderTests
         var patchMethod = methodGenerator.GenerateSetterPrefixPatch<HarmonyMethodBuilderTests>(
             testIntProperty.GetSetMethod(true), IdGetterMethod);
 
-        var type = typeBuilder.CreateType();
 
-        var method = AccessTools.Method(type, patchMethod.Name).BuildDelegate<Func<HarmonyMethodBuilderTests, int, bool>>();
+        Harmony harmony = new Harmony("This is a test");
+
+        harmony.Patch(testIntProperty.GetSetMethod(true), prefix: new HarmonyMethod(patchMethod));
+
+        TestInt += 1;
 
         // Assert
-        ModInformation.IsServer = true;
-        Assert.True(method(this, 3));
     }
 
-    public static string IdGetterMethod(HarmonyMethodBuilderTests getter)
+    public static string IdGetterMethod(HarmonyMethodBuilderTests instance)
     {
-        return getter.StringId;
+        return instance.StringId;
     }
 
     [Fact]

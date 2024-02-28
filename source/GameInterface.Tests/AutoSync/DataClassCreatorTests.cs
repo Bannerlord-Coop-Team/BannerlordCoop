@@ -2,6 +2,7 @@
 using GameInterface.Services.MobileParties.Messages.Data;
 using GameInterface.Utils.AutoSync.Dynamic;
 using GameInterface.Utils.AutoSync.Example;
+using GameInterface.Utils.AutoSync.Template;
 using HarmonyLib;
 using ProtoBuf;
 using ProtoBuf.Meta;
@@ -38,7 +39,7 @@ public class DataClassCreatorTests
 
         var expectedStringId = "MyData";
         var expectedValue = testIntProperty.GetValue(this)!;
-        var dataClassObj = Activator.CreateInstance(dataClassType, new object[] { expectedStringId, expectedValue });
+        var dataClassObj = Activator.CreateInstance(dataClassType, new object[] { expectedStringId, expectedValue })!;
 
         typeMapper.AddTypes(new Type[] { dataClassObj.GetType() });
 

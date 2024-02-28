@@ -27,7 +27,6 @@ public class HandlerGeneratorTests
 
         GameLoopRunner.Instance.SetGameLoopThread();
 
-        var handlerGenerator = new HandlerGenerator(moduleBuilder);
         var eventClassCreator = new EventMessageGenerator();
 
         var testObj = new TestObject("TestId", 1);

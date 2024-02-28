@@ -1,27 +1,27 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Utils.AutoSync.Template;
 using HarmonyLib;
-using ProtoBuf.Meta;
 using Serilog;
-using Serilog.Events;
 using System;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Utils.AutoSync.Dynamic;
 public class HarmonyPatchGenerator
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HarmonyPatchGenerator>();
-    private readonly DataClassGenerator dataClassGenerator;
     private readonly TypeBuilder autoPatchType;
+    private readonly Type dataClassType;
+    private readonly Type eventType;
 
-    public HarmonyPatchGenerator(ModuleBuilder moduleBuilder, PropertyInfo propertyInfo)
+    public HarmonyPatchGenerator(ModuleBuilder moduleBuilder, PropertyInfo propertyInfo, Type dataClassType, Type eventClassType)
     {
-        dataClassGenerator = new DataClassGenerator(moduleBuilder);
         autoPatchType = moduleBuilder.DefineType($"AutoSync_{propertyInfo.PropertyType.Name}_{propertyInfo.Name}_Patches");
+        this.dataClassType = dataClassType;
+        this.eventType = eventClassType;
     }
 
     public MethodInfo GenerateSetterPrefixPatch<T>(MethodInfo setMethod, Func<T, string> idGetterMethod) where T : class
@@ -41,42 +41,45 @@ public class HarmonyPatchGenerator
             returnType: typeof(bool),
             parameterTypes: parameters);
 
-        setterPrefixPatch.DefineParameter(0, ParameterAttributes.In, "__instance");
-        setterPrefixPatch.DefineParameter(1, ParameterAttributes.In, "value");
+        setterPrefixPatch.DefineParameter(1, ParameterAttributes.In, "__instance");
+        setterPrefixPatch.DefineParameter(2, ParameterAttributes.In, "value");
 
-        ILGenerator ilGenerator = setterPrefixPatch.GetILGenerator();
+        ILGenerator il = setterPrefixPatch.GetILGenerator();
 
-        var jumpTable = new Label[]
-        {
-            ilGenerator.DefineLabel(),
-        };
-
-        var dataClassType = dataClassGenerator.GenerateClass(valueType, setMethod.Name);
+        var returnTrue = il.DefineLabel();
 
 
-        ilGenerator.Emit(OpCodes.Call, AccessTools.Method(typeof(CallOriginalPolicy), nameof(CallOriginalPolicy.IsOriginalAllowed)));
-        ilGenerator.Emit(OpCodes.Brtrue, jumpTable[0]);
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(CallOriginalPolicy), nameof(CallOriginalPolicy.IsOriginalAllowed)));
+        il.Emit(OpCodes.Brtrue, returnTrue);
 
-        ilGenerator.Emit(OpCodes.Ldstr, valueType.Name);
-        ilGenerator.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(IsClient)));
-        ilGenerator.Emit(OpCodes.Brtrue, jumpTable[0]);
+        il.Emit(OpCodes.Ldstr, valueType.Name);
+        il.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(IsClient)));
+        il.Emit(OpCodes.Brtrue, returnTrue);
 
-        ilGenerator.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(MessageBroker), nameof(MessageBroker.Instance)));
-        ilGenerator.Emit(OpCodes.Ldarg_0);
-        ilGenerator.Emit(OpCodes.Ldarg_0);
-        ilGenerator.Emit(OpCodes.Call, idGetterMethod.Method);
-        ilGenerator.Emit(OpCodes.Ldarg_1);
+        //il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(MessageBroker), nameof(MessageBroker.Instance)));
+        //il.Emit(OpCodes.Ldarg_0);
 
-        ilGenerator.Emit(OpCodes.Newobj, dataClassType.GetConstructors().Single());
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, idGetterMethod.Method);
+        il.Emit(OpCodes.Ldarg_1);
 
-        var castedPublish = AccessTools.Method(typeof(MessageBroker), nameof(MessageBroker.Publish)).MakeGenericMethod(dataClassType);
-        ilGenerator.Emit(OpCodes.Callvirt, castedPublish);
+        il.Emit(OpCodes.Newobj, dataClassType.GetConstructors().Single());
+        il.Emit(OpCodes.Callvirt, typeof(object).GetMethod(nameof(object.GetType)));
+        il.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(Test)));
+        //il.Emit(OpCodes.Newobj, typeof(TestEvent).GetConstructors().Single());
+        //il.Emit(OpCodes.Newobj, eventType.GetConstructors().Single());
 
-        ilGenerator.MarkLabel(jumpTable[0]);
-        ilGenerator.Emit(OpCodes.Ldc_I4_1);
-        ilGenerator.Emit(OpCodes.Ret);
+        //il.Emit(OpCodes.Pop);
 
-        return setterPrefixPatch;
+        //var castedPublish = AccessTools.Method(typeof(MessageBroker), nameof(MessageBroker.Publish)).MakeGenericMethod(eventType);
+        //il.Emit(OpCodes.Callvirt, castedPublish);
+
+        il.MarkLabel(returnTrue);
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Ret);
+
+        var compiledType = autoPatchType.CreateTypeInfo();
+        return compiledType.GetMethod(setterPrefixPatch.Name, BindingFlags.NonPublic | BindingFlags.Static);
     }
 
     public static bool IsClient(string typeName)
@@ -89,5 +92,20 @@ public class HarmonyPatchGenerator
         }
 
         return false;
+    }
+
+    public static void Test(Type obj)
+    {
+        ;
+    }
+}
+
+public class TestEvent : IEvent//, IAutoSyncMessage<T>
+{
+    public object Data { get; }
+
+    public TestEvent(object data)
+    {
+        Data = data;
     }
 }

@@ -92,7 +92,7 @@ public class PropertySync : IDisposable
 
         var dataClassType = GenerateDataClass(property.PropertyType, property.Name);
         var eventMessageType = GenerateEventMessage(dataClassType);
-        var patchMethod = GeneratePatch(property, stringIdGetterFn);
+        var patchMethod = GeneratePatch(property, stringIdGetterFn, dataClassType, eventMessageType);
         var handlerType = GenerateHandler(property, eventMessageType);
 
         handler = (IDisposable)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network, Logger, property });
@@ -112,9 +112,9 @@ public class PropertySync : IDisposable
         return setMethod;
     }
 
-    private MethodInfo GeneratePatch<T>(PropertyInfo property, Func<T, string> stringIdGetterFn) where T : class
+    private MethodInfo GeneratePatch<T>(PropertyInfo property, Func<T, string> stringIdGetterFn, Type dataType, Type eventType) where T : class
     {
-        var patchGenerator = new HarmonyPatchGenerator(moduleBuilder, property);
+        var patchGenerator = new HarmonyPatchGenerator(moduleBuilder, property, dataType, eventType);
         return patchGenerator.GenerateSetterPrefixPatch(property.GetSetMethod(), stringIdGetterFn);
     }
 
