@@ -3,7 +3,7 @@
 namespace GameInterface.Services.Settlements.Audit;
 
 /// <summary>
-/// Request the Machien to get auditdata
+/// Request  to get auditdata
 /// </summary>
 public record SettlementGetAuditData : IEvent
 {
