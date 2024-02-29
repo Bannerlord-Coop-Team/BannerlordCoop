@@ -222,6 +222,7 @@ internal class SettlementAuditor : IAuditor
             // if the lists dont contain same elements
 
             // caches are null need to investigate
+            // probably shouldnt worry because its triggered so often.
 
             /*
             bool containSameNotables = settlementNotableCache.OrderBy(x => x).SequenceEqual(audit.NotablesCache.OrderBy(x => x));

@@ -4,6 +4,10 @@ using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Settlements.Messages;
 
+/// <summary>
+/// Results from an SettlementAudit
+/// </summary>
+
 [ProtoContract(SkipConstructor = true)]
 public record NetworkSettlementAuditResults : IEvent
 {

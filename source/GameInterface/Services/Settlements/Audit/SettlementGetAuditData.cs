@@ -1,9 +1,10 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.Settlements.Audit;
+
+/// <summary>
+/// Request the Machien to get auditdata
+/// </summary>
 public record SettlementGetAuditData : IEvent
 {
     public SettlementAuditData[] Data { get; }

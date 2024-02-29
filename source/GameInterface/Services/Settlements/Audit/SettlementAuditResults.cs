@@ -1,9 +1,10 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.Settlements.Audit;
+
+/// <summary>
+/// The Results of the Servers Audit
+/// </summary>
 public record SettlementAuditResults : IEvent
 {
     public SettlementAuditData[] Data { get; }
