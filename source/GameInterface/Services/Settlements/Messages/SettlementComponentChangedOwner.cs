@@ -9,9 +9,9 @@ namespace GameInterface.Services.Settlements.Messages
     {
         public string SettlementComponentId { get; set; }
         public string OwnerId { get; set; }
-        public SettlementComponentChangedOwner(string id, string ownerId)
+        public SettlementComponentChangedOwner(string settlementComponentId, string ownerId)
         {
-            SettlementComponentId = id;
+            SettlementComponentId = settlementComponentId;
             OwnerId = ownerId;
         }
     }
