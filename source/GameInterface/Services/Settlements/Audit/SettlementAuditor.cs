@@ -224,25 +224,48 @@ internal class SettlementAuditor : IAuditor
             // caches are null need to investigate
             // probably shouldnt worry because its triggered so often.
 
-            /*
-            bool containSameNotables = settlementNotableCache.OrderBy(x => x).SequenceEqual(audit.NotablesCache.OrderBy(x => x));
-            if (!containSameNotables) {
-                sb.AppendLine($"settlement._notablesCache list dont contain same items");
-                errSettlementHeroCache++;
+            // two caches can be null
+            if (!(audit.NotablesCache is null))
+            {
+
+                bool containSameNotables = settlementNotableCache.OrderBy(x => x).SequenceEqual(audit.NotablesCache.OrderBy(x => x));
+                if (!containSameNotables)
+                {
+                    sb.AppendLine($"settlement._notablesCache list dont contain same items");
+                    errSettlementHeroCache++;
+                }
+            } else
+            {
+                if(settlementNotableCache.Count > 0)
+                {
+                    sb.AppendLine($"settlement._notablesCache list dont contain same items");
+                    errSettlementHeroCache++;
+                }
             }
 
             List<Hero> heroCache = settlement.GetHeroesWithoutPartyCache().ToList();
             List<string> settlementHeroCache = heroCache.Select(hero => hero.StringId).ToList();
 
-            bool containsSameHerosWithoutParty = settlementHeroCache.OrderBy(x => x).SequenceEqual(audit.HeroesWithoutPartyCache.OrderBy(x => x));
 
-            if (!containsSameHerosWithoutParty)
+            if (!(audit.HeroesWithoutPartyCache is null))
             {
-                sb.AppendLine($"settlement._herosWithoutPartyCache list dont contain same items");
-                errHeroesWithoutPartyCache++;
+                bool containsSameHerosWithoutParty = settlementHeroCache.OrderBy(x => x).SequenceEqual(audit.HeroesWithoutPartyCache.OrderBy(x => x));
 
+                if (!containsSameHerosWithoutParty)
+                {
+                    sb.AppendLine($"settlement._herosWithoutPartyCache list dont contain same items");
+                    errHeroesWithoutPartyCache++;
+
+                }
+            } else
+            {
+                if(settlementHeroCache.Count > 0)
+                {
+                    sb.AppendLine($"settlement._herosWithoutPartyCache list dont contain same items");
+                    errHeroesWithoutPartyCache++;
+                }
             }
-            */
+            
 
             if (settlement.NumberOfLordPartiesAt != audit.NumberOfLordPartiesAt)
             {

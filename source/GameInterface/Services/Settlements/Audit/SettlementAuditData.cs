@@ -37,9 +37,9 @@ public record SettlementAuditData
     [ProtoMember(10)]
     public float Militia { get; }
     [ProtoMember(11)]
-    public List<string> NotablesCache { get; }
+    public  string[] NotablesCache { get; }
     [ProtoMember(12)]
-    public List<string> HeroesWithoutPartyCache { get; }
+    public string[] HeroesWithoutPartyCache { get; }
     [ProtoMember(13)]
     public int NumberOfLordPartiesAt { get; }
     [ProtoMember(14)]
@@ -66,17 +66,12 @@ public record SettlementAuditData
         CurrentSiegeState = (short)settlement.CurrentSiegeState;
         Militia = settlement.Militia;
 
-        NotablesCache = new List<string>();
-        HeroesWithoutPartyCache = new List<string>();
 
-        foreach (Hero s in settlement.GetNotablesCache().ToList())
-        {
-            NotablesCache.Add(s.StringId);
-        }
-        foreach(Hero s in settlement.GetHeroesWithoutPartyCache().ToList())
-        {
-            HeroesWithoutPartyCache.Add(s.StringId);
-        }
+        var notableCache = settlement.GetNotablesCache().ToList();
+        var heroCache = settlement.GetHeroesWithoutPartyCache(); 
+
+        NotablesCache = notableCache.Select(hero => hero.StringId).ToArray();
+        HeroesWithoutPartyCache = heroCache.Select(heroCache => heroCache.StringId).ToArray();
 
         NumberOfLordPartiesAt = settlement.NumberOfLordPartiesAt;
 
