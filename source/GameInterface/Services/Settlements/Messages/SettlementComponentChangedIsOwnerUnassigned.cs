@@ -9,9 +9,9 @@ namespace GameInterface.Services.Settlements.Messages
     {
         public string SettlementComponentId { get; set; }
         public bool IsOwnerUnassigned { get; set; }
-        public SettlementComponentChangedIsOwnerUnassigned(string id, bool isOwnerUnassigned)
+        public SettlementComponentChangedIsOwnerUnassigned(string settlementComponentId, bool isOwnerUnassigned)
         {
-            SettlementComponentId = id;
+            SettlementComponentId = settlementComponentId;
             IsOwnerUnassigned = isOwnerUnassigned;
         }
     }
