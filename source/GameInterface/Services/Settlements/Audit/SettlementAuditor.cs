@@ -221,10 +221,7 @@ internal class SettlementAuditor : IAuditor
 
             // if the lists dont contain same elements
 
-            // caches are null need to investigate
-            // probably shouldnt worry because its triggered so often.
-
-            // two caches can be null
+            // two caches can be null (e.g. TrainingField has null for both)
             if (!(audit.NotablesCache is null))
             {
 
