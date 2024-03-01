@@ -15,6 +15,7 @@ using GameInterface.Extentions;
 
 namespace GameInterface.Services.Settlements.Patches
 {
+    [HarmonyPatch(typeof(SettlementComponent))]
     public static class OwnerSettlementComponentPatch
     {
         private static ILogger Logger = LogManager.GetLogger<Settlement>();

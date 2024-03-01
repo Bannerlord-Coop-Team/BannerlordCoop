@@ -12,7 +12,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Handlers
 {
-    public class SettlementComponentHandler
+    public class SettlementComponentHandler : IHandler
     {
         private static readonly ILogger Logger = LogManager.GetLogger<SettlementHandler>();
         private readonly IMessageBroker messageBroker;
@@ -26,7 +26,12 @@ namespace GameInterface.Services.Settlements.Handlers
             messageBroker.Subscribe<SettlementComponentChangedIsOwnerUnassigned>(IsOwnerUnassignedChanged);
             messageBroker.Subscribe<SettlementComponentChangedOwner>(OwnerChanged);
         }
-
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<SettlementComponentChangedGold>(GoldChanged);
+            messageBroker.Unsubscribe<SettlementComponentChangedIsOwnerUnassigned>(IsOwnerUnassignedChanged);
+            messageBroker.Unsubscribe<SettlementComponentChangedOwner>(OwnerChanged);
+        }
         private void OwnerChanged(MessagePayload<SettlementComponentChangedOwner> payload)
         {
             if (!objectManager.TryGetObject<SettlementComponent>(payload.What.SettlementComponentId, out var obj))
@@ -34,7 +39,16 @@ namespace GameInterface.Services.Settlements.Handlers
                 Logger.Error("Unable to find SettlementComponent ({SettlementComponentId})", payload.What.SettlementComponentId);
                 return;
             }
-            if (!objectManager.TryGetObject<PartyBase>(payload.What.OwnerId, out var owner))
+            PartyBase owner;
+            if (objectManager.TryGetObject<Settlement>(payload.What.OwnerId, out var settlement))
+            {
+                owner = settlement.Party;
+            }
+            else if (objectManager.TryGetObject<MobileParty>(payload.What.OwnerId, out var party))
+            {
+                owner = party.Party;
+            }
+            else
             {
                 Logger.Error("Unable to find PartyBase ({OwnerId})", payload.What.OwnerId);
                 return;
