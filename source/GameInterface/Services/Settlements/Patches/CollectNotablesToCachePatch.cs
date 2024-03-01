@@ -22,7 +22,32 @@ public class CollectNotablesToCachePatch
     // may not be needed but for now if it does the code is here.
     [HarmonyPatch("CollectNotablesToCache")]
     [HarmonyPrefix]
-    private static bool CollectNotablesToCachePrefix(ref Settlement __instance) => ModInformation.IsServer;
+    private static bool CollectNotablesToCachePrefix(ref Settlement __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient) return false;
+
+        var notableCache = __instance.GetNotablesCache();
+        notableCache.Clear();
+
+        foreach (Hero hero in __instance.HeroesWithoutParty)
+        {
+            if (hero.IsNotable)
+            {
+                notableCache.Add(hero);
+            }
+        }
+
+
+        //pub list to server
+        List<string> cacheHeros = new();
+
+        notableCache.ForEach(hero => cacheHeros.Add(hero.StringId));
+
+        var message = new SettlementChangedNotablesCache(__instance.StringId, cacheHeros);
+        MessageBroker.Instance.Publish(__instance, message);
+        return false;
+    }
 
     internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heros)
     {
