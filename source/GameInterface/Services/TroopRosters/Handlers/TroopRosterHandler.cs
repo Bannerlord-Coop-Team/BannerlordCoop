@@ -93,7 +93,7 @@ public class TroopRosterHandler : IHandler
 
         // message to specific client then other clients?
         var message = new ApproveChangeOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, num);
-
+        // TODO: SYNC APPROVE and then SYNC THE OTHER CLIENTS
 
     }
 
