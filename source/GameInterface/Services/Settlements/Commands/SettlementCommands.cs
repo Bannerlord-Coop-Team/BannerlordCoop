@@ -434,7 +434,14 @@ internal class SettlementCommands
 
         return sb.ToString();
     }
+
     // coop.debug.settlementcomponent.set_owner town_comp_ES3 lord_6_5_party_1
+    // Change Poros component owner
+    /// <summary>
+    /// Changes <see cref="SettlementComponent.Owner"/>
+    /// </summary>
+    /// <param name="args"><see cref="SettlementComponent"/> id, <see cref="MobileParty"/> or <see cref="Settlement"/> id</param>
+    /// <returns>info that is was successful</returns>
     [CommandLineArgumentFunction("set_owner", "coop.debug.settlementComponent")]
     public static string SetOwner(List<string> args)
     {
@@ -443,9 +450,7 @@ internal class SettlementCommands
         if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <Mobile party id>\"";
 
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
-
         var objectManager = container.Resolve<IObjectManager>();
-
         string settlementComponentId = args[0];
         string partyBaseId = args[1];
         PartyBase partyBase;
@@ -474,5 +479,41 @@ internal class SettlementCommands
         }
 
         return $"Successfully set the SettlementComponent ({settlementComponentId}) Owner to '{args[1]}'";
+    }
+
+    // coop.debug.settlementcomponent.set_owner town_comp_ES3 lord_6_5_party_1
+    // Change Poros component owner
+    /// <summary>
+    /// Changes <see cref="SettlementComponent.Gold"/>
+    /// </summary>
+    /// <param name="args"><see cref="SettlementComponent"/> id, amount of gold</param>
+    /// <returns>info that is was successful</returns>
+    [CommandLineArgumentFunction("set_gold", "coop.debug.settlementComponent")]
+    public static string SetGold(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <Gold>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
+        var objectManager = container.Resolve<IObjectManager>();
+        string settlementComponentId = args[0];
+        if (!int.TryParse(args[1], out int gold))
+        {
+            return "Unable to parse gold amount";
+        }
+        if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
+            return $"SettlementComponent: {settlementComponentId} was not found.";
+
+        try
+        {
+            settlementComponent.SetGold(gold);
+        }
+        catch (Exception ex)
+        {
+            return $"Error setting the value: {gold}.";
+        }
+
+        return $"Successfully set the SettlementComponent ({settlementComponentId}) Gold to '{args[1]}'";
     }
 }
