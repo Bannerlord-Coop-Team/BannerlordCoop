@@ -49,6 +49,10 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="7.0.1" />
+    <PackageReference Include="Krafs.Publicizer" Version="2.2.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
@@ -81,5 +85,8 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Server\Services\Kingdoms\Messages\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Publicize Include="TaleWorlds.Library"/>
   </ItemGroup>
 </Project>
