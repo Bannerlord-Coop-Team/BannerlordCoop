@@ -21,7 +21,7 @@ namespace GameInterface.Services.Settlements.Patches
     [HarmonyPatch(typeof(SettlementComponent))]
     public static class OwnerSettlementComponentPatch
     {
-        private static ILogger Logger = LogManager.GetLogger<Settlement>();
+        private static ILogger Logger = LogManager.GetLogger<SettlementComponent>();
         [HarmonyPatch(nameof(SettlementComponent.Owner), MethodType.Setter)]
         public static bool Prefix(SettlementComponent __instance, PartyBase value)
         {
