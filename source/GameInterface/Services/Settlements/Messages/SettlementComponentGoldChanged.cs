@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -7,16 +6,13 @@ using System.Text;
 namespace GameInterface.Services.Settlements.Messages
 {
     /// <summary>
-    /// Notify clients of <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.Gold"/> set
+    /// Notify <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.Gold"/> changed
     /// </summary>
-    [ProtoContract(SkipConstructor = true)]
-    public record NetworkSettlementComponentChangedGold : IEvent
+    public record SettlementComponentGoldChanged : IEvent
     {
-        [ProtoMember(1)]
         public string SettlementComponentId { get; }
-        [ProtoMember(2)]
         public int Gold { get; }
-        public NetworkSettlementComponentChangedGold(string settlementComponentId, int gold)
+        public SettlementComponentGoldChanged(string settlementComponentId, int gold)
         {
             SettlementComponentId = settlementComponentId;
             Gold = gold;

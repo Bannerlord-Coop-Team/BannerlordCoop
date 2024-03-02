@@ -19,33 +19,33 @@ namespace Coop.Core.Server.Services.Settlements.Handlers
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<SettlementComponentChangedGold>(ChangedGold);
-            messageBroker.Subscribe<SettlementComponentChangedIsOwnerUnassigned>(ChangedIsOwnerUnassigned);
-            messageBroker.Subscribe<SettlementComponentChangedOwner>(ChangedOwner);
+            messageBroker.Subscribe<SettlementComponentGoldChanged>(ChangedGold);
+            messageBroker.Subscribe<SettlementComponentIsOwnerUnassignedChanged>(ChangedIsOwnerUnassigned);
+            messageBroker.Subscribe<SettlementComponentOwnerChanged>(ChangedOwner);
         }
         public void Dispose()
         {
-            messageBroker.Unsubscribe<SettlementComponentChangedGold>(ChangedGold);
-            messageBroker.Unsubscribe<SettlementComponentChangedIsOwnerUnassigned>(ChangedIsOwnerUnassigned);
-            messageBroker.Unsubscribe<SettlementComponentChangedOwner>(ChangedOwner);
+            messageBroker.Unsubscribe<SettlementComponentGoldChanged>(ChangedGold);
+            messageBroker.Unsubscribe<SettlementComponentIsOwnerUnassignedChanged>(ChangedIsOwnerUnassigned);
+            messageBroker.Unsubscribe<SettlementComponentOwnerChanged>(ChangedOwner);
         }
 
-        private void ChangedOwner(MessagePayload<SettlementComponentChangedOwner> payload)
+        private void ChangedOwner(MessagePayload<SettlementComponentOwnerChanged> payload)
         {
             var obj = payload.What;
-            network.SendAll(new NetworkSettlementComponentChangedOwner(obj.SettlementComponentId, obj.OwnerId));
+            network.SendAll(new NetworkChangeSettlementComponentOwner(obj.SettlementComponentId, obj.OwnerId));
         }
 
-        private void ChangedIsOwnerUnassigned(MessagePayload<SettlementComponentChangedIsOwnerUnassigned> payload)
+        private void ChangedIsOwnerUnassigned(MessagePayload<SettlementComponentIsOwnerUnassignedChanged> payload)
         {
             var obj = payload.What;
-            network.SendAll(new NetworkSettlementComponentChangedIsOwnerUnassigned(obj.SettlementComponentId, obj.IsOwnerUnassigned));
+            network.SendAll(new NetworkChangeSettlementComponentIsOwnerUnassigned(obj.SettlementComponentId, obj.IsOwnerUnassigned));
         }
 
-        private void ChangedGold(MessagePayload<SettlementComponentChangedGold> payload)
+        private void ChangedGold(MessagePayload<SettlementComponentGoldChanged> payload)
         {
             var obj = payload.What;
-            network.SendAll(new NetworkSettlementComponentChangedGold(obj.SettlementComponentId, obj.Gold));
+            network.SendAll(new NetworkChangeSettlementComponentGold(obj.SettlementComponentId, obj.Gold));
         }
 
     }

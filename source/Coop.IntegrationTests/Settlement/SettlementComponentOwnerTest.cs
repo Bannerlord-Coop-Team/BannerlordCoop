@@ -22,7 +22,7 @@ namespace Coop.IntegrationTests.Settlement
             // Arrange
             string settlementId = "SettlementComponent1";
             string newOwner = "Owner1";
-            var triggerMessage = new SettlementComponentChangedOwner(settlementId, newOwner);
+            var triggerMessage = new SettlementComponentOwnerChanged(settlementId, newOwner);
 
             var server = TestEnvironment.Server;
 
@@ -31,7 +31,7 @@ namespace Coop.IntegrationTests.Settlement
 
             // Assert
             // Verify the server sends a single message to it's game interface
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkSettlementComponentChangedOwner>());
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementComponentOwner>());
 
             // Verify the all clients send a single message to their game interfaces
             foreach (EnvironmentInstance client in TestEnvironment.Clients)

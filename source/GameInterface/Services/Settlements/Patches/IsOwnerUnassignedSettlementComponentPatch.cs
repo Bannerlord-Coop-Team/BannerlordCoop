@@ -32,7 +32,7 @@ namespace GameInterface.Services.Settlements.Patches
                 return false;
             }
 
-            var message = new SettlementComponentChangedIsOwnerUnassigned(__instance.StringId, value);
+            var message = new SettlementComponentIsOwnerUnassignedChanged(__instance.StringId, value);
 
             MessageBroker.Instance.Publish(__instance, message);
             return true;

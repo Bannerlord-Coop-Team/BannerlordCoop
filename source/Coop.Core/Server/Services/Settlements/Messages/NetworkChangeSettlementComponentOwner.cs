@@ -10,13 +10,13 @@ namespace GameInterface.Services.Settlements.Messages
     /// Notify clients of <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.Owner"/> set
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public record NetworkSettlementComponentChangedOwner : IEvent
+    public record NetworkChangeSettlementComponentOwner : ICommand
     {
         [ProtoMember(1)]
         public string SettlementComponentId { get; }
         [ProtoMember(2)]
         public string OwnerId { get; }
-        public NetworkSettlementComponentChangedOwner(string settlementComponentId, string ownerId)
+        public NetworkChangeSettlementComponentOwner(string settlementComponentId, string ownerId)
         {
             SettlementComponentId = settlementComponentId;
             OwnerId = ownerId;

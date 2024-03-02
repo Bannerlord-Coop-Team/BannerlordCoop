@@ -23,7 +23,7 @@ namespace Coop.IntegrationTests.Settlement
             // Arrange
             string settlementId = "SettlementComponent1";
             int newGold = 120;
-            var triggerMessage = new SettlementComponentChangedGold(settlementId, newGold);
+            var triggerMessage = new SettlementComponentGoldChanged(settlementId, newGold);
 
             var server = TestEnvironment.Server;
 
@@ -32,7 +32,7 @@ namespace Coop.IntegrationTests.Settlement
 
             // Assert
             // Verify the server sends a single message to it's game interface
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkSettlementComponentChangedGold>());
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementComponentGold>());
 
             // Verify the all clients send a single message to their game interfaces
             foreach (EnvironmentInstance client in TestEnvironment.Clients)

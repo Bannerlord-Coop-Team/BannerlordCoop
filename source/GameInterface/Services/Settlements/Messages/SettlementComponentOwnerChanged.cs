@@ -8,11 +8,11 @@ namespace GameInterface.Services.Settlements.Messages
     /// <summary>
     /// Notify <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.Owner"/> changed
     /// </summary>
-    public record SettlementComponentChangedOwner : IEvent
+    public record SettlementComponentOwnerChanged : IEvent
     {
         public string SettlementComponentId { get; }
         public string OwnerId { get; }
-        public SettlementComponentChangedOwner(string settlementComponentId, string ownerId)
+        public SettlementComponentOwnerChanged(string settlementComponentId, string ownerId)
         {
             SettlementComponentId = settlementComponentId;
             OwnerId = ownerId;

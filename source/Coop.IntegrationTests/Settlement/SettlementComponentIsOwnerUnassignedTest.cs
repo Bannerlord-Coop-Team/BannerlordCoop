@@ -22,7 +22,7 @@ namespace Coop.IntegrationTests.Settlement
             // Arrange
             string settlementId = "SettlementComponent1";
             bool newValue = true;
-            var triggerMessage = new SettlementComponentChangedIsOwnerUnassigned(settlementId, newValue);
+            var triggerMessage = new SettlementComponentIsOwnerUnassignedChanged(settlementId, newValue);
 
             var server = TestEnvironment.Server;
 
@@ -31,7 +31,7 @@ namespace Coop.IntegrationTests.Settlement
 
             // Assert
             // Verify the server sends a single message to it's game interface
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkSettlementComponentChangedIsOwnerUnassigned>());
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementComponentIsOwnerUnassigned>());
 
             // Verify the all clients send a single message to their game interfaces
             foreach (EnvironmentInstance client in TestEnvironment.Clients)

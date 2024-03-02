@@ -8,7 +8,7 @@ using System.Text;
 namespace Coop.Core.Client.Services.Settlements.Handlers
 {
     /// <summary>
-    /// Handles <see cref="NetworkSettlementComponentChangedGold"/>, <see cref="NetworkSettlementComponentChangedIsOwnerUnassigned"/> and <see cref="NetworkSettlementComponentChangedOwner"/> from the server and then goes to the <see cref="GameInterface.Services.Settlements.Handlers.SettlementComponentHandler"/>.
+    /// Handles <see cref="NetworkChangeSettlementComponentGold"/>, <see cref="NetworkChangeSettlementComponentIsOwnerUnassigned"/> and <see cref="NetworkChangeSettlementComponentOwner"/> from the server and then goes to the <see cref="GameInterface.Services.Settlements.Handlers.SettlementComponentHandler"/>.
     /// </summary>
     public class ClientSettlementComponentHandler : IHandler
     {
@@ -19,26 +19,26 @@ namespace Coop.Core.Client.Services.Settlements.Handlers
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            messageBroker.Subscribe<NetworkSettlementComponentChangedGold>(HandleChangedGold);
-            messageBroker.Subscribe<NetworkSettlementComponentChangedIsOwnerUnassigned>(HandleChangedIsOwnerUnassigned);
-            messageBroker.Subscribe<NetworkSettlementComponentChangedOwner>(HandleChangedOwner);
+            messageBroker.Subscribe<NetworkChangeSettlementComponentGold>(HandleChangedGold);
+            messageBroker.Subscribe<NetworkChangeSettlementComponentIsOwnerUnassigned>(HandleChangedIsOwnerUnassigned);
+            messageBroker.Subscribe<NetworkChangeSettlementComponentOwner>(HandleChangedOwner);
         }
 
-        private void HandleChangedOwner(MessagePayload<NetworkSettlementComponentChangedOwner> payload)
+        private void HandleChangedOwner(MessagePayload<NetworkChangeSettlementComponentOwner> payload)
         {
             var obj = payload.What;
             var message = new ChangeSettlementComponentOwner(obj.SettlementComponentId, obj.OwnerId);
             messageBroker.Publish(this, message);
         }
 
-        private void HandleChangedIsOwnerUnassigned(MessagePayload<NetworkSettlementComponentChangedIsOwnerUnassigned> payload)
+        private void HandleChangedIsOwnerUnassigned(MessagePayload<NetworkChangeSettlementComponentIsOwnerUnassigned> payload)
         {
             var obj = payload.What;
             var message = new ChangeSettlementComponentIsOwnerUnassigned(obj.SettlementComponentId, obj.IsOwnerUnassigned);
             messageBroker.Publish(this, message);
         }
 
-        private void HandleChangedGold(MessagePayload<NetworkSettlementComponentChangedGold> payload)
+        private void HandleChangedGold(MessagePayload<NetworkChangeSettlementComponentGold> payload)
         {
             var obj = payload.What;
             var message = new ChangeSettlementComponentGold(obj.SettlementComponentId, obj.Gold);
@@ -47,9 +47,9 @@ namespace Coop.Core.Client.Services.Settlements.Handlers
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<NetworkSettlementComponentChangedGold>(HandleChangedGold);
-            messageBroker.Unsubscribe<NetworkSettlementComponentChangedIsOwnerUnassigned>(HandleChangedIsOwnerUnassigned);
-            messageBroker.Unsubscribe<NetworkSettlementComponentChangedOwner>(HandleChangedOwner);
+            messageBroker.Unsubscribe<NetworkChangeSettlementComponentGold>(HandleChangedGold);
+            messageBroker.Unsubscribe<NetworkChangeSettlementComponentIsOwnerUnassigned>(HandleChangedIsOwnerUnassigned);
+            messageBroker.Unsubscribe<NetworkChangeSettlementComponentOwner>(HandleChangedOwner);
         }
 
     }
