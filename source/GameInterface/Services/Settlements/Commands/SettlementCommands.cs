@@ -471,7 +471,7 @@ internal class SettlementCommands
 
         try
         {
-            settlementComponent.SetOwner(partyBase);
+            settlementComponent.Owner = partyBase;
         }
         catch (Exception ex)
         {
@@ -507,7 +507,7 @@ internal class SettlementCommands
 
         try
         {
-            settlementComponent.SetGold(gold);
+            settlementComponent.Gold = gold;
         }
         catch (Exception ex)
         {

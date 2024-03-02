@@ -45,7 +45,7 @@ namespace GameInterface.Services.Settlements.Patches
             {
                 using (new AllowedThread())
                 {
-                    settlementComp.SetGold(gold);
+                    settlementComp.Gold = gold;
                 }
             });
         }

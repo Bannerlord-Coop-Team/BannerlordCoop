@@ -46,7 +46,7 @@ namespace GameInterface.Services.Settlements.Patches
             {
                 using (new AllowedThread())
                 {
-                    settlementComp.SetOwner(owner);
+                    settlementComp.Owner = owner;
                 }
             });
         }
