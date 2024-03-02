@@ -536,7 +536,7 @@ internal class SettlementCommands
         string settlementComponentId = args[0];
         if (!bool.TryParse(args[1], out bool value))
         {
-            return "Unable to parse gold amount";
+            return "Unable to parse IsOwnerUnassigned";
         }
         if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
             return $"SettlementComponent: {settlementComponentId} was not found.";
@@ -550,6 +550,6 @@ internal class SettlementCommands
             return $"Error setting the value: {value}.";
         }
 
-        return $"Successfully set the SettlementComponent ({settlementComponentId}) Gold to '{args[1]}'";
+        return $"Successfully set the SettlementComponent ({settlementComponentId}) IsOwnerUnassigned to '{args[1]}'";
     }
 }
