@@ -469,14 +469,7 @@ internal class SettlementCommands
             return $"PartyBase: {partyBaseId} was not found.";
         }
 
-        try
-        {
-            settlementComponent.Owner = partyBase;
-        }
-        catch (Exception ex)
-        {
-            return $"Error setting the value: {partyBaseId}.";
-        }
+        settlementComponent.Owner = partyBase;
 
         return $"Successfully set the SettlementComponent ({settlementComponentId}) Owner to '{args[1]}'";
     }
@@ -505,14 +498,7 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
             return $"SettlementComponent: {settlementComponentId} was not found.";
 
-        try
-        {
-            settlementComponent.Gold = gold;
-        }
-        catch (Exception ex)
-        {
-            return $"Error setting the value: {gold}.";
-        }
+        settlementComponent.Gold = gold;
 
         return $"Successfully set the SettlementComponent ({settlementComponentId}) Gold to '{args[1]}'";
     }
@@ -541,14 +527,9 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
             return $"SettlementComponent: {settlementComponentId} was not found.";
 
-        try
-        {
-            settlementComponent.IsOwnerUnassigned = value;
-        }
-        catch (Exception ex)
-        {
-            return $"Error setting the value: {value}.";
-        }
+
+        settlementComponent.IsOwnerUnassigned = value;
+
 
         return $"Successfully set the SettlementComponent ({settlementComponentId}) IsOwnerUnassigned to '{args[1]}'";
     }
