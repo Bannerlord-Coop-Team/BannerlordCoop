@@ -5,23 +5,36 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 namespace GameInterface.Utils.AutoSync.Dynamic;
+
+/// <summary>
+/// Event message type generator.
+/// </summary>
+/// <remarks>
+/// An event message type is a type that implements <see cref="IAutoSyncMessage{T}"/> interface.
+/// Conains a single property of type <see cref="IAutoSyncData{T}"/>.
+/// </remarks>
 public class EventMessageGenerator
 {
     public Type GenerateEvent(ModuleBuilder moduleBuilder, PropertyInfo property)
     {
+        // Creates type builder for the new event message type
         TypeBuilder typeBuilder = moduleBuilder.DefineType($"AutoSync_{property.DeclaringType.Name}_{property.Name}Changed",
             TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
             typeof(object));
 
         var dataType = property.PropertyType;
 
+        // Add IAutoSyncMessage<dataType> interface implementation
         typeBuilder.AddInterfaceImplementation(typeof(IAutoSyncMessage<>).MakeGenericType(dataType));
 
+        // Create property for the new event message type
         var dataField = CreateProperty(typeBuilder, "Data", typeof(IAutoSyncData<>).MakeGenericType(dataType));
 
         var fields = new FieldInfo[] { dataField };
 
+        // Generate constructor for the new event message type
         GenerateConstructor(typeBuilder, fields);
+        // Generate GetHashCode method for the new event message type
         GenerateGetHashCode(typeBuilder, fields);
 
         return typeBuilder.CreateTypeInfo();
@@ -35,9 +48,12 @@ public class EventMessageGenerator
             fields.Select(field => field.FieldType).ToArray());
         ILGenerator il = constructor.GetILGenerator();
 
+        // Call default object constructor
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
 
+        // Load arguments into fields
+        // It is assumed that all arguments are passed to the constructor in the same order as the fields are defined
         for (int i = 0; i < fields.Length; i++)
         {
             il.Emit(OpCodes.Ldarg_0);

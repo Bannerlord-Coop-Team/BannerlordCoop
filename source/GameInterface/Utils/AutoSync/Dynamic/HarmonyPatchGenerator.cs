@@ -1,7 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Utils.AutoSync.Template;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -10,6 +9,10 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 namespace GameInterface.Utils.AutoSync.Dynamic;
+
+/// <summary>
+/// Prefix function generator for property sync
+/// </summary>
 public class HarmonyPatchGenerator
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HarmonyPatchGenerator>();
@@ -26,11 +29,13 @@ public class HarmonyPatchGenerator
 
     public MethodInfo GenerateSetterPrefixPatch<T>(MethodInfo setMethod, Func<T, string> idGetterMethod) where T : class
     {
+        // Id getter method must be static
         if (idGetterMethod.Method.IsStatic == false)
         {
             throw new ArgumentException("IdGetterMethod must be static");
         }
 
+        // T must be of the same type as the set method
         if (typeof(T) != setMethod.DeclaringType)
         {
             throw new ArgumentException($"T must be of type {setMethod.DeclaringType.Name}");
@@ -59,31 +64,40 @@ public class HarmonyPatchGenerator
         var returnTrue = il.DefineLabel();
         var returnFalse = il.DefineLabel();
 
-
+        // If original call is allowed, return true (allow original method)
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(CallOriginalPolicy), nameof(CallOriginalPolicy.IsOriginalAllowed)));
         il.Emit(OpCodes.Brtrue, returnTrue);
 
+        // If client, return false (do not allow original method)
         il.Emit(OpCodes.Ldstr, valueType.Name);
         il.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(IsClient)));
         il.Emit(OpCodes.Brtrue, returnFalse);
 
+        // Get message broker
         il.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(GetMessageBroker)));
+
+        // Used the source parameter of MessageBroker.Publish<T>(object source, T message)
         il.Emit(OpCodes.Ldarg_0);
 
+        // Call the id getter method
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, idGetterMethod.Method);
         il.Emit(OpCodes.Ldarg_1);
 
+        // Create data and event objects
         il.Emit(OpCodes.Newobj, dataClassType.GetConstructors().Single());
         il.Emit(OpCodes.Newobj, eventType.GetConstructors().Single());
 
+        // Publish the event
         var castedPublish = AccessTools.Method(typeof(MessageBroker), nameof(MessageBroker.Publish)).MakeGenericMethod(eventType);
         il.Emit(OpCodes.Callvirt, castedPublish);
 
+        // Return true (allow original method)
         il.MarkLabel(returnTrue);
         il.Emit(OpCodes.Ldc_I4_1);
         il.Emit(OpCodes.Ret);
 
+        // Return false (do not allow original method)
         il.MarkLabel(returnFalse);
         il.Emit(OpCodes.Ldc_I4_0);
         il.Emit(OpCodes.Ret);
@@ -112,20 +126,5 @@ public class HarmonyPatchGenerator
         }
 
         return MessageBroker.Instance;
-    }
-
-    public static void Test(Type obj)
-    {
-        ;
-    }
-}
-
-public class TestEvent : IEvent//, IAutoSyncMessage<T>
-{
-    public object Data { get; }
-
-    public TestEvent(object data)
-    {
-        Data = data;
     }
 }

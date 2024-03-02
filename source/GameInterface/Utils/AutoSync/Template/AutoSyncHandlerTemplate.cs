@@ -11,11 +11,18 @@ using System.Reflection;
 
 namespace GameInterface.Utils.AutoSync.Template;
 
+/// <summary>
+/// Template for creating an AutoSyncHandler
+/// </summary>
 public interface IAutoSyncHandlerTemplate : IHandler
 {
-    Type NetworkMessageType { get; }
 }
 
+/// <inheritdoc cref="IAutoSyncHandlerTemplate"/>
+/// <typeparam name="ObjectType">Type of object to be synced</typeparam>
+/// <typeparam name="DataType">Property data type</typeparam>
+/// <typeparam name="NetworkMesage">Type of network message</typeparam>
+/// <typeparam name="EventMessage">Type of event message</typeparam>
 public class AutoSyncHandlerTemplate<ObjectType, DataType, NetworkMesage, EventMessage> : IAutoSyncHandlerTemplate
     where ObjectType : class
     where NetworkMesage : IAutoSyncMessage<DataType>
@@ -26,8 +33,6 @@ public class AutoSyncHandlerTemplate<ObjectType, DataType, NetworkMesage, EventM
     private readonly INetwork network;
     private readonly ILogger logger;
     private readonly Action<ObjectType, DataType> propertySetter;
-
-    public Type NetworkMessageType => typeof(NetworkMesage);
 
     public AutoSyncHandlerTemplate(
         IMessageBroker messageBroker,

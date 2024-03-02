@@ -1,17 +1,10 @@
 ﻿using Common.Serialization;
-using GameInterface.Services.MobileParties.Messages.Data;
 using GameInterface.Utils.AutoSync.Dynamic;
-using GameInterface.Utils.AutoSync.Example;
-using GameInterface.Utils.AutoSync.Template;
 using HarmonyLib;
 using ProtoBuf;
-using ProtoBuf.Meta;
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
-using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 
 namespace GameInterface.Tests.AutoSync;

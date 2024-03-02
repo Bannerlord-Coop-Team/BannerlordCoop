@@ -16,10 +16,15 @@ using System.Threading;
 
 namespace GameInterface.Utils.AutoSync;
 
+/// <summary>
+/// Service for automatically syncing properties between server and clients
+/// </summary>
 internal interface IAutoSync : IDisposable
 {
     public ISyncResults SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetter) where T : class;
 }
+
+/// <inheritdoc cref="IAutoSync"/>
 internal class AutoSync : IAutoSync
 {
     private readonly Harmony harmony;

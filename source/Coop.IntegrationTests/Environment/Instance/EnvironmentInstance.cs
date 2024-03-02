@@ -56,7 +56,6 @@ public abstract class EnvironmentInstance
     {
         using (new StaticScope(this))
         {
-            EnsureSerializable(message);
             messageBroker.Publish(source, message);
         }
     }

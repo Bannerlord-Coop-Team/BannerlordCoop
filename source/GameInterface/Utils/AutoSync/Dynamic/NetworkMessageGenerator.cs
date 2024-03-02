@@ -7,6 +7,14 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 namespace GameInterface.Utils.AutoSync.Dynamic;
+
+/// <summary>
+/// Serializable network message type generator.
+/// </summary>
+/// <remarks>
+/// An network message type is a type that implements <see cref="IAutoSyncMessage{T}"/> interface.
+/// Conains a single property of type <see cref="IAutoSyncData{T}"/>.
+/// </remarks>
 public class NetworkMessageGenerator
 {
     public Type GenerateNetworkMessage(ModuleBuilder moduleBuilder, PropertyInfo property)
@@ -45,9 +53,12 @@ public class NetworkMessageGenerator
             fields.Select(field => field.FieldType).ToArray());
         ILGenerator il = constructor.GetILGenerator();
 
+        // Call default object constructor
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
 
+        // Load arguments into fields
+        // It is assumed that all arguments are passed to the constructor in the same order as the fields are defined
         for (int i = 0; i < fields.Length; i++)
         {
             il.Emit(OpCodes.Ldarg_0);

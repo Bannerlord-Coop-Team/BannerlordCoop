@@ -10,6 +10,12 @@ using System.Reflection.Emit;
 
 namespace GameInterface.Utils.AutoSync.Dynamic;
 
+/// <summary>
+/// Constructs a new data class for a given type.
+/// </summary>
+/// <remarks>
+/// Data class constists of two fields: StringId and Value.
+/// </remarks>
 public class DataClassGenerator
 {
     private readonly ModuleBuilder moduleBuilder;
@@ -22,23 +28,26 @@ public class DataClassGenerator
 
     public Type GenerateClass(Type dataType, string name)
     {
-        var attributeBuilder = new CustomAttributeBuilder(
-            typeof(ProtoContractAttribute).GetConstructor(Type.EmptyTypes),
-            new object[0],
-            new PropertyInfo[] { AccessTools.Property(typeof(ProtoContractAttribute), "SkipConstructor") },
-            new object[] { true });
-
+        // Creates type builder for the new data class
         TypeBuilder typeBuilder = moduleBuilder.DefineType(
             $"{name}Data",
             TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
             typeof(object)
         );
 
+        // Add IAutoSyncData<dataType> interface implementation
         typeBuilder.AddInterfaceImplementation(typeof(IAutoSyncData<>).MakeGenericType(dataType));
+
+        // Add ProtoContract attribute to the new data class
+        var attributeBuilder = new CustomAttributeBuilder(
+            typeof(ProtoContractAttribute).GetConstructor(Type.EmptyTypes),
+            new object[0],
+            new PropertyInfo[] { AccessTools.Property(typeof(ProtoContractAttribute), "SkipConstructor") },
+            new object[] { true });
 
         typeBuilder.SetCustomAttribute(attributeBuilder);
 
-
+        // Create fields for the new data class
         var objIdFieldBuilder = CreateSerializableProperty(typeBuilder, "StringId", typeof(string));
         var dataFieldBuilder = CreateSerializableProperty(typeBuilder, "Value", dataType);
 
@@ -46,6 +55,7 @@ public class DataClassGenerator
 
         BuildContructor(typeBuilder, fields);
 
+        // Implement IEquatable<T>.Equals method
         MakeRecord(typeBuilder, fields);
 
         return typeBuilder.CreateTypeInfo();
@@ -59,9 +69,12 @@ public class DataClassGenerator
             fields.Select(field => field.FieldType).ToArray());
         ILGenerator il = constructor.GetILGenerator();
 
+        // Call default object constructor
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, typeof(object).GetConstructor(Type.EmptyTypes));
 
+        // Load arguments into fields
+        // It is assumed that all arguments are passed to the constructor in the same order as the fields are defined
         for (int i = 0; i < fields.Length; i++)
         {
             il.Emit(OpCodes.Ldarg_0);
@@ -84,6 +97,7 @@ public class DataClassGenerator
 
         var returnFalse = il.DefineLabel();
 
+        // Compare each field using default equality comparer
         foreach (var field in fields)
         {
             il.Emit(OpCodes.Call, typeof(EqualityComparer<>).MakeGenericType(field.FieldType).GetProperty("Default").GetGetMethod());
