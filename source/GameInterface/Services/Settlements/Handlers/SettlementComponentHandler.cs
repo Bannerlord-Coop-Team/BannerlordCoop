@@ -22,17 +22,17 @@ namespace GameInterface.Services.Settlements.Handlers
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-            messageBroker.Subscribe<SettlementComponentChangedGold>(GoldChanged);
-            messageBroker.Subscribe<SettlementComponentChangedIsOwnerUnassigned>(IsOwnerUnassignedChanged);
-            messageBroker.Subscribe<SettlementComponentChangedOwner>(OwnerChanged);
+            messageBroker.Subscribe<ChangeSettlementComponentGold>(GoldChanged);
+            messageBroker.Subscribe<ChangeSettlementComponentIsOwnerUnassigned>(IsOwnerUnassignedChanged);
+            messageBroker.Subscribe<ChangeSettlementComponentOwner>(OwnerChanged);
         }
         public void Dispose()
         {
-            messageBroker.Unsubscribe<SettlementComponentChangedGold>(GoldChanged);
-            messageBroker.Unsubscribe<SettlementComponentChangedIsOwnerUnassigned>(IsOwnerUnassignedChanged);
-            messageBroker.Unsubscribe<SettlementComponentChangedOwner>(OwnerChanged);
+            messageBroker.Unsubscribe<ChangeSettlementComponentGold>(GoldChanged);
+            messageBroker.Unsubscribe<ChangeSettlementComponentIsOwnerUnassigned>(IsOwnerUnassignedChanged);
+            messageBroker.Unsubscribe<ChangeSettlementComponentOwner>(OwnerChanged);
         }
-        private void OwnerChanged(MessagePayload<SettlementComponentChangedOwner> payload)
+        private void OwnerChanged(MessagePayload<ChangeSettlementComponentOwner> payload)
         {
             if (!objectManager.TryGetObject<SettlementComponent>(payload.What.SettlementComponentId, out var obj))
             {
@@ -56,7 +56,7 @@ namespace GameInterface.Services.Settlements.Handlers
             OwnerSettlementComponentPatch.RunSettlementComponentOwnerChanged(obj, owner);
         }
 
-        private void IsOwnerUnassignedChanged(MessagePayload<SettlementComponentChangedIsOwnerUnassigned> payload)
+        private void IsOwnerUnassignedChanged(MessagePayload<ChangeSettlementComponentIsOwnerUnassigned> payload)
         {
             if (!objectManager.TryGetObject<SettlementComponent>(payload.What.SettlementComponentId, out var obj))
             {
@@ -66,7 +66,7 @@ namespace GameInterface.Services.Settlements.Handlers
             IsOwnerUnassignedSettlementComponentPatch.RunSettlementComponentIsOwnerUnassignedChanged(obj, payload.What.IsOwnerUnassigned);
         }
 
-        private void GoldChanged(MessagePayload<SettlementComponentChangedGold> payload)
+        private void GoldChanged(MessagePayload<ChangeSettlementComponentGold> payload)
         {
             if (!objectManager.TryGetObject<SettlementComponent>(payload.What.SettlementComponentId, out var obj))
             {
