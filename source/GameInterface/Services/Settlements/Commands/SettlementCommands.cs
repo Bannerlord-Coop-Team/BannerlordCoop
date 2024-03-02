@@ -481,7 +481,7 @@ internal class SettlementCommands
         return $"Successfully set the SettlementComponent ({settlementComponentId}) Owner to '{args[1]}'";
     }
 
-    // coop.debug.settlementcomponent.set_owner town_comp_ES3 401021
+    // coop.debug.settlementcomponent.set_gold town_comp_ES3 401021
     // Change Poros component gold
     /// <summary>
     /// Changes <see cref="SettlementComponent.Gold"/>
@@ -517,8 +517,8 @@ internal class SettlementCommands
         return $"Successfully set the SettlementComponent ({settlementComponentId}) Gold to '{args[1]}'";
     }
 
-    // coop.debug.settlementcomponent.set_owner town_comp_ES3 401021
-    // Change Poros component gold
+    // coop.debug.settlementcomponent.set_is_owner_unassigned town_comp_ES3 true
+    // Change Poros component IsOwnerUnassigned
     /// <summary>
     /// Changes <see cref="SettlementComponent.IsOwnerUnassigned"/>
     /// </summary>
