@@ -516,4 +516,40 @@ internal class SettlementCommands
 
         return $"Successfully set the SettlementComponent ({settlementComponentId}) Gold to '{args[1]}'";
     }
+
+    // coop.debug.settlementcomponent.set_owner town_comp_ES3 401021
+    // Change Poros component gold
+    /// <summary>
+    /// Changes <see cref="SettlementComponent.IsOwnerUnassigned"/>
+    /// </summary>
+    /// <param name="args"><see cref="SettlementComponent"/> id, new <see cref="SettlementComponent.IsOwnerUnassigned"/> value></param>
+    /// <returns>info that is was successful</returns>
+    [CommandLineArgumentFunction("set_is_owner_unassigned", "coop.debug.settlementComponent")]
+    public static string SetIsOwnerUnassigned(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <boolean>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
+        var objectManager = container.Resolve<IObjectManager>();
+        string settlementComponentId = args[0];
+        if (!bool.TryParse(args[1], out bool value))
+        {
+            return "Unable to parse gold amount";
+        }
+        if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
+            return $"SettlementComponent: {settlementComponentId} was not found.";
+
+        try
+        {
+            settlementComponent.IsOwnerUnassigned = value;
+        }
+        catch (Exception ex)
+        {
+            return $"Error setting the value: {value}.";
+        }
+
+        return $"Successfully set the SettlementComponent ({settlementComponentId}) Gold to '{args[1]}'";
+    }
 }
