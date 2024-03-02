@@ -13,6 +13,7 @@ using Common.Util;
 
 namespace GameInterface.Services.Settlements.Patches
 {
+    [HarmonyPatch(typeof(SettlementComponent))]
     public static class IsOwnerUnassignedSettlementComponentPatch
     {
         private static ILogger Logger = LogManager.GetLogger<Settlement>();
