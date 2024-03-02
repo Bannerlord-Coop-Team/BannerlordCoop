@@ -30,7 +30,7 @@ namespace GameInterface.Services.Settlements.Patches
             {
                 Logger.Error("Client created unmanaged {name}\n"
                     + "Callstack: {callstack}", typeof(SettlementComponent), Environment.StackTrace);
-                return true;
+                return false;
             }
 
             var message = new SettlementComponentChangedGold(__instance.StringId, value);
