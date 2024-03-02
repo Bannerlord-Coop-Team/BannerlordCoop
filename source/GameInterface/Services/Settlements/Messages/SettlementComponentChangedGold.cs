@@ -10,8 +10,8 @@ namespace GameInterface.Services.Settlements.Messages
     /// </summary>
     public record SettlementComponentChangedGold : IEvent
     {
-        public string SettlementComponentId { get; set; }
-        public int Gold { get; set; }
+        public string SettlementComponentId { get; }
+        public int Gold { get; }
         public SettlementComponentChangedGold(string settlementComponentId, int gold)
         {
             SettlementComponentId = settlementComponentId;

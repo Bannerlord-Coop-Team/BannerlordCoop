@@ -13,9 +13,9 @@ namespace GameInterface.Services.Settlements.Messages
     public record NetworkSettlementComponentChangedGold : IEvent
     {
         [ProtoMember(1)]
-        public string SettlementComponentId { get; set; }
+        public string SettlementComponentId { get; }
         [ProtoMember(2)]
-        public int Gold { get; set; }
+        public int Gold { get; }
         public NetworkSettlementComponentChangedGold(string settlementComponentId, int gold)
         {
             SettlementComponentId = settlementComponentId;

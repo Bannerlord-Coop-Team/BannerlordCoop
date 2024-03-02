@@ -13,9 +13,9 @@ namespace GameInterface.Services.Settlements.Messages
     public record NetworkSettlementComponentChangedOwner : IEvent
     {
         [ProtoMember(1)]
-        public string SettlementComponentId { get; set; }
+        public string SettlementComponentId { get; }
         [ProtoMember(2)]
-        public string OwnerId { get; set; }
+        public string OwnerId { get; }
         public NetworkSettlementComponentChangedOwner(string settlementComponentId, string ownerId)
         {
             SettlementComponentId = settlementComponentId;

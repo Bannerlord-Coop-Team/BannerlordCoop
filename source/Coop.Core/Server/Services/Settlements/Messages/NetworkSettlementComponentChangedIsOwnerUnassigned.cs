@@ -13,9 +13,9 @@ namespace GameInterface.Services.Settlements.Messages
     public record NetworkSettlementComponentChangedIsOwnerUnassigned : IEvent
     {
         [ProtoMember(1)]
-        public string SettlementComponentId { get; set; }
+        public string SettlementComponentId { get; }
         [ProtoMember(2)]
-        public bool IsOwnerUnassigned { get; set; }
+        public bool IsOwnerUnassigned { get; }
         public NetworkSettlementComponentChangedIsOwnerUnassigned(string settlementComponentId, bool isOwnerUnassigned)
         {
             SettlementComponentId = settlementComponentId;

@@ -10,8 +10,8 @@ namespace GameInterface.Services.Settlements.Messages
     /// </summary>
     public record ChangeSettlementComponentIsOwnerUnassigned : ICommand
     {
-        public string SettlementComponentId { get; set; }
-        public bool IsOwnerUnassigned { get; set; }
+        public string SettlementComponentId { get; }
+        public bool IsOwnerUnassigned { get; }
         public ChangeSettlementComponentIsOwnerUnassigned(string settlementComponentId, bool isOwnerUnassigned)
         {
             SettlementComponentId = settlementComponentId;

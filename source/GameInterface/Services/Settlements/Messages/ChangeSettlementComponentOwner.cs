@@ -10,8 +10,8 @@ namespace GameInterface.Services.Settlements.Messages
     /// </summary>
     public record ChangeSettlementComponentOwner : ICommand
     {
-        public string SettlementComponentId { get; set; }
-        public string OwnerId { get; set; }
+        public string SettlementComponentId { get; }
+        public string OwnerId { get; }
         public ChangeSettlementComponentOwner(string settlementComponentId, string ownerId)
         {
             SettlementComponentId = settlementComponentId;
