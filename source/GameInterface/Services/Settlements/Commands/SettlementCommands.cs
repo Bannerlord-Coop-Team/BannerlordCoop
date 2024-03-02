@@ -481,8 +481,8 @@ internal class SettlementCommands
         return $"Successfully set the SettlementComponent ({settlementComponentId}) Owner to '{args[1]}'";
     }
 
-    // coop.debug.settlementcomponent.set_owner town_comp_ES3 lord_6_5_party_1
-    // Change Poros component owner
+    // coop.debug.settlementcomponent.set_owner town_comp_ES3 401021
+    // Change Poros component gold
     /// <summary>
     /// Changes <see cref="SettlementComponent.Gold"/>
     /// </summary>
