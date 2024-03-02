@@ -14,6 +14,9 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Patches
 {
+    /// <summary>
+    /// Patch for <see cref="SettlementComponent.Gold"/>
+    /// </summary>
     [HarmonyPatch(typeof(SettlementComponent))]
     public static class GoldSettlementComponentPatch
     {

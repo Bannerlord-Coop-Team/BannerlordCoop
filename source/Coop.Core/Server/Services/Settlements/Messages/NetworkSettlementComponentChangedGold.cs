@@ -6,6 +6,9 @@ using System.Text;
 
 namespace GameInterface.Services.Settlements.Messages
 {
+    /// <summary>
+    /// Notify clients of <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.Gold"/> set
+    /// </summary>
     [ProtoContract(SkipConstructor = true)]
     public record NetworkSettlementComponentChangedGold : IEvent
     {

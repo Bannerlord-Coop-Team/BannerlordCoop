@@ -7,6 +7,9 @@ using System.Text;
 
 namespace Coop.Core.Client.Services.Settlements.Handlers
 {
+    /// <summary>
+    /// Handles <see cref="NetworkSettlementComponentChangedGold"/>, <see cref="NetworkSettlementComponentChangedIsOwnerUnassigned"/> and <see cref="NetworkSettlementComponentChangedOwner"/> from the server and then goes to the <see cref="GameInterface.Services.Settlements.Handlers.SettlementComponentHandler"/>.
+    /// </summary>
     public class ClientSettlementComponetHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;

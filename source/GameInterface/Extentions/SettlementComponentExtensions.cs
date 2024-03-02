@@ -7,6 +7,9 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Extentions
 {
+    /// <summary>
+    /// <see cref="SettlementComponent"/> setter accessors
+    /// </summary>
     public static class SettlementComponentExtensions
     {
         static PropertyInfo GoldProperty = typeof(SettlementComponent).GetProperty(nameof(SettlementComponent.Gold));

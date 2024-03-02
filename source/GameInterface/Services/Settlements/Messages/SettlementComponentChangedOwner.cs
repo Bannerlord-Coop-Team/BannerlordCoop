@@ -5,6 +5,9 @@ using System.Text;
 
 namespace GameInterface.Services.Settlements.Messages
 {
+    /// <summary>
+    /// Notify <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.Owner"/> changed
+    /// </summary>
     public record SettlementComponentChangedOwner : IEvent
     {
         public string SettlementComponentId { get; set; }

@@ -15,6 +15,9 @@ using GameInterface.Extentions;
 
 namespace GameInterface.Services.Settlements.Patches
 {
+    /// <summary>
+    /// Patch for <see cref="SettlementComponent.Owner"/>
+    /// </summary>
     [HarmonyPatch(typeof(SettlementComponent))]
     public static class OwnerSettlementComponentPatch
     {

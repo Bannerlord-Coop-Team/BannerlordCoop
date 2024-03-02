@@ -13,6 +13,9 @@ using Common.Util;
 
 namespace GameInterface.Services.Settlements.Patches
 {
+    /// <summary>
+    /// Patch for <see cref="SettlementComponent.IsOwnerUnassigned"/>
+    /// </summary>
     [HarmonyPatch(typeof(SettlementComponent))]
     public static class IsOwnerUnassignedSettlementComponentPatch
     {

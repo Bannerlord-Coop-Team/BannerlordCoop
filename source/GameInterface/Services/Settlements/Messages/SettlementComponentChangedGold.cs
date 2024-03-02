@@ -5,6 +5,9 @@ using System.Text;
 
 namespace GameInterface.Services.Settlements.Messages
 {
+    /// <summary>
+    /// Notify <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.Gold"/> changed
+    /// </summary>
     public record SettlementComponentChangedGold : IEvent
     {
         public string SettlementComponentId { get; set; }

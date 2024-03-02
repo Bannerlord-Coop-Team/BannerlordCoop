@@ -7,6 +7,9 @@ using System.Text;
 
 namespace Coop.Core.Server.Services.Settlements.Handlers
 {
+    /// <summary>
+    /// Handles all <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent"/> changes
+    /// </summary>
     public class ServerSettlementComponentHandler : IHandler
     {
         private IMessageBroker messageBroker;

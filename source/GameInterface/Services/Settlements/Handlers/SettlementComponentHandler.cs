@@ -12,6 +12,9 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Handlers
 {
+    /// <summary>
+    /// Handles syncs for <see cref="SettlementComponent"/> patches
+    /// </summary>
     public class SettlementComponentHandler : IHandler
     {
         private static readonly ILogger Logger = LogManager.GetLogger<SettlementHandler>();
