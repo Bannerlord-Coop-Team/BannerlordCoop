@@ -1,17 +1,27 @@
 ﻿using GameInterface.Utils.AutoSync.Template;
+using HarmonyLib;
+using ProtoBuf;
 using System;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 
 namespace GameInterface.Utils.AutoSync.Dynamic;
-public class EventMessageGenerator
+public class NetworkMessageGenerator
 {
-    public Type GenerateEvent(ModuleBuilder moduleBuilder, PropertyInfo property)
+    public Type GenerateNetworkMessage(ModuleBuilder moduleBuilder, PropertyInfo property)
     {
-        TypeBuilder typeBuilder = moduleBuilder.DefineType($"AutoSync_{property.DeclaringType.Name}_{property.Name}Changed",
+        TypeBuilder typeBuilder = moduleBuilder.DefineType($"AutoSync_Network{property.DeclaringType.Name}_{property.Name}Changed",
             TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
             typeof(object));
+
+        var attributeBuilder = new CustomAttributeBuilder(
+            typeof(ProtoContractAttribute).GetConstructor(Type.EmptyTypes),
+            new object[0],
+            new PropertyInfo[] { AccessTools.Property(typeof(ProtoContractAttribute), "SkipConstructor") },
+            new object[] { true });
+
+        typeBuilder.SetCustomAttribute(attributeBuilder);
 
         var dataType = property.PropertyType;
 

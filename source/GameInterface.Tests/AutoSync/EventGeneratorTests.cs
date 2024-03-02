@@ -33,7 +33,7 @@ public class EventGeneratorTests
 
         // Act
         var dataType = dataClassCreator.GenerateClass(testIntProperty.PropertyType, testIntProperty.Name);
-        var eventType = eventClassCreator.GenerateEvent(moduleBuilder, testIntProperty.PropertyType);
+        var eventType = eventClassCreator.GenerateEvent(moduleBuilder, testIntProperty);
 
         var dataClassInstance = Activator.CreateInstance(dataType, new object[] { "MyData", testIntProperty.GetValue(this)! });
         var eventInstance = Activator.CreateInstance(eventType, new object[] { dataClassInstance! });

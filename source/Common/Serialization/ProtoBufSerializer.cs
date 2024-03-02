@@ -34,14 +34,17 @@ public class ProtoBufSerializer : ICommonSerializer
             using (var internalStream = new MemoryStream(wrapper.Data))
             {
                 if (typeMapper.TryGetType(wrapper.TypeId, out Type type) == false) return null;
-                return Serializer.NonGeneric.Deserialize(type, internalStream);
+                return Serializer.Deserialize(type, internalStream);
             }
         }
     }
 
     public byte[] Serialize(object obj)
     {
-        if (typeMapper.TryGetId(obj.GetType(), out int typeId) == false) return null;
+        if (typeMapper.TryGetId(obj.GetType(), out int typeId) == false)
+        {
+            throw new InvalidOperationException($"Type {obj.GetType().FullName} is not registered with the serialization type mapper");
+        }
         
         using (MemoryStream memoryStream = new MemoryStream())
         {

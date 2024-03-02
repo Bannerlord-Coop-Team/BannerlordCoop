@@ -5,6 +5,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.Armies.Messages.Lifetime;
+using GameInterface.Utils.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;

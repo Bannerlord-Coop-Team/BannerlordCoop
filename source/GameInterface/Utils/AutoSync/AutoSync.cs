@@ -1,7 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Policies;
+using Common.Serialization;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.AutoSync.Dynamic;
 using GameInterface.Utils.AutoSync.Template;
@@ -12,14 +12,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
-using TaleWorlds.MountAndBlade.GauntletUI.Widgets.Map;
+using System.Threading;
 
 namespace GameInterface.Utils.AutoSync;
 
 internal interface IAutoSync : IDisposable
 {
-    public void SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetter) where T : class;
+    public ISyncResults SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetter) where T : class;
 }
 internal class AutoSync : IAutoSync
 {
@@ -27,19 +26,23 @@ internal class AutoSync : IAutoSync
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
-    private readonly ModuleBuilder moduleBuilder;
+    private readonly ISerializableTypeMapper typeMapper;
 
     private readonly List<IDisposable> disposables = new List<IDisposable>();
 
-    public AutoSync(Harmony harmony, INetwork network, IMessageBroker messageBroker, IObjectManager objectManager)
+    private static AssemblyName assemblyName => new AssemblyName("AutoSyncDynamicAssembly");
+    private static readonly AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.Run);
+    private static readonly ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
+
+    
+
+    public AutoSync(Harmony harmony, INetwork network, IMessageBroker messageBroker, IObjectManager objectManager, ISerializableTypeMapper typeMapper)
     {
         this.harmony = harmony;
         this.network = network;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
-        var assemblyName = new AssemblyName("AutoSyncDynamicAssembly");
-        AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
-        moduleBuilder = assemblyBuilder.DefineDynamicModule("MainModule");
+        this.typeMapper = typeMapper;
     }
 
     public void Dispose()
@@ -47,38 +50,45 @@ internal class AutoSync : IAutoSync
         disposables.ForEach(d => d.Dispose());
     }
 
-    public void SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetter) where T : class
+    public ISyncResults SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetter) where T : class
     {
-        var propertySync = new PropertySync(harmony, moduleBuilder, messageBroker, objectManager, network);
+        var propertySync = new PropertySync(harmony, moduleBuilder, messageBroker, objectManager, network, typeMapper);
 
-        propertySync.SyncProperty(property, stringIdGetter);
+        var results = propertySync.SyncProperty(property, stringIdGetter);
 
         disposables.Add(propertySync);
+
+        return results;
     }
 }
 
 public class PropertySync : IDisposable
 {
+    private static readonly Dictionary<PropertyInfo, ISyncResults> PatchedProperties = new();
+
     private static readonly ILogger Logger = LogManager.GetLogger<PropertySync>();
     private readonly Harmony harmony;
     private readonly ModuleBuilder moduleBuilder;
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private IDisposable handler;
+    private readonly ISerializableTypeMapper typeMapper;
+    private IAutoSyncHandlerTemplate handler;
 
     public PropertySync(
         Harmony harmony,
         ModuleBuilder moduleBuilder,
         IMessageBroker messageBroker,
         IObjectManager objectManager, 
-        INetwork network)
+        INetwork network,
+        ISerializableTypeMapper typeMapper)
     {
         this.harmony = harmony;
         this.moduleBuilder = moduleBuilder;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+        this.typeMapper = typeMapper;
     }
 
     public void Dispose()
@@ -86,18 +96,46 @@ public class PropertySync : IDisposable
         handler?.Dispose();
     }
 
-    public void SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetterFn) where T : class
+    public ISyncResults SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetterFn) where T : class
     {
+        if (PatchedProperties.TryGetValue(property, out var existingResult))
+        {
+            return existingResult;
+        }
+
         var setMethod = GetSetMethod(property);
 
         var dataClassType = GenerateDataClass(property.PropertyType, property.Name);
-        var eventMessageType = GenerateEventMessage(dataClassType);
+        var eventMessageType = GenerateEventMessage(property);
+        var networkMessageType = GenerateNetworkMessage(property);
         var patchMethod = GeneratePatch(property, stringIdGetterFn, dataClassType, eventMessageType);
-        var handlerType = GenerateHandler(property, eventMessageType);
+        var handlerType = GenerateHandler(property, networkMessageType, eventMessageType);
 
-        handler = (IDisposable)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network, Logger, property });
+        handler = (IAutoSyncHandlerTemplate)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network, Logger, property });
+
+        var serializableTypes = new Type[]
+        {
+            dataClassType,
+            eventMessageType,
+            networkMessageType,
+        };
+
+        typeMapper.AddTypes(serializableTypes);
 
         harmony.Patch(setMethod, prefix: new HarmonyMethod(patchMethod));
+
+        var result = new SyncResults
+        {
+            DataType = dataClassType,
+            EventType = eventMessageType,
+            NetworkMessageType = networkMessageType,
+            HandlerType = handlerType,
+            SerializableTypes = serializableTypes,
+        };
+
+        PatchedProperties.Add(property, result);
+
+        return result;
     }
 
     private MethodInfo GetSetMethod(PropertyInfo property)
@@ -124,14 +162,20 @@ public class PropertySync : IDisposable
         return dataClassGenerator.GenerateClass(dataType, propertyName);
     }
 
-    private Type GenerateEventMessage(Type dataClassType)
+    private Type GenerateEventMessage(PropertyInfo property)
     {
         var eventMessageGenerator = new EventMessageGenerator();
-        return eventMessageGenerator.GenerateEvent(moduleBuilder, dataClassType);
+        return eventMessageGenerator.GenerateEvent(moduleBuilder, property);
     }
 
-    private Type GenerateHandler(PropertyInfo property, Type eventMessageType)
+    private Type GenerateNetworkMessage(PropertyInfo property)
     {
-        return typeof(AutoSyncHandlerTemplate<,,>).MakeGenericType(property.DeclaringType, property.PropertyType, eventMessageType);
+        var networkMessageGenerator = new NetworkMessageGenerator();
+        return networkMessageGenerator.GenerateNetworkMessage(moduleBuilder, property);
+    }
+
+    private Type GenerateHandler(PropertyInfo property, Type networkMessageType, Type eventMessageType)
+    {
+        return typeof(AutoSyncHandlerTemplate<,,,>).MakeGenericType(property.DeclaringType, property.PropertyType, networkMessageType, eventMessageType);
     }
 }

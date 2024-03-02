@@ -31,10 +31,9 @@ public class DataClassGenerator
         TypeBuilder typeBuilder = moduleBuilder.DefineType(
             $"{name}Data",
             TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
-            null
+            typeof(object)
         );
 
-        typeBuilder.AddInterfaceImplementation(typeof(IEquatable<>).MakeGenericType(typeBuilder));
         typeBuilder.AddInterfaceImplementation(typeof(IAutoSyncData<>).MakeGenericType(dataType));
 
         typeBuilder.SetCustomAttribute(attributeBuilder);
@@ -77,6 +76,8 @@ public class DataClassGenerator
 
     private void MakeRecord(TypeBuilder typeBuilder, IEnumerable<FieldInfo> fields)
     {
+        typeBuilder.AddInterfaceImplementation(typeof(IEquatable<>).MakeGenericType(typeBuilder));
+
         // Implement IEquatable<T>.Equals method
         MethodBuilder equalsMethod = typeBuilder.DefineMethod("Equals", MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual, typeof(bool), new Type[] { typeBuilder });
         ILGenerator il = equalsMethod.GetILGenerator();
@@ -91,16 +92,17 @@ public class DataClassGenerator
             il.Emit(OpCodes.Ldarg_1);
             il.Emit(OpCodes.Ldfld, field);
             il.Emit(OpCodes.Callvirt, typeof(EqualityComparer<>).MakeGenericType(field.FieldType).GetMethod(nameof(Equals), new Type[] { field.FieldType, field.FieldType }));
-            il.Emit(OpCodes.Brfalse, returnFalse);
+            il.Emit(OpCodes.Brfalse_S, returnFalse);
         }
 
         // Default return true
         il.Emit(OpCodes.Ldc_I4_1);
         il.Emit(OpCodes.Ret);
+
+        // Label for returning false
         il.MarkLabel(returnFalse);
         il.Emit(OpCodes.Ldc_I4_0);
         il.Emit(OpCodes.Ret);
-        
     }
 
     private FieldBuilder CreateSerializableProperty(TypeBuilder typeBuilder, string propertyName, Type propertyType)

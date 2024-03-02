@@ -34,10 +34,6 @@ public class HarmonyMethodBuilderTests
 
         ContainerProvider.SetContainer(container);
 
-        var methods = typeof(ILogger).GetMethods().Where(m => m.Name.Contains("Error")).ToArray();
-
-        var m = methods[2];
-
         ModInformation.IsServer = true;
 
         // Arrange
@@ -49,7 +45,7 @@ public class HarmonyMethodBuilderTests
         var eventClassCreator = new EventMessageGenerator();
 
         var dataClassType = new DataClassGenerator(moduleBuilder).GenerateClass(testIntProperty.PropertyType, "TestObjectData");
-        var eventType = eventClassCreator.GenerateEvent(moduleBuilder, testIntProperty.PropertyType);
+        var eventType = eventClassCreator.GenerateEvent(moduleBuilder, testIntProperty);
 
         var methodGenerator = new HarmonyPatchGenerator(moduleBuilder, testIntProperty, dataClassType, eventType);
 
@@ -65,9 +61,8 @@ public class HarmonyMethodBuilderTests
 
         harmony.Patch(testIntProperty.GetSetMethod(true), prefix: new HarmonyMethod(patchMethod));
 
-        TestInt += 1;
-
         // Assert
+        TestInt += 1;
     }
 
     public static string IdGetterMethod(HarmonyMethodBuilderTests instance)

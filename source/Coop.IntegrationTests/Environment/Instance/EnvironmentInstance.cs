@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.PacketHandlers;
+using Common.Serialization;
 using Common.Tests.Utils;
 using Common.Util;
 using Coop.Core;
@@ -55,6 +56,7 @@ public abstract class EnvironmentInstance
     {
         using (new StaticScope(this))
         {
+            EnsureSerializable(message);
             messageBroker.Publish(source, message);
         }
     }
@@ -68,6 +70,7 @@ public abstract class EnvironmentInstance
     {
         using(new StaticScope(this))
         {
+            EnsureSerializable(packet);
             mockNetwork.ReceiveFromNetwork(source, packet);
         }
     }
@@ -139,5 +142,14 @@ public abstract class EnvironmentInstance
             GameInterface.ContainerProvider.SetContainer(previousContainer);
             previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
         }
+    }
+
+    public T EnsureSerializable<T>(T obj)
+    {
+        var serializer = Container.Resolve<ICommonSerializer>();
+
+        byte[] bytes = serializer.Serialize(obj);
+
+        return serializer.Deserialize<T>(bytes);
     }
 }

@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Coop.IntegrationTests.Environment.Instance;
@@ -14,12 +15,6 @@ public class TestNetworkRouter
 {
     private ServerInstance Server;
     private List<ClientInstance> Clients = new List<ClientInstance>();
-    private readonly ICommonSerializer serializer;
-
-    public TestNetworkRouter(ICommonSerializer serializer)
-    {
-        this.serializer = serializer;
-    }
 
     public void AddServer(ServerInstance instance)
     {
@@ -33,8 +28,6 @@ public class TestNetworkRouter
 
     public void Send(NetPeer sender, NetPeer receiver, IMessage message)
     {
-        EnsureSerializable(message);
-
         if (receiver == Server.NetPeer)
         {
             Server.SimulateMessage(sender, message);
@@ -48,11 +41,9 @@ public class TestNetworkRouter
     }
     public void SendAll(NetPeer sender, IMessage message)
     {
-        EnsureSerializable(message);
-
         if (sender == Server.NetPeer)
         {
-            foreach(var client in Clients)
+            foreach (var client in Clients)
             {
                 client.SimulateMessage(sender, message);
             }
@@ -65,8 +56,6 @@ public class TestNetworkRouter
 
     public void SendAllBut(NetPeer sender, NetPeer ignored, IMessage message)
     {
-        EnsureSerializable(message);
-
         if (sender == Server.NetPeer)
         {
             foreach (var client in Clients.Where(c => c.NetPeer != ignored))
@@ -83,8 +72,6 @@ public class TestNetworkRouter
 
     public void Send(NetPeer sender, NetPeer receiver, IPacket message)
     {
-        EnsureSerializable(message);
-
         if (receiver == Server.NetPeer)
         {
             Server.SimulatePacket(sender, message);
@@ -98,8 +85,6 @@ public class TestNetworkRouter
     }
     public void SendAll(NetPeer sender, IPacket message)
     {
-        EnsureSerializable(message);
-
         if (sender == Server.NetPeer)
         {
             foreach (var client in Clients)
@@ -115,8 +100,6 @@ public class TestNetworkRouter
 
     public void SendAllBut(NetPeer sender, NetPeer ignored, IPacket message)
     {
-        EnsureSerializable(message);
-
         if (sender == Server.NetPeer)
         {
             foreach (var client in Clients.Where(c => c.NetPeer != ignored))
@@ -129,12 +112,5 @@ public class TestNetworkRouter
             if (ignored == Server.NetPeer) return;
             Server.SimulatePacket(sender, message);
         }
-    }
-
-    public T EnsureSerializable<T>(T obj) where T : class
-    {
-        byte[] bytes = serializer.Serialize(obj);
-
-        return serializer.Deserialize<T>(bytes);
     }
 }

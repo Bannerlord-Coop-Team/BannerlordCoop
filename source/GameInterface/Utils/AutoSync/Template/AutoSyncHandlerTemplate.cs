@@ -10,8 +10,15 @@ using System;
 using System.Reflection;
 
 namespace GameInterface.Utils.AutoSync.Template;
-public class AutoSyncHandlerTemplate<ObjectType, DataType, EventMessage> : IHandler 
+
+public interface IAutoSyncHandlerTemplate : IHandler
+{
+    Type NetworkMessageType { get; }
+}
+
+public class AutoSyncHandlerTemplate<ObjectType, DataType, NetworkMesage, EventMessage> : IAutoSyncHandlerTemplate
     where ObjectType : class
+    where NetworkMesage : IAutoSyncMessage<DataType>
     where EventMessage : IAutoSyncMessage<DataType>
 {
     private readonly IMessageBroker messageBroker;
@@ -19,6 +26,8 @@ public class AutoSyncHandlerTemplate<ObjectType, DataType, EventMessage> : IHand
     private readonly INetwork network;
     private readonly ILogger logger;
     private readonly Action<ObjectType, DataType> propertySetter;
+
+    public Type NetworkMessageType => typeof(NetworkMesage);
 
     public AutoSyncHandlerTemplate(
         IMessageBroker messageBroker,
@@ -31,26 +40,26 @@ public class AutoSyncHandlerTemplate<ObjectType, DataType, EventMessage> : IHand
         this.objectManager = objectManager;
         this.network = network;
         this.logger = logger;
-        
+
         propertySetter = syncedProperty.BuildUntypedSetter<ObjectType, DataType>();
 
-        messageBroker.Subscribe<NetworkChangeDataMessage>(Handle_NetworkMessage);
+        messageBroker.Subscribe<NetworkMesage>(Handle_NetworkMessage);
         messageBroker.Subscribe<EventMessage>(Handle_EventMessage);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkChangeDataMessage>(Handle_NetworkMessage);
+        messageBroker.Unsubscribe<NetworkMesage>(Handle_NetworkMessage);
         messageBroker.Unsubscribe<EventMessage>(Handle_EventMessage);
     }
 
     private void Handle_EventMessage(MessagePayload<EventMessage> payload)
     {
-        var message = new NetworkChangeDataMessage(payload.What.Data.StringId, payload.What.Data);
+        var message = (NetworkMesage)Activator.CreateInstance(typeof(NetworkMesage), payload.What.Data);
         network.SendAll(message);
     }
 
-    private void Handle_NetworkMessage(MessagePayload<NetworkChangeDataMessage> payload)
+    private void Handle_NetworkMessage(MessagePayload<NetworkMesage> payload)
     {
         if (objectManager.TryGetObject(payload.What.Data.StringId, out ObjectType obj) == false)
         {
@@ -67,20 +76,5 @@ public class AutoSyncHandlerTemplate<ObjectType, DataType, EventMessage> : IHand
                 propertySetter(obj, value);
             }
         });
-    }
-
-    [ProtoContract(SkipConstructor = true)]
-    class NetworkChangeDataMessage : IAutoSyncMessage<DataType>, ICommand
-    {
-        public NetworkChangeDataMessage(string stringId, IAutoSyncData<DataType> data)
-        {
-            Data = data;
-        }
-
-        [ProtoMember(1)]
-        public string StringId { get; }
-
-        [ProtoMember(2)]
-        public IAutoSyncData<DataType> Data { get; }
     }
 }

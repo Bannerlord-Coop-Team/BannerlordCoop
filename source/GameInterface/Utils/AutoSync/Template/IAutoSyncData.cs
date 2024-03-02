@@ -1,6 +1,9 @@
 ﻿using Common.Messaging;
+using ProtoBuf;
 
 namespace GameInterface.Utils.AutoSync.Template;
+
+
 public interface IAutoSyncData<DataType>
 {
     string StringId { get; }

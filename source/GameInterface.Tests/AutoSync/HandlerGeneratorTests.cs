@@ -34,7 +34,9 @@ public class HandlerGeneratorTests
         var syncedProperty = testObjType.GetProperty(nameof(TestObject.SomeValue))!;
 
         var dataClassType = new DataClassGenerator(moduleBuilder).GenerateClass(syncedProperty.PropertyType, "TestObjectData");
-        var eventType = eventClassCreator.GenerateEvent(moduleBuilder, syncedProperty.PropertyType);
+        var eventType = eventClassCreator.GenerateEvent(moduleBuilder, syncedProperty);
+
+        var networkMessageType = new NetworkMessageGenerator().GenerateNetworkMessage(moduleBuilder, syncedProperty);
 
         // Act
         var network = new TestNetwork();
@@ -50,7 +52,7 @@ public class HandlerGeneratorTests
 
         var objType = syncedProperty.DeclaringType!;
         var dataType = syncedProperty.PropertyType;
-        var handlerType = typeof(AutoSyncHandlerTemplate<,,>).MakeGenericType(objType, dataType, eventType);
+        var handlerType = typeof(AutoSyncHandlerTemplate<,,,>).MakeGenericType(objType, dataType, networkMessageType, eventType);
         ILogger logger = null;
         var handlerInstance = (IHandler)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network, logger, syncedProperty });
 

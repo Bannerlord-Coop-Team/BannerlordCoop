@@ -26,6 +26,16 @@ public class HarmonyPatchGenerator
 
     public MethodInfo GenerateSetterPrefixPatch<T>(MethodInfo setMethod, Func<T, string> idGetterMethod) where T : class
     {
+        if (idGetterMethod.Method.IsStatic == false)
+        {
+            throw new ArgumentException("IdGetterMethod must be static");
+        }
+
+        if (typeof(T) != setMethod.DeclaringType)
+        {
+            throw new ArgumentException($"T must be of type {setMethod.DeclaringType.Name}");
+        }
+
         var classType = setMethod.DeclaringType;
 
         var valueType = setMethod.GetParameters().Single().ParameterType;
@@ -47,6 +57,7 @@ public class HarmonyPatchGenerator
         ILGenerator il = setterPrefixPatch.GetILGenerator();
 
         var returnTrue = il.DefineLabel();
+        var returnFalse = il.DefineLabel();
 
 
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(CallOriginalPolicy), nameof(CallOriginalPolicy.IsOriginalAllowed)));
@@ -54,28 +65,27 @@ public class HarmonyPatchGenerator
 
         il.Emit(OpCodes.Ldstr, valueType.Name);
         il.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(IsClient)));
-        il.Emit(OpCodes.Brtrue, returnTrue);
+        il.Emit(OpCodes.Brtrue, returnFalse);
 
-        //il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(MessageBroker), nameof(MessageBroker.Instance)));
-        //il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(GetMessageBroker)));
+        il.Emit(OpCodes.Ldarg_0);
 
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Call, idGetterMethod.Method);
         il.Emit(OpCodes.Ldarg_1);
 
         il.Emit(OpCodes.Newobj, dataClassType.GetConstructors().Single());
-        il.Emit(OpCodes.Callvirt, typeof(object).GetMethod(nameof(object.GetType)));
-        il.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(Test)));
-        //il.Emit(OpCodes.Newobj, typeof(TestEvent).GetConstructors().Single());
-        //il.Emit(OpCodes.Newobj, eventType.GetConstructors().Single());
+        il.Emit(OpCodes.Newobj, eventType.GetConstructors().Single());
 
-        //il.Emit(OpCodes.Pop);
-
-        //var castedPublish = AccessTools.Method(typeof(MessageBroker), nameof(MessageBroker.Publish)).MakeGenericMethod(eventType);
-        //il.Emit(OpCodes.Callvirt, castedPublish);
+        var castedPublish = AccessTools.Method(typeof(MessageBroker), nameof(MessageBroker.Publish)).MakeGenericMethod(eventType);
+        il.Emit(OpCodes.Callvirt, castedPublish);
 
         il.MarkLabel(returnTrue);
         il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Ret);
+
+        il.MarkLabel(returnFalse);
+        il.Emit(OpCodes.Ldc_I4_0);
         il.Emit(OpCodes.Ret);
 
         var compiledType = autoPatchType.CreateTypeInfo();
@@ -92,6 +102,16 @@ public class HarmonyPatchGenerator
         }
 
         return false;
+    }
+
+    public static IMessageBroker GetMessageBroker()
+    {
+        if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker))
+        {
+            return messageBroker;
+        }
+
+        return MessageBroker.Instance;
     }
 
     public static void Test(Type obj)

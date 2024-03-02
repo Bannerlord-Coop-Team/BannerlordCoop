@@ -38,9 +38,7 @@ public class TestEnvironment
         this.registerGameInterface = registerGameInterface;
 
         // Setup test network
-        var typeMapper = new SerializableTypeMapper();
-        var serializer = new ProtoBufSerializer(typeMapper);
-        networkOrchestrator = new TestNetworkRouter(serializer);
+        networkOrchestrator = new TestNetworkRouter();
 
         Server = CreateServer();
 
