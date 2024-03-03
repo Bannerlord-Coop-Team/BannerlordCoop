@@ -53,7 +53,6 @@ namespace GameInterface.Serialization.External
             villageIds = PackIds(Object.Villages);
         }
 
-        //public static readonly MethodInfo InitializeCachedLists = typeof(Kingdom).GetMethod("InitializeCachedLists", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
             if(stringId != null)
