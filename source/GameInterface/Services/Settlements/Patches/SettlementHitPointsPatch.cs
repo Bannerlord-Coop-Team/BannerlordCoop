@@ -40,7 +40,7 @@ internal class SettlementHitPointsPatch
         {
             using (new AllowedThread())
             {
-                settlement.SetHitPointsChanged(settlementHitPoints);
+                settlement.SettlementHitPoints = settlementHitPoints;
             }
         });
     }

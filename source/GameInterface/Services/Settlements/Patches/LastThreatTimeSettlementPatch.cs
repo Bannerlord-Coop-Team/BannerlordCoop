@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using Coop.Mod.Extentions;
 using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
@@ -10,6 +9,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -43,7 +43,7 @@ internal class LastThreatTimeSettlementPatch
 
 
         // can pass null so always ensure to just set the value
-        long? numTicks = (value != null) ? value.GetNumTicks() : null;  
+        long? numTicks = (value != null) ? value.NumTicks : null;  
 
         var message = new SettlementChangedLastThreatTime(__instance.StringId, numTicks);
 
@@ -59,7 +59,10 @@ internal class LastThreatTimeSettlementPatch
         {
             using (new AllowedThread())
             {
-                settlement.SetLastThreatTimeChanged(lastThreatTime);
+                if (lastThreatTime.HasValue)
+                    settlement.LastThreatTime = new CampaignTime(lastThreatTime.Value);
+                else
+                    settlement.LastThreatTime = CampaignTime.Never;
             }
         });
     }

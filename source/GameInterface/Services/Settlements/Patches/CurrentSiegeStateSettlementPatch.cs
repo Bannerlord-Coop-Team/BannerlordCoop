@@ -49,7 +49,7 @@ public class CurrentSiegeStateSettlementPatch
         {
             using (new AllowedThread())
             {
-                settlement.SetSiegeState(siegeState);
+                settlement.CurrentSiegeState = siegeState;
             }
         });
     }

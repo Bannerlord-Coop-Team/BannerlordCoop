@@ -24,14 +24,14 @@ public class CollectNotablesToCachePatch
     [HarmonyPrefix]
     private static bool CollectNotablesToCachePrefix(ref Settlement __instance) => ModInformation.IsServer;
 
-    internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heros)
+    internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heroes)
     {
 
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                settlement.SetNotableCache(heros);
+                settlement._notablesCache = heroes;
             }
         });
     }
