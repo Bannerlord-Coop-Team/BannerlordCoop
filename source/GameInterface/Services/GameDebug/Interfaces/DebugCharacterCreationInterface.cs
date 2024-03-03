@@ -1,5 +1,6 @@
 ﻿using Common;
 using SandBox;
+using SandBox.GauntletUI.CharacterCreation;
 using System;
 using System.Linq;
 using System.Reflection;
@@ -64,7 +65,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
             if (characterCreationState.CurrentStage is CharacterCreationFaceGeneratorStage)
             {
                 ICharacterCreationStageListener listener = characterCreationState.CurrentStage.Listener;
-                BodyGeneratorView bgv = (BodyGeneratorView)listener.GetType().GetField("_faceGeneratorView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(listener);
+                BodyGeneratorView bgv = (listener as CharacterCreationFaceGeneratorView)._faceGeneratorView;
 
                 FaceGenVM facegen = bgv.DataSource;
 
