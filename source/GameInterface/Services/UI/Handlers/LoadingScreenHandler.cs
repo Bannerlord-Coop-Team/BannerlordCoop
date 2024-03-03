@@ -39,7 +39,7 @@ internal class LoadingScreenHandler : IHandler
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
-            ClientGameMenuPatch.IsDoneLoading = true;
+            ShowMenuUntilLoadedPatch.IsDoneLoading = true;
             LoadingWindow.DisableGlobalLoadingWindow();
         });
     }
