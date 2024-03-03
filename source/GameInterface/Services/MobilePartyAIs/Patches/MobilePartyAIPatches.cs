@@ -12,7 +12,7 @@ namespace GameInterface.Services.MobilePartyAIs.Patches
         static bool GetTargetPositionAndFace_Fix(ref MobilePartyAi __instance)
         {
             // Maybe fixes crashing on server for null ref exception
-            if (__instance.GetMobileParty() == null) return false;
+            if (__instance._mobileParty == null) return false;
             return true;
         }
     }

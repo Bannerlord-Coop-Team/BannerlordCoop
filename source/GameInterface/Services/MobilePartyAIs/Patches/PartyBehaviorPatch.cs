@@ -56,7 +56,7 @@ static class PartyBehaviorPatch
     {
         if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref targetPartyFigure, ref bestTargetPoint)) return false;
 
-        MobileParty party = __instance.GetMobileParty();
+        MobileParty party = __instance._mobileParty;
 
         bool hasTargetEntity = false;
         string targetEntityId = string.Empty;
@@ -85,7 +85,7 @@ static class PartyBehaviorPatch
         ref PartyBase targetPartyFigure,
         ref Vec2 bestTargetPoint)
     {
-        MobileParty party = __instance.GetMobileParty();
+        MobileParty party = __instance._mobileParty;
         IMapEntity targetEntity = null;
 
         if (targetPartyFigure != null)
