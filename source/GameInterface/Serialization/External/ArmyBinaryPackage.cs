@@ -37,7 +37,7 @@ namespace GameInterface.Serialization.External
             // Resolves _armiesCache for Kingdom
             if (Object.Kingdom != null)
             {
-                List<Army> kingdomArmies = (List<Army>)KingdomBinaryPackage.Kingdom_Armies.GetValue(Object.Kingdom);
+                List<Army> kingdomArmies = Object.Kingdom.Armies;
                 if (kingdomArmies.Contains(Object) == false)
                 {
                     kingdomArmies.Add(Object);
