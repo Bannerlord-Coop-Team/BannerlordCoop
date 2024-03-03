@@ -13,14 +13,6 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class KingdomBinaryPackage : BinaryPackageBase<Kingdom>
     {
-        public static readonly FieldInfo Kingdom_Armies = typeof(Kingdom).GetField("_armies", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Kingdom_Clans = typeof(Kingdom).GetField("_clans", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Kingdom_Fiefs = typeof(Kingdom).GetField("_fiefsCache", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Kingdom_Heroes = typeof(Kingdom).GetField("_heroesCache", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Kingdom_Lords = typeof(Kingdom).GetField("_lordsCache", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Kingdom_Settlements = typeof(Kingdom).GetField("_settlementsCache", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Kingdom_Villages = typeof(Kingdom).GetField("_villagesCache", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static readonly FieldInfo Kingdom_WarPartyComponents = typeof(Kingdom).GetField("_warPartyComponentsCache", BindingFlags.NonPublic | BindingFlags.Instance);
 
         private string stringId;
         private string[] clanIds;
@@ -61,7 +53,7 @@ namespace GameInterface.Serialization.External
             villageIds = PackIds(Object.Villages);
         }
 
-        public static readonly MethodInfo InitializeCachedLists = typeof(Kingdom).GetMethod("InitializeCachedLists", BindingFlags.NonPublic | BindingFlags.Instance);
+        //public static readonly MethodInfo InitializeCachedLists = typeof(Kingdom).GetMethod("InitializeCachedLists", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
             if(stringId != null)
@@ -76,19 +68,19 @@ namespace GameInterface.Serialization.External
 
             base.UnpackFields();
 
-            InitializeCachedLists.Invoke(Object, Array.Empty<object>());
+            Object.InitializeCachedLists();
 
             // Cached armies are handed in the ArmyBinaryPackage
 
             // Cached WarPartyComponents are handed in the
             // BanditComponentBinaryPackage and LordPartyComponentBinaryPackage
 
-            Kingdom_Clans.SetValue(Object, ResolveIds<Clan>(clanIds).ToMBList());
-            Kingdom_Fiefs.SetValue(Object, ResolveIds<Town>(fiefIds).ToMBList());
-            Kingdom_Heroes.SetValue(Object, ResolveIds<Hero>(heroIds).ToMBList());
-            Kingdom_Lords.SetValue(Object, ResolveIds<Hero>(lordIds).ToMBList());
-            Kingdom_Settlements.SetValue(Object, ResolveIds<Settlement>(settlementIds).ToMBList());
-            Kingdom_Villages.SetValue(Object, ResolveIds<Village>(villageIds).ToMBList());
+            Object._clans = ResolveIds<Clan>(clanIds).ToMBList();
+            Object._fiefsCache = ResolveIds<Town>(fiefIds).ToMBList();
+            Object._heroesCache = ResolveIds<Hero>(heroIds).ToMBList();
+            Object._lordsCache = ResolveIds<Hero>(lordIds).ToMBList();
+            Object._settlementsCache = ResolveIds<Settlement>(settlementIds).ToMBList();
+            Object._villagesCache = ResolveIds<Village>(villageIds).ToMBList();
         }
     }
 }
