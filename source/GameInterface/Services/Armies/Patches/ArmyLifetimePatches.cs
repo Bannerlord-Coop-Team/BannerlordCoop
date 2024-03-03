@@ -141,7 +141,7 @@ internal class ArmyLifetimePatches
         {
             using (new AllowedThread())
             {
-                army.DisbandArmy(reason);
+                army.DisperseInternal(reason);
             }
         });
     }
