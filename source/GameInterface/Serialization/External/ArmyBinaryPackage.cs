@@ -12,7 +12,6 @@ namespace GameInterface.Serialization.External
     public class ArmyBinaryPackage : BinaryPackageBase<Army>
     {
 
-        private static readonly MethodInfo AddEventHandlers = typeof(Army).GetMethod("AddEventHandlers", BindingFlags.NonPublic | BindingFlags.Instance);
         public ArmyBinaryPackage(Army obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
@@ -33,7 +32,7 @@ namespace GameInterface.Serialization.External
             base.UnpackFields();
 
             // Resolves _hourlyTickEvent and _tickEvent
-            AddEventHandlers.Invoke(Object, new object[0]);
+            Object.AddEventHandlers();
 
             // Resolves _armiesCache for Kingdom
             if (Object.Kingdom != null)
