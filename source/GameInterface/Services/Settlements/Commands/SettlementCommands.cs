@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using GameInterface.Extentions;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;

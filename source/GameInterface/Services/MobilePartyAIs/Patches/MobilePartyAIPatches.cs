@@ -1,5 +1,4 @@
-﻿using GameInterface.Extentions;
-using HarmonyLib;
+﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches

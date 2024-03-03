@@ -221,7 +221,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Extentions\" />
     <Folder Include="Services\Kingdoms\Messages\" />
   </ItemGroup>
     <ItemGroup>
