@@ -221,6 +221,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Extentions\" />
     <Folder Include="Services\Kingdoms\Messages\" />
   </ItemGroup>
     <ItemGroup>
@@ -235,8 +236,8 @@
     <!--<Publicize Include="SandBox.ViewModelCollection"/>                    -->
     <!--<Publicize Include="TaleWorlds.AchievementSystem"/>                   -->
     <!--<Publicize Include="TaleWorlds.ActivitySystem"/>-->
-    <Publicize Include="TaleWorlds.CampaignSystem"/>
-    <!--<Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection"/>                                                     -->
+    <Publicize Include="TaleWorlds.CampaignSystem" />
+    <Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection" />                                                     
     <!--<Publicize Include="TaleWorlds.Core"/>                                                                                   -->
     <!--<Publicize Include="TaleWorlds.Core.ViewModelCollection"/>                                                               -->
     <!--<Publicize Include="TaleWorlds.Diamond"/>                                                                                -->
