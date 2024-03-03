@@ -30,21 +30,11 @@ namespace GameInterface.Serialization.External
             base.PackFields(excludes);
         }
 
-        private static PropertyInfo OwnerParty = typeof(TroopRoster).GetProperty("OwnerParty", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static PropertyInfo NumberChangedCallback = typeof(TroopRoster).GetProperty("NumberChangedCallback", BindingFlags.NonPublic | BindingFlags.Instance);
-
-        private static MethodInfo MemberRosterNumberChanged = typeof(PartyBase).GetMethod("MemberRosterNumberChanged", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
             base.UnpackFields();
 
-            PartyBase ownerParty = (PartyBase)OwnerParty.GetValue(Object);
-            Type delegateType = NumberChangedCallback.PropertyType;
-
-            if(delegateType.TryCreateDelegate(ownerParty, MemberRosterNumberChanged, out Delegate @delegate))
-            {
-                NumberChangedCallback.SetValue(Object, @delegate);
-            }
+            Object.NumberChangedCallback = Object.OwnerParty.MemberRosterNumberChanged;
         }
     }
 }
