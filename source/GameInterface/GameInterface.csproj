@@ -273,7 +273,7 @@
     <!--<Publicize Include="TaleWorlds.MountAndBlade.ViewModelCollection"/>                                                      -->
     <!--<Publicize Include="TaleWorlds.NavigationSystem"/>                                                                       -->
     <!--<Publicize Include="TaleWorlds.Network"/>                                                                                -->
-    <!--<Publicize Include="TaleWorlds.ObjectSystem"/>                                                                           -->
+    <Publicize Include="TaleWorlds.ObjectSystem"/>                                                                           
     <!--<Publicize Include="TaleWorlds.PlatformService"/>                                                                        -->
     <!--<Publicize Include="TaleWorlds.PlatformService.Epic"/>                                                                   -->
     <!--<Publicize Include="TaleWorlds.PlatformService.GOG"/>                                                                    -->

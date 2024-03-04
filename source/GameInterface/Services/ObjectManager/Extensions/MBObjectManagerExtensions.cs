@@ -78,9 +78,6 @@ public static class MBObjectManagerExtensions
 internal class MBObjectManagerFacade
 {
     private Dictionary<Type, ObjectTypeRecordFacade> Records { get => GetRecords(); }
-
-    private readonly FieldInfo ObjectTypeRecords = typeof(MBObjectManager)
-        .GetField("ObjectTypeRecords", BindingFlags.NonPublic | BindingFlags.Instance);
     private readonly MBObjectManager objectManager;
 
     public MBObjectManagerFacade(MBObjectManager objectManager)
@@ -91,7 +88,7 @@ internal class MBObjectManagerFacade
     private Dictionary<Type, ObjectTypeRecordFacade> GetRecords()
     {
         var records = new Dictionary<Type, ObjectTypeRecordFacade>();
-        foreach (var obj in (IEnumerable<object>)ObjectTypeRecords.GetValue(objectManager))
+        foreach (var obj in objectManager.ObjectTypeRecords)
         {
             var type = obj.GetType();
             var handledType = type.GetGenericArguments()[0];
