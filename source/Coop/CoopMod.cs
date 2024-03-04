@@ -96,10 +96,7 @@ namespace Coop
 
             // Skip startup splash screen
 #if DEBUG
-            typeof(Module).GetField(
-                                "_splashScreenPlayed",
-                                BindingFlags.Instance | BindingFlags.NonPublic)
-                            .SetValue(Module.CurrentModule, true);
+            Module.CurrentModule._splashScreenPlayed = true;
 #endif
             #region ButtonAssignment
 
