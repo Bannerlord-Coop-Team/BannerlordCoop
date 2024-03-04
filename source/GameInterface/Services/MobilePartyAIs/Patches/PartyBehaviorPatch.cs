@@ -24,12 +24,6 @@ namespace GameInterface.Services.MobilePartyAIs.Patches;
 [HarmonyPatch(typeof(MobilePartyAi))]
 static class PartyBehaviorPatch
 {
-    static readonly Func<MobilePartyAi, bool> get_DefaultBehaviorNeedsUpdate = typeof(MobilePartyAi)
-        .GetField("DefaultBehaviorNeedsUpdate", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildUntypedGetter<MobilePartyAi, bool>();
-    static readonly Func<MobilePartyAi, MobileParty> _mobileParty = typeof(MobilePartyAi)
-        .GetField("_mobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildUntypedGetter<MobilePartyAi, MobileParty>();
 
     /// <summary>
     /// This prevents the tick method being called without the need for an update
@@ -42,7 +36,7 @@ static class PartyBehaviorPatch
         if (ModInformation.DISABLE_AI == false) return true;
 
         // This disables AI
-        return get_DefaultBehaviorNeedsUpdate(__instance);
+        return __instance.DefaultBehaviorNeedsUpdate;
     }
 
     [HarmonyPrefix]
@@ -103,7 +97,7 @@ static class PartyBehaviorPatch
     {
         DefaultBehavior(partyAi, newBehavior);
 
-        var mobileParty = _mobileParty(partyAi);
+        var mobileParty = partyAi._mobileParty;
 
         if (typeof(Settlement).IsAssignableFrom(targetMapEntity?.GetType()))
         {
