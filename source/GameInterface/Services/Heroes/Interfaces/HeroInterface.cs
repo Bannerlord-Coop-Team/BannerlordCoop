@@ -44,7 +44,6 @@ internal class HeroInterface : IHeroInterface
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IControlledEntityRegistry entityRegistry;
 
-    private static PropertyInfo Campaign_PlayerClan => typeof(Campaign).GetProperty("PlayerDefaultFaction", BindingFlags.Instance | BindingFlags.NonPublic);
 
 
     public HeroInterface(
@@ -138,7 +137,7 @@ internal class HeroInterface : IHeroInterface
             ChangePlayerCharacterAction.Apply(resolvedHero);
             MainParty.SetValue(Campaign.Current, resolvedHero.PartyBelongedTo);
 
-            Campaign_PlayerClan.SetValue(Campaign.Current, resolvedHero.Clan);
+            Campaign.Current.PlayerDefaultFaction = resolvedHero.Clan;
         }
         else
         {
