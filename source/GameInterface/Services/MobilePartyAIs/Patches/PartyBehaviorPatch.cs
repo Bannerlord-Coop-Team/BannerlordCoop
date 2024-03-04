@@ -69,9 +69,6 @@ static class PartyBehaviorPatch
         return false;
     }
 
-    private static Func<MobilePartyAi, Vec2> get_MobilePartyAi_BehaviorTarget = typeof(MobilePartyAi)
-        .GetField("BehaviorTarget", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildUntypedGetter<MobilePartyAi, Vec2>();
     private static bool BehaviorIsSame(
         ref MobilePartyAi __instance,
         ref AiBehavior newAiBehavior,
@@ -88,7 +85,7 @@ static class PartyBehaviorPatch
 
         return __instance.AiBehaviorMapEntity == targetEntity &&
             party.ShortTermBehavior == newAiBehavior &&
-            get_MobilePartyAi_BehaviorTarget(__instance) == bestTargetPoint;
+            __instance.BehaviorTarget == bestTargetPoint;
 
     }
 
