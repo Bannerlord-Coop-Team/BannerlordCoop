@@ -11,8 +11,6 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class StanceLinkBinaryPackage : BinaryPackageBase<StanceLink>
     {
-        public static readonly PropertyInfo StanceLink_Faction1 = typeof(StanceLink).GetProperty(nameof(StanceLink.Faction1));
-        //public static readonly PropertyInfo StanceLink_Faction2 = typeof(StanceLink).GetProperty(nameof(StanceLink.Faction2));
 
         private string faction1Id;
         private string faction2Id;
