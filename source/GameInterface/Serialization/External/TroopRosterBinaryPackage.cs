@@ -33,8 +33,10 @@ namespace GameInterface.Serialization.External
         protected override void UnpackInternal()
         {
             base.UnpackFields();
-
-            Object.NumberChangedCallback = Object.OwnerParty.MemberRosterNumberChanged;
+            if (Object?.OwnerParty != null)
+            {
+                Object.NumberChangedCallback = Object.OwnerParty.MemberRosterNumberChanged;
+            }
         }
     }
 }
