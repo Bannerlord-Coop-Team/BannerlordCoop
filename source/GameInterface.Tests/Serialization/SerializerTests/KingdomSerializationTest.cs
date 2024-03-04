@@ -73,8 +73,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             settlement2.StringId = "s2";
             objectManager.AddExisting(settlement2.StringId, settlement2);
 
-            KingdomBinaryPackage.InitializeCachedLists.Invoke(kingdomObject, new object[0]);
-            List<Settlement> settlements = (List<Settlement>)KingdomBinaryPackage.Kingdom_Settlements.GetValue(kingdomObject);
+            kingdomObject.InitializeCachedLists();
+            List<Settlement> settlements = kingdomObject._settlementsCache;
 
             settlements.Add(settlement1);
             settlements.Add(settlement2);
@@ -107,7 +107,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(kingdomObject.LastMercenaryOfferTime, newKingdomObject.LastMercenaryOfferTime);
             Assert.Equal(kingdomObject.LastArmyCreationDay, newKingdomObject.LastArmyCreationDay);
 
-            List<Settlement> newSettlements = (List<Settlement>)KingdomBinaryPackage.Kingdom_Settlements.GetValue(newKingdomObject);
+            List<Settlement> newSettlements = kingdomObject._settlementsCache;
             Assert.Equal(settlements.Count, newSettlements.Count);
             foreach (var zippedSettlements in settlements.Zip(newSettlements, (v1, v2) => (v1, v2)))
             {

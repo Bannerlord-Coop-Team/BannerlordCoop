@@ -61,7 +61,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             surgeon.StringId = "My Surgeon";
             MBObjectManager.Instance.RegisterObject(surgeon);
 
-            MobilePartyBinaryPackage.MobileParty_Surgeon.SetValue(mobilePartyObject, surgeon);
+           mobilePartyObject.Surgeon = surgeon;
 
             // Setup serialization for mobilePartyObject
             var factory = container.Resolve<IBinaryPackageFactory>();

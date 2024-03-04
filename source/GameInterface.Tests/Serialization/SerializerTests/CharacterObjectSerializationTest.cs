@@ -73,11 +73,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 character.StringId = $"Character_{i}";
                 objectManager.AddExisting(character.StringId, character);
             }
+            CharacterObject._battleEquipmentTemplate = characterMembers[0];
+            CharacterObject._civilianEquipmentTemplate = characterMembers[1];
+            CharacterObject._originCharacter = characterMembers[2];
+            CharacterObject.UpgradeTargets = characterMembers.ToArray();
 
-            CharacterObjectBinaryPackage.CharacterObject_battleEquipmentTemplate.SetValue(CharacterObject, characterMembers[0]);
-            CharacterObjectBinaryPackage.CharacterObject_civilianEquipmentTemplate.SetValue(CharacterObject, characterMembers[1]);
-            CharacterObjectBinaryPackage.CharacterObject_originCharacter.SetValue(CharacterObject, characterMembers[2]);
-            CharacterObjectBinaryPackage.CharacterObject_UpgradeTargets.SetValue(CharacterObject, characterMembers);
 
             var factory = container.Resolve<IBinaryPackageFactory>();
 
@@ -94,9 +94,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
             CharacterObject newCharacterObject = returnedPackage.Unpack<CharacterObject>(deserializeFactory);
 
-            Assert.Same(characterMembers[0], CharacterObjectBinaryPackage.CharacterObject_battleEquipmentTemplate.GetValue(newCharacterObject));
-            Assert.Same(characterMembers[1], CharacterObjectBinaryPackage.CharacterObject_civilianEquipmentTemplate.GetValue(newCharacterObject));
-            Assert.Same(characterMembers[2], CharacterObjectBinaryPackage.CharacterObject_originCharacter.GetValue(newCharacterObject));
+            Assert.Same(characterMembers[0], newCharacterObject._battleEquipmentTemplate);
+            Assert.Same(characterMembers[1], newCharacterObject._civilianEquipmentTemplate);
+            Assert.Same(characterMembers[2], newCharacterObject._originCharacter);
 
             CharacterObject[] characterObjects = newCharacterObject.UpgradeTargets;
 
