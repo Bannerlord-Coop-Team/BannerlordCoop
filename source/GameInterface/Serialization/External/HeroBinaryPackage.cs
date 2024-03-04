@@ -19,8 +19,9 @@ namespace GameInterface.Serialization.External
         private string[] exSpousesIds;
         private string spouseId;
         private string[] childrenIds;
-        
 
+        public static FieldInfo Hero_ExSpouses => typeof(Hero).GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance);
+        public static FieldInfo Hero_Children => typeof(Hero).GetField("_children", BindingFlags.NonPublic | BindingFlags.Instance);
         public HeroBinaryPackage(Hero obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
@@ -77,13 +78,10 @@ namespace GameInterface.Serialization.External
             // Set the values of the object's father, mother, spouse, ex-spouses, and children
             Object._father = ResolveId<Hero>(fatherId);
             Object._mother = ResolveId<Hero>(motherId);
-            Object._mother = ResolveId<Hero>(spouseId);
+            Object._spouse = ResolveId<Hero>(spouseId);
 
-            Object._exSpouses.Clear();
-            Object._exSpouses.AddRange(ResolveIds<Hero>(exSpousesIds));
-
-            Object._children.Clear();
-            Object._children.AddRange(ResolveIds<Hero>(childrenIds));
+            Hero_ExSpouses.SetValue(Object, new MBList<Hero>(ResolveIds<Hero>(exSpousesIds)));
+            Hero_Children.SetValue(Object, new MBList<Hero>(ResolveIds<Hero>(childrenIds)));
         }
     }
 }
