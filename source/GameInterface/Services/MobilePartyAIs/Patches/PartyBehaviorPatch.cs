@@ -92,56 +92,29 @@ static class PartyBehaviorPatch
     public static void SetAiBehavior(
         MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint)
     {
-        DefaultBehavior(partyAi, newBehavior);
+        partyAi.DefaultBehavior = newBehavior;
 
         var mobileParty = partyAi._mobileParty;
 
         if (typeof(Settlement).IsAssignableFrom(targetMapEntity?.GetType()))
         {
-            TargetSettlement(mobileParty, (Settlement)targetMapEntity);
-            TargetParty(mobileParty, null);
+            mobileParty.TargetSettlement = (Settlement)targetMapEntity;
+            mobileParty.TargetParty = null;
         }
 
         else if (typeof(MobileParty).IsAssignableFrom(targetMapEntity?.GetType()))
         {
-            TargetSettlement(mobileParty, null);
-            TargetParty(mobileParty, (MobileParty)targetMapEntity);
+            mobileParty.TargetSettlement = null;
+            mobileParty.TargetParty = (MobileParty)targetMapEntity;
         }
 
-        TargetPosition(mobileParty, targetPoint);
+        mobileParty.TargetPosition = targetPoint;
 
-        SetShortTermBehavior(partyAi, newBehavior, targetMapEntity);
-        SetBehaviorTarget(partyAi, targetPoint);
-        UpdateBehavior(partyAi);
+        partyAi.SetShortTermBehavior(newBehavior, targetMapEntity);
+        partyAi.BehaviorTarget = targetPoint;
+        partyAi.UpdateBehavior();
     }
 
-    static readonly Action<MobilePartyAi, AiBehavior, IMapEntity> SetShortTermBehavior = typeof(MobilePartyAi)
-        .GetMethod("SetShortTermBehavior", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildDelegate<Action<MobilePartyAi, AiBehavior, IMapEntity>>();
-
-    static readonly Action<MobilePartyAi, Vec2> SetBehaviorTarget = typeof(MobilePartyAi)
-        .GetField("BehaviorTarget", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildUntypedSetter<MobilePartyAi, Vec2>();
-
-    static readonly Action<MobilePartyAi> UpdateBehavior = typeof(MobilePartyAi)
-        .GetMethod("UpdateBehavior", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildDelegate<Action<MobilePartyAi>>();
-
-    static readonly Action<MobilePartyAi, AiBehavior> DefaultBehavior = typeof(MobilePartyAi)
-        .GetProperty(nameof(MobilePartyAi.DefaultBehavior)).GetSetMethod(true)
-        .BuildDelegate<Action<MobilePartyAi, AiBehavior>>();
-
-    static readonly Action<MobileParty, Settlement> TargetSettlement = typeof(MobileParty)
-        .GetProperty(nameof(MobileParty.TargetSettlement)).GetSetMethod(true)
-        .BuildDelegate<Action<MobileParty, Settlement>>();
-
-    static readonly Action<MobileParty, MobileParty> TargetParty = typeof(MobileParty)
-        .GetProperty(nameof(MobileParty.TargetParty)).GetSetMethod(true)
-        .BuildDelegate<Action<MobileParty, MobileParty>>();
-
-    static readonly Action<MobileParty, Vec2> TargetPosition = typeof(MobileParty)
-        .GetProperty(nameof(MobileParty.TargetPosition)).GetSetMethod(true)
-        .BuildDelegate<Action<MobileParty, Vec2>>();
 }
 
 
