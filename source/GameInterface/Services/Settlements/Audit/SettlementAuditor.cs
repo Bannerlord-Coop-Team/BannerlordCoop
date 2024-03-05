@@ -145,6 +145,9 @@ internal class SettlementAuditor : IAuditor
             var errLastVisitTimeOfOwner = 0;
             var errClaimedBy = 0;
             var errClaimValue = 0;
+            var errWallHitPointsRatio = 0;
+            var errCanBeClaimed = 0;
+
             sb.AppendLine($"Attempting Audit for Settlement {audit.StringId}");
             if(objectManager.TryGetObject<Settlement>(audit.StringId, out var settlement) == false)
             {
@@ -289,6 +292,20 @@ internal class SettlementAuditor : IAuditor
                 errClaimValue++;
             }
 
+            if(!audit.WallSectionHitPointsRatioList.SequenceEqual(settlement._settlementWallSectionHitPointsRatioList))
+            {
+                sb.AppendLine($"settlement._settlementWallSectionHitPointsRatioList {settlement._settlementWallSectionHitPointsRatioList} != {audit.WallSectionHitPointsRatioList}");
+                errWallHitPointsRatio++;
+            }
+
+            if(audit.CanBeClaimed != settlement.CanBeClaimed)
+            {
+                sb.AppendLine($"settlement.CanBeClaimed {settlement.CanBeClaimed} != {audit.CanBeClaimed}");
+
+                errCanBeClaimed++;
+            }
+
+
             sb.AppendFormat(
                 "\terrorNumberOfEnemiesSpottedAround: {0}\n" +
                 "\terrorNumberOfAlliesSpottedAround: {1}\n"+
@@ -305,6 +322,8 @@ internal class SettlementAuditor : IAuditor
                 "\terrLastVisitTimeOfOwner: {12}\n" +
                 "\terrClaimedBy: {13}\n" +
                 "\terrClaimValue: {14}\n",
+                "\terrCanBeClaimed: {15}\n",
+                "\tWallSectionHitPointsRatioList: {16}\n",
                 errorNumberOfEnemiesSpottedAround,
                 errorNumberOfAlliesSpottedAround,
                 errorBribePaid,
@@ -319,7 +338,9 @@ internal class SettlementAuditor : IAuditor
                 errNumberOfLordPartiesAt,
                 errLastVisitTimeOfOwner,
                 errClaimedBy,
-                errClaimValue
+                errClaimValue,
+                errCanBeClaimed,
+                errWallHitPointsRatio
             );
 
         }
