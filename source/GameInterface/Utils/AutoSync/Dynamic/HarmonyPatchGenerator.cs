@@ -11,7 +11,7 @@ using System.Reflection.Emit;
 namespace GameInterface.Utils.AutoSync.Dynamic;
 
 /// <summary>
-/// Prefix function generator for property sync
+/// Generates prefix functions for property synchronization.
 /// </summary>
 public class HarmonyPatchGenerator
 {
@@ -20,6 +20,13 @@ public class HarmonyPatchGenerator
     private readonly Type dataClassType;
     private readonly Type eventType;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="HarmonyPatchGenerator"/> class.
+    /// </summary>
+    /// <param name="moduleBuilder">The module builder.</param>
+    /// <param name="propertyInfo">The property information.</param>
+    /// <param name="dataClassType">The data class type.</param>
+    /// <param name="eventClassType">The event class type.</param>
     public HarmonyPatchGenerator(ModuleBuilder moduleBuilder, PropertyInfo propertyInfo, Type dataClassType, Type eventClassType)
     {
         autoPatchType = moduleBuilder.DefineType($"AutoSync_{propertyInfo.PropertyType.Name}_{propertyInfo.Name}_Patches");
@@ -27,6 +34,13 @@ public class HarmonyPatchGenerator
         this.eventType = eventClassType;
     }
 
+    /// <summary>
+    /// Generates the prefix patch method for the setter.
+    /// </summary>
+    /// <typeparam name="T">The type of the property.</typeparam>
+    /// <param name="setMethod">The setter method.</param>
+    /// <param name="idGetterMethod">The ID getter method.</param>
+    /// <returns>The generated prefix patch method.</returns>
     public MethodInfo GenerateSetterPrefixPatch<T>(MethodInfo setMethod, Func<T, string> idGetterMethod) where T : class
     {
         // Id getter method must be static
@@ -106,6 +120,11 @@ public class HarmonyPatchGenerator
         return compiledType.GetMethod(setterPrefixPatch.Name, BindingFlags.NonPublic | BindingFlags.Static);
     }
 
+    /// <summary>
+    /// Checks if the environment is a client.
+    /// </summary>
+    /// <param name="typeName">The name of the type.</param>
+    /// <returns>True if the environment is a client; otherwise, false.</returns>
     public static bool IsClient(string typeName)
     {
         if (ModInformation.IsClient)
@@ -118,6 +137,10 @@ public class HarmonyPatchGenerator
         return false;
     }
 
+    /// <summary>
+    /// Gets the message broker.
+    /// </summary>
+    /// <returns>The message broker.</returns>
     public static IMessageBroker GetMessageBroker()
     {
         if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker))

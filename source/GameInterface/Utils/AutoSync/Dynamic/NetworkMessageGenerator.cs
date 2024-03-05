@@ -19,7 +19,7 @@ public class NetworkMessageGenerator
 {
     public Type GenerateNetworkMessage(ModuleBuilder moduleBuilder, PropertyInfo property)
     {
-        TypeBuilder typeBuilder = moduleBuilder.DefineType($"AutoSync_Network{property.DeclaringType.Name}_{property.Name}Changed",
+        TypeBuilder typeBuilder = moduleBuilder.DefineType($"AutoSync_Network{property.DeclaringType.Name}_{property.Name}_Changed",
             TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
             typeof(object));
 
@@ -76,7 +76,7 @@ public class NetworkMessageGenerator
         MethodBuilder getHashCodeMethodBuilder = typeBuilder.DefineMethod("GetHashCode",
                                             MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.NewSlot |
                                             MethodAttributes.Virtual | MethodAttributes.Final,
-                                            typeof(int), null);
+                                            typeof(int), Type.EmptyTypes);
 
         ILGenerator ilGenerator = getHashCodeMethodBuilder.GetILGenerator();
 
@@ -100,13 +100,13 @@ public class NetworkMessageGenerator
     private FieldBuilder CreateProperty(TypeBuilder typeBuilder, string propertyName, Type propertyType)
     {
         // Define a private field for the property
-        FieldBuilder fieldBuilder = typeBuilder.DefineField("_" + propertyName, propertyType, FieldAttributes.Private | FieldAttributes.InitOnly);
+        FieldBuilder fieldBuilder = typeBuilder.DefineField($"_{propertyName}", propertyType, FieldAttributes.Private | FieldAttributes.InitOnly);
 
         // Define the getter method
-        MethodBuilder getMethodBuilder = typeBuilder.DefineMethod("get_" + propertyName,
+        MethodBuilder getMethodBuilder = typeBuilder.DefineMethod($"get_{propertyName}",
                                         MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName |
                                         MethodAttributes.NewSlot | MethodAttributes.Virtual | MethodAttributes.Final,
-                                        propertyType, null);
+                                        propertyType, Type.EmptyTypes);
 
         // Generate IL for the getter method
         ILGenerator ilGenerator = getMethodBuilder.GetILGenerator();
@@ -115,7 +115,7 @@ public class NetworkMessageGenerator
         ilGenerator.Emit(OpCodes.Ret);                     // Return the field value
 
         // Define the property
-        PropertyBuilder propertyBuilder = typeBuilder.DefineProperty(propertyName, PropertyAttributes.HasDefault, propertyType, null);
+        PropertyBuilder propertyBuilder = typeBuilder.DefineProperty(propertyName, PropertyAttributes.HasDefault, propertyType, Type.EmptyTypes);
         propertyBuilder.SetGetMethod(getMethodBuilder);
 
         // Return the fieldBuilder, which may be useful if you want to further modify the field

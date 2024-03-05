@@ -8,13 +8,38 @@ using System.Reflection;
 
 namespace Common.Serialization;
 
+/// <summary>
+/// Converts types to and from an integer id.
+/// </summary>
 public interface ISerializableTypeMapper
 {
+    /// <summary>
+    /// Adds types to type mapper
+    /// </summary>
+    /// <param name="types">Types to add</param>
+    /// <remarks>
+    /// Types should be added in the same order on both the client and server.
+    /// </remarks>
     void AddTypes(IEnumerable<Type> types);
+
+    /// <summary>
+    /// Tries to get the id from a type.
+    /// </summary>
+    /// <param name="type">Type to attempt id retreival</param>
+    /// <param name="id">id out parameter</param>
+    /// <returns>True if successful otherwise false</returns>
     bool TryGetId(Type type, out int id);
+
+    /// <summary>
+    /// Tries to get the type from an id.
+    /// </summary>
+    /// <param name="id">Id to attempt type retreival</param>
+    /// <param name="type">type out parameter</param>
+    /// <returns>True if successful otherwise false</returns>
     bool TryGetType(int id, out Type type);
 }
 
+/// <inheritdoc cref="ISerializableTypeMapper"/>"
 public class SerializableTypeMapper : ISerializableTypeMapper
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SerializableTypeMapper>();

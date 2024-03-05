@@ -1,28 +1,24 @@
 ﻿using Autofac;
-using Common.Extensions;
-using Common.Messaging;
-using Common.Network;
-using Common.Util;
-using Coop.Core.Server.Policies;
-using GameInterface;
 using GameInterface.Policies;
-using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.AutoSync.Dynamic;
 using HarmonyLib;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using Xunit;
 
 namespace GameInterface.Tests.AutoSync;
+
+/// <summary>
+/// Tests for the HarmonyMethodBuilder class.
+/// </summary>
 public class HarmonyMethodBuilderTests
 {
     private int TestInt { get; set; } = 5;
     public string StringId = "TestStringId";
 
+    /// <summary>
+    /// Test method to verify the functionality of creating a Harmony method.
+    /// </summary>
     [Fact]
     public void CreateHarmonyMethod()
     {
@@ -51,7 +47,6 @@ public class HarmonyMethodBuilderTests
 
         Assert.NotNull(AccessTools.Field(GetType(), "StringId"));
 
-
         // Act
         var patchMethod = methodGenerator.GenerateSetterPrefixPatch<HarmonyMethodBuilderTests>(
             testIntProperty.GetSetMethod(true), IdGetterMethod);
@@ -65,36 +60,24 @@ public class HarmonyMethodBuilderTests
         TestInt += 1;
     }
 
+    /// <summary>
+    /// Dummy policy class for testing purposes.
+    /// </summary>
+    class DummyPolicy : ISyncPolicy
+    {
+        /// <summary>
+        /// When true this skips patch functionality.
+        /// </summary>
+        public bool AllowOriginal() => false;
+    }
+
+    /// <summary>
+    /// Method to get the ID for testing purposes.
+    /// </summary>
+    /// <param name="instance">An instance of HarmonyMethodBuilderTests.</param>
+    /// <returns>The string ID.</returns>
     public static string IdGetterMethod(HarmonyMethodBuilderTests instance)
     {
         return instance.StringId;
-    }
-
-    [Fact]
-    public void SandboxTranspiler()
-    {
-        //var harmony = new Harmony("asdfasdfasdf");
-
-        //var targetMethod = AccessTools.Constructor(typeof(HandlerExample), new Type[] { 
-        //    typeof(IMessageBroker),
-        //    typeof(INetwork),
-        //    typeof(IObjectManager),
-        //    typeof(ILogger), });
-        //var transpilerMethod = new HarmonyMethod(GetType(), nameof(Transpiler));
-        
-        //harmony.Patch(targetMethod, transpiler: transpilerMethod);
-    }
-
-    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var instrs = instructions.ToList();
-
-        return instrs;
-    }
-
-    class DummyPolicy : ISyncPolicy
-    {
-        /// When true this skips patch functionality <see cref="IPolicyProvider"/>
-        public bool AllowOriginal() => false;
     }
 }

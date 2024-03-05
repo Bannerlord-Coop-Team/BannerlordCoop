@@ -9,8 +9,6 @@ using GameInterface.Services.MobileParties.Messages.Data;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -54,17 +52,5 @@ internal class PartyArmyPatches
                 mobileParty.Army = army;
             }
         });
-    }
-}
-
-[HarmonyPatch]
-class IDK
-{
-    [HarmonyPatch(typeof(PartyArmyPatches), "SetArmyPrefix")]
-    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var instrs = instructions.ToList();
-
-        return instrs;
     }
 }

@@ -31,8 +31,7 @@ public class DataClassGenerator
         // Creates type builder for the new data class
         TypeBuilder typeBuilder = moduleBuilder.DefineType(
             $"{name}Data",
-            TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
-            typeof(object)
+            TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit
         );
 
         // Add IAutoSyncData<dataType> interface implementation
@@ -41,7 +40,7 @@ public class DataClassGenerator
         // Add ProtoContract attribute to the new data class
         var attributeBuilder = new CustomAttributeBuilder(
             typeof(ProtoContractAttribute).GetConstructor(Type.EmptyTypes),
-            new object[0],
+            Array.Empty<object>(),
             new PropertyInfo[] { AccessTools.Property(typeof(ProtoContractAttribute), "SkipConstructor") },
             new object[] { true });
 
@@ -126,11 +125,11 @@ public class DataClassGenerator
             new object[] { protoMemberCounter++ });
 
         // Define a private field for the property
-        FieldBuilder fieldBuilder = typeBuilder.DefineField("_" + propertyName, propertyType, FieldAttributes.Private | FieldAttributes.InitOnly);
+        FieldBuilder fieldBuilder = typeBuilder.DefineField($"_{propertyName}", propertyType, FieldAttributes.Private | FieldAttributes.InitOnly);
         fieldBuilder.SetCustomAttribute(customAttributeBuilder);
 
         // Define the getter method
-        MethodBuilder getMethodBuilder = typeBuilder.DefineMethod("get_" + propertyName,
+        MethodBuilder getMethodBuilder = typeBuilder.DefineMethod($"get_{propertyName}",
                                         MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.SpecialName |
                                         MethodAttributes.NewSlot | MethodAttributes.Virtual | MethodAttributes.Final,
                                         propertyType, null);

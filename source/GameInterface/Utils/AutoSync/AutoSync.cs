@@ -9,10 +9,8 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Threading;
 
 namespace GameInterface.Utils.AutoSync;
 
@@ -67,6 +65,9 @@ internal class AutoSync : IAutoSync
     }
 }
 
+/// <summary>
+/// Handles synchronization of properties.
+/// </summary>
 public class PropertySync : IDisposable
 {
     private static readonly Dictionary<PropertyInfo, ISyncResults> PatchedProperties = new();
@@ -80,11 +81,20 @@ public class PropertySync : IDisposable
     private readonly ISerializableTypeMapper typeMapper;
     private IAutoSyncHandlerTemplate handler;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PropertySync"/> class.
+    /// </summary>
+    /// <param name="harmony">The Harmony instance.</param>
+    /// <param name="moduleBuilder">The module builder.</param>
+    /// <param name="messageBroker">The message broker.</param>
+    /// <param name="objectManager">The object manager.</param>
+    /// <param name="network">The network.</param>
+    /// <param name="typeMapper">The type mapper.</param>
     public PropertySync(
         Harmony harmony,
         ModuleBuilder moduleBuilder,
         IMessageBroker messageBroker,
-        IObjectManager objectManager, 
+        IObjectManager objectManager,
         INetwork network,
         ISerializableTypeMapper typeMapper)
     {
@@ -96,11 +106,21 @@ public class PropertySync : IDisposable
         this.typeMapper = typeMapper;
     }
 
+    /// <summary>
+    /// Disposes the handler.
+    /// </summary>
     public void Dispose()
     {
         handler?.Dispose();
     }
 
+    /// <summary>
+    /// Synchronizes a property.
+    /// </summary>
+    /// <typeparam name="T">The type of the property.</typeparam>
+    /// <param name="property">The property to synchronize.</param>
+    /// <param name="stringIdGetterFn">The function to get the string ID.</param>
+    /// <returns>The synchronization results.</returns>
     public ISyncResults SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetterFn) where T : class
     {
         if (PatchedProperties.TryGetValue(property, out var existingResult))
@@ -181,6 +201,6 @@ public class PropertySync : IDisposable
 
     private Type GenerateHandler(PropertyInfo property, Type networkMessageType, Type eventMessageType)
     {
-        return typeof(AutoSyncHandlerTemplate<,,,>).MakeGenericType(property.DeclaringType, property.PropertyType, networkMessageType, eventMessageType);
+        return typeof(AutoSyncHandler<,,,>).MakeGenericType(property.DeclaringType, property.PropertyType, networkMessageType, eventMessageType);
     }
 }

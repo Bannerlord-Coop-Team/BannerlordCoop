@@ -13,8 +13,14 @@ using System.Reflection.Emit;
 using Xunit;
 
 namespace GameInterface.Tests.AutoSync;
+/// <summary>
+/// Tests for the HandlerGenerator class.
+/// </summary>
 public class HandlerGeneratorTests
 {
+    /// <summary>
+    /// Test method to verify the functionality of creating a handler class.
+    /// </summary>
     [Fact]
     public void CreateHandlerClass()
     {
@@ -40,17 +46,17 @@ public class HandlerGeneratorTests
         var network = new TestNetwork();
         var registryCollection = new RegistryCollection();
         var testObjectRegistry = new TestObjectRegistry(registryCollection);
-        
+
         testObjectRegistry.RegisterExistingObject(testObj.StringId, testObj);
-        
+
         var objectManager = new ObjectManager(registryCollection);
-        
+
 
         var messageBroker = new TestMessageBroker();
 
         var objType = syncedProperty.DeclaringType!;
         var dataType = syncedProperty.PropertyType;
-        var handlerType = typeof(AutoSyncHandlerTemplate<,,,>).MakeGenericType(objType, dataType, networkMessageType, eventType);
+        var handlerType = typeof(AutoSyncHandler<,,,>).MakeGenericType(objType, dataType, networkMessageType, eventType);
         ILogger logger = null;
         var handlerInstance = (IHandler)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network, logger, syncedProperty });
 
@@ -68,6 +74,9 @@ public class HandlerGeneratorTests
         Assert.True(true);
     }
 
+    /// <summary>
+    /// TestObject class used for testing purposes.
+    /// </summary>
     public class TestObject
     {
         public string StringId;
@@ -91,6 +100,9 @@ public class HandlerGeneratorTests
         }
     }
 
+    /// <summary>
+    /// TestObjectRegistry class used for testing purposes.
+    /// </summary>
     class TestObjectRegistry : RegistryBase<TestObject>
     {
         public TestObjectRegistry(IRegistryCollection collection) : base(collection)
