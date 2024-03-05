@@ -225,46 +225,28 @@ internal class SettlementAuditor : IAuditor
             // if the lists dont contain same elements
 
             // two caches can be null (e.g. TrainingField has null for both)
-            if (!(audit.NotablesCache is null))
-            {
 
-                bool containSameNotables = settlementNotableCache.OrderBy(x => x).SequenceEqual(audit.NotablesCache.OrderBy(x => x));
-                if (!containSameNotables)
-                {
-                    sb.AppendLine($"settlement._notablesCache list dont contain same items");
-                    errSettlementHeroCache++;
-                }
-            } else
+            var auditNotables = audit.NotablesCache ?? Array.Empty<string>();
+            bool containSameNotables = settlementNotableCache.OrderBy(x => x).SequenceEqual(auditNotables.OrderBy(x => x));
+            if (!containSameNotables)
             {
-                if(settlementNotableCache.Count > 0)
-                {
-                    sb.AppendLine($"settlement._notablesCache list dont contain same items");
-                    errSettlementHeroCache++;
-                }
+                sb.AppendLine($"settlement._notablesCache list dont contain same items");
+                errSettlementHeroCache++;
             }
+            
 
             List<Hero> heroCache = settlement.GetHeroesWithoutPartyCache().ToList();
             List<string> settlementHeroCache = heroCache.Select(hero => hero.StringId).ToList();
 
+            var auditHerosWithoutPartyCache = audit.HeroesWithoutPartyCache ?? Array.Empty<string>();
 
-            if (!(audit.HeroesWithoutPartyCache is null))
+            bool containsSameHerosWithoutParty = settlementHeroCache.OrderBy(x => x).SequenceEqual(auditHerosWithoutPartyCache.OrderBy(x => x));
+
+            if (!containsSameHerosWithoutParty)
             {
-                bool containsSameHerosWithoutParty = settlementHeroCache.OrderBy(x => x).SequenceEqual(audit.HeroesWithoutPartyCache.OrderBy(x => x));
-
-                if (!containsSameHerosWithoutParty)
-                {
-                    sb.AppendLine($"settlement._herosWithoutPartyCache list dont contain same items");
-                    errHeroesWithoutPartyCache++;
-
-                }
-            } else
-            {
-                if(settlementHeroCache.Count > 0)
-                {
-                    sb.AppendLine($"settlement._herosWithoutPartyCache list dont contain same items");
-                    errHeroesWithoutPartyCache++;
-                }
-            }
+                sb.AppendLine($"settlement._herosWithoutPartyCache list dont contain same items");
+                errHeroesWithoutPartyCache++;
+            } 
             
 
             if (settlement.NumberOfLordPartiesAt != audit.NumberOfLordPartiesAt)
@@ -292,10 +274,23 @@ internal class SettlementAuditor : IAuditor
                 errClaimValue++;
             }
 
-            if(!audit.WallSectionHitPointsRatioList.SequenceEqual(settlement._settlementWallSectionHitPointsRatioList))
+            // value can be null sadly :(
+            if(!(audit.WallSectionHitPointsRatioList is null))
             {
-                sb.AppendLine($"settlement._settlementWallSectionHitPointsRatioList {settlement._settlementWallSectionHitPointsRatioList} != {audit.WallSectionHitPointsRatioList}");
-                errWallHitPointsRatio++;
+                if (!audit.WallSectionHitPointsRatioList.SequenceEqual(settlement._settlementWallSectionHitPointsRatioList))
+                {
+                    sb.AppendLine($"settlement._settlementWallSectionHitPointsRatioList {settlement._settlementWallSectionHitPointsRatioList} != {audit.WallSectionHitPointsRatioList}");
+                    errWallHitPointsRatio++;
+                }
+
+
+            } else
+            {
+                if(settlement._settlementWallSectionHitPointsRatioList.Count > 0)
+                {
+                    sb.AppendLine($"settlement._settlementWallSectionHitPointsRatioList {settlement._settlementWallSectionHitPointsRatioList} != {audit.WallSectionHitPointsRatioList}");
+                    errWallHitPointsRatio++;
+                }
             }
 
             if(audit.CanBeClaimed != settlement.CanBeClaimed)
@@ -305,43 +300,23 @@ internal class SettlementAuditor : IAuditor
                 errCanBeClaimed++;
             }
 
-
-            sb.AppendFormat(
-                "\terrorNumberOfEnemiesSpottedAround: {0}\n" +
-                "\terrorNumberOfAlliesSpottedAround: {1}\n"+
-                "\terrorBribePaid: {2}\n" +
-                "\terrSettlementHitPoints: {3}\n" +
-                "\terrGarrisonWagePaymentLimit: {4}\n" +
-                "\terrLastAttackerParty: {5}\n" +
-                "\terrLastThreatTime: {6}\n" +
-                "\terrCurrentSiegeState: {7}\n" +
-                "\terrMilitia: {8}\n" +
-                "\terrSettlementHeroCache: {9}\n" +
-                "\terrHeroesWithoutPartyCache: {10}\n" +
-                "\terrNumberOfLordPartiesAt: {11}\n" +
-                "\terrLastVisitTimeOfOwner: {12}\n" +
-                "\terrClaimedBy: {13}\n" +
-                "\terrClaimValue: {14}\n",
-                "\terrCanBeClaimed: {15}\n",
-                "\tWallSectionHitPointsRatioList: {16}\n",
-                errorNumberOfEnemiesSpottedAround,
-                errorNumberOfAlliesSpottedAround,
-                errorBribePaid,
-                errSettlementHitPoints,
-                errGarrisonWagePaymentLimit,
-                errLastAttackerParty,
-                errLastThreatTime,
-                errCurrentSiegeState,
-                errMilitia,
-                errSettlementHeroCache,
-                errHeroesWithoutPartyCache,
-                errNumberOfLordPartiesAt,
-                errLastVisitTimeOfOwner,
-                errClaimedBy,
-                errClaimValue,
-                errCanBeClaimed,
-                errWallHitPointsRatio
-            );
+            sb.AppendLine($"\terrorNumberOfEnemiesSpottedAround {errorNumberOfEnemiesSpottedAround}");
+            sb.AppendLine($"\terrorNumberOfAlliesSpottedAround: {errorNumberOfAlliesSpottedAround}");
+            sb.AppendLine($"\tterrorBribePaid: {errorBribePaid}");
+            sb.AppendLine($"\tterrSettlementHitPoints {errSettlementHitPoints}");
+            sb.AppendLine($"\terrGarrisonWagePaymentLimit {errGarrisonWagePaymentLimit}");
+            sb.AppendLine($"\tterrLastAttackerParty: {errLastAttackerParty}");
+            sb.AppendLine($"\tterrLastThreatTime: {errLastThreatTime}");
+            sb.AppendLine($"\tterrCurrentSiegeState: {errCurrentSiegeState}");
+            sb.AppendLine($"\terrMilitia: {errMilitia}");
+            sb.AppendLine($"\terrSettlementHeroCache: {errSettlementHeroCache}");
+            sb.AppendLine($"\terrHeroesWithoutPartyCache: {errHeroesWithoutPartyCache}");
+            sb.AppendLine($"\terrNumberOfLordPartiesAt: {errNumberOfLordPartiesAt}");
+            sb.AppendLine($"\terrLastVisitTimeOfOwner: {errLastVisitTimeOfOwner}");
+            sb.AppendLine($"\terrClaimedBy: {errClaimedBy}");
+            sb.AppendLine($"\terrClaimValue: {errClaimValue}");
+            sb.AppendLine($"\terrCanBeClaimed: {errCanBeClaimed}");
+            sb.AppendLine($"\terrWallSectionHitPointsRatioList: {errWallHitPointsRatio}");
 
         }
 
