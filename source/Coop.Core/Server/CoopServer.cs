@@ -47,7 +47,8 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         INetworkConfiguration configuration, 
         IMessageBroker messageBroker,
         IPacketManager packetManager,
-        IControllerIdProvider controllerIdProvider) : base(configuration)
+        IControllerIdProvider controllerIdProvider,
+        ICommonSerializer serializer) : base(configuration, serializer)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
@@ -113,7 +114,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
+        IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
         packetManager.HandleReceive(peer, packet);
     }
 

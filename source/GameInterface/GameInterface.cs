@@ -12,8 +12,13 @@ public interface IGameInterface : IDisposable
 public class GameInterface : IGameInterface
 {
     public const string HARMONY_STATIC_FIXES_CATEGORY = "HarmonyStaticFixes";
-    private const string HarmonyId = "TaleWorlds.MountAndBlade.Bannerlord.Coop";
+    
     private Harmony harmony;
+
+    public GameInterface(Harmony harmony)
+    {
+        this.harmony = harmony;
+    }
 
     public void Dispose()
     {
@@ -23,17 +28,15 @@ public class GameInterface : IGameInterface
     public void PatchAll()
     {
         // NOTE: Patching in constructor causes issues with tests and CI
-        if (Harmony.HasAnyPatches(HarmonyId)) return;
+        if (Harmony.HasAnyPatches(GameInterfaceModule.HarmonyId)) return;
 
         var assembly = typeof(GameInterface).Assembly;
-
-        harmony = new Harmony(HarmonyId);
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
     }
 
     public void UnpatchAll()
     {
-        harmony?.UnpatchAll(HarmonyId);
+        harmony?.UnpatchAll(GameInterfaceModule.HarmonyId);
     }
 }

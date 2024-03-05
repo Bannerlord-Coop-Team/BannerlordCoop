@@ -18,7 +18,7 @@ namespace E2E.Tests.Environment;
 /// <summary>
 /// Testing environment for End to End testing
 /// </summary>
-internal class E2ETestEnvironement : IDisposable
+internal class E2ETestEnvironment : IDisposable
 {
     public TestEnvironment IntegrationEnvironment { get; }
 
@@ -27,7 +27,7 @@ internal class E2ETestEnvironement : IDisposable
     public IEnumerable<EnvironmentInstance> Clients => IntegrationEnvironment.Clients;
     public EnvironmentInstance Server => IntegrationEnvironment.Server;
     
-    public E2ETestEnvironement(ITestOutputHelper output, int numClients = 2)
+    public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
         GameLoopRunner.Instance.SetGameLoopThread();
 

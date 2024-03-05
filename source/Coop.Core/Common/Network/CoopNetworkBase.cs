@@ -15,9 +15,12 @@ public abstract class CoopNetworkBase : INetwork
     public INetworkConfiguration Configuration { get; }
     public abstract int Priority { get; }
 
-    protected CoopNetworkBase(INetworkConfiguration configuration)
+    protected readonly ICommonSerializer serializer;
+
+    protected CoopNetworkBase(INetworkConfiguration configuration, ICommonSerializer serializer)
     {
         Configuration = configuration;
+        this.serializer = serializer;
     }
 
     public virtual void SendAllBut(NetManager netManager, NetPeer netPeer, IPacket packet)
@@ -43,7 +46,7 @@ public abstract class CoopNetworkBase : INetwork
     public virtual void Send(NetPeer netPeer, IPacket packet)
     {
         // Serialize data
-        byte[] data = ProtoBufSerializer.Serialize(packet);
+        byte[] data = serializer.Serialize(packet);
 
         // Send data
         netPeer.Send(data, packet.DeliveryMethod);

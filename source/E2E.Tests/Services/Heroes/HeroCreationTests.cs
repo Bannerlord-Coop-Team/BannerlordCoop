@@ -17,10 +17,10 @@ namespace E2E.Tests.Services.Heroes;
 
 public class HeroCreationTests : IDisposable
 {
-    E2ETestEnvironement TestEnvironement { get; }
+    E2ETestEnvironment TestEnvironement { get; }
     public HeroCreationTests(ITestOutputHelper output)
     {
-        TestEnvironement = new E2ETestEnvironement(output);
+        TestEnvironement = new E2ETestEnvironment(output);
     }
 
     public void Dispose()
