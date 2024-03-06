@@ -35,7 +35,7 @@ namespace GameInterface.Services.Clans.Patches
                 {
                     ChangeKingdomAction.ApplyInternal(clan, newKingdom, detail, awardMultiplier, byRebellion, showNotification);
                 }
-            }, true);
+            });
 
             
         }
