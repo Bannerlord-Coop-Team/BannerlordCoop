@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using Common.Messaging;
 using Common.Network;
+using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Tests.Mocks;
@@ -44,6 +45,8 @@ internal abstract class TestComponentBase
 
     private ContainerBuilder RegisterCommonTypes(ContainerBuilder builder)
     {
+        builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
+        builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TestNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
