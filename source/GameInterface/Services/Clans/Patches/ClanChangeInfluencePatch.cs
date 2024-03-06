@@ -13,8 +13,6 @@ namespace GameInterface.Services.Clans.Patches
     [HarmonyPatch(typeof(ChangeClanInfluenceAction), "ApplyInternal")]
     public class ClanChangeInfluencePatch
     {
-        private static readonly AllowedInstance<Clan> AllowedInstance = new AllowedInstance<Clan>();
-
         static bool Prefix(Clan clan, float amount)
         {
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;

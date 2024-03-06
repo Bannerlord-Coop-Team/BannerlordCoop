@@ -13,17 +13,11 @@ namespace GameInterface.Services.Clans.Patches
     [HarmonyPatch(typeof(AddCompanionAction), "ApplyInternal")]
     public class ClanAddCompanionPatch
     {
-        private static readonly AllowedInstance<Hero> AllowedInstance = new AllowedInstance<Hero>();
-
         static bool Prefix(Clan clan, Hero companion)
         {
-            if (AllowedInstance.IsAllowed(companion)) return true;
-
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
-
-            CallStackValidator.Validate(companion, AllowedInstance);
 
             MessageBroker.Instance.Publish(clan, new CompanionAdded(clan.StringId, companion.StringId));
 
@@ -32,15 +26,13 @@ namespace GameInterface.Services.Clans.Patches
 
         public static void RunOriginalAddCompanion(Clan clan, Hero companion)
         {
-            using (AllowedInstance)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AllowedInstance.Instance = companion;
-
-                GameLoopRunner.RunOnMainThread(() =>
+                using (new AllowedThread())
                 {
                     AddCompanionAction.Apply(clan, companion);
-                }, true);
-            }
+                }
+            });
         }
     }
 }

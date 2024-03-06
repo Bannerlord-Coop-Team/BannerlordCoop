@@ -1,6 +1,7 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
-using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Actions;
@@ -15,13 +16,11 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(LeaveSettlementAction))]
 public class LeaveSettlementActionPatches
 {
-    public static readonly AllowedInstance<MobileParty> AllowedInstance = new AllowedInstance<MobileParty>();
-
     [HarmonyPrefix]
     [HarmonyPatch(nameof(LeaveSettlementAction.ApplyForParty))]
     private static bool Prefix(MobileParty mobileParty)
     {
-        if(AllowedInstance.IsAllowed(mobileParty)) return true;
+        if(CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
 
@@ -31,15 +30,16 @@ public class LeaveSettlementActionPatches
         return false;
     }
 
-    private static object _lock = new object();
     public static void OverrideApplyForParty(MobileParty party)
     {
-        using(AllowedInstance)
-        {
-            AllowedInstance.Instance = party;
+        if (party.CurrentSettlement is null) return;
 
-            if (party.CurrentSettlement is null) return;
-            LeaveSettlementAction.ApplyForParty(party);
-        }
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                LeaveSettlementAction.ApplyForParty(party);
+            }
+        });
     }
 }
