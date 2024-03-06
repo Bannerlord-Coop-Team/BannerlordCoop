@@ -32,12 +32,11 @@ public class LeaveSettlementActionPatches
 
     public static void OverrideApplyForParty(MobileParty party)
     {
-        if (party.CurrentSettlement is null) return;
-
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
+                if (party.CurrentSettlement is null) return;
                 LeaveSettlementAction.ApplyForParty(party);
             }
         });
