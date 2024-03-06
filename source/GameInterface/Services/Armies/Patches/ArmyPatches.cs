@@ -22,7 +22,7 @@ namespace GameInterface.Services.Armies.Patches;
 public class ArmyPatches
 {
     private static ILogger Logger = LogManager.GetLogger<Kingdom>();
-
+/*
     [HarmonyPatch(typeof(Army), "OnAddPartyInternal")]
     [HarmonyPrefix]
     static bool OnAddPartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
@@ -53,7 +53,7 @@ public class ArmyPatches
         MessageBroker.Instance.Publish(mobileParty, message);
 
         return true;
-    }
+    }*/
 
 
     [HarmonyPatch(typeof(Army), "OnRemovePartyInternal")]
@@ -98,7 +98,7 @@ public class ArmyPatches
     }
 
 
-    public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
+    /*public static void AddMobilePartyInArmy(MobileParty mobileParty, Army army)
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
@@ -107,7 +107,7 @@ public class ArmyPatches
                 army.AddPartyInternal(mobileParty);
             }
         });
-    }
+    }*/
 
     public static void RemoveMobilePartyInArmy(MobileParty mobileParty, Army army)
     {

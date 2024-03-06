@@ -16,8 +16,15 @@ namespace GameInterface.Services.Clans.Patches
     [HarmonyPatch(typeof(DestroyClanAction), "ApplyInternal")]
     public class ClanDestroyPatch
     {
+        private static readonly Action<Clan, int> ApplyInternal =
+            typeof(DestroyClanAction)
+            .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
+            .BuildDelegate<Action<Clan, int>>();
+
         static bool Prefix(Clan destroyedClan, int details)
         {
+            if (AllowedThread.IsThisThreadAllowed()) return true;
+
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && destroyedClan != Clan.PlayerClan) return false;
@@ -31,9 +38,9 @@ namespace GameInterface.Services.Clans.Patches
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
-                using (new AllowedThread())
+                using(new AllowedThread())
                 {
-                    DestroyClanAction.ApplyInternal(clan, (DestroyClanAction.DestroyClanActionDetails)details);
+                    ApplyInternal.Invoke(clan, details);
                 }
             });
         }

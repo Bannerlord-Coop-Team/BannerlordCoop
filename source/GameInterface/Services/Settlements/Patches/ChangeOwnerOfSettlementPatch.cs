@@ -2,7 +2,6 @@
 using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
 using System;
@@ -23,6 +22,8 @@ namespace GameInterface.Services.Settlements.Patches
     [HarmonyPatch(typeof(ChangeOwnerOfSettlementAction), "ApplyInternal")]
     public class ChangeOwnerOfSettlementPatch
     {
+        private static readonly AllowedInstance<Settlement> AllowedInstance = new AllowedInstance<Settlement>();
+
         private static readonly Action<Settlement, Hero, Hero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail> ApplyInternal = 
         typeof(ChangeOwnerOfSettlementAction)
         .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
@@ -30,7 +31,7 @@ namespace GameInterface.Services.Settlements.Patches
     
         public static bool Prefix(Settlement settlement, Hero newOwner, Hero capturerHero, ChangeOwnerOfSettlementDetail detail)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (AllowedInstance.IsAllowed(settlement)) return true;
 
             MessageBroker.Instance.Publish(settlement, 
                 new LocalSettlementOwnershipChange(settlement.StringId, newOwner?.StringId, capturerHero?.StringId, Convert.ToInt32(detail)));
@@ -40,13 +41,15 @@ namespace GameInterface.Services.Settlements.Patches
     
         public static void RunOriginalApplyInternal(Settlement settlement, Hero newOwner, Hero capturerHero, ChangeOwnerOfSettlementDetail detail)
         {
-            GameLoopRunner.RunOnMainThread(() =>
+            using (AllowedInstance)
             {
-                using (new AllowedThread())
+                AllowedInstance.Instance = settlement;
+
+                GameLoopRunner.RunOnMainThread(() =>
                 {
-                    ChangeOwnerOfSettlementAction.ApplyInternal(settlement, newOwner, capturerHero, detail);
-                }
-            });
+                    ApplyInternal.Invoke(settlement, newOwner, capturerHero, detail);
+                }, true);
+            }
         }
     
     }

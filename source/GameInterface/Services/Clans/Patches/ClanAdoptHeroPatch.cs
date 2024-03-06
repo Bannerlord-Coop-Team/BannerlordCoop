@@ -37,7 +37,7 @@ namespace GameInterface.Services.Clans.Patches
                     adoptedHero.Father = playerHero;
                 }
                 adoptedHero.Clan = playerClan;
-            }, true);
+            });
         }
     }
 }

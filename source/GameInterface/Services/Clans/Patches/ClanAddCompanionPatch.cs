@@ -15,6 +15,8 @@ namespace GameInterface.Services.Clans.Patches
     {
         static bool Prefix(Clan clan, Hero companion)
         {
+            if (AllowedThread.IsThisThreadAllowed()) return true;
+
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
@@ -28,7 +30,7 @@ namespace GameInterface.Services.Clans.Patches
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
-                using (new AllowedThread())
+                using(new AllowedThread())
                 {
                     AddCompanionAction.Apply(clan, companion);
                 }
