@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -131,7 +132,14 @@ internal class MobilePartyInterface : IMobilePartyInterface
 
     public void EndPlayerSettlementEncounter()
     {
-        GameLoopRunner.RunOnMainThread(PlayerLeaveSettlementPatch.OverrideLeaveConsequence);
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                PlayerEncounter.Finish(true);
+                Campaign.Current.SaveHandler.SignalAutoSave();
+            }
+        });
     }
 
     public void EnterSettlement(string partyId, string settlementId)

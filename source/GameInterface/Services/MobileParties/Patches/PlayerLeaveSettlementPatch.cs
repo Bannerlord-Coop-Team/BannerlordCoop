@@ -34,14 +34,4 @@ internal class PlayerLeaveSettlementPatch
 
         return false;
     }
-
-    public static void OverrideLeaveConsequence()
-    {
-        using (LeaveSettlementActionPatches.AllowedInstance)
-        {
-            LeaveSettlementActionPatches.AllowedInstance.Instance = MobileParty.MainParty;
-            PlayerEncounter.Finish(true);
-            Campaign.Current.SaveHandler.SignalAutoSave();
-        }
-    }
 }
