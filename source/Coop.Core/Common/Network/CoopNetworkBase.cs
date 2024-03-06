@@ -3,6 +3,7 @@ using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using LiteNetLib;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -54,20 +55,33 @@ public abstract class CoopNetworkBase : INetwork
 
     public void Send(NetPeer netPeer, IMessage message)
     {
-        var eventPacket = new MessagePacket(message);
+        var data = SerializeMessage(message);
+        var eventPacket = new MessagePacket(data);
         Send(netPeer, eventPacket);
     }
 
     public void SendAll(IMessage message)
     {
-        var eventPacket = new MessagePacket(message);
+        var data = SerializeMessage(message);
+        var eventPacket = new MessagePacket(data);
         SendAll(eventPacket);
     }
 
     public void SendAllBut(NetPeer excludedPeer, IMessage message)
     {
-        var eventPacket = new MessagePacket(message);
+        var data = SerializeMessage(message);
+        var eventPacket = new MessagePacket(data);
         SendAllBut(excludedPeer, eventPacket);
+    }
+
+    private byte[] SerializeMessage(IMessage message)
+    {
+        if (RuntimeTypeModel.Default.IsDefined(message.GetType()) == false)
+        {
+            throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
+        }
+
+        return serializer.Serialize(message);
     }
 
     public abstract void Start();

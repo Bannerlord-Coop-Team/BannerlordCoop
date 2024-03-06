@@ -24,12 +24,13 @@ namespace Common.PacketHandlers
 
         private readonly IMessageBroker messageBroker;
         private readonly IPacketManager packetManager;
+        private readonly ICommonSerializer serializer;
 
-        public MessagePacketHandler(IMessageBroker messageBroker, IPacketManager packetManager)
+        public MessagePacketHandler(IMessageBroker messageBroker, IPacketManager packetManager, ICommonSerializer serializer)
         {
             this.messageBroker = messageBroker;
             this.packetManager = packetManager;
-
+            this.serializer = serializer;
             this.packetManager.RegisterPacketHandler(this);
         }
 
@@ -43,7 +44,7 @@ namespace Common.PacketHandlers
         {
             MessagePacket convertedPacket = (MessagePacket)packet;
 
-            IMessage networkEvent = convertedPacket.Message;
+            var networkEvent = serializer.Deserialize<IMessage>(convertedPacket.Data);
 
             if (networkEvent.GetType().GetCustomAttribute<BatchLogMessageAttribute>() == null)
             {
@@ -78,18 +79,12 @@ namespace Common.PacketHandlers
 
         public PacketType PacketType => PacketType.Message;
 
-
         [ProtoMember(1)]
-        public IMessage Message { get; }
+        public readonly byte[] Data;
 
-        public MessagePacket(IMessage message)
+        public MessagePacket(byte[] data)
         {
-            if (RuntimeTypeModel.Default.IsDefined(message.GetType()) == false)
-            {
-                throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
-            }
-
-            Message = message;
+            Data = data;
         }
     }
 }
