@@ -87,6 +87,6 @@
     <Folder Include="Server\Services\Kingdoms\Messages\" />
   </ItemGroup>
   <ItemGroup>
-    <Publicize Include="TaleWorlds.Library"/>
+    <Publicize Include="TaleWorlds.Library" />
   </ItemGroup>
 </Project>

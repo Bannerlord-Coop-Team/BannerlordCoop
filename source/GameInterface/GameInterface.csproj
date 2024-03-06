@@ -235,7 +235,7 @@
     <!--<Publicize Include="SandBox.ViewModelCollection"/>                    -->
     <!--<Publicize Include="TaleWorlds.AchievementSystem"/>                   -->
     <!--<Publicize Include="TaleWorlds.ActivitySystem"/>-->
-    <Publicize Include="TaleWorlds.CampaignSystem"/>
+    <Publicize Include="TaleWorlds.CampaignSystem" />
     <!--<Publicize Include="TaleWorlds.CampaignSystem.ViewModelCollection"/>                                                     -->
     <!--<Publicize Include="TaleWorlds.Core"/>                                                                                   -->
     <!--<Publicize Include="TaleWorlds.Core.ViewModelCollection"/>                                                               -->
