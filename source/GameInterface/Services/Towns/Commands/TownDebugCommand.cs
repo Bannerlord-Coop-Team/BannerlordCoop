@@ -20,8 +20,6 @@ namespace GameInterface.Services.Villages.Commands;
 
 public class TownDebugCommand
 {
-    private static readonly Func<Town, Town.SellLog[]> getSoldItems = typeof(Town).GetField("_soldItems", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Town, Town.SellLog[]>();
-
     /// <summary>
     /// Attempts to get the ObjectManager
     /// </summary>
@@ -118,7 +116,7 @@ public class TownDebugCommand
         sb.AppendFormat("Food stock '{0}' : \n", fief.FoodStocks);
         sb.AppendFormat("TradeTaxAccumulated: '{0}'\n", town.TradeTaxAccumulated);
         sb.AppendFormat("Sold Items: \n");
-        Town.SellLog[] logList = getSoldItems(town);
+        Town.SellLog[] logList = town._soldItems;
         if (logList != null)
         {
             foreach (Town.SellLog log in logList)
@@ -280,7 +278,7 @@ public class TownDebugCommand
         }
 
 
-        List<Town.SellLog> newSoldItems = new List<Town.SellLog>(getSoldItems(town));
+        List<Town.SellLog> newSoldItems = new List<Town.SellLog>(town._soldItems);
         int idx = newSoldItems.FindIndex(log => log.Category == item);
         if (idx != -1)
         {
