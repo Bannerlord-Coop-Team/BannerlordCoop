@@ -86,8 +86,10 @@ namespace GameInterface.Tests.Stubs
 
         public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
         {
-            obj = default;
-            return TryGetObject(id, out obj);            
+            var result = TryGetObject(id, out object _obj);
+            obj = _obj as T;
+            return result;
+
         }
     }
 }
