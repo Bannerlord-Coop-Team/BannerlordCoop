@@ -71,18 +71,23 @@ namespace GameInterface.Tests.Stubs
             throw new NotImplementedException();
         }
 
+        public bool TryGetNonMBObject<T>(string id, out T obj) where T : class
+        {
+            obj = default(T);
+            if (TryGetObject(id, out object resolvedObject) == false) return false;
+            if (resolvedObject is T castedObj == false) return false;
+
+            obj = castedObj;
+
+            return true;
+        }
+
         public bool TryGetObject(string id, out object obj) => registry.TryGetValue(id, out obj);
 
-        public bool TryGetObject<T>(string id, out T obj) where T : class
+        public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
         {
             obj = default;
-
-            if (TryGetObject(id, out object resolvedObject) == false) return false;
-            if(resolvedObject is T castedObj == false) return false;
-            
-            obj = castedObj;
-            
-            return true;
+            return TryGetObject(id, out obj);            
         }
     }
 }
