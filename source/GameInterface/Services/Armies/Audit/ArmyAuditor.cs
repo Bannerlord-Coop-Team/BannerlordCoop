@@ -135,7 +135,7 @@ internal class ArmyAuditor : IAuditor
 
         foreach (var audit in dataToAudit)
         {
-            if (objectManager.TryGetObject<Army>(audit.StringId, out var _) == false)
+            if (objectManager.TryGetNonMBObject<Army>(audit.StringId, out var _) == false)
             {
                 Logger.Error("Army {name} not found in {objectManager}", audit.Name, nameof(IObjectManager));
                 stringBuilder.AppendLine($"Army {audit.Name} not found in {nameof(IObjectManager)}");

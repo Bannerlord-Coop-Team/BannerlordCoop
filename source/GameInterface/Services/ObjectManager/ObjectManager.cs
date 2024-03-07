@@ -3,7 +3,6 @@ using Common.Logging;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Clans;
 using GameInterface.Services.MobileParties;
-using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
 using GameInterface.Services.Settlements;
 using HarmonyLib;
@@ -45,13 +44,21 @@ public interface IObjectManager
     bool TryGetId(object obj, out string id);
 
     /// <summary>
-    /// Attempts to get an object using a StringId and object type
+    /// Attempts to get a <see cref="MBObjectBase"/>-based object using a StringId and object type
     /// </summary>
     /// <typeparam name="T">Type of object</typeparam>
     /// <param name="id">StringId used to lookup object</param>
     /// <param name="obj">Out parameter for the object (null if not found)</param>
     /// <returns>True if successful, false if failed</returns>
-    bool TryGetObject<T>(string id, out T obj) where T : class;
+    bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase;
+    /// <summary>
+    /// Attempts to get an object not based on <see cref="MBObjectBase"/> object using a StringId and object type
+    /// </summary>
+    /// <typeparam name="T">Type of object</typeparam>
+    /// <param name="id">StringId used to lookup object</param>
+    /// <param name="obj">Out parameter for the object (null if not found)</param>
+    /// <returns>True if successful, false if failed</returns>
+    bool TryGetNonMBObject<T>(string id, out T obj) where T : class;
 
     /// <summary>
     /// Add an object with already existing StringId
@@ -163,9 +170,7 @@ internal class ObjectManager : IObjectManager
         return defaultObjectManager.TryGetId(obj, out id);
     }
 
-    private static readonly MethodInfo GetObject = typeof(MBObjectManager)
-        .GetMethod(nameof(MBObjectManager.GetObject), new Type[] { typeof(string) });
-    public bool TryGetObject<T>(string id, out T obj) where T : class
+    public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
     {
         obj = default;
 
@@ -178,6 +183,18 @@ internal class ObjectManager : IObjectManager
 
         /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
         return defaultObjectManager.TryGetObject(id, out obj);
+    }
+    public bool TryGetNonMBObject<T>(string id, out T obj) where T : class
+    {
+        obj = default;
+        if (string.IsNullOrEmpty(id)) return false;
+        if (typeof(MBObjectBase).IsAssignableFrom(typeof(T)))
+        {
+            var result = TryGetObject<MBObjectBase>(id, out var _obj);
+            obj = _obj as T;
+            return result;
+        }
+        return RegistryMap.TryGetValue(typeof(T), out IRegistry registry) && registry.TryGetValue(id, out obj);
     }
 
     public bool Remove(object obj)
@@ -254,8 +271,6 @@ internal class ObjectManager : IObjectManager
     {
         private MBObjectManager objectManager => MBObjectManager.Instance;
 
-        private static readonly MethodInfo RegisterObject = typeof(MBObjectManager)
-            .GetMethod(nameof(MBObjectManager.RegisterObject));
 
         public bool AddExisting(string id, object obj)
         {
@@ -274,8 +289,8 @@ internal class ObjectManager : IObjectManager
 
             /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
             if (TryCastToMBObject(obj, out var mbObject) == false) return false;
-
-            RegisterObject.MakeGenericMethod(obj.GetType()).Invoke(objectManager, new object[] { mbObject });
+            
+            objectManager.RegisterObject(mbObject);
 
             newId = mbObject.StringId;
 
@@ -292,7 +307,7 @@ internal class ObjectManager : IObjectManager
             return Contains(mbObject.StringId);
         }
 
-        public bool Contains(string id) => objectManager?.Contains(id) ?? false;
+        public bool Contains(string id) => objectManager?.ObjectTypeRecords.Any(x => x.ContainsObject(id)) ?? false;
 
         public bool Remove(object obj)
         {
@@ -319,17 +334,28 @@ internal class ObjectManager : IObjectManager
             return true;
         }
 
-        public bool TryGetObject<T>(string id, out T obj) where T : class
+        public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
         {
             obj = null;
             if (objectManager == null) return false;
 
             if (typeof(MBObjectBase).IsAssignableFrom(typeof(T)) == false) return false;
 
-            obj = (T)GetObject.MakeGenericMethod(typeof(T)).Invoke(objectManager, new object[] { id });
+            if (obj is MBObjectBase mbObject)
+            {
+                obj = objectManager.GetObject<T>(id);
+            }
 
             return obj != null;
         }
+
+        public bool TryGetNonMBObject<T>(string id, out T obj) where T : class
+        {
+            Logger.Error("Attempted to get non-MBObjectBase from MBObjectManager");
+            var result = TryGetObject<MBObjectBase>(id, out var _obj);
+            obj = _obj as T;
+            return result;
+        }    
 
         private bool TryCastToMBObject(object obj, out MBObjectBase mbObject)
         {
