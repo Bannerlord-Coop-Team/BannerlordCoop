@@ -68,11 +68,11 @@ public class ArmyDestructionTests : IDisposable
         });
 
         // Assert
-        Assert.False(server.ObjectManager.TryGetObject<Army>(armyId, out var _));
+        Assert.False(server.ObjectManager.TryGetNonMBObject<Army>(armyId, out var _));
 
         foreach (var client in TestEnvironement.Clients)
         {
-            Assert.False(client.ObjectManager.TryGetObject<Army>(armyId, out var _));
+            Assert.False(client.ObjectManager.TryGetNonMBObject<Army>(armyId, out var _));
         }
     }
 
@@ -114,16 +114,16 @@ public class ArmyDestructionTests : IDisposable
         // Call on client
         client1.Call(() =>
         {
-            Assert.True(server.ObjectManager.TryGetObject<Army>(armyId, out var clientArmy));
+            Assert.True(server.ObjectManager.TryGetNonMBObject<Army>(armyId, out var clientArmy));
             DisbandArmyAction.ApplyByObjectiveFinished(clientArmy);
         });
 
         // Assert
-        Assert.True(server.ObjectManager.TryGetObject<Army>(armyId, out var _));
+        Assert.True(server.ObjectManager.TryGetNonMBObject<Army>(armyId, out var _));
 
         foreach (var client in TestEnvironement.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var _));
+            Assert.True(client.ObjectManager.TryGetNonMBObject<Army>(armyId, out var _));
         }
     }
 

@@ -34,7 +34,7 @@ public class ArmyRegistryTests : IDisposable
 
         Assert.Equal(army.GetStringId(), newId);
 
-        objectManager.TryGetObject<Army>(newId, out var army2);
+        objectManager.TryGetNonMBObject<Army>(newId, out var army2);
 
         Assert.Equal(army, army2);
     }
