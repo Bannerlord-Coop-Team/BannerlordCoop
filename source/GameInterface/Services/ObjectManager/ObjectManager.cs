@@ -3,7 +3,6 @@ using Common.Logging;
 using GameInterface.Services.Armies;
 using GameInterface.Services.Clans;
 using GameInterface.Services.MobileParties;
-using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
 using GameInterface.Services.Settlements;
 using HarmonyLib;
@@ -308,7 +307,7 @@ internal class ObjectManager : IObjectManager
             return Contains(mbObject.StringId);
         }
 
-        public bool Contains(string id) => objectManager?.Contains(id) ?? false;
+        public bool Contains(string id) => objectManager?.ObjectTypeRecords.Any(x => x.ContainsObject(id)) ?? false;
 
         public bool Remove(object obj)
         {
