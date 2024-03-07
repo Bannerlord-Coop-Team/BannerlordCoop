@@ -23,8 +23,6 @@ namespace GameInterface.Services.Towns.Commands;
 
 public class TownAuditorDebugCommand
 {
-    private static readonly Func<Town, Town.SellLog[]> getSoldItems = typeof(Town).GetField("_soldItems", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Town, Town.SellLog[]>();
-
     /// <summary>
     /// Attempts to get the ObjectManager
     /// </summary>
@@ -97,7 +95,7 @@ public class TownAuditorDebugCommand
                     garrisonAutoRecruitmentIsEnabled: town.GarrisonAutoRecruitmentIsEnabled,
                     foodStocks: fief.FoodStocks,
                     tradeTaxAccumulated: town.TradeTaxAccumulated,
-                    sellLogList: getSoldItems(town));
+                    sellLogList: town._soldItems);
 
                 auditorDatas.Add(auditorData);
             }
