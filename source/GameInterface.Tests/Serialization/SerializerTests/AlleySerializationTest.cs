@@ -39,14 +39,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             settlement.StringId = "My Settlement";
             MBObjectManager.Instance.RegisterObject(settlement);
 
-            Alley_Settlement.SetValue(alley, settlement);
+            alley._settlement = settlement;
 
             List<Alley> alleys = new List<Alley>
             {
                 alley,
             };
 
-            Settlement_Alleys.SetValue(settlement, alleys);
+            settlement.Alleys = alleys;
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             AlleyBinaryPackage package = new AlleyBinaryPackage(alley, factory);
@@ -57,14 +57,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.NotEmpty(bytes);
         }
-
-        private static readonly PropertyInfo Settlement_Alleys = typeof(Settlement).GetProperty(nameof(Settlement.Alleys));
-        
-        private static readonly FieldInfo Alley_Owner = typeof(Alley).GetField("_owner", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly FieldInfo Alley_Settlement = typeof(Alley).GetField("_settlement", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly FieldInfo Alley_Name = typeof(Alley).GetField("_name", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly FieldInfo Alley_Tag = typeof(Alley).GetField("_tag", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly PropertyInfo Alley_State = typeof(Alley).GetProperty(nameof(Alley.State));
 
 
         [Fact]
@@ -86,21 +78,21 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             objectManager.AddExisting(settlement.StringId, settlement);
 
             // Attach settlement and commonArea
-            Alley_Settlement.SetValue(alley, settlement);
+            alley._settlement = settlement;
 
             List<Alley> alleys = new List<Alley>
             {
                 alley,
             };
 
-            Settlement_Alleys.SetValue(settlement, alleys);
+            settlement.Alleys = alleys;
 
             // Assign common area with setup values
-            Alley_Owner.SetValue(alley, owner);
-            Alley_Settlement.SetValue(alley, settlement);
-            Alley_State.SetValue(alley, Alley.AreaState.OccupiedByPlayer);
-            Alley_Name.SetValue(alley, new TextObject("TestName"));
-            Alley_Tag.SetValue(alley, "TestTag");
+            alley._owner = owner;
+            alley._settlement = settlement;
+            alley.State = Alley.AreaState.OccupiedByPlayer;
+            alley._name = new TextObject("TestName");
+            alley._tag = "TestTag";
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             AlleyBinaryPackage package = new AlleyBinaryPackage(alley, factory);
