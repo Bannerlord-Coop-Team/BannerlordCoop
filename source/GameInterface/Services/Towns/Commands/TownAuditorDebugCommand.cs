@@ -4,7 +4,6 @@ using Common.Messaging;
 using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Towns.Data;
 using GameInterface.Services.Towns.Messages;
 using GameInterface.Services.Towns.Patches;

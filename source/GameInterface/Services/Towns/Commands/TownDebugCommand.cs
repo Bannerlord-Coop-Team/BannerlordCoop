@@ -3,7 +3,6 @@ using Common.Extensions;
 using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Towns.Patches;
 using System;
 using System.Collections.Generic;
@@ -70,7 +69,7 @@ public class TownDebugCommand
     {
         StringBuilder stringBuilder = new StringBuilder();
 
-        List<ItemCategory> items = Campaign.Current.ObjectManager.GetObjectsOfType<ItemCategory>().Select(obj => (ItemCategory)obj).ToList();
+        List<ItemCategory> items = Campaign.Current.ObjectManager.GetObjectTypeList<ItemCategory>().ToList();
 
         items.ForEach((item) =>
         {

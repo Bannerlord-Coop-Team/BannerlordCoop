@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
-using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
