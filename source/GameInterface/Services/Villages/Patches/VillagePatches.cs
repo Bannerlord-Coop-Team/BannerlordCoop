@@ -24,10 +24,6 @@ internal class VillagePatches
     private static bool DailyTickPrefix() => ModInformation.IsServer;
 
 
-    private static readonly Func<Village, VillageStates> get_villageState = typeof(Village).GetField("_villageState",
-        BindingFlags.NonPublic | BindingFlags.Instance).BuildUntypedGetter<Village, VillageStates>();
-
-
     [HarmonyPatch(nameof(Village.VillageState), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool VillageStatePrefix(ref Village __instance, ref VillageStates value)
@@ -36,7 +32,7 @@ internal class VillagePatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
-        if (get_villageState(__instance) == value) return false;
+        if (__instance._villageState == value) return false;
         
         var message = new VillageStateChanged(__instance.StringId, (int)value);
         MessageBroker.Instance.Publish(__instance, message);    
@@ -91,14 +87,6 @@ internal class VillagePatches
 
     }
 
-
-
-    private static readonly Func<Village, Settlement> get_tradeBound = typeof(Village).GetField("_tradeBound",
-        BindingFlags.NonPublic | BindingFlags.Instance).BuildUntypedGetter<Village, Settlement>();
-
-    private static readonly Action<Village, Settlement> set_tradeBound = typeof(Village).GetField("_tradeBound",
-        BindingFlags.NonPublic | BindingFlags.Instance).BuildUntypedSetter<Village, Settlement>();
-
     [HarmonyPatch(nameof(Village.TradeBound), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool TradeBoundPrefix(ref Village __instance, ref Settlement value)
@@ -108,7 +96,7 @@ internal class VillagePatches
 
         if (ModInformation.IsClient) return false;
 
-        if (get_tradeBound(__instance) == value) return false;
+        if (__instance._tradeBound == value) return false;
 
         var message = new VillageTradeBoundChanged(__instance.StringId, value.StringId);
         MessageBroker.Instance.Publish(__instance, message);
