@@ -11,11 +11,11 @@ internal class CultureBuilder : IObjectBuilder
     {
         var cultureObject = new CultureObject();
 
-        AccessTools.Field(typeof(CultureObject), "_defaultPolicyList").SetValue(cultureObject, new MBList<PolicyObject>());
-        AccessTools.Field(typeof(CultureObject), "_maleNameList").SetValue(cultureObject, new MBList<TextObject>());
-        AccessTools.Field(typeof(CultureObject), "_femaleNameList").SetValue(cultureObject, new MBList<TextObject>());
-        AccessTools.Field(typeof(CultureObject), "_clanNameList").SetValue(cultureObject, new MBList<TextObject>());
-        AccessTools.Field(typeof(CultureObject), "_cultureFeats").SetValue(cultureObject, new MBList<FeatObject>());
+        cultureObject._defaultPolicyList = new MBList<PolicyObject>();
+        cultureObject._maleNameList = new MBList<TextObject>();
+        cultureObject._femaleNameList = new MBList<TextObject>();
+        cultureObject._clanNameList = new MBList<TextObject>();
+        cultureObject._cultureFeats = new MBList<FeatObject>();
 
         return cultureObject;
     }
