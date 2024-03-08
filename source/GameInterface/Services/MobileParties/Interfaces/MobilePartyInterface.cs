@@ -55,7 +55,6 @@ internal interface IMobilePartyInterface : IGameAbstraction
 internal class MobilePartyInterface : IMobilePartyInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyInterface>();
-    private static readonly MethodInfo PartyBase_OnFinishLoadState = typeof(PartyBase).GetMethod("OnFinishLoadState", BindingFlags.NonPublic | BindingFlags.Instance);
 
     private readonly MobilePartyRegistry partyRegistry;
     private readonly IObjectManager objectManager;
@@ -75,7 +74,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
     {
         party.IsVisible = true;
 
-        PartyBase_OnFinishLoadState.Invoke(party.Party, null);
+        party.Party.OnFinishLoadState();
     }
 
     public void RegisterAllPartiesAsControlled(string ownerId)
@@ -87,14 +86,6 @@ internal class MobilePartyInterface : IMobilePartyInterface
     }
 
     private static  AllowedInstance<MobileParty> allowedInstance = new AllowedInstance<MobileParty>();
-    private static MethodInfo InitMethod => typeof(PlayerEncounter).GetMethod(
-        "Init",
-        BindingFlags.NonPublic | BindingFlags.Instance,
-        null,
-        new Type[] { typeof(PartyBase), typeof(PartyBase), typeof(Settlement) },
-        null);
-    private static Action<PlayerEncounter, PartyBase, PartyBase, Settlement> Init =
-        InitMethod.BuildDelegate<Action<PlayerEncounter, PartyBase, PartyBase, Settlement>>();
     public void StartPlayerSettlementEncounter(string partyId, string settlementId)
     {
         if (objectManager.TryGetObject(partyId, out MobileParty mobileParty) == false)
@@ -124,7 +115,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
                 EnterSettlementActionPatches.AllowedInstance.Instance = mobileParty;
                 if (PlayerEncounter.Current is not null) return;
                 PlayerEncounter.Start();
-                Init(PlayerEncounter.Current, mobileParty.Party, settlementParty, settlement);
+                PlayerEncounter.Current.Init(mobileParty.Party, settlementParty, settlement);
             }
         });
     }
