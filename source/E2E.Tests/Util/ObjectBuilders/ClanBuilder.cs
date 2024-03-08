@@ -15,7 +15,7 @@ internal class ClanBuilder : IObjectBuilder
     {
         var clan = new Clan();
         var defaultTemplate = ObjectHelper.SkipConstructor<PartyTemplateObject>();
-        AccessTools.Field(typeof(Clan), "_defaultPartyTemplate").SetValue(clan, defaultTemplate);
+        clan._defaultPartyTemplate = defaultTemplate;
 
         return clan;
     }
