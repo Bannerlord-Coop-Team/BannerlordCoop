@@ -102,13 +102,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hero newHero = returnedPackage.Unpack<Hero>(deserializeFactory);
 
             // Verify PropertyOwner types
-            CharacterAttributes newAttribues = (CharacterAttributes)HeroFactory.Hero_characterAttributes.GetValue(newHero);
+            CharacterAttributes newAttribues = newHero._characterAttributes;
             AssertPropertyOwnerEqual(heroData.CharacterAttributes, newAttribues);
-            CharacterPerks newPerks = (CharacterPerks)HeroFactory.Hero_heroPerks.GetValue(newHero);
+            CharacterPerks newPerks = newHero._heroPerks;
             AssertPropertyOwnerEqual(heroData.CharacterPerks, newPerks);
-            CharacterSkills newSkills = (CharacterSkills)HeroFactory.Hero_heroSkills.GetValue(newHero);
+            CharacterSkills newSkills = newHero._heroSkills;
             AssertPropertyOwnerEqual(heroData.CharacterSkills, newSkills);
-            CharacterTraits newTraits = (CharacterTraits)HeroFactory.Hero_heroTraits.GetValue(newHero);
+            CharacterTraits newTraits = newHero._heroTraits;
             AssertPropertyOwnerEqual(heroData.CharacterTraits, newTraits);
 
             // Verify StringId resolvable list types
@@ -210,69 +210,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
 
         #region HeroFields
-        private static readonly FieldInfo Hero_StaticBodyProperties = typeof(Hero).GetField("<StaticBodyProperties>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_Weight = typeof(Hero).GetField("<Weight>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_Build = typeof(Hero).GetField("<Build>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_LastTimeStampForActivity = typeof(Hero).GetField("LastTimeStampForActivity", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_VolunteerTypes = typeof(Hero).GetField("VolunteerTypes", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_passedTimeAtHomeSettlement = typeof(Hero).GetField("_passedTimeAtHomeSettlement", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_characterObject = typeof(Hero).GetField("_characterObject", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_firstName = typeof(Hero).GetField("_firstName", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_name = typeof(Hero).GetField("_name", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_EncyclopediaText = typeof(Hero).GetField("<EncyclopediaText>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_IsFemale = typeof(Hero).GetField("<IsFemale>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_HairTags = typeof(Hero).GetField("HairTags", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_BeardTags = typeof(Hero).GetField("BeardTags", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_TattooTags = typeof(Hero).GetField("TattooTags", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_BattleEquipment = typeof(Hero).GetField("<_battleEquipment>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_CivilianEquipment = typeof(Hero).GetField("<_civilianEquipment>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_CaptivityStartTime = typeof(Hero).GetField("<CaptivityStartTime>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_PreferredUpgradeFormation = typeof(Hero).GetField("<PreferredUpgradeFormation>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_heroState = typeof(Hero).GetField("_heroState", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_heroTraits = typeof(Hero).GetField("_heroTraits", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_heroPerks = typeof(Hero).GetField("_heroPerks", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_heroSkills = typeof(Hero).GetField("_heroSkills", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        public static readonly FieldInfo Hero_characterAttributes = typeof(Hero).GetField("_characterAttributes", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_IsNobleForOldSaves = typeof(Hero).GetField("IsNobleForOldSaves", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_IsMinorFactionHero = typeof(Hero).GetField("<IsMinorFactionHero>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_Level = typeof(Hero).GetField("Level", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_companionOf = typeof(Hero).GetField("_companionOf", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_Occupation = typeof(Hero).GetField("<Occupation>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_DeathMark = typeof(Hero).GetField("<DeathMark>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_DeathMarkKillerHero = typeof(Hero).GetField("<DeathMarkKillerHero>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_SpcDaysInLocation = typeof(Hero).GetField("SpcDaysInLocation", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_health = typeof(Hero).GetField("_health", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_defaultAge = typeof(Hero).GetField("_defaultAge", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_birthDay = typeof(Hero).GetField("_birthDay", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_deathDay = typeof(Hero).GetField("_deathDay", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_power = typeof(Hero).GetField("_power", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_LastExaminedLogEntryID = typeof(Hero).GetField("<LastExaminedLogEntryID>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_clan = typeof(Hero).GetField("_clan", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_supporterOf = typeof(Hero).GetField("_supporterOf", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_governorOf = typeof(Hero).GetField("_governorOf", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_ownedWorkshops = typeof(Hero).GetField("_ownedWorkshops", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_OwnedAlleys = typeof(Hero).GetField("<OwnedAlleys>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_Culture = typeof(Hero).GetField("Culture", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_OwnedCaravans = typeof(Hero).GetField("<OwnedCaravans>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_partyBelongedTo = typeof(Hero).GetField("_partyBelongedTo", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_PartyBelongedToAsPrisoner = typeof(Hero).GetField("<PartyBelongedToAsPrisoner>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_stayingInSettlement = typeof(Hero).GetField("_stayingInSettlement", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_SpecialItems = typeof(Hero).GetField("SpecialItems", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_isKnownToPlayer = typeof(Hero).GetField("_isKnownToPlayer", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_hasMet = typeof(Hero).GetField("_hasMet", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly PropertyInfo Hero_LastMeetingTimeWithPlayer = typeof(Hero).GetProperty(nameof(Hero.LastMeetingTimeWithPlayer));
-        private static readonly FieldInfo Hero_bornSettlement = typeof(Hero).GetField("_bornSettlement", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_homeSettlement = typeof(Hero).GetField("_homeSettlement", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_gold = typeof(Hero).GetField("_gold", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_RandomValue = typeof(Hero).GetField("<RandomValue>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_father = typeof(Hero).GetField("_father", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_mother = typeof(Hero).GetField("_mother", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_exSpouses = typeof(Hero).GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_spouse = typeof(Hero).GetField("_spouse", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         private static readonly FieldInfo Hero_children = typeof(Hero).GetField("_children", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_IsPregnant = typeof(Hero).GetField("IsPregnant", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_heroDeveloper = typeof(Hero).GetField("_heroDeveloper", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-        private static readonly FieldInfo Hero_LastKnownClosestSettlement = typeof(Hero).GetField("<LastKnownClosestSettlement>k__BackingField", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
         #endregion
 
         public static RandomHeroWithData CreateRandomHero(IObjectManager objectManager)
@@ -327,15 +266,15 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             hero.OwnedAlleys = heroData.OwnedAlleys;
             hero.Culture = heroData.Culture;
             hero.OwnedCaravans = heroData.OwnedCaravans;
-            Hero_partyBelongedTo.SetValue(hero, heroData.HeroParty);
+            hero._partyBelongedTo = heroData.HeroParty;
             hero.PartyBelongedToAsPrisoner = heroData.PartyBelongedToAsPrisoner;
-            Hero_stayingInSettlement.SetValue(hero, heroData.HomeSettlement);
+            hero._stayingInSettlement = heroData.HomeSettlement;
             hero.SpecialItems = heroData.SpecialItems;
             hero._isKnownToPlayer = ReflectionExtensions.Random<bool>();
             hero._hasMet = ReflectionExtensions.Random<bool>();
-            Hero_LastMeetingTimeWithPlayer.SetValue(hero, new CampaignTime());
-            Hero_bornSettlement.SetValue(hero, heroData.HomeSettlement);
-            Hero_homeSettlement.SetValue(hero, heroData.HomeSettlement);
+            hero.LastMeetingTimeWithPlayer = new CampaignTime();
+            hero._bornSettlement = heroData.HomeSettlement;
+            hero._homeSettlement = heroData.HomeSettlement;
             hero._gold = ReflectionExtensions.Random<int>();
             hero.RandomValue = ReflectionExtensions.Random<int>();
             hero._father = heroData.Father;
@@ -344,7 +283,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             hero._spouse = heroData.Spouse;
             Hero_children.SetValue(hero, heroData.Children);
             hero.IsPregnant = ReflectionExtensions.Random<bool>();
-            Hero_heroDeveloper.SetValue(hero, heroData.HeroDeveloper);
+            hero._heroDeveloper = heroData.HeroDeveloper;
             hero.LastKnownClosestSettlement = heroData.LastKnownClosestSettlement;
             #endregion
 
@@ -405,7 +344,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             }
 
             #region CreationMethods
-            static readonly PropertyInfo PartyBase_MobileParty = typeof(PartyBase).GetProperty(nameof(PartyBase.MobileParty));
             private void CreateParty()
             {
                 HeroParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
@@ -414,13 +352,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 objectManager.AddExisting(HeroParty.StringId, HeroParty);
 
                 PartyBelongedToAsPrisoner = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
-                PartyBase_MobileParty.SetValue(PartyBelongedToAsPrisoner, HeroParty);
+                PartyBelongedToAsPrisoner.MobileParty = HeroParty;
             }
             private void CreateCharacterObject()
             {
                 CharacterObject = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
                 CharacterObject.StringId = "My CharacterObject";
-                CharacterObject_basicName.SetValue(CharacterObject, new TextObject("My CharacterObject"));
+                CharacterObject._basicName = new TextObject("My CharacterObject");
                 objectManager.AddExisting(CharacterObject.StringId, CharacterObject);
             }
 
@@ -438,7 +376,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 objectManager.AddExisting(LastKnownClosestSettlement.StringId, LastKnownClosestSettlement);
             }
 
-            static readonly FieldInfo CharacterObject_basicName = typeof(CharacterObject).GetField("_basicName", BindingFlags.NonPublic | BindingFlags.Instance);
             private void CreateVolunteerTypes()
             {
                 VolunteerTypes = new CharacterObject[]
@@ -452,7 +389,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 {
                     CharacterObject character = VolunteerTypes[i];
                     character.StringId = $"Character_{i}";
-                    CharacterObject_basicName.SetValue(character, new TextObject($"Character_{i}"));
+                    character._basicName = new TextObject($"Character_{i}");
                     objectManager.AddExisting(character.StringId, character);
                 }
             }
@@ -474,9 +411,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             private static readonly FieldInfo Workshop_Settlement = typeof(Workshop).GetField("_settlement", BindingFlags.NonPublic | BindingFlags.Instance);
             private static readonly FieldInfo Workshop_tag = typeof(Workshop).GetField("_tag", BindingFlags.NonPublic | BindingFlags.Instance);
-            private static readonly PropertyInfo Town_Workshops = typeof(Town).GetProperty(nameof(Town.Workshops));
-            private static readonly PropertyInfo Settlement_Alleys = typeof(Settlement).GetProperty(nameof(Settlement.Alleys));
-            private static readonly FieldInfo Alley_settlement = typeof(Alley).GetField("_settlement", BindingFlags.NonPublic | BindingFlags.Instance);
             private void CreateOwnedParties()
             {
                 Town town = (Town)FormatterServices.GetUninitializedObject(typeof(Town));
@@ -497,7 +431,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                     (Workshop)FormatterServices.GetUninitializedObject(typeof(Workshop)),
                 };
 
-                Town_Workshops.SetValue(town, OwnedWorkshops.ToArray());
+                town.Workshops = OwnedWorkshops.ToArray();
 
                 // Workshop requires settlement for GetHashCode
                 foreach (var workshop in OwnedWorkshops)
@@ -518,12 +452,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                     (Alley)FormatterServices.GetUninitializedObject(typeof(Alley)),
                 };
 
-                Settlement_Alleys.SetValue(settlement, OwnedAlleys);
+                settlement.Alleys = OwnedAlleys;
 
                 // Workshop requires settlement for GetHashCode
                 foreach (var alley in OwnedAlleys)
                 {
-                    Alley_settlement.SetValue(alley, settlement);
+                    alley._settlement = settlement;
                 }
 
                 OwnedCaravans = new List<CaravanPartyComponent>
