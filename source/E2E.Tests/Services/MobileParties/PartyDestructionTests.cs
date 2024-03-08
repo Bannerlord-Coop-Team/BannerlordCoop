@@ -35,8 +35,7 @@ public class PartyDestructionTests : IDisposable
         {
             var party = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
             {
-                AccessTools.Method(typeof(LordPartyComponent), "InitializeLordPartyProperties")
-                    .Invoke(partyComponent, new object[] { party, Vec2.Zero, 0, null });
+                partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
             });
 
             partyId = party.StringId;
@@ -67,8 +66,7 @@ public class PartyDestructionTests : IDisposable
         {
             var party = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
             {
-                AccessTools.Method(typeof(LordPartyComponent), "InitializeLordPartyProperties")
-                    .Invoke(partyComponent, new object[] { party, Vec2.Zero, 0, null });
+                partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
             });
             partyId = party.StringId;
         });
