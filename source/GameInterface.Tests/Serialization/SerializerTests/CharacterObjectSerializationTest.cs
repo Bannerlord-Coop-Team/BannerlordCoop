@@ -31,14 +31,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             container = builder.Build();
         }
 
-        private static readonly FieldInfo BasicCharacterObject_basicName = typeof(BasicCharacterObject).GetField("_basicName", BindingFlags.NonPublic | BindingFlags.Instance);
-
         [Fact]
         public void CharacterObject_Serialize()
         {
             CharacterObject CharacterObject = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
 
-            BasicCharacterObject_basicName.SetValue(CharacterObject, new TextObject("Test Name"));
+            CharacterObject._basicName = new TextObject("Test Name");
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterObjectBinaryPackage package = new CharacterObjectBinaryPackage(CharacterObject, factory);
@@ -55,7 +53,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         {
             CharacterObject CharacterObject = new CharacterObject();
 
-            BasicCharacterObject_basicName.SetValue(CharacterObject, new TextObject("Test Name"));
+            CharacterObject._basicName = new TextObject("Test Name");
 
             CharacterObject[] characterMembers = new CharacterObject[]
             {
@@ -120,7 +118,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             characterObject.StringId = newId;
 
-            BasicCharacterObject_basicName.SetValue(characterObject, new TextObject("Test Name"));
+            characterObject._basicName = new TextObject("Test Name");
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             CharacterObjectBinaryPackage package = new CharacterObjectBinaryPackage(characterObject, factory);
