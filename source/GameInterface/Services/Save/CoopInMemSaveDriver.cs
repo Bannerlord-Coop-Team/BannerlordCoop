@@ -5,7 +5,6 @@ namespace GameInterface.Services.Heroes;
 
 internal class CoopInMemSaveDriver : InMemDriver
 {
-    //private static readonly FieldInfo _data = typeof(InMemDriver).GetField("_data", BindingFlags.NonPublic | BindingFlags.Instance);
 
     public CoopInMemSaveDriver()
     {
