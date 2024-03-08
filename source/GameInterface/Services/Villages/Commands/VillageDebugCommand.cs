@@ -11,9 +11,6 @@ namespace GameInterface.Services.Villages.Commands;
 
 internal class VillageDebugCommand
 {
-
-    private static readonly PropertyInfo LastDemandSatisifiedTime = typeof(Village).GetProperty(nameof(Village.LastDemandSatisfiedTime));
-
     /// <summary>
     /// Finds a specific village in game.
     /// </summary>
@@ -233,7 +230,7 @@ internal class VillageDebugCommand
             return string.Format("Failed to parse the value: {0}", lastDemandTime);
         }
 
-        LastDemandSatisifiedTime.SetValue(village, lastDemandTime);
+        village.LastDemandSatisfiedTime = lastDemandTime;
 
         return string.Format("Hearth has changed to to: {0}", lastDemandTime);
     }
