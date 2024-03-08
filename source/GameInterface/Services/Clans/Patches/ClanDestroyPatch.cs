@@ -46,7 +46,7 @@ namespace GameInterface.Services.Clans.Patches
 
                 GameLoopRunner.RunOnMainThread(() =>
                 {
-                    ApplyInternal.Invoke(clan, details);
+                    DestroyClanAction.ApplyInternal(clan, (DestroyClanAction.DestroyClanActionDetails)details);
                 }, true);
             }
         }
