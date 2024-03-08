@@ -196,9 +196,9 @@ internal class SettlementAuditor : IAuditor
                 errLastAttackerParty++;
             }
 
-            if (settlement.LastThreatTime.GetNumTicks() != audit.LastThreatTime)
+            if (settlement.LastThreatTime.NumTicks != audit.LastThreatTime)
             {
-                sb.AppendLine($"settlement.LastThreatTime {settlement.LastThreatTime.GetNumTicks()}!= {audit.LastThreatTime}");
+                sb.AppendLine($"settlement.LastThreatTime {settlement.LastThreatTime.NumTicks}!= {audit.LastThreatTime}");
                 errLastThreatTime++;
             }
 
@@ -217,7 +217,7 @@ internal class SettlementAuditor : IAuditor
             }
 
 
-            List<Hero> notableCache = settlement.GetNotablesCache().ToList();
+            List<Hero> notableCache = settlement._notablesCache.ToList();
             List<string> settlementNotableCache = notableCache.Select(hero => hero.StringId).ToList();
 
             // if the lists dont contain same elements
@@ -233,7 +233,7 @@ internal class SettlementAuditor : IAuditor
             }
             
 
-            List<Hero> heroCache = settlement.GetHeroesWithoutPartyCache().ToList();
+            List<Hero> heroCache = settlement._heroesWithoutPartyCache.ToList();
             List<string> settlementHeroCache = heroCache.Select(hero => hero.StringId).ToList();
 
             var auditHerosWithoutPartyCache = audit.HeroesWithoutPartyCache ?? Array.Empty<string>();

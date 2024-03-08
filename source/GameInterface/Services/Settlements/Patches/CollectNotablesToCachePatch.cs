@@ -26,7 +26,7 @@ public class CollectNotablesToCachePatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient) return false;
 
-        var notableCache = __instance.GetNotablesCache();
+        var notableCache = __instance._notablesCache;
         notableCache.Clear();
 
         foreach (Hero hero in __instance.HeroesWithoutParty)
