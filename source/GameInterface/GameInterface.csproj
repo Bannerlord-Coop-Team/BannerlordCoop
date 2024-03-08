@@ -229,7 +229,7 @@
 	    </AssemblyAttribute>
     </ItemGroup>
   <ItemGroup>
-    <!--<Publicize Include="SandBox"/>-->
+    <Publicize Include="SandBox"/>
     <Publicize Include="SandBox.GauntletUI"/>                             
     <Publicize Include="SandBox.View"/>                                   
     <!--<Publicize Include="SandBox.ViewModelCollection"/>                    -->

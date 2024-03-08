@@ -37,7 +37,6 @@ namespace GameInterface.Services.GameDebug.Interfaces
                    videoState.VideoPath.Contains(VideoPathName);
         }
 
-        private readonly MethodInfo LaunchSandboxCharacterCreation = typeof(SandBoxGameManager).GetMethod("LaunchSandboxCharacterCreation", BindingFlags.NonPublic | BindingFlags.Instance);
         public void SkipCharacterCreation()
         {
             // Validation
@@ -51,7 +50,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
         {
             // Skip intro video
             SandBoxGameManager gameManager = (SandBoxGameManager)Game.Current.GameManager;
-            LaunchSandboxCharacterCreation.Invoke(gameManager, Array.Empty<object>());
+            gameManager.LaunchSandboxCharacterCreation();
 
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
             if (characterCreationState.CurrentStage is CharacterCreationCultureStage)
