@@ -66,7 +66,7 @@ public record SettlementAuditData
         GarrisonWagePaymentLimit = settlement.GarrisonWagePaymentLimit;
         // mobileParty StringID
         LastAttackerParty = settlement.LastAttackerParty?.StringId ?? "";
-        LastThreatTime = settlement.LastThreatTime.GetNumTicks();
+        LastThreatTime = settlement.LastThreatTime.NumTicks;
         CurrentSiegeState = (short)settlement.CurrentSiegeState;
         Militia = settlement.Militia;
 
