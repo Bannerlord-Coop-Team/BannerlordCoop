@@ -18,11 +18,6 @@ namespace GameInterface.Services.Clans.Patches
     {
         private static readonly AllowedInstance<Clan> AllowedInstance = new AllowedInstance<Clan>();
 
-        private static readonly Action<Clan, int> ApplyInternal =
-            typeof(DestroyClanAction)
-            .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
-            .BuildDelegate<Action<Clan, int>>();
-
         static bool Prefix(Clan destroyedClan, int details)
         {
             if (AllowedInstance.IsAllowed(destroyedClan)) return true;
