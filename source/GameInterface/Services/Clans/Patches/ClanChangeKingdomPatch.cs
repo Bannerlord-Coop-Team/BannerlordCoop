@@ -18,11 +18,6 @@ namespace GameInterface.Services.Clans.Patches
     {
         private static readonly AllowedInstance<Clan> AllowedInstance = new AllowedInstance<Clan>();
 
-        private static readonly Action<Clan, Kingdom, ChangeKingdomAction.ChangeKingdomActionDetail, int, bool, bool> ApplyInternal =
-            typeof(ChangeKingdomAction)
-            .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
-            .BuildDelegate<Action<Clan, Kingdom, ChangeKingdomAction.ChangeKingdomActionDetail, int, bool, bool>>();
-
         static bool Prefix(Clan clan, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, int awardMultiplier = 0, bool byRebellion = false, bool showNotification = true)
         {
             if (AllowedInstance.IsAllowed(clan)) return true;
@@ -46,7 +41,7 @@ namespace GameInterface.Services.Clans.Patches
 
                 GameLoopRunner.RunOnMainThread(() =>
                 {
-                    ApplyInternal.Invoke(clan, newKingdom, detail, awardMultiplier, byRebellion, showNotification);
+                    ChangeKingdomAction.ApplyInternal(clan, newKingdom, detail, awardMultiplier, byRebellion, showNotification);
                 }, true);
             }
         }
