@@ -28,10 +28,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             container = builder.Build();
         }
 
-        private readonly static FieldInfo _totalXp = typeof(HeroDeveloper).GetField("_totalXp", BindingFlags.NonPublic | BindingFlags.Instance);
-        private readonly static PropertyInfo Hero = typeof(HeroDeveloper).GetProperty(nameof(HeroDeveloper.Hero));
-        private readonly static PropertyInfo UnspentFocusPoints = typeof(HeroDeveloper).GetProperty(nameof(HeroDeveloper.UnspentFocusPoints));
-        private readonly static PropertyInfo UnspentAttributePoints = typeof(HeroDeveloper).GetProperty(nameof(HeroDeveloper.UnspentAttributePoints));
         [Fact]
         public void HeroDeveloper_Serialize()
         {
@@ -60,10 +56,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             // Setup instance and fields
             HeroDeveloper HeroDeveloper = (HeroDeveloper)FormatterServices.GetUninitializedObject(typeof(HeroDeveloper));
 
-            _totalXp.SetValue(HeroDeveloper, 101);
-            Hero.SetValue(HeroDeveloper, hero);
-            UnspentFocusPoints.SetValue(HeroDeveloper, 54);
-            UnspentAttributePoints.SetValue(HeroDeveloper, 68);
+            HeroDeveloper._totalXp = 101;
+            HeroDeveloper.Hero = hero;
+            HeroDeveloper.UnspentFocusPoints = 54;
+            HeroDeveloper.UnspentAttributePoints = 68;
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             HeroDeveloperBinaryPackage package = new HeroDeveloperBinaryPackage(HeroDeveloper, factory);
