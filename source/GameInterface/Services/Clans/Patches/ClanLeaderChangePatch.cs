@@ -19,11 +19,6 @@ namespace GameInterface.Services.Clans.Patches
     {
         private static readonly AllowedInstance<Clan> AllowedInstance = new AllowedInstance<Clan>();
 
-        private static readonly Action<Clan, Hero> ApplyInternal =
-            typeof(ChangeClanLeaderAction)
-            .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
-            .BuildDelegate<Action<Clan, Hero>>();
-
         static bool Prefix(Clan clan, Hero newLeader = null)
         {
             if (AllowedInstance.IsAllowed(clan)) return true;
@@ -46,7 +41,7 @@ namespace GameInterface.Services.Clans.Patches
 
                 GameLoopRunner.RunOnMainThread(() =>
                 {
-                    ApplyInternal.Invoke(clan, newLeader);
+                    ChangeClanLeaderAction.ApplyInternal(clan, newLeader);
                 }, true);
             }
         }
