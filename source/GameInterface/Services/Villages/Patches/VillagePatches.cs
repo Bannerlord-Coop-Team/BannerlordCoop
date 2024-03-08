@@ -104,14 +104,13 @@ internal class VillagePatches
         return true;
     }
 
-    private static readonly PropertyInfo TradeBound = typeof(Village).GetProperty(nameof(Village.TradeBound));
     internal static void RunTradeBoundChange(Village village, Settlement tradebound)
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                TradeBound.SetValue(village, tradebound);
+                village.TradeBound = tradebound;
             }
         });
 
@@ -144,8 +143,6 @@ internal class VillagePatches
 
     }
 
-
-    private static readonly PropertyInfo LastDemandSatisifiedTime = typeof(Village).GetProperty(nameof(Village.LastDemandSatisfiedTime));
     [HarmonyPatch(nameof(Village.LastDemandSatisfiedTime), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool LastDemandSatisifiedTimePrefix(ref Village __instance, ref float value)
@@ -166,7 +163,7 @@ internal class VillagePatches
         {
             using (new AllowedThread())
             {
-                LastDemandSatisifiedTime.SetValue(village, LastDemandSatisfiedTime);
+                village.LastDemandSatisfiedTime = LastDemandSatisfiedTime;
             }
         });
 
