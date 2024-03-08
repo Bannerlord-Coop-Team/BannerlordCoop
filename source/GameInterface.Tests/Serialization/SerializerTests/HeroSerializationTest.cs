@@ -159,10 +159,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
         private void AssertPropertyOwnerEqual<T>(PropertyOwner<T> owner1, PropertyOwner<T> owner2) where T : MBObjectBase
         {
-            var _attributes = typeof(PropertyOwner<>).MakeGenericType(typeof(T)).GetField("_attributes", BindingFlags.NonPublic | BindingFlags.Instance);
-
-            Dictionary<T, int> values1 = (Dictionary<T, int>)_attributes.GetValue(owner1);
-            Dictionary<T, int> values2 = (Dictionary<T, int>)_attributes.GetValue(owner2);
+            Dictionary<T, int> values1 = owner1._attributes;
+            Dictionary<T, int> values2 = owner2._attributes;
 
             Assert.Equal(values1.Count, values2.Count);
 
