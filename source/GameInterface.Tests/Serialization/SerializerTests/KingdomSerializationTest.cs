@@ -47,8 +47,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly PropertyInfo Kingdom_LastArmyCreationDay = typeof(Kingdom).GetProperty("LastArmyCreationDay", BindingFlags.Instance | BindingFlags.Public);
-        private static readonly FieldInfo Kingdom_Stances = typeof(Kingdom).GetField("_stances", BindingFlags.NonPublic | BindingFlags.Instance);
         [Fact]
         public void Kingdom_Full_Serialization()
         {
@@ -62,7 +60,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             // Assign values
             kingdomObject.LastMercenaryOfferTime = new CampaignTime();
             kingdomObject.NotAttackableByPlayerUntilTime= new CampaignTime();
-            Kingdom_LastArmyCreationDay.SetRandom(kingdomObject);
+            kingdomObject.LastArmyCreationDay = ReflectionExtensions.Random<int>();
 
             // Create settlements for one of the kingdoms cache lists
             Settlement settlement1 = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
@@ -80,7 +78,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             settlements.Add(settlement2);
 
             // Create StanceLink for testing
-            List<StanceLink> stances = (List<StanceLink>)Kingdom_Stances.GetValue(kingdomObject);
+            List<StanceLink> stances = kingdomObject._stances;
 
             StanceLink stance = (StanceLink)FormatterServices.GetUninitializedObject(typeof(StanceLink));
             stances.Add(stance);
