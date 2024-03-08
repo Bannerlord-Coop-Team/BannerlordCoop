@@ -43,8 +43,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        PropertyInfo MobileParty_Party = typeof(MobileParty).GetProperty(nameof(MobileParty.Party));
-
         [Fact]
         public void MobileParty_Full_Serialization()
         {
@@ -55,7 +53,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             mobilePartyObject.Aggressiveness = 56;
             mobilePartyObject.IsActive = true;
 
-            MobileParty_Party.SetValue(mobilePartyObject, new PartyBase(mobilePartyObject));
+            mobilePartyObject.Party = new PartyBase(mobilePartyObject);
 
             Hero surgeon = (Hero)FormatterServices.GetUninitializedObject(typeof(Hero));
             surgeon.StringId = "My Surgeon";
