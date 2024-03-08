@@ -1,6 +1,4 @@
-﻿using Coop.Mod.Extentions;
-using GameInterface.Extentions;
-using ProtoBuf;
+﻿using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Linq;

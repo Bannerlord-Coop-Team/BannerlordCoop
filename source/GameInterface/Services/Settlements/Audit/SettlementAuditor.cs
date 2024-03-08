@@ -2,8 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Coop.Mod.Extentions;
-using GameInterface.Extentions;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;
