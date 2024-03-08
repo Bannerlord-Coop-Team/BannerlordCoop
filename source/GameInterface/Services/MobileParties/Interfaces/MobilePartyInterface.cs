@@ -1,13 +1,12 @@
 ﻿using Common;
-using Common.Extensions;
 using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -55,6 +54,7 @@ internal interface IMobilePartyInterface : IGameAbstraction
 internal class MobilePartyInterface : IMobilePartyInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyInterface>();
+    private static readonly MethodInfo PartyBase_OnFinishLoadState = typeof(PartyBase).GetMethod("OnFinishLoadState", BindingFlags.NonPublic | BindingFlags.Instance);
 
     private readonly MobilePartyRegistry partyRegistry;
     private readonly IObjectManager objectManager;
@@ -74,7 +74,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
     {
         party.IsVisible = true;
 
-        party.Party.OnFinishLoadState();
+        PartyBase_OnFinishLoadState.Invoke(party.Party, null);
     }
 
     public void RegisterAllPartiesAsControlled(string ownerId)
@@ -85,7 +85,6 @@ internal class MobilePartyInterface : IMobilePartyInterface
         }
     }
 
-    private static  AllowedInstance<MobileParty> allowedInstance = new AllowedInstance<MobileParty>();
     public void StartPlayerSettlementEncounter(string partyId, string settlementId)
     {
         if (objectManager.TryGetObject(partyId, out MobileParty mobileParty) == false)
@@ -107,13 +106,12 @@ internal class MobilePartyInterface : IMobilePartyInterface
             return;
         }
 
-        
+        if (PlayerEncounter.Current is not null) return;
+
         GameLoopRunner.RunOnMainThread(() =>
         {
-            using (EnterSettlementActionPatches.AllowedInstance)
+            using (new AllowedThread())
             {
-                EnterSettlementActionPatches.AllowedInstance.Instance = mobileParty;
-                if (PlayerEncounter.Current is not null) return;
                 PlayerEncounter.Start();
                 PlayerEncounter.Current.Init(mobileParty.Party, settlementParty, settlement);
             }
@@ -122,7 +120,14 @@ internal class MobilePartyInterface : IMobilePartyInterface
 
     public void EndPlayerSettlementEncounter()
     {
-        GameLoopRunner.RunOnMainThread(PlayerLeaveSettlementPatch.OverrideLeaveConsequence);
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                PlayerEncounter.Finish(true);
+                Campaign.Current.SaveHandler.SignalAutoSave();
+            }
+        });
     }
 
     public void EnterSettlement(string partyId, string settlementId)
@@ -139,10 +144,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
             return;
         }
 
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            EnterSettlementActionPatches.OverrideApplyForParty(mobileParty, settlement);
-        });
+        EnterSettlementActionPatches.OverrideApplyForParty(mobileParty, settlement);
     }
 
     public void LeaveSettlement(string partyId)
@@ -153,9 +155,6 @@ internal class MobilePartyInterface : IMobilePartyInterface
             return;
         }
 
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            LeaveSettlementActionPatches.OverrideApplyForParty(mobileParty);
-        });
+        LeaveSettlementActionPatches.OverrideApplyForParty(mobileParty);
     }
 }

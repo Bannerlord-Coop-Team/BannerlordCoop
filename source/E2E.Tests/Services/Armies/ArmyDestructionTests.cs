@@ -16,10 +16,10 @@ namespace E2E.Tests.Services.Armies;
 
 public class ArmyDestructionTests : IDisposable
 {
-    E2ETestEnvironement TestEnvironement { get; }
+    E2ETestEnvironment TestEnvironement { get; }
     public ArmyDestructionTests(ITestOutputHelper output)
     {
-        TestEnvironement = new E2ETestEnvironement(output);
+        TestEnvironement = new E2ETestEnvironment(output);
     }
 
     public void Dispose()

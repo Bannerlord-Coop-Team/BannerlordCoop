@@ -10,6 +10,8 @@ public class ControlledEntityRegistryTests
     [Fact]
     public void Serialization()
     {
+        var serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+
         var ownerId = "Server";
 
         ControlledEntityRegistry registry = new ControlledEntityRegistry();
@@ -23,9 +25,9 @@ public class ControlledEntityRegistryTests
 
         registry.RegisterExistingEntities(existingEntities);
 
-        var bytes = ProtoBufSerializer.Serialize(registry);
+        var bytes = serializer.Serialize(registry);
 
-        var deserializedRegistry = ProtoBufSerializer.Deserialize<ControlledEntityRegistry>(bytes);
+        var deserializedRegistry = serializer.Deserialize<ControlledEntityRegistry>(bytes);
 
         Assert.Equal(registry, deserializedRegistry);
     }

@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
+using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Core.Client;
@@ -25,6 +26,9 @@ public class TestEnvironment
     private Core.ContainerProvider containerProvider;
     public IContainer Container => containerProvider.GetContainer();
 
+    private readonly TestNetworkRouter networkOrchestrator;
+
+
     /// <summary>
     /// Constructor for TestEnvironment
     /// </summary>
@@ -32,6 +36,9 @@ public class TestEnvironment
     public TestEnvironment(int numClients = 2, bool registerGameInterface = false)
     {
         this.registerGameInterface = registerGameInterface;
+
+        // Setup test network
+        networkOrchestrator = new TestNetworkRouter();
 
         Server = CreateServer();
 
@@ -50,7 +57,7 @@ public class TestEnvironment
     public IEnumerable<EnvironmentInstance> Clients { get; }
     public EnvironmentInstance Server { get; }
 
-    private TestNetworkRouter networkOrchestrator = new TestNetworkRouter();
+    
     private readonly bool registerGameInterface;
 
     private EnvironmentInstance CreateClient()
@@ -112,6 +119,7 @@ public class TestEnvironment
 
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
+        builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
 
         return builder;
     }

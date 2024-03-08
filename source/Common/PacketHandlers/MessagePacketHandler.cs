@@ -22,20 +22,21 @@ namespace Common.PacketHandlers
 
         public PacketType PacketType => PacketType.Message;
 
-        private readonly IMessageBroker _messageBroker;
-        private readonly IPacketManager _packetManager;
+        private readonly IMessageBroker messageBroker;
+        private readonly IPacketManager packetManager;
+        private readonly ICommonSerializer serializer;
 
-        public MessagePacketHandler(IMessageBroker messageBroker, IPacketManager packetManager)
+        public MessagePacketHandler(IMessageBroker messageBroker, IPacketManager packetManager, ICommonSerializer serializer)
         {
-            _messageBroker = messageBroker;
-            _packetManager = packetManager;
-
-            _packetManager.RegisterPacketHandler(this);
+            this.messageBroker = messageBroker;
+            this.packetManager = packetManager;
+            this.serializer = serializer;
+            this.packetManager.RegisterPacketHandler(this);
         }
 
         public virtual void Dispose()
         {
-            _packetManager.RemovePacketHandler(this);
+            packetManager.RemovePacketHandler(this);
         }
 
         protected static readonly MethodInfo Publish = typeof(IMessageBroker).GetMethod(nameof(IMessageBroker.Publish));
@@ -43,7 +44,7 @@ namespace Common.PacketHandlers
         {
             MessagePacket convertedPacket = (MessagePacket)packet;
 
-            IMessage networkEvent = convertedPacket.Message;
+            var networkEvent = serializer.Deserialize<IMessage>(convertedPacket.Data);
 
             if (networkEvent.GetType().GetCustomAttribute<BatchLogMessageAttribute>() == null)
             {
@@ -52,55 +53,38 @@ namespace Common.PacketHandlers
 
             PublishEvent(peer, networkEvent);
         }
-        private Dictionary<Type, Action<IMessageBroker, object, object>> publishFunctionLookup = new Dictionary<Type, Action<IMessageBroker, object, object>>();
+        private Dictionary<string, Action<IMessageBroker, object, object>> publishFunctionCache = new Dictionary<string, Action<IMessageBroker, object, object>>();
         internal virtual void PublishEvent(NetPeer peer, IMessage message)
         {
             var msgType = message.GetType();
-            if (publishFunctionLookup.TryGetValue(msgType, out var action))
+            if (publishFunctionCache.TryGetValue(msgType.FullName, out var action))
             {
-                action.Invoke(_messageBroker, peer, message);
+                action.Invoke(messageBroker, peer, message);
             }
             else
             {
                 var castedPublish = Publish.MakeGenericMethod(message.GetType());
-                publishFunctionLookup.Add(msgType, 
+                publishFunctionCache.Add(msgType.FullName, 
                     (messageBrokerParam, peerParam, messageParam) => castedPublish.Invoke(messageBrokerParam, new object[] { peerParam, messageParam }));
 
-                castedPublish.Invoke(_messageBroker, new object[] { peer, message });
+                castedPublish.Invoke(messageBroker, new object[] { peer, message });
             }
         }
     }
 
     [ProtoContract(SkipConstructor = true)]
-    public class MessagePacket : IPacket
+    public readonly struct MessagePacket : IPacket
     {
         public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
 
         public PacketType PacketType => PacketType.Message;
 
-        public IMessage Message
-        {
-            get
-            {
-                return (IMessage)ProtoBufSerializer.Deserialize(_message);
-            }
-            set
-            {
-                _message = ProtoBufSerializer.Serialize(value);
-            }
-        }
-
         [ProtoMember(1)]
-        private byte[] _message;
+        public readonly byte[] Data;
 
-        public MessagePacket(IMessage message)
+        public MessagePacket(byte[] data)
         {
-            if (RuntimeTypeModel.Default.IsDefined(message.GetType()) == false)
-            {
-                throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
-            }
-
-            Message = message;
+            Data = data;
         }
     }
 }

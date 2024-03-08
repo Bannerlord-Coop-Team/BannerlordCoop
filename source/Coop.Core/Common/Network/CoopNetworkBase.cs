@@ -3,6 +3,7 @@ using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
 using LiteNetLib;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,9 +16,12 @@ public abstract class CoopNetworkBase : INetwork
     public INetworkConfiguration Configuration { get; }
     public abstract int Priority { get; }
 
-    protected CoopNetworkBase(INetworkConfiguration configuration)
+    protected readonly ICommonSerializer serializer;
+
+    protected CoopNetworkBase(INetworkConfiguration configuration, ICommonSerializer serializer)
     {
         Configuration = configuration;
+        this.serializer = serializer;
     }
 
     public virtual void SendAllBut(NetManager netManager, NetPeer netPeer, IPacket packet)
@@ -43,7 +47,7 @@ public abstract class CoopNetworkBase : INetwork
     public virtual void Send(NetPeer netPeer, IPacket packet)
     {
         // Serialize data
-        byte[] data = ProtoBufSerializer.Serialize(packet);
+        byte[] data = serializer.Serialize(packet);
 
         // Send data
         netPeer.Send(data, packet.DeliveryMethod);
@@ -51,20 +55,33 @@ public abstract class CoopNetworkBase : INetwork
 
     public void Send(NetPeer netPeer, IMessage message)
     {
-        var eventPacket = new MessagePacket(message);
+        var data = SerializeMessage(message);
+        var eventPacket = new MessagePacket(data);
         Send(netPeer, eventPacket);
     }
 
     public void SendAll(IMessage message)
     {
-        var eventPacket = new MessagePacket(message);
+        var data = SerializeMessage(message);
+        var eventPacket = new MessagePacket(data);
         SendAll(eventPacket);
     }
 
     public void SendAllBut(NetPeer excludedPeer, IMessage message)
     {
-        var eventPacket = new MessagePacket(message);
+        var data = SerializeMessage(message);
+        var eventPacket = new MessagePacket(data);
         SendAllBut(excludedPeer, eventPacket);
+    }
+
+    private byte[] SerializeMessage(IMessage message)
+    {
+        if (RuntimeTypeModel.Default.IsDefined(message.GetType()) == false)
+        {
+            throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
+        }
+
+        return serializer.Serialize(message);
     }
 
     public abstract void Start();

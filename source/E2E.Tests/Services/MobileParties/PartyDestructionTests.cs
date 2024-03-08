@@ -10,10 +10,10 @@ namespace E2E.Tests.Services.MobileParties;
 
 public class PartyDestructionTests : IDisposable
 {
-    E2ETestEnvironement TestEnvironement { get; }
+    E2ETestEnvironment TestEnvironement { get; }
     public PartyDestructionTests(ITestOutputHelper output)
     {
-        TestEnvironement = new E2ETestEnvironement(output);
+        TestEnvironement = new E2ETestEnvironment(output);
     }
 
     public void Dispose()

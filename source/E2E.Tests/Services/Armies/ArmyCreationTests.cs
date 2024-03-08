@@ -5,6 +5,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.Armies.Messages.Lifetime;
+using GameInterface.Utils.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -16,10 +17,10 @@ namespace E2E.Tests.Services.Armies;
 [CollectionDefinition("Non-Parallel Collection", DisableParallelization = true)]
 public class ArmyCreationTests : IDisposable
 {
-    E2ETestEnvironement TestEnvironement { get; }
+    E2ETestEnvironment TestEnvironement { get; }
     public ArmyCreationTests(ITestOutputHelper output)
     {
-        TestEnvironement = new E2ETestEnvironement(output);
+        TestEnvironement = new E2ETestEnvironment(output);
     }
 
     public void Dispose()
