@@ -23,7 +23,7 @@ internal static class CampaignObjectManagerExtensions
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
-            OnHeroAddedDelegate(campaignObjectManager, hero);
+            campaignObjectManager.OnHeroAdded(hero);
         });
     }
 
@@ -31,15 +31,7 @@ internal static class CampaignObjectManagerExtensions
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
-            AddMobilePartyDelegate(campaignObjectManager, party);
+            campaignObjectManager.AddMobileParty(party);
         });
     }
-
-    private static readonly Action<CampaignObjectManager, Hero> OnHeroAddedDelegate = typeof(CampaignObjectManager)
-        .GetMethod("OnHeroAdded", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildDelegate<Action<CampaignObjectManager, Hero>>();
-
-    private static readonly Action<CampaignObjectManager, MobileParty> AddMobilePartyDelegate = typeof(CampaignObjectManager)
-        .GetMethod("AddMobileParty", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
 }
