@@ -36,7 +36,7 @@ internal static class MobilePartyDebugCommand
         }
 
         Hero owner = mobileParty.Owner;
-        var _lastCalculatedSpeed = AccessTools.Field(typeof(MobileParty), "_lastCalculatedSpeed").GetValue(mobileParty);
+        var _lastCalculatedSpeed = mobileParty._lastCalculatedSpeed;
         var explanations = mobileParty.SpeedExplained.GetExplanations();
 
         var stringBuilder = new StringBuilder();
