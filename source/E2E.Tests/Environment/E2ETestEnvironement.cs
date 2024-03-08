@@ -57,7 +57,7 @@ internal class E2ETestEnvironement : IDisposable
             var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
             MBObjectManager.Instance.RegisterObject(characterObject);
             var mainHero = HeroCreator.CreateSpecialHero(characterObject);
-            AccessTools.Property(typeof(CharacterObject), nameof(CharacterObject.HeroObject)).SetValue(characterObject, mainHero);
+            characterObject.HeroObject = mainHero;
             Game.Current.PlayerTroop = characterObject;
         });
     }
