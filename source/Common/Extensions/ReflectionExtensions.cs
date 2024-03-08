@@ -183,6 +183,15 @@ namespace Common.Extensions
             { typeof(bool), () => random.Next(2) > 0 ? true : false },
         };
 
+        public static T Random<T>()
+        {
+            if (TryChooseRandomType(typeof(T), out var result))
+            {
+                return (T)result;
+            }
+            return default(T);
+        }
+
         /// <summary>
         /// Sets the field of an object to a random type if it is handled
         /// </summary>
