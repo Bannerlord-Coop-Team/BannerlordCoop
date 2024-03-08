@@ -339,7 +339,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             hero._gold = ReflectionExtensions.Random<int>();
             hero.RandomValue = ReflectionExtensions.Random<int>();
             hero._father = heroData.Father;
-            hero._father = heroData.Mother;
+            hero._mother = heroData.Mother;
             Hero_exSpouses.SetValue(hero, heroData.ExSpouses);
             hero._spouse = heroData.Spouse;
             Hero_children.SetValue(hero, heroData.Children);
