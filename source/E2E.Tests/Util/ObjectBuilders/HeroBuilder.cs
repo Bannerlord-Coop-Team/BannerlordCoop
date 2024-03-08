@@ -17,9 +17,8 @@ internal class HeroBuilder : IObjectBuilder
         var partyBuilder = new MobilePartyBuilder();
         var party = partyBuilder.BuildWithHero(hero);
 
-        AccessTools.Method(typeof(Hero), "SetPartyBelongedTo").Invoke(hero, new object[] { party });
-
-        
+        hero.SetPartyBelongedTo(party);
+                
         return hero;
     }
 }
