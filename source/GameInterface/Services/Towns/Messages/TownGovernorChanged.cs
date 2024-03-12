@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 #nullable enable
 
 namespace GameInterface.Services.Towns.Messages
@@ -6,6 +7,7 @@ namespace GameInterface.Services.Towns.Messages
     /// <summary>
     /// Used when the Governor changes in a Town.
     /// </summary>
+    [BatchLogMessage]
     public record TownGovernorChanged: ICommand
     {
 
