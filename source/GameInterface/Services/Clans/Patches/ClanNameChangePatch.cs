@@ -33,6 +33,7 @@ namespace GameInterface.Services.Clans.Patches
         {
             if (clan == null) return;
             clan.Name = name;
+            clan.InformalName = informalName;
         }
     }
 }
