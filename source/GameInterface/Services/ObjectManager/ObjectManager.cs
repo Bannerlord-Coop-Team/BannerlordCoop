@@ -188,17 +188,13 @@ internal class ObjectManager : IObjectManager
     {
         obj = default;
         if (string.IsNullOrEmpty(id)) return false;
-        if (RegistryMap.TryGetValue(typeof(T), out IRegistry registry) && registry.TryGetValue(id, out obj))
-        {
-            return true;
-        }
         if (typeof(MBObjectBase).IsAssignableFrom(typeof(T)))
         {
             var result = TryGetObject<MBObjectBase>(id, out var _obj);
             obj = _obj as T;
             return result;
         }
-        return false;
+        return RegistryMap.TryGetValue(typeof(T), out IRegistry registry) && registry.TryGetValue(id, out obj);
     }
 
     public bool Remove(object obj)
