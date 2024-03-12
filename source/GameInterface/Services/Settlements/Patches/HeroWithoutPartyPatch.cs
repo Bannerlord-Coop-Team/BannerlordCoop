@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
@@ -28,7 +27,7 @@ public class HeroWithoutPartyPatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient) return false;
 
-        var heroCache = __instance.GetHeroesWithoutPartyCache();
+        var heroCache = __instance._heroesWithoutPartyCache;
 
         if (!heroCache.Contains(individual))
         {
@@ -45,7 +44,7 @@ public class HeroWithoutPartyPatch
     {
 
         // does this even need a allowedthread?
-        var heroList = settlement.GetHeroesWithoutPartyCache();
+        var heroList = settlement._heroesWithoutPartyCache;
 
         if (!heroList.Contains(individual))
         {
@@ -59,7 +58,7 @@ public class HeroWithoutPartyPatch
         {
             using (new AllowedThread())
             {
-                settlement.SetHeroesWithoutPartyCache(heroList);
+                settlement._heroesWithoutPartyCache = heroList;
             }
         });
     }
@@ -72,7 +71,7 @@ public class HeroWithoutPartyPatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient) return false;
 
-        var heroCache = __instance.GetHeroesWithoutPartyCache();
+        var heroCache = __instance._heroesWithoutPartyCache;
 
         if (heroCache.Contains(individual))
         {
@@ -88,7 +87,7 @@ public class HeroWithoutPartyPatch
     internal static void RunRemoveHeroWithoutParty(Settlement settlement, Hero individual)
     {
 
-        var heroList = settlement.GetHeroesWithoutPartyCache();
+        var heroList = settlement._heroesWithoutPartyCache;
 
         if (heroList.Contains(individual))
         {
@@ -103,7 +102,7 @@ public class HeroWithoutPartyPatch
         {
             using (new AllowedThread())
             {
-                settlement.SetHeroesWithoutPartyCache(heroList);
+                settlement._heroesWithoutPartyCache = heroList;
             }
         });
     }

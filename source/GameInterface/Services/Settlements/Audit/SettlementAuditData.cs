@@ -1,6 +1,4 @@
-﻿using Coop.Mod.Extentions;
-using GameInterface.Extentions;
-using ProtoBuf;
+﻿using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -66,7 +64,7 @@ public record SettlementAuditData
         GarrisonWagePaymentLimit = settlement.GarrisonWagePaymentLimit;
         // mobileParty StringID
         LastAttackerParty = settlement.LastAttackerParty?.StringId ?? "";
-        LastThreatTime = settlement.LastThreatTime.GetNumTicks();
+        LastThreatTime = settlement.LastThreatTime.NumTicks;
         CurrentSiegeState = (short)settlement.CurrentSiegeState;
         Militia = settlement.Militia;
 

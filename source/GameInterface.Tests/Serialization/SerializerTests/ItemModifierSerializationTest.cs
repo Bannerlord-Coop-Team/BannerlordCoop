@@ -37,8 +37,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        FieldInfo ItemModifier_damage = typeof(ItemModifier).GetField("<Damage>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        FieldInfo ItemModifier_armor = typeof(ItemModifier).GetField("<Armor>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
         [Fact]
         public void ItemModifier_Full_Serialization()
         {
@@ -64,11 +62,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
             ItemModifier newItemModifier = returnedPackage.Unpack<ItemModifier>(deserializeFactory);
 
-            Assert.Equal(ItemModifier_damage.GetValue(ItemModifier),
-                         ItemModifier_damage.GetValue(newItemModifier));
+            Assert.Equal(ItemModifier.Damage,
+                         newItemModifier.Damage);
 
-            Assert.Equal(ItemModifier_armor.GetValue(ItemModifier),
-                         ItemModifier_armor.GetValue(newItemModifier));
+            Assert.Equal(ItemModifier.Armor,
+                         newItemModifier.Armor);
         }
     }
 }

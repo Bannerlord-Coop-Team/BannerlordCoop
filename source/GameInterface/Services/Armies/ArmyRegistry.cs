@@ -9,7 +9,6 @@ using System.Linq;
 using TaleWorlds.Core;
 using System.Collections;
 using System.Threading;
-using GameInterface.Services.ObjectManager.Extensions;
 
 namespace GameInterface.Services.Armies;
 

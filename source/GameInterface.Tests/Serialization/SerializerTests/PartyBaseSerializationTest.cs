@@ -42,7 +42,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             PartyBase testPartyObject = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
 
             testPartyObject.RemainingFoodPercentage = 5;
-            testPartyObject.GetType().GetProperty("Index", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public).SetValue(testPartyObject, 5);
+            testPartyObject.Index = 5;
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             PartyBaseBinaryPackage package = new PartyBaseBinaryPackage(testPartyObject, factory);

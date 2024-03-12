@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Coop.Mod.Extentions;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Tests.Bootstrap.Modules;
@@ -40,8 +39,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void CampaignTime_Full_Serialization()
         {
-            CampaignTime CampaignTime = new CampaignTime();
-            CampaignTime.SetNumTicks(1111);
+            CampaignTime CampaignTime = new CampaignTime(1111);
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             CampaignTimeBinaryPackage package = new CampaignTimeBinaryPackage(CampaignTime, factory);
@@ -61,7 +59,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
             CampaignTime newCampaignTime = returnedPackage.Unpack<CampaignTime>(deserializeFactory);
 
-            Assert.Equal(CampaignTime.GetNumTicks(), newCampaignTime.GetNumTicks());
+            Assert.Equal(CampaignTime.NumTicks, newCampaignTime.NumTicks);
         }
     }
 }

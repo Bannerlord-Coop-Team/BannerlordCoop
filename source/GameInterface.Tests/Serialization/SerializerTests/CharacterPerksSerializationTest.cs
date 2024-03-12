@@ -93,7 +93,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(characterPerks.Id, characterPerks.Id);
             Assert.Equal(characterPerks.IsReady, newCharacterPerks.IsReady);
 
-            Dictionary<PerkObject, int> newPerks = (Dictionary<PerkObject, int>)_attributes.GetValue(newCharacterPerks);
+            Dictionary<PerkObject, int> newPerks = newCharacterPerks._attributes;
 
             Assert.Equal(perks.ToString(), newPerks.ToString());
         }

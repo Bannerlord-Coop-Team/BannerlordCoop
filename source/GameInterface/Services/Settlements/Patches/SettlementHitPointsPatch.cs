@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
@@ -40,7 +39,7 @@ internal class SettlementHitPointsPatch
         {
             using (new AllowedThread())
             {
-                settlement.SetHitPointsChanged(settlementHitPoints);
+                settlement.SettlementHitPoints = settlementHitPoints;
             }
         });
     }

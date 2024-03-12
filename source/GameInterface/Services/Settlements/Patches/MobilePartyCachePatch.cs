@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
@@ -35,15 +34,15 @@ public class MobilePartyCachePatch
             return true;
         }
 
-        var partiesCache = __instance.GetPartiesCache();
+        var partiesCache = __instance._partiesCache;
 
         if(!partiesCache.Contains(mobileParty))
         {
             partiesCache.Add(mobileParty);
-            int lordParties = __instance.GetNumberOfLordPartiesAt();
+            int lordParties = __instance._numberOfLordPartiesAt;
             if (mobileParty.IsLordParty)
             {
-                __instance.SetNumberOfLordPartiesAt(++lordParties);
+                __instance._numberOfLordPartiesAt = ++lordParties;
             }
             // SettlementId
             // MobilePartyId
@@ -65,15 +64,15 @@ public class MobilePartyCachePatch
 
         if (ModInformation.IsClient) return false;
 
-        var partiesCache = __instance.GetPartiesCache();
+        var partiesCache = __instance._partiesCache;
 
         if (partiesCache.Contains(mobileParty))
         {
             partiesCache.Remove(mobileParty);
-            int lordParties = __instance.GetNumberOfLordPartiesAt();
+            int lordParties = __instance._numberOfLordPartiesAt;
             if (mobileParty.IsLordParty)
             {
-                __instance.SetNumberOfLordPartiesAt(--lordParties);
+                __instance._numberOfLordPartiesAt = --lordParties;
             }
             // SettlementId
             // MobilePartyId
@@ -95,12 +94,12 @@ public class MobilePartyCachePatch
             {
                 if (AddMobileParty)
                 {
-                    settlement.GetPartiesCache().Add(party);
-                    settlement.SetNumberOfLordPartiesAt(numberOfLordParties);
+                    settlement._partiesCache.Add(party);
+                    settlement._numberOfLordPartiesAt = numberOfLordParties;
                 } else
                 {
-                    settlement.GetPartiesCache().Remove(party);
-                    settlement.SetNumberOfLordPartiesAt(numberOfLordParties);
+                    settlement._partiesCache.Remove(party);
+                    settlement.SettlementHitPoints = numberOfLordParties;
                 }
 
             }

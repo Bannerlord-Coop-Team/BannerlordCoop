@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
@@ -36,7 +35,7 @@ internal class SetWallHitPointsSettlementPatch
             return true;
         }
 
-        var wallSectionHitPointsRatioList = __instance.GetSettlementWallSectionHitPointsRatioList();
+        var wallSectionHitPointsRatioList = __instance.SettlementWallSectionHitPointsRatioList;
 
         wallSectionHitPointsRatioList[index] = MBMath.ClampFloat(hitPointsRatio, 0f, 1f);
 
@@ -51,7 +50,7 @@ internal class SetWallHitPointsSettlementPatch
         {
             using (new AllowedThread())
             {
-                settlement.GetSettlementWallSectionHitPointsRatioList()[index] = MBMath.ClampFloat(hitPointsRatio, 0f, 1f);
+                settlement.SettlementWallSectionHitPointsRatioList[index] = MBMath.ClampFloat(hitPointsRatio, 0f, 1f);
             }
         });
     }

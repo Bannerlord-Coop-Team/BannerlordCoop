@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using GameInterface.Extentions;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
@@ -176,7 +175,7 @@ internal class SettlementCommands
 
         try
         {
-            settlement.SetHitPointsChanged(float.Parse(args[1]));
+            settlement.SettlementHitPoints = float.Parse(args[1]);
         }
         catch (Exception ex)
         {
@@ -270,7 +269,7 @@ internal class SettlementCommands
             return ex.ToString();
         }
 
-        settlement.SetSiegeState(state);
+        settlement.CurrentSiegeState = state;
 
 
         return $"Successfully set the Settlement ({settlementId}) SiegeState to '{siegeState}'";

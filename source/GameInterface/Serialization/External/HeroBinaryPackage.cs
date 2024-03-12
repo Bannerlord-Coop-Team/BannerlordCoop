@@ -19,13 +19,9 @@ namespace GameInterface.Serialization.External
         private string[] exSpousesIds;
         private string spouseId;
         private string[] childrenIds;
-        
-        public static FieldInfo Hero_Father => typeof(Hero).GetField("_father", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static FieldInfo Hero_Mother => typeof(Hero).GetField("_mother", BindingFlags.NonPublic | BindingFlags.Instance);
-        public static FieldInfo Hero_Spouse => typeof(Hero).GetField("_spouse", BindingFlags.NonPublic | BindingFlags.Instance);
+
         public static FieldInfo Hero_ExSpouses => typeof(Hero).GetField("_exSpouses", BindingFlags.NonPublic | BindingFlags.Instance);
         public static FieldInfo Hero_Children => typeof(Hero).GetField("_children", BindingFlags.NonPublic | BindingFlags.Instance);
-
         public HeroBinaryPackage(Hero obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
@@ -50,7 +46,7 @@ namespace GameInterface.Serialization.External
             motherId = Object.Mother?.StringId;
             spouseId = Object.Spouse?.StringId;
 
-            List<Hero> exSpoueses = (List<Hero>)Hero_ExSpouses.GetValue(Object);
+            List<Hero> exSpoueses = Object._exSpouses;
             exSpousesIds = PackIds(exSpoueses);
             childrenIds = PackIds(Object.Children);
         }
@@ -80,14 +76,12 @@ namespace GameInterface.Serialization.External
             base.UnpackFields();
 
             // Set the values of the object's father, mother, spouse, ex-spouses, and children
-            Hero_Father.SetValue(Object, ResolveId<Hero>(fatherId));
-            Hero_Mother.SetValue(Object, ResolveId<Hero>(motherId));
-            Hero_Spouse.SetValue(Object, ResolveId<Hero>(spouseId));
+            Object._father = ResolveId<Hero>(fatherId);
+            Object._mother = ResolveId<Hero>(motherId);
+            Object._spouse = ResolveId<Hero>(spouseId);
 
-            MBList<Hero> exSpouses = new MBList<Hero>(ResolveIds<Hero>(exSpousesIds));
-            Hero_ExSpouses.SetValue(Object, exSpouses);
-            MBList<Hero> children = new MBList<Hero>(ResolveIds<Hero>(childrenIds));
-            Hero_Children.SetValue(Object, children);
+            Hero_ExSpouses.SetValue(Object, new MBList<Hero>(ResolveIds<Hero>(exSpousesIds)));
+            Hero_Children.SetValue(Object, new MBList<Hero>(ResolveIds<Hero>(childrenIds)));
         }
     }
 }

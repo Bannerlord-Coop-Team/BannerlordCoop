@@ -11,8 +11,6 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class StanceLinkBinaryPackage : BinaryPackageBase<StanceLink>
     {
-        public static readonly PropertyInfo StanceLink_Faction1 = typeof(StanceLink).GetProperty(nameof(StanceLink.Faction1));
-        public static readonly PropertyInfo StanceLink_Faction2 = typeof(StanceLink).GetProperty(nameof(StanceLink.Faction2));
 
         private string faction1Id;
         private string faction2Id;
@@ -37,9 +35,8 @@ namespace GameInterface.Serialization.External
         protected override void UnpackInternal()
         {
             base.UnpackFields();
-
-            StanceLink_Faction1.SetValue(Object, ResolveId<Clan>(faction1Id));
-            StanceLink_Faction2.SetValue(Object, ResolveId<Clan>(faction2Id));
+            Object.Faction1 = ResolveId<Clan>(faction1Id);
+            Object.Faction2 = ResolveId<Clan>(faction2Id);
         }
     }
 }
