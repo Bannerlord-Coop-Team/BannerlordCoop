@@ -66,7 +66,7 @@ public class AutoSyncHandler<ObjectType, DataType, NetworkMesage, EventMessage> 
 
     private void Handle_NetworkMessage(MessagePayload<NetworkMesage> payload)
     {
-        if (objectManager.TryGetNonMBObject(payload.What.Data.StringId, out ObjectType obj) == false)
+        if (objectManager.TryGetObject(payload.What.Data.StringId, out ObjectType obj) == false)
         {
             logger.Error("Could not find {objType} with string id {stringId}", typeof(ObjectType), payload.What.Data.StringId);
             return;
