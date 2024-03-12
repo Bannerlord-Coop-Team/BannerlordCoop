@@ -183,6 +183,11 @@ namespace Common.Extensions
             { typeof(bool), () => random.Next(2) > 0 ? true : false },
         };
 
+        /// <summary>
+        /// Returns random value of <typeparamref name="T"/>
+        /// </summary>
+        /// <typeparam name="T">Type of random value</typeparam>
+        /// <returns>Random value of <typeparamref name="T"/> or default of <typeparamref name="T"/> if failed</returns>
         public static T Random<T>()
         {
             if (TryChooseRandomType(typeof(T), out var result))
