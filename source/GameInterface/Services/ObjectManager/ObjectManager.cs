@@ -44,7 +44,7 @@ public interface IObjectManager
     bool TryGetId(object obj, out string id);
 
     /// <summary>
-    /// Attempts to get a <see cref="MBObjectBase"/>-based object using a StringId and object type
+    /// Attempts to get an object using a StringId and object type
     /// </summary>
     /// <typeparam name="T">Type of object</typeparam>
     /// <param name="id">StringId used to lookup object</param>
@@ -52,7 +52,7 @@ public interface IObjectManager
     /// <returns>True if successful, false if failed</returns>
     bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase;
     /// <summary>
-    /// Attempts to get an object not based on <see cref="MBObjectBase"/> object using a StringId and object type
+    /// Attempts to get an non-<see cref="MBObjectBase"/> object using a StringId and object type
     /// </summary>
     /// <typeparam name="T">Type of object</typeparam>
     /// <param name="id">StringId used to lookup object</param>
@@ -187,7 +187,6 @@ internal class ObjectManager : IObjectManager
     public bool TryGetNonMBObject<T>(string id, out T obj) where T : class
     {
         obj = default;
-        if (string.IsNullOrEmpty(id)) return false;
         if (typeof(MBObjectBase).IsAssignableFrom(typeof(T)))
         {
             var result = TryGetObject<MBObjectBase>(id, out var _obj);
