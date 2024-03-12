@@ -71,7 +71,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             testClan._supporterNotablesCache = heroes;
             testClan._companionsCache = heroes;
             testClan._lordsCache = heroes;
-            testClan._supporterNotablesCache = heroes; // Again?
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             ClanBinaryPackage package = new ClanBinaryPackage(testClan, factory);
@@ -97,7 +96,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(heroes, newClan._supporterNotablesCache);
             Assert.Equal(heroes, newClan._companionsCache);
             Assert.Equal(heroes, newClan._lordsCache);
-            Assert.Equal(heroes, newClan._supporterNotablesCache);
         }
 
         [Fact]
