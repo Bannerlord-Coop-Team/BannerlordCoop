@@ -8,17 +8,18 @@ namespace Coop.Core.Client.Services.PartyBases.Handlers
     /// <summary>
     /// Handles NetworkItemRosterUpdate and publishes UpdateItemRoster
     /// </summary>
-    public class NetworkItemRosterUpdateHandler : IHandler
+    public class NetworkItemRosterMessageHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
-        public NetworkItemRosterUpdateHandler(IMessageBroker broker, INetwork network)
+        public NetworkItemRosterMessageHandler(IMessageBroker broker, INetwork network)
         {
             messageBroker = broker;
             this.network = network;
 
             messageBroker.Subscribe<NetworkItemRosterUpdate>(Handle);
+            messageBroker.Subscribe<NetworkItemRosterClear>(Handle);
         }
 
         public void Handle(MessagePayload<NetworkItemRosterUpdate> payload)
@@ -31,9 +32,15 @@ namespace Coop.Core.Client.Services.PartyBases.Handlers
                 );
         }
 
+        public void Handle(MessagePayload<NetworkItemRosterClear> payload)
+        {
+            messageBroker.Publish(this, new ClearItemRoster(payload.What.PartyBaseID));
+        }
+
         public void Dispose()
         {
             messageBroker.Unsubscribe<NetworkItemRosterUpdate>(Handle);
+            messageBroker.Unsubscribe<NetworkItemRosterClear>(Handle);
         }
     }
 }
