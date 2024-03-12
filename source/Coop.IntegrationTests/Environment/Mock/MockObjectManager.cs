@@ -36,13 +36,7 @@ namespace Coop.IntegrationTests.Environment.Mock
             return false;
         }
 
-        public bool TryGetNonMBObject<T>(string id, out T obj) where T : class
-        {
-            obj = default;
-            return false;
-        }
-
-        public bool TryGetObject<T>(string id, out T obj) where T : MBObjectBase
+        public bool TryGetObject<T>(string id, out T obj) where T : class
         {
             obj = default;
             return false;
