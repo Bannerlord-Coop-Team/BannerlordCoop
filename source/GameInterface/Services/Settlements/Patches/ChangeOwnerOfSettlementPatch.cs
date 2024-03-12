@@ -19,7 +19,7 @@ namespace GameInterface.Services.Settlements.Patches
 {
     /// <summary>
     /// Patches ownership changes of settlements
-    /// </summary>ChangeOwnerOfSettlementPatch
+    /// </summary>
     [HarmonyPatch(typeof(ChangeOwnerOfSettlementAction), "ApplyInternal")]
     public class ChangeOwnerOfSettlementPatch
     {    
