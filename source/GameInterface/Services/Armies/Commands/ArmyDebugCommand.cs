@@ -148,7 +148,7 @@ public class ArmyDebugCommand
         }
 
         var armyId = args[0];
-        if (objectManager.TryGetNonMBObject<Army>(armyId, out var army) == false)
+        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
         {
             return $"Unable to get {nameof(Army)} with {armyId}";
         }
@@ -207,7 +207,7 @@ public class ArmyDebugCommand
             return $"Unable to get {nameof(IObjectManager)}";
         }
 
-        if (objectManager.TryGetNonMBObject<Army>(armyId, out var army) == false)
+        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
         {
             return $"Unable to get {nameof(Army)} with {armyId}";
         }
@@ -253,7 +253,7 @@ public class ArmyDebugCommand
         }
 
 
-        if (objectManager.TryGetNonMBObject<Army>(armyId, out var army) == false)
+        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
         {
             return $"Unable to get {nameof(Army)} with {armyId}";
         }
@@ -298,7 +298,7 @@ public class ArmyDebugCommand
         }
 
 
-        if (objectManager.TryGetNonMBObject<Army>(armyId, out var army) == false)
+        if (objectManager.TryGetObject<Army>(armyId, out var army) == false)
         {
             return $"Unable to get {nameof(Army)} with {armyId}";
         }

@@ -42,7 +42,7 @@ internal class MobilePartyDataHandler : IHandler
             return;
         }
 
-        if (objectManager.TryGetNonMBObject(armyId, out Army army) == false)
+        if (objectManager.TryGetObject(armyId, out Army army) == false)
         {
             Logger.Error("Failed to find army with stringId {stringId}", armyId);
             return;

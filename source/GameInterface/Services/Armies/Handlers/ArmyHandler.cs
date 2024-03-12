@@ -40,7 +40,7 @@ public class ArmyHandler : IHandler
             return;
         }
 
-        if (objectManager.TryGetNonMBObject<Army>(data.ArmyStringId, out var army) == false)
+        if (objectManager.TryGetObject<Army>(data.ArmyStringId, out var army) == false)
         {
             Logger.Error("Unable to find Army ({armyId})", data.ArmyStringId);
             return;
@@ -61,7 +61,7 @@ public class ArmyHandler : IHandler
             return;
         }
 
-        if (objectManager.TryGetNonMBObject<Army>(obj.ArmyStringId, out var army) == false)
+        if (objectManager.TryGetObject<Army>(obj.ArmyStringId, out var army) == false)
         {
             Logger.Error("Unable to find Army ({armyId})", obj.ArmyStringId);
             return;

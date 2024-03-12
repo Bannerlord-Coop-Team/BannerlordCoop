@@ -69,7 +69,7 @@ public class ArmyCreationTests : IDisposable
 
         foreach (var client in TestEnvironement.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetNonMBObject<Army>(newArmyStringId, out var newArmy));
+            Assert.True(client.ObjectManager.TryGetObject<Army>(newArmyStringId, out var newArmy));
         }
     }
 
@@ -112,11 +112,11 @@ public class ArmyCreationTests : IDisposable
         });
 
         // Assert
-        Assert.False(server.ObjectManager.TryGetNonMBObject<Army>(newArmyStringId, out var _));
+        Assert.False(server.ObjectManager.TryGetObject<Army>(newArmyStringId, out var _));
 
         foreach (var client in TestEnvironement.Clients)
         {
-            Assert.False(client.ObjectManager.TryGetNonMBObject<Army>(newArmyStringId, out var _));
+            Assert.False(client.ObjectManager.TryGetObject<Army>(newArmyStringId, out var _));
         }
     }
 

@@ -47,7 +47,7 @@ public class ArmyLifetimeHandler : IHandler
         var stringId = payload.What.Data.StringId;
         var reason = (Army.ArmyDispersionReason)payload.What.Data.Reason;
 
-        if(objectManager.TryGetNonMBObject(stringId, out Army army) == false)
+        if(objectManager.TryGetObject(stringId, out Army army) == false)
         {
             Logger.Error("Failed to find army with stringId {stringId}", stringId);
             return;
