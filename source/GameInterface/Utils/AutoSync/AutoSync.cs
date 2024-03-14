@@ -178,7 +178,7 @@ public class PropertySync : IDisposable
     private MethodInfo GeneratePatch<T>(PropertyInfo property, Func<T, string> stringIdGetterFn, Type dataType, Type eventType) where T : class
     {
         var patchGenerator = new HarmonyPatchGenerator(moduleBuilder, property, dataType, eventType);
-        return patchGenerator.GenerateSetterPrefixPatch(property.GetSetMethod(), stringIdGetterFn);
+        return patchGenerator.GenerateSetterPrefixPatch(GetSetMethod(property), stringIdGetterFn);
     }
 
     private Type GenerateDataClass(Type dataType, string propertyName)
