@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using Common;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -7,7 +6,6 @@ using Coop.Core.Client;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
-using Coop.Core.Surrogates;
 using GameInterface;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
@@ -28,7 +26,6 @@ namespace Coop.Core
             // TODO use DI maybe?
             messageBroker = MessageBroker.Instance;
             configuration = new NetworkConfiguration();
-            SurrogateCollection.AssignSurrogates();
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
