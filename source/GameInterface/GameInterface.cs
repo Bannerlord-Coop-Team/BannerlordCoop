@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Surrogates;
+using HarmonyLib;
 using System;
 
 namespace GameInterface;
@@ -13,11 +14,13 @@ public class GameInterface : IGameInterface
 {
     public const string HARMONY_STATIC_FIXES_CATEGORY = "HarmonyStaticFixes";
     
-    private Harmony harmony;
+    private readonly Harmony harmony;
+    private readonly ISurrogateCollection surrogateCollection;
 
-    public GameInterface(Harmony harmony)
+    public GameInterface(Harmony harmony, ISurrogateCollection surrogateCollection)
     {
         this.harmony = harmony;
+        this.surrogateCollection = surrogateCollection;
     }
 
     public void Dispose()
