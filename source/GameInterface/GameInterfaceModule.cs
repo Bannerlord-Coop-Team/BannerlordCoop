@@ -9,6 +9,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Registry;
 using GameInterface.Services.Time;
+using GameInterface.Surrogates;
 using GameInterface.Utils.AutoSync;
 using HarmonyLib;
 
@@ -30,7 +31,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSync>().As<IAutoSync>().InstancePerLifetimeScope();
         
 
