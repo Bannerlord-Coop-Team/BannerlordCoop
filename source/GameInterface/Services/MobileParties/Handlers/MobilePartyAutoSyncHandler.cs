@@ -69,7 +69,7 @@ public class MobilePartyAutoSyncHandler : IHandler
         }
     }
 
-    private static string GetMobilePartyId(MobileParty mobileParty) {
+    public static string GetMobilePartyId(MobileParty mobileParty) {
 
         return mobileParty.StringId;
     }

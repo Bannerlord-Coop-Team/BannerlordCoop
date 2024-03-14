@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Utils.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
@@ -34,7 +35,7 @@ public class MobilePartyPropertiesAutoSyncTest
         var autosync = server.Container.Resolve<IAutoSync>();
 
         var prop = AccessTools.Property(typeof(MobileParty), nameof(MobileParty.CustomName));
-        autosync.SyncProperty<MobileParty>(prop, party => party.StringId);
+        autosync.SyncProperty<MobileParty>(prop, MobilePartyAutoSyncHandler.GetMobilePartyId);
 
 
         // Act
