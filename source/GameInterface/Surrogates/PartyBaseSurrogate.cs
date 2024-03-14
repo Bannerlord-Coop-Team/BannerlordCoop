@@ -20,7 +20,7 @@ internal struct PartyBaseSurrogate
 
     public PartyBaseSurrogate(PartyBase partyBase)
     {
-        StringId = partyBase.MobileParty.StringId;
+        StringId = partyBase.Id;
         IsParty = partyBase.IsMobile;
     }
 

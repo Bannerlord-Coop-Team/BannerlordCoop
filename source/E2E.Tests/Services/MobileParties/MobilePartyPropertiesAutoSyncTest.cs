@@ -1,9 +1,11 @@
 ﻿using Autofac;
+using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Utils.AutoSync;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Library;
@@ -35,7 +37,7 @@ public class MobilePartyPropertiesAutoSyncTest
         var autosync = server.Container.Resolve<IAutoSync>();
 
         var prop = AccessTools.Property(typeof(MobileParty), nameof(MobileParty.CustomName));
-        autosync.SyncProperty<MobileParty>(prop, MobilePartyAutoSyncHandler.GetMobilePartyId);
+        //autosync.SyncProperty<MobileParty>(prop, MobilePartyAutoSyncHandler.GetMobilePartyId);
 
 
         // Act
@@ -46,8 +48,10 @@ public class MobilePartyPropertiesAutoSyncTest
             {
                 partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
             });
-
             partyId = party.StringId;
+            //party.CustomName = new TaleWorlds.Localization.TextObject(1232);
+
+            //party.Army = ObjectHelper.SkipConstructor<Army>();
 
         });
 

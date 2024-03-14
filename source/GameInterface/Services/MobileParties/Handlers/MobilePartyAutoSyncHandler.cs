@@ -15,9 +15,9 @@ public class MobilePartyAutoSyncHandler : IHandler
     {
         var properties = new HashSet<PropertyInfo>()
         {
-            AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Army)),
-            AccessTools.Property(typeof(MobileParty), nameof(MobileParty.CustomName)),
-            AccessTools.Property(typeof(MobileParty), nameof(MobileParty.LastVisitedSettlement)),
+           AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Army)),
+          //  AccessTools.Property(typeof(MobileParty), nameof(MobileParty.CustomName)),
+       /*     AccessTools.Property(typeof(MobileParty), nameof(MobileParty.LastVisitedSettlement)),
             AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Aggressiveness)),
             AccessTools.Property(typeof(MobileParty), nameof(MobileParty.ArmyPositionAdder)),
             AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Objective)),
@@ -59,13 +59,13 @@ public class MobilePartyAutoSyncHandler : IHandler
             AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsGarrison)), 
             AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsCustomParty)), 
 
-            AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsBandit)), 
+            AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsBandit)), */
     };
 
 
         foreach (var property in properties)
         {
-         //   autoSync.SyncProperty<MobileParty>(property, GetMobilePartyId);
+            autoSync.SyncProperty<MobileParty>(property, GetMobilePartyId);
         }
     }
 
