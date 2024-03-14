@@ -25,7 +25,7 @@ public interface IAutoSync : IDisposable
 /// <inheritdoc cref="IAutoSync"/>
 internal class AutoSync : IAutoSync
 {
-    private readonly Harmony harmony;
+    private static readonly Harmony harmony = new Harmony("Coop.AutoSync");
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
@@ -39,9 +39,8 @@ internal class AutoSync : IAutoSync
 
     
 
-    public AutoSync(Harmony harmony, INetwork network, IMessageBroker messageBroker, IObjectManager objectManager, ISerializableTypeMapper typeMapper)
+    public AutoSync(INetwork network, IMessageBroker messageBroker, IObjectManager objectManager, ISerializableTypeMapper typeMapper)
     {
-        this.harmony = harmony;
         this.network = network;
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -81,6 +80,8 @@ public class PropertySync : IDisposable
     private readonly ISerializableTypeMapper typeMapper;
     private IAutoSyncHandlerTemplate handler;
 
+    private List<(MethodInfo, MethodInfo)> PatchedMethods = new();
+
     /// <summary>
     /// Initializes a new instance of the <see cref="PropertySync"/> class.
     /// </summary>
@@ -111,6 +112,11 @@ public class PropertySync : IDisposable
     /// </summary>
     public void Dispose()
     {
+        foreach(var patch in PatchedMethods)
+        {
+            harmony.Unpatch(patch.Item1, patch.Item2);
+        }
+
         handler?.Dispose();
     }
 
@@ -147,7 +153,8 @@ public class PropertySync : IDisposable
 
         typeMapper.AddTypes(serializableTypes);
 
-        harmony.Patch(setMethod, prefix: new HarmonyMethod(patchMethod));
+        var patchedMethod = harmony.Patch(setMethod, prefix: new HarmonyMethod(patchMethod));
+        PatchedMethods.Add((setMethod, patchedMethod));
 
         var result = new SyncResults
         {
