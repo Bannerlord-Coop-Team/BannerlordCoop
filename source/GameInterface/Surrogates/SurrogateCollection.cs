@@ -1,4 +1,5 @@
 ﻿using ProtoBuf.Meta;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
 namespace GameInterface.Surrogates;
@@ -14,5 +15,6 @@ internal class SurrogateCollection : ISurrogateCollection
     public SurrogateCollection()
     {
         RuntimeTypeModel.Default.Add(typeof(Vec2), false).SetSurrogate(typeof(Vec2Surrogate));
+        RuntimeTypeModel.Default.Add(typeof(Army), false).SetSurrogate(typeof(ArmySurrogate));
     }
 }
