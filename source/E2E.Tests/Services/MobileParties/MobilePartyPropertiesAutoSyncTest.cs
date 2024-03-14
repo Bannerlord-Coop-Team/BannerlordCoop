@@ -42,6 +42,7 @@ public class MobilePartyPropertiesAutoSyncTest
 
         // Act
         string? partyId = null;
+        var customName = new TaleWorlds.Localization.TextObject("abc");
         server.Call(() =>
         {
             var party = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
@@ -49,7 +50,7 @@ public class MobilePartyPropertiesAutoSyncTest
                 partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
             });
             partyId = party.StringId;
-            //party.CustomName = new TaleWorlds.Localization.TextObject(1232);
+            party.CustomName = customName;
 
             //party.Army = ObjectHelper.SkipConstructor<Army>();
 
@@ -61,6 +62,9 @@ public class MobilePartyPropertiesAutoSyncTest
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
+
+            Assert.True(newParty.CustomName.Value == customName.Value);
+
         }
     }
 

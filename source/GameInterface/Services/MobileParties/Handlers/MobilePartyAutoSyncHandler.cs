@@ -16,7 +16,7 @@ public class MobilePartyAutoSyncHandler : IHandler
         var properties = new HashSet<PropertyInfo>()
         {
            AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Army)),
-          //  AccessTools.Property(typeof(MobileParty), nameof(MobileParty.CustomName)),
+           AccessTools.Property(typeof(MobileParty), nameof(MobileParty.CustomName)),
        /*     AccessTools.Property(typeof(MobileParty), nameof(MobileParty.LastVisitedSettlement)),
             AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Aggressiveness)),
             AccessTools.Property(typeof(MobileParty), nameof(MobileParty.ArmyPositionAdder)),
