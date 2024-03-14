@@ -29,6 +29,7 @@ internal class E2ETestEnvironment : IDisposable
     
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
+        ModInformation.IsServer = true;
         GameLoopRunner.Instance.SetGameLoopThread();
 
         GameBootStrap.Initialize();
