@@ -9,7 +9,7 @@ namespace GameInterface.Services.MobileParties.Handlers;
 
 
 /// <summary>
-/// TODO
+/// Handler for attached mobile parties
 /// </summary>
 internal class MobilePartyAttachedPartyHandler : IHandler
 {
