@@ -30,6 +30,36 @@ public class HeroDebugCommand
         return stringBuilder.ToString();
     }
 
+
+
+    // coop.debug.hero.add_children hero child
+    [CommandLineArgumentFunction("add_children", "coop.debug.hero")]
+    public static string Add(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.hero.add_children <heroId> <childid>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+        if (objectManager.TryGetObject<Hero>(args[1], out var childHero) == false)
+        {
+            return $"Unable to find hero with id: {args[1]}";
+        }
+
+        childHero.Father = hero;
+
+        return "Successfully added children";
+    }
+
     // coop.debug.hero.info
     [CommandLineArgumentFunction("info", "coop.debug.hero")]
     public static string Info(List<string> args)

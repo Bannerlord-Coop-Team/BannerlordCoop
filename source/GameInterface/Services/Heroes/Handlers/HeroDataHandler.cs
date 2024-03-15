@@ -1,5 +1,7 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
@@ -27,14 +29,40 @@ internal class HeroDataHandler : IHandler
         this.objectManager = objectManager;
 
         messageBroker.Subscribe<ChangeHeroName>(Handle_HeroChangeName);
-        
+        messageBroker.Subscribe<AddNewChildren>(Handle_AddChildren);
+
     }
 
     public void Dispose()
     {
-        messageBroker?.Unsubscribe<ChangeHeroName>(Handle_HeroChangeName);
+        messageBroker.Unsubscribe<ChangeHeroName>(Handle_HeroChangeName);
+        messageBroker.Unsubscribe<AddNewChildren>(Handle_AddChildren);
     }
+    private void Handle_AddChildren(MessagePayload<AddNewChildren> payload)
+    {
+        var obj = payload.What;
 
+        if (objectManager.TryGetObject<Hero>(obj.HeroId, out var father) == false)
+        {
+            Logger.Error("Unable to get {type} from id {stringId}", typeof(Hero), obj.HeroId);
+            return;
+        }
+
+        if (objectManager.TryGetObject<Hero>(obj.ChildId, out var child) == false)
+        {
+            Logger.Error("Unable to get {type} from id {stringId}", typeof(Hero), obj.HeroId);
+            return;
+        }
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                father._children.Add(child);
+            }
+        });
+
+    }
     private void Handle_HeroChangeName(MessagePayload<ChangeHeroName> payload)
     {
         var data = payload.What.Data;

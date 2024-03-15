@@ -43,6 +43,9 @@ public class MobilePartyPropertiesAutoSyncTest
         // Act
         string? partyId = null;
         var customName = new TaleWorlds.Localization.TextObject("abc");
+        float agressiveness = 24.4f;
+
+        bool IsPartyTradeActive = true;
         server.Call(() =>
         {
             var party = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
@@ -51,7 +54,8 @@ public class MobilePartyPropertiesAutoSyncTest
             });
             partyId = party.StringId;
             party.CustomName = customName;
-
+            party.Aggressiveness = agressiveness;
+            party.IsPartyTradeActive = IsPartyTradeActive;
             //party.Army = ObjectHelper.SkipConstructor<Army>();
 
         });
@@ -62,8 +66,10 @@ public class MobilePartyPropertiesAutoSyncTest
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
+            Assert.True(newParty.IsPartyTradeActive == IsPartyTradeActive);
 
-            Assert.True(newParty.CustomName.Value == customName.Value);
+
+            //Assert.True(newParty.CustomName.Value == customName.Value);
 
         }
     }

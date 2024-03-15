@@ -32,12 +32,22 @@ internal class ServerHeroHandler : IHandler
         this.configuration = configuration;
         messageBroker.Subscribe<HeroCreated>(Handle_HeroCreated);
         messageBroker.Subscribe<HeroNameChanged>(Handle_HeroNameChanged);
+        messageBroker.Subscribe<NewChildrenAdded>(Handle_ChildrenAdded);
+
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<HeroCreated>(Handle_HeroCreated);
         messageBroker.Unsubscribe<HeroNameChanged>(Handle_HeroNameChanged);
+        messageBroker.Unsubscribe<NewChildrenAdded>(Handle_ChildrenAdded);
+
+    }
+
+    private void Handle_ChildrenAdded(MessagePayload<NewChildrenAdded> obj)
+    {
+        var payload = obj.What;
+        server.SendAll(new NetworkNewChildrenAdded(payload.HeroId, payload.ChildId));
     }
 
     private void Handle_HeroCreated(MessagePayload<HeroCreated> obj)

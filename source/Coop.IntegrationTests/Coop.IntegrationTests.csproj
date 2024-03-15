@@ -44,8 +44,8 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Publicize Include="TaleWorlds.CampaignSystem"/>
-    <Publicize Include="TaleWorlds.Library"/>
-    <Publicize Include="TaleWorlds.ObjectSystem"/>
+    <Publicize Include="TaleWorlds.CampaignSystem" />
+    <Publicize Include="TaleWorlds.Library" />
+    <Publicize Include="TaleWorlds.ObjectSystem" />
   </ItemGroup>
 </Project>
