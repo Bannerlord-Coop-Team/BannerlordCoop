@@ -123,7 +123,7 @@ namespace GameInterface
                 return errorMsg;
             }
         }
-        public abstract IEnumerable<AuditData> Objects {get;}
+        public abstract IEnumerable<AuditingType> Objects {get;}
         public abstract IEnumerable<AuditData> GetAuditData();
         public virtual string DoAuditData(IEnumerable<IAuditData> dataToAudit)
         {
