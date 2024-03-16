@@ -76,14 +76,14 @@ namespace GameInterface
             stringBuilder.AppendLine(payload.What.ServerAuditResult);
 
             stringBuilder.AppendLine("Client Audit Result:");
-            stringBuilder.AppendLine(DoAuditData(auditDatas));
+            stringBuilder.AppendLine(DoAuditData(auditDatas.Cast<AuditData>()));
 
             tcs.SetResult(stringBuilder.ToString());
         }
 
         private void Handle_Request(MessagePayload<Request> payload)
         {
-            var serverAuditResult = DoAuditData(payload.What.Data);
+            var serverAuditResult = DoAuditData(payload.What.Data.Cast<AuditData>());
             var response = CreateResponseInstance(GetAuditData(), serverAuditResult);
             network.Send((NetPeer)payload.Who, response);
         }
@@ -125,7 +125,7 @@ namespace GameInterface
         }
         public abstract IEnumerable<AuditingType> Objects {get;}
         public abstract IEnumerable<AuditData> GetAuditData();
-        public virtual string DoAuditData(IEnumerable<IAuditData> dataToAudit)
+        public virtual string DoAuditData(IEnumerable<AuditData> dataToAudit)
         {
             var typeName = typeof(AuditingType).Name;
             var stringBuilder = new StringBuilder();
@@ -142,17 +142,29 @@ namespace GameInterface
 
             foreach (var audit in dataToAudit)
             {
-                if (objectManager.TryGetObject<AuditingType>(audit.StringId, out var _) == false)
+                if (objectManager.TryGetObject<AuditingType>(audit.StringId, out var obj) == false)
                 {
                     Logger.Error($"{typeName} {audit.Name} not found in {objectManager.GetType().Name}");
                     stringBuilder.AppendLine($"MobileParty {audit} not found in {nameof(IObjectManager)}");
                     errorCount++;
+                }
+                else
+                {
+                    errorCount += CompareObjects(stringBuilder, audit, obj);
                 }
             }
 
             stringBuilder.AppendLine($"Found {errorCount} errors in {dataToAudit.Count()} objects");
 
             return stringBuilder.ToString();
+        }
+        /// <summary>
+        /// Compares fields and properties
+        /// </summary>
+        /// <returns>Returns count of errors</returns>
+        public virtual int CompareObjects(StringBuilder stringBuilder, AuditData data, AuditingType obj)
+        {
+            return 0;
         }
         public abstract Response CreateResponseInstance(IEnumerable<AuditData> par1, string par2);
         public abstract Request CreateRequestInstance(IEnumerable<AuditData> par1);

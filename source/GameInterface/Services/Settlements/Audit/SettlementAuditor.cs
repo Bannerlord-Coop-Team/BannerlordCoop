@@ -31,7 +31,7 @@ internal class SettlementAuditor : Auditor<RequestSettlementAudit, SettlementAud
     }
     public override IEnumerable<Settlement> Objects => Campaign.Current.CampaignObjectManager.Settlements;
 
-    public override string DoAuditData(IEnumerable<IAuditData> dataToAudit)
+    public override string DoAuditData(IEnumerable<SettlementAuditData> dataToAudit)
     {
 
         var sb = new StringBuilder();
