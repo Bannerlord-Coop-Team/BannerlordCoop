@@ -84,7 +84,7 @@ namespace GameInterface
         private void Handle_Request(MessagePayload<Request> payload)
         {
             var serverAuditResult = DoAuditData(payload.What.Data);
-            var response = CreateRequstInstance(GetAuditData(), serverAuditResult);
+            var response = CreateRequestInstance(GetAuditData(), serverAuditResult);
             network.Send((NetPeer)payload.Who, response);
         }
 
@@ -154,6 +154,6 @@ namespace GameInterface
 
             return stringBuilder.ToString();
         }
-        public abstract Request CreateRequstInstance(IEnumerable<AuditData> par1, string par2);
+        public abstract Request CreateRequestInstance(IEnumerable<AuditData> par1, string par2);
     }
 }
