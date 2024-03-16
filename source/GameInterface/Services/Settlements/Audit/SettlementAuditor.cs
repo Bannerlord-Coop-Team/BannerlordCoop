@@ -19,7 +19,7 @@ namespace GameInterface.Services.Settlements.Audit;
 /// <summary>
 /// Auditor for <see cref="Settlement"/> objects
 /// </summary>
-internal class SettlementAuditor : Auditor<ProcessSettlementAudit, SettlementAuditResponse, Settlement, SettlementAuditData, SettlementAuditor>
+internal class SettlementAuditor : Auditor<RequestSettlementAudit, SettlementAuditResponse, Settlement, SettlementAuditData, SettlementAuditor>
 {
     public SettlementAuditor(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, INetworkConfiguration configuration) : base(messageBroker, network, objectManager, configuration)
     {
@@ -43,7 +43,7 @@ internal class SettlementAuditor : Auditor<ProcessSettlementAudit, SettlementAud
 
         if(SettlementCount != dataToAudit.Count())
         {
-            Logger.Error("Settlement count mismatch: {ArmyCount} != {dataToAudit.Length}", SettlementCount, dataToAudit.Count());
+            Logger.Error("Settlement count mismatch: {SettlementCount} != {dataToAudit.Length}", SettlementCount, dataToAudit.Count());
             sb.AppendLine($"Settlement count mismatch: {SettlementCount} != {dataToAudit.Count()}");
         }
 
@@ -250,8 +250,8 @@ internal class SettlementAuditor : Auditor<ProcessSettlementAudit, SettlementAud
         return new SettlementAuditResponse(par1.ToArray(), par2);
     }
 
-    public override ProcessSettlementAudit CreateRequestInstance(IEnumerable<SettlementAuditData> par1)
+    public override RequestSettlementAudit CreateRequestInstance(IEnumerable<SettlementAuditData> par1)
     {
-        return new ProcessSettlementAudit(par1.ToArray());
+        return new RequestSettlementAudit(par1.ToArray());
     }
 }
