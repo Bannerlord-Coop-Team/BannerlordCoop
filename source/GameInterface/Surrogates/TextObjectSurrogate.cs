@@ -9,7 +9,7 @@ namespace GameInterface.Surrogates;
 internal struct TextObjectSurrogate
 {
     [ProtoMember(1)]
-    public string Value { get; }
+    public string Value { get; set; }
 
     public TextObjectSurrogate(TextObject textObject)
     {

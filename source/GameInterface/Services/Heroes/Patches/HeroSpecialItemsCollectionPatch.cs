@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using HarmonyLib;
+using SandBox.Missions.MissionLogics;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -15,15 +16,12 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.Heroes.Patches;
 
 [HarmonyPatch]
+[HarmonyDebug]
 internal class HeroSpecialItemsCollectionPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroSpecialItemsCollectionPatch>();
-    /*
-    private static IEnumerable<MethodBase> TargetMethods()
-    {
-        return AccessTools.GetDeclaredMethods(typeof(Hero));
-    }
-
+    
+    [HarmonyPatch(typeof(SearchBodyMissionHandler), methodName: "AddItemsToPlayer")]
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ExSpousesTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -37,7 +35,7 @@ internal class HeroSpecialItemsCollectionPatch
             if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == listAddMethod)
             {
                 // Load instance onto stack
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
+                yield return new CodeInstruction(OpCodes.Ldarg_1);
                 // Replace our add call with our intercept function (line above adds instance to the parameters, specifically as the last parameter by adding it to the stack)
                 yield return new CodeInstruction(OpCodes.Call, listAddOverrideMethod);
             }
@@ -71,5 +69,5 @@ internal class HeroSpecialItemsCollectionPatch
 
         _specialItems.Add(specialItem);
     }
-    */
+    
 }
