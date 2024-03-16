@@ -39,13 +39,13 @@ namespace GameInterface
         where AuditData : IAuditData
 
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<LoggerType>();
+        protected static readonly ILogger Logger = LogManager.GetLogger<LoggerType>();
 
-        private readonly IMessageBroker messageBroker;
-        private readonly INetwork network;
-        private readonly IObjectManager objectManager;
-        private readonly INetworkConfiguration configuration;
-        private TaskCompletionSource<string> tcs;
+        protected readonly IMessageBroker messageBroker;
+        protected readonly INetwork network;
+        protected readonly IObjectManager objectManager;
+        protected readonly INetworkConfiguration configuration;
+        protected TaskCompletionSource<string> tcs;
 
         public Auditor(
             IMessageBroker messageBroker,
