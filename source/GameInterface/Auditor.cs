@@ -25,7 +25,7 @@ namespace GameInterface
     }
     public interface IAuditRequest : ICommand
     {
-        public IEnumerable<IAuditData> Data { get; }
+        public IAuditData[] Data { get; }
     }
     public interface IAuditData
     {
@@ -33,10 +33,10 @@ namespace GameInterface
         public string StringId { get; }
     }
     public abstract class Auditor<Request, Response, AuditingType, AuditData, LoggerType> : IAuditor 
-        where Request : IAuditRequest, new()
-        where Response : IAuditResponse, new()
+        where Request : IAuditRequest
+        where Response : IAuditResponse
         where AuditingType : class
-        where AuditData : IAuditData, new()
+        where AuditData : IAuditData
 
     {
         private static readonly ILogger Logger = LogManager.GetLogger<LoggerType>();
@@ -84,7 +84,7 @@ namespace GameInterface
         private void Handle_Request(MessagePayload<Request> payload)
         {
             var serverAuditResult = DoAuditData(payload.What.Data);
-            var response = CreateRequestInstance(GetAuditData(), serverAuditResult);
+            var response = CreateResponseInstance(GetAuditData(), serverAuditResult);
             network.Send((NetPeer)payload.Who, response);
         }
 
@@ -105,7 +105,7 @@ namespace GameInterface
                 tcs.TrySetCanceled();
             });
 
-            var request = new Request();
+            var request = CreateRequestInstance(GetAuditData());
 
             network.SendAll(request);
 
@@ -154,6 +154,7 @@ namespace GameInterface
 
             return stringBuilder.ToString();
         }
-        public abstract Request CreateRequestInstance(IEnumerable<AuditData> par1, string par2);
+        public abstract Response CreateResponseInstance(IEnumerable<AuditData> par1, string par2);
+        public abstract Request CreateRequestInstance(IEnumerable<AuditData> par1);
     }
 }
