@@ -12,7 +12,7 @@ namespace GameInterface.Services.Settlements.Audit;
 /// Audit data for a settlement
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record SettlementAuditData
+public record SettlementAuditData : IAuditData
 {
     [ProtoMember(1)]
     public string StringId { get; }
@@ -50,6 +50,7 @@ public record SettlementAuditData
     public int CanBeClaimed { get; }
     [ProtoMember(18)]
     public float[] WallSectionHitPointsRatioList {get;}
+    public string Name => StringId;
 
     // TODO: add more fields/properties for now this will suffice
 

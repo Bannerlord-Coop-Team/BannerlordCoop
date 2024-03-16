@@ -19,114 +19,35 @@ namespace GameInterface.Services.Settlements.Audit;
 /// <summary>
 /// Auditor for <see cref="Settlement"/> objects
 /// </summary>
-internal class SettlementAuditor : IAuditor
+internal class SettlementAuditor : Auditor<ProcessSettlementAudit, SettlementAuditResponse, Settlement, SettlementAuditData, SettlementAuditor>
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<SettlementAuditor>();
-
-    private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
-    private readonly IObjectManager objectManager;
-    private readonly INetworkConfiguration configuration;
-    private TaskCompletionSource<string> tcs;
-
-    public SettlementAuditor(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, INetworkConfiguration configuration)
+    public SettlementAuditor(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, INetworkConfiguration configuration) : base(messageBroker, network, objectManager, configuration)
     {
-        this.messageBroker = messageBroker;
-        this.network = network;
-        this.objectManager = objectManager;
-        this.configuration = configuration;
-
-        messageBroker.Subscribe<ProcessSettlementAudit>(Handle_Request);
-        messageBroker.Subscribe<SettlementAuditResponse>(Handle_Response);
-
-    }
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<ProcessSettlementAudit>(Handle_Request);
-        messageBroker.Unsubscribe<SettlementAuditResponse>(Handle_Response);
     }
 
-
-    private void Handle_Response(MessagePayload<SettlementAuditResponse> payload)
+    public override IEnumerable<SettlementAuditData> GetAuditData()
     {
-        var stringBuilder = new StringBuilder();
-        var auditDatas = payload.What.Data;
-
-        stringBuilder.AppendLine("Server Audit Results:");
-        stringBuilder.AppendLine(payload.What.ServerAuditResults);
-
-        stringBuilder.AppendLine("CLient Audit Results:");
-        stringBuilder.AppendLine(AuditData(auditDatas));
-
-        tcs.SetResult(stringBuilder.ToString());
+        return Objects.Select(h => new SettlementAuditData(h)).ToArray();
     }
+    public override IEnumerable<Settlement> Objects => Campaign.Current.CampaignObjectManager.Settlements;
 
-    private void Handle_Request(MessagePayload<ProcessSettlementAudit> payload)
-    {
-        var serverAuditResult = AuditData(payload.What.Data);
-        var response = new SettlementAuditResponse(GetAuditData(), serverAuditResult);
-        messageBroker.Publish(this, response);
-
-    }
-
-    public string Audit()
-    {
-        if(ModInformation.IsServer)
-        {
-            var errorMsg = "Audit is only client side";
-            Logger.Error(errorMsg);
-            return errorMsg;
-        }
-
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        tcs = new TaskCompletionSource<string>();
-
-        cts.Token.Register(() =>
-        {
-            tcs.TrySetCanceled();
-        });
-
-        var request = new RequestSettlementAudit(GetAuditData());
-
-        network.SendAll(request);
-
-        try
-        {
-            tcs.Task.Wait();
-            return tcs.Task.Result;
-
-        }catch (AggregateException ex)
-        {
-            if (ex.InnerException is TaskCanceledException == false) throw ex;
-
-            var errorMsg = "Audit timed out";
-            Logger.Error(errorMsg);
-            return errorMsg;
-        }
-    }
-    private SettlementAuditData[] GetAuditData()
-    {
-        return GetSettlements().Select(h => new SettlementAuditData(h)).ToArray();
-    }
-    private IEnumerable<Settlement> GetSettlements() => Campaign.Current.CampaignObjectManager.Settlements;
-
-    private string AuditData(SettlementAuditData[] dataToAudit)
+    public override string DoAuditData(IEnumerable<IAuditData> dataToAudit)
     {
 
         var sb = new StringBuilder();
         var errorCountObjectFound = 0;
 
-        var SettlementCount = GetSettlements().Count();
+        var SettlementCount = Objects.Count();
 
         sb.AppendLine($"Auditing {SettlementCount} objects");
 
-        if(SettlementCount != dataToAudit.Length)
+        if(SettlementCount != dataToAudit.Count())
         {
-            Logger.Error("Settlement count mismatch: {ArmyCount} != {dataToAudit.Length}", SettlementCount, dataToAudit.Length);
-            sb.AppendLine($"Settlement count mismatch: {SettlementCount} != {dataToAudit.Length}");
+            Logger.Error("Settlement count mismatch: {ArmyCount} != {dataToAudit.Length}", SettlementCount, dataToAudit.Count());
+            sb.AppendLine($"Settlement count mismatch: {SettlementCount} != {dataToAudit.Count()}");
         }
 
-        foreach(var audit in dataToAudit)
+        foreach(var audit in dataToAudit.Cast<SettlementAuditData>())
         {
             var errorNumberOfEnemiesSpottedAround = 0;
             var errorNumberOfAlliesSpottedAround = 0;
@@ -318,10 +239,19 @@ internal class SettlementAuditor : IAuditor
 
         }
 
-        sb.AppendLine($"Found {errorCountObjectFound} errors in {dataToAudit.Length} objects");
+        sb.AppendLine($"Found {errorCountObjectFound} errors in {dataToAudit.Count()} objects");
 
 
         return sb.ToString();
     }
 
+    public override SettlementAuditResponse CreateResponseInstance(IEnumerable<SettlementAuditData> par1, string par2)
+    {
+        return new SettlementAuditResponse(par1.ToArray(), par2);
+    }
+
+    public override ProcessSettlementAudit CreateRequestInstance(IEnumerable<SettlementAuditData> par1)
+    {
+        return new ProcessSettlementAudit(par1.ToArray());
+    }
 }
