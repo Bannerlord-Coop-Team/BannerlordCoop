@@ -5,10 +5,12 @@ using ProtoBuf;
 namespace GameInterface.Services.Heroes.Audit;
 
 [ProtoContract(SkipConstructor = true)]
-internal record RequestHeroAudit : ICommand
+internal record RequestHeroAudit : IAuditRequest
 {
     [ProtoMember(1)]
     public HeroAuditData[] Data { get; }
+
+    IAuditData[] IAuditRequest.Data => Data;
 
     public RequestHeroAudit(HeroAuditData[] data)
     {
