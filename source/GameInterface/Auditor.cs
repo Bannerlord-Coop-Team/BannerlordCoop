@@ -32,14 +32,14 @@ namespace GameInterface
         public string Name { get; }
         public string StringId { get; }
     }
-    public abstract class Auditor<Request, Response, AuditingType, AuditData> : IAuditor 
+    public abstract class Auditor<Request, Response, AuditingType, AuditData, LoggerType> : IAuditor 
         where Request : IAuditRequest, new()
         where Response : IAuditResponse, new()
         where AuditingType : class
         where AuditData : IAuditData, new()
 
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<ArmyAuditor>();
+        private static readonly ILogger Logger = LogManager.GetLogger<LoggerType>();
 
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
