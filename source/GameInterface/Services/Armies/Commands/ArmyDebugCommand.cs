@@ -1,5 +1,6 @@
 ﻿using Common.Extensions;
 using Common.Messaging;
+using GameInterface.Services.Armies.Audit;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
@@ -309,6 +310,15 @@ public class ArmyDebugCommand
         
         return stringBuilder.ToString();
     }
+    [CommandLineArgumentFunction("audit", "coop.debug.army")]
+    public static string AuditArmies(List<string> args)
+    {
+        if (ContainerProvider.TryResolve<ArmyAuditor>(out var auditor) == false)
+        {
+            return $"Unable to get {nameof(ArmyAuditor)}";
+        }
 
+        return auditor.Audit();
+    }
 
 }
