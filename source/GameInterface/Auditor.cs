@@ -67,7 +67,7 @@ namespace GameInterface
             messageBroker.Unsubscribe<Response>(Handle_Response);
         }
 
-        private void Handle_Response(MessagePayload<Response> payload)
+        protected virtual void Handle_Response(MessagePayload<Response> payload)
         {
             var stringBuilder = new StringBuilder();
             var auditDatas = payload.What.Data;
@@ -81,14 +81,14 @@ namespace GameInterface
             tcs.SetResult(stringBuilder.ToString());
         }
 
-        private void Handle_Request(MessagePayload<Request> payload)
+        protected virtual void Handle_Request(MessagePayload<Request> payload)
         {
             var serverAuditResult = DoAuditData(payload.What.Data.Cast<AuditData>());
             var response = CreateResponseInstance(GetAuditData(), serverAuditResult);
             network.Send((NetPeer)payload.Who, response);
         }
 
-        public string Audit()
+        public virtual string Audit()
         {
             if (ModInformation.IsServer)
             {
