@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
@@ -28,8 +29,18 @@ namespace GameInterface.Services.Heroes.Handlers
 
             messageBroker.Subscribe<ChangeLastTimeStamp>(Handle);
             messageBroker.Subscribe<ChangeCharacterObject>(Handle);
+            messageBroker.Subscribe<ChangeFirstName>(Handle);
         }
 
+        private void Handle(MessagePayload<ChangeFirstName> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance._firstName = new TextObject(data.NewName);
+        }
         private void Handle(MessagePayload<ChangeCharacterObject> payload)
         {
             var data = payload.What;
@@ -44,7 +55,6 @@ namespace GameInterface.Services.Heroes.Handlers
 
             instance._characterObject = character;
         }
-
         private void Handle(MessagePayload<ChangeLastTimeStamp> payload)
         {
             var data = payload.What;

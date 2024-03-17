@@ -42,5 +42,21 @@ namespace Coop.IntegrationTests.Heroes
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeCharacterObject>());
             }
         }
+        [Fact]
+        public void ServerRecievesFirstNameChangedChanged()
+        {
+            var triggerMessage = new FirstNameChanged("testChar", "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkFirstNameChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeFirstName>());
+            }
+        }
     }
 }

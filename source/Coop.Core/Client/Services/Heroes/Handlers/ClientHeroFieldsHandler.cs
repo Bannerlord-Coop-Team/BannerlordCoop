@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Messages;
+using System;
 
 namespace Coop.Core.Client.Services.Heroes.Handlers
 {
@@ -17,6 +18,13 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
             this.messageBroker = messageBroker;
             messageBroker.Subscribe<NetworkLastTimeStampChanged>(Handle);
             messageBroker.Subscribe<NetworkCharacterObjectChanged>(Handle);
+            messageBroker.Subscribe<NetworkFirstNameChanged>(Handle);
+        }
+
+        private void Handle(MessagePayload<NetworkFirstNameChanged> payload)
+        {
+            var data = payload.What;
+            messageBroker.Publish(this, new ChangeFirstName(data.NewName, data.HeroId));
         }
 
         private void Handle(MessagePayload<NetworkCharacterObjectChanged> payload)

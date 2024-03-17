@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches
 {
@@ -99,6 +100,45 @@ namespace GameInterface.Services.Heroes.Patches
             MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject.StringId, instance.StringId));
 
             instance._characterObject = newCharacterObject;
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == firstNameField)
+                {
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+
+        public static void FirstNameIntercept(TextObject newName, Hero instance)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._firstName = newName;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance._firstName = newName;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance.StringId));
+
+            instance._firstName = newName;
         }
     }
 }

@@ -20,6 +20,12 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             this.network = network;
             messageBroker.Subscribe<LastTimeStampChanged>(Handle);
             messageBroker.Subscribe<CharacterObjectChanged>(Handle);
+            messageBroker.Subscribe<FirstNameChanged>(Handle);
+        }
+        private void Handle(MessagePayload<FirstNameChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkFirstNameChanged(data.NewName, data.HeroId));
         }
         private void Handle(MessagePayload<CharacterObjectChanged> payload)
         {
