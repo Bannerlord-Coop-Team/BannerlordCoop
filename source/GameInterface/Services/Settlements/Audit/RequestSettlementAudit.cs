@@ -8,10 +8,12 @@ namespace GameInterface.Services.Settlements.Audit;
 /// To request an settlement audit
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record RequestSettlementAudit : ICommand
+public record RequestSettlementAudit : IAuditRequest
 {
     [ProtoMember(1)]
     public SettlementAuditData[] Data { get; }
+
+    IAuditData[] IAuditRequest.Data => Data;
 
     public RequestSettlementAudit(SettlementAuditData[] data)
     {
