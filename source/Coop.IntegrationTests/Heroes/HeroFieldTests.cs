@@ -2,11 +2,6 @@
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Heroes.Messages;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Coop.IntegrationTests.Heroes
 {
@@ -29,6 +24,22 @@ namespace Coop.IntegrationTests.Heroes
             foreach(EnvironmentInstance client in TestEnvironment.Clients)
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeLastTimeStamp>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesCharacterObjectChanged()
+        {
+            var triggerMessage = new CharacterObjectChanged("testChar", "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkCharacterObjectChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeCharacterObject>());
             }
         }
     }

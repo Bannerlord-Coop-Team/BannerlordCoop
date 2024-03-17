@@ -14,24 +14,35 @@ namespace GameInterface.Services.Heroes.Handlers
     /// <summary>
     /// Handler for LastTimeStampForActivity
     /// </summary>
-    public class LastTimeStampHandler : IHandler
+    public class HeroFieldsHandler : IHandler
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<LastTimeStampHandler>();
+        private static readonly ILogger Logger = LogManager.GetLogger<HeroFieldsHandler>();
 
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
 
-        public LastTimeStampHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+        public HeroFieldsHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
 
             messageBroker.Subscribe<ChangeLastTimeStamp>(Handle);
+            messageBroker.Subscribe<ChangeCharacterObject>(Handle);
         }
 
-        public void Dispose()
+        private void Handle(MessagePayload<ChangeCharacterObject> payload)
         {
-            messageBroker.Unsubscribe<ChangeLastTimeStamp>(Handle);
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            if (objectManager.TryGetObject<CharacterObject>(data.CharacterObjectId, out var character) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(CharacterObject), data.CharacterObjectId);
+            }
+
+            instance._characterObject = character;
         }
 
         private void Handle(MessagePayload<ChangeLastTimeStamp> payload)
@@ -43,6 +54,10 @@ namespace GameInterface.Services.Heroes.Handlers
             }
 
             instance.LastTimeStampForActivity = data.LastTimeStamp;
+        }
+        public void Dispose()
+        {
+            messageBroker.Unsubscribe<ChangeLastTimeStamp>(Handle);
         }
     }
 }
