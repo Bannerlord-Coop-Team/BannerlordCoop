@@ -32,6 +32,15 @@ namespace GameInterface
         public string Name { get; }
         public string StringId { get; }
     }
+
+    /// <summary>
+    /// A base class that contains default audit behavior
+    /// </summary>
+    /// <typeparam name="Request"><see cref="IAuditRequest"/> type</typeparam>
+    /// <typeparam name="Response"><see cref="IAuditResponse"/> type</typeparam>
+    /// <typeparam name="AuditingType">Type, being audited (like a <seealso cref="MobileParty"/>, <seealso cref="TaleWorlds.CampaignSystem.Army"/> and etc.)</typeparam>
+    /// <typeparam name="AuditData"><see cref="IAuditData"/> type, contains StringId, Name and other specific fields/properties</typeparam>
+    /// <typeparam name="LoggerType">Type for <see cref="LogManager.GetLogger{T}"/>. Basically itself</typeparam>
     public abstract class Auditor<Request, Response, AuditingType, AuditData, LoggerType> : IAuditor 
         where Request : IAuditRequest
         where Response : IAuditResponse
