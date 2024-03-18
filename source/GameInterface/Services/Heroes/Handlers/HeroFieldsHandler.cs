@@ -1,19 +1,16 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Handlers
 {
     /// <summary>
-    /// Handler for LastTimeStampForActivity
+    /// Handler for Hero Fields
     /// </summary>
     public class HeroFieldsHandler : IHandler
     {
@@ -30,6 +27,28 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<ChangeLastTimeStamp>(Handle);
             messageBroker.Subscribe<ChangeCharacterObject>(Handle);
             messageBroker.Subscribe<ChangeFirstName>(Handle);
+            messageBroker.Subscribe<ChangeName>(Handle);
+            messageBroker.Subscribe<ChangeHairTags>(Handle);
+        }
+
+        private void Handle(MessagePayload<ChangeHairTags> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance.HairTags = data.HairTags;
+        }
+
+        private void Handle(MessagePayload<ChangeName> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance._name = new TextObject(data.NewName);
         }
 
         private void Handle(MessagePayload<ChangeFirstName> payload)
@@ -68,6 +87,9 @@ namespace GameInterface.Services.Heroes.Handlers
         public void Dispose()
         {
             messageBroker.Unsubscribe<ChangeLastTimeStamp>(Handle);
+            messageBroker.Unsubscribe<ChangeCharacterObject>(Handle);
+            messageBroker.Unsubscribe<ChangeFirstName>(Handle);
+            messageBroker.Unsubscribe<ChangeName>(Handle);
         }
     }
 }

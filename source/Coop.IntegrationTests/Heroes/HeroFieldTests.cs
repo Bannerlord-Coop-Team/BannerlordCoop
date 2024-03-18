@@ -43,7 +43,7 @@ namespace Coop.IntegrationTests.Heroes
             }
         }
         [Fact]
-        public void ServerRecievesFirstNameChangedChanged()
+        public void ServerRecievesFirstNameChanged()
         {
             var triggerMessage = new FirstNameChanged("testChar", "testId");
 
@@ -56,6 +56,38 @@ namespace Coop.IntegrationTests.Heroes
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
             {
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeFirstName>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesNameChanged()
+        {
+            var triggerMessage = new NameChanged("testChar", "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkNameChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeName>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesHairTagsChanged()
+        {
+            var triggerMessage = new HairTagsChanged("testChar", "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkHairTagsChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeHairTags>());
             }
         }
     }

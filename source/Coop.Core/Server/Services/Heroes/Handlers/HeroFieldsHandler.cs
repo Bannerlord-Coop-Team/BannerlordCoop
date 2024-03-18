@@ -21,6 +21,20 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             messageBroker.Subscribe<LastTimeStampChanged>(Handle);
             messageBroker.Subscribe<CharacterObjectChanged>(Handle);
             messageBroker.Subscribe<FirstNameChanged>(Handle);
+            messageBroker.Subscribe<NameChanged>(Handle);
+            messageBroker.Subscribe<HairTagsChanged>(Handle);
+        }
+
+        private void Handle(MessagePayload<HairTagsChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkHairTagsChanged(data.HairTags, data.HeroId));
+        }
+
+        private void Handle(MessagePayload<NameChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkNameChanged(data.NewName, data.HeroId));
         }
         private void Handle(MessagePayload<FirstNameChanged> payload)
         {
@@ -41,6 +55,8 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
         {
             messageBroker.Unsubscribe<LastTimeStampChanged>(Handle);
             messageBroker.Unsubscribe<CharacterObjectChanged>(Handle);
+            messageBroker.Unsubscribe<FirstNameChanged>(Handle);
+            messageBroker.Unsubscribe<NameChanged>(Handle);
         }
     }
 }

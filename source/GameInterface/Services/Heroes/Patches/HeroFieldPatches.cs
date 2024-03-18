@@ -140,5 +140,80 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance._firstName = newName;
         }
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == nameField)
+                {
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+
+        public static void NameIntercept(TextObject newName, Hero instance)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._name = newName;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance._name = newName;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance.StringId));
+
+            instance._name = newName;
+        }
+        private static IEnumerable<CodeInstruction> HairTagsTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var hairTagsField = AccessTools.Field(typeof(Hero), nameof(Hero.HairTags));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HairTagsIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == hairTagsField)
+                {
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+
+        public static void HairTagsIntercept(string newTags, Hero instance)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance.HairTags = newTags;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance.HairTags = newTags;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new HairTagsChanged(newTags, instance.StringId));
+
+            instance.HairTags = newTags;
+        }
     }
 }
