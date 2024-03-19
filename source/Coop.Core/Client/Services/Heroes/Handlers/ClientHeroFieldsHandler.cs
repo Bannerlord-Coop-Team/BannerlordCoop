@@ -7,7 +7,7 @@ using System;
 namespace Coop.Core.Client.Services.Heroes.Handlers
 {
     /// <summary>
-    /// Client handler for LastTimeStampForActivity
+    /// Client handler for Hero fields
     /// </summary>
     public class ClientHeroFieldsHandler : IHandler
     {
@@ -21,6 +21,13 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
             messageBroker.Subscribe<NetworkFirstNameChanged>(Handle);
             messageBroker.Subscribe<NetworkNameChanged>(Handle);
             messageBroker.Subscribe<NetworkHairTagsChanged>(Handle);
+            messageBroker.Subscribe<NetworkBeardTagsChanged>(Handle);
+        }
+
+        private void Handle(MessagePayload<NetworkBeardTagsChanged> payload)
+        {
+            var data = payload.What;
+            messageBroker.Publish(this, new ChangeBeardTags(data.BeardTags, data.HeroId));
         }
 
         private void Handle(MessagePayload<NetworkHairTagsChanged> payload)
@@ -60,7 +67,7 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
             messageBroker.Unsubscribe<NetworkFirstNameChanged>(Handle);
             messageBroker.Unsubscribe<NetworkNameChanged>(Handle);
             messageBroker.Unsubscribe<NetworkHairTagsChanged>(Handle);
-
+            messageBroker.Unsubscribe<NetworkBeardTagsChanged>(Handle);
         }
     }
 

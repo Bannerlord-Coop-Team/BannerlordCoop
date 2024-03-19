@@ -4,19 +4,19 @@ using ProtoBuf;
 namespace Coop.Core.Client.Services.Heroes.Messages;
 
 /// <summary>
-/// Command to change the HairTags of a hero.
+/// Command to change the BeardTags of a hero.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record NetworkHairTagsChanged : ICommand
+public record NetworkBeardTagsChanged : ICommand
 {
     [ProtoMember(1)]
-    public string HairTags { get; }
+    public string BeardTags { get; }
     [ProtoMember(2)]
     public string HeroId { get; }
 
-    public NetworkHairTagsChanged(string hairTags, string heroId)
+    public NetworkBeardTagsChanged(string beardTags, string heroId)
     {
-        HairTags = hairTags;
+        BeardTags = beardTags;
         HeroId = heroId;
     }
 }

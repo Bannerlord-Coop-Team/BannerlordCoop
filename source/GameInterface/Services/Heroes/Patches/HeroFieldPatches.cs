@@ -215,5 +215,43 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.HairTags = newTags;
         }
+        private static IEnumerable<CodeInstruction> BeardTagsTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var beardTagsField = AccessTools.Field(typeof(Hero), nameof(Hero.BeardTags));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(BeardTagsIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == beardTagsField)
+                {
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+
+        public static void BeardTagsIntercept(string newTags, Hero instance)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance.BeardTags = newTags;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance.BeardTags = newTags;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new BeardTagsChanged(newTags, instance.StringId));
+
+            instance.BeardTags = newTags;
+        }
+
     }
 }

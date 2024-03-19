@@ -9,12 +9,12 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
     /// <summary>
     /// Server handler for all fields in the Hero Class
     /// </summary>
-    public class HeroFieldsHandler : IHandler
+    public class ServerHeroFieldsHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
-        public HeroFieldsHandler(IMessageBroker messageBroker, INetwork network)
+        public ServerHeroFieldsHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.network = network;
@@ -23,6 +23,13 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             messageBroker.Subscribe<FirstNameChanged>(Handle);
             messageBroker.Subscribe<NameChanged>(Handle);
             messageBroker.Subscribe<HairTagsChanged>(Handle);
+            messageBroker.Subscribe<BeardTagsChanged>(Handle);
+        }
+
+        private void Handle(MessagePayload<BeardTagsChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkBeardTagsChanged(data.BeardTags, data.HeroId));
         }
 
         private void Handle(MessagePayload<HairTagsChanged> payload)
@@ -57,6 +64,8 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             messageBroker.Unsubscribe<CharacterObjectChanged>(Handle);
             messageBroker.Unsubscribe<FirstNameChanged>(Handle);
             messageBroker.Unsubscribe<NameChanged>(Handle);
+            messageBroker.Unsubscribe<HairTagsChanged>(Handle);
+            messageBroker.Unsubscribe<BeardTagsChanged>(Handle);
         }
     }
 }

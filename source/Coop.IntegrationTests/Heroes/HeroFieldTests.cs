@@ -90,5 +90,21 @@ namespace Coop.IntegrationTests.Heroes
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeHairTags>());
             }
         }
+        [Fact]
+        public void ServerRecievesBeardTagsChanged()
+        {
+            var triggerMessage = new BeardTagsChanged("testChar", "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkBeardTagsChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeBeardTags>());
+            }
+        }
     }
 }

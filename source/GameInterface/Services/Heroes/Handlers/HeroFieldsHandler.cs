@@ -29,6 +29,17 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<ChangeFirstName>(Handle);
             messageBroker.Subscribe<ChangeName>(Handle);
             messageBroker.Subscribe<ChangeHairTags>(Handle);
+            messageBroker.Subscribe<ChangeBeardTags>(Handle);
+        }
+
+        private void Handle(MessagePayload<ChangeBeardTags> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance.BeardTags = data.BeardTags;
         }
 
         private void Handle(MessagePayload<ChangeHairTags> payload)
@@ -90,6 +101,8 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Unsubscribe<ChangeCharacterObject>(Handle);
             messageBroker.Unsubscribe<ChangeFirstName>(Handle);
             messageBroker.Unsubscribe<ChangeName>(Handle);
+            messageBroker.Unsubscribe<ChangeHairTags>(Handle);
+            messageBroker.Unsubscribe<ChangeBeardTags>(Handle);
         }
     }
 }
