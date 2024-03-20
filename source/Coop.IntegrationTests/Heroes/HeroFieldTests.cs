@@ -106,5 +106,117 @@ namespace Coop.IntegrationTests.Heroes
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeBeardTags>());
             }
         }
+        [Fact]
+        public void ServerRecievesTattooTagsChanged()
+        {
+            var triggerMessage = new TattooTagsChanged("testChar", "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkTattooTagsChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeTattooTags>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesHeroStateChanged()
+        {
+            var triggerMessage = new HeroStateChanged(2, "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkHeroStateChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeHeroState>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesHeroLevelChanged()
+        {
+            var triggerMessage = new HeroLevelChanged(2, "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkHeroLevelChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeHeroLevel>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesSpcDaysInLocationChanged()
+        {
+            var triggerMessage = new SpcDaysInLocationChanged(2, "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkSpcDaysInLocationChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSpcDaysInLocation>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesDefaultAgeChanged()
+        {
+            var triggerMessage = new DefaultAgeChanged(2f, "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkDefaultAgeChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeDefaultAge>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesBirthDayChanged()
+        {
+            var triggerMessage = new BirthDayChanged(2L, "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkBirthDayChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeBirthDay>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesPowerChanged()
+        {
+            var triggerMessage = new PowerChanged(2f, "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkPowerChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangePower>());
+            }
+        }
     }
 }

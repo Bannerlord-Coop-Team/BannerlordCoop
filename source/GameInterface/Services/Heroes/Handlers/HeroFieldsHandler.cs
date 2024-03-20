@@ -30,6 +30,82 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<ChangeName>(Handle);
             messageBroker.Subscribe<ChangeHairTags>(Handle);
             messageBroker.Subscribe<ChangeBeardTags>(Handle);
+            messageBroker.Subscribe<ChangeTattooTags>(Handle);
+            messageBroker.Subscribe<ChangeHeroState>(Handle);
+            messageBroker.Subscribe<ChangeHeroLevel>(Handle);
+            messageBroker.Subscribe<ChangeSpcDaysInLocation>(Handle);
+            messageBroker.Subscribe<ChangeDefaultAge>(Handle);
+            messageBroker.Subscribe<ChangeBirthDay>(Handle);
+            messageBroker.Subscribe<ChangePower>(Handle);
+        }
+
+        private void Handle(MessagePayload<ChangePower> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance._power = data.Power;
+        }
+
+        private void Handle(MessagePayload<ChangeBirthDay> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance._birthDay = new CampaignTime(data.BirthDay);
+        }
+
+        private void Handle(MessagePayload<ChangeDefaultAge> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance._defaultAge = data.Age;
+        }
+
+        private void Handle(MessagePayload<ChangeSpcDaysInLocation> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance.SpcDaysInLocation = data.Days;
+        }
+
+        private void Handle(MessagePayload<ChangeHeroLevel> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance.Level = data.HeroLevel;
+        }
+
+        private void Handle(MessagePayload<ChangeHeroState> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance._heroState = (Hero.CharacterStates)data.HeroState;
+        }
+        private void Handle(MessagePayload<ChangeTattooTags> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance.TattooTags = data.TattooTags;
         }
 
         private void Handle(MessagePayload<ChangeBeardTags> payload)
@@ -103,6 +179,13 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Unsubscribe<ChangeName>(Handle);
             messageBroker.Unsubscribe<ChangeHairTags>(Handle);
             messageBroker.Unsubscribe<ChangeBeardTags>(Handle);
+            messageBroker.Unsubscribe<ChangeTattooTags>(Handle);
+            messageBroker.Unsubscribe<ChangeHeroState>(Handle);
+            messageBroker.Unsubscribe<ChangeHeroLevel>(Handle);
+            messageBroker.Unsubscribe<ChangeSpcDaysInLocation>(Handle);
+            messageBroker.Unsubscribe<ChangeDefaultAge>(Handle);
+            messageBroker.Unsubscribe<ChangeBirthDay>(Handle);
+            messageBroker.Unsubscribe<ChangePower>(Handle);
         }
     }
 }

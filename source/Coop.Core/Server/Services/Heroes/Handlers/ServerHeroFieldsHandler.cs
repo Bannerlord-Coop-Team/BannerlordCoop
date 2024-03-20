@@ -24,6 +24,55 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             messageBroker.Subscribe<NameChanged>(Handle);
             messageBroker.Subscribe<HairTagsChanged>(Handle);
             messageBroker.Subscribe<BeardTagsChanged>(Handle);
+            messageBroker.Subscribe<TattooTagsChanged>(Handle);
+            messageBroker.Subscribe<HeroStateChanged>(Handle);
+            messageBroker.Subscribe<HeroLevelChanged>(Handle);
+            messageBroker.Subscribe<SpcDaysInLocationChanged>(Handle);
+            messageBroker.Subscribe<DefaultAgeChanged>(Handle);
+            messageBroker.Subscribe<BirthDayChanged>(Handle);
+            messageBroker.Subscribe<PowerChanged>(Handle);
+        }
+
+        private void Handle(MessagePayload<PowerChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkPowerChanged(data.Power, data.HeroId));
+        }
+
+        private void Handle(MessagePayload<BirthDayChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkBirthDayChanged(data.BirthDay, data.HeroId));
+        }
+
+        private void Handle(MessagePayload<DefaultAgeChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkDefaultAgeChanged(data.Age, data.HeroId));
+        }
+
+        private void Handle(MessagePayload<SpcDaysInLocationChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkSpcDaysInLocationChanged(data.Days, data.HeroId));
+        }
+
+        private void Handle(MessagePayload<HeroLevelChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkHeroLevelChanged(data.HeroLevel, data.HeroId));
+        }
+
+        private void Handle(MessagePayload<HeroStateChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkHeroStateChanged(data.HeroState, data.HeroId));
+        }
+
+        private void Handle(MessagePayload<TattooTagsChanged> payload)
+        {
+            var data = payload.What;
+            network.SendAll(new NetworkTattooTagsChanged(data.TattooTags, data.HeroId));
         }
 
         private void Handle(MessagePayload<BeardTagsChanged> payload)
@@ -66,6 +115,13 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
             messageBroker.Unsubscribe<NameChanged>(Handle);
             messageBroker.Unsubscribe<HairTagsChanged>(Handle);
             messageBroker.Unsubscribe<BeardTagsChanged>(Handle);
+            messageBroker.Unsubscribe<TattooTagsChanged>(Handle);
+            messageBroker.Unsubscribe<HeroStateChanged>(Handle);
+            messageBroker.Unsubscribe<HeroLevelChanged>(Handle);
+            messageBroker.Unsubscribe<SpcDaysInLocationChanged>(Handle);
+            messageBroker.Unsubscribe<DefaultAgeChanged>(Handle);
+            messageBroker.Unsubscribe<BirthDayChanged>(Handle);
+            messageBroker.Unsubscribe<PowerChanged>(Handle);
         }
     }
 }
