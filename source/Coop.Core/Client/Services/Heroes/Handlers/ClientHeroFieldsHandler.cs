@@ -2,7 +2,6 @@
 using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Messages;
-using System;
 
 namespace Coop.Core.Client.Services.Heroes.Handlers
 {
@@ -29,6 +28,27 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
             messageBroker.Subscribe<NetworkDefaultAgeChanged>(Handle);
             messageBroker.Subscribe<NetworkBirthDayChanged>(Handle);
             messageBroker.Subscribe<NetworkPowerChanged>(Handle);
+            messageBroker.Subscribe<NetworkCultureChanged>(Handle);
+            messageBroker.Subscribe<NetworkHomeSettlementChanged>(Handle);
+            messageBroker.Subscribe<NetworkPregnantChanged>(Handle);
+        }
+
+        private void Handle(MessagePayload<NetworkPregnantChanged> payload)
+        {
+            var data = payload.What;
+            messageBroker.Publish(this, new ChangePregnant(data.IsPregnant, data.HeroId));
+        }
+
+        private void Handle(MessagePayload<NetworkHomeSettlementChanged> payload)
+        {
+            var data = payload.What;
+            messageBroker.Publish(this, new ChangeHomeSettlement(data.SettlementStringId, data.HeroId));
+        }
+
+        private void Handle(MessagePayload<NetworkCultureChanged> payload)
+        {
+            var data = payload.What;
+            messageBroker.Publish(this, new ChangeCulture(data.CultureStringId, data.HeroId));
         }
 
         private void Handle(MessagePayload<NetworkPowerChanged> payload)
@@ -124,6 +144,9 @@ namespace Coop.Core.Client.Services.Heroes.Handlers
             messageBroker.Unsubscribe<NetworkDefaultAgeChanged>(Handle);
             messageBroker.Unsubscribe<NetworkBirthDayChanged>(Handle);
             messageBroker.Unsubscribe<NetworkPowerChanged>(Handle);
+            messageBroker.Unsubscribe<NetworkCultureChanged>(Handle);
+            messageBroker.Unsubscribe<NetworkHomeSettlementChanged>(Handle);
+            messageBroker.Unsubscribe<NetworkPregnantChanged>(Handle);
         }
     }
 }

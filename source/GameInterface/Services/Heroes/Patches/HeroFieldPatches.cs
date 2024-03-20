@@ -8,8 +8,8 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches
@@ -63,121 +63,121 @@ namespace GameInterface.Services.Heroes.Patches
             instance.LastTimeStampForActivity = newTimestamp;
         }
 
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> CharacterObjectTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var characterObjectField = AccessTools.Field(typeof(Hero), nameof(Hero._characterObject));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(CharacterObjectIntercept));
+        //[HarmonyTranspiler]
+        //private static IEnumerable<CodeInstruction> CharacterObjectTranspiler(IEnumerable<CodeInstruction> instructions)
+        //{
+        //    var characterObjectField = AccessTools.Field(typeof(Hero), nameof(Hero._characterObject));
+        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(CharacterObjectIntercept));
 
-            foreach (var instruction in instructions)
-            {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == characterObjectField)
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
+        //    foreach (var instruction in instructions)
+        //    {
+        //        if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == characterObjectField)
+        //        {
+        //            yield return new CodeInstruction(OpCodes.Ldarg_0);
+        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+        //        }
+        //        else
+        //        {
+        //            yield return instruction;
+        //        }
+        //    }
+        //}
 
-        public static void CharacterObjectIntercept(CharacterObject newCharacterObject, Hero instance)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._characterObject = newCharacterObject;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._characterObject = newCharacterObject;
-                return;
-            }
+        //public static void CharacterObjectIntercept(CharacterObject newCharacterObject, Hero instance)
+        //{
+        //    if (CallOriginalPolicy.IsOriginalAllowed())
+        //    {
+        //        instance._characterObject = newCharacterObject;
+        //        return;
+        //    }
+        //    if (ModInformation.IsClient)
+        //    {
+        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+        //        instance._characterObject = newCharacterObject;
+        //        return;
+        //    }
 
-            MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject.StringId, instance.StringId));
+        //    MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject.StringId, instance.StringId));
 
-            instance._characterObject = newCharacterObject;
-        }
+        //    instance._characterObject = newCharacterObject;
+        //}
 
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
+        //[HarmonyTranspiler]
+        //private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
+        //{
+        //    var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
+        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
 
-            foreach (var instruction in instructions)
-            {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == firstNameField)
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
+        //    foreach (var instruction in instructions)
+        //    {
+        //        if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == firstNameField)
+        //        {
+        //            yield return new CodeInstruction(OpCodes.Ldarg_0);
+        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+        //        }
+        //        else
+        //        {
+        //            yield return instruction;
+        //        }
+        //    }
+        //}
 
-        public static void FirstNameIntercept(TextObject newName, Hero instance)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._firstName = newName;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._firstName = newName;
-                return;
-            }
+        //public static void FirstNameIntercept(TextObject newName, Hero instance)
+        //{
+        //    if (CallOriginalPolicy.IsOriginalAllowed())
+        //    {
+        //        instance._firstName = newName;
+        //        return;
+        //    }
+        //    if (ModInformation.IsClient)
+        //    {
+        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+        //        instance._firstName = newName;
+        //        return;
+        //    }
 
-            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance.StringId));
+        //    MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance.StringId));
 
-            instance._firstName = newName;
-        }
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
+        //    instance._firstName = newName;
+        //}
+        //[HarmonyTranspiler]
+        //private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
+        //{
+        //    var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
+        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
 
-            foreach (var instruction in instructions)
-            {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == nameField)
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
+        //    foreach (var instruction in instructions)
+        //    {
+        //        if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == nameField)
+        //        {
+        //            yield return new CodeInstruction(OpCodes.Ldarg_0);
+        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+        //        }
+        //        else
+        //        {
+        //            yield return instruction;
+        //        }
+        //    }
+        //}
 
-        public static void NameIntercept(TextObject newName, Hero instance)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._name = newName;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._name = newName;
-                return;
-            }
+        //public static void NameIntercept(TextObject newName, Hero instance)
+        //{
+        //    if (CallOriginalPolicy.IsOriginalAllowed())
+        //    {
+        //        instance._name = newName;
+        //        return;
+        //    }
+        //    if (ModInformation.IsClient)
+        //    {
+        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+        //        instance._name = newName;
+        //        return;
+        //    }
 
-            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance.StringId));
+        //    MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance.StringId));
 
-            instance._name = newName;
-        }
+        //    instance._name = newName;
+        //}
         private static IEnumerable<CodeInstruction> HairTagsTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var hairTagsField = AccessTools.Field(typeof(Hero), nameof(Hero.HairTags));
@@ -473,6 +473,117 @@ namespace GameInterface.Services.Heroes.Patches
             MessageBroker.Instance.Publish(instance, new PowerChanged(power, instance.StringId));
 
             instance._power = power;
+        }
+        private static IEnumerable<CodeInstruction> CultureTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero.Culture));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(CultureIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == valueField)
+                {
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+
+        public static void CultureIntercept(CultureObject culture, Hero instance)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance.Culture = culture;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance.Culture = culture;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new CultureChanged(culture.StringId, instance.StringId));
+
+            instance.Culture = culture;
+        }
+        private static IEnumerable<CodeInstruction> HomeSettlementTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._homeSettlement));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HomeSettlementIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == valueField)
+                {
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+
+        public static void HomeSettlementIntercept(Settlement settlement, Hero instance)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._homeSettlement = settlement;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance._homeSettlement = settlement;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement.StringId, instance.StringId));
+
+            instance._homeSettlement = settlement;
+        }
+        private static IEnumerable<CodeInstruction> PregnantTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero.IsPregnant));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(PregnantIntercept));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == valueField)
+                {
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+
+        public static void PregnantIntercept(bool isPregnant, Hero instance)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance.IsPregnant = isPregnant;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance.IsPregnant = isPregnant;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new PregnantChanged(isPregnant, instance.StringId));
+
+            instance.IsPregnant = isPregnant;
         }
     }
 }

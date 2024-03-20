@@ -109,4 +109,22 @@ public class HeroDebugCommand
         
         return auditor.Audit();
     }
+
+    [CommandLineArgumentFunction("change", "coop.debug.hero")]
+    public static string ChangeTimeStamp(List<string> args)
+    {
+        Hero hero = Hero.MainHero;
+
+        hero.LastTimeStampForActivity = 23190475;
+
+        return "Updated to " + hero.LastTimeStampForActivity;
+    }
+
+    [CommandLineArgumentFunction("getChange", "coop.debug.hero")]
+    public static string GetTimeStamp(List<string> args)
+    {
+        Hero hero = Hero.FindFirst(x => x.LastTimeStampForActivity == 23190475);
+
+        return hero.Name.Value;
+    }
 }

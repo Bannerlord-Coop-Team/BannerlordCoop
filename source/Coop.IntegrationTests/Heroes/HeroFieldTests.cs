@@ -218,5 +218,53 @@ namespace Coop.IntegrationTests.Heroes
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangePower>());
             }
         }
+        [Fact]
+        public void ServerRecievesCultureChanged()
+        {
+            var triggerMessage = new CultureChanged("cultureObject", "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkCultureChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeCulture>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesHomeSettlementChanged()
+        {
+            var triggerMessage = new HomeSettlementChanged("settlement", "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkHomeSettlementChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeHomeSettlement>());
+            }
+        }
+        [Fact]
+        public void ServerRecievesPregnantChanged()
+        {
+            var triggerMessage = new PregnantChanged(true, "testId");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkPregnantChanged>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangePregnant>());
+            }
+        }
     }
 }
