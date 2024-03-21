@@ -64,12 +64,15 @@ internal class InterceptGenerator
             il.DefineLabel(),
         };
 
+        // if (CallOriginalPolicy.IsOriginalAllowed())
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(CallOriginalPolicy), nameof(CallOriginalPolicy.IsOriginalAllowed)));
         il.Emit(OpCodes.Brfalse, labels[0]);
 
+        // store field in the instance (ldarg_0)
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Stfld, field);
 
+        // end if
         il.MarkLabel(labels[0]);
     }
 }
