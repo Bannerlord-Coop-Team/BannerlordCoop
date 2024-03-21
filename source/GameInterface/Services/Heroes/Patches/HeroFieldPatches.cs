@@ -9,7 +9,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches
@@ -22,6 +21,7 @@ namespace GameInterface.Services.Heroes.Patches
         private static IEnumerable<MethodBase> TargetMethods()
         {
             return AccessTools.GetDeclaredMethods(typeof(Hero));
+
         }
 
         [HarmonyTranspiler]
@@ -81,7 +81,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void CharacterObjectIntercept(CharacterObject newCharacterObject, Hero instance)
+        public static void CharacterObjectIntercept(Hero instance, CharacterObject newCharacterObject)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -119,7 +119,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void FirstNameIntercept(TextObject newName, Hero instance)
+        public static void FirstNameIntercept(Hero instance, TextObject newName)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -156,7 +156,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void NameIntercept(TextObject newName, Hero instance)
+        public static void NameIntercept(Hero instance, TextObject newName)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -193,7 +193,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void HairTagsIntercept(string newTags, Hero instance)
+        public static void HairTagsIntercept(Hero instance, string newTags)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -230,7 +230,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void BeardTagsIntercept(string newTags, Hero instance)
+        public static void BeardTagsIntercept(Hero instance, string newTags)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -267,7 +267,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void TattooTagsIntercept(string newTags, Hero instance)
+        public static void TattooTagsIntercept(Hero instance, string newTags)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -295,6 +295,7 @@ namespace GameInterface.Services.Heroes.Patches
             {
                 if (instruction.StoresField(heroStateField))
                 {
+
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
                 else
@@ -304,7 +305,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void HeroStateIntercept(Hero.CharacterStates newState, Hero instance)
+        public static void HeroStateIntercept(Hero instance, Hero.CharacterStates newState)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -341,7 +342,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void SpcDaysInLocationIntercept(int days, Hero instance)
+        public static void SpcDaysInLocationIntercept(Hero instance, int days)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -450,8 +451,7 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
-        public static void PowerIntercept(float power, Hero instance)
+        public static void PowerIntercept(Hero instance, float power)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -488,7 +488,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void CultureIntercept(CultureObject culture, Hero instance)
+        public static void CultureIntercept(Hero instance, CultureObject culture)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -562,7 +562,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void PregnantIntercept(bool isPregnant, Hero instance)
+        public static void PregnantIntercept(Hero instance, bool isPregnant)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {

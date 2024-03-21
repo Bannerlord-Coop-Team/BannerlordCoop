@@ -115,15 +115,15 @@ public class HeroDebugCommand
     {
         Hero hero = Hero.MainHero;
 
-        hero.LastTimeStampForActivity = 23190475;
+        hero.AddPower(66);
 
-        return "Updated to " + hero.LastTimeStampForActivity;
+        return "Updated to " + hero._power;
     }
 
     [CommandLineArgumentFunction("getChange", "coop.debug.hero")]
     public static string GetTimeStamp(List<string> args)
     {
-        Hero hero = Hero.FindFirst(x => x.LastTimeStampForActivity == 23190475);
+        Hero hero = Hero.FindFirst(x => x._power == 66);
 
         return hero.Name.Value;
     }
