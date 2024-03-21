@@ -5,12 +5,68 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Heroes.Commands;
 
 public class HeroDebugCommand
 {
+
+    // TODO: MOVE :)
+    [CommandLineArgumentFunction("list", "coop.debug.itemobjects")]
+    public static string ListItems(List<string> list)
+    {
+        StringBuilder stringBuilder = new StringBuilder();
+
+        foreach (var item in Campaign.Current.AllItems)
+        {
+            stringBuilder.AppendFormat("ID: '{0}'\tName: '{1}'\n", item.StringId, item.Name);
+        }
+        return stringBuilder.ToString();
+    }
+
+
+    // coop.debug.hero.addspecialItem
+    /// <summary>
+    /// add SpecialItem
+    /// </summary>
+    /// <param name="args">ItemObjectId</param>
+    /// <returns>if success</returns>
+    [CommandLineArgumentFunction("add_special", "coop.debug.hero")]
+    public static string AddSpecialItem(List<string> args)
+    {
+        StringBuilder stringBuilder = new StringBuilder();
+
+
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.hero.add_special <heroId> <item>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+
+
+        if (objectManager.TryGetObject<ItemObject>(args[1], out var obj) == false)
+        {
+            return $"Unable to find ItemObject with id: {args[1]}";
+        }
+
+        hero.SpecialItems.Add(obj);
+
+
+        return "Successfully added itemobj";
+    }
+
+
     // coop.debug.hero.list
     /// <summary>
     /// Lists all the heroes
@@ -34,7 +90,7 @@ public class HeroDebugCommand
 
     // coop.debug.hero.add_children hero child
     [CommandLineArgumentFunction("add_children", "coop.debug.hero")]
-    public static string Add(List<string> args)
+    public static string AddChild(List<string> args)
     {
         if (args.Count != 2)
         {

@@ -79,6 +79,9 @@
 	</AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
+	  <Reference Include="TaleWorlds.Core">
+	    <HintPath>..\GameInterface\obj\x64\Debug\netstandard2.0\PublicizedAssemblies\TaleWorlds.Core.4D408777483550FA404CE84518157E05\TaleWorlds.Core.dll</HintPath>
+	  </Reference>
 	  <Reference Include="TaleWorlds.Library">
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
 	  </Reference>
@@ -87,6 +90,6 @@
     <Folder Include="Server\Services\Kingdoms\Messages\" />
   </ItemGroup>
   <ItemGroup>
-    <Publicize Include="TaleWorlds.Library"/>
+    <Publicize Include="TaleWorlds.Library" />
   </ItemGroup>
 </Project>

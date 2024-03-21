@@ -13,6 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Handlers;
@@ -30,13 +31,41 @@ internal class HeroDataHandler : IHandler
 
         messageBroker.Subscribe<ChangeHeroName>(Handle_HeroChangeName);
         messageBroker.Subscribe<AddNewChildren>(Handle_AddChildren);
+        messageBroker.Subscribe<HeroAddSpecialItem>(Handle_SpecialItem);
+
 
     }
+
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<ChangeHeroName>(Handle_HeroChangeName);
         messageBroker.Unsubscribe<AddNewChildren>(Handle_AddChildren);
+        messageBroker.Unsubscribe<HeroAddSpecialItem>(Handle_SpecialItem);
+
+    }
+    private void Handle_SpecialItem(MessagePayload<HeroAddSpecialItem> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject<Hero>(obj.HeroId, out var hero) == false)
+        {
+            Logger.Error("Unable to get {type} from id {stringId}", typeof(Hero), obj.HeroId);
+            return;
+        }
+        if (objectManager.TryGetObject<ItemObject>(obj.ItemObject, out var specialItem) == false)
+        {
+            Logger.Error("Unable to get {type} from id {stringId}", typeof(ItemObject), obj.ItemObject);
+            return;
+        }
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                hero.SpecialItems.Add(specialItem);
+            }
+        });
+
     }
     private void Handle_AddChildren(MessagePayload<AddNewChildren> payload)
     {

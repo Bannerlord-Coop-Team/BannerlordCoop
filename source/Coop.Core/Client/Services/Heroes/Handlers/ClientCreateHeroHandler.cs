@@ -25,16 +25,27 @@ internal class ClientCreateHeroHandler : IHandler
         messageBroker.Subscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
         messageBroker.Subscribe<HeroCreated>(Handle_HeroCreated);
         messageBroker.Subscribe<NetworkNewChildrenAdded>(Handle_ChildrenAdded);
+        messageBroker.Subscribe<NetworkNewSpecialItemAdded>(Handle_SpecialItem);
+
 
     }
-
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkCreateHero>(Handle_NetworkCreateHero);
         messageBroker.Unsubscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
         messageBroker.Unsubscribe<HeroCreated>(Handle_HeroCreated);
         messageBroker.Unsubscribe<NetworkNewChildrenAdded>(Handle_ChildrenAdded);
+        messageBroker.Unsubscribe<NetworkNewSpecialItemAdded>(Handle_SpecialItem);
+
     }
+
+    private void Handle_SpecialItem(MessagePayload<NetworkNewSpecialItemAdded> payload)
+    {
+        var obj = payload.What;
+
+        messageBroker.Publish(this, new HeroAddSpecialItem(obj.HeroId, obj.ItemObjectId));
+    }
+
 
 
     private void Handle_ChildrenAdded(MessagePayload<NetworkNewChildrenAdded> payload)

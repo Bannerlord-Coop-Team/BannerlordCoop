@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using SandBox.Missions.MissionLogics;
 using Serilog;
@@ -65,7 +66,7 @@ internal class HeroSpecialItemsCollectionPatch
             return;
         }
 
-        //MessageBroker.Instance.Publish(instance, new ExSpouseAdded(instance, exSpouse));
+        MessageBroker.Instance.Publish(instance, new HeroSpecialItemChanged(instance.StringId, specialItem.StringId));
 
         _specialItems.Add(specialItem);
     }
