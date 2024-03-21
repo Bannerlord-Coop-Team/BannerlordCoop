@@ -32,9 +32,8 @@ namespace GameInterface.Services.Heroes.Patches
 
             foreach (var instruction in instructions)
             {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == lastTimeStampField)
+                if (instruction.StoresField(lastTimeStampField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
                 else
@@ -44,7 +43,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void LastTimeStampForActivityIntercept(int newTimestamp, Hero instance)
+        public static void LastTimeStampForActivityIntercept(Hero instance, int newTimestamp)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -63,131 +62,128 @@ namespace GameInterface.Services.Heroes.Patches
             instance.LastTimeStampForActivity = newTimestamp;
         }
 
-        //[HarmonyTranspiler]
-        //private static IEnumerable<CodeInstruction> CharacterObjectTranspiler(IEnumerable<CodeInstruction> instructions)
-        //{
-        //    var characterObjectField = AccessTools.Field(typeof(Hero), nameof(Hero._characterObject));
-        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(CharacterObjectIntercept));
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> CharacterObjectTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var characterObjectField = AccessTools.Field(typeof(Hero), nameof(Hero._characterObject));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(CharacterObjectIntercept));
 
-        //    foreach (var instruction in instructions)
-        //    {
-        //        if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == characterObjectField)
-        //        {
-        //            yield return new CodeInstruction(OpCodes.Ldarg_0);
-        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-        //        }
-        //        else
-        //        {
-        //            yield return instruction;
-        //        }
-        //    }
-        //}
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(characterObjectField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
 
-        //public static void CharacterObjectIntercept(CharacterObject newCharacterObject, Hero instance)
-        //{
-        //    if (CallOriginalPolicy.IsOriginalAllowed())
-        //    {
-        //        instance._characterObject = newCharacterObject;
-        //        return;
-        //    }
-        //    if (ModInformation.IsClient)
-        //    {
-        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-        //        instance._characterObject = newCharacterObject;
-        //        return;
-        //    }
+        public static void CharacterObjectIntercept(CharacterObject newCharacterObject, Hero instance)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._characterObject = newCharacterObject;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance._characterObject = newCharacterObject;
+                return;
+            }
 
-        //    MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject.StringId, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject.StringId, instance.StringId));
 
-        //    instance._characterObject = newCharacterObject;
-        //}
+            instance._characterObject = newCharacterObject;
+        }
 
-        //[HarmonyTranspiler]
-        //private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
-        //{
-        //    var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
-        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> FirstNameTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var firstNameField = AccessTools.Field(typeof(Hero), nameof(Hero._firstName));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(FirstNameIntercept));
 
-        //    foreach (var instruction in instructions)
-        //    {
-        //        if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == firstNameField)
-        //        {
-        //            yield return new CodeInstruction(OpCodes.Ldarg_0);
-        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-        //        }
-        //        else
-        //        {
-        //            yield return instruction;
-        //        }
-        //    }
-        //}
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(firstNameField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
 
-        //public static void FirstNameIntercept(TextObject newName, Hero instance)
-        //{
-        //    if (CallOriginalPolicy.IsOriginalAllowed())
-        //    {
-        //        instance._firstName = newName;
-        //        return;
-        //    }
-        //    if (ModInformation.IsClient)
-        //    {
-        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-        //        instance._firstName = newName;
-        //        return;
-        //    }
+        public static void FirstNameIntercept(TextObject newName, Hero instance)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._firstName = newName;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance._firstName = newName;
+                return;
+            }
 
-        //    MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance.StringId));
 
-        //    instance._firstName = newName;
-        //}
-        //[HarmonyTranspiler]
-        //private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
-        //{
-        //    var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
-        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
+            instance._firstName = newName;
+        }
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var nameField = AccessTools.Field(typeof(Hero), nameof(Hero._name));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(NameIntercept));
 
-        //    foreach (var instruction in instructions)
-        //    {
-        //        if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == nameField)
-        //        {
-        //            yield return new CodeInstruction(OpCodes.Ldarg_0);
-        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-        //        }
-        //        else
-        //        {
-        //            yield return instruction;
-        //        }
-        //    }
-        //}
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(nameField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
 
-        //public static void NameIntercept(TextObject newName, Hero instance)
-        //{
-        //    if (CallOriginalPolicy.IsOriginalAllowed())
-        //    {
-        //        instance._name = newName;
-        //        return;
-        //    }
-        //    if (ModInformation.IsClient)
-        //    {
-        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-        //        instance._name = newName;
-        //        return;
-        //    }
+        public static void NameIntercept(TextObject newName, Hero instance)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._name = newName;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance._name = newName;
+                return;
+            }
 
-        //    MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance.StringId));
 
-        //    instance._name = newName;
-        //}
-        private static IEnumerable<CodeInstruction> HairTagsTranspiler(IEnumerable<CodeInstruction> instructions)
+            instance._name = newName;
+        }
+        [HarmonyTranspiler]
+        static IEnumerable<CodeInstruction> HairTagsTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var hairTagsField = AccessTools.Field(typeof(Hero), nameof(Hero.HairTags));
             var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HairTagsIntercept));
 
             foreach (var instruction in instructions)
             {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == hairTagsField)
+                if (instruction.StoresField(hairTagsField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
                 else
@@ -215,6 +211,7 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.HairTags = newTags;
         }
+        [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> BeardTagsTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var beardTagsField = AccessTools.Field(typeof(Hero), nameof(Hero.BeardTags));
@@ -222,9 +219,8 @@ namespace GameInterface.Services.Heroes.Patches
 
             foreach (var instruction in instructions)
             {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == beardTagsField)
+                if (instruction.StoresField(beardTagsField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
                 else
@@ -252,6 +248,7 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.BeardTags = newTags;
         }
+        [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> TattooTagsTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var tattooTagsField = AccessTools.Field(typeof(Hero), nameof(Hero.TattooTags));
@@ -259,9 +256,8 @@ namespace GameInterface.Services.Heroes.Patches
 
             foreach (var instruction in instructions)
             {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == tattooTagsField)
+                if (instruction.StoresField(tattooTagsField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
                 else
@@ -289,6 +285,7 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.TattooTags = newTags;
         }
+        [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> HeroStateTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var heroStateField = AccessTools.Field(typeof(Hero), nameof(Hero._heroState));
@@ -296,9 +293,8 @@ namespace GameInterface.Services.Heroes.Patches
 
             foreach (var instruction in instructions)
             {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == heroStateField)
+                if (instruction.StoresField(heroStateField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
                 else
@@ -308,24 +304,25 @@ namespace GameInterface.Services.Heroes.Patches
             }
         }
 
-        public static void HeroStateIntercept(int newState, Hero instance)
+        public static void HeroStateIntercept(Hero.CharacterStates newState, Hero instance)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
-                instance._heroState = (Hero.CharacterStates)newState;
+                instance._heroState = newState;
                 return;
             }
             if (ModInformation.IsClient)
             {
                 Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._heroState = (Hero.CharacterStates)newState;
+                instance._heroState = newState;
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new HeroStateChanged(newState, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance.StringId));
 
-            instance._heroState = (Hero.CharacterStates)newState;
+            instance._heroState = newState;
         }
+        [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> SpcDaysInLocationTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var spcDaysInLocationField = AccessTools.Field(typeof(Hero), nameof(Hero.SpcDaysInLocation));
@@ -333,9 +330,8 @@ namespace GameInterface.Services.Heroes.Patches
 
             foreach (var instruction in instructions)
             {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == spcDaysInLocationField)
+                if (instruction.StoresField(spcDaysInLocationField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
                 else
@@ -363,80 +359,80 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.SpcDaysInLocation = days;
         }
-        private static IEnumerable<CodeInstruction> DefaultAgeTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._defaultAge));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(DefaultAgeIntercept));
+        //[HarmonyTranspiler]
+        //private static IEnumerable<CodeInstruction> DefaultAgeTranspiler(IEnumerable<CodeInstruction> instructions)
+        //{
+        //    var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._defaultAge));
+        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(DefaultAgeIntercept));
 
-            foreach (var instruction in instructions)
-            {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == valueField)
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
+        //    foreach (var instruction in instructions)
+        //    {
+        //        if (instruction.StoresField(valueField))
+        //        {
+        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+        //        }
+        //        else
+        //        {
+        //            yield return instruction;
+        //        }
+        //    }
+        //}
 
-        public static void DefaultAgeIntercept(int age, Hero instance)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._defaultAge = age;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._defaultAge = age;
-                return;
-            }
+        //public static void DefaultAgeIntercept(int age, Hero instance)
+        //{
+        //    if (CallOriginalPolicy.IsOriginalAllowed())
+        //    {
+        //        instance._defaultAge = age;
+        //        return;
+        //    }
+        //    if (ModInformation.IsClient)
+        //    {
+        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+        //        instance._defaultAge = age;
+        //        return;
+        //    }
 
-            MessageBroker.Instance.Publish(instance, new DefaultAgeChanged(age, instance.StringId));
+        //    MessageBroker.Instance.Publish(instance, new DefaultAgeChanged(age, instance.StringId));
 
-            instance._defaultAge = age;
-        }
-        private static IEnumerable<CodeInstruction> BirthDayTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._birthDay));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(BirthDayIntercept));
+        //    instance._defaultAge = age;
+        //}
+        //[HarmonyTranspiler]
+        //private static IEnumerable<CodeInstruction> BirthDayTranspiler(IEnumerable<CodeInstruction> instructions)
+        //{
+        //    var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._birthDay));
+        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(BirthDayIntercept));
 
-            foreach (var instruction in instructions)
-            {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == valueField)
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
+        //    foreach (var instruction in instructions)
+        //    {
+        //        if (instruction.StoresField(valueField))
+        //        {
+        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+        //        }
+        //        else
+        //        {
+        //            yield return instruction;
+        //        }
+        //    }
+        //}
+        //public static void BirthDayIntercept(CampaignTime birthDay, Hero instance)
+        //{
+        //    if (CallOriginalPolicy.IsOriginalAllowed())
+        //    {
+        //        instance._birthDay = birthDay;
+        //        return;
+        //    }
+        //    if (ModInformation.IsClient)
+        //    {
+        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+        //        instance._birthDay = birthDay;
+        //        return;
+        //    }
 
-        public static void BirthDayIntercept(long birthDay, Hero instance)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._birthDay = new CampaignTime(birthDay);
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._birthDay = new CampaignTime(birthDay);
-                return;
-            }
+        //    MessageBroker.Instance.Publish(instance, new BirthDayChanged(birthDay.NumTicks, instance.StringId));
 
-            MessageBroker.Instance.Publish(instance, new BirthDayChanged(birthDay, instance.StringId));
-
-            instance._birthDay = new CampaignTime(birthDay);
-        }
+        //    instance._birthDay = birthDay;
+        //}
+        [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> PowerTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._power));
@@ -444,9 +440,8 @@ namespace GameInterface.Services.Heroes.Patches
 
             foreach (var instruction in instructions)
             {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == valueField)
+                if (instruction.StoresField(valueField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
                 else
@@ -474,6 +469,7 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance._power = power;
         }
+        [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> CultureTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var valueField = AccessTools.Field(typeof(Hero), nameof(Hero.Culture));
@@ -481,9 +477,8 @@ namespace GameInterface.Services.Heroes.Patches
 
             foreach (var instruction in instructions)
             {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == valueField)
+                if (instruction.StoresField(valueField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
                 else
@@ -511,43 +506,44 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.Culture = culture;
         }
-        private static IEnumerable<CodeInstruction> HomeSettlementTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._homeSettlement));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HomeSettlementIntercept));
+        //[HarmonyTranspiler]
+        //private static IEnumerable<CodeInstruction> HomeSettlementTranspiler(IEnumerable<CodeInstruction> instructions)
+        //{
+        //    var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._homeSettlement));
+        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HomeSettlementIntercept));
 
-            foreach (var instruction in instructions)
-            {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == valueField)
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
+        //    foreach (var instruction in instructions)
+        //    {
+        //        if (instruction.StoresField(valueField))
+        //        {
+        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+        //        }
+        //        else
+        //        {
+        //            yield return instruction;
+        //        }
+        //    }
+        //}
 
-        public static void HomeSettlementIntercept(Settlement settlement, Hero instance)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._homeSettlement = settlement;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._homeSettlement = settlement;
-                return;
-            }
+        //public static void HomeSettlementIntercept(Settlement settlement, Hero instance)
+        //{
+        //    if (CallOriginalPolicy.IsOriginalAllowed())
+        //    {
+        //        instance._homeSettlement = settlement;
+        //        return;
+        //    }
+        //    if (ModInformation.IsClient)
+        //    {
+        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+        //        instance._homeSettlement = settlement;
+        //        return;
+        //    }
 
-            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement.StringId, instance.StringId));
+        //    MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement.StringId, instance.StringId));
 
-            instance._homeSettlement = settlement;
-        }
+        //    instance._homeSettlement = settlement;
+        //}
+        [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> PregnantTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var valueField = AccessTools.Field(typeof(Hero), nameof(Hero.IsPregnant));
@@ -555,9 +551,8 @@ namespace GameInterface.Services.Heroes.Patches
 
             foreach (var instruction in instructions)
             {
-                if (instruction.opcode == OpCodes.Stfld && instruction.operand as FieldInfo == valueField)
+                if (instruction.StoresField(valueField))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
                 }
                 else
