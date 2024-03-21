@@ -12,9 +12,17 @@ namespace GameInterface.Utils.AutoSync.Dynamic;
 
 internal class TranspilerGenerator
 {
-    public TypeBuilder GenerateTranspiler(ModuleBuilder module)
+    public TypeBuilder GenerateTranspiler(ModuleBuilder moduleBuilder, FieldInfo fieldInfo)
     {
+        // Creates type builder for the new event message type
+        TypeBuilder typeBuilder = moduleBuilder.DefineType($"{fieldInfo.Name}Transpiler",
+            TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
+            typeof(object));
 
+        var loggerField = GenerateStaticConstructor(typeBuilder);
+
+        var interceptGenerator = new InterceptGenerator();
+        interceptGenerator.GenerateIntercept(typeBuilder, fieldInfo, loggerField);
     }
 
     private FieldBuilder GenerateStaticConstructor(TypeBuilder typeBuilder)
@@ -35,14 +43,14 @@ internal class TranspilerGenerator
         return fieldBuilder;
     }
 
-    private void GenerateConstructor()
+    private void GenerateTranspiler()
     {
-
+        throw new NotImplementedException();
     }
 }
 internal class InterceptGenerator
 {
-    public MethodInfo GenerateIntercept(TypeBuilder typeBuilder, FieldInfo field)
+    public MethodInfo GenerateIntercept(TypeBuilder typeBuilder, FieldInfo field, FieldBuilder loggerField)
     {
         var parameters = new Type[]
         {

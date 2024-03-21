@@ -4,6 +4,7 @@ using GameInterface.Policies;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -118,6 +119,87 @@ public class HarmonyPatchGenerator
 
         var compiledType = autoPatchType.CreateTypeInfo();
         return compiledType.GetMethod(setterPrefixPatch.Name, BindingFlags.NonPublic | BindingFlags.Static);
+    }
+
+    public MethodInfo GenerateFieldSetTranspiler(FieldInfo field)
+    {
+        var classType = field.DeclaringType;
+
+        var valueType = field.FieldType;
+        var parameters = new Type[] {
+            typeof(IEnumerable<CodeInstruction>),
+        };
+
+        var setterPrefixPatch = autoPatchType.DefineMethod(
+            name: $"AutoSync_Prefix_{field.Name}",
+            attributes: MethodAttributes.Private | MethodAttributes.Static,
+            callingConvention: CallingConventions.Standard,
+            returnType: typeof(IEnumerable<CodeInstruction>),
+            parameterTypes: parameters);
+
+        setterPrefixPatch.DefineParameter(1, ParameterAttributes.In, "__instance");
+        setterPrefixPatch.DefineParameter(2, ParameterAttributes.In, "value");
+
+        ILGenerator il = setterPrefixPatch.GetILGenerator();
+
+        var returnTrue = il.DefineLabel();
+        var returnFalse = il.DefineLabel();
+
+        // If original call is allowed, return true (allow original method)
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(CallOriginalPolicy), nameof(CallOriginalPolicy.IsOriginalAllowed)));
+        il.Emit(OpCodes.Brtrue, returnTrue);
+
+        // If client, return false (do not allow original method)
+        il.Emit(OpCodes.Ldstr, valueType.Name);
+        il.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(IsClient)));
+        il.Emit(OpCodes.Brtrue, returnFalse);
+
+        // Get message broker
+        il.Emit(OpCodes.Call, AccessTools.Method(GetType(), nameof(GetMessageBroker)));
+
+        // Used the source parameter of MessageBroker.Publish<T>(object source, T message)
+        il.Emit(OpCodes.Ldarg_0);
+
+        // Call the id getter method
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Call, idGetterMethod.Method);
+        il.Emit(OpCodes.Ldarg_1);
+
+        // Create data and event objects
+        il.Emit(OpCodes.Newobj, dataClassType.GetConstructors().Single());
+        il.Emit(OpCodes.Newobj, eventType.GetConstructors().Single());
+
+        // Publish the event
+        var castedPublish = AccessTools.Method(typeof(MessageBroker), nameof(MessageBroker.Publish)).MakeGenericMethod(eventType);
+        il.Emit(OpCodes.Callvirt, castedPublish);
+
+        // Return true (allow original method)
+        il.MarkLabel(returnTrue);
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Ret);
+
+        // Return false (do not allow original method)
+        il.MarkLabel(returnFalse);
+        il.Emit(OpCodes.Ldc_I4_0);
+        il.Emit(OpCodes.Ret);
+
+        var compiledType = autoPatchType.CreateTypeInfo();
+        return compiledType.GetMethod(setterPrefixPatch.Name, BindingFlags.NonPublic | BindingFlags.Static);
+    }
+
+    public static IEnumerable<CodeInstruction> GenericTranspiler<T>(IEnumerable<CodeInstruction> instructions)
+    {
+        foreach (var instruction in instructions)
+        {
+            if ()
+            {
+                var newInstr = new CodeInstruction(OpCodes.Call, )
+            }
+            else
+            {
+                yield return instruction;
+            }
+        }
     }
 
     /// <summary>
