@@ -2,11 +2,13 @@
 using GameInterface.Policies;
 using HarmonyLib;
 using Serilog;
+using Serilog.Core;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Text;
+using static HarmonyLib.Code;
 
 namespace GameInterface.Utils.AutoSync.Dynamic;
 
@@ -70,6 +72,7 @@ internal class InterceptGenerator
 
         var labels = new Label[] {
             il.DefineLabel(),
+            il.DefineLabel(),
         };
 
         // if (CallOriginalPolicy.IsOriginalAllowed())
@@ -82,5 +85,29 @@ internal class InterceptGenerator
 
         // end if
         il.MarkLabel(labels[0]);
+
+        //if (ModInformation.IsClient)
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ModInformation), nameof(ModInformation.IsClient)));
+        il.Emit(OpCodes.Brfalse, labels[1]);
+
+        il.Emit(OpCodes.Ldfld, loggerField);
+        il.Emit(OpCodes.Ldstr, "Client added unmanaged item: {callstack}");
+
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Newarr, typeof(object));
+        il.Emit(OpCodes.Dup);
+        il.Emit(OpCodes.Ldc_I4_0);
+        il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(Environment), nameof(Environment.StackTrace)));
+        il.Emit(OpCodes.Stelem_Ref);
+        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(Logger), nameof(Logger.Error), new Type[] { typeof(string), typeof(object[]) }));
+
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Stfld, field);
+
+        il.Emit(OpCodes.Ret);
+        il.MarkLabel(labels[1]);
+
+        il.Emit(OpCodes.Ret);
+        //TODO Draw the rest of the fucking owl (Messagebroker and stuff)
     }
 }
