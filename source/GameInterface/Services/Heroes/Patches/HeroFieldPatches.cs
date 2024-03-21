@@ -285,44 +285,44 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.TattooTags = newTags;
         }
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> HeroStateTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var heroStateField = AccessTools.Field(typeof(Hero), nameof(Hero._heroState));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HeroStateIntercept));
+        //[HarmonyTranspiler]
+        //private static IEnumerable<CodeInstruction> HeroStateTranspiler(IEnumerable<CodeInstruction> instructions)
+        //{
+        //    var heroStateField = AccessTools.Field(typeof(Hero), nameof(Hero._heroState));
+        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HeroStateIntercept));
 
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(heroStateField))
-                {
+        //    foreach (var instruction in instructions)
+        //    {
+        //        if (instruction.StoresField(heroStateField))
+        //        {
 
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
+        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+        //        }
+        //        else
+        //        {
+        //            yield return instruction;
+        //        }
+        //    }
+        //}
 
-        public static void HeroStateIntercept(Hero instance, Hero.CharacterStates newState)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._heroState = newState;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._heroState = newState;
-                return;
-            }
+        //public static void HeroStateIntercept(Hero instance, Hero.CharacterStates newState)
+        //{
+        //    if (CallOriginalPolicy.IsOriginalAllowed())
+        //    {
+        //        instance._heroState = newState;
+        //        return;
+        //    }
+        //    if (ModInformation.IsClient)
+        //    {
+        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+        //        instance._heroState = newState;
+        //        return;
+        //    }
 
-            MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance.StringId));
+        //    MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance.StringId));
 
-            instance._heroState = newState;
-        }
+        //    instance._heroState = newState;
+        //}
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> SpcDaysInLocationTranspiler(IEnumerable<CodeInstruction> instructions)
         {
