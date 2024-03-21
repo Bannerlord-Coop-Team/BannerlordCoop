@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System.Xml.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
@@ -75,7 +76,11 @@ namespace GameInterface.Services.Heroes.Handlers
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
             }
             //Add CultureObject to objectManager?
-            instance.Culture = MBObjectManager.Instance.GetObject<CultureObject>(data.CultureStringId);
+            if (objectManager.TryGetObject<CultureObject>(data.CultureStringId, out var culture) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+            }
+            instance.Culture = culture;
         }
 
         private void Handle(MessagePayload<ChangePower> payload)
