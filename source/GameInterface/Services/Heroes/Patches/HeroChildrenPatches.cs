@@ -15,7 +15,6 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.Heroes.Patches;
 
 [HarmonyPatch(typeof(Hero))]
-[HarmonyDebug]
 public class HeroChildrenPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroChildrenPatches>();

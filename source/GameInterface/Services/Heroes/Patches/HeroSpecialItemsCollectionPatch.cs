@@ -25,7 +25,7 @@ internal class HeroSpecialItemsCollectionPatch
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> ExSpousesTranspiler(IEnumerable<CodeInstruction> instructions)
     {
-        var listAddMethod = AccessTools.Method(typeof(MBList<ItemObject>), "Add");
+        var listAddMethod = AccessTools.Method(typeof(List<ItemObject>), "Add");
         var listAddOverrideMethod = AccessTools.Method(typeof(HeroSpecialItemsCollectionPatch), nameof(ListAddOverride));
 
         foreach (var instruction in instructions)
