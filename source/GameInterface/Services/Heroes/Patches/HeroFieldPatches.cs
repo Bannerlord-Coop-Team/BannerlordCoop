@@ -9,6 +9,10 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches
@@ -20,8 +24,15 @@ namespace GameInterface.Services.Heroes.Patches
 
         private static IEnumerable<MethodBase> TargetMethods()
         {
-            return AccessTools.GetDeclaredMethods(typeof(Hero));
-
+            foreach(var method in AccessTools.GetDeclaredMethods(typeof(Hero)))
+            {
+                yield return method;
+            }
+            yield return AccessTools.Method(typeof(HeroDeveloper), "CheckLevel");
+            yield return AccessTools.Method(typeof(HeroDeveloper), "ClearHeroLevel");
+            yield return AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal));
+            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(Hero) });
+            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(PregnancyCampaignBehavior.Pregnancy) });
         }
 
         [HarmonyTranspiler]
@@ -42,7 +53,6 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
         public static void LastTimeStampForActivityIntercept(Hero instance, int newTimestamp)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -80,7 +90,6 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
         public static void CharacterObjectIntercept(Hero instance, CharacterObject newCharacterObject)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -118,7 +127,6 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
         public static void FirstNameIntercept(Hero instance, TextObject newName)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -137,6 +145,7 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance._firstName = newName;
         }
+
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> NameTranspiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -155,7 +164,6 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
         public static void NameIntercept(Hero instance, TextObject newName)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -174,6 +182,7 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance._name = newName;
         }
+
         [HarmonyTranspiler]
         static IEnumerable<CodeInstruction> HairTagsTranspiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -192,7 +201,6 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
         public static void HairTagsIntercept(Hero instance, string newTags)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -211,6 +219,7 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.HairTags = newTags;
         }
+
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> BeardTagsTranspiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -229,7 +238,6 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
         public static void BeardTagsIntercept(Hero instance, string newTags)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -248,6 +256,7 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.BeardTags = newTags;
         }
+
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> TattooTagsTranspiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -266,7 +275,6 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
         public static void TattooTagsIntercept(Hero instance, string newTags)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -285,44 +293,46 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.TattooTags = newTags;
         }
-        //[HarmonyTranspiler]
-        //private static IEnumerable<CodeInstruction> HeroStateTranspiler(IEnumerable<CodeInstruction> instructions)
-        //{
-        //    var heroStateField = AccessTools.Field(typeof(Hero), nameof(Hero._heroState));
-        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HeroStateIntercept));
 
-        //    foreach (var instruction in instructions)
-        //    {
-        //        if (instruction.StoresField(heroStateField))
-        //        {
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> HeroStateTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var heroStateField = AccessTools.Field(typeof(Hero), nameof(Hero._heroState));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HeroStateIntercept));
 
-        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-        //        }
-        //        else
-        //        {
-        //            yield return instruction;
-        //        }
-        //    }
-        //}
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(heroStateField))
+                {
+                    CodeInstruction codeInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
+                    codeInst.labels = instruction.labels;
+                    yield return codeInst;
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void HeroStateIntercept(Hero instance, Hero.CharacterStates newState)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._heroState = newState;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance._heroState = newState;
+                return;
+            }
 
-        //public static void HeroStateIntercept(Hero instance, Hero.CharacterStates newState)
-        //{
-        //    if (CallOriginalPolicy.IsOriginalAllowed())
-        //    {
-        //        instance._heroState = newState;
-        //        return;
-        //    }
-        //    if (ModInformation.IsClient)
-        //    {
-        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-        //        instance._heroState = newState;
-        //        return;
-        //    }
+            MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance.StringId));
 
-        //    MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance.StringId));
+            instance._heroState = newState;
+        }
 
-        //    instance._heroState = newState;
-        //}
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> SpcDaysInLocationTranspiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -341,7 +351,6 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
         public static void SpcDaysInLocationIntercept(Hero instance, int days)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -360,79 +369,83 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.SpcDaysInLocation = days;
         }
-        //[HarmonyTranspiler]
-        //private static IEnumerable<CodeInstruction> DefaultAgeTranspiler(IEnumerable<CodeInstruction> instructions)
-        //{
-        //    var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._defaultAge));
-        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(DefaultAgeIntercept));
 
-        //    foreach (var instruction in instructions)
-        //    {
-        //        if (instruction.StoresField(valueField))
-        //        {
-        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-        //        }
-        //        else
-        //        {
-        //            yield return instruction;
-        //        }
-        //    }
-        //}
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> DefaultAgeTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._defaultAge));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(DefaultAgeIntercept));
 
-        //public static void DefaultAgeIntercept(int age, Hero instance)
-        //{
-        //    if (CallOriginalPolicy.IsOriginalAllowed())
-        //    {
-        //        instance._defaultAge = age;
-        //        return;
-        //    }
-        //    if (ModInformation.IsClient)
-        //    {
-        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-        //        instance._defaultAge = age;
-        //        return;
-        //    }
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(valueField))
+                {
+                    CodeInstruction codeInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
+                    codeInst.labels = instruction.labels;
+                    yield return codeInst;
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void DefaultAgeIntercept(Hero instance, float age)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._defaultAge = age;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance._defaultAge = age;
+                return;
+            }
 
-        //    MessageBroker.Instance.Publish(instance, new DefaultAgeChanged(age, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new DefaultAgeChanged(age, instance.StringId));
 
-        //    instance._defaultAge = age;
-        //}
-        //[HarmonyTranspiler]
-        //private static IEnumerable<CodeInstruction> BirthDayTranspiler(IEnumerable<CodeInstruction> instructions)
-        //{
-        //    var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._birthDay));
-        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(BirthDayIntercept));
+            instance._defaultAge = age;
+        }
 
-        //    foreach (var instruction in instructions)
-        //    {
-        //        if (instruction.StoresField(valueField))
-        //        {
-        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-        //        }
-        //        else
-        //        {
-        //            yield return instruction;
-        //        }
-        //    }
-        //}
-        //public static void BirthDayIntercept(CampaignTime birthDay, Hero instance)
-        //{
-        //    if (CallOriginalPolicy.IsOriginalAllowed())
-        //    {
-        //        instance._birthDay = birthDay;
-        //        return;
-        //    }
-        //    if (ModInformation.IsClient)
-        //    {
-        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-        //        instance._birthDay = birthDay;
-        //        return;
-        //    }
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> BirthDayTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._birthDay));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(BirthDayIntercept));
 
-        //    MessageBroker.Instance.Publish(instance, new BirthDayChanged(birthDay.NumTicks, instance.StringId));
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(valueField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void BirthDayIntercept(Hero instance, CampaignTime birthDay)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._birthDay = birthDay;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance._birthDay = birthDay;
+                return;
+            }
 
-        //    instance._birthDay = birthDay;
-        //}
+            MessageBroker.Instance.Publish(instance, new BirthDayChanged(birthDay.NumTicks, instance.StringId));
+
+            instance._birthDay = birthDay;
+        }
+
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> PowerTranspiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -487,7 +500,6 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
         public static void CultureIntercept(Hero instance, CultureObject culture)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -506,43 +518,44 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance.Culture = culture;
         }
-        //[HarmonyTranspiler]
-        //private static IEnumerable<CodeInstruction> HomeSettlementTranspiler(IEnumerable<CodeInstruction> instructions)
-        //{
-        //    var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._homeSettlement));
-        //    var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HomeSettlementIntercept));
 
-        //    foreach (var instruction in instructions)
-        //    {
-        //        if (instruction.StoresField(valueField))
-        //        {
-        //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-        //        }
-        //        else
-        //        {
-        //            yield return instruction;
-        //        }
-        //    }
-        //}
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> HomeSettlementTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero._homeSettlement));
+            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(HomeSettlementIntercept));
 
-        //public static void HomeSettlementIntercept(Settlement settlement, Hero instance)
-        //{
-        //    if (CallOriginalPolicy.IsOriginalAllowed())
-        //    {
-        //        instance._homeSettlement = settlement;
-        //        return;
-        //    }
-        //    if (ModInformation.IsClient)
-        //    {
-        //        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-        //        instance._homeSettlement = settlement;
-        //        return;
-        //    }
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(valueField))
+                {
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void HomeSettlementIntercept(Hero instance, Settlement settlement)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance._homeSettlement = settlement;
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance._homeSettlement = settlement;
+                return;
+            }
 
-        //    MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement.StringId, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement.StringId, instance.StringId));
 
-        //    instance._homeSettlement = settlement;
-        //}
+            instance._homeSettlement = settlement;
+        }
+
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> PregnantTranspiler(IEnumerable<CodeInstruction> instructions)
         {
@@ -561,7 +574,6 @@ namespace GameInterface.Services.Heroes.Patches
                 }
             }
         }
-
         public static void PregnantIntercept(Hero instance, bool isPregnant)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
