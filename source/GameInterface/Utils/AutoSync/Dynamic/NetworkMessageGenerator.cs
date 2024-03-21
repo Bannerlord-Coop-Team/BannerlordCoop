@@ -23,6 +23,25 @@ public class NetworkMessageGenerator
             TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
             typeof(object));
 
+        return GenerateNetworkMessageInternal(property.PropertyType, typeBuilder);
+    }
+
+    public Type GenerateNetworkMessage(ModuleBuilder moduleBuilder, FieldInfo field)
+    {
+        TypeBuilder typeBuilder = moduleBuilder.DefineType($"AutoSync_Network{field.DeclaringType.Name}_{field.Name}_Changed",
+            TypeAttributes.Public | TypeAttributes.Sealed | TypeAttributes.AnsiClass | TypeAttributes.AutoLayout | TypeAttributes.BeforeFieldInit,
+            typeof(object));
+
+        return GenerateNetworkMessageInternal(field.FieldType, typeBuilder);
+    }
+
+    public Type GenerateNetworkMessageInternal(Type dataType, TypeBuilder typeBuilder)
+    {
+        if (Serializer.NonGeneric.CanSerialize(dataType) == false)
+        {
+            throw new ArgumentException($"{dataType} is not serializable, try creating a surrogate");
+        }
+
         var attributeBuilder = new CustomAttributeBuilder(
             typeof(ProtoContractAttribute).GetConstructor(Type.EmptyTypes),
             new object[0],
@@ -30,8 +49,6 @@ public class NetworkMessageGenerator
             new object[] { true });
 
         typeBuilder.SetCustomAttribute(attributeBuilder);
-
-        var dataType = property.PropertyType;
 
         typeBuilder.AddInterfaceImplementation(typeof(IAutoSyncMessage<>).MakeGenericType(dataType));
 
