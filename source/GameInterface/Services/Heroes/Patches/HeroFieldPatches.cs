@@ -551,7 +551,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement.StringId, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement?.StringId, instance.StringId));
 
             instance._homeSettlement = settlement;
         }
