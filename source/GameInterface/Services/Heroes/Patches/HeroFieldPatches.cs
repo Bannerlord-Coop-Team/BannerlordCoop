@@ -33,6 +33,8 @@ namespace GameInterface.Services.Heroes.Patches
             yield return AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal));
             yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(Hero) });
             yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(PregnancyCampaignBehavior.Pregnancy) });
+            yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero));
+            yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring));
         }
 
         [HarmonyTranspiler]
@@ -492,7 +494,9 @@ namespace GameInterface.Services.Heroes.Patches
             {
                 if (instruction.StoresField(valueField))
                 {
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                    CodeInstruction codeInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
+                    codeInst.labels = instruction.labels;
+                    yield return codeInst;
                 }
                 else
                 {
