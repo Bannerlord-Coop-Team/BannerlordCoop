@@ -8,12 +8,10 @@ namespace GameInterface.Services.Armies.Audit;
 /// Command to request an army audit.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-internal record RequestArmyAudit : IAuditRequest
+internal record RequestArmyAudit : IAuditRequest<ArmyAuditData>
 {
     [ProtoMember(1)]
     public ArmyAuditData[] Data { get; }
-
-    IAuditData[] IAuditRequest.Data => Data;
 
     public RequestArmyAudit(ArmyAuditData[] data)
     {

@@ -18,7 +18,7 @@ namespace GameInterface.Services.Armies.Audit;
 /// <summary>
 /// Auditor for <see cref="Army"/> objects
 /// </summary>
-internal class ArmyAuditor : Auditor<RequestArmyAudit, ArmyAuditResponse, Army, ArmyAuditData, ArmyAuditor>
+internal class ArmyAuditor : AuditorBase<RequestArmyAudit, ArmyAuditResponse, ArmyAuditData, Army>
 {
     public ArmyAuditor(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, INetworkConfiguration configuration) : base(messageBroker, network, objectManager, configuration)
     {
@@ -28,13 +28,5 @@ internal class ArmyAuditor : Auditor<RequestArmyAudit, ArmyAuditResponse, Army, 
     public override IEnumerable<ArmyAuditData> GetAuditData()
     {
         return Objects.Select(h => new ArmyAuditData(h)).ToArray();
-    }
-    public override RequestArmyAudit CreateRequestInstance(IEnumerable<ArmyAuditData> par1)
-    {
-        return new RequestArmyAudit(par1.ToArray());
-    }
-    public override ArmyAuditResponse CreateResponseInstance(IEnumerable<ArmyAuditData> par1, string par2)
-    {
-        return new ArmyAuditResponse(par1.ToArray(), par2);
     }
 }
