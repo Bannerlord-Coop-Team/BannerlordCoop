@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties.Audit;
 
 [ProtoContract(SkipConstructor = true)]
-internal record MobilePartyAuditData : IAuditData
+internal record MobilePartyAuditData : IAuditInfo
 {
     [ProtoMember(1)]
     public string StringId { get; }

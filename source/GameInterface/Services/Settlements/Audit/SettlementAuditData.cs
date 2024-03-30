@@ -12,7 +12,7 @@ namespace GameInterface.Services.Settlements.Audit;
 /// Audit data for a settlement
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record SettlementAuditData : IAuditData
+public record SettlementAuditData : IAuditInfo
 {
     [ProtoMember(1)]
     public string StringId { get; }
