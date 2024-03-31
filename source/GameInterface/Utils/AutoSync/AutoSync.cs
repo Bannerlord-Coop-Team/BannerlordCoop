@@ -17,7 +17,7 @@ namespace GameInterface.Utils.AutoSync;
 /// <summary>
 /// Service for automatically syncing properties between server and clients
 /// </summary>
-internal interface IAutoSync : IDisposable
+public interface IAutoSync : IDisposable
 {
     public ISyncResults SyncProperty<T>(PropertyInfo property, Func<T, string> stringIdGetter) where T : class;
 }
