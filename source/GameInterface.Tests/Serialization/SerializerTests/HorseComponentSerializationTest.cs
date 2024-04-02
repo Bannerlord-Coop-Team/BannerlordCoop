@@ -42,31 +42,22 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly PropertyInfo BodyLength = typeof(HorseComponent).GetProperty(nameof(HorseComponent.BodyLength));
-        private static readonly PropertyInfo ChargeDamage = typeof(HorseComponent).GetProperty(nameof(HorseComponent.ChargeDamage));
-        private static readonly PropertyInfo HitPointBonus = typeof(HorseComponent).GetProperty(nameof(HorseComponent.HitPointBonus));
-        private static readonly PropertyInfo IsPackAnimal = typeof(HorseComponent).GetProperty(nameof(HorseComponent.IsPackAnimal));
-        private static readonly PropertyInfo IsRideable = typeof(HorseComponent).GetProperty(nameof(HorseComponent.IsRideable));
-        private static readonly PropertyInfo Maneuver = typeof(HorseComponent).GetProperty(nameof(HorseComponent.Maneuver));
-        private static readonly PropertyInfo Speed = typeof(HorseComponent).GetProperty(nameof(HorseComponent.Speed));
-        private static readonly PropertyInfo Monster = typeof(HorseComponent).GetProperty(nameof(HorseComponent.Monster));
-
         private static readonly FieldInfo _monsterMaterialNames = typeof(HorseComponent).GetField("_monsterMaterialNames", BindingFlags.NonPublic | BindingFlags.Instance);
         [Fact]
         public void HorseComponent_Full_Serialization()
         {
             HorseComponent HorseComponent = new HorseComponent();
 
-            BodyLength.SetValue(HorseComponent, 5);
-            ChargeDamage.SetValue(HorseComponent, 6);
-            HitPointBonus.SetValue(HorseComponent, 8);
-            IsPackAnimal.SetValue(HorseComponent, false);
-            IsRideable.SetValue(HorseComponent, false);
-            Maneuver.SetValue(HorseComponent, 55);
-            Speed.SetValue(HorseComponent, 513);
+            HorseComponent.BodyLength = 5;
+            HorseComponent.ChargeDamage = 6;
+            HorseComponent.HitPointBonus = 8;
+            HorseComponent.IsPackAnimal = false;
+            HorseComponent.IsRideable = false;
+            HorseComponent.Maneuver = 55;
+            HorseComponent.Speed = 513;
 
             Monster monster = MBObjectManager.Instance.CreateObject<Monster>();
-            Monster.SetValue(HorseComponent, monster);
+            HorseComponent.Monster = monster;
 
             _monsterMaterialNames.SetValue(HorseComponent, new MBList<HorseComponent.MaterialProperty>
             {

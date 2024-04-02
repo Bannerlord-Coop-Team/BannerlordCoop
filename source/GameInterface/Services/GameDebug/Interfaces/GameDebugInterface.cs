@@ -37,8 +37,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
             GameLoopRunner.RunOnMainThread(InternalLoadDebugGame, false);
         }
 
-        private static PropertyInfo FileDriver_SavePath => typeof(FileDriver).GetProperty("SavePath", BindingFlags.NonPublic | BindingFlags.Static);
-        private static PlatformDirectoryPath SaveDir => (PlatformDirectoryPath)FileDriver_SavePath?.GetValue(null);
+        private static PlatformDirectoryPath SaveDir => FileDriver.SavePath;
         private static PlatformFilePath SavePath => new PlatformFilePath(SaveDir, $"{LOAD_GAME}.sav");
         private static string FullSavePath => TaleWorlds.Library.Common.PlatformFileHelper?.GetFileFullPath(SavePath);
         private void InternalLoadDebugGame()

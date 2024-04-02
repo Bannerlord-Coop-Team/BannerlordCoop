@@ -7,7 +7,6 @@ using GameInterface.Services.Settlements.Messages;
 using Common.Messaging;
 using Common;
 using System.Reflection;
-using GameInterface.Extentions;
 using System;
 using Common.Logging;
 using Serilog;
@@ -49,7 +48,7 @@ public class CurrentSiegeStateSettlementPatch
         {
             using (new AllowedThread())
             {
-                settlement.SetSiegeState(siegeState);
+                settlement.CurrentSiegeState = siegeState;
             }
         });
     }

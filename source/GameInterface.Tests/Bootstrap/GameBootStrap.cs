@@ -73,24 +73,18 @@ namespace GameInterface.Tests.Bootstrap
             MBObjectManager.Instance.RegisterType<T>($"{typeof(T).Name}", $"{typeof(T).Name}s", itemCounter++, true, false);
         }
 
-        private static readonly PropertyInfo Campaign_Current = typeof(Campaign).GetProperty(nameof(Campaign.Current))!;
-
         private static void InitializeGame()
         {
-            var ctor_Module = AccessTools.Constructor(typeof(TaleWorlds.MountAndBlade.Module));
-            var currentModule = AccessTools.Property(typeof(TaleWorlds.MountAndBlade.Module), "CurrentModule");
-
-            currentModule.SetValue(null, ctor_Module.Invoke(null));
-
+            TaleWorlds.MountAndBlade.Module.CurrentModule = new TaleWorlds.MountAndBlade.Module();
             SandBoxGameManager gameManager = new SandBoxGameManager();
             
             Campaign campaign = new Campaign(CampaignGameMode.Campaign);
-            Campaign_Current.SetValue(null, campaign);
+            Campaign.Current = campaign;
             Game game = Game.CreateGame(campaign, gameManager);
 
             game.Initialize();
 
-            AccessTools.Field(typeof(Campaign), "_mapSceneWrapper").SetValue(campaign, new MapScene());
+            campaign._mapSceneWrapper = new MapScene();
         }
     }
 }

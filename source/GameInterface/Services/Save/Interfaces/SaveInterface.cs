@@ -17,8 +17,6 @@ internal class SaveInterface : ISaveInterface
 {
     private readonly ILogger Logger = LogManager.GetLogger<SaveInterface>();
 
-    private static readonly MethodInfo SaveHandler_GetSaveMetaData = typeof(SaveHandler).GetMethod(nameof(SaveHandler.GetSaveMetaData));
-    private static readonly MethodInfo MBSaveLoad_GetSaveMetaData = typeof(MBSaveLoad).GetMethod("GetSaveMetaData", BindingFlags.NonPublic | BindingFlags.Static);
     public byte[] SaveCurrentGame()
     {
         // Validation
@@ -28,8 +26,8 @@ internal class SaveInterface : ISaveInterface
 
         // Logic
         var saveHandler = Campaign.Current.SaveHandler;
-        var dataArgs = (CampaignSaveMetaDataArgs)SaveHandler_GetSaveMetaData.Invoke(saveHandler, Array.Empty<object>());
-        var metaData = (MetaData)MBSaveLoad_GetSaveMetaData.Invoke(null, new object[] { dataArgs });
+        var dataArgs = saveHandler.GetSaveMetaData();
+        var metaData = MBSaveLoad.GetSaveMetaData(dataArgs);
 
         var saveDriver = new CoopInMemSaveDriver();
         Game.Current.Save(metaData, "TransferSave", saveDriver, (SaveResult) => { });

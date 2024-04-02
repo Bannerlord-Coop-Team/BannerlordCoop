@@ -4,7 +4,6 @@ using Common.Messaging;
 using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Towns.Data;
 using GameInterface.Services.Towns.Messages;
 using GameInterface.Services.Towns.Patches;
@@ -24,8 +23,6 @@ namespace GameInterface.Services.Towns.Commands;
 
 public class TownAuditorDebugCommand
 {
-    private static readonly Func<Town, Town.SellLog[]> getSoldItems = typeof(Town).GetField("_soldItems", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Town, Town.SellLog[]>();
-
     /// <summary>
     /// Attempts to get the ObjectManager
     /// </summary>
@@ -98,7 +95,7 @@ public class TownAuditorDebugCommand
                     garrisonAutoRecruitmentIsEnabled: town.GarrisonAutoRecruitmentIsEnabled,
                     foodStocks: fief.FoodStocks,
                     tradeTaxAccumulated: town.TradeTaxAccumulated,
-                    sellLogList: getSoldItems(town));
+                    sellLogList: town._soldItems);
 
                 auditorDatas.Add(auditorData);
             }

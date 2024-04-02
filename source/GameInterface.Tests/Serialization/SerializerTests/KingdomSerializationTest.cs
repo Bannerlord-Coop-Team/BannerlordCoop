@@ -47,8 +47,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly PropertyInfo Kingdom_LastArmyCreationDay = typeof(Kingdom).GetProperty("LastArmyCreationDay", BindingFlags.Instance | BindingFlags.Public);
-        private static readonly FieldInfo Kingdom_Stances = typeof(Kingdom).GetField("_stances", BindingFlags.NonPublic | BindingFlags.Instance);
         [Fact]
         public void Kingdom_Full_Serialization()
         {
@@ -62,7 +60,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             // Assign values
             kingdomObject.LastMercenaryOfferTime = new CampaignTime();
             kingdomObject.NotAttackableByPlayerUntilTime= new CampaignTime();
-            Kingdom_LastArmyCreationDay.SetRandom(kingdomObject);
+            kingdomObject.LastArmyCreationDay = ReflectionExtensions.Random<int>();
 
             // Create settlements for one of the kingdoms cache lists
             Settlement settlement1 = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
@@ -73,14 +71,14 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             settlement2.StringId = "s2";
             objectManager.AddExisting(settlement2.StringId, settlement2);
 
-            KingdomBinaryPackage.InitializeCachedLists.Invoke(kingdomObject, new object[0]);
-            List<Settlement> settlements = (List<Settlement>)KingdomBinaryPackage.Kingdom_Settlements.GetValue(kingdomObject);
+            kingdomObject.InitializeCachedLists();
+            List<Settlement> settlements = kingdomObject._settlementsCache;
 
             settlements.Add(settlement1);
             settlements.Add(settlement2);
 
             // Create StanceLink for testing
-            List<StanceLink> stances = (List<StanceLink>)Kingdom_Stances.GetValue(kingdomObject);
+            List<StanceLink> stances = kingdomObject._stances;
 
             StanceLink stance = (StanceLink)FormatterServices.GetUninitializedObject(typeof(StanceLink));
             stances.Add(stance);
@@ -107,7 +105,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(kingdomObject.LastMercenaryOfferTime, newKingdomObject.LastMercenaryOfferTime);
             Assert.Equal(kingdomObject.LastArmyCreationDay, newKingdomObject.LastArmyCreationDay);
 
-            List<Settlement> newSettlements = (List<Settlement>)KingdomBinaryPackage.Kingdom_Settlements.GetValue(newKingdomObject);
+            List<Settlement> newSettlements = kingdomObject._settlementsCache;
             Assert.Equal(settlements.Count, newSettlements.Count);
             foreach (var zippedSettlements in settlements.Zip(newSettlements, (v1, v2) => (v1, v2)))
             {

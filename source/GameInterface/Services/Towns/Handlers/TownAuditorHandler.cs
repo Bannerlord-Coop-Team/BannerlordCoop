@@ -28,7 +28,6 @@ namespace GameInterface.Services.Towns.Handlers.TownAuditorHandler
 
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
-        private static readonly Func<Town, Town.SellLog[]> getSoldItems = typeof(Town).GetField("_soldItems", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Town, Town.SellLog[]>();
         public TownAuditorHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;

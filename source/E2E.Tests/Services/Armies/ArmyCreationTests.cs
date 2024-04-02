@@ -122,7 +122,7 @@ public class ArmyCreationTests : IDisposable
 
     private void SetupKingdom(Kingdom kingdom, Hero hero, Settlement settlement)
     {
-        var settlements = (MBList<Settlement>)AccessTools.Field(typeof(Kingdom), "_settlementsCache").GetValue(kingdom)!;
+        var settlements = kingdom._settlementsCache!;
         settlements.Add(settlement);
 
         hero.Clan.Kingdom = kingdom;

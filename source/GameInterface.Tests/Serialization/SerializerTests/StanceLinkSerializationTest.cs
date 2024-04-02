@@ -57,8 +57,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             objectManager.AddExisting(clan1.StringId, clan1);
             objectManager.AddExisting(clan2.StringId, clan2);
 
-            StanceLinkBinaryPackage.StanceLink_Faction1.SetValue(stanceLink, clan1);
-            StanceLinkBinaryPackage.StanceLink_Faction2.SetValue(stanceLink, clan2);
+            stanceLink.Faction1 = clan1;
+            stanceLink.Faction2 = clan2;
 
             // Serialize stanceLink
             var factory = container.Resolve<IBinaryPackageFactory>();

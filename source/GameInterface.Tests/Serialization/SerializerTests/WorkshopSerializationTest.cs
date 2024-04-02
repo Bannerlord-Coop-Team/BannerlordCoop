@@ -44,7 +44,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Workshop Workshop = new Workshop(settlement, "ws");
 
-            Town_Workshops.SetValue(town, new Workshop[] { Workshop });
+            town.Workshops = new Workshop[] { Workshop };
 
             // Setup serialization
             var factory = container.Resolve<IBinaryPackageFactory>();
@@ -57,7 +57,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly PropertyInfo Town_Workshops = typeof(Town).GetProperty(nameof(Town.Workshops));
         [Fact]
         public void Workshop_Full_Serialization()
         {
@@ -75,7 +74,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Workshop Workshop = new Workshop(settlement, "ws");
 
-            Town_Workshops.SetValue(town, new Workshop[] { Workshop });
+            town.Workshops = new Workshop[] { Workshop };
 
             // Setup serialization
             var factory = container.Resolve<IBinaryPackageFactory>();

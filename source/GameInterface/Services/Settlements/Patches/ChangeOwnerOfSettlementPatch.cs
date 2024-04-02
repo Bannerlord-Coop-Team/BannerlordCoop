@@ -29,6 +29,7 @@ namespace GameInterface.Services.Settlements.Patches
         .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
         .BuildDelegate<Action<Settlement, Hero, Hero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail>>();
     
+    {    
         public static bool Prefix(Settlement settlement, Hero newOwner, Hero capturerHero, ChangeOwnerOfSettlementDetail detail)
         {
             if (AllowedInstance.IsAllowed(settlement)) return true;

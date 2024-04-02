@@ -104,7 +104,7 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
-                army.AddPartyInternal(mobileParty);
+                army.OnAddPartyInternal(mobileParty);
             }
         });
     }*/
@@ -115,7 +115,7 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
-                army.RemovePartyInternal(mobileParty);
+                army.OnRemovePartyInternal(mobileParty);
             }
         });
     }

@@ -46,7 +46,6 @@ internal class HeroInterface : IHeroInterface
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IControlledEntityRegistry entityRegistry;
 
-    private static PropertyInfo Campaign_PlayerClan => typeof(Campaign).GetProperty("PlayerDefaultFaction", BindingFlags.Instance | BindingFlags.NonPublic);
 
 
     public HeroInterface(
@@ -130,7 +129,6 @@ internal class HeroInterface : IHeroInterface
         return true;
     }
 
-    private static readonly PropertyInfo MainParty = typeof(Campaign).GetProperty(nameof(Campaign.MainParty));
     public void SwitchMainHero(string heroId)
     {
         if(objectManager.TryGetObject(heroId, out Hero resolvedHero))
@@ -138,9 +136,9 @@ internal class HeroInterface : IHeroInterface
             Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
 
             ChangePlayerCharacterAction.Apply(resolvedHero);
-            MainParty.SetValue(Campaign.Current, resolvedHero.PartyBelongedTo);
+            Campaign.Current.MainParty = resolvedHero.PartyBelongedTo;
 
-            Campaign_PlayerClan.SetValue(Campaign.Current, resolvedHero.Clan);
+            Campaign.Current.PlayerDefaultFaction = resolvedHero.Clan;
         }
         else
         {
@@ -154,15 +152,6 @@ internal class HeroInterface : IHeroInterface
         SetupNewParty(hero);
     }
 
-    private static readonly Action<CampaignObjectManager, Hero> CampaignObjectManager_AddHero = typeof(CampaignObjectManager)
-    .GetMethod("AddHero", BindingFlags.Instance | BindingFlags.NonPublic)
-    .BuildDelegate<Action<CampaignObjectManager, Hero>>();
-    private static readonly Action<CampaignObjectManager, MobileParty> CampaignObjectManager_AddMobileParty = typeof(CampaignObjectManager)
-        .GetMethod("AddMobileParty", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildDelegate<Action<CampaignObjectManager, MobileParty>>();
-    private static readonly Action<CampaignObjectManager, Clan> CampaignObjectManager_AddClan = typeof(CampaignObjectManager)
-        .GetMethod("AddClan", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildDelegate<Action<CampaignObjectManager, Clan>>();
     private void SetupHeroWithObjectManagers(Hero hero)
     {
         objectManager.AddNewObject(hero, out var _);
@@ -176,15 +165,15 @@ internal class HeroInterface : IHeroInterface
             return;
         }
 
-        CampaignObjectManager_AddHero(campaignObjectManager, hero);
+        campaignObjectManager.AddHero(hero);
 
         var party = hero.PartyBelongedTo;
 
-        CampaignObjectManager_AddMobileParty(campaignObjectManager, party);
+        campaignObjectManager.AddMobileParty(party);
 
         var partyBase = party.Party;
 
-        CampaignObjectManager_AddClan(campaignObjectManager, hero.Clan);
+        campaignObjectManager.AddClan(hero.Clan);
 
         partyBase.GetPartyVisual().OnStartup();
         partyBase.SetVisualAsDirty();
@@ -209,8 +198,10 @@ internal class HeroInterface : IHeroInterface
         typeof(MobileParty).GetProperty("CurrentNavigationFace").SetValue(
             party,
             Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D));
+        party.RecoverPositionsForNavMeshUpdate();
+        party.CurrentNavigationFace = Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D);
 
-        typeof(MobilePartyAi).GetMethod("OnGameInitialized", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party.Ai, null);
+        party.Ai.OnGameInitialized();
 
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
     }
