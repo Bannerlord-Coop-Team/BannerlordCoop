@@ -11,7 +11,6 @@ using System.Text;
 using TaleWorlds.CampaignSystem.Settlements;
 using Common.Util;
 using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Extentions;
 
 namespace GameInterface.Services.Settlements.Patches
 {

@@ -18,8 +18,7 @@ internal class MobilePartyBuilder : IObjectBuilder
 
         return MobileParty.CreateParty("This should not set", partyComponent, (party) =>
         {
-            AccessTools.Method(typeof(LordPartyComponent), "InitializeLordPartyProperties")
-                .Invoke(partyComponent, new object[] { party, Vec2.Zero, 0, null });
+            partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
         });
     }
 
@@ -31,8 +30,7 @@ internal class MobilePartyBuilder : IObjectBuilder
 
         return MobileParty.CreateParty("This should not set", partyComponent, (party) =>
         {
-            AccessTools.Method(typeof(LordPartyComponent), "InitializeLordPartyProperties")
-                .Invoke(partyComponent, new object[] { party, Vec2.Zero, 0, null });
+            partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
         });
     }
 }

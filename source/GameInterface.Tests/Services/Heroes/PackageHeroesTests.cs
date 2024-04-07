@@ -1,7 +1,6 @@
 ﻿using Autofac;
 using GameInterface.Services.Registry;
 using GameInterface.Tests.Bootstrap;
-using GameInterface.Tests.Bootstrap.Extensions;
 using System;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;

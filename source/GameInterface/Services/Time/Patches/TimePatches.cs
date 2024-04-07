@@ -20,14 +20,6 @@ internal class TimePatches
 {
     private static CampaignTimeControlMode CurrentMode = CampaignTimeControlMode.Stop;
 
-    private static readonly Action<Campaign, CampaignTimeControlMode> _setTimeControlMode = 
-        typeof(Campaign)
-        .GetField("_timeControlMode", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildUntypedSetter<Campaign, CampaignTimeControlMode>();
-    private static readonly Func<Campaign, CampaignTimeControlMode> _getTimeControlMode =
-        typeof(Campaign)
-        .GetField("_timeControlMode", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildUntypedGetter<Campaign, CampaignTimeControlMode>();
 
     private static readonly TimeControlModeConverter timeControlModeConverter = new();
 
@@ -41,7 +33,7 @@ internal class TimePatches
         // We set this thread to "allowed" in AllowTimeControlFromControlsPatches
         if (AllowedThread.IsThisThreadAllowed() == false) return false;
 
-        if (value != _getTimeControlMode(__instance))
+        if (value != __instance._timeControlMode)
         {
             var controlMode = timeControlModeConverter.Convert(value);
             MessageBroker.Instance.Publish(__instance, new AttemptedTimeSpeedChanged(controlMode));
@@ -63,7 +55,7 @@ internal class TimePatches
 
         // _timeControlMode is getting set magically somewhere so we use our own value instead
         CurrentMode = value;
-        _setTimeControlMode(campaign, value);
+        campaign._timeControlMode = value;
     }
 }
 

@@ -1,7 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
@@ -27,7 +26,7 @@ public class CollectNotablesToCachePatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
         if (ModInformation.IsClient) return false;
 
-        var notableCache = __instance.GetNotablesCache();
+        var notableCache = __instance._notablesCache;
         notableCache.Clear();
 
         foreach (Hero hero in __instance.HeroesWithoutParty)
@@ -49,14 +48,14 @@ public class CollectNotablesToCachePatch
         return false;
     }
 
-    internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heros)
+    internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heroes)
     {
 
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                settlement.SetNotableCache(heros);
+                settlement._notablesCache = heroes;
             }
         });
     }

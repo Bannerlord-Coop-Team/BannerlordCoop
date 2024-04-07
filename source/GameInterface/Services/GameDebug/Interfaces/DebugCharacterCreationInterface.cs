@@ -1,5 +1,6 @@
 ﻿using Common;
 using SandBox;
+using SandBox.GauntletUI.CharacterCreation;
 using System;
 using System.Linq;
 using System.Reflection;
@@ -36,7 +37,6 @@ namespace GameInterface.Services.GameDebug.Interfaces
                    videoState.VideoPath.Contains(VideoPathName);
         }
 
-        private readonly MethodInfo LaunchSandboxCharacterCreation = typeof(SandBoxGameManager).GetMethod("LaunchSandboxCharacterCreation", BindingFlags.NonPublic | BindingFlags.Instance);
         public void SkipCharacterCreation()
         {
             // Validation
@@ -50,7 +50,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
         {
             // Skip intro video
             SandBoxGameManager gameManager = (SandBoxGameManager)Game.Current.GameManager;
-            LaunchSandboxCharacterCreation.Invoke(gameManager, Array.Empty<object>());
+            gameManager.LaunchSandboxCharacterCreation();
 
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
             if (characterCreationState.CurrentStage is CharacterCreationCultureStage)
@@ -64,7 +64,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
             if (characterCreationState.CurrentStage is CharacterCreationFaceGeneratorStage)
             {
                 ICharacterCreationStageListener listener = characterCreationState.CurrentStage.Listener;
-                BodyGeneratorView bgv = (BodyGeneratorView)listener.GetType().GetField("_faceGeneratorView", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(listener);
+                BodyGeneratorView bgv = (listener as CharacterCreationFaceGeneratorView)._faceGeneratorView;
 
                 FaceGenVM facegen = bgv.DataSource;
 

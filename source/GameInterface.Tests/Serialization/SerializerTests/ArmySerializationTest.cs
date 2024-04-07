@@ -44,11 +44,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly FieldInfo Army_tickEvent = typeof(Army).GetField("_tickEvent", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly FieldInfo Army_hourlyTickEvent = typeof(Army).GetField("_hourlyTickEvent", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static readonly PropertyInfo Army_Cohesion = typeof(Army).GetProperty(nameof(Army.Cohesion));
-        private static readonly PropertyInfo Army_Morale = typeof(Army).GetProperty(nameof(Army.Morale));
-        private static readonly PropertyInfo Campaing_MapTimeTracker = typeof(Campaign).GetProperty("MapTimeTracker", BindingFlags.NonPublic | BindingFlags.Instance);
         [Fact]
         public void Army_Full_Serialization()
         {
@@ -62,8 +57,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.True(objectManager.AddExisting(hero.StringId, hero));
 
             armyObject.ArmyOwner = hero;
-            Army_Cohesion.SetRandom(armyObject);
-            Army_Morale.SetRandom(armyObject);
+            armyObject.Cohesion = ReflectionExtensions.Random<float>();
+            armyObject.Morale = ReflectionExtensions.Random<float>();
 
             // Setup serialization for armyObject
             var factory = container.Resolve<IBinaryPackageFactory>();
@@ -87,8 +82,8 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             // Verify newArmyObject values
             Assert.Equal(armyObject.Cohesion, newArmyObject.Cohesion);
             Assert.Equal(armyObject.Morale, newArmyObject.Morale);
-            Assert.NotNull(Army_tickEvent.GetValue(newArmyObject));
-            Assert.NotNull(Army_hourlyTickEvent.GetValue(newArmyObject));
+            Assert.NotNull(newArmyObject._tickEvent);
+            Assert.NotNull(newArmyObject._hourlyTickEvent);
             Assert.Same(armyObject.ArmyOwner, newArmyObject.ArmyOwner);
         }
     }

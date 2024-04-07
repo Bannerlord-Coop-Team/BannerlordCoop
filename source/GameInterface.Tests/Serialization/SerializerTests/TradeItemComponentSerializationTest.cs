@@ -40,7 +40,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void TradeItemComponent_Full_Serialization()
         {
             TradeItemComponent tradeItemComponent = new TradeItemComponent();
-            tradeItemComponent.GetType().GetProperty("MoraleBonus", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public).SetValue(tradeItemComponent, 5);
+            tradeItemComponent.MoraleBonus = 5;
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             TradeItemComponentBinaryPackage package = new TradeItemComponentBinaryPackage(tradeItemComponent, factory);
