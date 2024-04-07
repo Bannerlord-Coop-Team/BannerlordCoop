@@ -11,12 +11,11 @@ namespace Coop.Core.Client.Services.PartyBases.Handlers
     public class NetworkItemRosterMessageHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
-        private readonly INetwork network;
 
-        public NetworkItemRosterMessageHandler(IMessageBroker broker, INetwork network)
+
+        public NetworkItemRosterMessageHandler(IMessageBroker broker)
         {
             messageBroker = broker;
-            this.network = network;
 
             messageBroker.Subscribe<NetworkItemRosterUpdate>(Handle);
             messageBroker.Subscribe<NetworkItemRosterClear>(Handle);
