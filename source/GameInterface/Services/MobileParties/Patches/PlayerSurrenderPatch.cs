@@ -49,7 +49,7 @@ namespace GameInterface.Services.MobileParties.Patches
             MessageBroker.Instance.Publish(null, new LocalPlayerSurrendered(
                 MobileParty.MainParty.StringId, 
                 MobileParty.MainParty.MapEvent.GetMapEventSide(enemySide).LeaderParty.MobileParty.StringId,
-                Hero.MainHero.StringId));
+                MobileParty.MainParty.LeaderHero.StringId));
 
             return false;
         }

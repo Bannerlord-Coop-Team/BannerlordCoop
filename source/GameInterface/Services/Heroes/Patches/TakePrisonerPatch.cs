@@ -16,11 +16,6 @@ namespace GameInterface.Services.Heroes.Patches
     [HarmonyPatch(typeof(TakePrisonerAction))]
     public class TakePrisonerPatch
     {
-        private static readonly Action<PartyBase, Hero, bool> ApplyInternal =
-            typeof(TakePrisonerAction)
-            .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
-            .BuildDelegate<Action<PartyBase, Hero, bool>>();
-
         [HarmonyPrefix]
         [HarmonyPatch("ApplyInternal")]
         private static bool Prefix(PartyBase capturerParty, Hero prisonerCharacter, bool isEventCalled = true)
@@ -45,7 +40,7 @@ namespace GameInterface.Services.Heroes.Patches
             {
                 using (new AllowedThread())
                 {
-                    ApplyInternal.Invoke(capturerParty, prisonerCharacter, isEventCalled);
+                    TakePrisonerAction.Apply(capturerParty, prisonerCharacter);
                 }
             });
         }
