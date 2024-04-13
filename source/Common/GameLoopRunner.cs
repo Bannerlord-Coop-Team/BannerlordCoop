@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Threading;
 
@@ -6,6 +8,8 @@ namespace Common;
 
 public class GameLoopRunner : IUpdateable
 {
+    private static ILogger Logger = LogManager.GetLogger<GameLoopRunner>();
+
     private static readonly Lazy<GameLoopRunner> m_Instance =
         new Lazy<GameLoopRunner>(() => new GameLoopRunner());
 
@@ -34,12 +38,17 @@ public class GameLoopRunner : IUpdateable
 
         lock (m_Queue)
         {
-            while(m_Queue.Count > 0)
+            while (m_Queue.Count > 0)
             {
                 toBeRun.Add(m_Queue.Dequeue());
             }
         }
 
+        if (toBeRun.Count > 0)
+        {
+            Logger.Debug("Processing {count} actions in the game loop", toBeRun.Count);
+        }
+        
         foreach ((Action, EventWaitHandle) task in toBeRun)
         {
             task.Item1?.Invoke();
