@@ -87,15 +87,6 @@ internal class MobilePartyInterface : IMobilePartyInterface
         }
     }
 
-    private static  AllowedInstance<MobileParty> allowedInstance = new AllowedInstance<MobileParty>();
-    private static MethodInfo InitMethod => typeof(PlayerEncounter).GetMethod(
-        "Init",
-        BindingFlags.NonPublic | BindingFlags.Instance,
-        null,
-        new Type[] { typeof(PartyBase), typeof(PartyBase), typeof(Settlement) },
-        null);
-    private static Action<PlayerEncounter, PartyBase, PartyBase, Settlement> Init =
-        InitMethod.BuildDelegate<Action<PlayerEncounter, PartyBase, PartyBase, Settlement>>();
     public void StartPlayerSettlementEncounter(string partyId, string settlementId)
     {
         if (objectManager.TryGetObject(partyId, out MobileParty mobileParty) == false)
@@ -120,12 +111,11 @@ internal class MobilePartyInterface : IMobilePartyInterface
         
         GameLoopRunner.RunOnMainThread(() =>
         {
-            using (EnterSettlementActionPatches.AllowedInstance)
+            using (new AllowedThread())
             {
-                EnterSettlementActionPatches.AllowedInstance.Instance = mobileParty;
                 if (PlayerEncounter.Current is not null) return;
                 PlayerEncounter.Start();
-                Init(PlayerEncounter.Current, mobileParty.Party, settlementParty, settlement);
+                PlayerEncounter.Current.Init(mobileParty.Party, settlementParty, settlement);
             }
         });
     }

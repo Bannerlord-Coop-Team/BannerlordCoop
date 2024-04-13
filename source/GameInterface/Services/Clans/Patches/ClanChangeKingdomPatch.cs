@@ -16,15 +16,8 @@ namespace GameInterface.Services.Clans.Patches
     [HarmonyPatch(typeof(ChangeKingdomAction), "ApplyInternal")]
     public class ClanChangeKingdomPatch
     {
-        private static readonly Action<Clan, Kingdom, ChangeKingdomAction.ChangeKingdomActionDetail, int, bool, bool> ApplyInternal =
-            typeof(ChangeKingdomAction)
-            .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
-            .BuildDelegate<Action<Clan, Kingdom, ChangeKingdomAction.ChangeKingdomActionDetail, int, bool, bool>>();
-
         static bool Prefix(Clan clan, Kingdom newKingdom, ChangeKingdomAction.ChangeKingdomActionDetail detail, int awardMultiplier = 0, bool byRebellion = false, bool showNotification = true)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
@@ -40,7 +33,7 @@ namespace GameInterface.Services.Clans.Patches
             {
                 using(new AllowedThread())
                 {
-                    ApplyInternal.Invoke(clan, newKingdom, detail, awardMultiplier, byRebellion, showNotification);
+                    ChangeKingdomAction.ApplyInternal(clan, newKingdom, detail, awardMultiplier, byRebellion, showNotification);
                 }
             });
         }
