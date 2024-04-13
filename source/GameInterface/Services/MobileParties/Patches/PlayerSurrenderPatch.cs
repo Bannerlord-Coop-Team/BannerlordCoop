@@ -1,12 +1,9 @@
 ﻿using Common;
-using Common.Extensions;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
-using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameMenus;
@@ -22,11 +19,6 @@ namespace GameInterface.Services.MobileParties.Patches
     [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
     public class PlayerSurrenderPatch
     {
-        private static readonly Action<EncounterGameMenuBehavior, MenuCallbackArgs> SurrenderOnConsequence =
-            typeof(EncounterGameMenuBehavior)
-            .GetMethod("game_menu_encounter_surrender_on_consequence", BindingFlags.NonPublic | BindingFlags.Instance)
-            .BuildDelegate<Action<EncounterGameMenuBehavior, MenuCallbackArgs>>();
-
         [HarmonyPrefix]
         [HarmonyPatch("game_menu_encounter_surrender_on_consequence")]
         public static bool Prefix(MenuCallbackArgs args)
@@ -60,9 +52,10 @@ namespace GameInterface.Services.MobileParties.Patches
             {
                 using (new AllowedThread())
                 {
-                    SurrenderOnConsequence.Invoke(
-                        Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>(), 
-                        new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, new TextObject()));
+                    Campaign.Current.GetCampaignBehavior<EncounterGameMenuBehavior>()
+                    .game_menu_encounter_surrender_on_consequence(
+                        new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, new TextObject())
+                    );
                 }
             });
         }

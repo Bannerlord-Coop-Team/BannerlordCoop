@@ -89,6 +89,9 @@ internal class MobilePartyInterface : IMobilePartyInterface
 
     public void StartPlayerSettlementEncounter(string partyId, string settlementId)
     {
+        // If player is already in an encounter we can skip
+        if (PlayerEncounter.Current is not null) return;
+
         if (objectManager.TryGetObject(partyId, out MobileParty mobileParty) == false)
         {
             Logger.Error("PartyId not found: {id}", partyId);
@@ -107,13 +110,11 @@ internal class MobilePartyInterface : IMobilePartyInterface
             Logger.Error("Settlement {settlementName} did not have a party value", settlement.Name);
             return;
         }
-
         
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                if (PlayerEncounter.Current is not null) return;
                 PlayerEncounter.Start();
                 PlayerEncounter.Current.Init(mobileParty.Party, settlementParty, settlement);
             }
@@ -146,10 +147,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
             return;
         }
 
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            EnterSettlementActionPatches.OverrideApplyForParty(mobileParty, settlement);
-        });
+        EnterSettlementActionPatches.OverrideApplyForParty(mobileParty, settlement);
     }
 
     public void LeaveSettlement(string partyId)
@@ -160,9 +158,6 @@ internal class MobilePartyInterface : IMobilePartyInterface
             return;
         }
 
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            LeaveSettlementActionPatches.OverrideApplyForParty(mobileParty);
-        });
+        LeaveSettlementActionPatches.OverrideApplyForParty(mobileParty);
     }
 }

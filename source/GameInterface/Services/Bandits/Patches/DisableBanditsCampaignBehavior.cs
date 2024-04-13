@@ -12,4 +12,8 @@ internal class DisableBanditsCampaignBehavior
     [HarmonyPatch(nameof(BanditsCampaignBehavior.HourlyTick))]
     [HarmonyPatch("OnNewGameCreatedPartialFollowUp")]
     static bool Prefix() => false;
+
+    [HarmonyPatch(nameof(BanditsCampaignBehavior.OnNewGameCreated))]
+    [HarmonyPrefix]
+    static bool OnNewGameCreatedPrefix() => ModInformation.IsServer;
 }

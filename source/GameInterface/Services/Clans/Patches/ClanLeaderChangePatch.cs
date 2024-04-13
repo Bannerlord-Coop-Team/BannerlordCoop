@@ -17,15 +17,8 @@ namespace GameInterface.Services.Clans.Patches
     [HarmonyPatch(typeof(ChangeClanLeaderAction), "ApplyInternal")]
     public class ClanLeaderChangePatch
     {
-        private static readonly Action<Clan, Hero> ApplyInternal =
-            typeof(ChangeClanLeaderAction)
-            .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
-            .BuildDelegate<Action<Clan, Hero>>();
-
         static bool Prefix(Clan clan, Hero newLeader = null)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && clan != Clan.PlayerClan) return false;
@@ -38,9 +31,9 @@ namespace GameInterface.Services.Clans.Patches
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
-                using(new AllowedThread())
+                using (new AllowedThread())
                 {
-                    ApplyInternal.Invoke(clan, newLeader);
+                    ChangeClanLeaderAction.ApplyInternal(clan, newLeader);
                 }
             });
         }

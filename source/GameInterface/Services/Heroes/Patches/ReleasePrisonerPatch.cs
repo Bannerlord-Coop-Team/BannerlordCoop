@@ -15,17 +15,10 @@ namespace GameInterface.Services.Heroes.Patches
     [HarmonyPatch(typeof(EndCaptivityAction))]
     public class ReleasePrisonerPatch
     {
-        private static readonly Action<Hero, EndCaptivityDetail, Hero> ApplyInternal =
-            typeof(EndCaptivityAction)
-            .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
-            .BuildDelegate<Action<Hero, EndCaptivityDetail, Hero>>();
-
         [HarmonyPrefix]
         [HarmonyPatch("ApplyInternal")]
         private static bool Prefix(Hero prisoner, EndCaptivityDetail detail, Hero facilitatior = null)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && prisoner != Hero.MainHero) return false;
@@ -44,7 +37,7 @@ namespace GameInterface.Services.Heroes.Patches
             {
                 using (new AllowedThread())
                 {
-                    ApplyInternal.Invoke(prisoner, detail, facilitator);
+                    EndCaptivityAction.ApplyInternal(prisoner, detail, facilitator);
                 }
             });
         }

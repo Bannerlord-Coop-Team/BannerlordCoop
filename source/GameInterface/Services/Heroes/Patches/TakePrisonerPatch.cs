@@ -20,8 +20,6 @@ namespace GameInterface.Services.Heroes.Patches
         [HarmonyPatch("ApplyInternal")]
         private static bool Prefix(PartyBase capturerParty, Hero prisonerCharacter, bool isEventCalled = true)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && prisonerCharacter != Hero.MainHero) return false;

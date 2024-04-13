@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.GameDebug.Patches;
@@ -33,10 +34,13 @@ namespace GameInterface.Services.MobileParties.Patches
 
         public static void OverrideApplyForParty(MobileParty mobileParty, Settlement settlement)
         {
-            using(new AllowedThread())
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                EnterSettlementAction.ApplyForParty(mobileParty, settlement);
-            }
+                using (new AllowedThread())
+                {
+                    EnterSettlementAction.ApplyForParty(mobileParty, settlement);
+                }
+            });
         }
     }
 }

@@ -46,11 +46,6 @@ namespace Common.PacketHandlers
 
             var networkEvent = serializer.Deserialize<IMessage>(convertedPacket.Data);
 
-            if (networkEvent.GetType().GetCustomAttribute<BatchLogMessageAttribute>() == null)
-            {
-                Logger.Information("Received network event from {Peer} of {EventType}", peer.EndPoint, networkEvent.GetType().Name);
-            }
-
             PublishEvent(peer, networkEvent);
         }
         private Dictionary<string, Action<IMessageBroker, object, object>> publishFunctionCache = new Dictionary<string, Action<IMessageBroker, object, object>>();

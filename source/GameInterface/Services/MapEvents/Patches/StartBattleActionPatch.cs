@@ -25,7 +25,7 @@ namespace GameInterface.Services.MapEvents.Patches
             if (lastAttackerPartyId == attackerParty.MobileParty.StringId) return false;
             lastAttackerPartyId = attackerParty.MobileParty.StringId;
 
-            //Disables interaction between players, this will be handled in a future issue
+            // Disables interaction between players, this will be handled in a future issue
             if (!attackerParty.MobileParty.IsPartyControlled() && !defenderParty.MobileParty.IsPartyControlled()) { return false; } 
 
             MessageBroker.Instance.Publish(attackerParty, new BattleStarted(

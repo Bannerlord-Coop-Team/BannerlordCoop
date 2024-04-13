@@ -18,62 +18,72 @@ namespace GameInterface.Services.MobileParties.Patches
     [HarmonyPatch(typeof(TroopRoster))]
     public class UnitRecruitPatch
     {
-        static readonly Func<TroopRoster, PartyBase> TroopRoster_OwnerParty = 
-            typeof(TroopRoster)
-        .GetProperty("OwnerParty", BindingFlags.Instance | BindingFlags.NonPublic)
-        .BuildUntypedGetter<TroopRoster, PartyBase>();
-
-        static readonly Func<TroopRoster, CharacterObject, bool, int, int> TroopRoster_AddNewElement = 
-            typeof(TroopRoster)
-            .GetMethod("AddNewElement", BindingFlags.Instance | BindingFlags.NonPublic)
-            .BuildDelegate<Func<TroopRoster, CharacterObject, bool, int, int>>();
-
         private static readonly ILogger Logger = LogManager.GetLogger<UnitRecruitPatch>();
 
         [HarmonyPrefix]
         [HarmonyPatch("AddNewElement")]
         private static bool PrefixAddNewElement(TroopRoster __instance, CharacterObject character, bool insertAtFront = false, int insertionIndex = -1)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            PartyBase ownerParty = TroopRoster_OwnerParty(__instance);
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                return true;
+            }
 
-            if (ownerParty == null) return false;
+            PartyBase ownerParty = __instance.OwnerParty;
 
-            MessageBroker.Instance.Publish(__instance, new NewTroopAdded(
-                character.StringId, 
-                ownerParty.MobileParty.StringId, 
-                __instance.IsPrisonRoster, 
-                insertAtFront, 
-                insertionIndex));
+            if (ownerParty == null)
+            {
+                Logger.Error("OwnerParty was null for troop roster");
+                return false;
+            }
 
-            return ModInformation.IsServer;
+            var message = new NewTroopAdded(
+                character.StringId,
+                ownerParty.MobileParty.StringId,
+                __instance.IsPrisonRoster,
+                insertAtFront,
+                insertionIndex);
+
+            MessageBroker.Instance.Publish(__instance, message);
+
+            return true;
         }
 
         [HarmonyPrefix]
         [HarmonyPatch(nameof(TroopRoster.AddToCountsAtIndex))]
         private static bool PrefixAddToCountsAtIndex(TroopRoster __instance, int index, int countChange, int woundedCountChange = 0, int xpChange = 0, bool removeDepleted = true)
         {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            PartyBase ownerParty = TroopRoster_OwnerParty(__instance);
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                return true;
+            }
 
-            if (ownerParty == null) return false;
+            PartyBase ownerParty = __instance.OwnerParty;
 
-            MessageBroker.Instance.Publish(__instance, new TroopIndexAdded(
-                ownerParty.MobileParty.StringId, 
+            if (ownerParty == null)
+            {
+                Logger.Error("OwnerParty was null for troop roster");
+                return false;
+            }
+
+            var message = new TroopIndexAdded(
+                ownerParty.MobileParty.StringId,
                 __instance.IsPrisonRoster,
                 index,
                 countChange,
                 woundedCountChange,
                 xpChange,
-                removeDepleted));
+                removeDepleted);
 
-            return ModInformation.IsServer;
+            MessageBroker.Instance.Publish(__instance, message);
+
+            return true;
         }
 
         public static void RunOriginalAddNewElement(CharacterObject character, MobileParty party, bool isPrisonerRoster, bool insertAtFront = false, int insertionIndex = -1)
@@ -82,16 +92,9 @@ namespace GameInterface.Services.MobileParties.Patches
             {
                 using (new AllowedThread())
                 {
-                    TroopRoster roster;
-                    if (isPrisonerRoster)
-                    {
-                        roster = party.PrisonRoster;
-                    }
-                    else
-                    {
-                        roster = party.MemberRoster;
-                    }
-                    TroopRoster_AddNewElement(roster, character, insertAtFront, insertionIndex);
+                    TroopRoster roster = isPrisonerRoster ? party.PrisonRoster : party.MemberRoster;
+
+                    roster.AddNewElement(character, insertAtFront, insertionIndex);
                 }
             }, true);
         }
@@ -103,21 +106,13 @@ namespace GameInterface.Services.MobileParties.Patches
             {
                 using (new AllowedThread())
                 {
-                    if (isPrisonerRoster)
+                    TroopRoster roster = isPrisonerRoster ? party.PrisonRoster : party.MemberRoster;
+
+                    roster.RemoveZeroCounts();
+
+                    if(roster.Count > index)
                     {
-                        party.PrisonRoster.RemoveZeroCounts();
-                        if (party.PrisonRoster.Count > index)
-                        {
-                            party.PrisonRoster.AddToCountsAtIndex(index, countChange, woundedCountChange, xpChange, removeDepleted);
-                        }
-                    }
-                    else
-                    {
-                        party.MemberRoster.RemoveZeroCounts();
-                        if(party.MemberRoster.Count > index)
-                        {
-                            party.MemberRoster.AddToCountsAtIndex(index, countChange, woundedCountChange, xpChange, removeDepleted);
-                        }
+                        roster.AddToCountsAtIndex(index, countChange, woundedCountChange, xpChange, removeDepleted);
                     }
                 }
             }, true);

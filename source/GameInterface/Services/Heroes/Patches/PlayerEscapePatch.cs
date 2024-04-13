@@ -20,11 +20,6 @@ namespace GameInterface.Services.MobileParties.Patches
     [HarmonyPatch(typeof(PlayerCaptivityCampaignBehavior))]
     public class PlayerEscapePatch
     {
-        private static readonly Action<PlayerCaptivityCampaignBehavior, MenuCallbackArgs> CaptivityEscape =
-            typeof(PlayerCaptivityCampaignBehavior)
-            .GetMethod("game_menu_captivity_escape_on_init", BindingFlags.NonPublic | BindingFlags.Instance)
-            .BuildDelegate<Action<PlayerCaptivityCampaignBehavior, MenuCallbackArgs>>();
-
         [HarmonyPrefix]
         [HarmonyPatch("game_menu_captivity_escape_on_init")]
         public static bool Prefix(MenuCallbackArgs args)
@@ -45,9 +40,11 @@ namespace GameInterface.Services.MobileParties.Patches
             {
                 using (new AllowedThread())
                 {
-                    CaptivityEscape.Invoke(
-                        Campaign.Current.GetCampaignBehavior<PlayerCaptivityCampaignBehavior>(), 
-                        new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, new TextObject()));
+                    Campaign.Current
+                    .GetCampaignBehavior<PlayerCaptivityCampaignBehavior>()
+                    .game_menu_captivity_escape_on_init(
+                        new MenuCallbackArgs(Campaign.Current.CurrentMenuContext, new TextObject())
+                    );
                 }
             });
         }

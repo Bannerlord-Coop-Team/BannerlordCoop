@@ -135,10 +135,13 @@ internal class HeroInterface : IHeroInterface
         {
             Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
 
-            ChangePlayerCharacterAction.Apply(resolvedHero);
-            Campaign.Current.MainParty = resolvedHero.PartyBelongedTo;
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                ChangePlayerCharacterAction.Apply(resolvedHero);
+                Campaign.Current.MainParty = resolvedHero.PartyBelongedTo;
 
-            Campaign.Current.PlayerDefaultFaction = resolvedHero.Clan;
+                Campaign.Current.PlayerDefaultFaction = resolvedHero.Clan;
+            });
         }
         else
         {
@@ -179,25 +182,17 @@ internal class HeroInterface : IHeroInterface
         partyBase.SetVisualAsDirty();
     }
 
-    private static MethodInfo TroopRoster_VersionNo => typeof(TroopRoster).GetProperty("VersionNo", BindingFlags.Instance | BindingFlags.Public).GetSetMethod(true);
-    private static readonly Action<TroopRoster, int> TroopRoster_VersionNo_Setter = TroopRoster_VersionNo.BuildDelegate<Action<TroopRoster, int>>();
-    private static FieldInfo TroopRoster_troopRosterElements => typeof(TroopRoster).GetField("_troopRosterElements", BindingFlags.Instance | BindingFlags.NonPublic);
-
     private void SetupNewParty(Hero hero)
     {
         var party = hero.PartyBelongedTo;
         party.IsVisible = true;
         party.Party.SetVisualAsDirty();
 
-        TroopRoster_VersionNo_Setter(party.MemberRoster, 1);
-        TroopRoster_VersionNo_Setter(party.PrisonRoster, 1);
-        TroopRoster_troopRosterElements.SetValue(party.MemberRoster, new MBList<TroopRosterElement> { });
-        TroopRoster_troopRosterElements.SetValue(party.PrisonRoster, new MBList<TroopRosterElement> { });
+        party.MemberRoster.VersionNo = 1;
+        party.PrisonRoster.VersionNo = 1;
+        party.MemberRoster._troopRosterElements = new MBList<TroopRosterElement>();
+        party.PrisonRoster._troopRosterElements = new MBList<TroopRosterElement>();
 
-        typeof(MobileParty).GetMethod("RecoverPositionsForNavMeshUpdate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(party, null);
-        typeof(MobileParty).GetProperty("CurrentNavigationFace").SetValue(
-            party,
-            Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D));
         party.RecoverPositionsForNavMeshUpdate();
         party.CurrentNavigationFace = Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D);
 
