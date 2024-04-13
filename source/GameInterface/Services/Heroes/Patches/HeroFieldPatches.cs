@@ -548,6 +548,7 @@ namespace GameInterface.Services.Heroes.Patches
                 instance._homeSettlement = settlement;
                 return;
             }
+
             if (ModInformation.IsClient)
             {
                 Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
