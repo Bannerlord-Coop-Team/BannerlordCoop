@@ -22,7 +22,8 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// <summary>
 /// Patches for lifecycle of <see cref="MobileParty"/> objects.
 /// </summary>
-[HarmonyPatch(typeof(MobileParty))]
+// TODO re-enable when working
+// [HarmonyPatch(typeof(MobileParty))]
 internal class PartyLifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroLifetimePatches>();
