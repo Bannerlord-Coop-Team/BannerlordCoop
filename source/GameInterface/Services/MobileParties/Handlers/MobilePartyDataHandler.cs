@@ -119,6 +119,13 @@ internal class MobilePartyDataHandler : IHandler
             return;
         }
 
+        // Set clan to null if id was null
+        if (clanId == null)
+        {
+            ActualClanPatches.OverrideSetActualClan(party, null);
+            return;
+        }
+
         if (objectManager.TryGetObject(clanId, out Clan clan) == false)
         {
             Logger.Error("Failed to find Clan with stringId {stringId}", clanId);

@@ -3,7 +3,7 @@ using ProtoBuf;
 
 namespace GameInterface.Services.MobileParties.Messages;
 
-[ProtoContract]
+[ProtoContract(SkipConstructor = true)]
 internal class NetworkChangeActualClan : ICommand
 {
     [ProtoMember(1)]

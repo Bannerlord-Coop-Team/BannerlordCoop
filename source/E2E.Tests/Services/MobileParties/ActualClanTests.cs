@@ -60,6 +60,46 @@ public class ActualClanTests : IDisposable
     }
 
     [Fact]
+    public void ServerCreateParty_SetNull_SyncAllClients()
+    {
+        // Arrange
+        var server = TestEnvironement.Server;
+
+        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+        var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+
+        var partyId = "PartyId";
+        var clanId = "ClanId";
+
+        clan.StringId = clanId;
+        party.StringId = partyId;
+
+        foreach (var client in TestEnvironement.Clients)
+        {
+            client.ObjectManager.AddExisting(party.StringId, GameObjectCreator.CreateInitializedObject<MobileParty>());
+            client.ObjectManager.AddExisting(clan.StringId, GameObjectCreator.CreateInitializedObject<Clan>());
+        }
+
+        server.ObjectManager.AddExisting(party.StringId, GameObjectCreator.CreateInitializedObject<MobileParty>());
+        server.ObjectManager.AddExisting(clan.StringId, GameObjectCreator.CreateInitializedObject<Clan>());
+
+        // Act
+        server.Call(() =>
+        {
+            party.ActualClan = clan;
+            party.ActualClan = null;
+        });
+
+
+        // Assert
+        foreach (var client in TestEnvironement.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(party.StringId, out var clientParty));
+            Assert.Null(clientParty.ActualClan);
+        }
+    }
+
+    [Fact]
     public void ClientCreateParty_DoesNothing()
     {
         // Arrange

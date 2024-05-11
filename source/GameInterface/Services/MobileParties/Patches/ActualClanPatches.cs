@@ -31,7 +31,7 @@ internal class ActualClanPatches
             return true;
         }
 
-        var message = new ActualClanChanged(__instance.StringId, value.StringId);
+        var message = new ActualClanChanged(__instance.StringId, value?.StringId);
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;

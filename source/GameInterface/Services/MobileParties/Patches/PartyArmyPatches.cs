@@ -49,7 +49,7 @@ internal class PartyArmyPatches
         {
             using(new AllowedThread())
             {
-                mobileParty.Army = army;
+                mobileParty._army = army;
             }
         });
     }
