@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.Registry;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -19,6 +20,13 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>
         this.messageBroker = messageBroker;
 
         messageBroker.Subscribe<PartyDestroyed>(Handle_PartyDestroyed);
+    }
+
+    public override void Dispose()
+    {
+        messageBroker.Unsubscribe<PartyDestroyed>(Handle_PartyDestroyed);
+
+        base.Dispose();
     }
 
     public override void RegisterAll()

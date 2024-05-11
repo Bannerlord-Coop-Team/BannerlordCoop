@@ -1,6 +1,8 @@
-﻿using HarmonyLib;
+﻿using Common.Util;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -10,6 +12,8 @@ internal class CultureBuilder : IObjectBuilder
     public object Build()
     {
         var cultureObject = new CultureObject();
+
+        cultureObject.StringId = Guid.NewGuid().ToString();
 
         cultureObject._defaultPolicyList = new MBList<PolicyObject>();
         cultureObject._maleNameList = new MBList<TextObject>();
