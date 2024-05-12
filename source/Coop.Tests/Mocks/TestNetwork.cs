@@ -128,4 +128,9 @@ public class TestNetwork : INetwork
         SentNetworkMessages.Clear();
         SentPackets.Clear();
     }
+
+    public void Dispose()
+    {
+        Clear();
+    }
 }

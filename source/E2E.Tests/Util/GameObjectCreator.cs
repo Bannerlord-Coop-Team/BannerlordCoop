@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Util.ObjectBuilders;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -13,10 +14,23 @@ internal class GameObjectCreator
         { typeof(Clan), new ClanBuilder() },
         { typeof(Hero), new HeroBuilder() },
         { typeof(LordPartyComponent), new LordPartyComponentBuilder() },
+        { typeof(Hideout), new HideoutBuilder() },
+        { typeof(CultureObject), new CultureBuilder() },
+        { typeof(PartyTemplateObject), new PartyTemplateObjectBuilder() },
+        { typeof(Town), new TownBuilder() },
+        { typeof(Village), new VillageBuilder() },
+        { typeof(MobileParty), new MobilePartyBuilder() },
     };
 
     public static T CreateInitializedObject<T>()
     {
+        if (ObjectBuilders.ContainsKey(typeof(T)) == false)
+        {
+            throw new KeyNotFoundException(
+                $"{typeof(T)} does not have a builder assigned, please create a builder " +
+                $"and add it to {nameof(GameObjectCreator)}.{nameof(ObjectBuilders)}");
+        }
+
         return (T)ObjectBuilders[typeof(T)].Build();
     }
 }

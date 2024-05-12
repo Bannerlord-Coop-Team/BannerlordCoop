@@ -89,4 +89,8 @@ public abstract class MockNetworkBase : INetwork
     {
         throw new NotImplementedException();
     }
+
+    public void Dispose()
+    {
+    }
 }
