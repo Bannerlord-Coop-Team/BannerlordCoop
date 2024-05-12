@@ -3,9 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.Armies.Extensions;
-using GameInterface.Services.MobileParties.Data;
-using GameInterface.Services.MobileParties.Messages.Data;
+using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -14,17 +12,14 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
-/// <summary>
-/// Patches for setting a party's army
-/// </summary>
 [HarmonyPatch(typeof(MobileParty))]
-internal class PartyArmyPatches
+internal class ActualClanPatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<PartyArmyPatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<ActualClanPatches>();
 
-    [HarmonyPatch(nameof(MobileParty.Army), MethodType.Setter)]
+    [HarmonyPatch(nameof(MobileParty.ActualClan), MethodType.Setter)]
     [HarmonyPrefix]
-    private static bool SetArmyPrefix(MobileParty __instance, Army value)
+    private static bool SetActualClanPrefix(MobileParty __instance, Clan value)
     {
         // Skip if we called it
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -36,20 +31,19 @@ internal class PartyArmyPatches
             return true;
         }
 
-        var data = new PartyArmyChangeData(__instance.StringId, value.GetStringId());
-        var message = new PartyArmyChanged(data);
+        var message = new ActualClanChanged(__instance.StringId, value?.StringId);
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;
     }
 
-    internal static void OverrideSetArmy(MobileParty mobileParty, Army army)
+    internal static void OverrideSetActualClan(MobileParty mobileParty, Clan clan)
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
-            using(new AllowedThread())
+            using (new AllowedThread())
             {
-                mobileParty._army = army;
+                mobileParty.ActualClan = clan;
             }
         });
     }

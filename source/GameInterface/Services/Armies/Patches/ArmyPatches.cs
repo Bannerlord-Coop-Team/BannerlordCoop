@@ -104,6 +104,12 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
+                // TODO find why this is not getting set automatically
+                if (mobileParty.Army == null)
+                {
+                    mobileParty._army = army;
+                }
+
                 army.OnAddPartyInternal(mobileParty);
             }
         });
@@ -115,6 +121,12 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
+                // TODO find why this is not getting set automatically
+                if (mobileParty.Army == null)
+                {
+                    mobileParty._army = army;
+                }
+
                 army.OnRemovePartyInternal(mobileParty);
             }
         });

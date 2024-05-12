@@ -94,16 +94,16 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Publicize Include="SandBox"/>
-    <Publicize Include="TaleWorlds.CampaignSystem"/>
-    <Publicize Include="TaleWorlds.Core"/>
-    <Publicize Include="TaleWorlds.Engine"/>
-    <Publicize Include="TaleWorlds.Library"/>
-    <Publicize Include="TaleWorlds.Localization"/>
-    <Publicize Include="TaleWorlds.ModuleManager"/>
-    <Publicize Include="TaleWorlds.MountAndBlade"/>
-    <Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library"/>
-    <Publicize Include="TaleWorlds.ObjectSystem"/>
-    <Publicize Include="TaleWorlds.SaveSystem"/>
+    <Publicize Include="SandBox" />
+    <Publicize Include="TaleWorlds.CampaignSystem" />
+    <Publicize Include="TaleWorlds.Core" />
+    <Publicize Include="TaleWorlds.Engine" />
+    <Publicize Include="TaleWorlds.Library" />
+    <Publicize Include="TaleWorlds.Localization" />
+    <Publicize Include="TaleWorlds.ModuleManager" />
+    <Publicize Include="TaleWorlds.MountAndBlade" />
+    <Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library" />
+    <Publicize Include="TaleWorlds.ObjectSystem" />
+    <Publicize Include="TaleWorlds.SaveSystem" />
   </ItemGroup>
 </Project>

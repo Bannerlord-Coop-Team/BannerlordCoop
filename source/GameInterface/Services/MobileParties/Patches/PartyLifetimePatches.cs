@@ -72,10 +72,10 @@ internal class PartyLifetimePatches
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return;
 
-        if (objectManager.AddExisting(partyId, newParty) == false) return;
-
         GameLoopRunner.RunOnMainThread(() =>
         {
+            if (objectManager.AddExisting(partyId, newParty) == false) return;
+
             using (new AllowedThread())
             {
                 MobileParty_ctor.Invoke(newParty, Array.Empty<object>());
@@ -140,7 +140,7 @@ internal class PartyLifetimePatches
     {
         var set_stringId = AccessTools.PropertySetter(typeof(MBObjectBase), nameof(MBObjectBase.StringId));
 
-        foreach(var instr in instructions)
+        foreach (var instr in instructions)
         {
             if (instr.opcode == OpCodes.Callvirt && instr.operand as MethodInfo == set_stringId)
             {
