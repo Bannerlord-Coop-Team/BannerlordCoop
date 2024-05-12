@@ -35,36 +35,6 @@ namespace Coop.Core
             messageBroker.Subscribe<EndCoopMode>(Handle);
         }
 
-        private Thread UpdateThread { get; set; }
-        private CancellationTokenSource CancellationTokenSource;
-        private void StartUpdateThread()
-        {
-            CancellationTokenSource = new CancellationTokenSource();
-            UpdateThread = new Thread(UpdateThreadMethod);
-            UpdateThread.Start();
-        }
-
-        private void StopUpdateThread()
-        {
-            CancellationTokenSource?.Cancel();
-            CancellationTokenSource?.Dispose();
-            UpdateThread?.Join(configuration.ObjectCreationTimeout);
-        }
-        
-        // TODO move to PeriodicTimer
-        private void UpdateThreadMethod()
-        {
-            var lastTime = DateTime.Now;
-            while (CancellationTokenSource.IsCancellationRequested == false)
-            {
-                var now = DateTime.Now;
-                TimeSpan deltaTime = now - lastTime;
-                lastTime = now;
-                network?.Update(deltaTime);
-                Thread.Sleep(configuration.NetworkPollInterval);
-            }
-        }
-
         private void Handle(MessagePayload<AttemptJoin> obj)
         {
             var connectMessage = obj.What;
@@ -98,8 +68,6 @@ namespace Coop.Core
         {
             DestroyContainer();
 
-            StartUpdateThread();
-
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
@@ -124,8 +92,6 @@ namespace Coop.Core
         public void StartAsClient(INetworkConfiguration configuration = null)
         {
             DestroyContainer();
-
-            StartUpdateThread();
 
             var containerProvider = new ContainerProvider();
 
@@ -156,7 +122,6 @@ namespace Coop.Core
 
         private void DestroyContainer()
         {
-            StopUpdateThread();
             container?.Dispose();
             container = null;
         }

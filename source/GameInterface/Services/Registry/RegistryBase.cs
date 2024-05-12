@@ -26,7 +26,7 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
         collection.AddRegistry(this);
     }
 
-    public void Dispose()
+    public virtual void Dispose()
     {
         collection.RemoveRegistry(this);
     }
