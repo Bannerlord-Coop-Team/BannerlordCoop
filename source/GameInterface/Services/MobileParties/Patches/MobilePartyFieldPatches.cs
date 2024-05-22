@@ -22,15 +22,15 @@ namespace GameInterface.Services.MobileParties.Patches;
 public class MobilePartyFieldPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyFieldPatches>();
-    
+
     private static IEnumerable<MethodBase> TargetMethods()
     {
         foreach(var method in AccessTools.GetDeclaredMethods(typeof(MobileParty)))
         {
             yield return method;
         }
-        
-        
+
+
         //yield return AccessTools.Method(typeof(MobileParty), nameof(MobileParty.RemoveParty));
     }
     
@@ -109,7 +109,7 @@ public class MobilePartyFieldPatches
 
         instance.HasUnpaidWages = newHasUnpaidWages;
     }
-
+    /*
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> LastCalculatedSpeedTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -131,6 +131,13 @@ public class MobilePartyFieldPatches
 
     public static void LastCalculatedSpeedIntercept(MobileParty instance, float newLastCalculatedSpeed)
     {
+        var hasChanged = instance._lastCalculatedSpeed.CompareTo(newLastCalculatedSpeed) != 0;
+
+        if (!hasChanged)
+        {
+            return;
+        }
+
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             instance._lastCalculatedSpeed = newLastCalculatedSpeed;
@@ -147,6 +154,7 @@ public class MobilePartyFieldPatches
 
         instance._lastCalculatedSpeed = newLastCalculatedSpeed;
     }
+    */
 
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> DisorganizedUntilTimeTranspiler(IEnumerable<CodeInstruction> instructions)
@@ -186,6 +194,7 @@ public class MobilePartyFieldPatches
         instance._disorganizedUntilTime = newDisorganizedUntilTime;
     }
 
+    /*
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> PartyPureSpeedLastCheckVersionTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -245,6 +254,13 @@ public class MobilePartyFieldPatches
 
     public static void PartyLastCheckIsPrisonerIntercept(MobileParty instance, bool newPartyLastCheckIsPrisoner)
     {
+        var hasChanged = instance._partyLastCheckIsPrisoner != newPartyLastCheckIsPrisoner;
+
+        if (!hasChanged)
+        {
+            return;
+        }
+        
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             instance._partyLastCheckIsPrisoner = newPartyLastCheckIsPrisoner;
@@ -299,7 +315,7 @@ public class MobilePartyFieldPatches
 
         instance._lastCalculatedBaseSpeedExplained = newLastCalculatedBaseSpeedExplained;
     }
-    
+
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> PartyLastCheckAtNightTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -321,6 +337,13 @@ public class MobilePartyFieldPatches
 
     public static void PartyLastCheckAtNightIntercept(MobileParty instance, bool newPartyLastCheckAtNight)
     {
+        var hasChanged = instance._partyLastCheckAtNight != newPartyLastCheckAtNight;
+
+        if (!hasChanged)
+        {
+            return;
+        }
+        
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             instance._partyLastCheckAtNight = newPartyLastCheckAtNight;
@@ -413,6 +436,7 @@ public class MobilePartyFieldPatches
 
         instance._partySizeRatioLastCheckVersion = newPartySizeRatioLastCheckVersion;
     }
+    */
 
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> LatestUsedPaymentRatioTranspiler(IEnumerable<CodeInstruction> instructions)
@@ -603,7 +627,7 @@ public class MobilePartyFieldPatches
 
         instance._customHomeSettlement = newCustomHomeSettlement;
     }
-    
+
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> IsDisorganizedTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -641,7 +665,7 @@ public class MobilePartyFieldPatches
 
         instance._isDisorganized = newIsDisorganized;
     }
-    
+
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> IsCurrentlyUsedByAQuestTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -832,6 +856,7 @@ public class MobilePartyFieldPatches
         instance._besiegerCampResetStarted = newBesiegerCampResetStarted;
     }
 
+    /*
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> LastWeatherTerrainEffectTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -869,6 +894,7 @@ public class MobilePartyFieldPatches
 
         instance._lastWeatherTerrainEffect = newLastWeatherTerrainEffect;
     }
+    */
 
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> PartyComponentTranspiler(IEnumerable<CodeInstruction> instructions)
