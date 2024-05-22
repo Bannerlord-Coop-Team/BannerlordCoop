@@ -75,6 +75,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
         
         instance.HasUnpaidWages = data.HasUnpaidWages;
@@ -86,6 +87,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
         
         instance._lastCalculatedSpeed = data.LastCalculatedSpeed;
@@ -97,6 +99,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
         
         instance._disorganizedUntilTime = new CampaignTime(data.DisorganizedUntilTime);
@@ -108,6 +111,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
         
         instance._partyPureSpeedLastCheckVersion = data.PartyPureSpeedLastCheckVersion;
@@ -119,6 +123,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
         
         instance._partyLastCheckIsPrisoner = data.PartyLastCheckIsPrisoner;
@@ -130,6 +135,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
         
         instance._lastCalculatedBaseSpeedExplained = new ExplainedNumber(data.Number, data.IncludeDescriptions, data.TextObjectValue == null ? null : new TextObject(data.TextObjectValue, null));
@@ -141,6 +147,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._partyLastCheckAtNight = data.PartyLastCheckAtNight;
@@ -152,6 +159,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._itemRosterVersionNo = data.ItemRosterVersionNo;
@@ -163,6 +171,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._partySizeRatioLastCheckVersion = data.PartySizeRatioLastCheckVersion;
@@ -174,6 +183,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._latestUsedPaymentRatio = data.LatestUsedPaymentRatio;
@@ -185,6 +195,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._cachedPartySizeRatio = data.CachedPartySizeRatio;
@@ -196,6 +207,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._cachedPartySizeLimit = data.CachedPartySizeLimit;
@@ -207,6 +219,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._doNotAttackMainParty = data.DoNotAttackMainParty;
@@ -218,11 +231,13 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
         
         if (objectManager.TryGetObject<Settlement>(data.CustomHomeSettlementId, out var settlement) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.CustomHomeSettlementId);
+            return;
         }
 
         instance._customHomeSettlement = settlement;
@@ -234,6 +249,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._isDisorganized = data.IsDisorganized;
@@ -245,6 +261,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._isCurrentlyUsedByAQuest = data.IsCurrentlyUsedByAQuest;
@@ -256,6 +273,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._partyTradeGold = data.PartyTradeGold;
@@ -267,6 +285,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._ignoredUntilTime = new CampaignTime(data.IgnoredUntilTime);
@@ -278,6 +297,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance.AverageFleeTargetDirection = new Vec2(data.VecX, data.VecY);
@@ -289,6 +309,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._besiegerCampResetStarted = data.BesiegerCampResetStarted;
@@ -300,6 +321,7 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
 
         instance._lastWeatherTerrainEffect = (MapWeatherModel.WeatherEventEffectOnTerrain) data.LastWeatherTerrainEffect;
@@ -311,11 +333,13 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
         
         if (objectManager.TryGetObject<PartyComponent>(data.PartyComponentId, out var partyComponent) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(PartyComponent), data.PartyComponentId);
+            return;
         }
 
         instance._partyComponent = partyComponent;
