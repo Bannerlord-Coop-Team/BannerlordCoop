@@ -12,7 +12,7 @@ namespace GameInterface.Services.Heroes.Messages
         public int EndCaptivityDetail { get; }
         public string? FacilitatorId { get; }
 
-        public PrisonerReleased(string heroId, int endCaptivityDetail, string? facilitatorId)
+        public PrisonerReleased(string heroId, int endCaptivityDetail, string? facilitatorId = null)
         {
             HeroId = heroId;
             EndCaptivityDetail = endCaptivityDetail;

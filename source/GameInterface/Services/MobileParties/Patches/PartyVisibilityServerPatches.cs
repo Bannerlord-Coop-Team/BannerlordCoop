@@ -10,9 +10,9 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.IsSpotted))]
 internal class PartyIsSpottedServerPatch
 {
-    private static void Postfix(ref bool __result)
+    private static void Postfix(ref MobileParty __instance, ref bool __result)
     {
-        if (ModInformation.IsServer || Debugger.IsAttached)
+        if (ModInformation.IsServer)
         {
             __result = true;
         }
@@ -25,7 +25,7 @@ internal class PartyVisibilityOnServerPatch
     [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Setter)]
     private static void Prefix(ref bool value)
     {
-        if (ModInformation.IsServer || Debugger.IsAttached)
+        if (ModInformation.IsServer)
         {
             value = true;
         }
@@ -34,7 +34,7 @@ internal class PartyVisibilityOnServerPatch
     [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Getter)]
     private static void Postfix(ref bool __result)
     {
-        if (ModInformation.IsServer || Debugger.IsAttached)
+        if (ModInformation.IsServer)
         {
             __result = true;
         }

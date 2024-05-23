@@ -19,6 +19,8 @@ namespace GameInterface.Services.Heroes.Patches
         [HarmonyPatch("ApplyInternal")]
         private static bool Prefix(Hero prisoner, EndCaptivityDetail detail, Hero facilitatior = null)
         {
+            if (AllowedThread.IsThisThreadAllowed()) return true;
+
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient && prisoner != Hero.MainHero) return false;
