@@ -1,4 +1,5 @@
-﻿using Autofac;
+﻿using System.Collections.Generic;
+using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Tests.Utils;
@@ -9,6 +10,7 @@ using Coop.Tests.Mocks;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
 using System.Linq;
+using GameInterface.Services.Modules;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -73,6 +75,25 @@ namespace Coop.Tests.Server.Connections.States
 
             // Assert
             Assert.IsType<ResolveCharacterState>(connectionLogic.State);
+        }
+        
+        [Fact]
+        public void NetworkModuleVersionsValidate_ModulesMatches()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            // Act
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo>()));
+            currentState.ModuleVersionsValidateHandler(payload);
+
+            // Assert
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            Assert.IsType<NetworkModuleVersionsValidated>(message);
+
+            var castedMessage = (NetworkModuleVersionsValidated)message;
+            Assert.True(castedMessage.Matches);
         }
 
         [Fact]

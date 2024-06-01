@@ -6,6 +6,7 @@ using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Modules;
 
 namespace Coop.Core.Client.States;
 
@@ -24,7 +25,8 @@ public class ValidateModuleState : ClientStateBase
         IMessageBroker messageBroker,
         INetwork network,
         IControllerIdProvider controllerIdProvider,
-        ICoopFinalizer coopFinalizer) : base(logic)
+        ICoopFinalizer coopFinalizer,
+        IModuleInfoProvider moduleInfoProvider) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
@@ -33,6 +35,7 @@ public class ValidateModuleState : ClientStateBase
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
+        messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
 
 #if DEBUG
         controllerIdProvider.SetControllerFromProgramArgs();
@@ -40,8 +43,7 @@ public class ValidateModuleState : ClientStateBase
         controllerIdProvider.SetControllerAsPlatformId();
 #endif
 
-
-        network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
+        network.SendAll(new NetworkModuleVersionsValidate(moduleInfoProvider.GetModuleInfos()));
     }
 
     public override void Dispose()
@@ -49,6 +51,7 @@ public class ValidateModuleState : ClientStateBase
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
         messageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
+        messageBroker.Unsubscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
     }
 
     internal void Handle_NetworkClientValidated(MessagePayload<NetworkClientValidated> obj)
@@ -61,6 +64,19 @@ public class ValidateModuleState : ClientStateBase
         else
         {
             Logic.StartCharacterCreation();   
+        }
+    }
+
+    internal void Handle_NetworkModuleVersionsValidated(MessagePayload<NetworkModuleVersionsValidated> obj)
+    {
+        if (obj.What.Matches)
+        {
+            network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
+        }
+        else
+        {
+            messageBroker.Publish(this, new SendInformationMessage(obj.What.Reason));
+            Disconnect();
         }
     }
 
