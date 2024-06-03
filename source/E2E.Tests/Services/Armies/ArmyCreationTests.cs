@@ -14,7 +14,6 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Armies;
 
-[CollectionDefinition("Non-Parallel Collection", DisableParallelization = true)]
 public class ArmyCreationTests : IDisposable
 {
     E2ETestEnvironment TestEnvironement { get; }

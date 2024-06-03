@@ -9,6 +9,9 @@ namespace Coop.Core.Client.Services.MobileParties.Messages.Fields;
 [ProtoContract(SkipConstructor = true)]
 public record NetworkCustomHomeSettlementChanged(string CustomHomeSettlementId, string MobilePartyId) : ICommand
 {
+    [ProtoMember(1)]
     public string CustomHomeSettlementId { get; } = CustomHomeSettlementId;
+
+    [ProtoMember(2)]
     public string MobilePartyId { get; } = MobilePartyId;
 }

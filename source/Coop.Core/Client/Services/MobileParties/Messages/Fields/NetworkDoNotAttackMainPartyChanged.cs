@@ -9,6 +9,8 @@ namespace Coop.Core.Client.Services.MobileParties.Messages.Fields;
 [ProtoContract(SkipConstructor = true)]
 public record NetworkDoNotAttackMainPartyChanged(int DoNotAttackMainParty, string MobilePartyId) : ICommand
 {
+    [ProtoMember(1)]
     public int DoNotAttackMainParty { get; } = DoNotAttackMainParty;
+    [ProtoMember(2)]
     public string MobilePartyId { get; } = MobilePartyId;
 }
