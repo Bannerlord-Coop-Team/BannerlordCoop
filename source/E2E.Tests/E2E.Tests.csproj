@@ -59,10 +59,10 @@
 	</AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
-    <Publicize Include="TaleWorlds.CampaignSystem"/>
-    <Publicize Include="TaleWorlds.Core"/>
-    <Publicize Include="TaleWorlds.Library"/>
-    <Publicize Include="TaleWorlds.Localization"/>
-    <Publicize Include="TaleWorlds.ObjectSystem"/>
+    <Publicize Include="TaleWorlds.CampaignSystem" />
+    <Publicize Include="TaleWorlds.Core" />
+    <Publicize Include="TaleWorlds.Library" />
+    <Publicize Include="TaleWorlds.Localization" />
+    <Publicize Include="TaleWorlds.ObjectSystem" />
   </ItemGroup>
 </Project>
