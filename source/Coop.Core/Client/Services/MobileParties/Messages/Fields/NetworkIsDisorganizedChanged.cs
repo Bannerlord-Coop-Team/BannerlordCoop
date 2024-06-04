@@ -9,6 +9,8 @@ namespace Coop.Core.Client.Services.MobileParties.Messages.Fields;
 [ProtoContract(SkipConstructor = true)]
 public record NetworkIsDisorganizedChanged(bool IsDisorganized, string MobilePartyId) : ICommand
 {
+    [ProtoMember(1)]
     public bool IsDisorganized { get; } = IsDisorganized;
+    [ProtoMember(2)]
     public string MobilePartyId { get; } = MobilePartyId;
 }

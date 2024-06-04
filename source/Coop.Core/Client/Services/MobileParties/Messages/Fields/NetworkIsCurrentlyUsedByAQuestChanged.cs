@@ -9,6 +9,8 @@ namespace Coop.Core.Client.Services.MobileParties.Messages.Fields;
 [ProtoContract(SkipConstructor = true)]
 public record NetworkIsCurrentlyUsedByAQuestChanged(bool IsCurrentlyUsedByAQuest, string MobilePartyId) : ICommand
 {
+    [ProtoMember(1)]
     public bool IsCurrentlyUsedByAQuest { get; } = IsCurrentlyUsedByAQuest;
+    [ProtoMember(2)]
     public string MobilePartyId { get; } = MobilePartyId;
 }
