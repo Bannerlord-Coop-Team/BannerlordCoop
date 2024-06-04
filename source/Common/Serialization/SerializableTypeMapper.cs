@@ -45,15 +45,15 @@ public class SerializableTypeMapper : ISerializableTypeMapper
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SerializableTypeMapper>();
 
-    private Dictionary<string, int> AddedKeyData = new Dictionary<string, int>();
-    private Type[] TypeMap = Array.Empty<Type>();
+    private static Dictionary<string, int> AddedKeyData = new Dictionary<string, int>();
+    private static Type[] TypeMap = Array.Empty<Type>();
 
-    public SerializableTypeMapper()
+    static SerializableTypeMapper()
     {
         CollectProtoContracts();
     }
 
-    private void CollectProtoContracts()
+    private static void CollectProtoContracts()
     {
         var types = AppDomain.CurrentDomain.GetAssemblies()
             .Where(a => a.IsDynamic == false)
@@ -80,7 +80,12 @@ public class SerializableTypeMapper : ISerializableTypeMapper
                 }
             });
 
-        AddTypes(types);
+        var sortedTypes = TypeMap.Concat(types).OrderBy(type => type.FullName);
+
+        TypeMap = sortedTypes.ToArray();
+        AddedKeyData = sortedTypes
+            .Select((type, index) => (type, index))
+            .ToDictionary(pair => pair.type.FullName, pair => pair.index);
     }
 
     public void AddTypes(IEnumerable<Type> types)
