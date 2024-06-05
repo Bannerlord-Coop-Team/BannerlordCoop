@@ -17,10 +17,10 @@ namespace Coop.Core.Server.Connections.Messages;
 public record NetworkModuleVersionsValidate : ICommand
 {
     [ProtoMember(1)]
-    public List<NetworkModuleInfo> Modules { get; }
+    public NetworkModuleInfo[] Modules { get; }
 
     public NetworkModuleVersionsValidate(IEnumerable<ModuleInfo> modules)
     {
-        Modules = modules.Select(m => new NetworkModuleInfo(m.Id, m.IsOfficial, m.Version)).ToList();
+        Modules = modules.Select(m => new NetworkModuleInfo(m.Id, m.IsOfficial, m.Version)).ToArray();
     }
 }

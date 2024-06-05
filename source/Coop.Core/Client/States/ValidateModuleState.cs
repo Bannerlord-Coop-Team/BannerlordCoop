@@ -75,8 +75,8 @@ public class ValidateModuleState : ClientStateBase
         }
         else
         {
-            messageBroker.Publish(this, new SendInformationMessage(obj.What.Reason));
-            Disconnect();
+            messageBroker.Publish(this, new SendInformationMessage("Module validation failed!\nReason: " + obj.What.Reason));
+            Logic.SetState<ReceivingSavedDataState>();
         }
     }
 
