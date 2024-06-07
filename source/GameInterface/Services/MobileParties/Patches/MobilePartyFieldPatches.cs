@@ -25,13 +25,7 @@ public class MobilePartyFieldPatches
 
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach(var method in AccessTools.GetDeclaredMethods(typeof(MobileParty)))
-        {
-            yield return method;
-        }
-
-
-        //yield return AccessTools.Method(typeof(MobileParty), nameof(MobileParty.RemoveParty));
+        return AccessTools.GetDeclaredMethods(typeof(MobileParty));
     }
     
     [HarmonyTranspiler]
