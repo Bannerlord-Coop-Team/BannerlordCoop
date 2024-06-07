@@ -385,21 +385,4 @@ public class MobilePartyFieldTests
             Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeLastWeatherTerrainEffect>());
         }
     }
-
-    [Fact]
-    public void ServerReceivedPartyComponentChanged()
-    {
-        var triggerMessage = new PartyComponentChanged("ComponentId", "testId");
-
-        var server = TestEnvironment.Server;
-
-        server.SimulateMessage(this, triggerMessage);
-
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkPartyComponentChanged>());
-
-        foreach (EnvironmentInstance client in TestEnvironment.Clients)
-        {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangePartyComponent>());
-        }
-    }
 }

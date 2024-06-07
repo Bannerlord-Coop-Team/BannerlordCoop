@@ -44,7 +44,6 @@ public class ServerMobilePartyFieldsHandler : IHandler
         
         messageBroker.Subscribe<BesiegerCampResetStartedChanged>(Handle);
         messageBroker.Subscribe<LastWeatherTerrainEffectChanged>(Handle);
-        messageBroker.Subscribe<PartyComponentChanged>(Handle);
     }
     
     private void Handle(MessagePayload<AttachedToChanged> payload)
@@ -179,12 +178,6 @@ public class ServerMobilePartyFieldsHandler : IHandler
         network.SendAll(new NetworkLastWeatherTerrainEffectChanged(data.LastWeatherTerrainEffect, data.MobilePartyId));
     }
 
-    private void Handle(MessagePayload<PartyComponentChanged> payload)
-    {
-        var data = payload.What;
-        network.SendAll(new NetworkPartyComponentChanged(data.PartyComponentId, data.MobilePartyId));
-    }
-
     public void Dispose()
     {
         messageBroker.Unsubscribe<AttachedToChanged>(Handle);
@@ -213,6 +206,5 @@ public class ServerMobilePartyFieldsHandler : IHandler
         
         messageBroker.Unsubscribe<BesiegerCampResetStartedChanged>(Handle);
         messageBroker.Unsubscribe<LastWeatherTerrainEffectChanged>(Handle);
-        messageBroker.Unsubscribe<PartyComponentChanged>(Handle);
     }
 }

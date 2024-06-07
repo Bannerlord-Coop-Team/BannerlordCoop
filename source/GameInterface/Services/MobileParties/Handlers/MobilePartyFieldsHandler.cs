@@ -52,7 +52,6 @@ public class MobilePartyFieldsHandler : IHandler
         
         messageBroker.Subscribe<ChangeBesiegerCampResetStarted>(Handle);
         messageBroker.Subscribe<ChangeLastWeatherTerrainEffect>(Handle);
-        messageBroker.Subscribe<ChangePartyComponent>(Handle);
     }
 
     private void Handle(MessagePayload<ChangeAttachedTo> payload)
@@ -326,24 +325,6 @@ public class MobilePartyFieldsHandler : IHandler
 
         instance._lastWeatherTerrainEffect = (MapWeatherModel.WeatherEventEffectOnTerrain) data.LastWeatherTerrainEffect;
     }
-
-    private void Handle(MessagePayload<ChangePartyComponent> payload)
-    {
-        var data = payload.What;
-        if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
-            return;
-        }
-        
-        if (objectManager.TryGetObject<PartyComponent>(data.PartyComponentId, out var partyComponent) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(PartyComponent), data.PartyComponentId);
-            return;
-        }
-
-        instance._partyComponent = partyComponent;
-    }
     
     public void Dispose()
     {
@@ -373,6 +354,5 @@ public class MobilePartyFieldsHandler : IHandler
         
         messageBroker.Unsubscribe<ChangeBesiegerCampResetStarted>(Handle);
         messageBroker.Unsubscribe<ChangeLastWeatherTerrainEffect>(Handle);
-        messageBroker.Unsubscribe<ChangePartyComponent>(Handle);
     }
 }
