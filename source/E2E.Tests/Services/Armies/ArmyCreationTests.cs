@@ -1,15 +1,10 @@
 using Autofac;
 using Common.Messaging;
-using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
-using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.Armies.Messages.Lifetime;
-using GameInterface.Utils.AutoSync;
-using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Armies;
