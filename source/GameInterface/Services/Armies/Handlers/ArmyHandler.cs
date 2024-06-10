@@ -67,7 +67,7 @@ public class ArmyHandler : IHandler
             return;
         }
 
-        //ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
+        ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
           
     }
     public void Dispose()

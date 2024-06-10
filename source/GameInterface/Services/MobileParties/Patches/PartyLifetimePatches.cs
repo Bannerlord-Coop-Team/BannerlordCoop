@@ -24,7 +24,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// </summary>
  
 // TODO fix patch
-// [HarmonyPatch(typeof(MobileParty))]
+[HarmonyPatch(typeof(MobileParty))]
 internal class PartyLifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroLifetimePatches>();
