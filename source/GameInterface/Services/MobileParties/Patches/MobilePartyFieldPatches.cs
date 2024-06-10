@@ -11,6 +11,7 @@ using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ComponentInterfaces;
+using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -25,7 +26,13 @@ public class MobilePartyFieldPatches
 
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        return AccessTools.GetDeclaredMethods(typeof(MobileParty));
+        foreach (var method in AccessTools.GetDeclaredMethods(typeof(MobileParty)))
+        {
+            yield return method;
+        }
+        ;
+        yield return AccessTools.Method(typeof(DefaultClanFinanceModel), nameof(DefaultClanFinanceModel.ApplyMoraleEffect));
+        yield return AccessTools.Method(typeof(MobilePartyAi), nameof(MobilePartyAi.GetFleeBehavior));
     }
     
     [HarmonyTranspiler]
@@ -103,7 +110,7 @@ public class MobilePartyFieldPatches
 
         instance.HasUnpaidWages = newHasUnpaidWages;
     }
-    /*
+    
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> LastCalculatedSpeedTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -148,7 +155,6 @@ public class MobilePartyFieldPatches
 
         instance._lastCalculatedSpeed = newLastCalculatedSpeed;
     }
-    */
 
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> DisorganizedUntilTimeTranspiler(IEnumerable<CodeInstruction> instructions)
@@ -188,7 +194,6 @@ public class MobilePartyFieldPatches
         instance._disorganizedUntilTime = newDisorganizedUntilTime;
     }
 
-    /*
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> PartyPureSpeedLastCheckVersionTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -430,7 +435,6 @@ public class MobilePartyFieldPatches
 
         instance._partySizeRatioLastCheckVersion = newPartySizeRatioLastCheckVersion;
     }
-    */
 
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> LatestUsedPaymentRatioTranspiler(IEnumerable<CodeInstruction> instructions)
@@ -850,7 +854,6 @@ public class MobilePartyFieldPatches
         instance._besiegerCampResetStarted = newBesiegerCampResetStarted;
     }
 
-    /*
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> LastWeatherTerrainEffectTranspiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -888,5 +891,4 @@ public class MobilePartyFieldPatches
 
         instance._lastWeatherTerrainEffect = newLastWeatherTerrainEffect;
     }
-    */
 }

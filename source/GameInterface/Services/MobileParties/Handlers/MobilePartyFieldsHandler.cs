@@ -60,10 +60,12 @@ public class MobilePartyFieldsHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
+            return;
         }
         if (objectManager.TryGetObject<MobileParty>(data.AttachedToId, out var attachedToMobileParty) == false)
         {
             Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.AttachedToId);
+            return;
         }
         instance._attachedTo = attachedToMobileParty;
     }
