@@ -15,22 +15,49 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 namespace GameInterface.Services.PartyComponents.Patches;
 
 [HarmonyPatch]
-internal class PartyComponentLifetimePatches
+internal class LordPartyComponentLifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroLifetimePatches>();
 
-    private static IEnumerable<MethodBase> TargetMethods()
-    {
-        return AccessTools.GetDeclaredConstructors(typeof(LordPartyComponent))
-            .Concat(AccessTools.GetDeclaredConstructors(typeof(BanditPartyComponent)))
-            .Concat(AccessTools.GetDeclaredConstructors(typeof(CaravanPartyComponent)))
-            .Concat(AccessTools.GetDeclaredConstructors(typeof(CustomPartyComponent)))
-            .Concat(AccessTools.GetDeclaredConstructors(typeof(GarrisonPartyComponent)))
-            .Concat(AccessTools.GetDeclaredConstructors(typeof(MilitiaPartyComponent)))
-            .Concat(AccessTools.GetDeclaredConstructors(typeof(VillagerPartyComponent)));
-    }
+    private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(LordPartyComponent));
+    //{
+    //    return 
+    //        .Concat(AccessTools.GetDeclaredConstructors(typeof(BanditPartyComponent)))
+    //        .Concat(AccessTools.GetDeclaredConstructors(typeof(CaravanPartyComponent)))
+    //        .Concat(AccessTools.GetDeclaredConstructors(typeof(CustomPartyComponent)))
+    //        .Concat(AccessTools.GetDeclaredConstructors(typeof(GarrisonPartyComponent)))
+    //        .Concat(AccessTools.GetDeclaredConstructors(typeof(MilitiaPartyComponent)))
+    //        .Concat(AccessTools.GetDeclaredConstructors(typeof(VillagerPartyComponent)));
+    //}
 
     private static bool Prefix(LordPartyComponent __instance)
+    {
+        // Skip if we called it
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
+            return true;
+        }
+
+        var message = new PartyComponentCreated(__instance);
+
+        MessageBroker.Instance.Publish(__instance, message);
+
+        return true;
+    }
+}
+
+[HarmonyPatch]
+internal class BanditPartyComponentLifetimePatches
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<HeroLifetimePatches>();
+
+    private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(BanditPartyComponent));
+
+    private static bool Prefix(BanditPartyComponent __instance)
     {
         // Skip if we called it
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
