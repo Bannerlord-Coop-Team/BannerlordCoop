@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.PartyComponents.Handlers;
 internal class PartyComponentHandler : IHandler
@@ -14,6 +15,17 @@ internal class PartyComponentHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly PartyComponentRegistry registry;
+
+    private readonly Type[] partyTypes = new Type[]
+    {
+        typeof(BanditPartyComponent),
+        typeof(CaravanPartyComponent),
+        typeof(CustomPartyComponent),
+        typeof(GarrisonPartyComponent),
+        typeof(LordPartyComponent),
+        typeof(MilitiaPartyComponent),
+        typeof(VillagerPartyComponent),
+    };
 
     public PartyComponentHandler(IMessageBroker messageBroker, INetwork network, PartyComponentRegistry registry)
     {
@@ -28,16 +40,17 @@ internal class PartyComponentHandler : IHandler
     {
         registry.RegisterNewObject(payload.What.Instance, out var id);
 
-        var data = new PartyComponentData(id);
+        var typeIndex = partyTypes.IndexOf(payload.What.Instance.GetType());
+        var data = new PartyComponentData(typeIndex, id);
         network.SendAll(new NetworkCreatePartyComponent(data));
     }
 
     private void Handle(MessagePayload<NetworkCreatePartyComponent> payload)
     {
         var data = payload.What.Data;
+        var typeIdx = data.TypeIndex;
 
-        // TODO add all types
-        var obj = ObjectHelper.SkipConstructor<LordPartyComponent>();
+        var obj = ObjectHelper.SkipConstructor(partyTypes[typeIdx]);
 
         registry.RegisterExistingObject(data.Id, obj);
     }

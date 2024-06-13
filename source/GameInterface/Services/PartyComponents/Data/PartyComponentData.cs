@@ -3,12 +3,11 @@
 namespace GameInterface.Services.PartyComponents.Data;
 
 [ProtoContract(SkipConstructor = true)]
-public record PartyComponentData
+public record PartyComponentData(int TypeIndex, string Id)
 {
-    public string Id { get; }
+    [ProtoMember(1)]
+    public int TypeIndex = TypeIndex;
 
-    public PartyComponentData(string id)
-    {
-        Id = id;
-    }
+    [ProtoMember(2)]
+    public string Id { get; } = Id;
 }
