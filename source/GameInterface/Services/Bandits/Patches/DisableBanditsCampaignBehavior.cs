@@ -7,9 +7,21 @@ namespace GameInterface.Services.Bandits.Patches;
 internal class DisableBanditsCampaignBehavior
 {
     [HarmonyPatch(nameof(BanditsCampaignBehavior.OnSettlementEntered))]
+    [HarmonyPrefix]
+    static bool OnSettlementEnteredPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch(nameof(BanditsCampaignBehavior.WeeklyTick))]
+    [HarmonyPrefix]
+    static bool WeeklyTickPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch(nameof(BanditsCampaignBehavior.DailyTick))]
+    [HarmonyPrefix]
+    static bool DailyTickPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch(nameof(BanditsCampaignBehavior.HourlyTick))]
+    [HarmonyPrefix]
+    static bool HourlyTickPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch("OnNewGameCreatedPartialFollowUp")]
     static bool Prefix() => false;
 
