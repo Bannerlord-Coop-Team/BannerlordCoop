@@ -47,23 +47,6 @@ public class MobilePartyFieldTests
     }
 
     [Fact]
-    public void ServerReceivedLastCalculatedSpeedChanged()
-    {
-        var triggerMessage = new LastCalculatedSpeedChanged(10.5f, "testId");
-
-        var server = TestEnvironment.Server;
-
-        server.SimulateMessage(this, triggerMessage);
-
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkLastCalculatedSpeedChanged>());
-
-        foreach (EnvironmentInstance client in TestEnvironment.Clients)
-        {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeLastCalculatedSpeed>());
-        }
-    }
-
-    [Fact]
     public void ServerReceivedDisorganizedUntilTimeChanged()
     {
         var triggerMessage = new DisorganizedUntilTimeChanged(1203203, "testId");
@@ -77,91 +60,6 @@ public class MobilePartyFieldTests
         foreach (EnvironmentInstance client in TestEnvironment.Clients)
         {
             Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeDisorganizedUntilTime>());
-        }
-    }
-
-    [Fact]
-    public void ServerReceivedPartyPureSpeedLastCheckVersionChanged()
-    {
-        var triggerMessage = new PartyPureSpeedLastCheckVersionChanged(2, "testId");
-
-        var server = TestEnvironment.Server;
-
-        server.SimulateMessage(this, triggerMessage);
-
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkPartyPureSpeedLastCheckVersionChanged>());
-
-        foreach (EnvironmentInstance client in TestEnvironment.Clients)
-        {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangePartyPureSpeedLastCheckVersion>());
-        }
-    }
-
-    [Fact]
-    public void ServerReceivedPartyLastCheckIsPrisonerChanged()
-    {
-        var triggerMessage = new PartyLastCheckIsPrisonerChanged(true, "testId");
-
-        var server = TestEnvironment.Server;
-
-        server.SimulateMessage(this, triggerMessage);
-
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkPartyLastCheckIsPrisonerChanged>());
-
-        foreach (EnvironmentInstance client in TestEnvironment.Clients)
-        {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangePartyLastCheckIsPrisoner>());
-        }
-    }
-
-    [Fact]
-    public void ServerReceivedLastCalculatedBaseSpeedExplainedChanged()
-    {
-        var triggerMessage = new LastCalculatedBaseSpeedExplainedChanged(2f, true, "RandomValue", "testId");
-
-        var server = TestEnvironment.Server;
-
-        server.SimulateMessage(this, triggerMessage);
-
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkLastCalculatedBaseSpeedExplainedChanged>());
-
-        foreach (EnvironmentInstance client in TestEnvironment.Clients)
-        {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeLastCalculatedBaseSpeedExplained>());
-        }
-    }
-
-    [Fact]
-    public void ServerReceivedPartyLastCheckAtNightChanged()
-    {
-        var triggerMessage = new PartyLastCheckAtNightChanged(true, "testId");
-
-        var server = TestEnvironment.Server;
-
-        server.SimulateMessage(this, triggerMessage);
-
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkPartyLastCheckAtNightChanged>());
-
-        foreach (EnvironmentInstance client in TestEnvironment.Clients)
-        {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangePartyLastCheckAtNight>());
-        }
-    }
-
-    [Fact]
-    public void ServerReceivedItemRosterVersionNoChanged()
-    {
-        var triggerMessage = new ItemRosterVersionNoChanged(1, "testId");
-
-        var server = TestEnvironment.Server;
-
-        server.SimulateMessage(this, triggerMessage);
-
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkItemRosterVersionNoChanged>());
-
-        foreach (EnvironmentInstance client in TestEnvironment.Clients)
-        {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeItemRosterVersionNo>());
         }
     }
 
@@ -336,23 +234,6 @@ public class MobilePartyFieldTests
     }
 
     [Fact]
-    public void ServerReceivedAverageFleeTargetDirectionChanged()
-    {
-        var triggerMessage = new AverageFleeTargetDirectionChanged(1.0f, 2.0f, "testId");
-
-        var server = TestEnvironment.Server;
-
-        server.SimulateMessage(this, triggerMessage);
-
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkAverageFleeTargetDirectionChanged>());
-
-        foreach (EnvironmentInstance client in TestEnvironment.Clients)
-        {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeAverageFleeTargetDirection>());
-        }
-    }
-
-    [Fact]
     public void ServerReceivedBesiegerCampResetStartedChanged()
     {
         var triggerMessage = new BesiegerCampResetStartedChanged(true, "testId");
@@ -366,23 +247,6 @@ public class MobilePartyFieldTests
         foreach (EnvironmentInstance client in TestEnvironment.Clients)
         {
             Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeBesiegerCampResetStarted>());
-        }
-    }
-
-    [Fact]
-    public void ServerReceivedLastWeatherTerrainEffectChanged()
-    {
-        var triggerMessage = new LastWeatherTerrainEffectChanged(12, "testId");
-
-        var server = TestEnvironment.Server;
-
-        server.SimulateMessage(this, triggerMessage);
-
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkLastWeatherTerrainEffectChanged>());
-
-        foreach (EnvironmentInstance client in TestEnvironment.Clients)
-        {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeLastWeatherTerrainEffect>());
         }
     }
 }

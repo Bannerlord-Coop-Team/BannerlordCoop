@@ -28,30 +28,20 @@ public class MobilePartyFieldsHandler : IHandler
 
         messageBroker.Subscribe<ChangeAttachedTo>(Handle);
         messageBroker.Subscribe<ChangeHasUnpaidWages>(Handle);
-        messageBroker.Subscribe<ChangeLastCalculatedSpeed>(Handle);
         messageBroker.Subscribe<ChangeDisorganizedUntilTime>(Handle);
-        messageBroker.Subscribe<ChangePartyPureSpeedLastCheckVersion>(Handle);
-        
-        messageBroker.Subscribe<ChangePartyLastCheckIsPrisoner>(Handle);
-        messageBroker.Subscribe<ChangeLastCalculatedBaseSpeedExplained>(Handle);
-        messageBroker.Subscribe<ChangePartyLastCheckAtNight>(Handle);
-        messageBroker.Subscribe<ChangeItemRosterVersionNo>(Handle);
         messageBroker.Subscribe<ChangePartySizeRatioLastCheckVersion>(Handle);
-        
         messageBroker.Subscribe<ChangeLatestUsedPaymentRatio>(Handle);
+        
         messageBroker.Subscribe<ChangeCachedPartySizeRatio>(Handle);
         messageBroker.Subscribe<ChangeCachedPartySizeLimit>(Handle);
         messageBroker.Subscribe<ChangeDoNotAttackMainParty>(Handle);
         messageBroker.Subscribe<ChangeCustomHomeSettlement>(Handle);
-        
         messageBroker.Subscribe<ChangeIsDisorganized>(Handle);
+        
         messageBroker.Subscribe<ChangeIsCurrentlyUsedByAQuest>(Handle);
         messageBroker.Subscribe<ChangePartyTradeGold>(Handle);
         messageBroker.Subscribe<ChangeIgnoredUntilTime>(Handle);
-        messageBroker.Subscribe<ChangeAverageFleeTargetDirection>(Handle);
-        
         messageBroker.Subscribe<ChangeBesiegerCampResetStarted>(Handle);
-        messageBroker.Subscribe<ChangeLastWeatherTerrainEffect>(Handle);
     }
 
     private void Handle(MessagePayload<ChangeAttachedTo> payload)
@@ -82,18 +72,6 @@ public class MobilePartyFieldsHandler : IHandler
         instance.HasUnpaidWages = data.HasUnpaidWages;
     }
 
-    private void Handle(MessagePayload<ChangeLastCalculatedSpeed> payload)
-    {
-        var data = payload.What;
-        if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
-            return;
-        }
-        
-        instance._lastCalculatedSpeed = data.LastCalculatedSpeed;
-    }
-
     private void Handle(MessagePayload<ChangeDisorganizedUntilTime> payload)
     {
         var data = payload.What;
@@ -104,66 +82,6 @@ public class MobilePartyFieldsHandler : IHandler
         }
         
         instance._disorganizedUntilTime = new CampaignTime(data.DisorganizedUntilTime);
-    }
-
-    private void Handle(MessagePayload<ChangePartyPureSpeedLastCheckVersion> payload)
-    {
-        var data = payload.What;
-        if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
-            return;
-        }
-        
-        instance._partyPureSpeedLastCheckVersion = data.PartyPureSpeedLastCheckVersion;
-    }
-
-    private void Handle(MessagePayload<ChangePartyLastCheckIsPrisoner> payload)
-    {
-        var data = payload.What;
-        if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
-            return;
-        }
-        
-        instance._partyLastCheckIsPrisoner = data.PartyLastCheckIsPrisoner;
-    }
-
-    private void Handle(MessagePayload<ChangeLastCalculatedBaseSpeedExplained> payload)
-    {
-        var data = payload.What;
-        if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
-            return;
-        }
-        
-        instance._lastCalculatedBaseSpeedExplained = new ExplainedNumber(data.Number, data.IncludeDescriptions, data.TextObjectValue == null ? null : new TextObject(data.TextObjectValue, null));
-    }
-
-    private void Handle(MessagePayload<ChangePartyLastCheckAtNight> payload)
-    {
-        var data = payload.What;
-        if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
-            return;
-        }
-
-        instance._partyLastCheckAtNight = data.PartyLastCheckAtNight;
-    }
-
-    private void Handle(MessagePayload<ChangeItemRosterVersionNo> payload)
-    {
-        var data = payload.What;
-        if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
-            return;
-        }
-
-        instance._itemRosterVersionNo = data.ItemRosterVersionNo;
     }
 
     private void Handle(MessagePayload<ChangePartySizeRatioLastCheckVersion> payload)
@@ -292,18 +210,6 @@ public class MobilePartyFieldsHandler : IHandler
         instance._ignoredUntilTime = new CampaignTime(data.IgnoredUntilTime);
     }
 
-    private void Handle(MessagePayload<ChangeAverageFleeTargetDirection> payload)
-    {
-        var data = payload.What;
-        if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
-            return;
-        }
-
-        instance.AverageFleeTargetDirection = new Vec2(data.VecX, data.VecY);
-    }
-
     private void Handle(MessagePayload<ChangeBesiegerCampResetStarted> payload)
     {
         var data = payload.What;
@@ -315,46 +221,24 @@ public class MobilePartyFieldsHandler : IHandler
 
         instance._besiegerCampResetStarted = data.BesiegerCampResetStarted;
     }
-
-    private void Handle(MessagePayload<ChangeLastWeatherTerrainEffect> payload)
-    {
-        var data = payload.What;
-        if (objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.MobilePartyId);
-            return;
-        }
-
-        instance._lastWeatherTerrainEffect = (MapWeatherModel.WeatherEventEffectOnTerrain) data.LastWeatherTerrainEffect;
-    }
     
     public void Dispose()
     {
         messageBroker.Unsubscribe<ChangeAttachedTo>(Handle);
         messageBroker.Unsubscribe<ChangeHasUnpaidWages>(Handle);
-        messageBroker.Unsubscribe<ChangeLastCalculatedSpeed>(Handle);
         messageBroker.Unsubscribe<ChangeDisorganizedUntilTime>(Handle);
-        messageBroker.Unsubscribe<ChangePartyPureSpeedLastCheckVersion>(Handle);
-        
-        messageBroker.Unsubscribe<ChangePartyLastCheckIsPrisoner>(Handle);
-        messageBroker.Unsubscribe<ChangeLastCalculatedBaseSpeedExplained>(Handle);
-        messageBroker.Unsubscribe<ChangePartyLastCheckAtNight>(Handle);
-        messageBroker.Unsubscribe<ChangeItemRosterVersionNo>(Handle);
         messageBroker.Unsubscribe<ChangePartySizeRatioLastCheckVersion>(Handle);
-        
         messageBroker.Unsubscribe<ChangeLatestUsedPaymentRatio>(Handle);
+        
         messageBroker.Unsubscribe<ChangeCachedPartySizeRatio>(Handle);
         messageBroker.Unsubscribe<ChangeCachedPartySizeLimit>(Handle);
         messageBroker.Unsubscribe<ChangeDoNotAttackMainParty>(Handle);
         messageBroker.Unsubscribe<ChangeCustomHomeSettlement>(Handle);
-        
         messageBroker.Unsubscribe<ChangeIsDisorganized>(Handle);
+        
         messageBroker.Unsubscribe<ChangeIsCurrentlyUsedByAQuest>(Handle);
         messageBroker.Unsubscribe<ChangePartyTradeGold>(Handle);
         messageBroker.Unsubscribe<ChangeIgnoredUntilTime>(Handle);
-        messageBroker.Unsubscribe<ChangeAverageFleeTargetDirection>(Handle);
-        
         messageBroker.Unsubscribe<ChangeBesiegerCampResetStarted>(Handle);
-        messageBroker.Unsubscribe<ChangeLastWeatherTerrainEffect>(Handle);
     }
 }
