@@ -12,6 +12,10 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.PartyComponents.Patches.Lifetime;
 
+
+/// <summary>
+/// Harmony patches for the lifetime of a <see cref="GarrisonPartyComponent"/> object
+/// </summary>
 [HarmonyPatch]
 internal class GarrisonPartyComponentLifetimePatches
 {
