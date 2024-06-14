@@ -1,11 +1,7 @@
-﻿using Common.Extensions;
-using Coop.Mod.Extentions;
-using GameInterface.Services.Kingdoms.Data;
+﻿using GameInterface.Services.Kingdoms.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 
 namespace GameInterface.Services.Kingdoms.Extentions
@@ -15,12 +11,6 @@ namespace GameInterface.Services.Kingdoms.Extentions
     /// </summary>
     public static class KingdomDecisionExtensions
     {
-        private static Func<KingdomPolicyDecision, bool> GetIsInvertedDecision = typeof(KingdomPolicyDecision).GetField("_isInvertedDecision", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<KingdomPolicyDecision, bool>();
-        private static Func<KingdomPolicyDecision, List<PolicyObject>> GetKingdomPolicies = typeof(KingdomPolicyDecision).GetField("_kingdomPolicies", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<KingdomPolicyDecision, List<PolicyObject>>();
-        private static Func<KingSelectionKingdomDecision, Clan> GetClanToExclude = typeof(KingSelectionKingdomDecision).GetField("_clanToExclude", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<KingSelectionKingdomDecision, Clan>();
-        private static Func<MakePeaceKingdomDecision, bool> GetApplyResults = typeof(MakePeaceKingdomDecision).GetField("_applyResults", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<MakePeaceKingdomDecision, bool>();
-        private static Func<SettlementClaimantDecision, Hero> GetCapturerHero = typeof(SettlementClaimantDecision).GetField("_capturerHero", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<SettlementClaimantDecision, Hero>();
-        private static Func<SettlementClaimantPreliminaryDecision, Clan> GetOwnerClan = typeof(SettlementClaimantPreliminaryDecision).GetField("_ownerClan", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<SettlementClaimantPreliminaryDecision, Clan>();
 
         private static readonly Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>> SupportedConversions = new Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>>()
         {
@@ -57,7 +47,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (declareWarDecision != null)
             {
                 return new DeclareWarDecisionData(declareWarDecision.ProposerClan.StringId, declareWarDecision.Kingdom.StringId,
-                    declareWarDecision.TriggerTime.GetNumTicks(), declareWarDecision.IsEnforced, declareWarDecision.NotifyPlayer, declareWarDecision.PlayerExamined, declareWarDecision.FactionToDeclareWarOn.StringId);
+                    declareWarDecision.TriggerTime._numTicks, declareWarDecision.IsEnforced, declareWarDecision.NotifyPlayer, declareWarDecision.PlayerExamined, declareWarDecision.FactionToDeclareWarOn.StringId);
             }
             else
             {
@@ -71,7 +61,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (kingdomPolicyDecision != null)
             {
                 return new KingdomPolicyDecisionData(kingdomPolicyDecision.ProposerClan.StringId, kingdomPolicyDecision.Kingdom.StringId,
-                    kingdomPolicyDecision.TriggerTime.GetNumTicks(), kingdomPolicyDecision.IsEnforced, kingdomPolicyDecision.NotifyPlayer, kingdomPolicyDecision.PlayerExamined, kingdomPolicyDecision.Policy.StringId, GetIsInvertedDecision(kingdomPolicyDecision), GetKingdomPolicies(kingdomPolicyDecision).Select(policy => policy.StringId).ToList());
+                    kingdomPolicyDecision.TriggerTime._numTicks, kingdomPolicyDecision.IsEnforced, kingdomPolicyDecision.NotifyPlayer, kingdomPolicyDecision.PlayerExamined, kingdomPolicyDecision.Policy.StringId, kingdomPolicyDecision._isInvertedDecision, kingdomPolicyDecision._kingdomPolicies.Select(policy => policy.StringId).ToList());
             }
             else
             {
@@ -85,7 +75,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (expelClanFromKingdomDecision != null)
             {
                 return new ExpelClanFromKingdomDecisionData(expelClanFromKingdomDecision.ProposerClan.StringId, expelClanFromKingdomDecision.Kingdom.StringId,
-                    expelClanFromKingdomDecision.TriggerTime.GetNumTicks(), expelClanFromKingdomDecision.IsEnforced, expelClanFromKingdomDecision.NotifyPlayer, expelClanFromKingdomDecision.PlayerExamined, expelClanFromKingdomDecision.ClanToExpel.StringId, expelClanFromKingdomDecision.OldKingdom.StringId);
+                    expelClanFromKingdomDecision.TriggerTime._numTicks, expelClanFromKingdomDecision.IsEnforced, expelClanFromKingdomDecision.NotifyPlayer, expelClanFromKingdomDecision.PlayerExamined, expelClanFromKingdomDecision.ClanToExpel.StringId, expelClanFromKingdomDecision.OldKingdom.StringId);
             }
             else
             {
@@ -99,7 +89,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (kingSelectionKingdomDecision != null)
             {
                 return new KingSelectionKingdomDecisionData(kingSelectionKingdomDecision.ProposerClan.StringId, kingSelectionKingdomDecision.Kingdom.StringId,
-                    kingSelectionKingdomDecision.TriggerTime.GetNumTicks(), kingSelectionKingdomDecision.IsEnforced, kingSelectionKingdomDecision.NotifyPlayer, kingSelectionKingdomDecision.PlayerExamined, GetClanToExclude(kingSelectionKingdomDecision).StringId);
+                    kingSelectionKingdomDecision.TriggerTime._numTicks, kingSelectionKingdomDecision.IsEnforced, kingSelectionKingdomDecision.NotifyPlayer, kingSelectionKingdomDecision.PlayerExamined, kingSelectionKingdomDecision._clanToExclude.StringId);
             }
             else
             {
@@ -113,7 +103,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (makePeaceKingdomDecision != null)
             {
                 return new MakePeaceKingdomDecisionData(makePeaceKingdomDecision.ProposerClan.StringId, makePeaceKingdomDecision.Kingdom.StringId,
-                    makePeaceKingdomDecision.TriggerTime.GetNumTicks(), makePeaceKingdomDecision.IsEnforced, makePeaceKingdomDecision.NotifyPlayer, makePeaceKingdomDecision.PlayerExamined, makePeaceKingdomDecision.FactionToMakePeaceWith.StringId, makePeaceKingdomDecision.DailyTributeToBePaid, GetApplyResults(makePeaceKingdomDecision));
+                    makePeaceKingdomDecision.TriggerTime._numTicks, makePeaceKingdomDecision.IsEnforced, makePeaceKingdomDecision.NotifyPlayer, makePeaceKingdomDecision.PlayerExamined, makePeaceKingdomDecision.FactionToMakePeaceWith.StringId, makePeaceKingdomDecision.DailyTributeToBePaid, makePeaceKingdomDecision._applyResults);
             }
             else
             {
@@ -127,7 +117,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (settlementClaimantDecision != null)
             {
                 return new SettlementClaimantDecisionData(settlementClaimantDecision.ProposerClan.StringId, settlementClaimantDecision.Kingdom.StringId,
-                    settlementClaimantDecision.TriggerTime.GetNumTicks(), settlementClaimantDecision.IsEnforced, settlementClaimantDecision.NotifyPlayer, settlementClaimantDecision.PlayerExamined, settlementClaimantDecision.Settlement.StringId, GetCapturerHero(settlementClaimantDecision).StringId, settlementClaimantDecision.ClanToExclude.StringId);
+                    settlementClaimantDecision.TriggerTime._numTicks, settlementClaimantDecision.IsEnforced, settlementClaimantDecision.NotifyPlayer, settlementClaimantDecision.PlayerExamined, settlementClaimantDecision.Settlement.StringId, settlementClaimantDecision._capturerHero.StringId, settlementClaimantDecision.ClanToExclude.StringId);
             }
             else
             {
@@ -141,7 +131,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
             if (settlementClaimantPreliminaryDecision != null)
             {
                 return new SettlementClaimantPreliminaryDecisionData(settlementClaimantPreliminaryDecision.ProposerClan.StringId, settlementClaimantPreliminaryDecision.Kingdom.StringId,
-                    settlementClaimantPreliminaryDecision.TriggerTime.GetNumTicks(), settlementClaimantPreliminaryDecision.IsEnforced, settlementClaimantPreliminaryDecision.NotifyPlayer, settlementClaimantPreliminaryDecision.PlayerExamined, settlementClaimantPreliminaryDecision.Settlement.StringId, GetOwnerClan(settlementClaimantPreliminaryDecision).StringId);
+                    settlementClaimantPreliminaryDecision.TriggerTime._numTicks, settlementClaimantPreliminaryDecision.IsEnforced, settlementClaimantPreliminaryDecision.NotifyPlayer, settlementClaimantPreliminaryDecision.PlayerExamined, settlementClaimantPreliminaryDecision.Settlement.StringId, settlementClaimantPreliminaryDecision._ownerClan.StringId);
             }
             else
             {

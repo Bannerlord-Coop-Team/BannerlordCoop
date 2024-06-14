@@ -1,22 +1,15 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Extentions;
+using GameInterface.Policies;
 using GameInterface.Services.Kingdoms.Extentions;
 using GameInterface.Services.Kingdoms.Messages;
 using HarmonyLib;
-using System.Reflection;
-using System;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Election;
-using TaleWorlds.Library;
-using Common.Extensions;
-using GameInterface.Policies;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using System.Runtime.CompilerServices;
-using TaleWorlds.CampaignSystem.Party;
-using GameInterface.Services.MobileParties.Extensions;
-using GameInterface.Extentions;
+using TaleWorlds.CampaignSystem.Election;
 
 namespace GameInterface.Services.Kingdoms.Patches
 {
@@ -27,10 +20,6 @@ namespace GameInterface.Services.Kingdoms.Patches
     [HarmonyPatch(typeof(Kingdom))]
     internal class KingdomPatches
     {
-
-        private static Func<Kingdom, MBList<KingdomDecision>> GetUnresolvedDecisions = typeof(Kingdom).GetField("_unresolvedDecisions", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Kingdom, MBList<KingdomDecision>>();
-        private static readonly AllowedInstance<Kingdom> AllowedInstance = new AllowedInstance<Kingdom>();
-
         [HarmonyPatch(nameof(Kingdom.AddDecision))]
         [HarmonyPrefix]
         public static bool AddDecisionPrefix(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
@@ -40,7 +29,7 @@ namespace GameInterface.Services.Kingdoms.Patches
                 ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
                 return false;
             }
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
 
@@ -89,7 +78,7 @@ namespace GameInterface.Services.Kingdoms.Patches
                 return;
             }
 
-            GetUnresolvedDecisions(__instance).Add(kingdomDecision);
+            __instance._unresolvedDecisions.Add(kingdomDecision);
         }
 
         [HarmonyPatch(nameof(Kingdom.RemoveDecision))]
@@ -97,11 +86,11 @@ namespace GameInterface.Services.Kingdoms.Patches
         public static bool RemoveDecisionPrefix(Kingdom __instance, KingdomDecision kingdomDecision)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
-            if (PolicyProvider.AllowOriginalCalls) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
 
-            var index = GetUnresolvedDecisions(__instance).FindIndex(decision => decision == kingdomDecision);
+            var index = __instance._unresolvedDecisions.FindIndex(decision => decision == kingdomDecision);
 
             MessageBroker.Instance.Publish(__instance,
                 new LocalDecisionRemoved(__instance.StringId, index));
