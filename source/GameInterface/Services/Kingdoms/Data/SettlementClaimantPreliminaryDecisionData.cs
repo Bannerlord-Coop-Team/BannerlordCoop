@@ -1,7 +1,5 @@
-﻿using Common.Extensions;
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using ProtoBuf;
-using System;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -17,7 +15,6 @@ namespace GameInterface.Services.Kingdoms.Data
     public class SettlementClaimantPreliminaryDecisionData : KingdomDecisionData
     {
         private static readonly FieldInfo SettlementField = typeof(SettlementClaimantPreliminaryDecision).GetField(nameof(SettlementClaimantPreliminaryDecision.Settlement), BindingFlags.Instance | BindingFlags.Public);
-        private static readonly FieldInfo OwnerClanField = typeof(SettlementClaimantPreliminaryDecision).GetField("_ownerClan", BindingFlags.Instance | BindingFlags.NonPublic);
         
         [ProtoMember(1)]
         public string SettlementId { get; }
@@ -43,7 +40,7 @@ namespace GameInterface.Services.Kingdoms.Data
             SettlementClaimantPreliminaryDecision settlementClaimantPreliminaryDecision = (SettlementClaimantPreliminaryDecision)FormatterServices.GetUninitializedObject(typeof(SettlementClaimantPreliminaryDecision));
             SetKingdomDecisionProperties(settlementClaimantPreliminaryDecision, proposerClan, kingdom);
             SettlementField.SetValue(settlementClaimantPreliminaryDecision, settlement);
-            OwnerClanField.SetValue(settlementClaimantPreliminaryDecision, ownerClan);
+            settlementClaimantPreliminaryDecision._ownerClan = ownerClan;
             kingdomDecision = settlementClaimantPreliminaryDecision;
             return true;
         }

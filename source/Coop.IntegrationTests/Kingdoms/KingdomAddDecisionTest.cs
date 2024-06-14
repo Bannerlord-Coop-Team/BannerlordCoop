@@ -21,7 +21,7 @@ namespace Coop.IntegrationTests.Kingdoms
         public void ServerKingdom_AddDecision_Publishes_AllClients()
         {
             // Arrange
-            var triggerMessage = new LocalDecisionAdded("Kingdom1", new DeclareWarDecisionData("ProposerClan", "Kingdom", 10, true, true, true, "ClanFaction"), true);
+            var triggerMessage = new DecisionAdded("Kingdom1", new DeclareWarDecisionData("ProposerClan", "Kingdom", 10, true, true, true, "ClanFaction"), true);
 
             var server = TestEnvironment.Server;
 

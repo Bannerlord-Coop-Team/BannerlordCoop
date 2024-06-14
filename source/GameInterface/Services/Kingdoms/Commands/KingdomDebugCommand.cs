@@ -30,7 +30,6 @@ public class KingdomDebugCommand
     private static readonly string AddSettlementClaimantPreliminaryDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> SettlementClaimantPreliminaryDecision <SettlementId>";
     private static readonly string AddMakePeaceKingdomDecisionUsage = "Usage: coop.debug.kingdom.add_decision <kingdomId> <proposerClanId> <ignoreInfluenceCost> MakePeaceKingdomDecision <factionId> <dailyTribute> <applyResults>";
     private delegate bool KingdomDecisionDelegate(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message);
-    private static readonly Func<Kingdom, MBList<KingdomDecision>> GetUnresolvedDecisions = typeof(Kingdom).GetField("_unresolvedDecisions", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Kingdom, MBList<KingdomDecision>>();
     private static readonly Dictionary<string, KingdomDecisionDelegate> TryGetKingdomDecisionFunc = new Dictionary<string, KingdomDecisionDelegate>()
         {
             { nameof(DeclareWarDecision), TryGetDeclareWarDecision },
@@ -236,7 +235,7 @@ public class KingdomDebugCommand
             return $"Argument2: {index} is not a number.";
         }
 
-        var decisions = GetUnresolvedDecisions(kingdom);
+        var decisions = kingdom._unresolvedDecisions;
         if (idx > 0 && idx <= decisions.Count)
         {
             kingdom.RemoveDecision(decisions[idx - 1]);

@@ -28,14 +28,5 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Equal(kingSelectionKingdomDecisionData.ClanToExcludeId, deserializedObj.ClanToExcludeId);
 
         }
-
-        [Fact]
-        public void KingSelectionKingdomDecisionDataReflectionTests()
-        {
-            FieldInfo? fieldInfo = typeof(KingSelectionKingdomDecisionData).GetField("SetClanToExclude", BindingFlags.Static | BindingFlags.NonPublic);
-            Assert.NotNull(fieldInfo);
-            object? obj = fieldInfo?.GetValue(null);
-            Assert.NotNull(obj);
-        }
     }
 }

@@ -6,7 +6,7 @@ namespace GameInterface.Services.Kingdoms.Messages
     /// <summary>
     /// Event that is handled on client side, when Server sends NetworkAddDecision message to clients.
     /// </summary>
-    public class AddDecision: IEvent
+    public class AddDecision: ICommand
     {
         public string KingdomId { get; }
         public KingdomDecisionData Data { get; }

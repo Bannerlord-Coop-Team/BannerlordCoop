@@ -19,7 +19,6 @@ namespace GameInterface.Services.Kingdoms.Handlers;
 public class KingdomHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<KingdomHandler>();
-    private static Func<Kingdom, MBList<KingdomDecision>> GetUnresolvedDecisions = typeof(Kingdom).GetField("_unresolvedDecisions", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedGetter<Kingdom, MBList<KingdomDecision>>();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
@@ -41,7 +40,7 @@ public class KingdomHandler : IHandler
             return;
         }
 
-        var decisions = GetUnresolvedDecisions(kingdom);
+        var decisions = kingdom._unresolvedDecisions;
         if (payload.Index >= 0 && decisions.Count > payload.Index)
         {
             KingdomPatches.RunOriginalRemoveDecision(kingdom, decisions[payload.Index]);

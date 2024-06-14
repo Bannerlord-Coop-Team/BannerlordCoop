@@ -1,15 +1,12 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Kingdoms.Data;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.Kingdoms.Messages
 {
     /// <summary>
     /// Event that is handled on server side, when Kingdom.AddDecision method is called.
     /// </summary>
-    public record LocalDecisionAdded: IEvent
+    public record DecisionAdded: IEvent
     {
         public string KingdomId { get; }
 
@@ -17,7 +14,7 @@ namespace GameInterface.Services.Kingdoms.Messages
 
         public bool IgnoreInfluenceCost { get; }
 
-        public LocalDecisionAdded(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost)
+        public DecisionAdded(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost)
         {
             KingdomId = kingdomId;
             Data = data;

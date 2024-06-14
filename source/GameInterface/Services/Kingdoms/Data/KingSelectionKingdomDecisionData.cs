@@ -15,7 +15,6 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class KingSelectionKingdomDecisionData : KingdomDecisionData
     {
-        private static Action<KingSelectionKingdomDecision, Clan> SetClanToExclude = typeof(KingSelectionKingdomDecision).GetField("_clanToExclude", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<KingSelectionKingdomDecision, Clan>();
 
         [ProtoMember(1)]
         public string ClanToExcludeId { get; }
@@ -36,7 +35,7 @@ namespace GameInterface.Services.Kingdoms.Data
 
             KingSelectionKingdomDecision kingSelectionKingdomDecision = (KingSelectionKingdomDecision)FormatterServices.GetUninitializedObject(typeof(KingSelectionKingdomDecision));
             SetKingdomDecisionProperties(kingSelectionKingdomDecision, proposerClan, kingdom);
-            SetClanToExclude(kingSelectionKingdomDecision, clanToExclude);
+            kingSelectionKingdomDecision._clanToExclude = clanToExclude;
             kingdomDecision = kingSelectionKingdomDecision;
             return true;
         }

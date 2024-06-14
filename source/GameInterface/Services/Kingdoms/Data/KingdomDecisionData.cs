@@ -1,8 +1,5 @@
-﻿using Common.Extensions;
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using ProtoBuf;
-using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Election;
 
@@ -21,10 +18,6 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoInclude(106, typeof(SettlementClaimantPreliminaryDecisionData))]
     public abstract class KingdomDecisionData
     {
-        private static readonly Action<KingdomDecision, Kingdom> SetKingdomMethod = typeof(KingdomDecision).GetField("_kingdom", BindingFlags.Instance | BindingFlags.NonPublic).BuildUntypedSetter<KingdomDecision, Kingdom>();
-        private static readonly Action<KingdomDecision, Clan> SetProposerClanMethod = typeof(KingdomDecision).GetProperty(nameof(KingdomDecision.ProposerClan), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<KingdomDecision, Clan>();
-        private static readonly Action<KingdomDecision, CampaignTime> SetTriggerTimeMethod = typeof(KingdomDecision).GetProperty(nameof(KingdomDecision.TriggerTime), BindingFlags.Instance | BindingFlags.Public).BuildUntypedSetter<KingdomDecision, CampaignTime>();
-        private static readonly ConstructorInfo CampaignTimeCtr = typeof(CampaignTime).GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(long) }, null);
 
         [ProtoMember(1)]
         public string ProposerClanId { get; }
@@ -74,12 +67,12 @@ namespace GameInterface.Services.Kingdoms.Data
         /// <param name="kingdom">kingdom.</param>
         protected void SetKingdomDecisionProperties(KingdomDecision kingdomDecision, Clan proposerClan, Kingdom kingdom)
         {
-            SetProposerClanMethod(kingdomDecision, proposerClan);
-            SetKingdomMethod(kingdomDecision, kingdom);
+            kingdomDecision.ProposerClan = proposerClan;
+            kingdomDecision._kingdom = kingdom;
             kingdomDecision.IsEnforced = IsEnforced;
             kingdomDecision.NotifyPlayer = NotifyPlayer;
             kingdomDecision.PlayerExamined = PlayerExamined;
-            SetTriggerTimeMethod(kingdomDecision, (CampaignTime)CampaignTimeCtr.Invoke(new object[] { TriggerTime }));
+            kingdomDecision.TriggerTime = new CampaignTime(TriggerTime);
         }
 
         /// <summary>

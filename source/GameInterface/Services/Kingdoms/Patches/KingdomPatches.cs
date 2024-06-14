@@ -35,7 +35,7 @@ namespace GameInterface.Services.Kingdoms.Patches
 
             ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
             MessageBroker.Instance.Publish(__instance,
-                new LocalDecisionAdded(__instance.StringId, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost));
+                new DecisionAdded(__instance.StringId, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost));
             return false;
         }
 
@@ -93,7 +93,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             var index = __instance._unresolvedDecisions.FindIndex(decision => decision == kingdomDecision);
 
             MessageBroker.Instance.Publish(__instance,
-                new LocalDecisionRemoved(__instance.StringId, index));
+                new DecisionRemoved(__instance.StringId, index));
 
             return true;
         }

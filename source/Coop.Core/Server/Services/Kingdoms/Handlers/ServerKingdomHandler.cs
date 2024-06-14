@@ -17,18 +17,18 @@ public class ServerKingdomHandler : IHandler
     {
         this.messageBroker = messageBroker;
         this.network = network;
-        messageBroker.Subscribe<LocalDecisionAdded>(HandleLocalDecisionAdded);
-        messageBroker.Subscribe<LocalDecisionRemoved>(HandleLocalDecisionRemoved);
+        messageBroker.Subscribe<DecisionAdded>(HandleLocalDecisionAdded);
+        messageBroker.Subscribe<DecisionRemoved>(HandleLocalDecisionRemoved);
     }
 
-    private void HandleLocalDecisionRemoved(MessagePayload<LocalDecisionRemoved> obj)
+    private void HandleLocalDecisionRemoved(MessagePayload<DecisionRemoved> obj)
     {
         var payload = obj.What;
         var message = new NetworkRemoveDecision(payload.KingdomId, payload.Index);
         network.SendAll(message);
     }
 
-    private void HandleLocalDecisionAdded(MessagePayload<LocalDecisionAdded> obj)
+    private void HandleLocalDecisionAdded(MessagePayload<DecisionAdded> obj)
     {
         var payload = obj.What;
         var message = new NetworkAddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost);
@@ -38,7 +38,7 @@ public class ServerKingdomHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<LocalDecisionAdded>(HandleLocalDecisionAdded);
-        messageBroker.Unsubscribe<LocalDecisionRemoved>(HandleLocalDecisionRemoved);
+        messageBroker.Unsubscribe<DecisionAdded>(HandleLocalDecisionAdded);
+        messageBroker.Unsubscribe<DecisionRemoved>(HandleLocalDecisionRemoved);
     }
 }

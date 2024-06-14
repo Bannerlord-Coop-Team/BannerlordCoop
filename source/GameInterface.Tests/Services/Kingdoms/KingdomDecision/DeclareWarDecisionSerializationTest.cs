@@ -2,7 +2,6 @@
 using ProtoBuf;
 using System.IO;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.Election;
 using Xunit;
 
 namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision

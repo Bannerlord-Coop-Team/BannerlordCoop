@@ -15,9 +15,6 @@ namespace GameInterface.Services.Kingdoms.Data
     public class KingdomPolicyDecisionData : KingdomDecisionData
     {
         private static readonly FieldInfo PolicyField = typeof(KingdomPolicyDecision).GetField(nameof(KingdomPolicyDecision.Policy), BindingFlags.Instance | BindingFlags.Public);
-        private static readonly FieldInfo IsInvertedDecisionField = typeof(KingdomPolicyDecision).GetField("_isInvertedDecision", BindingFlags.Instance | BindingFlags.NonPublic);
-        private static readonly FieldInfo KingdomPoliciesField = typeof(KingdomPolicyDecision).GetField("_kingdomPolicies", BindingFlags.Instance | BindingFlags.NonPublic);
-
 
         [ProtoMember(1)]
         public string PolicyObjectId { get; }
@@ -58,8 +55,8 @@ namespace GameInterface.Services.Kingdoms.Data
             KingdomPolicyDecision kingdomPolicyDecision = (KingdomPolicyDecision)FormatterServices.GetUninitializedObject(typeof(KingdomPolicyDecision));
             SetKingdomDecisionProperties(kingdomPolicyDecision, proposerClan, kingdom);
             PolicyField.SetValue(kingdomPolicyDecision, policyObject);
-            IsInvertedDecisionField.SetValue(kingdomPolicyDecision, IsInvertedDecision);
-            KingdomPoliciesField.SetValue(kingdomPolicyDecision, kingdomPolicies);
+            kingdomPolicyDecision._isInvertedDecision = IsInvertedDecision;
+            kingdomPolicyDecision._kingdomPolicies = kingdomPolicies;
             kingdomDecision = kingdomPolicyDecision;
             return true;
         }
