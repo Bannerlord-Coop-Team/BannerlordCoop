@@ -1,4 +1,5 @@
 ﻿using Common.Util;
+using ProtoBuf.Serializers;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
@@ -41,11 +42,7 @@ public sealed class BatchLogger : IDisposable
 	{
 		var messageName = messageType.Name;
 
-		if (LogMap.TryAdd(messageName, 1) == false)
-		{
-            LogMap[messageName]++;
-            return;
-        }
+		LogMap.AddOrUpdate(messageName, 1, (name, value) => value++);
     }
 
     // A method to poll for messages to log.
