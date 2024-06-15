@@ -17,7 +17,7 @@ namespace GameInterface.Services.MobileParties.Handlers;
 /// </summary>
 internal class MobilePartyDataHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<PartyLifetimeHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyDataHandler>();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
