@@ -2,9 +2,7 @@
 using Serilog;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Text;
-using System.Threading;
 
 namespace Common.Logging;
 
@@ -41,11 +39,7 @@ public sealed class BatchLogger : IDisposable
 	{
 		var messageName = messageType.Name;
 
-		if (LogMap.TryAdd(messageName, 1) == false)
-		{
-            LogMap[messageName]++;
-            return;
-        }
+		LogMap.AddOrUpdate(messageName, 1, (name, value) => value++);
     }
 
     // A method to poll for messages to log.
