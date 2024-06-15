@@ -31,7 +31,7 @@ internal class MilitiaPartyComponentLifetimePatches
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
+                + "Callstack: {callstack}", typeof(MilitiaPartyComponent), Environment.StackTrace);
             return true;
         }
 
