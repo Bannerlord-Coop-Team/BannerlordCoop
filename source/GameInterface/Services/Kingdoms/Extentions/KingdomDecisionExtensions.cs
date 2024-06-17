@@ -31,14 +31,11 @@ namespace GameInterface.Services.Kingdoms.Extentions
         /// <exception cref="InvalidOperationException">If KingdomDecision object is not convertable.</exception>
         public static KingdomDecisionData ToKingdomDecisionData(this KingdomDecision kingdomDecision)
         {
-            if (SupportedConversions.ContainsKey(kingdomDecision.GetType()))
-            {
-                return SupportedConversions[kingdomDecision.GetType()](kingdomDecision);
-            }
-            else
+            if (!SupportedConversions.TryGetValue(kingdomDecision.GetType(), out var conversionFunction))
             {
                 throw new InvalidOperationException($"Type of kingdom decision: {kingdomDecision.GetType().Name} is not supported.");
             }
+            return conversionFunction(kingdomDecision);
         }
 
         private static KingdomDecisionData ConvertDeclareWarDecision(KingdomDecision decision)

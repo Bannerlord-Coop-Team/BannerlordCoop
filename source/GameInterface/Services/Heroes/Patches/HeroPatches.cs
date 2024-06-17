@@ -19,7 +19,7 @@ namespace GameInterface.Services.Heroes.Patches
         /// <returns></returns>
         [HarmonyPrefix]
         [HarmonyPatch(nameof(Hero.IsHumanPlayerCharacter),MethodType.Getter)]
-        private static bool IsHumanPlayerCharacterPrefix(Hero __instance, bool __result)
+        private static bool IsHumanPlayerCharacterPrefix(Hero __instance, ref bool __result)
         {
             __result = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties().Any(party => party.LeaderHero == __instance);
             return false;
