@@ -39,18 +39,15 @@ namespace GameInterface.Services.Kingdoms.Patches
             return false;
         }
 
-        public static void RunOriginalAddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
+        public static void RunCoopAddDecision(Kingdom kingdom, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float randomFloat)
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
-                using (new AllowedThread())
-                {
-                    kingdom.AddDecision(kingdomDecision, ignoreInfluenceCost);
-                }
+                ModifiedAddDecision(kingdom, kingdomDecision, ignoreInfluenceCost, randomFloat);
             }, true); 
         }
 
-        private static void ModifiedAddDecision(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost)
+        private static void ModifiedAddDecision(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float? randomFloat = null)
         {
             if (!ignoreInfluenceCost)
             {
@@ -74,7 +71,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             var playerParties = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties();
             if (playerParties.All(party => party.ActualClan.Kingdom != kingdomDecision.Kingdom))
             {
-                new KingdomElection(kingdomDecision).StartElection();
+                new CoopKingdomElection(kingdomDecision, randomFloat).StartElectionCoop();
                 return;
             }
 
