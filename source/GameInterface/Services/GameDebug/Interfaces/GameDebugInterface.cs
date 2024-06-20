@@ -64,11 +64,14 @@ namespace GameInterface.Services.GameDebug.Interfaces
         {
             PartyVisibilityPatch.AllPartiesVisible = true;
 
-            foreach(var party in Campaign.Current.MobileParties)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                party.IsVisible = true;
-                party.Party.SetVisualAsDirty();
-            }
+                foreach (var party in Campaign.Current.MobileParties)
+                {
+                    party.IsVisible = true;
+                    party.Party.SetVisualAsDirty();
+                }
+            });
         }
 
         public void LoadGame(string saveName)

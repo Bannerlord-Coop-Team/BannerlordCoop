@@ -23,7 +23,7 @@ namespace GameInterface.Services.GameDebug.Patches
         {
             if (AllPartiesVisible == false) return true;
 
-            __instance.IsVisible = true;
+            __instance._isVisible = true;
             __instance.Party.OnVisibilityChanged(true);
 
             return false;
