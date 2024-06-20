@@ -50,6 +50,11 @@ namespace GameInterface.Services.MobileParties.Handlers
                     switch ((PropertyType)data.PropertyType)
                     {
                         case PropertyType.Army:
+                            if(data.Value2 == null)
+                            {
+                                instance.Army = null;
+                                return;
+                            }
                             if (objectManager.TryGetObject<Army>(data.Value2, out var army) == false)
                             {
                                 Logger.Error("Unable to find {type} with id: {id}", typeof(Army), data.Value2);
@@ -84,11 +89,21 @@ namespace GameInterface.Services.MobileParties.Handlers
                             break;
 
                         case PropertyType.Ai:
-                            //TODO
+                            if (objectManager.TryGetObject<MobileParty>(data.Value2, out var mobilePartyForAi) == false)
+                            {
+                                Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
+                                return;
+                            }
+                            instance.Ai = new MobilePartyAi(mobilePartyForAi);
                             break;
 
                         case PropertyType.Party:
-                            //TODO
+                            if (objectManager.TryGetObject<MobileParty>(data.Value2, out var party) == false)
+                            {
+                                Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
+                                return;
+                            }
+                            instance.Party = party.Party;
                             break;
 
                         case PropertyType.IsActive:
@@ -154,6 +169,11 @@ namespace GameInterface.Services.MobileParties.Handlers
                             break;
 
                         case PropertyType.Scout:
+                            if (data.Value2 == null)
+                            {
+                                instance.Scout = null;
+                                break;
+                            }
                             if (objectManager.TryGetObject<Hero>(data.Value2, out var scout) == false)
                             {
                                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2);
@@ -172,6 +192,11 @@ namespace GameInterface.Services.MobileParties.Handlers
                             break;
 
                         case PropertyType.Quartermaster:
+                            if (data.Value2 == null)
+                            {
+                                instance.Quartermaster = null;
+                                break;
+                            }
                             if (objectManager.TryGetObject<Hero>(data.Value2, out var quatermaster) == false)
                             {
                                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2);
@@ -181,6 +206,11 @@ namespace GameInterface.Services.MobileParties.Handlers
                             break;
 
                         case PropertyType.Surgeon:
+                            if(data.Value2 == null)
+                            {
+                                instance.Surgeon = null; 
+                                break;
+                            }
                             if (objectManager.TryGetObject<Hero>(data.Value2, out var surgeon) == false)
                             {
                                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2);
@@ -190,6 +220,11 @@ namespace GameInterface.Services.MobileParties.Handlers
                             break;
 
                         case PropertyType.ActualClan:
+                            if(data.Value2 == null)
+                            {
+                                instance.ActualClan = null;
+                                return;
+                            }
                             if (objectManager.TryGetObject<Clan>(data.Value2, out var actualClan) == false)
                             {
                                 Logger.Error("Unable to find {type} with id: {id}", typeof(Clan), data.Value2);

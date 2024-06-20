@@ -148,7 +148,7 @@ public class MobilePartyPropertyPatches
             return true;
         }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value.ToString());
+        var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value._mobileParty.StringId);
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;
@@ -268,7 +268,7 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    //StationaryStartTime causes a lot of lag, not sure why but looks like some circular reference
+    //StationaryStartTime causes a lot of lag, called on tick
 
     //[HarmonyPatch(nameof(MobileParty.StationaryStartTime), MethodType.Setter)]
     //[HarmonyPrefix]
