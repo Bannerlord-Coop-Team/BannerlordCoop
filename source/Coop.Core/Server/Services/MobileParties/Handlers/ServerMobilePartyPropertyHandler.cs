@@ -27,7 +27,7 @@ public class ServerMobilePartyPropertyHandler : IHandler
     private void Handle(MessagePayload<MobilePartyPropertyChanged> payload)
     {
         var data = payload.What;
-        network.SendAll(new NetworkMobilePartyPropertyChanged((int)data._propertyType, data.value1, data.value2));
+        network.SendAll(new NetworkMobilePartyPropertyChanged((int)data._propertyType, data.value1, data.value2, data.value3));
     }
 
     public void Dispose()

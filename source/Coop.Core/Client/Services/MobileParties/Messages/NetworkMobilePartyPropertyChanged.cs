@@ -23,6 +23,7 @@ namespace Coop.Core.Client.Services.MobileParties.Messages
             PropertyType = propertyType;
             Value1 = value1;
             Value2 = value2;
+            Value3 = value3;
         }
     }
 }

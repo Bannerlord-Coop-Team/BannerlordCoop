@@ -92,30 +92,31 @@ public class MobilePartyPropertyPatches
 
         return ModInformation.IsServer;
     }
-    [HarmonyPatch(nameof(MobileParty.Ai), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetAiPrefix(MobileParty __instance, MobilePartyAi value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        //Is this one needed?
-        var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value.ToString());
-        MessageBroker.Instance.Publish(__instance, message);
+    //[HarmonyPatch(nameof(MobileParty.Ai), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetAiPrefix(MobileParty __instance, MobilePartyAi value)
+    //{
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        return ModInformation.IsServer;
-    }
+    //    //Is this one needed?
+    //    var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value.ToString());
+    //    MessageBroker.Instance.Publish(__instance, message);
 
-    [HarmonyPatch(nameof(MobileParty.Party), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetPartyPrefix(MobileParty __instance, PartyBase value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //    return ModInformation.IsServer;
+    //}
 
-        var message = new MobilePartyPropertyChanged(PropertyType.Party, __instance.StringId, value.MobileParty?.StringId);
-        MessageBroker.Instance.Publish(__instance, message);
+    //[HarmonyPatch(nameof(MobileParty.Party), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetPartyPrefix(MobileParty __instance, PartyBase value)
+    //{
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        return ModInformation.IsServer;
-    }
+    //    var message = new MobilePartyPropertyChanged(PropertyType.Party, __instance.StringId, value.MobileParty?.StringId);
+    //    MessageBroker.Instance.Publish(__instance, message);
+
+    //    return ModInformation.IsServer;
+    //}
 
     [HarmonyPatch(nameof(MobileParty.IsActive), MethodType.Setter)]
     [HarmonyPrefix]
@@ -142,17 +143,17 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.ShortTermBehavior), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetShortTermBehaviorPrefix(MobileParty __instance, AiBehavior value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //[HarmonyPatch(nameof(MobileParty.ShortTermBehavior), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetShortTermBehaviorPrefix(MobileParty __instance, AiBehavior value)
+    //{
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        var message = new MobilePartyPropertyChanged(PropertyType.ShortTermBehaviour, __instance.StringId, value.ToString());
-        MessageBroker.Instance.Publish(__instance, message);
+    //    var message = new MobilePartyPropertyChanged(PropertyType.ShortTermBehaviour, __instance.StringId, value.ToString());
+    //    MessageBroker.Instance.Publish(__instance, message);
 
-        return ModInformation.IsServer;
-    }
+    //    return ModInformation.IsServer;
+    //}
 
     [HarmonyPatch(nameof(MobileParty.IsPartyTradeActive), MethodType.Setter)]
     [HarmonyPrefix]
@@ -190,17 +191,19 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.StationaryStartTime), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetStationaryStartTimePrefix(MobileParty __instance, CampaignTime value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //StationaryStartTime causes a lot of lag, not sure why but looks like some circular reference
 
-        var message = new MobilePartyPropertyChanged(PropertyType.StationaryStartTime, __instance.StringId, value.NumTicks.ToString());
-        MessageBroker.Instance.Publish(__instance, message);
+    //[HarmonyPatch(nameof(MobileParty.StationaryStartTime), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetStationaryStartTimePrefix(MobileParty __instance, CampaignTime value)
+    //{
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        return ModInformation.IsServer;
-    }
+    //    var message = new MobilePartyPropertyChanged(PropertyType.StationaryStartTime, __instance.StringId, value.NumTicks.ToString());
+    //    MessageBroker.Instance.Publish(__instance, message);
+
+    //    return ModInformation.IsServer;
+    //}
 
     [HarmonyPatch(nameof(MobileParty.VersionNo), MethodType.Setter)]
     [HarmonyPrefix]
@@ -322,17 +325,17 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.ActualClan), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetActualClanPrefix(MobileParty __instance, Clan value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //[HarmonyPatch(nameof(MobileParty.ActualClan), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetActualClanPrefix(MobileParty __instance, Clan value)
+    //{
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        var message = new MobilePartyPropertyChanged(PropertyType.ActualClan, __instance.StringId, value?.StringId);
-        MessageBroker.Instance.Publish(__instance, message);
+    //    var message = new MobilePartyPropertyChanged(PropertyType.ActualClan, __instance.StringId, value?.StringId);
+    //    MessageBroker.Instance.Publish(__instance, message);
 
-        return ModInformation.IsServer;
-    }
+    //    return ModInformation.IsServer;
+    //}
 
     [HarmonyPatch(nameof(MobileParty.RecentEventsMorale), MethodType.Setter)]
     [HarmonyPrefix]
@@ -358,17 +361,17 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.IsInspected), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetIsInspectedPrefix(MobileParty __instance, bool value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //[HarmonyPatch(nameof(MobileParty.IsInspected), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetIsInspectedPrefix(MobileParty __instance, bool value)
+    //{
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        var message = new MobilePartyPropertyChanged(PropertyType.IsInspected, __instance.StringId, value.ToString());
-        MessageBroker.Instance.Publish(__instance, message);
+    //    var message = new MobilePartyPropertyChanged(PropertyType.IsInspected, __instance.StringId, value.ToString());
+    //    MessageBroker.Instance.Publish(__instance, message);
 
-        return ModInformation.IsServer;
-    }
+    //    return ModInformation.IsServer;
+    //}
 
     [HarmonyPatch(nameof(MobileParty.MapEventSide), MethodType.Setter)]
     [HarmonyPrefix]
