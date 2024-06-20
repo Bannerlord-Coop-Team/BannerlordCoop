@@ -1,8 +1,6 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Client.Services.MobileParties.Messages.Fields;
-using GameInterface.Services.MobileParties.Messages.Fields.Events;
 using GameInterface.Services.MobileParties.Patches;
 
 namespace Coop.Core.Server.Services.MobileParties.Handlers;

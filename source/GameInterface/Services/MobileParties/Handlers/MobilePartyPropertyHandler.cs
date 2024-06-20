@@ -100,7 +100,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                             break;
 
                         case PropertyType.ShortTermBehaviour:
-                            instance.ShortTermBehavior = (AiBehavior)int.Parse(data.Value2);
+                            instance.ShortTermBehavior = (AiBehavior)Enum.Parse(typeof(AiBehavior), data.Value2);
                             break;
 
                         case PropertyType.IsPartyTradeActive:
