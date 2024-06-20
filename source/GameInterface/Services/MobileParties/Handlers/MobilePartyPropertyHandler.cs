@@ -50,12 +50,12 @@ namespace GameInterface.Services.MobileParties.Handlers
                     switch ((PropertyType)data.PropertyType)
                     {
                         case PropertyType.Army:
-                            if (objectManager.TryGetObject<MobileParty>(data.Value2, out var armyLeaderParty) == false)
+                            if (objectManager.TryGetObject<Army>(data.Value2, out var army) == false)
                             {
-                                Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
+                                Logger.Error("Unable to find {type} with id: {id}", typeof(Army), data.Value2);
                                 return;
                             }
-                            instance.Army = armyLeaderParty.Army;
+                            instance.Army = army;
                             break;
 
                         case PropertyType.CustomName:

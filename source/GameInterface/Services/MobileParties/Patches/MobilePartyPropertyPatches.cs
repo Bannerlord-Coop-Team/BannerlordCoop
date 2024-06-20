@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.Armies.Extensions;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -33,7 +34,7 @@ public class MobilePartyPropertyPatches
             return true;
         }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.Army, __instance.StringId, value?.LeaderParty.StringId);
+        var message = new MobilePartyPropertyChanged(PropertyType.Army, __instance.StringId, value?.GetStringId());
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;
