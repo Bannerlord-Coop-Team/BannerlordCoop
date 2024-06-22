@@ -68,7 +68,7 @@ public class KingdomHandler : IHandler
             return;
         }
 
-        KingdomPatches.RunOriginalAddDecision(kingdom, kingdomDecision, payload.IgnoreInfluenceCost);
+        KingdomPatches.RunCoopAddDecision(kingdom, kingdomDecision, payload.IgnoreInfluenceCost, payload.RandomNumber);
     }
 
     public void Dispose()

@@ -12,11 +12,14 @@ namespace GameInterface.Services.Kingdoms.Messages
         public KingdomDecisionData Data { get; }
         public bool IgnoreInfluenceCost { get; }
 
-        public AddDecision(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost)
+        public float RandomNumber { get; }
+
+        public AddDecision(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost, float randomNumber)
         {
             KingdomId = kingdomId;
             Data = data;
             IgnoreInfluenceCost = ignoreInfluenceCost;
+            RandomNumber = randomNumber;
         }
     }
 }

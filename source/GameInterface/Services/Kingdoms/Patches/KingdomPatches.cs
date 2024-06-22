@@ -32,10 +32,9 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
-
-            ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
+            float randomNumber = ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
             MessageBroker.Instance.Publish(__instance,
-                new DecisionAdded(__instance.StringId, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost));
+                new DecisionAdded(__instance.StringId, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost, randomNumber));
             return false;
         }
 
@@ -47,7 +46,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             }, true); 
         }
 
-        private static void ModifiedAddDecision(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float? randomFloat = null)
+        private static float ModifiedAddDecision(Kingdom __instance, KingdomDecision kingdomDecision, bool ignoreInfluenceCost, float? randomFloat = null)
         {
             if (!ignoreInfluenceCost)
             {
@@ -71,11 +70,13 @@ namespace GameInterface.Services.Kingdoms.Patches
             var playerParties = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties();
             if (playerParties.All(party => party.ActualClan.Kingdom != kingdomDecision.Kingdom))
             {
-                new CoopKingdomElection(kingdomDecision, randomFloat).StartElectionCoop();
-                return;
+                CoopKingdomElection election = new CoopKingdomElection(kingdomDecision, randomFloat);
+                election.StartElectionCoop();
+                return election.RandomFloat;
             }
 
             __instance._unresolvedDecisions.Add(kingdomDecision);
+            return default;
         }
 
         [HarmonyPatch(nameof(Kingdom.RemoveDecision))]

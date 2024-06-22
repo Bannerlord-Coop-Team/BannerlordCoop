@@ -17,11 +17,15 @@ namespace Coop.Core.Server.Services.Kingdoms.Messages
         [ProtoMember(3, IsRequired = true)]
         public bool IgnoreInfluenceCost { get; }
 
-        public NetworkAddDecision(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost)
+        [ProtoMember(4)]
+        public float RandomNumber { get; }
+
+        public NetworkAddDecision(string kingdomId, KingdomDecisionData data, bool ignoreInfluenceCost, float randomNumber)
         {
             KingdomId = kingdomId;
             Data = data;
             IgnoreInfluenceCost = ignoreInfluenceCost;
+            RandomNumber = randomNumber;
         }
     }
 }

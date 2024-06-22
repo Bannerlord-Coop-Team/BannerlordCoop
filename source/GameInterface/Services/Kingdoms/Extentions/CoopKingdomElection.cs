@@ -10,7 +10,7 @@ namespace GameInterface.Services.Kingdoms.Extentions
     {
         private float? randomFloat;
 
-        private float RandomFloat
+        public float RandomFloat
         {   
             get
             {

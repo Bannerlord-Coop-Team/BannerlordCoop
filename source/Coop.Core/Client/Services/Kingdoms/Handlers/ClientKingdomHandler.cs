@@ -32,7 +32,7 @@ public class ClientKingdomHandler : IHandler
     private void HandleNetworkAddDecision(MessagePayload<NetworkAddDecision> obj)
     {
         var payload = obj.What;
-        var message = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost);
+        var message = new AddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
         messageBroker.Publish(this, message);
     }
 

@@ -31,7 +31,7 @@ public class ServerKingdomHandler : IHandler
     private void HandleLocalDecisionAdded(MessagePayload<DecisionAdded> obj)
     {
         var payload = obj.What;
-        var message = new NetworkAddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost);
+        var message = new NetworkAddDecision(payload.KingdomId, payload.Data, payload.IgnoreInfluenceCost, payload.RandomNumber);
         network.SendAll(message);
     }
 
