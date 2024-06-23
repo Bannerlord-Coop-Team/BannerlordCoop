@@ -24,6 +24,7 @@ public class MobilePartyPropertyTests : IDisposable
 
     string PartyId { get; set; }
     string PartyId2 { get; set; }
+    string ClanId { get; set; }
 
     public MobilePartyPropertyTests(ITestOutputHelper output)
     {
@@ -34,13 +35,16 @@ public class MobilePartyPropertyTests : IDisposable
         {
             var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var party2 = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            GameObjectCreator.CreateInitializedObject<Clan>();
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
 
             PartyId = party.StringId;
+            ClanId = clan.StringId;
+
             party.CustomName = new TextObject("DefaultName");
+            party.ActualClan = clan;
+
 
             PartyId2 = party2.StringId;
-            party2.CustomName = new TextObject("DefaultName2");
         });
     }
 
@@ -989,12 +993,12 @@ public class MobilePartyPropertyTests : IDisposable
     public void ServerChangeActualClan_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+        Assert.True(Server.ObjectManager.TryGetObject<Clan>(ClanId, out var serverClan));
 
         // Act
         Server.Call(() =>
         {
-            serverParty.ActualClan = clan;
+            serverParty.ActualClan = serverClan;
         });
 
 
@@ -1013,7 +1017,6 @@ public class MobilePartyPropertyTests : IDisposable
 
         // Act
         var firstClient = Clients.First();
-
 
         firstClient.Call(() =>
         {
