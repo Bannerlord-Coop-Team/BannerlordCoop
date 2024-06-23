@@ -46,6 +46,9 @@ public class MobilePartyPropertyTests : IDisposable
             party.CustomName = new TextObject("DefaultName");
             party.ActualClan = clan;
             party.Engineer = hero;
+            party.Scout = hero;
+            party.Surgeon = hero;
+            party.Quartermaster = hero;
 
 
             PartyId2 = party2.StringId;
@@ -815,12 +818,12 @@ public class MobilePartyPropertyTests : IDisposable
     public void ServerChangeScout_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        var hero = GameObjectCreator.CreateInitializedObject<Hero>();
 
         // Act
         Server.Call(() =>
         {
-            serverParty.Scout = hero;
+            var newScout = GameObjectCreator.CreateInitializedObject<Hero>();
+            serverParty.Scout = newScout;
         });
 
 
@@ -828,7 +831,10 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Scout, serverParty.Scout);
+
+            // Assert hero changes
+            Assert.NotEqual(HeroId, serverParty.Scout.StringId);
+            Assert.Equal(clientParty.Scout.StringId, serverParty.Scout.StringId);
         }
     }
 
@@ -840,11 +846,12 @@ public class MobilePartyPropertyTests : IDisposable
         // Act
         var firstClient = Clients.First();
 
-
         firstClient.Call(() =>
         {
             Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            clientParty.Scout = null;
+
+            // Null because creating a hero causes issues
+            serverParty.Scout = null;
         });
 
 
@@ -852,7 +859,10 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Scout, serverParty.Scout);
+
+            // Assert hero does not actually change
+            Assert.Equal(HeroId, serverParty.Scout.StringId);
+            Assert.Equal(clientParty.Scout.StringId, serverParty.Scout.StringId);
         }
     }
 
@@ -873,6 +883,9 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
+
+            // Assert hero changes
+            Assert.NotEqual(HeroId, serverParty.Engineer.StringId);
             Assert.Equal(clientParty.Engineer.StringId, serverParty.Engineer.StringId);
         }
     }
@@ -888,6 +901,8 @@ public class MobilePartyPropertyTests : IDisposable
         firstClient.Call(() =>
         {
             Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
+
+            // Null because creating a hero causes issues
             serverParty.Engineer = null;
         });
 
@@ -896,6 +911,8 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
+
+            // Assert hero does not actually change
             Assert.Equal(HeroId, serverParty.Engineer.StringId);
             Assert.Equal(clientParty.Engineer.StringId, serverParty.Engineer.StringId);
         }
@@ -905,12 +922,12 @@ public class MobilePartyPropertyTests : IDisposable
     public void ServerChangeQuartermaster_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        var hero = GameObjectCreator.CreateInitializedObject<Hero>();
 
         // Act
         Server.Call(() =>
         {
-            serverParty.Quartermaster = hero;
+            var newQuartermaster = GameObjectCreator.CreateInitializedObject<Hero>();
+            serverParty.Quartermaster = newQuartermaster;
         });
 
 
@@ -918,7 +935,10 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Quartermaster, serverParty.Quartermaster);
+
+            // Assert hero changes
+            Assert.NotEqual(HeroId, serverParty.Quartermaster.StringId);
+            Assert.Equal(clientParty.Quartermaster.StringId, serverParty.Quartermaster.StringId);
         }
     }
 
@@ -930,11 +950,12 @@ public class MobilePartyPropertyTests : IDisposable
         // Act
         var firstClient = Clients.First();
 
-
         firstClient.Call(() =>
         {
             Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            clientParty.Quartermaster = null;
+
+            // Null because creating a hero causes issues
+            serverParty.Quartermaster = null;
         });
 
 
@@ -942,7 +963,10 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Quartermaster, serverParty.Quartermaster);
+
+            // Assert hero does not actually change
+            Assert.Equal(HeroId, serverParty.Quartermaster.StringId);
+            Assert.Equal(clientParty.Quartermaster.StringId, serverParty.Quartermaster.StringId);
         }
     }
 
@@ -950,12 +974,12 @@ public class MobilePartyPropertyTests : IDisposable
     public void ServerChangeSurgeon_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        var hero = GameObjectCreator.CreateInitializedObject<Hero>();
 
         // Act
         Server.Call(() =>
         {
-            serverParty.Surgeon = hero;
+            var newSurgeon = GameObjectCreator.CreateInitializedObject<Hero>();
+            serverParty.Surgeon = newSurgeon;
         });
 
 
@@ -963,7 +987,10 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Surgeon, serverParty.Surgeon);
+
+            // Assert hero changes
+            Assert.NotEqual(HeroId, serverParty.Surgeon.StringId);
+            Assert.Equal(clientParty.Surgeon.StringId, serverParty.Surgeon.StringId);
         }
     }
 
@@ -975,11 +1002,12 @@ public class MobilePartyPropertyTests : IDisposable
         // Act
         var firstClient = Clients.First();
 
-
         firstClient.Call(() =>
         {
             Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            clientParty.Surgeon = null;
+
+            // Null because creating a hero causes issues
+            serverParty.Surgeon = null;
         });
 
 
@@ -987,7 +1015,10 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Surgeon, serverParty.Surgeon);
+
+            // Assert hero does not actually change
+            Assert.Equal(HeroId, serverParty.Surgeon.StringId);
+            Assert.Equal(clientParty.Surgeon.StringId, serverParty.Surgeon.StringId);
         }
     }
 
