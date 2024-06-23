@@ -49,6 +49,7 @@ public class MobilePartyPropertyTests : IDisposable
             party.Scout = hero;
             party.Surgeon = hero;
             party.Quartermaster = hero;
+            party.AttachedTo = party2;
 
 
             PartyId2 = party2.StringId;
