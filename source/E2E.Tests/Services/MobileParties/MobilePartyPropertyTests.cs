@@ -25,6 +25,7 @@ public class MobilePartyPropertyTests : IDisposable
     string PartyId { get; set; }
     string PartyId2 { get; set; }
     string ClanId { get; set; }
+    string HeroId { get; set; }
 
     public MobilePartyPropertyTests(ITestOutputHelper output)
     {
@@ -36,12 +37,15 @@ public class MobilePartyPropertyTests : IDisposable
             var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var party2 = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
 
             PartyId = party.StringId;
             ClanId = clan.StringId;
+            HeroId = hero.StringId;
 
             party.CustomName = new TextObject("DefaultName");
             party.ActualClan = clan;
+            party.Engineer = hero;
 
 
             PartyId2 = party2.StringId;
@@ -359,7 +363,7 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Party, serverParty.Party);
+            Assert.Equal(clientParty.Party.Id, serverParty.Party.Id);
         }
     }
 
@@ -856,14 +860,12 @@ public class MobilePartyPropertyTests : IDisposable
     public void ServerChangeEngineer_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        
-        var hero = GameObjectCreator.CreateInitializedObject<Hero>();
-        Assert.True(Server.ObjectManager.TryGetObject<Hero>(hero.StringId, out var engineer));
 
         // Act
         Server.Call(() =>
         {
-            serverParty.Engineer = engineer;
+            var newEngineer = GameObjectCreator.CreateInitializedObject<Hero>();
+            serverParty.Engineer = newEngineer;
         });
 
 
@@ -871,7 +873,7 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Engineer, serverParty.Engineer);
+            Assert.Equal(clientParty.Engineer.StringId, serverParty.Engineer.StringId);
         }
     }
 
@@ -883,11 +885,10 @@ public class MobilePartyPropertyTests : IDisposable
         // Act
         var firstClient = Clients.First();
 
-
         firstClient.Call(() =>
         {
             Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            clientParty.Engineer = null;
+            serverParty.Engineer = null;
         });
 
 
@@ -895,7 +896,8 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Engineer, serverParty.Engineer);
+            Assert.Equal(HeroId, serverParty.Engineer.StringId);
+            Assert.Equal(clientParty.Engineer.StringId, serverParty.Engineer.StringId);
         }
     }
 
