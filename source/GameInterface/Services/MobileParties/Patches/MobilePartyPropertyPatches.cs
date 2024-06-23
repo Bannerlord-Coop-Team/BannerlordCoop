@@ -26,7 +26,6 @@ public enum PropertyType
     ArmyPositionAdder,
     Objective,
     Ai,
-    Party,
     IsActive,
     ShortTermBehaviour,
     IsPartyTradeActive,
@@ -191,25 +190,6 @@ public class MobilePartyPropertyPatches
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value._mobileParty?.StringId);
-        MessageBroker.Instance.Publish(__instance, message);
-
-        return ModInformation.IsServer;
-    }
-
-    [HarmonyPatch(nameof(MobileParty.Party), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetPartyPrefix(MobileParty __instance, PartyBase value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", nameof(MobileParty.Party), Environment.StackTrace);
-            return false;
-        }
-
-        var message = new MobilePartyPropertyChanged(PropertyType.Party, __instance.StringId, value.MobileParty?.StringId);
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;

@@ -326,51 +326,6 @@ public class MobilePartyPropertyTests : IDisposable
     }
 
     [Fact]
-    public void ServerChangeParty_SyncAllClients()
-    {
-        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        var newParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-
-        // Act
-        Server.Call(() =>
-        {
-            serverParty.Party = newParty.Party;
-        });
-
-
-        // Assert
-        foreach (var client in TestEnvironement.Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Party, serverParty.Party);
-        }
-    }
-
-    [Fact]
-    public void ClientParty_NoChange()
-    {
-        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-
-        // Act
-        var firstClient = Clients.First();
-
-
-        firstClient.Call(() =>
-        {
-            Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            clientParty.Party = null;
-        });
-
-
-        // Assert
-        foreach (var client in TestEnvironement.Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Party.Id, serverParty.Party.Id);
-        }
-    }
-
-    [Fact]
     public void ServerChangeIsActive_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));

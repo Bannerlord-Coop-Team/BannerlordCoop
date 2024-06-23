@@ -49,7 +49,9 @@ namespace GameInterface.Services.MobileParties.Handlers
 
         private void HandleDataChanged(MobileParty instance, ChangeMobilePartyProperty data)
         {
-            switch ((PropertyType)data.PropertyType)
+            var propertyType = (PropertyType)data.PropertyType;
+
+            switch (propertyType)
             {
                 case PropertyType.Army:
                     if (data.Value2 == null)
@@ -63,11 +65,11 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.Army = army;
-                    break;
+                    return;
 
                 case PropertyType.CustomName:
                     instance.CustomName = new TextObject(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.LastVisitedSettlement:
                     if (objectManager.TryGetObject<Settlement>(data.Value2, out var settlement) == false)
@@ -76,19 +78,19 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.LastVisitedSettlement = settlement;
-                    break;
+                    return;
 
                 case PropertyType.Aggressiveness:
                     instance.Aggressiveness = float.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.ArmyPositionAdder:
                     instance.ArmyPositionAdder = new Vec2(float.Parse(data.Value2), float.Parse(data.Value3));
-                    break;
+                    return;
 
                 case PropertyType.Objective:
                     instance.Objective = (MobileParty.PartyObjective)int.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.Ai:
                     if (objectManager.TryGetObject<MobileParty>(data.Value2, out var mobilePartyForAi) == false)
@@ -97,52 +99,43 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.Ai = mobilePartyForAi.Ai;
-                    break;
-
-                case PropertyType.Party:
-                    if (objectManager.TryGetObject<MobileParty>(data.Value2, out var party) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
-                        return;
-                    }
-                    instance.Party = party.Party;
-                    break;
+                    return;
 
                 case PropertyType.IsActive:
                     instance.IsActive = bool.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.ShortTermBehaviour:
                     instance.ShortTermBehavior = (AiBehavior)Enum.Parse(typeof(AiBehavior), data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.IsPartyTradeActive:
                     instance.IsPartyTradeActive = bool.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.PartyTradeGold:
                     instance.PartyTradeGold = int.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.PartyTradeTaxGold:
                     instance.PartyTradeTaxGold = int.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.StationaryStartTime:
                     instance.StationaryStartTime = new CampaignTime(long.Parse(data.Value2));
-                    break;
+                    return;
 
                 case PropertyType.VersionNo:
                     instance.VersionNo = int.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.ShouldJoinPlayerBattles:
                     instance.ShouldJoinPlayerBattles = bool.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.IsDisbanding:
                     instance.IsDisbanding = bool.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.CurrentSettlement:
                     if (objectManager.TryGetObject<Settlement>(data.Value2, out var curSettlement) == false)
@@ -151,7 +144,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.CurrentSettlement = curSettlement;
-                    break;
+                    return;
 
                 case PropertyType.AttachedTo:
                     if (objectManager.TryGetObject<MobileParty>(data.Value2, out var attachedToParty) == false)
@@ -160,7 +153,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.AttachedTo = attachedToParty;
-                    break;
+                    return;
 
                 case PropertyType.BesiegerCamp:
                     if (data.Value2 == null)
@@ -175,13 +168,13 @@ namespace GameInterface.Services.MobileParties.Handlers
                     }
 
                     instance.BesiegerCamp = campLeaderParty?.BesiegerCamp;
-                    break;
+                    return;
 
                 case PropertyType.Scout:
                     if (data.Value2 == null)
                     {
                         instance.Scout = null;
-                        break;
+                        return;
                     }
                     if (objectManager.TryGetObject<Hero>(data.Value2, out var scout) == false)
                     {
@@ -189,7 +182,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.Scout = scout;
-                    break;
+                    return;
 
                 case PropertyType.Engineer:
                     if (objectManager.TryGetObject<Hero>(data.Value2, out var engineer) == false)
@@ -198,13 +191,13 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.Engineer = engineer;
-                    break;
+                    return;
 
                 case PropertyType.Quartermaster:
                     if (data.Value2 == null)
                     {
                         instance.Quartermaster = null;
-                        break;
+                        return;
                     }
                     if (objectManager.TryGetObject<Hero>(data.Value2, out var quatermaster) == false)
                     {
@@ -212,13 +205,13 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.Quartermaster = quatermaster;
-                    break;
+                    return;
 
                 case PropertyType.Surgeon:
                     if (data.Value2 == null)
                     {
                         instance.Surgeon = null;
-                        break;
+                        return;
                     }
                     if (objectManager.TryGetObject<Hero>(data.Value2, out var surgeon) == false)
                     {
@@ -226,7 +219,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.Surgeon = surgeon;
-                    break;
+                    return;
 
                 case PropertyType.ActualClan:
                     if (data.Value2 == null)
@@ -240,15 +233,15 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.ActualClan = actualClan;
-                    break;
+                    return;
 
                 case PropertyType.RecentEventsMorale:
                     instance.RecentEventsMorale = float.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.EventPositionAdder:
                     instance.EventPositionAdder = new Vec2(float.Parse(data.Value2), float.Parse(data.Value3));
-                    break;
+                    return;
 
                 case PropertyType.MapEventSide:
                     if (data.Value2 == null)
@@ -262,39 +255,43 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
                     instance.MapEventSide = leaderParty.MapEventSide;
-                    break;
+                    return;
 
                 case PropertyType.PartyComponent:
                     //Do we want to move this here?
-                    break;
+                    return;
 
                 case PropertyType.IsMilita:
                     instance.IsMilitia = bool.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.IsLordParty:
                     instance.IsLordParty = bool.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.IsVillager:
                     instance.IsVillager = bool.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.IsCaravan:
                     instance.IsCaravan = bool.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.IsGarrison:
                     instance.IsGarrison = bool.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.IsCustomParty:
                     instance.IsCustomParty = bool.Parse(data.Value2);
-                    break;
+                    return;
 
                 case PropertyType.IsBandit:
                     instance.IsBandit = bool.Parse(data.Value2);
-                    break;
+                    return;
+
+                default: 
+                    Logger.Error("{propertyType} is not supported", propertyType);
+                    return;
             }
         }
 
