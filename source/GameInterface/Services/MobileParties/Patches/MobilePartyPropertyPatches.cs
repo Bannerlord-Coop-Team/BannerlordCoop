@@ -2,6 +2,7 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Extensions;
+using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -29,8 +30,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.Army), Environment.StackTrace);
             return true;
         }
 
@@ -48,8 +49,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.CustomName), Environment.StackTrace);
             return true;
         }
 
@@ -67,8 +68,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.LastVisitedSettlement), Environment.StackTrace);
             return true;
         }
 
@@ -86,8 +87,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.Aggressiveness), Environment.StackTrace);
             return true;
         }
 
@@ -105,8 +106,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.ArmyPositionAdder), Environment.StackTrace);
             return true;
         }
 
@@ -124,8 +125,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.Objective), Environment.StackTrace);
             return true;
         }
 
@@ -143,12 +144,12 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.Ai), Environment.StackTrace);
             return true;
         }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value._mobileParty.StringId);
+        var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value._mobileParty?.StringId);
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;
@@ -162,8 +163,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(PartyBase), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.Party), Environment.StackTrace);
             return true;
         }
 
@@ -181,8 +182,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.IsActive), Environment.StackTrace);
             return true;
         }
 
@@ -200,8 +201,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.ThinkParamsCache), Environment.StackTrace);
             return true;
         }
 
@@ -219,8 +220,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.IsPartyTradeActive), Environment.StackTrace);
             return true;
         }
 
@@ -238,8 +239,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.PartyTradeGold), Environment.StackTrace);
             return true;
         }
 
@@ -257,8 +258,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.PartyTradeTaxGold), Environment.StackTrace);
             return true;
         }
 
@@ -278,8 +279,8 @@ public class MobilePartyPropertyPatches
 
     //    if (ModInformation.IsClient)
     //    {
-    //        Logger.Error("Client created unmanaged {name}\n"
-    //            + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+    //        Logger.Error("Client tried to set {name}\n"
+    //            + "Callstack: {callstack}", nameof(MobileParty.StationaryStartTime), Environment.StackTrace);
     //        return true;
     //    }
 
@@ -297,8 +298,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.VersionNo), Environment.StackTrace);
             return true;
         }
 
@@ -316,8 +317,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.ShouldJoinPlayerBattles), Environment.StackTrace);
             return true;
         }
 
@@ -335,8 +336,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.IsDisbanding), Environment.StackTrace);
             return true;
         }
 
@@ -354,8 +355,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.CurrentSettlement), Environment.StackTrace);
             return true;
         }
 
@@ -373,8 +374,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.AttachedTo), Environment.StackTrace);
             return true;
         }
 
@@ -392,8 +393,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.BesiegerCamp), Environment.StackTrace);
             return true;
         }
 
@@ -411,8 +412,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.Scout), Environment.StackTrace);
             return true;
         }
 
@@ -430,8 +431,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.Engineer), Environment.StackTrace);
             return true;
         }
 
@@ -449,8 +450,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.Quartermaster), Environment.StackTrace);
             return true;
         }
 
@@ -468,8 +469,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.Surgeon), Environment.StackTrace);
             return true;
         }
 
@@ -487,14 +488,14 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.ActualClan), Environment.StackTrace);
             return true;
         }
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
+            Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", typeof(Clan), Environment.StackTrace);
             return true;
         }
@@ -513,8 +514,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.RecentEventsMorale), Environment.StackTrace);
             return true;
         }
 
@@ -532,31 +533,12 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.EventPositionAdder), Environment.StackTrace);
             return true;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.EventPositionAdder, __instance.StringId, value.X.ToString(), value.Y.ToString());
-        MessageBroker.Instance.Publish(__instance, message);
-
-        return ModInformation.IsServer;
-    }
-
-    [HarmonyPatch(nameof(MobileParty.IsInspected), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetIsInspectedPrefix(MobileParty __instance, bool value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
-            return true;
-        }
-
-        var message = new MobilePartyPropertyChanged(PropertyType.IsInspected, __instance.StringId, value.ToString());
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;
@@ -570,8 +552,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.MapEventSide), Environment.StackTrace);
             return true;
         }
 
@@ -589,8 +571,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.PartyComponent), Environment.StackTrace);
             return true;
         }
 
@@ -608,8 +590,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.IsMilitia), Environment.StackTrace);
             return true;
         }
 
@@ -627,8 +609,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.IsLordParty), Environment.StackTrace);
             return true;
         }
 
@@ -646,8 +628,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.IsVillager), Environment.StackTrace);
             return true;
         }
 
@@ -665,8 +647,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.IsCaravan), Environment.StackTrace);
             return true;
         }
 
@@ -684,8 +666,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.IsGarrison), Environment.StackTrace);
             return true;
         }
 
@@ -703,8 +685,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.IsCustomParty), Environment.StackTrace);
             return true;
         }
 
@@ -722,8 +704,8 @@ public class MobilePartyPropertyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobilePartyAi), Environment.StackTrace);
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.IsBandit), Environment.StackTrace);
             return true;
         }
 
@@ -764,7 +746,6 @@ public enum PropertyType
     ActualClan,
     RecentEventsMorale,
     EventPositionAdder,
-    IsInspected,
     MapEventSide,
     PartyComponent,
     IsMilita,

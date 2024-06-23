@@ -94,7 +94,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                                 Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
                                 return;
                             }
-                            instance.Ai = new MobilePartyAi(mobilePartyForAi);
+                            instance.Ai = mobilePartyForAi.Ai;
                             break;
 
                         case PropertyType.Party:
@@ -239,10 +239,6 @@ namespace GameInterface.Services.MobileParties.Handlers
 
                         case PropertyType.EventPositionAdder:
                             instance.EventPositionAdder = new Vec2(float.Parse(data.Value2), float.Parse(data.Value3));
-                            break;
-
-                        case PropertyType.IsInspected:
-                            instance.IsInspected = bool.Parse(data.Value2);
                             break;
 
                         case PropertyType.MapEventSide:
