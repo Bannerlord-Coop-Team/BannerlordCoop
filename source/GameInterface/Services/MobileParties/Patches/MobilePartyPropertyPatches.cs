@@ -17,6 +17,47 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
+public enum PropertyType
+{
+    Army,
+    CustomName,
+    LastVisitedSettlement,
+    Aggressiveness,
+    ArmyPositionAdder,
+    Objective,
+    Ai,
+    Party,
+    IsActive,
+    ShortTermBehaviour,
+    IsPartyTradeActive,
+    PartyTradeGold,
+    PartyTradeTaxGold,
+    StationaryStartTime,
+    VersionNo,
+    ShouldJoinPlayerBattles,
+    IsDisbanding,
+    CurrentSettlement,
+    AttachedTo,
+    BesiegerCamp,
+    Scout,
+    Engineer,
+    Quartermaster,
+    Surgeon,
+    ActualClan,
+    RecentEventsMorale,
+    EventPositionAdder,
+    MapEventSide,
+    PartyComponent,
+    IsMilita,
+    IsLordParty,
+    IsVillager,
+    IsCaravan,
+    IsGarrison,
+    IsCustomParty,
+    IsBandit,
+}
+
+
 [HarmonyPatch(typeof(MobileParty))]
 public class MobilePartyPropertyPatches
 {
@@ -32,7 +73,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.Army), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Army, __instance.StringId, value?.GetStringId());
@@ -51,7 +92,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.CustomName), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.CustomName, __instance.StringId, value?.Value);
@@ -70,7 +111,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.LastVisitedSettlement), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.LastVisitedSettlement, __instance.StringId, value?.StringId);
@@ -108,7 +149,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.ArmyPositionAdder), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.ArmyPositionAdder, __instance.StringId, value.x.ToString(), value.y.ToString());
@@ -127,7 +168,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.Objective), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Objective, __instance.StringId, value.ToString());
@@ -146,7 +187,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.Ai), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value._mobileParty?.StringId);
@@ -165,7 +206,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.Party), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Party, __instance.StringId, value.MobileParty?.StringId);
@@ -184,7 +225,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.IsActive), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.IsActive, __instance.StringId, value.ToString());
@@ -203,7 +244,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.IsPartyTradeActive), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.IsPartyTradeActive, __instance.StringId, value.ToString());
@@ -222,7 +263,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.PartyTradeGold), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.PartyTradeGold, __instance.StringId, value.ToString());
@@ -241,7 +282,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.PartyTradeTaxGold), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.PartyTradeTaxGold, __instance.StringId, value.ToString());
@@ -281,7 +322,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.VersionNo), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.VersionNo, __instance.StringId, value.ToString());
@@ -300,7 +341,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.ShouldJoinPlayerBattles), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.ShouldJoinPlayerBattles, __instance.StringId, value.ToString());
@@ -319,7 +360,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.IsDisbanding), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.IsDisbanding, __instance.StringId, value.ToString());
@@ -338,7 +379,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.CurrentSettlement), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.CurrentSettlement, __instance.StringId, value?.StringId);
@@ -357,7 +398,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.AttachedTo), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.AttachedTo, __instance.StringId, value?.StringId);
@@ -376,7 +417,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.BesiegerCamp), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.BesiegerCamp, __instance.StringId, value?.LeaderParty.StringId);
@@ -395,7 +436,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.Scout), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Scout, __instance.StringId, value?.StringId);
@@ -414,7 +455,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.Engineer), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Engineer, __instance.StringId, value?.StringId);
@@ -433,7 +474,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.Quartermaster), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Quartermaster, __instance.StringId, value?.StringId);
@@ -452,7 +493,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.Surgeon), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Surgeon, __instance.StringId, value?.StringId);
@@ -471,14 +512,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.ActualClan), Environment.StackTrace);
-            return true;
-        }
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", typeof(Clan), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.ActualClan, __instance.StringId, value?.StringId);
@@ -497,7 +531,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.RecentEventsMorale), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.RecentEventsMorale, __instance.StringId, value.ToString());
@@ -516,7 +550,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.EventPositionAdder), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.EventPositionAdder, __instance.StringId, value.X.ToString(), value.Y.ToString());
@@ -535,7 +569,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.MapEventSide), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.MapEventSide, __instance.StringId, value.LeaderParty.MobileParty.StringId);
@@ -573,7 +607,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.IsMilitia), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.IsMilita, __instance.StringId, value.ToString());
@@ -592,7 +626,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.IsLordParty), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.IsLordParty, __instance.StringId, value.ToString());
@@ -611,7 +645,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.IsVillager), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.IsVillager, __instance.StringId, value.ToString());
@@ -630,7 +664,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.IsCaravan), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.IsCaravan, __instance.StringId, value.ToString());
@@ -649,7 +683,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.IsGarrison), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.IsGarrison, __instance.StringId, value.ToString());
@@ -668,7 +702,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.IsCustomParty), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.IsCustomParty, __instance.StringId, value.ToString());
@@ -687,7 +721,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.IsBandit), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.IsBandit, __instance.StringId, value.ToString());
@@ -695,44 +729,4 @@ public class MobilePartyPropertyPatches
 
         return ModInformation.IsServer;
     }
-}
-
-public enum PropertyType
-{
-    Army,
-    CustomName,
-    LastVisitedSettlement,
-    Aggressiveness,
-    ArmyPositionAdder,
-    Objective,
-    Ai,
-    Party,
-    IsActive,
-    ShortTermBehaviour,
-    IsPartyTradeActive,
-    PartyTradeGold,
-    PartyTradeTaxGold,
-    StationaryStartTime,
-    VersionNo,
-    ShouldJoinPlayerBattles,
-    IsDisbanding,
-    CurrentSettlement,
-    AttachedTo,
-    BesiegerCamp,
-    Scout,
-    Engineer,
-    Quartermaster,
-    Surgeon,
-    ActualClan,
-    RecentEventsMorale,
-    EventPositionAdder,
-    MapEventSide,
-    PartyComponent,
-    IsMilita,
-    IsLordParty,
-    IsVillager,
-    IsCaravan,
-    IsGarrison,
-    IsCustomParty,
-    IsBandit,
 }
