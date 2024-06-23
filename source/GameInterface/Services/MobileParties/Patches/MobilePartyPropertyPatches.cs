@@ -193,25 +193,6 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.ThinkParamsCache), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetThinkParamsCachePrefix(MobileParty __instance, PartyThinkParams value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", nameof(MobileParty.ThinkParamsCache), Environment.StackTrace);
-            return true;
-        }
-
-        var message = new MobilePartyPropertyChanged(PropertyType.ThinkParamsCache, __instance.StringId, value.ToString());
-        MessageBroker.Instance.Publish(__instance, message);
-
-        return ModInformation.IsServer;
-    }
-
     [HarmonyPatch(nameof(MobileParty.IsPartyTradeActive), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool SetIsPartyTradeActivePrefix(MobileParty __instance, bool value)
@@ -398,7 +379,7 @@ public class MobilePartyPropertyPatches
             return true;
         }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.BesiegerCamp, __instance.StringId, value?.ToString());
+        var message = new MobilePartyPropertyChanged(PropertyType.BesiegerCamp, __instance.StringId, value?.LeaderParty.StringId);
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;
@@ -557,7 +538,7 @@ public class MobilePartyPropertyPatches
             return true;
         }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.MapEventSide, __instance.StringId, value.ToString());
+        var message = new MobilePartyPropertyChanged(PropertyType.MapEventSide, __instance.StringId, value.LeaderParty.MobileParty.StringId);
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;
@@ -727,7 +708,6 @@ public enum PropertyType
     Ai,
     Party,
     IsActive,
-    ThinkParamsCache,
     ShortTermBehaviour,
     IsPartyTradeActive,
     PartyTradeGold,

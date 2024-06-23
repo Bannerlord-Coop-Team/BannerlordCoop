@@ -85,6 +85,7 @@
 	  </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Client\Services\MobileParties\Messages\Data\" />
     <Folder Include="Server\Services\Kingdoms\Messages\" />
   </ItemGroup>
   <ItemGroup>

@@ -1,5 +1,4 @@
-﻿using Autofac.Core;
-using Common;
+﻿using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -8,10 +7,7 @@ using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -110,10 +106,6 @@ namespace GameInterface.Services.MobileParties.Handlers
                             instance.IsActive = bool.Parse(data.Value2);
                             break;
 
-                        case PropertyType.ThinkParamsCache:
-                            //TODO
-                            break;
-
                         case PropertyType.ShortTermBehaviour:
                             instance.ShortTermBehavior = (AiBehavior)Enum.Parse(typeof(AiBehavior), data.Value2);
                             break;
@@ -165,7 +157,18 @@ namespace GameInterface.Services.MobileParties.Handlers
                             break;
 
                         case PropertyType.BesiegerCamp:
-                            //TODO
+                            if(data.Value2 == null)
+                            {
+                                instance.BesiegerCamp = null;
+                                return;
+                            }
+                            if (objectManager.TryGetObject<MobileParty>(data.Value2, out var campLeaderParty) == false)
+                            {
+                                Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
+                                return;
+                            }
+
+                            instance.BesiegerCamp = campLeaderParty?.BesiegerCamp;
                             break;
 
                         case PropertyType.Scout:
@@ -242,11 +245,21 @@ namespace GameInterface.Services.MobileParties.Handlers
                             break;
 
                         case PropertyType.MapEventSide:
-                            //TODO
+                            if (data.Value2 == null)
+                            {
+                                instance.MapEventSide = null;
+                                return;
+                            }
+                            if (objectManager.TryGetObject<MobileParty>(data.Value2, out var leaderParty) == false)
+                            {
+                                Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
+                                return;
+                            }
+                            instance.MapEventSide = leaderParty.MapEventSide;
                             break;
 
                         case PropertyType.PartyComponent:
-                            //TODO
+                            //Do we want to move this here?
                             break;
 
                         case PropertyType.IsMilita:

@@ -28,36 +28,14 @@ internal class MobilePartyDataHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        messageBroker.Subscribe<ChangePartyArmy>(Handle_ChangePartyArmy);
         messageBroker.Subscribe<PartyComponentChanged>(Handle_PartyComponentChanged);
         messageBroker.Subscribe<NetworkChangePartyComponent>(Handle_ChangePartyComponent);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<ChangePartyArmy>(Handle_ChangePartyArmy);
         messageBroker.Unsubscribe<PartyComponentChanged>(Handle_PartyComponentChanged);
         messageBroker.Unsubscribe<NetworkChangePartyComponent>(Handle_ChangePartyComponent);
-    }
-
-    private void Handle_ChangePartyArmy(MessagePayload<ChangePartyArmy> payload)
-    {
-        var partyId = payload.What.Data.PartyId;
-        var armyId = payload.What.Data.ArmyId;
-
-        if (objectManager.TryGetObject(partyId, out MobileParty party) == false)
-        {
-            Logger.Error("Failed to find party with stringId {stringId}", partyId);
-            return;
-        }
-
-        if (objectManager.TryGetObject(armyId, out Army army) == false)
-        {
-            Logger.Error("Failed to find army with stringId {stringId}", armyId);
-            return;
-        }
-
-        PartyArmyPatches.OverrideSetArmy(party, army);
     }
 
     private void Handle_PartyComponentChanged(MessagePayload<PartyComponentChanged> payload)
