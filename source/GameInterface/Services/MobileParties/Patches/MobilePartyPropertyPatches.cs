@@ -130,7 +130,7 @@ public class MobilePartyPropertyPatches
         {
             Logger.Error("Client tried to set {name}\n"
                 + "Callstack: {callstack}", nameof(MobileParty.Aggressiveness), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Aggressiveness, __instance.StringId, value.ToString());
