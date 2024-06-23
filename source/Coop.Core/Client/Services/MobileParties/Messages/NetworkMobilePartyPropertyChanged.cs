@@ -19,7 +19,7 @@ namespace Coop.Core.Client.Services.MobileParties.Messages
         [ProtoMember(4)]
         public string? Value3 { get; }
 
-        public NetworkMobilePartyPropertyChanged(int propertyType, string value1, string value2, string value3 = null)
+        public NetworkMobilePartyPropertyChanged(int propertyType, string value1, string value2, string? value3)
         {
             PropertyType = propertyType;
             Value1 = value1;
