@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+#nullable enable
 
 namespace Coop.Core.Client.Services.MobileParties.Messages
 {
