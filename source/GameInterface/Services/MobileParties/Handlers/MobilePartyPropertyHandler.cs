@@ -98,7 +98,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                         Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
                         return;
                     }
-                    instance.Ai = mobilePartyForAi.Ai;
+                    instance.Ai = new MobilePartyAi(mobilePartyForAi);
                     return;
 
                 case PropertyType.IsActive:

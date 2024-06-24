@@ -50,7 +50,7 @@ public class MobilePartyPropertyTests : IDisposable
             party.Surgeon = hero;
             party.Quartermaster = hero;
             party.AttachedTo = party2;
-
+            party.Ai = new MobilePartyAi(party);
 
             PartyId2 = party2.StringId;
         });
@@ -298,7 +298,7 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Ai, serverParty.Ai);
+            Assert.Equal(clientParty.Ai._mobileParty.StringId, serverParty.Ai._mobileParty.StringId);
         }
     }
 
@@ -322,7 +322,7 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.Ai, serverParty.Ai);
+            Assert.Equal(clientParty.Ai._mobileParty.StringId, serverParty.Ai._mobileParty.StringId);
         }
     }
 
@@ -697,7 +697,7 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.AttachedTo, serverParty.AttachedTo);
+            Assert.Equal(clientParty.AttachedTo.StringId, serverParty.AttachedTo.StringId);
         }
     }
 
