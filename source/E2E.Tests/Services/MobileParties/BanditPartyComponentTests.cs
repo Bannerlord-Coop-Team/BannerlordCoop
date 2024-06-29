@@ -9,22 +9,22 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.MobileParties;
 public class BanditPartyComponentTests : IDisposable
 {
-    E2ETestEnvironment TestEnvironement { get; }
+    E2ETestEnvironment TestEnvironment { get; }
     public BanditPartyComponentTests(ITestOutputHelper output)
     {
-        TestEnvironement = new E2ETestEnvironment(output);
+        TestEnvironment = new E2ETestEnvironment(output);
     }
 
     public void Dispose()
     {
-        TestEnvironement.Dispose();
+        TestEnvironment.Dispose();
     }
 
     [Fact]
     public void ServerCreateParty_SyncAllClients()
     {
         // Arrange
-        var server = TestEnvironement.Server;
+        var server = TestEnvironment.Server;
 
         var clan = GameObjectCreator.CreateInitializedObject<Clan>();
         var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
@@ -42,7 +42,7 @@ public class BanditPartyComponentTests : IDisposable
         // Assert
         Assert.NotNull(partyId);
 
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
             Assert.IsType<BanditPartyComponent>(newParty.PartyComponent);
@@ -53,8 +53,8 @@ public class BanditPartyComponentTests : IDisposable
     public void ClientCreateParty_DoesNothing()
     {
         // Arrange
-        var server = TestEnvironement.Server;
-        var client1 = TestEnvironement.Clients.First();
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
 
         var clan = GameObjectCreator.CreateInitializedObject<Clan>();
         var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
@@ -67,7 +67,7 @@ public class BanditPartyComponentTests : IDisposable
         });
 
         // Assert
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
         }
