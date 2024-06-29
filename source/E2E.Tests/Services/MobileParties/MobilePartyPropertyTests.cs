@@ -146,7 +146,7 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.CustomName.Value, serverParty.CustomName.Value);
+            Assert.Equal(clientParty.LastVisitedSettlement, serverParty.LastVisitedSettlement);
         }
     }
 
