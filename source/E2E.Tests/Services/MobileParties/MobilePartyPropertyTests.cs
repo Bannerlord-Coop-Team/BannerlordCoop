@@ -109,8 +109,18 @@ public class MobilePartyPropertyTests : IDisposable
     [Fact]
     public void ServerChangeLastVisitedSettlement_SyncAllClients()
     {
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        // Arrange
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
+
+        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        Server.ObjectManager.AddNewObject(settlement, out var settlementId);
+
+        foreach(var client in TestEnvironement.Clients)
+        {
+            var newSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            client.ObjectManager.AddExisting(settlementId, newSettlement);
+        }
+        
 
         // Act
         Server.Call(() =>
@@ -123,7 +133,7 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.LastVisitedSettlement, serverParty.LastVisitedSettlement);
+            Assert.Equal(clientParty.LastVisitedSettlement.StringId, serverParty.LastVisitedSettlement.StringId);
         }
     }
 
