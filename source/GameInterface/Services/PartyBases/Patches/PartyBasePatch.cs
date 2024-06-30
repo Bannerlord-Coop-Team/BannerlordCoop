@@ -1,10 +1,6 @@
-﻿using Common.Logging;
-using Common.Messaging;
-using GameInterface.Services.ItemRosters;
+﻿using GameInterface.Services.ItemRosters;
 using HarmonyLib;
-using Serilog;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.PartyBases.Patches
 {

@@ -1,15 +1,10 @@
 ﻿using Autofac;
 using GameInterface.Serialization;
 using GameInterface.Services;
-using GameInterface.Services.Armies;
-using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using GameInterface.Services.Registry;
 using GameInterface.Services.Time;
-using GameInterface.Utils.AutoSync;
 using HarmonyLib;
 
 namespace GameInterface;
@@ -30,7 +25,6 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSync>().As<IAutoSync>().InstancePerLifetimeScope();
         
 
         builder.RegisterModule<ServiceModule>();

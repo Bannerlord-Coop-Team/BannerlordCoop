@@ -44,7 +44,7 @@ public class VillagerPartyComponentTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
-            Assert.NotNull(newParty.PartyComponent);
+            Assert.IsType<VillagerPartyComponent>(newParty.PartyComponent);
         }
     }
 
