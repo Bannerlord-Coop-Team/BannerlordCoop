@@ -1,4 +1,5 @@
-﻿using Coop.IntegrationTests.Environment.Instance;
+﻿using Common.Util;
+using Coop.IntegrationTests.Environment.Instance;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Extensions;
@@ -638,7 +639,15 @@ public class MobilePartyPropertyTests : IDisposable
     public void ServerChangeCurrentSettlement_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
+
         var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        Server.ObjectManager.AddNewObject(settlement, out var settlementId);
+
+        foreach(var client in TestEnvironement.Clients)
+        {
+            var newSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            client.ObjectManager.AddExisting(settlementId, newSettlement);
+        }
 
         // Act
         Server.Call(() =>
@@ -651,7 +660,7 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.CurrentSettlement, serverParty.CurrentSettlement);
+            Assert.Equal(serverParty.CurrentSettlement.StringId, clientParty.CurrentSettlement.StringId);
         }
     }
 

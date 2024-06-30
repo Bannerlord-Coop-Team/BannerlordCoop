@@ -24,7 +24,7 @@ public class TestMessageBroker : MessageBroker
             return;
         }
 
-        var delegates = _subscribers[messageType];
+        var delegates = _subscribers[messageType].ToList();
         if (delegates == null || delegates.Count == 0) return;
 
         var payloadType = typeof(MessagePayload<>).MakeGenericType(messageType);
