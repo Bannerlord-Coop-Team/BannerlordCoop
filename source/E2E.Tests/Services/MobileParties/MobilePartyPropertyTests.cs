@@ -25,7 +25,6 @@ public class MobilePartyPropertyTests : IDisposable
 
     string PartyId { get; set; }
     string PartyId2 { get; set; }
-    string ClanId { get; set; }
     string HeroId { get; set; }
 
     public MobilePartyPropertyTests(ITestOutputHelper output)
@@ -37,15 +36,12 @@ public class MobilePartyPropertyTests : IDisposable
         {
             var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var party2 = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var hero = GameObjectCreator.CreateInitializedObject<Hero>();
 
             PartyId = party.StringId;
-            ClanId = clan.StringId;
             HeroId = hero.StringId;
 
             party.CustomName = new TextObject("DefaultName");
-            party.ActualClan = clan;
             party.Engineer = hero;
             party.Scout = hero;
             party.Surgeon = hero;
@@ -1001,12 +997,20 @@ public class MobilePartyPropertyTests : IDisposable
     public void ServerChangeActualClan_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        Assert.True(Server.ObjectManager.TryGetObject<Clan>(ClanId, out var serverClan));
+
+        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+        Server.ObjectManager.AddNewObject(clan, out string clanId);
+
+        foreach (var client in TestEnvironement.Clients)
+        {
+            var newClan = GameObjectCreator.CreateInitializedObject<Clan>();
+            client.ObjectManager.AddExisting(clanId, newClan);
+        }
 
         // Act
         Server.Call(() =>
         {
-            serverParty.ActualClan = serverClan;
+            serverParty.ActualClan = clan;
         });
 
 
@@ -1014,7 +1018,7 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.ActualClan, serverParty.ActualClan);
+            Assert.Equal(serverParty.ActualClan.StringId, clientParty.ActualClan.StringId);
         }
     }
 
@@ -1023,13 +1027,25 @@ public class MobilePartyPropertyTests : IDisposable
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
 
-        // Act
+        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+        Server.ObjectManager.AddNewObject(clan, out string clanId);
+
+        foreach (var client in TestEnvironement.Clients)
+        {
+            var newClan = GameObjectCreator.CreateInitializedObject<Clan>();
+            client.ObjectManager.AddExisting(clanId, newClan);
+        }
+
+        Server.Call(() =>
+        {
+            serverParty.ActualClan = clan;
+        });
+
         var firstClient = Clients.First();
 
         firstClient.Call(() =>
         {
-            Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            clientParty.ActualClan = null;
+            serverParty.ActualClan = null;
         });
 
 
@@ -1037,7 +1053,7 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.ActualClan, serverParty.ActualClan);
+            Assert.Equal(serverParty.ActualClan.StringId, clientParty.ActualClan.StringId);
         }
     }
 
