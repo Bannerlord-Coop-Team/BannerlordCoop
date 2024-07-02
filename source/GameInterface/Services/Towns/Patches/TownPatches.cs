@@ -19,12 +19,7 @@ namespace GameInterface.Services.Towns.Patches
     [HarmonyPatch(typeof(Town))]
     public class TownPatches
     {
-        [HarmonyPatch("DailyTick")]
-        [HarmonyPrefix]
-        private static bool DailyTickPrefix()
-        {
-            return ModInformation.IsServer;
-        }
+        
 
         [HarmonyPatch(nameof(Town.Governor), MethodType.Setter)]
         [HarmonyPrefix]

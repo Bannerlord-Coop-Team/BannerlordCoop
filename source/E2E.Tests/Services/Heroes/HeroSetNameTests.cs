@@ -7,31 +7,31 @@ namespace E2E.Tests.Services.Heroes;
 
 public class HeroSetNameTests : IDisposable
 {
-    E2ETestEnvironment TestEnvironement { get; }
+    E2ETestEnvironment TestEnvironment { get; }
     public HeroSetNameTests(ITestOutputHelper output)
     {
-        TestEnvironement = new E2ETestEnvironment(output);
+        TestEnvironment = new E2ETestEnvironment(output);
     }
 
     public void Dispose()
     {
-        TestEnvironement.Dispose();
+        TestEnvironment.Dispose();
     }
 
     [Fact]
     public void ServerSetName_SyncAllClients()
     {
         // Arrange
-        var server = TestEnvironement.Server;
+        var server = TestEnvironment.Server;
 
         var networkId = "CoopHero_1";
         // Creates a new hero and registers it with the objectManager
         // using the networkId as an identifier
-        var serverHero = TestEnvironement.Server.CreateRegisteredObject<Hero>(networkId);
+        var serverHero = TestEnvironment.Server.CreateRegisteredObject<Hero>(networkId);
         
         // Creates and stores heroes on the clients with same id as server
         var clientHeroes = new List<Hero>();
-        foreach(var client in TestEnvironement.Clients)
+        foreach(var client in TestEnvironment.Clients)
         {
             clientHeroes.Add(client.CreateRegisteredObject<Hero>(networkId));
         }
@@ -62,18 +62,18 @@ public class HeroSetNameTests : IDisposable
     public void ClientSetName_DoesNothing()
     {
         // Arrange
-        var server = TestEnvironement.Server;
-        var client1 = TestEnvironement.Clients.First();
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
 
         var networkId = "CoopHero_1";
 
         // Creates a new hero and registers it with the objectManager
         // using the networkId as an identifier
-        var serverHero = TestEnvironement.Server.CreateRegisteredObject<Hero>(networkId);
+        var serverHero = TestEnvironment.Server.CreateRegisteredObject<Hero>(networkId);
 
         // Creates and stores heroes on the clients with same id as server
         var clientHeroes = new List<Hero>();
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             clientHeroes.Add(client.CreateRegisteredObject<Hero>(networkId));
         }

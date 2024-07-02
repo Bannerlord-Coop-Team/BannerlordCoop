@@ -14,7 +14,9 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Patches;
@@ -33,28 +35,23 @@ internal class PartyLifetimePatches
         // Skip if we called it
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        // This is needed to prevent Party.CreateParty from crashing
-        __instance.StringId = "";
-
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
+
+            __instance.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>("ERROR_PARTY");
+
             return true;
         }
 
-        // Allow method if container is not setup
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
-        if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) == false) return true;
-        if (ContainerProvider.TryResolve<INetworkConfiguration>(out var configuration) == false) return true;
-
-        if (objectManager.AddNewObject(__instance, out var stringID) == false) return true;
-
-        var data = new PartyCreationData(__instance);
-        var message = new PartyCreated(data);
-
-        using (new MessageTransaction<NewPartySynced>(messageBroker, configuration.ObjectCreationTimeout))
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
         {
+            objectManager.AddNewObject(__instance, out var _);
+
+            var data = new PartyCreationData(__instance);
+            var message = new PartyCreated(data);
+
             MessageBroker.Instance.Publish(__instance, message);
         }
 
@@ -132,6 +129,7 @@ internal class PartyLifetimePatches
         MessageBroker.Instance.Publish(party, message);
     }
 
+    /// Disable setting of string id in <see cref="MobileParty.CreateParty"/> so we can manage the id on our own
     [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.CreateParty))]
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
@@ -141,19 +139,13 @@ internal class PartyLifetimePatches
         {
             if (instr.opcode == OpCodes.Callvirt && instr.operand as MethodInfo == set_stringId)
             {
-                yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(PartyLifetimePatches), "SetStringIdIntercept"));
-                continue;
+                yield return new CodeInstruction(OpCodes.Pop);
+                yield return new CodeInstruction(OpCodes.Pop);
             }
-
-            yield return instr;
-        }
-    }
-
-    private static void SetStringIdIntercept(MobileParty instance, string value)
-    {
-        if (instance.StringId == null)
-        {
-            instance.StringId = value;
+            else
+            {
+                yield return instr;
+            }
         }
     }
 }
