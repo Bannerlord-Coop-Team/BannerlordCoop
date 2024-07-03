@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.Clans.Patches;
+namespace GameInterface.Services.Clans.Patches.Disable;
 
 [HarmonyPatch(typeof(ClanVariablesCampaignBehavior))]
 internal class DisableClanVariablesCampaignBehavior

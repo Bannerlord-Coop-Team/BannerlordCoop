@@ -16,22 +16,22 @@ namespace E2E.Tests.Services.Armies;
 
 public class ArmyDestructionTests : IDisposable
 {
-    E2ETestEnvironment TestEnvironement { get; }
+    E2ETestEnvironment TestEnvironment { get; }
     public ArmyDestructionTests(ITestOutputHelper output)
     {
-        TestEnvironement = new E2ETestEnvironment(output);
+        TestEnvironment = new E2ETestEnvironment(output);
     }
 
     public void Dispose()
     {
-        TestEnvironement.Dispose();
+        TestEnvironment.Dispose();
     }
 
     [Fact]
     public void ServerDestroyArmy_SyncAllClients()
     {
         // Arrange
-        var server = TestEnvironement.Server;
+        var server = TestEnvironment.Server;
 
         var kingdom = new Kingdom();
         var hero = GameObjectCreator.CreateInitializedObject<Hero>();
@@ -44,7 +44,7 @@ public class ArmyDestructionTests : IDisposable
         server.ObjectManager.AddNewObject(hero, out string heroStringId);
         server.ObjectManager.AddNewObject(hero.PartyBelongedTo, out string partyStringId);
 
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             client.ObjectManager.AddExisting(kingdomStringId, kingdom);
             client.ObjectManager.AddExisting(heroStringId, hero);
@@ -70,7 +70,7 @@ public class ArmyDestructionTests : IDisposable
         // Assert
         Assert.False(server.ObjectManager.TryGetObject<Army>(armyId, out var _));
 
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             Assert.False(client.ObjectManager.TryGetObject<Army>(armyId, out var _));
         }
@@ -80,8 +80,8 @@ public class ArmyDestructionTests : IDisposable
     public void ClientDestroyArmy_DoesNothing()
     {
         // Arrange
-        var server = TestEnvironement.Server;
-        var client1 = TestEnvironement.Clients.First();
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
 
         var kingdom = new Kingdom();
         var hero = GameObjectCreator.CreateInitializedObject<Hero>();
@@ -94,7 +94,7 @@ public class ArmyDestructionTests : IDisposable
         server.ObjectManager.AddNewObject(hero, out string heroStringId);
         server.ObjectManager.AddNewObject(hero.PartyBelongedTo, out string partyStringId);
 
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             client.ObjectManager.AddExisting(kingdomStringId, kingdom);
             client.ObjectManager.AddExisting(heroStringId, hero);
@@ -121,7 +121,7 @@ public class ArmyDestructionTests : IDisposable
         // Assert
         Assert.True(server.ObjectManager.TryGetObject<Army>(armyId, out var _));
 
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var _));
         }
