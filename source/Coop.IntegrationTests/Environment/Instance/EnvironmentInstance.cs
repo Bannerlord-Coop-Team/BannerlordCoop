@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;

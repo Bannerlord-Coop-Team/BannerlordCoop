@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common.Util;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,6 +8,7 @@ using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 
 namespace E2E.Tests.Util.ObjectBuilders;
@@ -14,23 +16,33 @@ internal class MobilePartyBuilder : IObjectBuilder
 {
     public object Build()
     {
-        var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
+        var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
+        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+        
+        leaderHero.Clan = clan;
+        clan.SetLeader(leaderHero);
+        
 
-        return MobileParty.CreateParty("This should not set", partyComponent, (party) =>
-        {
-            partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
-        });
+        return LordPartyComponent.CreateLordParty("TestParty", leaderHero, Vec2.Zero, 0, spawnSettlement, leaderHero);
     }
 
     public MobileParty BuildWithHero(Hero hero)
     {
         var componentBuilder = new LordPartyComponentBuilder();
 
+        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+
         var partyComponent = componentBuilder.BuildWithHero(hero);
 
         return MobileParty.CreateParty("This should not set", partyComponent, (party) =>
         {
-            partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
+            using (new AllowedThread())
+            {
+                party.ActualClan = clan;
+            }
+
+            partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null); 
         });
     }
 }

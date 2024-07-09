@@ -93,7 +93,7 @@ internal class PartyLifetimePatches
         {
             Logger.Error("Client destroyed unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;

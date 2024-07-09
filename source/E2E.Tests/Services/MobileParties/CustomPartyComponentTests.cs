@@ -29,17 +29,17 @@ public class CustomPartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-        var hero = GameObjectCreator.CreateInitializedObject<Hero>();
-        var name = new TextObject("Name");
-        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        var partyTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
-
         // Act
         string? partyId = null;
 
         server.Call(() =>
         {
+            var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            var name = new TextObject("Name");
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var partyTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
+
             var newParty = CustomPartyComponent.CreateQuestParty(new Vec2(5, 5), 5, spawnSettlement, name, clan, partyTemplate, hero);
             partyId = newParty.StringId;
         });
@@ -62,23 +62,18 @@ public class CustomPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-        var hero = GameObjectCreator.CreateInitializedObject<Hero>();
-        var name = new TextObject("Name");
-        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        var partyTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
 
         // Act
-        string partyId = "TestId";
+        PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            CustomPartyComponent.CreateQuestParty(new Vec2(5, 5), 5, spawnSettlement, name, clan, partyTemplate, hero);
+            partyComponent = new CustomPartyComponent();
         });
 
+        Assert.NotNull(partyComponent);
+
+
         // Assert
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
-        }
+        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
     }
 }

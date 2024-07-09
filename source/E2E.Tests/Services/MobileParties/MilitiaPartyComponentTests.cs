@@ -58,16 +58,16 @@ public class MilitiaPartyComponentTests : IDisposable
         var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
         // Act
-        string partyId = "TestId";
+        PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            MilitiaPartyComponent.CreateMilitiaParty("TestId", settlement);
+            partyComponent = new MilitiaPartyComponent(settlement);
         });
 
+        Assert.NotNull(partyComponent);
+
+
         // Assert
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
-        }
+        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
     }
 }

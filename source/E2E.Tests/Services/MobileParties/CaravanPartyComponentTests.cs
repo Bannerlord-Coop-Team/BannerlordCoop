@@ -27,17 +27,15 @@ public class CaravanPartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var owner = GameObjectCreator.CreateInitializedObject<Hero>();
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-        var culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
-
-        settlement.Culture = culture;
-
         // Act
         string? partyId = null;
 
         server.Call(() =>
         {
+            var owner = GameObjectCreator.CreateInitializedObject<Hero>();
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
+            settlement.Culture = culture;
             var newParty = CaravanPartyComponent.CreateCaravanParty(owner, settlement, caravanLeader: owner);
             partyId = newParty.StringId;
         });
@@ -60,23 +58,19 @@ public class CaravanPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        var owner = GameObjectCreator.CreateInitializedObject<Hero>();
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-        var culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
-
-        settlement.Culture = culture;
-
         // Act
-        string partyId = "TestId";
+        PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            CaravanPartyComponent.CreateCaravanParty(owner, settlement);
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            
+            partyComponent = new CaravanPartyComponent(settlement, hero, hero);
         });
 
+        Assert.NotNull(partyComponent);
+
         // Assert
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
-        }
+        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
     }
 }

@@ -26,36 +26,33 @@ public class ActualClanTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+        MobileParty? party = null;
 
-        var partyId = "PartyId";
-        var clanId = "ClanId";
-
-        clan.StringId = clanId;
-        party.StringId = partyId;
-
-        foreach (var client in TestEnvironment.Clients)
-        {
-            client.ObjectManager.AddExisting(party.StringId, GameObjectCreator.CreateInitializedObject<MobileParty>());
-            client.ObjectManager.AddExisting(clan.StringId, GameObjectCreator.CreateInitializedObject<Clan>());
-        }
-
-        server.ObjectManager.AddExisting(party.StringId, GameObjectCreator.CreateInitializedObject<MobileParty>());
-        server.ObjectManager.AddExisting(clan.StringId, GameObjectCreator.CreateInitializedObject<Clan>());
-
-        // Act
         server.Call(() =>
         {
-            party.ActualClan = clan;
+            party = GameObjectCreator.CreateInitializedObject<MobileParty>();
         });
+
+
+        Assert.NotNull(party);
+        Assert.NotNull(party.ActualClan);
+
+        // Act
+        Clan? newClan = null;
+        server.Call(() =>
+        {
+            newClan = GameObjectCreator.CreateInitializedObject<Clan>();
+            party.ActualClan = newClan;
+        });
+
+        Assert.NotNull(newClan);
 
 
         // Assert
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(party.StringId, out var clientParty));
-            Assert.Equal(clientParty.ActualClan.StringId, clan.StringId);
+            Assert.Equal(clientParty.ActualClan.StringId, newClan.StringId);
         }
     }
 
@@ -65,28 +62,20 @@ public class ActualClanTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+        MobileParty? party = null;
 
-        var partyId = "PartyId";
-        var clanId = "ClanId";
-
-        clan.StringId = clanId;
-        party.StringId = partyId;
-
-        foreach (var client in TestEnvironment.Clients)
+        server.Call(() =>
         {
-            client.ObjectManager.AddExisting(party.StringId, GameObjectCreator.CreateInitializedObject<MobileParty>());
-            client.ObjectManager.AddExisting(clan.StringId, GameObjectCreator.CreateInitializedObject<Clan>());
-        }
+            party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+        });
 
-        server.ObjectManager.AddExisting(party.StringId, GameObjectCreator.CreateInitializedObject<MobileParty>());
-        server.ObjectManager.AddExisting(clan.StringId, GameObjectCreator.CreateInitializedObject<Clan>());
+
+        Assert.NotNull(party);
+        Assert.NotNull(party.ActualClan);
 
         // Act
         server.Call(() =>
         {
-            party.ActualClan = clan;
             party.ActualClan = null;
         });
 
@@ -105,38 +94,34 @@ public class ActualClanTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+        MobileParty? party = null;
 
-        var partyId = "PartyId";
-        var clanId = "ClanId";
-
-        clan.StringId = clanId;
-        party.StringId = partyId;
-
-        foreach (var client in TestEnvironment.Clients)
+        server.Call(() =>
         {
-            client.ObjectManager.AddExisting(party.StringId, GameObjectCreator.CreateInitializedObject<MobileParty>());
-            client.ObjectManager.AddExisting(clan.StringId, GameObjectCreator.CreateInitializedObject<Clan>());
-        }
+            party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+        });
 
-        server.ObjectManager.AddExisting(party.StringId, GameObjectCreator.CreateInitializedObject<MobileParty>());
-        server.ObjectManager.AddExisting(clan.StringId, GameObjectCreator.CreateInitializedObject<Clan>());
+
+        Assert.NotNull(party);
+        Assert.NotNull(party.ActualClan);
 
         // Act
 
+        Clan? newClan = null;
         var executingClient = TestEnvironment.Clients.First();
         executingClient.Call(() =>
         {
-            party.ActualClan = clan;
+            newClan = GameObjectCreator.CreateInitializedObject<Clan>();
+            party.ActualClan = newClan;
         });
 
+        Assert.NotNull(newClan);
 
         // Assert
         foreach (var gameInstance in TestEnvironment.Clients.Where(c => c != executingClient).Append(server))
         {
             Assert.True(gameInstance.ObjectManager.TryGetObject<MobileParty>(party.StringId, out var clientParty));
-            Assert.NotEqual(clientParty.ActualClan.StringId, clan.StringId);
+            Assert.NotEqual(clientParty.ActualClan.StringId, newClan.StringId);
         }
     }
 }

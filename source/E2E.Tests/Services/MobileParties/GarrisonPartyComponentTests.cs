@@ -60,16 +60,16 @@ public class GarrisonPartyComponentTests : IDisposable
         settlement.Town = GameObjectCreator.CreateInitializedObject<Town>();
 
         // Act
-        string partyId = "TestId";
+        PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            GarrisonPartyComponent.CreateGarrisonParty("TestId", settlement, true);
+            partyComponent = new GarrisonPartyComponent(settlement);
         });
 
+        Assert.NotNull(partyComponent);
+
+
         // Assert
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
-        }
+        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
     }
 }

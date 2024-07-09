@@ -29,6 +29,7 @@ public class LordPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
 
         var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
+        leaderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
         var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
         // Act
@@ -59,19 +60,18 @@ public class LordPartyComponentTests : IDisposable
         var client1 = TestEnvironment.Clients.First();
 
         var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
-        var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
         // Act
-        string partyId = "TestId";
+        PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            LordPartyComponent.CreateLordParty(partyId, leaderHero, new Vec2(5, 5), 5, spawnSettlement, leaderHero);
+            partyComponent = new LordPartyComponent(leaderHero, leaderHero);
         });
 
+        Assert.NotNull(partyComponent);
+
+
         // Assert
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
-        }
+        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
     }
 }

@@ -1,4 +1,5 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -26,14 +27,13 @@ public class BanditPartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
-
         // Act
         string? partyId = null;
 
         server.Call(() =>
         {
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
             var newParty = BanditPartyComponent.CreateBanditParty("TestId", clan, hideout, true);
             partyId = newParty.StringId;
         });
@@ -56,20 +56,18 @@ public class BanditPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
-
         // Act
-        string partyId = "TestId";
+        PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            BanditPartyComponent.CreateBanditParty(partyId, clan, hideout, true);
+            var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
+            var isBossParty = false;
+            partyComponent = new BanditPartyComponent(hideout, isBossParty);
         });
 
+        Assert.NotNull(partyComponent);
+
         // Assert
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
-        }
+        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
     }
 }
