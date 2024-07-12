@@ -9,6 +9,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -258,7 +259,12 @@ namespace GameInterface.Services.MobileParties.Handlers
                     return;
 
                 case PropertyType.PartyComponent:
-                    //Do we want to move this here?
+                    if (objectManager.TryGetObject<PartyComponent>(data.Value2, out var partyComponent) == false)
+                    {
+                        Logger.Error("Unable to find {type} with id: {id}", typeof(PartyComponent), data.Value2);
+                        return;
+                    }
+                    instance.PartyComponent = partyComponent;
                     return;
 
                 case PropertyType.IsMilita:

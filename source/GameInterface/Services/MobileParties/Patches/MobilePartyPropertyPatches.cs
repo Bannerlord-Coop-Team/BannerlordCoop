@@ -558,24 +558,24 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    //[HarmonyPatch(nameof(MobileParty.PartyComponent), MethodType.Setter)]
-    //[HarmonyPrefix]
-    //private static bool SetPartyComponentPrefix(MobileParty __instance, PartyComponent value)
-    //{
-    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    [HarmonyPatch(nameof(MobileParty.PartyComponent), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static bool SetPartyComponentPrefix(MobileParty __instance, PartyComponent value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-    //    if (ModInformation.IsClient)
-    //    {
-    //        Logger.Error("Client tried to set {name}\n"
-    //            + "Callstack: {callstack}", nameof(MobileParty.PartyComponent), Environment.StackTrace);
-    //        return true;
-    //    }
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client tried to set {name}\n"
+                + "Callstack: {callstack}", nameof(MobileParty.PartyComponent), Environment.StackTrace);
+            return true;
+        }
 
-    //    var message = new MobilePartyPropertyChanged(PropertyType.PartyComponent, __instance.StringId, value.ToString());
-    //    MessageBroker.Instance.Publish(__instance, message);
+        var message = new MobilePartyPropertyChanged(PropertyType.PartyComponent, __instance.StringId, value.ToString());
+        MessageBroker.Instance.Publish(__instance, message);
 
-    //    return ModInformation.IsServer;
-    //}
+        return ModInformation.IsServer;
+    }
 
     [HarmonyPatch(nameof(MobileParty.IsMilitia), MethodType.Setter)]
     [HarmonyPrefix]

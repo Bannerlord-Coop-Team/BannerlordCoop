@@ -91,7 +91,10 @@ internal class ObjectManager : IObjectManager
     {
         foreach (var registry in registryCollection)
         {
-            RegistryMap.Add(registry.ManagedType, registry);
+            foreach (var managedType in registry.ManagedTypes)
+            {
+                RegistryMap.Add(managedType, registry);
+            }
         }
     }
 

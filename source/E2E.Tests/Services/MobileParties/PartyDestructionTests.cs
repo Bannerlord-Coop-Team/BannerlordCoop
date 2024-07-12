@@ -38,21 +38,16 @@ public class PartyDestructionTests : IDisposable
 
         Assert.NotNull(party);
 
-        var comps = new List<PartyComponent>();
-
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(party.StringId, out var clientParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(party.StringId, out var clientParty));
             Assert.NotNull(clientParty);
-            Assert.NotNull(clientParty.PartyComponent?.MobileParty?.Party);
-
-            comps.Add(clientParty.PartyComponent);
+            Assert.NotNull(clientParty.LordPartyComponent.Clan);
         }
 
         // Act
         server.Call(() =>
         {
-            var compasfd = comps;
             party.RemoveParty();
         });
 
