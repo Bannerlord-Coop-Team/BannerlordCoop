@@ -1,16 +1,19 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.MobileParties;
-public class MilitiaPartyComponentTests : IDisposable
+namespace E2E.Tests.Services.PartyComponents;
+public class CustomPartyComponentTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
-    public MilitiaPartyComponentTests(ITestOutputHelper output)
+    public CustomPartyComponentTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
@@ -26,14 +29,18 @@ public class MilitiaPartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-
         // Act
         string? partyId = null;
 
         server.Call(() =>
         {
-            var newParty = MilitiaPartyComponent.CreateMilitiaParty("TestId", settlement);
+            var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            var name = new TextObject("Name");
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var partyTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
+
+            var newParty = CustomPartyComponent.CreateQuestParty(new Vec2(5, 5), 5, spawnSettlement, name, clan, partyTemplate, hero);
             partyId = newParty.StringId;
         });
 
@@ -44,7 +51,7 @@ public class MilitiaPartyComponentTests : IDisposable
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
-            Assert.IsType<MilitiaPartyComponent>(newParty.PartyComponent);
+            Assert.IsType<CustomPartyComponent>(newParty.PartyComponent);
         }
     }
 
@@ -55,13 +62,12 @@ public class MilitiaPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
         // Act
         PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            partyComponent = new MilitiaPartyComponent(settlement);
+            partyComponent = new CustomPartyComponent();
         });
 
         Assert.NotNull(partyComponent);

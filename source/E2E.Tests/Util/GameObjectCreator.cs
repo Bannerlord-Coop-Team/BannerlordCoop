@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Util.ObjectBuilders;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -20,6 +21,7 @@ internal class GameObjectCreator
         { typeof(Town), new TownBuilder() },
         { typeof(Village), new VillageBuilder() },
         { typeof(MobileParty), new MobilePartyBuilder() },
+        { typeof(MapEvent), new MapEventBuilder() },
     };
 
     public static T CreateInitializedObject<T>()

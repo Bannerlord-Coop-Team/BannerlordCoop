@@ -80,7 +80,7 @@ internal class PartyComponentHandler : IHandler
         var component = payload.What.Component;
         var party = payload.What.Party;
         
-        if(objectManager.TryGetId((PartyComponent)component, out var componentId) == false)
+        if(objectManager.TryGetId(component, out var componentId) == false)
         {
             Logger.Error("PartyComponent was not registered with party PartyComponentRegistry");
             return;

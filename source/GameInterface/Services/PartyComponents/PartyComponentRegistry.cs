@@ -18,6 +18,7 @@ internal class PartyComponentRegistry : RegistryBase<PartyComponent>
         typeof(WarPartyComponent),
         typeof(BanditPartyComponent),
         typeof(CustomPartyComponent),
+        typeof(CaravanPartyComponent),
         typeof(GarrisonPartyComponent),
         typeof(LordPartyComponent),
         typeof(MilitiaPartyComponent),

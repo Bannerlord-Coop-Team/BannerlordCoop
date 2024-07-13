@@ -1,4 +1,4 @@
-﻿using Autofac.Features.OwnedInstances;
+﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
@@ -7,11 +7,11 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.MobileParties;
-public class CaravanPartyComponentTests : IDisposable
+namespace E2E.Tests.Services.PartyComponents;
+public class BanditPartyComponentTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
-    public CaravanPartyComponentTests(ITestOutputHelper output)
+    public BanditPartyComponentTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
@@ -32,11 +32,9 @@ public class CaravanPartyComponentTests : IDisposable
 
         server.Call(() =>
         {
-            var owner = GameObjectCreator.CreateInitializedObject<Hero>();
-            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            var culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
-            settlement.Culture = culture;
-            var newParty = CaravanPartyComponent.CreateCaravanParty(owner, settlement, caravanLeader: owner);
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
+            var newParty = BanditPartyComponent.CreateBanditParty("TestId", clan, hideout, true);
             partyId = newParty.StringId;
         });
 
@@ -47,7 +45,7 @@ public class CaravanPartyComponentTests : IDisposable
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
-            Assert.IsType<CaravanPartyComponent>(newParty.PartyComponent);
+            Assert.IsType<BanditPartyComponent>(newParty.PartyComponent);
         }
     }
 
@@ -62,10 +60,9 @@ public class CaravanPartyComponentTests : IDisposable
         PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
-            
-            partyComponent = new CaravanPartyComponent(settlement, hero, hero);
+            var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
+            var isBossParty = false;
+            partyComponent = new BanditPartyComponent(hideout, isBossParty);
         });
 
         Assert.NotNull(partyComponent);

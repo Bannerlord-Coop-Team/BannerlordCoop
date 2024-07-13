@@ -1,17 +1,18 @@
-﻿using Common.Util;
-using E2E.Tests.Environment;
+﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.MobileParties;
-public class BanditPartyComponentTests : IDisposable
+namespace E2E.Tests.Services.PartyComponents;
+public class LordPartyComponentTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
-    public BanditPartyComponentTests(ITestOutputHelper output)
+    public LordPartyComponentTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
@@ -27,14 +28,16 @@ public class BanditPartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
+        var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
+        leaderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
+        var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+
         // Act
         string? partyId = null;
 
         server.Call(() =>
         {
-            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-            var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
-            var newParty = BanditPartyComponent.CreateBanditParty("TestId", clan, hideout, true);
+            var newParty = LordPartyComponent.CreateLordParty(null, leaderHero, new Vec2(5, 5), 5, spawnSettlement, leaderHero);
             partyId = newParty.StringId;
         });
 
@@ -45,7 +48,7 @@ public class BanditPartyComponentTests : IDisposable
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
-            Assert.IsType<BanditPartyComponent>(newParty.PartyComponent);
+            Assert.IsType<LordPartyComponent>(newParty.PartyComponent);
         }
     }
 
@@ -56,16 +59,17 @@ public class BanditPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
+        var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
+
         // Act
         PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
-            var isBossParty = false;
-            partyComponent = new BanditPartyComponent(hideout, isBossParty);
+            partyComponent = new LordPartyComponent(leaderHero, leaderHero);
         });
 
         Assert.NotNull(partyComponent);
+
 
         // Assert
         Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));

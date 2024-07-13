@@ -1,18 +1,16 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
-using GameInterface.Services.ObjectManager;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.MobileParties;
-public class LordPartyComponentTests : IDisposable
+namespace E2E.Tests.Services.PartyComponents;
+public class MilitiaPartyComponentTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
-    public LordPartyComponentTests(ITestOutputHelper output)
+    public MilitiaPartyComponentTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
@@ -28,16 +26,14 @@ public class LordPartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
-        leaderHero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
         // Act
         string? partyId = null;
 
         server.Call(() =>
         {
-            var newParty = LordPartyComponent.CreateLordParty(null, leaderHero, new Vec2(5, 5), 5, spawnSettlement, leaderHero);
+            var newParty = MilitiaPartyComponent.CreateMilitiaParty("TestId", settlement);
             partyId = newParty.StringId;
         });
 
@@ -48,7 +44,7 @@ public class LordPartyComponentTests : IDisposable
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
-            Assert.IsType<LordPartyComponent>(newParty.PartyComponent);
+            Assert.IsType<MilitiaPartyComponent>(newParty.PartyComponent);
         }
     }
 
@@ -59,13 +55,13 @@ public class LordPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        var leaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
+        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
         // Act
         PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            partyComponent = new LordPartyComponent(leaderHero, leaderHero);
+            partyComponent = new MilitiaPartyComponent(settlement);
         });
 
         Assert.NotNull(partyComponent);

@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.MobileParties;
+namespace E2E.Tests.Services.PartyComponents;
 public class GarrisonPartyComponentTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
