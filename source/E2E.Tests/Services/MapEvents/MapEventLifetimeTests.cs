@@ -81,9 +81,15 @@ public class MapEventLifetimeTests : IDisposable
         server.Call(() =>
         {
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            var attackerParty = GameObjectCreator.CreateInitializedObject<MobileParty>().Party;
+            var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>().Party;
 
             Assert.True(server.ObjectManager.TryGetId(mapEvent, out mapEventId));
 
+            // TODO find better way
+            mapEvent.MapEventVisual = Moq.Mock.Of<IMapEventVisual>();
+
+            mapEvent.Initialize(attackerParty, defenderParty);
             mapEvent.FinalizeEvent();
         });
 
@@ -108,8 +114,6 @@ public class MapEventLifetimeTests : IDisposable
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
 
             Assert.True(server.ObjectManager.TryGetId(mapEvent, out mapEventId));
-
-            mapEvent.FinalizeEvent();
         });
 
         Assert.NotNull(mapEventId);
@@ -118,7 +122,7 @@ public class MapEventLifetimeTests : IDisposable
         var firstClient = TestEnvironment.Clients.First();
         firstClient.Call(() =>
         {
-            Assert.False(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
 
             mapEvent.FinalizeEvent();
         });

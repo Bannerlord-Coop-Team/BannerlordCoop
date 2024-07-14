@@ -24,13 +24,46 @@ internal class MapEventHandler : IHandler
         this.objectManager = objectManager;
         messageBroker.Subscribe<MapEventCreated>(Handle);
         messageBroker.Subscribe<NetworkCreateMapEvent>(Handle);
+
+        messageBroker.Subscribe<MapEventDestroyed>(Handle);
+        messageBroker.Subscribe<NetworkDestroyMapEvent>(Handle);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<MapEventCreated>(Handle);
         messageBroker.Unsubscribe<NetworkCreateMapEvent>(Handle);
+
+        messageBroker.Unsubscribe<MapEventDestroyed>(Handle);
+        messageBroker.Unsubscribe<NetworkDestroyMapEvent>(Handle);
     }
+
+    private void Handle(MessagePayload<NetworkDestroyMapEvent> payload)
+    {
+        if (objectManager.TryGetObject<MapEvent>(payload.What.MapEventId, out var mapEvent) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), payload.What.MapEventId);
+            return;
+        }
+
+        objectManager.Remove(mapEvent);
+    }
+
+    private void Handle(MessagePayload<MapEventDestroyed> payload)
+    {
+        var mapEvent = payload.What.Instance;
+        if (objectManager.TryGetId(mapEvent, out var mapEventId) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEvent);
+            return;
+        }
+
+        objectManager.Remove(payload.What.Instance);
+
+        network.SendAll(new NetworkDestroyMapEvent(mapEventId));
+    }
+
+    
 
     private void Handle(MessagePayload<MapEventCreated> payload)
     {
@@ -43,6 +76,9 @@ internal class MapEventHandler : IHandler
     private void Handle(MessagePayload<NetworkCreateMapEvent> payload)
     {
         var newMapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+
+        // TODO find better way of doing this
+        newMapEvent._sides = new MapEventSide[2];
 
         objectManager.AddExisting(payload.What.MapEventId, newMapEvent);
     }

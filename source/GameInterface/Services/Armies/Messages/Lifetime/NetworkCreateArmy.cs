@@ -1,16 +1,16 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Armies.Data;
+using ProtoBuf;
 
 namespace GameInterface.Services.Armies.Messages.Lifetime;
 
-/// <summary>
-/// Command to create a new army.
-/// </summary>
-public record CreateArmy : ICommand
+[ProtoContract(SkipConstructor = true)]
+internal class NetworkCreateArmy : ICommand
 {
+    [ProtoMember(1)]
     public ArmyCreationData Data { get; }
 
-    public CreateArmy(ArmyCreationData data)
+    public NetworkCreateArmy(ArmyCreationData data)
     {
         Data = data;
     }

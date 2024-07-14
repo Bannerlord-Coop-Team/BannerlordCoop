@@ -15,9 +15,25 @@ internal class MapEventDestructionPatches
     static readonly ILogger Logger = LogManager.GetLogger<MapEventDestructionPatches>();
 
     [HarmonyPatch(nameof(MapEvent.FinalizeEvent))]
+    static bool Prefix()
+    {
+        // Call original if we called it
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
+            return false;
+        }
+
+        return true;
+    }
+
+    [HarmonyPatch(nameof(MapEvent.FinalizeEvent))]
     static void Postfix(MapEvent __instance)
     {
-        // Skip if we called it
+        // Call original if we called it
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
@@ -27,7 +43,7 @@ internal class MapEventDestructionPatches
             return;
         }
 
-        var message = new MapEventCreated(__instance);
+        var message = new MapEventDestroyed(__instance);
 
         MessageBroker.Instance.Publish(__instance, message);
     }

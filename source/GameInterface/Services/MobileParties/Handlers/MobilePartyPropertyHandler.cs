@@ -65,7 +65,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                         Logger.Error("Unable to find {type} with id: {id}", typeof(Army), data.Value2);
                         return;
                     }
-                    instance.Army = army;
+                    instance._army = army;
                     return;
 
                 case PropertyType.CustomName:

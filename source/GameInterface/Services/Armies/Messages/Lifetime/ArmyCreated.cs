@@ -4,9 +4,9 @@ using GameInterface.Services.Armies.Data;
 namespace GameInterface.Services.Armies.Messages.Lifetime;
 
 /// <summary>
-/// Event that is published when a party is created on the server.
+/// Command to create a new army.
 /// </summary>
-public record ArmyCreated : IEvent
+public record ArmyCreated : ICommand
 {
     public ArmyCreationData Data { get; }
 

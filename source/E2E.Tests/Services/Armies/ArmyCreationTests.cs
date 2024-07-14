@@ -4,6 +4,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
@@ -28,42 +29,33 @@ public class ArmyCreationTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var kingdom = new Kingdom();
-        var hero = GameObjectCreator.CreateInitializedObject<Hero>();
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-        var serverMessageBroker = server.Container.Resolve<IMessageBroker>();
-
-        SetupKingdom(kingdom, hero, settlement);
-
-        server.ObjectManager.AddNewObject(kingdom, out string kingdomStringId);
-        server.ObjectManager.AddNewObject(hero, out string heroStringId);
-        server.ObjectManager.AddNewObject(hero.PartyBelongedTo, out string partyStringId);
-
-        foreach (var client in TestEnvironment.Clients)
-        {
-            client.ObjectManager.AddExisting(kingdomStringId, kingdom);
-            client.ObjectManager.AddExisting(heroStringId, hero);
-            client.ObjectManager.AddExisting(partyStringId, hero.PartyBelongedTo);
-        }
-
-        string? newArmyStringId = null;
-        serverMessageBroker.Subscribe<ArmyCreated>(payload =>
-        {
-            newArmyStringId = payload.What.Data.StringId;
-        });
-
         // Act
+        string? armyId = null;
         server.Call(() =>
         {
+            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
+            var mobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var hero = mobileParty.LeaderHero;
+
+            Assert.NotNull(mobileParty.Ai);
+
+            SetupKingdom(kingdom, hero, settlement);
+
             kingdom.CreateArmy(hero, settlement, Army.ArmyTypes.Patrolling);
+
+            var army = kingdom.Armies.Find(a => a.LeaderParty == hero.PartyBelongedTo);
+            Assert.NotNull(army);
+
+            Assert.True(server.ObjectManager.TryGetId(army, out armyId));
         });
 
         // Assert
-        Assert.NotNull(newArmyStringId);
+        Assert.NotNull(armyId);
 
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<Army>(newArmyStringId, out var newArmy));
+            Assert.True(client.ObjectManager.TryGetObject<Army>(armyId, out var _));
         }
     }
 

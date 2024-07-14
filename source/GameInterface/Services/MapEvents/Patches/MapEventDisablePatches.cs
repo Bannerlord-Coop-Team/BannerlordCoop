@@ -6,33 +6,29 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Reflection;
+using System.Text;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
-[HarmonyPatch]
-internal class MapEventCreationPatches
+[HarmonyPatch(typeof(MapEvent))]
+internal class MapEventDisablePatches
 {
-    static readonly ILogger Logger = LogManager.GetLogger<MapEventCreationPatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MapEventCollectionPatches>();
 
-    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(MapEvent));
-
-    static bool Prefix(MapEvent __instance)
+    [HarmonyPatch(nameof(MapEvent.Initialize))]
+    [HarmonyPrefix]
+    static bool InitializePrefix()
     {
-        // Skip if we called it
+        // Call original if we called it
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
-            return true;
+            return false;
         }
-
-        var message = new MapEventCreated(__instance);
-
-        MessageBroker.Instance.Publish(__instance, message);
 
         return true;
     }

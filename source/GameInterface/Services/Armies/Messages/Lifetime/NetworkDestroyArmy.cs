@@ -1,16 +1,16 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Armies.Data;
+using ProtoBuf;
 
 namespace GameInterface.Services.Armies.Messages.Lifetime;
 
-/// <summary>
-/// Command to destroy a army.
-/// </summary>
-public record DestroyArmy : ICommand
+[ProtoContract(SkipConstructor = true)]
+internal class NetworkDestroyArmy : ICommand
 {
+    [ProtoMember(1)]
     public ArmyDestructionData Data { get; }
 
-    public DestroyArmy(ArmyDestructionData data)
+    public NetworkDestroyArmy(ArmyDestructionData data)
     {
         Data = data;
     }

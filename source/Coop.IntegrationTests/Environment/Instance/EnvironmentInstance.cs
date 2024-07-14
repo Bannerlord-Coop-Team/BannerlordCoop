@@ -113,6 +113,17 @@ public abstract class EnvironmentInstance
         return obj;
     }
 
+    public T GetRegisteredObject<T>(string stringId) where T: class
+    {
+        var objectManager = Resolve<IObjectManager>();
+        if (objectManager.TryGetObject<T>(stringId, out var obj) == false)
+        {
+            throw new Exception($"Unable to resolve {stringId} for type {typeof(T)}");
+        }
+
+        return obj;
+    }
+
     private class StaticScope : IDisposable
     {
         private readonly ILifetimeScope previousContainer;

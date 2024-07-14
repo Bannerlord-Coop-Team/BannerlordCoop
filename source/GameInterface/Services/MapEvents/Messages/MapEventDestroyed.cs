@@ -2,7 +2,7 @@
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Messages;
-internal record MapEventSideCreated(MapEventSide Instance) : IEvent
+internal record MapEventDestroyed(MapEvent Instance) : IEvent
 {
-    public MapEventSide Instance { get; } = Instance;
+    public MapEvent Instance { get; } = Instance;
 }

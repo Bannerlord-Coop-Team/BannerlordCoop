@@ -62,6 +62,27 @@ internal class E2ETestEnvironment : IDisposable
         });
     }
 
+    public string CreateRegisteredObject<T>() where T : class
+    {
+        string? id = null;
+        Server.Call(() =>
+        {
+            var obj = GameObjectCreator.CreateInitializedObject<T>();
+
+            if (Server.ObjectManager.TryGetId(obj, out id) == false)
+            {
+                throw new Exception($"Server object manager failed to register new object {typeof(T).Name}");
+            }
+        });
+
+        if (id == null)
+        {
+            throw new Exception($"Failed to create {typeof(T).Name} on Server");
+        }
+
+        return id;
+    }
+
     public void Dispose()
     {
     }
