@@ -2,7 +2,6 @@
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Armies.Data;
 
@@ -12,6 +11,14 @@ namespace GameInterface.Services.Armies.Data;
 [ProtoContract(SkipConstructor = true)]
 public record ArmyCreationData
 {
+    public ArmyCreationData(string stringId, string kingdomId, string leaderPartyId, short armyType)
+    {
+        StringId = stringId;
+        KingdomId = kingdomId;
+        LeaderPartyId = leaderPartyId;
+        ArmyType = armyType;
+    }
+
     [ProtoMember(1)]
     public string StringId { get; }
     [ProtoMember(2)]
@@ -21,11 +28,4 @@ public record ArmyCreationData
     [ProtoMember(4)]
     public short ArmyType { get; }
 
-    internal ArmyCreationData(Army instance, Kingdom kingdom, MobileParty party, Army.ArmyTypes armyType)
-    {
-        StringId = instance.GetStringId();
-        KingdomId = kingdom.StringId;
-        LeaderPartyId = party.StringId;
-        ArmyType = (short)armyType;
-    }
 }

@@ -43,8 +43,8 @@ internal class ArmyLifetimePatches
             return true;
         }
 
-        var data = new ArmyCreationData(__instance, kingdom, leaderParty, armyType);
-        var message = new ArmyCreated(data);
+        
+        var message = new ArmyCreated(__instance, kingdom, leaderParty, armyType);
 
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -67,9 +67,9 @@ internal class ArmyLifetimePatches
         return true;
     }
 
-    [HarmonyPatch(typeof(DisbandArmyAction), "ApplyInternal")]
+    [HarmonyPatch(typeof(Army), "DisperseInternal")]
     [HarmonyPostfix]
-    public static void DisbandArmyPostfix(ref Army __instance, Army.ArmyDispersionReason reason)
+    public static void DisbandArmyPostfix(Army __instance, Army.ArmyDispersionReason reason)
     {
         // Call original if we called it
         if (CallOriginalPolicy.IsOriginalAllowed()) return;

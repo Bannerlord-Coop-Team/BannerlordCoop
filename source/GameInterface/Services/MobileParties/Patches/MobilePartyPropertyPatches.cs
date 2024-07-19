@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -552,7 +553,10 @@ public class MobilePartyPropertyPatches
             return false;
         }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.MapEventSide, __instance.StringId, value.LeaderParty.MobileParty.StringId);
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
+        if (objectManager.TryGetId(value, out var mapEventSideId) == false) return true;
+
+        var message = new MobilePartyPropertyChanged(PropertyType.MapEventSide, __instance.StringId, mapEventSideId);
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;

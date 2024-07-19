@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Armies.Data;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
@@ -46,7 +47,18 @@ public class ArmyLifetimeHandler : IHandler
 
     private void Handle_ArmyCreated(MessagePayload<ArmyCreated> payload)
     {
-        var message = new NetworkCreateArmy(payload.What.Data);
+        var army = payload.What.Army;
+        var kingom = payload.What.Kingdom;
+        var mobileParty = payload.What.MobileParty;
+        var type = (short)payload.What.ArmyType;
+
+        if (objectManager.TryGetId(kingom, out var kingdomId) == false) return;
+        if (objectManager.TryGetId(mobileParty, out var mobilePartyId) == false) return;
+
+        objectManager.AddNewObject(army, out var armyId);
+
+        var data = new ArmyCreationData(armyId, kingdomId, mobilePartyId, type);
+        var message = new NetworkCreateArmy(data);
         network.SendAll(message);
     }
 
@@ -67,7 +79,7 @@ public class ArmyLifetimeHandler : IHandler
             using (new AllowedThread())
             {
                 var army = new Army(kingdom, leaderParty, armyType);
-                if (objectManager.AddExisting(armyId, army) == false) return;
+                objectManager.AddExisting(armyId, army);
             }
         });
     }

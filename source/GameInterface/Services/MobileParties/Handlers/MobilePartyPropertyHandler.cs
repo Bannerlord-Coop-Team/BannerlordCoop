@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -250,12 +251,10 @@ namespace GameInterface.Services.MobileParties.Handlers
                         instance.MapEventSide = null;
                         return;
                     }
-                    if (objectManager.TryGetObject<MobileParty>(data.Value2, out var leaderParty) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
-                        return;
-                    }
-                    instance.MapEventSide = leaderParty.MapEventSide;
+
+                    if (objectManager.TryGetObject<MapEventSide>(data.Value2, out var mapEventSide) == false) return;
+
+                    instance.MapEventSide = mapEventSide;
                     return;
 
                 case PropertyType.PartyComponent:

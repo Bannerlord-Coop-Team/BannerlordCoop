@@ -18,7 +18,7 @@ using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MapEventSides.Handlers;
-internal class MapEventSideHandler : IHandler
+internal class MapEventSideLifetimeHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventHandler>();
 
@@ -27,7 +27,7 @@ internal class MapEventSideHandler : IHandler
     private readonly IObjectManager objectManager;
 
 
-    public MapEventSideHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public MapEventSideLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;

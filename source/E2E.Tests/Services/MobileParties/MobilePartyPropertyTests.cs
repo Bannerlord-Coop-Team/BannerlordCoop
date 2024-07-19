@@ -3,9 +3,12 @@ using Coop.IntegrationTests.Environment.Instance;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.Armies.Extensions;
+using HarmonyLib;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -1148,36 +1151,56 @@ public class MobilePartyPropertyTests : IDisposable
     [Fact]
     public void ServerChangeMapEventSide_SyncAllClients()
     {
-        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        var eventSide = GameObjectCreator.CreateInitializedObject<MapEventSide>();
+        // Arrange
+        string? eventSideId = null;
+        Server.Call(() =>
+        {
+            var eventSide = GameObjectCreator.CreateInitializedObject<MapEventSide>();
+
+            Assert.True(Server.ObjectManager.TryGetId(eventSide, out eventSideId));
+        });
+
+        Assert.NotNull(eventSideId);
 
         // Act
         Server.Call(() =>
         {
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
+            Assert.True(Server.ObjectManager.TryGetObject<MapEventSide>(eventSideId, out var eventSide));
+
             serverParty.MapEventSide = eventSide;
-        });
+        }, new MethodBase[] { AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.AddPartyInternal)) });
 
 
         // Assert
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.MapEventSide, serverParty.MapEventSide);
+            Assert.True(client.ObjectManager.TryGetId(clientParty.MapEventSide, out var clientEventSideId));
+            Assert.Equal(clientEventSideId, eventSideId);
         }
     }
 
     [Fact]
     public void ClientMapEventSide_NoChange()
     {
-        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        var eventSide = GameObjectCreator.CreateInitializedObject<MapEventSide>();
+        string? eventSideId = null;
+        Server.Call(() =>
+        {
+            var eventSide = GameObjectCreator.CreateInitializedObject<MapEventSide>();
+
+            Assert.True(Server.ObjectManager.TryGetId(eventSide, out eventSideId));
+        });
+
+        Assert.NotNull(eventSideId);
+
         // Act
         var firstClient = Clients.First();
-
 
         firstClient.Call(() =>
         {
             Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
+            Assert.True(firstClient.ObjectManager.TryGetObject<MapEventSide>(eventSideId, out var eventSide));
             clientParty.MapEventSide = eventSide;
         });
 
@@ -1186,7 +1209,8 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.MapEventSide, serverParty.MapEventSide);
+            Assert.True(client.ObjectManager.TryGetId(clientParty.MapEventSide, out var clientEventSideId));
+            Assert.Equal(clientEventSideId, eventSideId);
         }
     }
 
