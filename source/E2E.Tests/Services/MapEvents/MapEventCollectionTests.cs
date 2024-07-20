@@ -1,6 +1,9 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using HarmonyLib;
+using SandBox.GauntletUI.Map;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -37,13 +40,13 @@ public class MapEventCollectionTests : IDisposable
             var defenderParty = GameObjectCreator.CreateInitializedObject<MobileParty>().Party;
 
             // TODO find better way
-            mapEvent.MapEventVisual = Moq.Mock.Of<IMapEventVisual>();
+            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
 
             mapEvent.Initialize(attackerParty, defenderParty);
 
             Assert.True(server.ObjectManager.TryGetId(mapEvent.AttackerSide, out attackerSideId));
             Assert.True(server.ObjectManager.TryGetId(mapEvent.DefenderSide, out defenderSideId));
-        });
+        }, new MethodBase[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
 
         // Assert
         Assert.NotNull(attackerSideId);
@@ -88,13 +91,13 @@ public class MapEventCollectionTests : IDisposable
             Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
 
             // TODO find better way
-            mapEvent.MapEventVisual = Moq.Mock.Of<IMapEventVisual>();
+            mapEvent.MapEventVisual = ObjectHelper.SkipConstructor<GauntletMapEventVisual>();
 
             mapEvent.Initialize(attackerParty.Party, defenderParty.Party);
 
             Assert.False(server.ObjectManager.TryGetId(mapEvent.AttackerSide, out attackerSideId));
             Assert.False(server.ObjectManager.TryGetId(mapEvent.DefenderSide, out defenderSideId));
-        });
+        }, new MethodBase[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
 
         // Assert
         Assert.Null(attackerSideId);
