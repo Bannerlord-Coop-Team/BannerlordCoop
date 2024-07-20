@@ -8,22 +8,23 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.IntegrationTests.Settlement;
-public class SettlementHitPointsRatioAtIndexTest
+namespace Coop.IntegrationTests.Settlements;
+
+
+/// <summary>
+/// Used to test that CurrentSiegeState is sent to all clients.
+/// </summary>
+public class SettlementCurrentSiegeStateTest
 {
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
 
-    /// <summary>
-    /// Used to Test that client recieves  SetWallSectionHitPointsRatioAtIndex messsages.
-    /// </summary>
     [Fact]
-    public void ServerSettlementHitPointsRatioAtIndexChanged_Publishes_AllClients()
+    public void ServerCurrentSiegeStateChanged_Publishes_AllClients()
     {
         string settlementId = "Settlement1";
-        int index = 0;
-        float hitPointsRatio = 29.0f;
+        short siegeState = 1;
 
-        var triggerMessage = new SettlementWallHitPointsRatioChanged(settlementId, index, hitPointsRatio);
+        var triggerMessage = new SettlementChangedCurrentSiegeState(settlementId, siegeState);
 
         var server = TestEnvironment.Server;
 
@@ -33,13 +34,11 @@ public class SettlementHitPointsRatioAtIndexTest
 
         // Assert
         // Verify the server sends a single message to it's game interface
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeWallHitPointsRatio>());
+        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementCurrentSiegeState>());
 
-        // Verify the all clients send a single message to their game interfaces
         foreach (EnvironmentInstance client in TestEnvironment.Clients)
         {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementWallHitPointsRatio>());
+            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementCurrentSiegeState>());
         }
     }
-
 }

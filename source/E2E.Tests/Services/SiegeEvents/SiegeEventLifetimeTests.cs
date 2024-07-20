@@ -39,24 +39,22 @@ public class SiegeEventLifetimeTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        
-
         // Act
-        string? beseigerCampId = null;
-        server.Call(() =>
+        string? siegeEventId = null;
+        server.Call((Action)(() =>
         {
-            var beseigerCamp = GameObjectCreator.CreateInitializedObject<SiegeEvent>();
+            var siegeEvent = GameObjectCreator.CreateInitializedObject<SiegeEvent>();
 
-            Assert.True(server.ObjectManager.TryGetId(beseigerCamp, out beseigerCampId));
-        },
+            Assert.True(server.ObjectManager.TryGetId(siegeEvent, out siegeEventId));
+        }),
         disabledMethods: disabledMethods);
 
         // Assert
-        Assert.NotNull(beseigerCampId);
+        Assert.NotNull(siegeEventId);
 
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(beseigerCampId, out var _));
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var _));
         }
     }
 

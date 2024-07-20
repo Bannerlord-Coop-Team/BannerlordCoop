@@ -1,8 +1,11 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Sieges.Messages;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.Sieges.Handlers;
@@ -31,9 +34,9 @@ internal class SiegeEventLifetimeHandler : IHandler
 
     private void Handle(MessagePayload<SiegeEventCreated> payload)
     {
-        objectManager.AddNewObject(payload.What.Instance, out var id);
+        if (objectManager.AddNewObject(payload.What.Instance, out var siegeEventId) == false) return;
 
-        network.SendAll(new NetworkCreateSiegeEvent(id));
+        network.SendAll(new NetworkCreateSiegeEvent(siegeEventId));
     }
 
     private void Handle(MessagePayload<NetworkCreateSiegeEvent> payload)

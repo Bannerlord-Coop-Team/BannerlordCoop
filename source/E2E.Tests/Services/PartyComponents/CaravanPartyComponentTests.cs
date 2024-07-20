@@ -1,7 +1,10 @@
 ﻿using Autofac.Features.OwnedInstances;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using HarmonyLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -38,6 +41,9 @@ public class CaravanPartyComponentTests : IDisposable
             settlement.Culture = culture;
             var newParty = CaravanPartyComponent.CreateCaravanParty(owner, settlement, caravanLeader: owner);
             partyId = newParty.StringId;
+        }, new MethodBase[]
+        {
+            AccessTools.Method(typeof(EnterSettlementAction), nameof(EnterSettlementAction.ApplyForParty)),
         });
 
 

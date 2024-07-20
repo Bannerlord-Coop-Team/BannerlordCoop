@@ -3,7 +3,7 @@ using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
-namespace Coop.IntegrationTests.Settlement;
+namespace Coop.IntegrationTests.Settlements;
 
 /// <summary>
 /// Test Syncs for Settlement MobilePartyAdd and Remove functions

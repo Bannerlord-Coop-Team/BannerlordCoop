@@ -649,27 +649,24 @@ public class MobilePartyPropertyTests : IDisposable
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
 
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-        Server.ObjectManager.AddNewObject(settlement, out var settlementId);
-
-        foreach(var client in TestEnvironement.Clients)
-        {
-            var newSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            client.ObjectManager.AddExisting(settlementId, newSettlement);
-        }
-
         // Act
+        string? settlementId = null;
         Server.Call(() =>
         {
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             serverParty.CurrentSettlement = settlement;
+
+            settlementId = settlement.StringId;
         });
+
+        Assert.NotNull(settlementId);
 
 
         // Assert
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(serverParty.CurrentSettlement.StringId, clientParty.CurrentSettlement.StringId);
+            Assert.Equal(settlementId, clientParty.CurrentSettlement.StringId);
         }
     }
 
@@ -750,18 +747,33 @@ public class MobilePartyPropertyTests : IDisposable
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
 
         // Act
+        string? besiegerCampId = null;
+        string? partyId = null;
         Server.Call(() =>
         {
-            var camp = GameObjectCreator.CreateInitializedObject<BesiegerCamp>();
-            serverParty.BesiegerCamp = camp;
+            var serverParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            var besiegerCamp = GameObjectCreator.CreateInitializedObject<BesiegerCamp>();
+            serverParty.BesiegerCamp = besiegerCamp;
+
+            Server.ObjectManager.TryGetId(besiegerCamp, out besiegerCampId);
+            Server.ObjectManager.TryGetId(serverParty, out partyId);
+
+
+        }, new MethodBase[] { 
+            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
+            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
         });
+
+        Assert.NotNull(besiegerCampId);
+        Assert.NotNull(partyId);
 
 
         // Assert
         foreach (var client in TestEnvironement.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.BesiegerCamp, serverParty.BesiegerCamp);
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+            Assert.True(client.ObjectManager.TryGetId(clientParty.BesiegerCamp, out var clientBesiegerCampId));
+            Assert.Equal(besiegerCampId, clientBesiegerCampId);
         }
     }
 
@@ -1146,72 +1158,6 @@ public class MobilePartyPropertyTests : IDisposable
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
             Assert.Equal(clientParty.EventPositionAdder, serverParty.EventPositionAdder);
-        }
-    }
-
-    [Fact]
-    public void ServerChangeMapEventSide_SyncAllClients()
-    {
-        // Arrange
-        string? eventSideId = null;
-        Server.Call(() =>
-        {
-            var eventSide = GameObjectCreator.CreateInitializedObject<MapEventSide>();
-
-            Assert.True(Server.ObjectManager.TryGetId(eventSide, out eventSideId));
-        });
-
-        Assert.NotNull(eventSideId);
-
-        // Act
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-            Assert.True(Server.ObjectManager.TryGetObject<MapEventSide>(eventSideId, out var eventSide));
-
-            serverParty.MapEventSide = eventSide;
-        }, new MethodBase[] { AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.AddPartyInternal)) });
-
-
-        // Assert
-        foreach (var client in TestEnvironement.Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.True(client.ObjectManager.TryGetId(clientParty.MapEventSide, out var clientEventSideId));
-            Assert.Equal(clientEventSideId, eventSideId);
-        }
-    }
-
-    [Fact]
-    public void ClientMapEventSide_NoChange()
-    {
-        string? eventSideId = null;
-        Server.Call(() =>
-        {
-            var eventSide = GameObjectCreator.CreateInitializedObject<MapEventSide>();
-
-            Assert.True(Server.ObjectManager.TryGetId(eventSide, out eventSideId));
-        });
-
-        Assert.NotNull(eventSideId);
-
-        // Act
-        var firstClient = Clients.First();
-
-        firstClient.Call(() =>
-        {
-            Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.True(firstClient.ObjectManager.TryGetObject<MapEventSide>(eventSideId, out var eventSide));
-            clientParty.MapEventSide = eventSide;
-        });
-
-
-        // Assert
-        foreach (var client in TestEnvironement.Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.True(client.ObjectManager.TryGetId(clientParty.MapEventSide, out var clientEventSideId));
-            Assert.Equal(clientEventSideId, eventSideId);
         }
     }
 

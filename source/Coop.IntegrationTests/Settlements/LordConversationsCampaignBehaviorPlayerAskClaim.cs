@@ -3,7 +3,7 @@ using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using GameInterface.Services.Settlements.Messages;
 
-namespace Coop.IntegrationTests.Settlement;
+namespace Coop.IntegrationTests.Settlements;
 
 /// <summary>
 /// LordConversationsCampaignBehavior.conversation_player_ask_to_claim_land_answer_on_consequence() 

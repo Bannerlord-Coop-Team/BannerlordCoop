@@ -1,4 +1,9 @@
-﻿using TaleWorlds.CampaignSystem.Party;
+﻿using Common.Util;
+using HarmonyLib;
+using System.IO;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 
@@ -9,6 +14,14 @@ internal class SiegeEventBuilder : IObjectBuilder
     {
         var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
         var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+
+        foreach (MobileParty item in MobileParty.All)
+        {
+            if (item.Ai != null) continue;
+
+            item.Ai = new MobilePartyAi(item);
+        }
+
         return new SiegeEvent(settlement, party);
     }
 }

@@ -65,11 +65,10 @@ internal class PartyLifetimePatches
         MobileParty newParty = ObjectHelper.SkipConstructor<MobileParty>();
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return;
+        if (objectManager.AddExisting(partyId, newParty) == false) return;
 
         GameLoopRunner.RunOnMainThread(() =>
         {
-            if (objectManager.AddExisting(partyId, newParty) == false) return;
-
             using (new AllowedThread())
             {
                 MobileParty_ctor.Invoke(newParty, Array.Empty<object>());

@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.Sieges.Messages;

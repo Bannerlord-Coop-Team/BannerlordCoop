@@ -146,7 +146,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                         Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.Value2);
                         return;
                     }
-                    instance.CurrentSettlement = curSettlement;
+                    instance._currentSettlement = curSettlement;
                     return;
 
                 case PropertyType.AttachedTo:
@@ -161,7 +161,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                 case PropertyType.BesiegerCamp:
                     if (data.Value2 == null)
                     {
-                        instance.BesiegerCamp = null;
+                        instance._besiegerCamp = null;
                         return;
                     }
                     if (objectManager.TryGetObject<BesiegerCamp>(data.Value2, out var besiegerCamp) == false)
@@ -170,7 +170,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                         return;
                     }
 
-                    instance.BesiegerCamp = besiegerCamp;
+                    instance._besiegerCamp = besiegerCamp;
                     return;
 
                 case PropertyType.Scout:
@@ -244,18 +244,6 @@ namespace GameInterface.Services.MobileParties.Handlers
 
                 case PropertyType.EventPositionAdder:
                     instance.EventPositionAdder = new Vec2(float.Parse(data.Value2), float.Parse(data.Value3));
-                    return;
-
-                case PropertyType.MapEventSide:
-                    if (data.Value2 == null)
-                    {
-                        instance.MapEventSide = null;
-                        return;
-                    }
-
-                    if (objectManager.TryGetObject<MapEventSide>(data.Value2, out var mapEventSide) == false) return;
-
-                    instance.MapEventSide = mapEventSide;
                     return;
 
                 case PropertyType.PartyComponent:

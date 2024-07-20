@@ -32,7 +32,7 @@ public class TestMessageBroker : MessageBroker
         for (int i = 0; i < delegates.Count; i++)
         {
             var weakDelegate = delegates[i];
-            if (weakDelegate.IsAlive == false)
+            if (weakDelegate == null || weakDelegate.IsAlive == false)
             {
                 // Remove dead delegates
                 delegates.RemoveAt(i--);
@@ -65,7 +65,7 @@ public class TestMessageBroker : MessageBroker
         {
             // TODO this might be slow
             var weakDelegate = delegates[i];
-            if (weakDelegate.IsAlive == false)
+            if (weakDelegate == null || weakDelegate.IsAlive == false)
             {
                 // Remove dead delegates
                 delegates.RemoveAt(i--);

@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
@@ -43,5 +44,13 @@ internal class SettlementLifetimeHandler : IHandler
         var newSettlement = ObjectHelper.SkipConstructor<Settlement>();
 
         objectManager.AddExisting(payload.What.SettlementId, newSettlement);
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                newSettlement.InitSettlement();
+            }
+        });
     }
 }

@@ -46,7 +46,6 @@ public enum PropertyType
     ActualClan,
     RecentEventsMorale,
     EventPositionAdder,
-    MapEventSide,
     PartyComponent,
     IsMilita,
     IsLordParty,
@@ -538,28 +537,6 @@ public class MobilePartyPropertyPatches
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.EventPositionAdder, __instance.StringId, value.X.ToString(), value.Y.ToString());
-        MessageBroker.Instance.Publish(__instance, message);
-
-        return ModInformation.IsServer;
-    }
-
-    [HarmonyPatch(nameof(MobileParty.MapEventSide), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetMapEventSidePrefix(MobileParty __instance, MapEventSide value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", nameof(MobileParty.MapEventSide), Environment.StackTrace);
-            return false;
-        }
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
-        if (objectManager.TryGetId(value, out var mapEventSideId) == false) return true;
-
-        var message = new MobilePartyPropertyChanged(PropertyType.MapEventSide, __instance.StringId, mapEventSideId);
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;

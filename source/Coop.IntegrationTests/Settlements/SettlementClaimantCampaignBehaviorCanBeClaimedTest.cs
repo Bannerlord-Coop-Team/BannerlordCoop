@@ -3,7 +3,7 @@ using GameInterface.Services.Settlements.Messages;
 using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment.Instance;
 
-namespace Coop.IntegrationTests.Settlement;
+namespace Coop.IntegrationTests.Settlements;
 
 /// <summary>
 /// Handles Settlement.CanBeClaimed Sync Tests

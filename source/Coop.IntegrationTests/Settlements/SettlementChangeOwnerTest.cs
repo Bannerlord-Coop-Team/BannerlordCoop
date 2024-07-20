@@ -2,7 +2,7 @@
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 
-namespace Coop.IntegrationTests.Settlement
+namespace Coop.IntegrationTests.Settlements
 {
     public class SettlementChangeOwnerTest
     {

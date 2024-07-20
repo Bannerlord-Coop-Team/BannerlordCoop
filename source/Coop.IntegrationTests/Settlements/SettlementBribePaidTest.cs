@@ -2,25 +2,28 @@
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace Coop.IntegrationTests.Settlement;
-/// <summary>
-/// Test NotableCaches function call test
-/// </summary>
-public class SettlementCollectNotablesToCacheTest
+namespace Coop.IntegrationTests.Settlements;
+public class SettlementBribePaidTest
 {
+    // Creates a test environment with 1 server and 2 clients by default
     internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
-    
+
     /// <summary>
-    /// Test that the cache is published to all clients.
+    /// Used to Test that client recieves BribePaid messsages.
     /// </summary>
     [Fact]
-    public void ServerSettlementNotableCache_Publishes_AllClients()
+    public void ServerSettlementBribePaidChanged_Publishes_AllClients()
     {
         // Arrange
         string settlementId = "Settlement1";
-        var cacheNotables = new List<string> { "test1", "test2", "test3" };
-        var triggerMessage = new SettlementChangedNotablesCache(settlementId, cacheNotables);
+        int bribePaid = 15;
+        var triggerMessage = new SettlementChangedBribePaid(settlementId, bribePaid);
 
         var server = TestEnvironment.Server;
 
@@ -29,12 +32,12 @@ public class SettlementCollectNotablesToCacheTest
 
         // Assert
         // Verify the server sends a single message to it's game interface
-        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementNotablesCache>());
+        Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementBribePaid>());
 
         // Verify the all clients send a single message to their game interfaces
         foreach (EnvironmentInstance client in TestEnvironment.Clients)
         {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementNotablesCache>());
+            Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementBribePaid>());
         }
     }
 }

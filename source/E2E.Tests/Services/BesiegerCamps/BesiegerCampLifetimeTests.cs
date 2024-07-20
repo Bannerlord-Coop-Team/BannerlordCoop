@@ -1,5 +1,7 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using HarmonyLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
@@ -33,6 +35,9 @@ public class BesiegerCampLifetimeTests : IDisposable
             var beseigerCamp = GameObjectCreator.CreateInitializedObject<BesiegerCamp>();
 
             Assert.True(server.ObjectManager.TryGetId(beseigerCamp, out beseigerCampId));
+        }, new MethodBase[] {
+            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
+            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
         });
 
         // Assert

@@ -7,22 +7,22 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Coop.IntegrationTests.Settlement
+namespace Coop.IntegrationTests.Settlements
 {
     /// <summary>
-    /// Test syncs for <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.Owner"/>
+    /// Test syncs for <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.IsOwnerUnassigned"/>
     /// Verifies all clients receive property changes
     /// </summary>
-    public class SettlementComponentOwnerTest
+    public class SettlementComponentIsOwnerUnassignedTest
     {
         internal TestEnvironment TestEnvironment { get; } = new TestEnvironment();
         [Fact]
-        public void ServerSettlementComponentOwnerChanged_Publishes_AllClients()
+        public void ServerSettlementComponentIsOwnerUnassignedChanged_Publishes_AllClients()
         {
             // Arrange
             string settlementId = "SettlementComponent1";
-            string newOwner = "Owner1";
-            var triggerMessage = new SettlementComponentOwnerChanged(settlementId, newOwner);
+            bool newValue = true;
+            var triggerMessage = new SettlementComponentIsOwnerUnassignedChanged(settlementId, newValue);
 
             var server = TestEnvironment.Server;
 
@@ -31,12 +31,12 @@ namespace Coop.IntegrationTests.Settlement
 
             // Assert
             // Verify the server sends a single message to it's game interface
-            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementComponentOwner>());
+            Assert.Equal(1, server.NetworkSentMessages.GetMessageCount<NetworkChangeSettlementComponentIsOwnerUnassigned>());
 
             // Verify the all clients send a single message to their game interfaces
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
             {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementComponentOwner>());
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementComponentIsOwnerUnassigned>());
             }
         }
     }
