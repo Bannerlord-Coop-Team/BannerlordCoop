@@ -34,8 +34,6 @@ public class PartyDestructionTests : IDisposable
             party = GameObjectCreator.CreateInitializedObject<MobileParty>();
         });
 
-        
-
         Assert.NotNull(party);
 
         foreach (var client in TestEnvironment.Clients)
@@ -45,7 +43,16 @@ public class PartyDestructionTests : IDisposable
             Assert.NotNull(clientParty.LordPartyComponent.Clan);
         }
 
+        // TODO make game instanced
+        foreach(var mobileParty in Campaign.Current.MobileParties)
+        {
+            if (mobileParty.Ai != null) continue;
+
+            mobileParty.Ai = new MobilePartyAi(mobileParty);
+        }
+
         // Act
+
         server.Call(() =>
         {
             party.RemoveParty();
