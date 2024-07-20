@@ -32,7 +32,7 @@ internal class PartyLifetimePatches
     [HarmonyPatch(typeof(MobileParty), MethodType.Constructor)]
     private static bool Prefix(ref MobileParty __instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
@@ -86,7 +86,7 @@ internal class PartyLifetimePatches
     [HarmonyPrefix]
     private static bool RemoveParty_Prefix(ref MobileParty __instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

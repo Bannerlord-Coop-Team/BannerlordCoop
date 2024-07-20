@@ -17,7 +17,7 @@ internal class MapEventSideDestructionPatches
     [HarmonyPatch(nameof(MapEventSide.HandleMapEventEnd))]
     static void Postfix(MapEventSide __instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)

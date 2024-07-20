@@ -25,7 +25,7 @@ internal class GarrisonPartyComponentLifetimePatches
 
     private static bool Prefix(GarrisonPartyComponent __instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

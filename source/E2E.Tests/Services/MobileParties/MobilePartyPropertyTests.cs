@@ -746,12 +746,13 @@ public class MobilePartyPropertyTests : IDisposable
     [Fact]
     public void ServerChangeBesiegerCamp_SyncAllClients()
     {
+        // Arrange
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        var camp = GameObjectCreator.CreateInitializedObject<BesiegerCamp>();
 
         // Act
         Server.Call(() =>
         {
+            var camp = GameObjectCreator.CreateInitializedObject<BesiegerCamp>();
             serverParty.BesiegerCamp = camp;
         });
 

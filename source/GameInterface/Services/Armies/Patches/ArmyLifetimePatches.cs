@@ -33,7 +33,7 @@ internal class ArmyLifetimePatches
     [HarmonyPrefix]
     private static bool CreateArmyPrefix(ref Army __instance, Kingdom kingdom, MobileParty leaderParty, Army.ArmyTypes armyType)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

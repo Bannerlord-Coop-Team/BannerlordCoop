@@ -22,7 +22,7 @@ internal class MapEventSideCreationPatches
 
     static bool Prefix(MapEventSide __instance, MapEvent mapEvent, BattleSideEnum missionSide, PartyBase leaderParty)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

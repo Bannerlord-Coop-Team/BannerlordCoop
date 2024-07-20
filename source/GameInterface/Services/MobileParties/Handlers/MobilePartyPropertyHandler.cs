@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -163,13 +164,13 @@ namespace GameInterface.Services.MobileParties.Handlers
                         instance.BesiegerCamp = null;
                         return;
                     }
-                    if (objectManager.TryGetObject<MobileParty>(data.Value2, out var campLeaderParty) == false)
+                    if (objectManager.TryGetObject<BesiegerCamp>(data.Value2, out var besiegerCamp) == false)
                     {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
+                        Logger.Error("Unable to find {type} with id: {id}", typeof(BesiegerCamp), data.Value2);
                         return;
                     }
 
-                    instance.BesiegerCamp = campLeaderParty?.BesiegerCamp;
+                    instance.BesiegerCamp = besiegerCamp;
                     return;
 
                 case PropertyType.Scout:

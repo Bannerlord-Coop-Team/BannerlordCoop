@@ -57,7 +57,7 @@ internal class MapEventCollectionPatches
 
     public static void ArrayAssignIntercept(MapEventSide[] _sides, int index, MapEventSide value, MapEvent instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             _sides[index] = value;

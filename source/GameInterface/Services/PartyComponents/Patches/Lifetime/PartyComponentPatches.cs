@@ -20,7 +20,7 @@ internal class PartyComponentPatches
     [HarmonyPatch(nameof(PartyComponent.MobileParty), MethodType.Setter)]
     private static bool Prefix(PartyComponent __instance, MobileParty value)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

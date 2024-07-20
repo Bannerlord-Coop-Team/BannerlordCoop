@@ -401,8 +401,11 @@ public class MobilePartyPropertyPatches
             return false;
         }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.BesiegerCamp, __instance.StringId, value?.LeaderParty.StringId);
-        MessageBroker.Instance.Publish(__instance, message);
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
+        if (objectManager.TryGetId(value, out var besiegerCampId) == false) return true;
+
+        var message = new MobilePartyPropertyChanged(PropertyType.BesiegerCamp, __instance.StringId, besiegerCampId);
+        MessageBroker.Instance.Publish(__instance, message); 
 
         return ModInformation.IsServer;
     }

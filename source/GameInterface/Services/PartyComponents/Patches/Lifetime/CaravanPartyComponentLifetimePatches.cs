@@ -25,7 +25,7 @@ internal class CaravanPartyComponentLifetimePatches
 
     private static bool Prefix(CaravanPartyComponent __instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

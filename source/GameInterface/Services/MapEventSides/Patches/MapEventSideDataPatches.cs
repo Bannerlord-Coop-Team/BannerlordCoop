@@ -19,7 +19,7 @@ internal class MapEventSideDataPatches
     [HarmonyPrefix]
     static bool LeaderPartyPrefix(ref MapEventSide __instance, ref PartyBase value)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
