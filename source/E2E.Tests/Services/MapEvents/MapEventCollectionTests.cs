@@ -44,8 +44,8 @@ public class MapEventCollectionTests : IDisposable
 
             mapEvent.Initialize(attackerParty.Party, defenderParty.Party);
 
-            Assert.True(server.ObjectManager.TryGetId(attackerParty, out attackerSideId));
-            Assert.True(server.ObjectManager.TryGetId(defenderParty, out defenderSideId));
+            Assert.True(server.ObjectManager.TryGetId(mapEvent.AttackerSide, out attackerSideId));
+            Assert.True(server.ObjectManager.TryGetId(mapEvent.DefenderSide, out defenderSideId));
         }, new MethodBase[] { AccessTools.Method(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual.Initialize)) });
 
         // Assert
