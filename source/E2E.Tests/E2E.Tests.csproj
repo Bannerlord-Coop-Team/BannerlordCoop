@@ -61,6 +61,12 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+	<AssemblyAttribute Include="Xunit.CollectionBehaviorAttribute">
+	  <_Parameter1>DisableTestParallelization = true</_Parameter1>
+	  <_Parameter1_IsLiteral>true</_Parameter1_IsLiteral>
+	</AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
     <Publicize Include="TaleWorlds.CampaignSystem" />
     <Publicize Include="TaleWorlds.Core" />
     <Publicize Include="TaleWorlds.Library" />
