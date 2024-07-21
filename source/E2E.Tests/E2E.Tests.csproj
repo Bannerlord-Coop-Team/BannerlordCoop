@@ -30,12 +30,14 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Coop.IntegrationTests\Coop.IntegrationTests.csproj" />
     <ProjectReference Include="..\GameInterface.Tests\GameInterface.Tests.csproj" />
     <ProjectReference Include="..\GameInterface\GameInterface.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="SandBox">
+      <HintPath>..\GameInterface.Tests\obj\x64\Debug\net6.0\PublicizedAssemblies\SandBox.A32C5F155B205CFBE9423FFBADAAE94A\SandBox.dll</HintPath>
+    </Reference>
     <Reference Include="SandBox.GauntletUI">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
     </Reference>
@@ -51,15 +53,12 @@
     <Reference Include="TaleWorlds.Localization">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.MountAndBlade">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.ObjectSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
     </Reference>
-  </ItemGroup>
-  <ItemGroup>
-	<AssemblyAttribute Include="Xunit.CollectionBehaviorAttribute">
-	  <_Parameter1>DisableTestParallelization = true</_Parameter1>
-	  <_Parameter1_IsLiteral>true</_Parameter1_IsLiteral>
-	</AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
     <Publicize Include="TaleWorlds.CampaignSystem" />

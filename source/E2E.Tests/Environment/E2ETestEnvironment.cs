@@ -2,8 +2,7 @@
 using Common;
 using Common.Messaging;
 using Common.Tests.Utils;
-using Coop.IntegrationTests.Environment;
-using Coop.IntegrationTests.Environment.Instance;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.Tests.Bootstrap;

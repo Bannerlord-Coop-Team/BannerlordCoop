@@ -1,15 +1,9 @@
-﻿using Common.Util;
-using Coop.IntegrationTests.Environment.Instance;
-using E2E.Tests.Environment;
+﻿using E2E.Tests.Environment;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using GameInterface.Services.Armies.Extensions;
 using HarmonyLib;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
