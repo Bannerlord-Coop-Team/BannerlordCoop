@@ -36,7 +36,7 @@
 
   <ItemGroup>
     <Reference Include="SandBox">
-      <HintPath>..\GameInterface.Tests\obj\x64\Debug\net6.0\PublicizedAssemblies\SandBox.A32C5F155B205CFBE9423FFBADAAE94A\SandBox.dll</HintPath>
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
     <Reference Include="SandBox.GauntletUI">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
