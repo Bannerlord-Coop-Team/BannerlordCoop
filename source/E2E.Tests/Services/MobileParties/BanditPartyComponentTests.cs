@@ -1,5 +1,7 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using E2E.Tests.Util.ObjectBuilders;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -70,6 +72,62 @@ public class BanditPartyComponentTests : IDisposable
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
+        }
+    }
+
+    [Fact]
+    public void ClientUpdateParty_DoesNothing()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
+
+        var component = GameObjectCreator.CreateInitializedObject<BanditPartyComponent>();
+        var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
+        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+
+        component.Hideout = null;
+        component.IsBossParty = false;
+
+        // Act
+        client1.Call(() =>
+        {
+            component.IsBossParty = true;
+            component.Hideout = hideout;
+        });
+
+        // Assert
+        Assert.False(component.IsBossParty);
+        Assert.NotEqual(component.Hideout, hideout);
+    }
+
+    [Fact]
+    public void ServerUpdateParty_SyncAllClients()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
+
+        var component = GameObjectCreator.CreateInitializedObject<BanditPartyComponent>();
+        HideoutBuilder hideoutBuilder = new HideoutBuilder();
+
+        var hideout = hideoutBuilder.BuildWithSettlement();
+
+        component.Hideout = null;
+        component.IsBossParty = false;
+
+        // Act
+        server.Call(() =>
+        {
+            component.IsBossParty = true;
+            component.Hideout = hideout;
+        });
+
+        // Assert
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(component.IsBossParty);
+            Assert.Equal(component.Hideout, hideout);
         }
     }
 }

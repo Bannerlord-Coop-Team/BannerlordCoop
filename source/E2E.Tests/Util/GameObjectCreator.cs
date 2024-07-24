@@ -20,6 +20,7 @@ internal class GameObjectCreator
         { typeof(Town), new TownBuilder() },
         { typeof(Village), new VillageBuilder() },
         { typeof(MobileParty), new MobilePartyBuilder() },
+        { typeof(BanditPartyComponent), new BanditPartyComponentBuilder() }
     };
 
     public static T CreateInitializedObject<T>()
