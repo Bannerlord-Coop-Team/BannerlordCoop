@@ -32,7 +32,7 @@ internal class PartyLifetimePatches
     [HarmonyPatch(typeof(MobileParty), MethodType.Constructor)]
     private static bool Prefix(ref MobileParty __instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
@@ -65,11 +65,10 @@ internal class PartyLifetimePatches
         MobileParty newParty = ObjectHelper.SkipConstructor<MobileParty>();
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return;
+        if (objectManager.AddExisting(partyId, newParty) == false) return;
 
         GameLoopRunner.RunOnMainThread(() =>
         {
-            if (objectManager.AddExisting(partyId, newParty) == false) return;
-
             using (new AllowedThread())
             {
                 MobileParty_ctor.Invoke(newParty, Array.Empty<object>());
@@ -86,14 +85,14 @@ internal class PartyLifetimePatches
     [HarmonyPrefix]
     private static bool RemoveParty_Prefix(ref MobileParty __instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client destroyed unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;

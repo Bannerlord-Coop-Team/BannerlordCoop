@@ -30,6 +30,11 @@ public class GameInterfaceModule : Module
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
 
+        foreach(var type in LifetimeSyncCollection.LifetimeSync)
+        {
+            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+        }
+
         base.Load(builder);
     }
 }

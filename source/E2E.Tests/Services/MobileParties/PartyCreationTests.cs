@@ -1,6 +1,7 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Library;
@@ -27,14 +28,15 @@ public class PartyCreationTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
-
         // Act
         string? partyId = null;
         server.Call(() =>
         {
+            var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var party = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
             {
+                party.ActualClan = clan;
                 partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
             });
 
@@ -57,15 +59,12 @@ public class PartyCreationTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
-
         // Act
         string? partyId = null;
         client1.Call(() =>
         {
             var clientParty = MobileParty.CreateParty("This should not set", null, (party) =>
             {
-                partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
             });
 
             partyId = clientParty.StringId;

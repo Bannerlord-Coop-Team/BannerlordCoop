@@ -56,7 +56,7 @@ internal class ClanLifetimePatches
     [HarmonyPrefix]
     private static bool ctorPrefix(ref Clan __instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

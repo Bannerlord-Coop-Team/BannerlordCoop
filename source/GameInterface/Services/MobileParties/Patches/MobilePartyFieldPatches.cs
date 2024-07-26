@@ -1,25 +1,21 @@
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Reflection.Emit;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages.Fields.Events;
-using GameInterface.Services.PartyComponents;
 using HarmonyLib;
 using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.ComponentInterfaces;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
-[HarmonyPatch(typeof(MobileParty))]
+[HarmonyPatch]
 public class MobilePartyFieldPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyFieldPatches>();
@@ -30,7 +26,6 @@ public class MobilePartyFieldPatches
         {
             yield return method;
         }
-        ;
         yield return AccessTools.Method(typeof(DefaultClanFinanceModel), nameof(DefaultClanFinanceModel.ApplyMoraleEffect));
         yield return AccessTools.Method(typeof(MobilePartyAi), nameof(MobilePartyAi.GetFleeBehavior));
     }

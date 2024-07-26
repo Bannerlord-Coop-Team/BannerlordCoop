@@ -13,11 +13,6 @@ internal class HeroBuilder : IObjectBuilder
         var hero = HeroCreator.CreateSpecialHero(characterObject);
         hero.ChangeState(CharacterStates.Active);
         hero.Clan = clan;
-
-        var partyBuilder = new MobilePartyBuilder();
-        var party = partyBuilder.BuildWithHero(hero);
-
-        hero.SetPartyBelongedTo(party);
                 
         return hero;
     }
