@@ -2,8 +2,7 @@
 using Common;
 using Common.Messaging;
 using Common.Tests.Utils;
-using Coop.IntegrationTests.Environment;
-using Coop.IntegrationTests.Environment.Instance;
+using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.Tests.Bootstrap;
@@ -60,6 +59,27 @@ internal class E2ETestEnvironment : IDisposable
             characterObject.HeroObject = mainHero;
             Game.Current.PlayerTroop = characterObject;
         });
+    }
+
+    public string CreateRegisteredObject<T>() where T : class
+    {
+        string? id = null;
+        Server.Call(() =>
+        {
+            var obj = GameObjectCreator.CreateInitializedObject<T>();
+
+            if (Server.ObjectManager.TryGetId(obj, out id) == false)
+            {
+                throw new Exception($"Server object manager failed to register new object {typeof(T).Name}");
+            }
+        });
+
+        if (id == null)
+        {
+            throw new Exception($"Failed to create {typeof(T).Name} on Server");
+        }
+
+        return id;
     }
 
     public void Dispose()

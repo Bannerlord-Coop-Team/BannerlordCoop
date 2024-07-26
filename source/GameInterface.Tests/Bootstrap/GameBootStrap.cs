@@ -22,8 +22,6 @@ namespace GameInterface.Tests.Bootstrap
         private const string HarmonyID = "Coop.Testing";
         private static Harmony harmony;
 
-        private static Campaign current;
-
         /// <summary>
         /// Initializes any game functionality used for testing
         /// Currently initializes the following:
