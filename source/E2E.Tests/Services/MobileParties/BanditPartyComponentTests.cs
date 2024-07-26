@@ -82,9 +82,18 @@ public class BanditPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        var component = GameObjectCreator.CreateInitializedObject<BanditPartyComponent>();
-        var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        BanditPartyComponent component = GameObjectCreator.CreateInitializedObject<BanditPartyComponent>();
+        Hideout hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
+        Settlement settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+
+        server.Call(() =>
+        {
+            component = GameObjectCreator.CreateInitializedObject<BanditPartyComponent>();
+            hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
+            settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        });
+        
+        GameObjectCreator.CreateInitializedObject<Settlement>();
 
         component.Hideout = null;
         component.IsBossParty = false;
