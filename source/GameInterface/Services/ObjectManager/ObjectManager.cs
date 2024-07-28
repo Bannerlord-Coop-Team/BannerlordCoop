@@ -85,17 +85,11 @@ internal class ObjectManager : IObjectManager
 
     private readonly GameObjectManager defaultObjectManager = new GameObjectManager();
 
-    private readonly Dictionary<Type, IRegistry> RegistryMap = new Dictionary<Type, IRegistry>();
+    IReadOnlyDictionary<Type, IRegistry> RegistryMap => registryCollection.RegistryMap;
 
     public ObjectManager(IRegistryCollection registryCollection)
     {
-        foreach (var registry in registryCollection)
-        {
-            foreach (var managedType in registry.ManagedTypes)
-            {
-                RegistryMap.Add(managedType, registry);
-            }
-        }
+        this.registryCollection = registryCollection;
     }
 
     public bool AddExisting(string id, object obj)
@@ -174,6 +168,8 @@ internal class ObjectManager : IObjectManager
 
     private static readonly MethodInfo GetObject = typeof(MBObjectManager)
         .GetMethod(nameof(MBObjectManager.GetObject), new Type[] { typeof(string) });
+    private readonly IRegistryCollection registryCollection;
+
     public bool TryGetObject<T>(string id, out T obj) where T : class
     {
         obj = default;
