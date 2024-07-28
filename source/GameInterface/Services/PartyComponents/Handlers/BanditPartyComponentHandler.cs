@@ -7,81 +7,74 @@ using GameInterface.Services.PartyComponents.Messages;
 using GameInterface.Services.PartyComponents.Patches.BanditPartyComponents;
 using Serilog;
 using System;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.PartyComponents.Handlers
+namespace GameInterface.Services.PartyComponents.Handlers;
+
+internal class BanditPartyComponentHandler : IHandler
 {
-    internal class BanditPartyComponentHandler
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+    private readonly IObjectManager objectManager;
+
+    private static readonly ILogger Logger = LogManager.GetLogger<BanditPartyComponentPatches>();
+
+    public BanditPartyComponentHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
-        private readonly IMessageBroker messageBroker;
-        private readonly INetwork network;
-        private readonly IObjectManager objectManager;
-        private readonly PartyComponentRegistry registry;
+        this.messageBroker = messageBroker;
+        this.network = network;
+        this.objectManager = objectManager;
 
-        private static readonly ILogger Logger = LogManager.GetLogger<BanditPartyComponentPatches>();
+        messageBroker.Subscribe<BanditPartyComponentUpdated>(Handle);
+        messageBroker.Subscribe<NetworkUpdateBanditPartyComponent>(Handle);
+    }
 
-        public static FieldInfo Component_RelatedSettlement => typeof(BanditPartyComponent).GetField("_relatedSettlement", BindingFlags.NonPublic | BindingFlags.Instance);
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<BanditPartyComponentUpdated>(Handle);
+        messageBroker.Unsubscribe<NetworkUpdateBanditPartyComponent>(Handle);
+    }
 
-        public BanditPartyComponentHandler(IMessageBroker messageBroker, INetwork network, PartyComponentRegistry registry, IObjectManager objectManager)
+    private void Handle(MessagePayload<BanditPartyComponentUpdated> payload)
+    {
+        var obj = payload.What;
+
+        if(objectManager.TryGetId(obj.Component, out string componentId) == false)
         {
-            this.messageBroker = messageBroker;
-            this.network = network;
-            this.registry = registry;
-            this.objectManager = objectManager;
-
-            messageBroker.Subscribe<BanditPartyComponentUpdated>(Handle);
-            messageBroker.Subscribe<NetworkUpdateBanditPartyComponent>(Handle);
+            Logger.Error("Could not find {component} in registry \n"
+                + "Callstack: {callstack}", obj.Component.Name, Environment.StackTrace);
+            return;
         }
 
-        public void Dispose()
+        NetworkUpdateBanditPartyComponent message = new(componentId, (int)obj.ComponentType, obj.NewValue);
+
+        network.SendAll(message);
+    }
+
+    private void Handle(MessagePayload<NetworkUpdateBanditPartyComponent> payload)
+    {
+        var obj = payload.What;
+
+        if (objectManager.TryGetObject<BanditPartyComponent>(obj.ComponentId, out var component) == false)
         {
-            messageBroker.Unsubscribe<BanditPartyComponentUpdated>(Handle);
-            messageBroker.Unsubscribe<NetworkUpdateBanditPartyComponent>(Handle);
+            Logger.Error("Could not find {component} in registry \n"
+                + "Callstack: {callstack}", obj.ComponentId, Environment.StackTrace);
+            return;
         }
 
-        private void Handle(MessagePayload<BanditPartyComponentUpdated> payload)
+        using (new AllowedThread())
         {
-            var obj = payload.What;
-
-            if(registry.TryGetId(obj.Component, out string componentId) == false)
+            switch ((BanditPartyComponentType)obj.BanditPartyComponentType)
             {
-                Logger.Error("Could not find {component} in registry \n"
-                    + "Callstack: {callstack}", obj.Component.Name, Environment.StackTrace);
-                return;
-            }
+                case BanditPartyComponentType.Hideout:
+                    objectManager.TryGetObject(obj.Value, out Hideout hideout);
+                    component.Hideout = hideout;
+                    break;
 
-            NetworkUpdateBanditPartyComponent message = new(componentId, (int)obj.ComponentType, obj.NewValue);
-
-            network.SendAll(message);
-        }
-
-        private void Handle(MessagePayload<NetworkUpdateBanditPartyComponent> payload)
-        {
-            var obj = payload.What;
-
-            if (registry.TryGetValue(obj.ComponentId, out BanditPartyComponent component) == false)
-            {
-                Logger.Error("Could not find {component} in registry \n"
-                    + "Callstack: {callstack}", obj.ComponentId, Environment.StackTrace);
-                return;
-            }
-
-            using (new AllowedThread())
-            {
-                switch ((BanditPartyComponentType)obj.BanditPartyComponentType)
-                {
-                    case BanditPartyComponentType.Hideout:
-                        objectManager.TryGetObject(obj.Value, out Settlement settlement);
-                        component.Hideout = settlement.Hideout;
-                        break;
-
-                    case BanditPartyComponentType.IsBossParty:
-                        component.IsBossParty = bool.Parse(obj.Value);
-                        break;
-                }
+                case BanditPartyComponentType.IsBossParty:
+                    component.IsBossParty = bool.Parse(obj.Value);
+                    break;
             }
         }
     }

@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
 using HarmonyLib;
 using Serilog;
@@ -56,7 +57,10 @@ public class BanditPartyComponentPatches
             return false;
         }
 
-        var message = new BanditPartyComponentUpdated(__instance, BanditPartyComponentType.Hideout, value.Settlement.StringId);
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
+        if (objectManager.TryGetId(value, out var hideoutId) == false) return true;
+
+        var message = new BanditPartyComponentUpdated(__instance, BanditPartyComponentType.Hideout, hideoutId);
 
         MessageBroker.Instance.Publish(__instance, message);
 

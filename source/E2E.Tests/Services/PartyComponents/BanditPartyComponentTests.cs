@@ -82,13 +82,18 @@ public class BanditPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        string componentId = TestEnvironment.CreateRegisteredObject<BanditPartyComponent>();
-        Assert.True(server.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var serverComponent));
+        // Create objects on the server and all clients, this returns the "network id" of the object
+        var componentId = TestEnvironment.CreateRegisteredObject<BanditPartyComponent>();
+        var hideoutId = TestEnvironment.CreateRegisteredObject<Hideout>();
 
-        HideoutBuilder hideoutBuilder = new HideoutBuilder();
-        var hideout = hideoutBuilder.BuildWithSettlement();
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var serverComponent));
+            Assert.True(server.ObjectManager.TryGetObject<Hideout>(hideoutId, out var hideout));
 
-        serverComponent.Hideout = hideout;
+            serverComponent.IsBossParty = false;
+            serverComponent.Hideout = hideout;
+        });
 
         // Act
         client1.Call(() =>
@@ -99,8 +104,16 @@ public class BanditPartyComponentTests : IDisposable
         });
 
         // Assert
+        Assert.True(server.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var serverComponent));
         Assert.False(serverComponent.IsBossParty);
         Assert.NotNull(serverComponent.Hideout);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var clientComponent));
+            Assert.False(clientComponent.IsBossParty);
+            Assert.NotNull(clientComponent.Hideout);
+        }
     }
 
     [Fact]
@@ -110,15 +123,17 @@ public class BanditPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        string componentId = TestEnvironment.CreateRegisteredObject<BanditPartyComponent>();
-        
-        HideoutBuilder hideoutBuilder = new HideoutBuilder();
-        var hideout = hideoutBuilder.BuildWithSettlement();
+        // Create objects on the server and all clients, this returns the "network id" of the object
+        var componentId = TestEnvironment.CreateRegisteredObject<BanditPartyComponent>();
+        var hideoutId = TestEnvironment.CreateRegisteredObject<Hideout>();
+
 
         // Act
         server.Call(() =>
         {
-            server.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var serverComponent);
+            Assert.True(server.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var serverComponent));
+            Assert.True(server.ObjectManager.TryGetObject<Hideout>(hideoutId, out var hideout));
+
             serverComponent.IsBossParty = true;
             serverComponent.Hideout = hideout;
         });
@@ -127,6 +142,7 @@ public class BanditPartyComponentTests : IDisposable
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<BanditPartyComponent>(componentId, out var clientComponent));
+            Assert.True(client.ObjectManager.TryGetObject<Hideout>(hideoutId, out var hideout));
             Assert.True(clientComponent.IsBossParty);
             Assert.Equal(clientComponent.Hideout, hideout);
         }
