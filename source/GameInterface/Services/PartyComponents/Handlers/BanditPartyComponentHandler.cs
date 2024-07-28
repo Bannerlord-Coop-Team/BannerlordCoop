@@ -43,7 +43,7 @@ internal class BanditPartyComponentHandler : IHandler
         if(objectManager.TryGetId(obj.Component, out string componentId) == false)
         {
             Logger.Error("Could not find {component} in registry \n"
-                + "Callstack: {callstack}", obj.Component.Name, Environment.StackTrace);
+                + "Callstack: {callstack}", obj.Component, Environment.StackTrace);
             return;
         }
 
