@@ -5,6 +5,8 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
+using System.ComponentModel;
+using Coop.IntegrationTests.Environment;
 
 namespace E2E.Tests.Services.MobileParties;
 public class MilitiaPartyComponentTests : IDisposable
@@ -48,6 +50,7 @@ public class MilitiaPartyComponentTests : IDisposable
         }
     }
 
+
     [Fact]
     public void ClientCreateParty_DoesNothing()
     {
@@ -70,4 +73,59 @@ public class MilitiaPartyComponentTests : IDisposable
             Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
         }
     }
+
+
+    [Fact]
+    public void ServerUpdateParty_SyncAllClients()
+    {
+        // Arrange
+        var server = TestEnvironement.Server;
+
+        
+
+        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        var newParty = MilitiaPartyComponent.CreateMilitiaParty("TestId", settlement);
+
+        // Act
+
+        server.Call(() =>
+        {
+            newParty.RemoveParty();
+        });
+
+
+        // Assert
+        Assert.Null(newParty.HomeSettlement);
+
+        foreach (var client in TestEnvironement.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MilitiaPartyComponent>("TestId", out var component));
+            Assert.Null(component.Settlement);
+        }
+    }
+
+    // TBD
+    /*
+    [Fact]
+    public void ClientUpdateParty_DoesNothing()
+    {
+        // Arrange
+        var server = TestEnvironement.Server;
+        var client1 = TestEnvironement.Clients.First();
+
+        
+        // Act
+        string partyId = "TestId";
+        client1.Call(() =>
+        {
+            
+        });
+
+        // Assert
+        foreach (var client in TestEnvironement.Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
+        }
+    }
+    */
 }
