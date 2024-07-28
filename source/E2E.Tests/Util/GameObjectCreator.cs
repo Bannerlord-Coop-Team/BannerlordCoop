@@ -24,6 +24,7 @@ internal class GameObjectCreator
         { typeof(Town), new TownBuilder() },
         { typeof(Village), new VillageBuilder() },
         { typeof(MobileParty), new MobilePartyBuilder() },
+        { typeof(BanditPartyComponent), new BanditPartyComponentBuilder() },
         { typeof(MapEvent), new MapEventBuilder() },
         { typeof(MapEventSide), new MapEventSideBuilder() },
         { typeof(BesiegerCamp), new BesiegerCampBuilder() },

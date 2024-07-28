@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
 
-namespace GameInterface.Services.Hideouts.Patches;
+namespace GameInterface.Services.Hideouts.Patches.Disable;
 
 [HarmonyPatch(typeof(CapturedByBountyHuntersIssueBehavior))]
 internal class DisableCapturedByBountyHuntersIssueBehavior

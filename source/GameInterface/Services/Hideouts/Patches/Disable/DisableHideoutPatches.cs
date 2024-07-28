@@ -2,7 +2,7 @@
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Hideouts.Patches
+namespace GameInterface.Services.Hideouts.Patches.Disable
 {
     /// <summary>
     /// Disables hideout functionality. Will be removed when
@@ -19,7 +19,7 @@ namespace GameInterface.Services.Hideouts.Patches
             {
                 __instance.Owner.Settlement.IsVisible = false;
             }
-            
+
             return false;
         }
     }
