@@ -5,13 +5,8 @@ using ProtoBuf;
 namespace GameInterface.Services.PartyComponents.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-internal class NetworkCreatePartyComponent : ICommand
+internal record NetworkCreatePartyComponent(PartyComponentData Data) : ICommand
 {
     [ProtoMember(1)]
-    public PartyComponentData Data { get; }
-
-    public NetworkCreatePartyComponent(PartyComponentData data)
-    {
-        Data = data;
-    }
+    public PartyComponentData Data { get; } = Data;
 }

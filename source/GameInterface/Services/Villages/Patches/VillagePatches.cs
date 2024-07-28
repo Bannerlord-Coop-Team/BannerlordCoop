@@ -49,7 +49,6 @@ internal class VillagePatches
                 village.Settlement.Party.SetLevelMaskIsDirty();
             }
         });
-
     }
 
     // Justification:
@@ -83,8 +82,6 @@ internal class VillagePatches
                 village.Hearth = Hearth;
             }
         });
-
-
     }
 
     [HarmonyPatch(nameof(Village.TradeBound), MethodType.Setter)]
@@ -113,7 +110,6 @@ internal class VillagePatches
                 village.TradeBound = tradebound;
             }
         });
-
     }
 
 
@@ -140,7 +136,6 @@ internal class VillagePatches
                 village.TradeTaxAccumulated = tradeTaxAccumulated;
             }
         });
-
     }
 
     [HarmonyPatch(nameof(Village.LastDemandSatisfiedTime), MethodType.Setter)]
@@ -166,8 +161,5 @@ internal class VillagePatches
                 village.LastDemandSatisfiedTime = LastDemandSatisfiedTime;
             }
         });
-
     }
-
-
 }
