@@ -3,59 +3,49 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.MapEvents.Messages;
-using GameInterface.Services.MapEvents.Patches;
-using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Registry;
 using HarmonyLib;
 using ProtoBuf;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using static SandBox.Missions.MissionLogics.HideoutMissionController;
 
-namespace GameInterface;
+namespace GameInterface.AutoSync;
 
-public class TestObject { }
-
-
-internal class LifetimeProto<T> : IDisposable where T : class
+internal class AutoLifetimeSync<T> : IDisposable where T : class
 {
-    static readonly ILogger Logger = LogManager.GetLogger<LifetimeProto<T>>();
+    static readonly ILogger Logger = LogManager.GetLogger<AutoLifetimeSync<T>>();
 
-    public static bool Patched = false;
     private LifetimeHandler lifetimeHandler;
     private LifetimeRegistry lifetimeRegistry;
+    private Harmony harmony = new Harmony(nameof(AutoLifetimeSync<T>));
 
-    public LifetimeProto(
-        Harmony harmony,
-        IMessageBroker messageBroker, 
-        INetwork network, 
-        IObjectManager objectManager, 
+    public AutoLifetimeSync(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
         IRegistryCollection registryCollection)
     {
         lifetimeHandler = new LifetimeHandler(messageBroker, network, objectManager);
         lifetimeRegistry = new LifetimeRegistry(registryCollection);
 
-        Patch(harmony);
+        Patch();
     }
 
-    private void Patch(Harmony harmony)
+    private void Patch()
     {
-        if (Patched) return;
-        Patched = true;
+        if (Harmony.HasAnyPatches(nameof(AutoLifetimeSync<T>))) return;
 
-        var prefix = AccessTools.Method(typeof(LifetimeProto<T>), nameof(Prefix));
+        var prefix = AccessTools.Method(typeof(AutoLifetimeSync<T>), nameof(Prefix));
         harmony.Patch(AccessTools.Constructor(typeof(T)), prefix: new HarmonyMethod(prefix));
     }
 
     public void Dispose()
     {
         lifetimeHandler.Dispose();
+
+        harmony.UnpatchAll(nameof(AutoLifetimeSync<T>));
     }
 
     class LifetimeRegistry : RegistryBase<T>

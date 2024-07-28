@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using GameInterface.AutoSync;
 using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Entity;
@@ -6,6 +7,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Time;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface;
 
@@ -30,12 +32,8 @@ public class GameInterfaceModule : Module
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
 
-        builder.RegisterType<LifetimeProto<TestObject>>().AsSelf().AutoActivate();
+        builder.RegisterType<AutoLifetimeSync<Kingdom>>().AsSelf().AutoActivate();
 
-        foreach(var type in LifetimeSyncCollection.LifetimeSync)
-        {
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
-        }
 
         base.Load(builder);
     }
