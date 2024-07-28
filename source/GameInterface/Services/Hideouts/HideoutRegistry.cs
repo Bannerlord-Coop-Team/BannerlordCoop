@@ -19,8 +19,9 @@ internal class HideoutRegistry : RegistryBase<Hideout>
             return;
         }
 
-        foreach (var hideout in Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsHideout).Cast<Hideout>())
+        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements.Where(settlement => settlement.IsHideout))
         {
+            Hideout hideout = settlement.Hideout;
             base.RegisterExistingObject(hideout.StringId, hideout);
         }
     }
