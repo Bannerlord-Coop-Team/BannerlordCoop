@@ -12,6 +12,10 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.PartyComponents.Patches.Lifetime;
 
+
+/// <summary>
+/// Harmony patches for the lifetime of a <see cref="CaravanPartyComponent"/> object
+/// </summary>
 [HarmonyPatch]
 internal class CaravanPartyComponentLifetimePatches
 {
@@ -21,13 +25,13 @@ internal class CaravanPartyComponentLifetimePatches
 
     private static bool Prefix(CaravanPartyComponent __instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
+                + "Callstack: {callstack}", typeof(CaravanPartyComponent), Environment.StackTrace);
             return true;
         }
 

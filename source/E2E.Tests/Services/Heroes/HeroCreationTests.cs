@@ -1,14 +1,7 @@
-using Common.Messaging;
-using Common.Tests.Utils;
-using Common.Util;
-using Coop.IntegrationTests.Environment.Instance;
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
-using GameInterface.Services.Heroes.Messages;
-using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
@@ -17,22 +10,22 @@ namespace E2E.Tests.Services.Heroes;
 
 public class HeroCreationTests : IDisposable
 {
-    E2ETestEnvironment TestEnvironement { get; }
+    E2ETestEnvironment TestEnvironment { get; }
     public HeroCreationTests(ITestOutputHelper output)
     {
-        TestEnvironement = new E2ETestEnvironment(output);
+        TestEnvironment = new E2ETestEnvironment(output);
     }
 
     public void Dispose()
     {
-        TestEnvironement.Dispose();
+        TestEnvironment.Dispose();
     }
 
     [Fact]
     public void ServerCreateHero_SyncAllClients()
     {
         // Arrange
-        var server = TestEnvironement.Server;
+        var server = TestEnvironment.Server;
 
         var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
         MBObjectManager.Instance.RegisterObject(characterObject);
@@ -53,7 +46,7 @@ public class HeroCreationTests : IDisposable
         var newHeroStringId = serverHero?.StringId;
         Assert.NotNull(newHeroStringId);
 
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<Hero>(newHeroStringId, out var newHero));
 
@@ -65,8 +58,8 @@ public class HeroCreationTests : IDisposable
     public void ClientCreateHero_DoesNothing()
     {
         // Arrange
-        var server = TestEnvironement.Server;
-        var client1 = TestEnvironement.Clients.First();
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
 
         var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
         MBObjectManager.Instance.RegisterObject(characterObject);
@@ -86,7 +79,7 @@ public class HeroCreationTests : IDisposable
         // Assert
         Assert.False(server.ObjectManager.TryGetObject<Hero>(newHeroStringId, out var _));
 
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             Assert.False(client.ObjectManager.TryGetObject<Hero>(newHeroStringId, out var _));
         }

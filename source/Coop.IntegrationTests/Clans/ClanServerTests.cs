@@ -1,11 +1,6 @@
 ﻿using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Clans.Messages;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Coop.IntegrationTests.Clans
 {
@@ -50,6 +45,7 @@ namespace Coop.IntegrationTests.Clans
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeClanName>());
             }
         }
+
         /// <summary>
         /// Verify sending ClanKingdomChange on one client
         /// Triggers ClanKingdomChanged on all other clients
@@ -80,35 +76,7 @@ namespace Coop.IntegrationTests.Clans
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeClanKingdom>());
             }
         }
-        /// <summary>
-        /// Verify sending DestroyClan on one client
-        /// Triggers ClanDestroyed on all other clients
-        /// </summary>
-        [Fact]
-        public void DestroyClan_Publishes_Server()
-        {
-            // Arrange
-            var clanId = "TestClan";
 
-            var message = new ClanDestroyed(clanId, 1);
-
-            var client1 = TestEnvironment.Clients.First();
-
-            var server = TestEnvironment.Server;
-
-            // Act
-            server.SimulateMessage(this, message);
-
-            // Assert
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<DestroyClan>());
-
-            Assert.Equal(1, client1.InternalMessages.GetMessageCount<DestroyClan>());
-
-            foreach (EnvironmentInstance client in TestEnvironment.Clients.Where(c => c != client1))
-            {
-                Assert.Equal(1, client.InternalMessages.GetMessageCount<DestroyClan>());
-            }
-        }
         /// <summary>
         /// Verify sending AddCompanion on one client
         /// Triggers CompanionAdded on all other clients

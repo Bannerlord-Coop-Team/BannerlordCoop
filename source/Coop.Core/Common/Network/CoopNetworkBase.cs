@@ -32,12 +32,11 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         this.serializer = serializer;
 
         netManager = new NetManager(this);
-        netManager.DisconnectTimeout = configuration.ConnectionTimeout.Milliseconds;
 
-#if DEBUG
+        // netManager.DisconnectTimeout = configuration.ConnectionTimeout.Milliseconds;
+
         // Increase disconnect timeout to prevent disconnect during debugging
         netManager.DisconnectTimeout = 300 * 1000;
-#endif
 
         CancellationTokenSource = new CancellationTokenSource();
         UpdateThread = new Thread(UpdateThreadMethod);

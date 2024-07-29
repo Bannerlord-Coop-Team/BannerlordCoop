@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Registry;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.PartyComponents;
@@ -10,6 +11,19 @@ namespace GameInterface.Services.PartyComponents;
 internal class PartyComponentRegistry : RegistryBase<PartyComponent>
 {
     public PartyComponentRegistry(IRegistryCollection collection) : base(collection) { }
+
+    public override IEnumerable<Type> ManagedTypes { get; } = new Type[]
+    {
+        typeof(PartyComponent),
+        typeof(WarPartyComponent),
+        typeof(BanditPartyComponent),
+        typeof(CustomPartyComponent),
+        typeof(CaravanPartyComponent),
+        typeof(GarrisonPartyComponent),
+        typeof(LordPartyComponent),
+        typeof(MilitiaPartyComponent),
+        typeof(VillagerPartyComponent),
+    };
 
     public override void RegisterAll()
     {
