@@ -95,26 +95,37 @@ public class CustomPartyComponentTests : IDisposable
 
             serverComponent._name = new TextObject("TestComponent");
             serverComponent._homeSettlement = settlement;
+            serverComponent._customPartyBaseSpeed = 5f;
+            serverComponent._partyHarnessStringId = "harness";
+            serverComponent._partyMountStringId = "mount";
         });
 
         // Act
         client1.Call(() =>
         {
             Assert.True(client1.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var clientComponent));
-            clientComponent._name = null;
+            clientComponent._name = new TextObject("ClientComponet");
             clientComponent._homeSettlement = null;
+            clientComponent._customPartyBaseSpeed = 0f;
+            clientComponent._partyHarnessStringId = null;
+            clientComponent._partyMountStringId = null;
         });
 
         // Assert
         Assert.True(server.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var serverComponent));
         Assert.NotNull(serverComponent._name);
         Assert.NotNull(serverComponent._homeSettlement);
+        Assert.NotNull(serverComponent._partyHarnessStringId);
+        Assert.NotNull(serverComponent._partyMountStringId);
 
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var clientComponent));
-            Assert.NotNull(clientComponent._name);
+            Assert.Equal(serverComponent._name, clientComponent._name);
             Assert.NotNull(clientComponent._homeSettlement);
+            Assert.Equal(5f, clientComponent._customPartyBaseSpeed);
+            Assert.NotNull(clientComponent._partyHarnessStringId);
+            Assert.NotNull(clientComponent._partyMountStringId);
         }
     }
 
