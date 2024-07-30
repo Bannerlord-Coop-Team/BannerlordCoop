@@ -1,8 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.MobileParties.Messages.Fields.Events;
-using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Messages;
 using HarmonyLib;
@@ -12,8 +10,6 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.GameComponents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
