@@ -76,4 +76,78 @@ public class CustomPartyComponentTests : IDisposable
         // Assert
         Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
     }
+
+    [Fact]
+    public void ClientUpdateParty_DoesNothing()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
+
+        // Create objects on the server and all clients, this returns the "network id" of the object
+        var componentId = TestEnvironment.CreateRegisteredObject<CustomPartyComponent>();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var serverComponent));
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            serverComponent._name = new TextObject("TestComponent");
+            serverComponent._homeSettlement = settlement;
+        });
+
+        // Act
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var clientComponent));
+            clientComponent._name = null;
+            clientComponent._homeSettlement = null;
+        });
+
+        // Assert
+        Assert.True(server.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var serverComponent));
+        Assert.NotNull(serverComponent._name);
+        Assert.NotNull(serverComponent._homeSettlement);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var clientComponent));
+            Assert.NotNull(clientComponent._name);
+            Assert.NotNull(clientComponent._homeSettlement);
+        }
+    }
+
+    [Fact]
+    public void ServerUpdateParty_SyncAllClients()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
+
+        // Create objects on the server and all clients, this returns the "network id" of the object
+        var componentId = TestEnvironment.CreateRegisteredObject<CustomPartyComponent>();
+        var hideoutId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+
+        // Act
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var serverComponent));
+            Assert.True(server.ObjectManager.TryGetObject<Settlement>(hideoutId, out var settlement));
+
+            serverComponent._name = new TextObject("TestComponent");
+            serverComponent._homeSettlement = settlement;
+        });
+
+        // Assert
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var clientComponent));
+            Assert.True(client.ObjectManager.TryGetObject<Settlement>(hideoutId, out var settlement));
+
+            Assert.True(clientComponent._name.Value.Equals("TestComponent"));
+            Assert.Equal(clientComponent._homeSettlement, settlement);
+        }
+    }
 }
