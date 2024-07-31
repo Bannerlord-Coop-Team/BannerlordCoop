@@ -9,6 +9,7 @@ using HarmonyLib;
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -34,13 +35,15 @@ namespace GameInterface.Services.MobileParties.Patches
 
         public static void OverrideApplyForParty(MobileParty mobileParty, Settlement settlement)
         {
-            GameLoopRunner.RunOnMainThread(() =>
             {
-                using (new AllowedThread())
+                GameLoopRunner.RunOnMainThread(() =>
                 {
-                    EnterSettlementAction.ApplyForParty(mobileParty, settlement);
-                }
-            });
+                    using (new AllowedThread())
+                    {
+                        EnterSettlementAction.ApplyForParty(mobileParty, settlement);
+                    }
+                });
+            }
         }
     }
 }

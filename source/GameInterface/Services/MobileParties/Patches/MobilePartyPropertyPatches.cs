@@ -104,6 +104,7 @@ public class MobilePartyPropertyPatches
     [HarmonyPrefix]
     private static bool SetLastVisitedSettlementPrefix(MobileParty __instance, Settlement value)
     {
+        if (value == __instance.LastVisitedSettlement) return false;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
@@ -353,6 +354,7 @@ public class MobilePartyPropertyPatches
     [HarmonyPrefix]
     private static bool SetCurentSettlementPrefix(MobileParty __instance, Settlement value)
     {
+        if (value == __instance._currentSettlement) return false;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

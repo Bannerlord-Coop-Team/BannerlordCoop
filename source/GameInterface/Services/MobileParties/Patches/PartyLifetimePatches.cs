@@ -98,7 +98,12 @@ internal class PartyLifetimePatches
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
 
         // Clean up object manager
-        objectManager.Remove(__instance);
+        if (objectManager.Remove(__instance) == false)
+        {
+            Logger.Error("Removal from object manager failed {name}\n"
+                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
+            return false;
+        }
 
         var data = new PartyDestructionData(__instance);
         var message = new PartyDestroyed(data);

@@ -1,12 +1,18 @@
-﻿using E2E.Tests.Environment;
+﻿using Common;
+using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using GameInterface.Services.MobileParties.Messages.Lifetime;
+using System.IO;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
-using System.ComponentModel;
-using Coop.IntegrationTests.Environment;
+
 
 namespace E2E.Tests.Services.PartyComponents;
 public class MilitiaPartyComponentTests : IDisposable
@@ -28,14 +34,20 @@ public class MilitiaPartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
         // Act
         string? partyId = null;
-
+        string? testStringId = null;
         server.Call(() =>
         {
+            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var settlementComp = GameObjectCreator.CreateInitializedObject<Town>();
+            settlement.SetSettlementComponent(settlementComp);
+            Assert.NotNull(settlement.SettlementComponent);
+            Assert.True(server.ObjectManager.TryGetId(settlement, out testStringId));
+            
             var newParty = MilitiaPartyComponent.CreateMilitiaParty("TestId", settlement);
+            Assert.NotNull(newParty.HomeSettlement);
             partyId = newParty.StringId;
         });
 
@@ -47,6 +59,7 @@ public class MilitiaPartyComponentTests : IDisposable
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
             Assert.IsType<MilitiaPartyComponent>(newParty.PartyComponent);
+            Assert.NotNull(newParty.HomeSettlement);
         }
     }
 
@@ -79,28 +92,42 @@ public class MilitiaPartyComponentTests : IDisposable
     public void ServerUpdateParty_SyncAllClients()
     {
         // Arrange
-        var server = TestEnvironement.Server;
-
-        
+        var server = TestEnvironment.Server;
 
         var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-        var newParty = MilitiaPartyComponent.CreateMilitiaParty("TestId", settlement);
 
-        // Act
+        string? newPartyId = null;
+        MobileParty? newParty = null;
 
         server.Call(() =>
         {
-            newParty.RemoveParty();
+            newParty = MilitiaPartyComponent.CreateMilitiaParty("TestId", settlement);
+            Assert.NotNull(newParty.HomeSettlement);
+            Assert.True(server.ObjectManager.TryGetId(newParty, out newPartyId));
         });
 
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(newPartyId, out var clientParty));
+            Assert.NotNull(clientParty);
+            Assert.NotNull(clientParty.HomeSettlement);
+        }
+
+        // Act
+        server.Call(() =>
+        {
+            newParty.RemoveParty();
+            
+        });
+
+        //DestroyPartyAction.Apply(PartyBase.MainParty, newParty);
 
         // Assert
-        Assert.Null(newParty.HomeSettlement);
+        Assert.NotNull(newPartyId);
 
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MilitiaPartyComponent>("TestId", out var component));
-            Assert.Null(component.Settlement);
+            Assert.False(client.ObjectManager.TryGetObject<MilitiaPartyComponent>(newPartyId, out var _));
         }
     }
 

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.ObjectManager;
 using Common.Util;
 using GameInterface.Services.PartyComponents.Data;
 using GameInterface.Services.PartyComponents.Messages;
@@ -7,44 +8,67 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using Common.Logging;
+using Serilog;
+using Common;
 
 namespace GameInterface.Services.PartyComponents.Handlers;
 internal class MilitiaPartyComponentHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<PartyComponentHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    private readonly PartyComponentRegistry registry;
+    private readonly IObjectManager objectManager;
 
-    public MilitiaPartyComponentHandler(IMessageBroker messageBroker, INetwork network, PartyComponentRegistry registry)
+    public MilitiaPartyComponentHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-        this.registry = registry;
-        messageBroker.Subscribe<PartyComponentCreated>(Handle);
-        messageBroker.Subscribe<NetworkCreatePartyComponent>(Handle);
+        this.objectManager = objectManager;
+
+        messageBroker.Subscribe<MilitiaPartyComponentSettlementFinalized>(Handle);
     }
 
-    private void Handle(MessagePayload<PartyComponentCreated> payload)
+    private void Handle(MessagePayload<MilitiaPartyComponentSettlementFinalized> payload)
     {
-        registry.RegisterNewObject(payload.What.Instance, out var id);
+        var component = payload.What.Instance;
+        if (objectManager.TryGetId(component, out var componentID) == false)
+        {
+            Logger.Error("MilitiaPartyComponent was not registered with PartyComponentRegistry");
+            return;
+        }
 
-        var data = new PartyComponentData(id);
-        network.SendAll(new NetworkCreatePartyComponent(data));
+        var message = new NetworkFinalizeMilitiaPartyComponent(componentID);
+        network.SendAll(message);
+        return;
     }
-
-    private void Handle(MessagePayload<NetworkCreatePartyComponent> payload)
+    private void Handle(MessagePayload<NetworkFinalizeMilitiaPartyComponent> payload)
     {
-        var data = payload.What.Data;
+        var componentId = payload.What.ComponentId;
 
-        // TODO add all types
-        var obj = ObjectHelper.SkipConstructor<LordPartyComponent>();
+        if (objectManager.TryGetObject(componentId, out MilitiaPartyComponent component) == false)
+        {
+            Logger.Error("MilitiaPartyComponent was not registered with PartyComponentRegistry");
+            return;
+        }
 
-        registry.RegisterExistingObject(data.Id, obj);
+      /*  GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                component.OnFinalize();
+            }
+        }); */
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<PartyComponentCreated>(Handle);
-        messageBroker.Unsubscribe<NetworkCreatePartyComponent>(Handle);
+        messageBroker.Unsubscribe<MilitiaPartyComponentSettlementFinalized>(Handle);
+        messageBroker.Unsubscribe<NetworkFinalizeMilitiaPartyComponent>(Handle);
     }
 }
+
+
+    
+

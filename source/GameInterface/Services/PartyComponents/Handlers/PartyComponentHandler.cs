@@ -10,9 +10,11 @@ using GameInterface.Services.PartyComponents.Patches.Lifetime;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Text;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.PartyComponents.Handlers;
@@ -55,6 +57,7 @@ internal class PartyComponentHandler : IHandler
 
     private void Handle(MessagePayload<NetworkChangePartyComponentMobileParty> payload)
     {
+        // Check if Settlement sync is needed here as well for MilitiaPartyComponent
         var componentId = payload.What.ComponentId;
         var partyId = payload.What.PartyId;
 
@@ -91,21 +94,52 @@ internal class PartyComponentHandler : IHandler
     }
 
     private void Handle(MessagePayload<PartyComponentCreated> payload)
+
     {
         objectManager.AddNewObject(payload.What.Instance, out var id);
-
+        // TODO: Check if party type is MilitiaPartyComponent and if thats the case use different patching to make sure (Home) Settlement is  sync as well
+        // Note: Only found that PartyComponent is registered in obj manager, but not sure it is really created on clients gameInterface
         var typeIndex = partyTypes.IndexOf(payload.What.Instance.GetType());
-        var data = new PartyComponentData(typeIndex, id);
-        network.SendAll(new NetworkCreatePartyComponent(data));
+
+        if (typeIndex == 5)
+        {
+            objectManager.TryGetId(payload.What.Instance.HomeSettlement, out var SettlementId);
+            var MilitiaCompData = new PartyComponentData(typeIndex, id, SettlementId);
+            
+            network.SendAll(new NetworkCreatePartyComponent(MilitiaCompData));
+        }
+        else
+        {
+
+            var data = new PartyComponentData(typeIndex, id);
+            network.SendAll(new NetworkCreatePartyComponent(data));
+        }
     }
 
     private void Handle(MessagePayload<NetworkCreatePartyComponent> payload)
     {
         var data = payload.What.Data;
         var typeIdx = data.TypeIndex;
+        // obj is off specific Party Component type like fe MilitiaPartyComponent
 
-        var obj = ObjectHelper.SkipConstructor(partyTypes[typeIdx]);
+        if (typeIdx == 5)
+        {
+            var militiaObj = ObjectHelper.SkipConstructor(partyTypes[typeIdx]);
 
-        objectManager.AddExisting(data.Id, obj);
+            if (!objectManager.TryGetObject<Settlement>(data.SettlementId, out var settlementObj)) 
+            { 
+                Logger.Error("Failed to retrieve Settlement");
+                return; 
+            }
+
+            //militiaObj.Settlement = settlementObj;
+            objectManager.AddExisting(data.Id, militiaObj);
+        }
+        else
+        {
+            PartyComponent obj = (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[typeIdx]);
+            objectManager.AddExisting(data.Id, obj);
+        }
+        
     }
 }

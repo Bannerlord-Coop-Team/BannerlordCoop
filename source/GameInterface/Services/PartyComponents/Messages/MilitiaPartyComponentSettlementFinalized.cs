@@ -4,12 +4,8 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.PartyComponents.Messages;
 
-    public record MilitiaPartyComponentSettlementFinalized : IEvent
+    internal record MilitiaPartyComponentSettlementFinalized(MilitiaPartyComponent Instance) : IEvent
     {
-        public MilitiaPartyComponent MilitiaPartyComponent { get; }
+        public MilitiaPartyComponent Instance { get; } = Instance;
 
-        public MilitiaPartyComponentSettlementFinalized(MilitiaPartyComponent militiaPartyComponent)
-        {
-            MilitiaPartyComponent = militiaPartyComponent;
-        }
     }

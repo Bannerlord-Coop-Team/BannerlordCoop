@@ -1,19 +1,16 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.PartyComponents.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
-namespace GameInterface.Services.PartyComponents.Patches;
+namespace GameInterface.Services.PartyComponents.Patches.Lifetime;
 
 [HarmonyPatch(typeof(MilitiaPartyComponent))]
 internal class MilitiaPartyComponentPatches
@@ -22,7 +19,7 @@ internal class MilitiaPartyComponentPatches
 
     [HarmonyPatch(nameof(MilitiaPartyComponent.OnFinalize))]
     [HarmonyPrefix]
-    static bool OnFinalizePrefix(ref MilitiaPartyComponent __instance)
+    static bool OnFinalizePrefix(MilitiaPartyComponent __instance)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -40,5 +37,4 @@ internal class MilitiaPartyComponentPatches
 
         return true;
     }
-
 }
