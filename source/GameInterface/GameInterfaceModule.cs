@@ -8,6 +8,7 @@ using GameInterface.Services.Players;
 using GameInterface.Services.Time;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface;
 
@@ -32,7 +33,8 @@ public class GameInterfaceModule : Module
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
 
-        builder.RegisterType<AutoLifetimeSync<Kingdom>>().AsSelf().AutoActivate();
+        // Generic class registration, getting any template type in any constructor will resolve this class
+        builder.RegisterGeneric(typeof(AutoSyncBuilder<>)).As(typeof(IAutoSyncBuilder<>)).InstancePerLifetimeScope();
 
 
         base.Load(builder);

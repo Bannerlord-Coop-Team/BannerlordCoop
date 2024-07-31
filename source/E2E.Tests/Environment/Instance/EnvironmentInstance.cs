@@ -17,7 +17,7 @@ namespace E2E.Tests.Environment.Instance;
 /// <summary>
 /// Single instance of a server or client. Stores relevant test information.
 /// </summary>
-public abstract class EnvironmentInstance
+public abstract class EnvironmentInstance : IDisposable
 {
     public NetPeer NetPeer => mockNetwork.NetPeer;
     /// <summary>
@@ -206,4 +206,6 @@ public abstract class EnvironmentInstance
 
         return serializer.Deserialize<T>(bytes);
     }
+
+    public abstract void Dispose();
 }

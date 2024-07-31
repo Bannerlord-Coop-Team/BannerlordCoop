@@ -9,43 +9,36 @@ using HarmonyLib;
 using ProtoBuf;
 using Serilog;
 using System;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.AutoSync;
 
-internal class AutoLifetimeSync<T> : IDisposable where T : class
+internal class AutoCreationSync<T> : IDisposable where T : class
 {
-    static readonly ILogger Logger = LogManager.GetLogger<AutoLifetimeSync<T>>();
-
+    static readonly ILogger Logger = LogManager.GetLogger<AutoCreationSync<T>>();
+    private readonly MethodBase destroyFunction;
     private LifetimeHandler lifetimeHandler;
     private LifetimeRegistry lifetimeRegistry;
-    private Harmony harmony = new Harmony(nameof(AutoLifetimeSync<T>));
 
-    public AutoLifetimeSync(
+    public AutoCreationSync(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IRegistryCollection registryCollection)
+        IRegistryCollection registryCollection,
+        IPatchCollection patchCollection)
     {
         lifetimeHandler = new LifetimeHandler(messageBroker, network, objectManager);
         lifetimeRegistry = new LifetimeRegistry(registryCollection);
 
-        Patch();
-    }
-
-    private void Patch()
-    {
-        if (Harmony.HasAnyPatches(nameof(AutoLifetimeSync<T>))) return;
-
-        var prefix = AccessTools.Method(typeof(AutoLifetimeSync<T>), nameof(Prefix));
-        harmony.Patch(AccessTools.Constructor(typeof(T)), prefix: new HarmonyMethod(prefix));
+        var ctor = AccessTools.Constructor(typeof(T));
+        var prefix = AccessTools.Method(typeof(AutoCreationSync<T>), nameof(CreationPrefix));
+        patchCollection.AddPrefix(ctor, prefix);
     }
 
     public void Dispose()
     {
         lifetimeHandler.Dispose();
-
-        harmony.UnpatchAll(nameof(AutoLifetimeSync<T>));
     }
 
     class LifetimeRegistry : RegistryBase<T>
@@ -103,7 +96,7 @@ internal class AutoLifetimeSync<T> : IDisposable where T : class
         }
     }
 
-    private static bool Prefix(T __instance)
+    private static bool CreationPrefix(T __instance)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;

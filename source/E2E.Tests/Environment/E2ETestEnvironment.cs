@@ -84,5 +84,8 @@ internal class E2ETestEnvironment : IDisposable
 
     public void Dispose()
     {
+        Server.Dispose();
+
+        foreach (var client in Clients) client.Dispose();
     }
 }
