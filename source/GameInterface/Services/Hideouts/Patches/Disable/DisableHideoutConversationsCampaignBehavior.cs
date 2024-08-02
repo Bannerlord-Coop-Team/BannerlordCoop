@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using SandBox.CampaignBehaviors;
 
-namespace GameInterface.Services.Hideouts.Patches;
+namespace GameInterface.Services.Hideouts.Patches.Disable;
 
 [HarmonyPatch(typeof(HideoutConversationsCampaignBehavior))]
 internal class DisableHideoutConversationsCampaignBehavior
