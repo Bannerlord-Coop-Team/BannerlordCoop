@@ -13,13 +13,13 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.AutoSync;
-internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
+internal class AutoPropertySyncAsRef<T, ValueType> : IDisposable where T : class where ValueType : class
 {
 
-    static readonly ILogger Logger = LogManager.GetLogger<AutoPropertySync<T, ValueType>>();
+    static readonly ILogger Logger = LogManager.GetLogger<AutoPropertySyncAsRef<T, ValueType>>();
     private PropertyHandler propertyHandler;
 
-    public AutoPropertySync(
+    public AutoPropertySyncAsRef(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
@@ -31,7 +31,7 @@ internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
 
         propertyHandler = new PropertyHandler(messageBroker, network, objectManager, propertyMapper, setterId);
 
-        var prefix = AccessTools.Method(typeof(AutoPropertySync<T, ValueType>), nameof(SetterPrefix));
+        var prefix = AccessTools.Method(typeof(AutoPropertySyncAsRef<T, ValueType>), nameof(SetterPrefix));
         autoSyncPatcher.AddPrefix(propertySetter, prefix);
     }
 
@@ -67,15 +67,19 @@ internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
 
         private void Handle(MessagePayload<PropertyChanged> payload)
         {
-            if (objectManager.TryGetId(payload.What.Instance, out var id) == false)
+            if (objectManager.TryGetId(payload.What.Instance, out var instanceId) == false)
             {
                 Logger.Error($"Unable to resolve id for {payload.What.Instance}");
                 return;
             }
 
-            var value = payload.What.Value;
+            if (objectManager.TryGetId(payload.What.Value, out var valueId) == false)
+            {
+                Logger.Error($"Unable to resolve id for {payload.What.Value}");
+                return;
+            }
 
-            network.SendAll(new NetworkChangeProperty(id, value));
+            network.SendAll(new NetworkChangeProperty(instanceId, valueId));
         }
 
 
@@ -87,9 +91,15 @@ internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
                 return;
             }
 
+            if (objectManager.TryGetObject(payload.What.ValueId, out ValueType value) == false)
+            {
+                Logger.Error($"Unable to resolve instance for {payload.What.InstanceId}");
+                return;
+            }
+
             var setter = propertyMapper.GetSetter(fieldId);
 
-            setter.Invoke(instance, new object[] { payload.What.Value });
+            setter.Invoke(instance, new object[] { value });
         }
     }
 
@@ -127,17 +137,17 @@ internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
     [ProtoContract(SkipConstructor = true)]
     class NetworkChangeProperty : ICommand
     {
-        public NetworkChangeProperty(string instanceId, ValueType value)
+        public NetworkChangeProperty(string instanceId, string value)
         {
             InstanceId = instanceId;
-            Value = value;
+            ValueId = value;
         }
 
         [ProtoMember(1)]
         public string InstanceId { get; }
 
         [ProtoMember(2)]
-        public ValueType Value { get; }
+        public string ValueId { get; }
     }
 }
 

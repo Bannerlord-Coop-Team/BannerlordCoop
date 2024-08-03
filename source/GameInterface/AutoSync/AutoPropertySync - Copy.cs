@@ -13,25 +13,25 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.AutoSync;
-internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
+internal class AutoFieldSync<T, ValueType> : IDisposable where T : class
 {
 
-    static readonly ILogger Logger = LogManager.GetLogger<AutoPropertySync<T, ValueType>>();
+    static readonly ILogger Logger = LogManager.GetLogger<AutoFieldSync<T, ValueType>>();
     private PropertyHandler propertyHandler;
 
-    public AutoPropertySync(
+    public AutoFieldSync(
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
         IAutoSyncPatcher autoSyncPatcher,
         IAutoSyncPropertyMapper propertyMapper,
-        MethodInfo propertySetter)
+        FieldInfo fieldInfo)
     {
         int setterId = propertyMapper.AddPropertySetter(propertySetter);
 
         propertyHandler = new PropertyHandler(messageBroker, network, objectManager, propertyMapper, setterId);
 
-        var prefix = AccessTools.Method(typeof(AutoPropertySync<T, ValueType>), nameof(SetterPrefix));
+        var prefix = AccessTools.Method(typeof(AutoFieldSync<T, ValueType>), nameof(SetterPrefix));
         autoSyncPatcher.AddPrefix(propertySetter, prefix);
     }
 

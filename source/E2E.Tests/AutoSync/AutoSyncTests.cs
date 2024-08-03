@@ -4,7 +4,9 @@ using GameInterface.AutoSync;
 using HarmonyLib;
 using ProtoBuf;
 using ProtoBuf.Meta;
+using TaleWorlds.CampaignSystem.MapEvents;
 using Xunit.Abstractions;
+using Xunit.Sdk;
 
 namespace E2E.Tests.AutoSync;
 
@@ -30,11 +32,10 @@ public class TestClass
 
 public class RefTestClass
 {
-    public TestClass TestProp { get; set; }
-
-    public RefTestClass(TestClass testProp)
+    public MapEvent TestProp { get; set; }
+    public RefTestClass(MapEvent mapEvent)
     {
-        TestProp = testProp;
+        TestProp = mapEvent;
     }
 }
 
@@ -145,7 +146,7 @@ public class AutoSyncTests : IDisposable
             builder
                 .SyncCreation()
                 .SyncDeletion(destroyMethod)
-                .SyncProperty<string>(AccessTools.Property(typeof(TestClass), nameof(TestClass.MyProp)));
+                .SyncProperty(AccessTools.Property(typeof(TestClass), nameof(TestClass.MyProp)));
         }
 
         server.Resolve<IAutoSyncPatcher>().PatchAll();
@@ -175,48 +176,41 @@ public class AutoSyncTests : IDisposable
     {
         // Arrange
         var server = TestEnvironment.Server;
-        var destroyMethod = AccessTools.Method(typeof(TestClass), nameof(TestClass.Destroy));
 
-        List<IAutoSyncBuilder<TestClass>> builders = new();
-        builders.AddRange(TestEnvironment.Clients.Select(c => c.Container.Resolve<IAutoSyncBuilder<TestClass>>()));
-        builders.Add(server.Container.Resolve<IAutoSyncBuilder<TestClass>>());
+        List<IAutoSyncBuilder<RefTestClass>> builders = new();
+        builders.AddRange(TestEnvironment.Clients.Select(c => c.Container.Resolve<IAutoSyncBuilder<RefTestClass>>()));
+        builders.Add(server.Container.Resolve<IAutoSyncBuilder<RefTestClass>>());
 
         foreach (var builder in builders)
         {
             builder
                 .SyncCreation()
-                .SyncDeletion(destroyMethod);
-        }
-
-        List<IAutoSyncBuilder<RefTestClass>> builders2 = new();
-        builders2.AddRange(TestEnvironment.Clients.Select(c => c.Container.Resolve<IAutoSyncBuilder<RefTestClass>>()));
-        builders2.Add(server.Container.Resolve<IAutoSyncBuilder<RefTestClass>>());
-
-        foreach (var builder in builders2)
-        {
-            builder
-                .SyncCreation()
-                .SyncProperty<string>(AccessTools.Property(typeof(RefTestClass), nameof(RefTestClass.TestProp)));
+                .SyncProperty(AccessTools.Property(typeof(RefTestClass), nameof(RefTestClass.TestProp)));
         }
 
         server.Resolve<IAutoSyncPatcher>().PatchAll();
 
         // Act
-        string? testclassId = null;
+        string? refclassId = null;
+        string? mapEventId  = null;
         server.Call(() =>
         {
-            var testClass = new TestClass();
-            var newTestClass = new TestClass();
-            var refTestClass = new RefTestClass(testClass);
-            refTestClass.TestProp = newTestClass;
+            var newMapEvent = new MapEvent();
+            var refTestClass = new RefTestClass(new MapEvent());
+            refTestClass.TestProp = newMapEvent;
+
+            Assert.True(server.ObjectManager.TryGetId(refTestClass, out refclassId));
+            mapEventId = newMapEvent.StringId;
         });
 
-        Assert.NotNull(testclassId);
+        Assert.NotNull(refclassId);
+        Assert.NotNull(mapEventId);
 
         // Assert
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<TestClass>(testclassId, out var clientObj));
+            Assert.True(client.ObjectManager.TryGetObject<RefTestClass>(refclassId, out var clientObj));
+            Assert.Equal(mapEventId, clientObj.TestProp.StringId);
         }
     }
 }

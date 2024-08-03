@@ -31,9 +31,11 @@ internal class AutoCreationSync<T> : IDisposable where T : class
         lifetimeHandler = new LifetimeHandler(messageBroker, network, objectManager);
         lifetimeRegistry = new LifetimeRegistry(registryCollection);
 
-        var ctor = AccessTools.Constructor(typeof(T));
         var prefix = AccessTools.Method(typeof(AutoCreationSync<T>), nameof(CreationPrefix));
-        autoSyncPatcher.AddPrefix(ctor, prefix);
+        foreach(var ctor in AccessTools.GetDeclaredConstructors(typeof(T)))
+        {
+            autoSyncPatcher.AddPrefix(ctor, prefix);
+        }
     }
 
     public void Dispose()
@@ -96,7 +98,7 @@ internal class AutoCreationSync<T> : IDisposable where T : class
         }
     }
 
-    private static bool CreationPrefix(T __instance)
+    private static bool CreationPrefix(ref T __instance)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;

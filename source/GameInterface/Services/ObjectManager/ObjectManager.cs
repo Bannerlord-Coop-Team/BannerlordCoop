@@ -1,20 +1,11 @@
 ﻿using Common;
 using Common.Logging;
-using GameInterface.Services.Armies;
-using GameInterface.Services.Clans;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.Registry;
-using GameInterface.Services.Settlements;
-using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ObjectManager;
@@ -74,6 +65,7 @@ public interface IObjectManager
     /// <param name="obj">Object to remove</param>
     /// <returns>True if successful, false if failed</returns>
     bool Remove(object obj);
+    bool IsTypeManaged(Type type);
 }
 
 /// <summary>
@@ -196,6 +188,11 @@ internal class ObjectManager : IObjectManager
 
         /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
         return defaultObjectManager.Remove(obj);
+    }
+
+    public bool IsTypeManaged(Type type)
+    {
+        return RegistryMap.ContainsKey(type) || defaultObjectManager.IsTypeManaged(type);
     }
 
     #region LogHelpers
@@ -349,5 +346,7 @@ internal class ObjectManager : IObjectManager
 
             return mbObject != null;
         }
+
+        public bool IsTypeManaged(Type type) => objectManager.HasType(type);
     }
 }

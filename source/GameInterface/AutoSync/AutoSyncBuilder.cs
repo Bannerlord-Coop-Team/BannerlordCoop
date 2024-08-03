@@ -3,6 +3,7 @@ using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Registry;
 using HarmonyLib;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -15,7 +16,7 @@ public interface IAutoSyncBuilder<T> : IDisposable where T : class
     IAutoSyncBuilder<T> SyncDeletion(MethodInfo deletionFunction);
     IAutoSyncBuilder<T> SyncField(FieldInfo field);
     IAutoSyncBuilder<T> SyncFields(IEnumerable<FieldInfo> fields);
-    IAutoSyncBuilder<T> SyncProperty<ValueType>(PropertyInfo property);
+    IAutoSyncBuilder<T> SyncProperty(PropertyInfo property);
     IAutoSyncBuilder<T> SyncPropertys(IEnumerable<PropertyInfo> properties);
 }
 internal class AutoSyncBuilder<T> : IAutoSyncBuilder<T> where T : class
@@ -72,13 +73,27 @@ internal class AutoSyncBuilder<T> : IAutoSyncBuilder<T> where T : class
         return this;
     }
 
-    public IAutoSyncBuilder<T> SyncProperty<ValueType>(PropertyInfo property)
+    public IAutoSyncBuilder<T> SyncProperty(PropertyInfo property)
     {
         if (property.SetMethod == null) throw new ArgumentException($"Unable to sync property with no setter: {property.Name}");
 
-        var propSync = new AutoPropertySync<T, ValueType>(messageBroker, network, objectManager, autoSyncPatcher, autoSyncTypeMapper, property.SetMethod);
+        object[] args = new object[] { messageBroker, network, objectManager, autoSyncPatcher, autoSyncTypeMapper, property.SetMethod };
+        Type propertySyncType;
 
-        disposables.Add(propSync);
+        if (RuntimeTypeModel.Default.CanSerializeBasicType(property.PropertyType))
+        {
+            propertySyncType = typeof(AutoPropertySync<,>).MakeGenericType(typeof(T), property.PropertyType);
+        }
+        else if (objectManager.IsTypeManaged(property.PropertyType))
+        {
+            propertySyncType = typeof(AutoPropertySyncAsRef<,>).MakeGenericType(typeof(T), property.PropertyType);
+        }
+        else
+        {
+            throw new ArgumentException($"{property.Name} is not serializable by {nameof(ProtoBuf)}");
+        }
+
+        disposables.Add((IDisposable)Activator.CreateInstance(propertySyncType, args));
 
         return this;
     }
