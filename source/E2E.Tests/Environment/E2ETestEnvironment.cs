@@ -36,8 +36,8 @@ internal class E2ETestEnvironment : IDisposable
         IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
-        Server.Resolve<IAutoSyncPatcher>().PatchAll();
         Server.Resolve<IGameInterface>().PatchAll();
+        Server.Resolve<IAutoSyncPatcher>().PatchAll();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
