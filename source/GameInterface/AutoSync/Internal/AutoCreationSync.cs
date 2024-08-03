@@ -12,7 +12,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 
-namespace GameInterface.AutoSync;
+namespace GameInterface.AutoSync.Internal;
 
 internal class AutoCreationSync<T> : IDisposable where T : class
 {
@@ -32,7 +32,7 @@ internal class AutoCreationSync<T> : IDisposable where T : class
         lifetimeRegistry = new LifetimeRegistry(registryCollection);
 
         var prefix = AccessTools.Method(typeof(AutoCreationSync<T>), nameof(CreationPrefix));
-        foreach(var ctor in AccessTools.GetDeclaredConstructors(typeof(T)))
+        foreach (var ctor in AccessTools.GetDeclaredConstructors(typeof(T)))
         {
             autoSyncPatcher.AddPrefix(ctor, prefix);
         }

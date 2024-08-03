@@ -54,15 +54,7 @@ public class VillagerPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        string? villageId = null;
-
-        server.Call(() =>
-        {
-            var village = GameObjectCreator.CreateInitializedObject<Village>();
-            villageId = village.StringId;
-        });
-
-        Assert.NotNull(villageId);
+        var villageId = TestEnvironment.CreateRegisteredObject<Village>();
 
         // Act
         string partyId = "TestId";

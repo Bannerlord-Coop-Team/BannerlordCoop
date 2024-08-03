@@ -1,11 +1,9 @@
-﻿﻿using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
-using GameInterface.AutoSync;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;
 using GameInterface.Services.Villages.Patches;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Villages.Handlers;
@@ -19,7 +17,7 @@ public class VillageHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
-    public VillageHandler(IMessageBroker messageBroker, IObjectManager objectManager, IAutoSyncBuilder<Village> villageSync)
+    public VillageHandler(IMessageBroker messageBroker, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker; 
         this.objectManager = objectManager;
@@ -29,8 +27,6 @@ public class VillageHandler : IHandler
         messageBroker.Subscribe<ChangeVillageHearth>(HandleHearth);
         messageBroker.Subscribe<ChangeVillageTradeTaxAccumulated>(HandleTradeTax);
         messageBroker.Subscribe<ChangeVillageLastDemandTime>(HandleLastDemandTime);
-
-        villageSync.SyncCreation();
     }
 
     public void Dispose()
@@ -116,6 +112,4 @@ public class VillageHandler : IHandler
 
         VillagePatches.RunVillageStateChange(village, (Village.VillageStates)obj.State);
     }
-
-
 }

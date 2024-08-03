@@ -12,7 +12,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 
-namespace GameInterface.AutoSync;
+namespace GameInterface.AutoSync.Internal;
 
 internal class AutoDeletionSync<T> : IDisposable where T : class
 {
@@ -28,7 +28,7 @@ internal class AutoDeletionSync<T> : IDisposable where T : class
         IAutoSyncPatcher autoSyncPatcher,
         MethodBase deletionFunction)
     {
-        this.destroyFunction = deletionFunction;
+        destroyFunction = deletionFunction;
 
         lifetimeHandler = new DestructionHandler(messageBroker, network, objectManager);
 

@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 
-namespace GameInterface.AutoSync;
+namespace GameInterface.AutoSync.Internal;
 
 public interface IAutoSyncPatcher
 {

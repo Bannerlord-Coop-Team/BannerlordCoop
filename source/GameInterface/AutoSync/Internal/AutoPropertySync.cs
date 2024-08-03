@@ -12,7 +12,7 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 
-namespace GameInterface.AutoSync;
+namespace GameInterface.AutoSync.Internal;
 internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
 {
 

@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using GameInterface.AutoSync.Internal;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Registry;
 using HarmonyLib;
@@ -12,7 +13,7 @@ namespace GameInterface.AutoSync;
 
 public interface IAutoSyncBuilder<T> : IDisposable where T : class
 {
-    IAutoSyncBuilder<T> SyncCreation();
+    IAutoSyncBuilder<T> SyncCreation(IEnumerable<T> existingObjects = null);
     IAutoSyncBuilder<T> SyncDeletion(MethodInfo deletionFunction);
     IAutoSyncBuilder<T> SyncField(FieldInfo field);
     IAutoSyncBuilder<T> SyncFields(IEnumerable<FieldInfo> fields);
@@ -50,7 +51,7 @@ internal class AutoSyncBuilder<T> : IAutoSyncBuilder<T> where T : class
         foreach (IDisposable disposable in disposables) disposable.Dispose();
     }
 
-    public IAutoSyncBuilder<T> SyncCreation()
+    public IAutoSyncBuilder<T> SyncCreation(IEnumerable<T> existingObjects = null)
     {
         var lifetimeSync = new AutoCreationSync<T>(messageBroker, network, objectManager, registryCollection, autoSyncPatcher);
 
@@ -84,13 +85,9 @@ internal class AutoSyncBuilder<T> : IAutoSyncBuilder<T> where T : class
         {
             propertySyncType = typeof(AutoPropertySync<,>).MakeGenericType(typeof(T), property.PropertyType);
         }
-        else if (objectManager.IsTypeManaged(property.PropertyType))
-        {
-            propertySyncType = typeof(AutoPropertySyncAsRef<,>).MakeGenericType(typeof(T), property.PropertyType);
-        }
         else
         {
-            throw new ArgumentException($"{property.Name} is not serializable by {nameof(ProtoBuf)}");
+            propertySyncType = typeof(AutoPropertySyncAsRef<,>).MakeGenericType(typeof(T), property.PropertyType);
         }
 
         disposables.Add((IDisposable)Activator.CreateInstance(propertySyncType, args));

@@ -1,6 +1,7 @@
 ﻿using Autofac;
 using E2E.Tests.Environment;
 using GameInterface.AutoSync;
+using GameInterface.AutoSync.Internal;
 using HarmonyLib;
 using ProtoBuf;
 using ProtoBuf.Meta;

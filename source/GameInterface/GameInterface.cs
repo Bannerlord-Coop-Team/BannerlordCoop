@@ -1,4 +1,4 @@
-﻿using GameInterface.AutoSync;
+﻿using GameInterface.AutoSync.Internal;
 using HarmonyLib;
 using System;
 using System.Linq;

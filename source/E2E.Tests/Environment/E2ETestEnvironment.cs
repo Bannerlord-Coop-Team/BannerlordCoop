@@ -6,7 +6,7 @@ using Coop.Core.Client;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
-using GameInterface.AutoSync;
+using GameInterface.AutoSync.Internal;
 using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -38,6 +38,7 @@ internal class E2ETestEnvironment : IDisposable
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
         Server.Resolve<IAutoSyncPatcher>().PatchAll();
+
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {

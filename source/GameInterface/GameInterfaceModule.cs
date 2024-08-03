@@ -29,13 +29,12 @@ public class GameInterfaceModule : Module
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
 
-        // Autosync
-        builder.RegisterType<AutoSyncPatcher>().As<IAutoSyncPatcher>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncPropertyMapper>().As<IAutoSyncPropertyMapper>().InstancePerLifetimeScope();
+        
         
 
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
+        builder.RegisterModule<AutoSyncModule>();
 
         // Generic class registration, getting any template type in any constructor will resolve this class
         builder.RegisterGeneric(typeof(AutoSyncBuilder<>)).As(typeof(IAutoSyncBuilder<>)).InstancePerLifetimeScope();
