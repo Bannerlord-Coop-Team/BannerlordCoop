@@ -26,14 +26,14 @@ internal class AutoCreationSync<T> : IDisposable where T : class
         INetwork network,
         IObjectManager objectManager,
         IRegistryCollection registryCollection,
-        IPatchCollection patchCollection)
+        IAutoSyncPatcher autoSyncPatcher)
     {
         lifetimeHandler = new LifetimeHandler(messageBroker, network, objectManager);
         lifetimeRegistry = new LifetimeRegistry(registryCollection);
 
         var ctor = AccessTools.Constructor(typeof(T));
         var prefix = AccessTools.Method(typeof(AutoCreationSync<T>), nameof(CreationPrefix));
-        patchCollection.AddPrefix(ctor, prefix);
+        autoSyncPatcher.AddPrefix(ctor, prefix);
     }
 
     public void Dispose()

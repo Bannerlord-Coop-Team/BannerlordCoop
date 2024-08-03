@@ -1,5 +1,6 @@
 ﻿﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.AutoSync;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;
 using GameInterface.Services.Villages.Patches;
@@ -18,7 +19,7 @@ public class VillageHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
-    public VillageHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public VillageHandler(IMessageBroker messageBroker, IObjectManager objectManager, IAutoSyncBuilder<Village> villageSync)
     {
         this.messageBroker = messageBroker; 
         this.objectManager = objectManager;
@@ -28,6 +29,8 @@ public class VillageHandler : IHandler
         messageBroker.Subscribe<ChangeVillageHearth>(HandleHearth);
         messageBroker.Subscribe<ChangeVillageTradeTaxAccumulated>(HandleTradeTax);
         messageBroker.Subscribe<ChangeVillageLastDemandTime>(HandleLastDemandTime);
+
+        villageSync.SyncCreation();
     }
 
     public void Dispose()

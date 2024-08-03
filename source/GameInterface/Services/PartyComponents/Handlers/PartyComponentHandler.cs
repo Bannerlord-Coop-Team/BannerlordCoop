@@ -1,16 +1,13 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Data;
 using GameInterface.Services.PartyComponents.Messages;
-using GameInterface.Services.PartyComponents.Patches.Lifetime;
+using GameInterface.Services.PartyComponents.Patches;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Library;
@@ -72,8 +69,6 @@ internal class PartyComponentHandler : IHandler
 
         PartyComponentPatches.OverrideSetParty(component, party);
     }
-
-    
 
     private void Handle(MessagePayload<PartyComponentMobilePartyChanged> payload)
     {

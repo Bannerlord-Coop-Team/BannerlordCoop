@@ -46,8 +46,6 @@ public class AutoSyncTests : IDisposable
         {
             builder.SyncCreation();
         }
-        builders[0].Build();
-
 
         string? testclassId = null;
         server.Call(() =>
@@ -82,8 +80,8 @@ public class AutoSyncTests : IDisposable
         {
             builder.SyncCreation().SyncDeletion(destroyMethod);
         }
-        builders[0].Build();
 
+        server.Resolve<IAutoSyncPatcher>().PatchAll();
 
         string? testclassId = null;
         server.Call(() =>

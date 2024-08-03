@@ -25,7 +25,7 @@ internal class AutoDeletionSync<T> : IDisposable where T : class
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        IPatchCollection patchCollection,
+        IAutoSyncPatcher autoSyncPatcher,
         MethodBase deletionFunction)
     {
         this.destroyFunction = deletionFunction;
@@ -33,7 +33,7 @@ internal class AutoDeletionSync<T> : IDisposable where T : class
         lifetimeHandler = new DestructionHandler(messageBroker, network, objectManager);
 
         var prefix = AccessTools.Method(typeof(AutoDeletionSync<T>), nameof(DeletionPrefix));
-        patchCollection.AddPrefix(deletionFunction, prefix);
+        autoSyncPatcher.AddPrefix(deletionFunction, prefix);
     }
 
     public void Dispose()

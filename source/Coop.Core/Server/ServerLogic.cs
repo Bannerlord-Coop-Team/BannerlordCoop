@@ -45,7 +45,10 @@ public class ServerLogic : IServerLogic
         SetState<InitialServerState>();
     }
 
-    public void Dispose() => State.Dispose();
+    public void Dispose()
+    {
+        _state?.Dispose();
+    }
 
     public void Start()
     {

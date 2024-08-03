@@ -2,9 +2,11 @@
 using Common;
 using Common.Messaging;
 using Common.Tests.Utils;
+using Coop.Core.Client;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
+using GameInterface.AutoSync;
 using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
@@ -19,13 +21,13 @@ namespace E2E.Tests.Environment;
 /// </summary>
 internal class E2ETestEnvironment : IDisposable
 {
-    public TestEnvironment IntegrationEnvironment { get; }
-
     public ITestOutputHelper Output { get; }
 
     public IEnumerable<EnvironmentInstance> Clients => IntegrationEnvironment.Clients;
     public EnvironmentInstance Server => IntegrationEnvironment.Server;
-    
+
+    private TestEnvironment IntegrationEnvironment { get; }
+
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
         GameLoopRunner.Instance.SetGameLoopThread();
@@ -34,9 +36,8 @@ internal class E2ETestEnvironment : IDisposable
         IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
-        var gameInterface = Server.Container.Resolve<IGameInterface>();
-
-        gameInterface.PatchAll();
+        Server.Resolve<IAutoSyncPatcher>().PatchAll();
+        Server.Resolve<IGameInterface>().PatchAll();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
@@ -84,8 +85,6 @@ internal class E2ETestEnvironment : IDisposable
 
     public void Dispose()
     {
-        Server.Dispose();
-
-        foreach (var client in Clients) client.Dispose();
+        Server.Resolve<IAutoSyncPatcher>().UnpatchAll();
     }
 }

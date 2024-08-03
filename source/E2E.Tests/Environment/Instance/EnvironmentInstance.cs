@@ -140,8 +140,7 @@ public abstract class EnvironmentInstance : IDisposable
         public StaticScope(EnvironmentInstance instance)
         {
             Monitor.Enter(GameInstance.@lock);
-            instance.GameInstance.SetStatics();
-
+            
             // Save previous static values
             wasServer = ModInformation.IsServer;
             if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
@@ -151,6 +150,8 @@ public abstract class EnvironmentInstance : IDisposable
             }
 
             // Set new static values
+            instance.GameInstance.SetStatics();
+
             ModInformation.IsServer = instance is ServerInstance;
             instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
             GameInterface.ContainerProvider.SetContainer(instance.Container);

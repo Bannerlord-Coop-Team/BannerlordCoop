@@ -1,5 +1,7 @@
-﻿using HarmonyLib;
+﻿using GameInterface.AutoSync;
+using HarmonyLib;
 using System;
+using System.Linq;
 
 namespace GameInterface;
 
@@ -14,19 +16,24 @@ public class GameInterface : IGameInterface
     public const string HARMONY_STATIC_FIXES_CATEGORY = "HarmonyStaticFixes";
     
     private Harmony harmony;
+    private readonly IAutoSyncPatcher autoSyncPatcher;
 
-    public GameInterface(Harmony harmony)
+    public GameInterface(Harmony harmony, IAutoSyncPatcher autoSyncPatcher)
     {
         this.harmony = harmony;
+        this.autoSyncPatcher = autoSyncPatcher;
     }
 
     public void Dispose()
     {
+        autoSyncPatcher.UnpatchAll();
         UnpatchAll();
     }
 
     public void PatchAll()
     {
+        autoSyncPatcher.PatchAll();
+
         // NOTE: Patching in constructor causes issues with tests and CI
         if (Harmony.HasAnyPatches(GameInterfaceModule.HarmonyId)) return;
 
@@ -37,6 +44,11 @@ public class GameInterface : IGameInterface
 
     public void UnpatchAll()
     {
-        harmony?.UnpatchAll(GameInterfaceModule.HarmonyId);
+        if (Harmony.HasAnyPatches(GameInterfaceModule.HarmonyId) == false) return;
+
+        foreach (var patch in harmony.GetPatchedMethods())
+        {
+            harmony.Unpatch(patch, HarmonyPatchType.All, harmony.Id);
+        }
     }
 }
