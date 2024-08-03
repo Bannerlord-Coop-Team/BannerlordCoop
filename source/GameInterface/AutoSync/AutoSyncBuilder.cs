@@ -25,7 +25,7 @@ internal class AutoSyncBuilder<T> : IAutoSyncBuilder<T> where T : class
     private readonly IObjectManager objectManager;
     private readonly IRegistryCollection registryCollection;
     private readonly IAutoSyncPatcher autoSyncPatcher;
-    private readonly IAutoSyncTypeMapper autoSyncTypeMapper;
+    private readonly IAutoSyncPropertyMapper autoSyncTypeMapper;
     private readonly List<IDisposable> disposables = new List<IDisposable>();
 
     public AutoSyncBuilder(
@@ -34,7 +34,7 @@ internal class AutoSyncBuilder<T> : IAutoSyncBuilder<T> where T : class
         IObjectManager objectManager,
         IRegistryCollection registryCollection,
         IAutoSyncPatcher autoSyncPatcher,
-        IAutoSyncTypeMapper autoSyncTypeMapper)
+        IAutoSyncPropertyMapper autoSyncTypeMapper)
     {
         this.messageBroker = messageBroker;
         this.network = network;

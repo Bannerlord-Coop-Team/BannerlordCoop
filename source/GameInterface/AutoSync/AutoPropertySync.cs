@@ -24,12 +24,12 @@ internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
         INetwork network,
         IObjectManager objectManager,
         IAutoSyncPatcher autoSyncPatcher,
-        IAutoSyncTypeMapper autoSyncTypeMapper,
+        IAutoSyncPropertyMapper propertyMapper,
         MethodInfo propertySetter)
     {
-        autoSyncTypeMapper.AddType(typeof(ValueType));
+        int setterId = propertyMapper.AddPropertySetter(propertySetter);
 
-        lifetimeHandler = new PropertyHandler(messageBroker, network, objectManager);
+        lifetimeHandler = new PropertyHandler(messageBroker, network, objectManager, propertyMapper, setterId);
 
         var prefix = AccessTools.Method(typeof(AutoPropertySync<T, ValueType>), nameof(SetterPrefix));
         autoSyncPatcher.AddPrefix(propertySetter, prefix);
@@ -45,15 +45,16 @@ internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
         private readonly IObjectManager objectManager;
+        private readonly IAutoSyncPropertyMapper propertyMapper;
+        private readonly int fieldId;
 
-
-        public PropertyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+        public PropertyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, IAutoSyncPropertyMapper propertyMapper, int fieldId)
         {
-
-
             this.messageBroker = messageBroker;
             this.network = network;
             this.objectManager = objectManager;
+            this.propertyMapper = propertyMapper;
+            this.fieldId = fieldId;
             messageBroker.Subscribe<PropertyChanged>(Handle);
             messageBroker.Subscribe<NetworkChangeProperty>(Handle);
         }
@@ -80,9 +81,15 @@ internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
 
         private void Handle(MessagePayload<NetworkChangeProperty> payload)
         {
-            var newInstance = ObjectHelper.SkipConstructor<T>();
+            if (objectManager.TryGetObject(payload.What.InstanceId, out T instance) == false)
+            {
+                Logger.Error($"Unable to resolve instance for {payload.What.InstanceId}");
+                return;
+            }
 
-            objectManager.AddExisting(payload.What.InstanceId, newInstance);
+            var setter = propertyMapper.GetSetter(fieldId);
+
+            setter.Invoke(instance, new object[] { payload.What.Value });
         }
     }
 
@@ -123,6 +130,7 @@ internal class AutoPropertySync<T, ValueType> : IDisposable where T : class
         public NetworkChangeProperty(string instanceId, ValueType value)
         {
             InstanceId = instanceId;
+            Value = value;
         }
 
         [ProtoMember(1)]

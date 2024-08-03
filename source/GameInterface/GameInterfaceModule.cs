@@ -31,7 +31,7 @@ public class GameInterfaceModule : Module
 
         // Autosync
         builder.RegisterType<AutoSyncPatcher>().As<IAutoSyncPatcher>().InstancePerLifetimeScope();
-        builder.RegisterType<AutoSyncTypeMapper>().As<IAutoSyncTypeMapper>().InstancePerLifetimeScope();
+        builder.RegisterType<AutoSyncPropertyMapper>().As<IAutoSyncPropertyMapper>().InstancePerLifetimeScope();
         
 
         builder.RegisterModule<ServiceModule>();

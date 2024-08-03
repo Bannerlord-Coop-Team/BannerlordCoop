@@ -28,6 +28,16 @@ public class TestClass
     public void Destroy() { }
 }
 
+public class RefTestClass
+{
+    public TestClass TestProp { get; set; }
+
+    public RefTestClass(TestClass testProp)
+    {
+        TestProp = testProp;
+    }
+}
+
 
 public class AutoSyncTests : IDisposable
 {
@@ -157,6 +167,56 @@ public class AutoSyncTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<TestClass>(testclassId, out var clientObj));
 
             Assert.Equal(newPropValue, clientObj.MyProp);
+        }
+    }
+
+    [Fact]
+    public void RefPropertySync()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+        var destroyMethod = AccessTools.Method(typeof(TestClass), nameof(TestClass.Destroy));
+
+        List<IAutoSyncBuilder<TestClass>> builders = new();
+        builders.AddRange(TestEnvironment.Clients.Select(c => c.Container.Resolve<IAutoSyncBuilder<TestClass>>()));
+        builders.Add(server.Container.Resolve<IAutoSyncBuilder<TestClass>>());
+
+        foreach (var builder in builders)
+        {
+            builder
+                .SyncCreation()
+                .SyncDeletion(destroyMethod);
+        }
+
+        List<IAutoSyncBuilder<RefTestClass>> builders2 = new();
+        builders2.AddRange(TestEnvironment.Clients.Select(c => c.Container.Resolve<IAutoSyncBuilder<RefTestClass>>()));
+        builders2.Add(server.Container.Resolve<IAutoSyncBuilder<RefTestClass>>());
+
+        foreach (var builder in builders2)
+        {
+            builder
+                .SyncCreation()
+                .SyncProperty<string>(AccessTools.Property(typeof(RefTestClass), nameof(RefTestClass.TestProp)));
+        }
+
+        server.Resolve<IAutoSyncPatcher>().PatchAll();
+
+        // Act
+        string? testclassId = null;
+        server.Call(() =>
+        {
+            var testClass = new TestClass();
+            var newTestClass = new TestClass();
+            var refTestClass = new RefTestClass(testClass);
+            refTestClass.TestProp = newTestClass;
+        });
+
+        Assert.NotNull(testclassId);
+
+        // Assert
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TestClass>(testclassId, out var clientObj));
         }
     }
 }
