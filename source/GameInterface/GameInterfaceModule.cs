@@ -28,7 +28,10 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
+
+        // Autosync
         builder.RegisterType<AutoSyncPatcher>().As<IAutoSyncPatcher>().InstancePerLifetimeScope();
+        builder.RegisterType<AutoSyncTypeMapper>().As<IAutoSyncTypeMapper>().InstancePerLifetimeScope();
         
 
         builder.RegisterModule<ServiceModule>();

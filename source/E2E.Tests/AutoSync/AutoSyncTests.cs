@@ -2,16 +2,29 @@
 using E2E.Tests.Environment;
 using GameInterface.AutoSync;
 using HarmonyLib;
+using ProtoBuf;
+using ProtoBuf.Meta;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.AutoSync;
 
 public class TestClass
 {
+
+    public string GetMyField => MyField;
+    private string MyField = "Hi";
+    public string MyProp { get; set; } = "Hello";
+
     public TestClass()
     {
         ;
     }
+
+    public void SomeFn()
+    {
+        MyField = "Bye";
+    }
+
     public void Destroy() { }
 }
 
@@ -36,9 +49,9 @@ public class AutoSyncTests : IDisposable
         var server = TestEnvironment.Server;
         var destroyMethod = AccessTools.Method(typeof(TestClass), nameof(TestClass.Destroy));
 
-        IAutoSyncBuilder<TestClass>[] builders = TestEnvironment.Clients.Select(c => c.Container.Resolve<IAutoSyncBuilder<TestClass>>()).Append(
-            server.Container.Resolve<IAutoSyncBuilder<TestClass>>()
-            ).ToArray();
+        List<IAutoSyncBuilder<TestClass>> builders = new();
+        builders.AddRange(TestEnvironment.Clients.Select(c => c.Container.Resolve<IAutoSyncBuilder<TestClass>>()));
+        builders.Add(server.Container.Resolve<IAutoSyncBuilder<TestClass>>());
 
 
         // Act
@@ -70,13 +83,13 @@ public class AutoSyncTests : IDisposable
         var server = TestEnvironment.Server;
         var destroyMethod = AccessTools.Method(typeof(TestClass), nameof(TestClass.Destroy));
 
-        IAutoSyncBuilder<TestClass>[] builders = TestEnvironment.Clients.Select(c => c.Container.Resolve<IAutoSyncBuilder<TestClass>>()).Append(
-            server.Container.Resolve<IAutoSyncBuilder<TestClass>>()
-            ).ToArray();
+        List<IAutoSyncBuilder<TestClass>> builders = new();
+        builders.AddRange(TestEnvironment.Clients.Select(c => c.Container.Resolve<IAutoSyncBuilder<TestClass>>()));
+        builders.Add(server.Container.Resolve<IAutoSyncBuilder<TestClass>>());
 
 
         // Act
-        foreach(var builder in builders)
+        foreach (var builder in builders)
         {
             builder.SyncCreation().SyncDeletion(destroyMethod);
         }
@@ -100,5 +113,62 @@ public class AutoSyncTests : IDisposable
         {
             Assert.False(client.ObjectManager.TryGetObject<TestClass>(testclassId, out var _));
         }
+    }
+
+    [Fact]
+    public void PropertySync()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+        var destroyMethod = AccessTools.Method(typeof(TestClass), nameof(TestClass.Destroy));
+
+        List<IAutoSyncBuilder<TestClass>> builders = new();
+        builders.AddRange(TestEnvironment.Clients.Select(c => c.Container.Resolve<IAutoSyncBuilder<TestClass>>()));
+        builders.Add(server.Container.Resolve<IAutoSyncBuilder<TestClass>>());
+
+
+        const string newPropValue = "ThisIsMyTestValue";
+
+        // Act
+        foreach (var builder in builders)
+        {
+            builder
+                .SyncCreation()
+                .SyncDeletion(destroyMethod)
+                .SyncProperty<string>(AccessTools.Property(typeof(TestClass), nameof(TestClass.MyProp)));
+        }
+
+        server.Resolve<IAutoSyncPatcher>().PatchAll();
+
+        string? testclassId = null;
+        server.Call(() =>
+        {
+            var testClass = new TestClass();
+            Assert.True(server.ObjectManager.TryGetId(testClass, out testclassId));
+
+            testClass.MyProp = newPropValue;
+        });
+
+        Assert.NotNull(testclassId);
+
+        // Assert
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TestClass>(testclassId, out var clientObj));
+
+            Assert.Equal(newPropValue, clientObj.MyProp);
+        }
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public class SomeClass<T>
+{
+    [ProtoMember(1)]
+    public T Value { get; }
+
+    public SomeClass(T value)
+    {
+        Value = value;
     }
 }

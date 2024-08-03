@@ -67,7 +67,6 @@ internal class MobilePartyDataPatches
             return;
         }
 
-
         MessageBroker.Instance.Publish(instance, new PartyComponentChanged(instance.StringId, componentId));
 
         instance._partyComponent = value;
