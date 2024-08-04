@@ -138,8 +138,9 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.ArmyPositionAdder), MethodType.Setter)]
-    [HarmonyPrefix]
+    // TODO remove
+    //[HarmonyPatch(nameof(MobileParty.ArmyPositionAdder), MethodType.Setter)]
+    //[HarmonyPrefix]
     private static bool SetArmyPositionAdderPrefix(MobileParty __instance, Vec2 value)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;

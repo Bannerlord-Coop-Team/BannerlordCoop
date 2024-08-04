@@ -9,6 +9,7 @@ using HarmonyLib;
 using ProtoBuf;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.MapEvents;
 
@@ -26,10 +27,11 @@ internal class AutoCreationSync<T> : IDisposable where T : class
         INetwork network,
         IObjectManager objectManager,
         IRegistryCollection registryCollection,
-        IAutoSyncPatcher autoSyncPatcher)
+        IAutoSyncPatcher autoSyncPatcher,
+        Func<IEnumerable<T>> existingObjects = null)
     {
         lifetimeHandler = new LifetimeHandler(messageBroker, network, objectManager);
-        lifetimeRegistry = new LifetimeRegistry(registryCollection);
+        lifetimeRegistry = new LifetimeRegistry(registryCollection, existingObjects);
 
         var prefix = AccessTools.Method(typeof(AutoCreationSync<T>), nameof(CreationPrefix));
         foreach (var ctor in AccessTools.GetDeclaredConstructors(typeof(T)))
@@ -45,13 +47,19 @@ internal class AutoCreationSync<T> : IDisposable where T : class
 
     class LifetimeRegistry : RegistryBase<T>
     {
-        public LifetimeRegistry(IRegistryCollection collection) : base(collection)
+        private Func<IEnumerable<T>> existingObjects;
+
+        public LifetimeRegistry(IRegistryCollection collection, Func<IEnumerable<T>> existingObjects = null) : base(collection)
         {
+            this.existingObjects = existingObjects ?? new Func<IEnumerable<T>>(() => Array.Empty<T>());
         }
 
         public override void RegisterAll()
         {
-            // not required
+            foreach (var obj in existingObjects())
+            {
+                RegisterNewObject(obj, out var _);
+            }
         }
 
         protected override string GetNewId(T obj)

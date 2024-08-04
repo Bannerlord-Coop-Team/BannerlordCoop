@@ -13,7 +13,7 @@ namespace GameInterface.AutoSync;
 
 public interface IAutoSyncBuilder<T> : IDisposable where T : class
 {
-    IAutoSyncBuilder<T> SyncCreation(IEnumerable<T> existingObjects = null);
+    IAutoSyncBuilder<T> SyncCreation(Func<IEnumerable<T>> existingObjects = null);
     IAutoSyncBuilder<T> SyncDeletion(MethodInfo deletionFunction);
     IAutoSyncBuilder<T> SyncField(FieldInfo field);
     IAutoSyncBuilder<T> SyncFields(IEnumerable<FieldInfo> fields);
@@ -51,9 +51,9 @@ internal class AutoSyncBuilder<T> : IAutoSyncBuilder<T> where T : class
         foreach (IDisposable disposable in disposables) disposable.Dispose();
     }
 
-    public IAutoSyncBuilder<T> SyncCreation(IEnumerable<T> existingObjects = null)
+    public IAutoSyncBuilder<T> SyncCreation(Func<IEnumerable<T>> existingObjects = null)
     {
-        var lifetimeSync = new AutoCreationSync<T>(messageBroker, network, objectManager, registryCollection, autoSyncPatcher);
+        var lifetimeSync = new AutoCreationSync<T>(messageBroker, network, objectManager, registryCollection, autoSyncPatcher, existingObjects);
 
         disposables.Add(lifetimeSync);
 

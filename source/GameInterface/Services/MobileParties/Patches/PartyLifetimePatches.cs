@@ -120,12 +120,12 @@ internal class PartyLifetimePatches
             {
                 party.RemoveParty();
             }
+
+            var data = new PartyDestructionData(party);
+            var message = new PartyDestroyed(data);
+
+            MessageBroker.Instance.Publish(party, message);
         });
-
-        var data = new PartyDestructionData(party);
-        var message = new PartyDestroyed(data);
-
-        MessageBroker.Instance.Publish(party, message);
     }
 
     /// Disable setting of string id in <see cref="MobileParty.CreateParty"/> so we can manage the id on our own
