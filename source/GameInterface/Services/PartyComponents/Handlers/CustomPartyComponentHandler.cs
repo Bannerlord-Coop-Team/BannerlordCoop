@@ -92,7 +92,7 @@ internal class CustomPartyComponentHandler : IHandler
                     break;
 
                 case CustomPartyComponentType.HarnessId:
-                    component._partyMountStringId = obj.Value;
+                    component._partyHarnessStringId = obj.Value;
                     break;
 
                 case CustomPartyComponentType.AvoidHostileActions:

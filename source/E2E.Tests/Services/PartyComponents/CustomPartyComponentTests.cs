@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyComponents.Patches.CustomPartyComponents;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -97,61 +98,48 @@ public class CustomPartyComponentTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
             Assert.True(server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
 
-
-            serverComponent.InitializeQuestPartyProperties(
-                mobileParty,
-                new Vec2(0, 0), 
-                5f,
-                settlement,
-                new TextObject("ServerName"),
-                GameObjectCreator.CreateInitializedObject<PartyTemplateObject>(),
-                hero,
-                5,
-                "mount",
-                "harness",
-                5,
-                false);
+            CustomPartyComponentPatches.NameIntercept(serverComponent, new TextObject("ServerName"));
+            CustomPartyComponentPatches.HomeSettlementIntercept(serverComponent, settlement);
+            CustomPartyComponentPatches.BaseSpeedIntercept(serverComponent, 5f);
+            CustomPartyComponentPatches.HarnessIdIntercept(serverComponent, "harness");
+            CustomPartyComponentPatches.MountIdIntercept(serverComponent, "mount");
+            CustomPartyComponentPatches.AvoidHostileActionsIntercept(serverComponent, true);
         });
 
         // Act
         client1.Call(() =>
         {
             Assert.True(client1.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var clientComponent));
-            Assert.True(client1.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var serverComponent));
             Assert.True(client1.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
             Assert.True(client1.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
             Assert.True(client1.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
 
-            serverComponent.InitializeQuestPartyProperties(
-                mobileParty,
-                new Vec2(0, 0),
-                5f,
-                settlement,
-                new TextObject("ClientName"),
-                GameObjectCreator.CreateInitializedObject<PartyTemplateObject>(),
-                hero,
-                5,
-                "mount",
-                "harness",
-                5,
-                false);
+            CustomPartyComponentPatches.NameIntercept(clientComponent, new TextObject("ClientName"));
+            CustomPartyComponentPatches.HomeSettlementIntercept(clientComponent, null);
+            CustomPartyComponentPatches.BaseSpeedIntercept(clientComponent, 55f);
+            CustomPartyComponentPatches.HarnessIdIntercept(clientComponent, null);
+            CustomPartyComponentPatches.MountIdIntercept(clientComponent, null);
+            CustomPartyComponentPatches.AvoidHostileActionsIntercept(clientComponent, false);
         });
 
         // Assert
         Assert.True(server.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var serverComponent));
-        Assert.Equal(new TextObject("ServerName"), serverComponent._name);
+        Assert.Equal(new TextObject("ServerName").Value, serverComponent._name.Value);
         Assert.NotNull(serverComponent._homeSettlement);
+        Assert.Equal(5f, serverComponent._customPartyBaseSpeed);
         Assert.NotNull(serverComponent._partyHarnessStringId);
         Assert.NotNull(serverComponent._partyMountStringId);
+        Assert.True(serverComponent._avoidHostileActions);
 
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var clientComponent));
-            Assert.Equal(serverComponent._name, clientComponent._name);
+            Assert.Equal(serverComponent._name.Value, clientComponent._name.Value);
             Assert.NotNull(clientComponent._homeSettlement);
             Assert.Equal(5f, clientComponent._customPartyBaseSpeed);
             Assert.NotNull(clientComponent._partyHarnessStringId);
             Assert.NotNull(clientComponent._partyMountStringId);
+            Assert.True(clientComponent._avoidHostileActions);
         }
     }
 
@@ -173,8 +161,12 @@ public class CustomPartyComponentTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<CustomPartyComponent>(componentId, out var serverComponent));
             Assert.True(server.ObjectManager.TryGetObject<Settlement>(hideoutId, out var settlement));
 
-            serverComponent._name = new TextObject("TestComponent");
-            serverComponent._homeSettlement = settlement;
+            CustomPartyComponentPatches.NameIntercept(serverComponent, new TextObject("TestComponent"));
+            CustomPartyComponentPatches.HomeSettlementIntercept(serverComponent, settlement);
+            CustomPartyComponentPatches.BaseSpeedIntercept(serverComponent, 5f);
+            CustomPartyComponentPatches.HarnessIdIntercept(serverComponent, "harness");
+            CustomPartyComponentPatches.MountIdIntercept(serverComponent, "mount");
+            CustomPartyComponentPatches.AvoidHostileActionsIntercept(serverComponent, true);
         });
 
         // Assert
@@ -185,6 +177,10 @@ public class CustomPartyComponentTests : IDisposable
 
             Assert.True(clientComponent._name.Value.Equals("TestComponent"));
             Assert.Equal(clientComponent._homeSettlement, settlement);
+            Assert.Equal(5f, clientComponent._customPartyBaseSpeed);
+            Assert.Equal("harness", clientComponent._partyHarnessStringId);
+            Assert.Equal("mount", clientComponent._partyMountStringId);
+            Assert.True(clientComponent._avoidHostileActions);
         }
     }
 }
