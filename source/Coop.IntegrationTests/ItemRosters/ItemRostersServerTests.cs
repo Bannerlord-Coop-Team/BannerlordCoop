@@ -40,7 +40,7 @@ namespace Coop.IntegrationTests.ItemRosters
 
             server.SimulateMessage(this, triggerMessage);
 
-            Assert.Equal(1, server.InternalMessages.GetMessageCount<ClearItemRoster>());
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<ItemRosterCleared>());
 
             foreach (EnvironmentInstance client in TestEnvironment.Clients)
             {
