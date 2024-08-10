@@ -53,6 +53,7 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
+    <PackageReference Include="System.Collections.Immutable" Version="7.0.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
@@ -84,9 +85,10 @@
 	  </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="Client\Services\MobileParties\Messages\Data\" />
     <Folder Include="Server\Services\Kingdoms\Messages\" />
   </ItemGroup>
   <ItemGroup>
-    <Publicize Include="TaleWorlds.Library"/>
+    <Publicize Include="TaleWorlds.Library" />
   </ItemGroup>
 </Project>

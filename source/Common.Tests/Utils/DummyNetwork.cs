@@ -10,6 +10,10 @@ internal class DummyNetwork : INetwork
 
     public int Priority => throw new NotImplementedException();
 
+    public void Dispose()
+    {
+    }
+
     public void Send(NetPeer netPeer, IPacket packet)
     {
         throw new NotImplementedException();

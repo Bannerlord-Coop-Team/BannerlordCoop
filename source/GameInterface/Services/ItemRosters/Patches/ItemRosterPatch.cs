@@ -20,7 +20,7 @@ namespace GameInterface.Services.ItemRosters.Patches
         [HarmonyPrefix]
         public static bool AddToCountsPrefix(ItemRoster __instance, ref int __result, EquipmentElement rosterElement, int number)
         {
-            // Skip this prefix, if called by the mod
+            // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient)
@@ -36,7 +36,7 @@ namespace GameInterface.Services.ItemRosters.Patches
         [HarmonyPostfix]
         public static void AddToCountsPostfix(ItemRoster __instance, ref int __result, EquipmentElement rosterElement, int number)
         {
-            // Skip this postfix, if called by the mod
+            // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
             if (ModInformation.IsClient)

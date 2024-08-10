@@ -2,7 +2,6 @@
 using Common.Messaging;
 using GameInterface.Services.UI.Interfaces;
 using GameInterface.Services.UI.Messages;
-using GameInterface.Services.UI.Patches;
 using TaleWorlds.Engine;
 
 namespace GameInterface.Services.UI.Handlers;
@@ -39,7 +38,6 @@ internal class LoadingScreenHandler : IHandler
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
-            ShowMenuUntilLoadedPatch.IsDoneLoading = true;
             LoadingWindow.DisableGlobalLoadingWindow();
         });
     }

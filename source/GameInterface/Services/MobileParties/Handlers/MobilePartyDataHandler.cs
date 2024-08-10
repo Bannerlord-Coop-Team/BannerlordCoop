@@ -1,11 +1,14 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Data;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
@@ -14,27 +17,41 @@ namespace GameInterface.Services.MobileParties.Handlers;
 /// </summary>
 internal class MobilePartyDataHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<PartyLifetimeHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyDataHandler>();
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly INetwork network;
 
-    public MobilePartyDataHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public MobilePartyDataHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
-
-        messageBroker.Subscribe<ChangePartyArmy>(Handle_ChangePartyArmy);
+        this.network = network;
+        messageBroker.Subscribe<PartyComponentChanged>(Handle_PartyComponentChanged);
+        messageBroker.Subscribe<NetworkChangePartyComponent>(Handle_ChangePartyComponent);
     }
+
     public void Dispose()
     {
-        messageBroker.Unsubscribe<ChangePartyArmy>(Handle_ChangePartyArmy);
+        messageBroker.Unsubscribe<PartyComponentChanged>(Handle_PartyComponentChanged);
+        messageBroker.Unsubscribe<NetworkChangePartyComponent>(Handle_ChangePartyComponent);
     }
 
-    private void Handle_ChangePartyArmy(MessagePayload<ChangePartyArmy> payload)
+    private void Handle_PartyComponentChanged(MessagePayload<PartyComponentChanged> payload)
     {
-        var partyId = payload.What.Data.PartyId;
-        var armyId = payload.What.Data.ArmyId;
+        var message = new NetworkChangePartyComponent(
+            payload.What.PartyId,
+            payload.What.ComponentId
+        );
+
+        network.SendAll(message);
+    }
+
+    private void Handle_ChangePartyComponent(MessagePayload<NetworkChangePartyComponent> payload)
+    {
+        var partyId = payload.What.PartyId;
+        var componentId = payload.What.PartyComponentId;
 
         if (objectManager.TryGetObject(partyId, out MobileParty party) == false)
         {
@@ -42,12 +59,14 @@ internal class MobilePartyDataHandler : IHandler
             return;
         }
 
-        if (objectManager.TryGetObject(armyId, out Army army) == false)
+        if (objectManager.TryGetObject(componentId, out PartyComponent component) == false)
         {
-            Logger.Error("Failed to find army with stringId {stringId}", armyId);
+            Logger.Error("Failed to find PartyComponent with stringId {stringId}", componentId);
             return;
         }
 
-        PartyArmyPatches.OverrideSetArmy(party, army);
+        objectManager.Remove(componentId);
+
+        party._partyComponent = component;
     }
 }

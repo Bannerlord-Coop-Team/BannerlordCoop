@@ -26,7 +26,7 @@ namespace GameInterface.Services.Time.Patches
                 MapState mapState = __instance.LastOrDefault<MapState>();
                 if (mapState == null) return;
 
-                MapState_OnTick.Invoke(mapState, new object[] { dt });
+                mapState.OnTick(dt);
             }
         }
 

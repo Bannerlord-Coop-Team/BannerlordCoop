@@ -10,6 +10,11 @@ using GameInterface;
 [HarmonyPatch(typeof(Town), "DailyTick")]
 public static class TownDailyTickPatch
 {
+    [HarmonyPrefix]
+    private static bool Prefix()
+    {
+        return ModInformation.IsServer;
+    }
 
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instrs)

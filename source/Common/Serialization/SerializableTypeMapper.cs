@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using ProtoBuf;
+using ProtoBuf.Meta;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -54,26 +55,38 @@ public class SerializableTypeMapper : ISerializableTypeMapper
 
     private void CollectProtoContracts()
     {
-        var types = AppDomain.CurrentDomain.GetAssemblies()
-            .Where(a => {
+        // Get all types with the ProtoContract attribute
+        var serializableTypes = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => a.IsDynamic == false)
+            .SelectMany(a =>
+            {
                 try
                 {
-                    a.GetTypes();
-                    return a.IsDynamic == false;
-                } catch(ReflectionTypeLoadException)
+                    return a.GetTypes();
+                }
+                catch (ReflectionTypeLoadException)
+                {
+                    return Array.Empty<Type>();
+                }
+            })
+            .Where(type => {
+                try 
+                {
+                    return type.IsDefined(typeof(ProtoContractAttribute), inherit: false);
+                }
+                // Some types have malformed attributes?
+                catch (CustomAttributeFormatException)
                 {
                     return false;
                 }
-             })
-            .SelectMany(a => a.GetTypes())
-            .Where(type => type.GetCustomAttribute<ProtoContractAttribute>() != null);
+            });
 
-        AddTypes(types);
+        AddTypes(serializableTypes);
     }
 
     public void AddTypes(IEnumerable<Type> types)
     {
-        var sortedTypes = TypeMap.Concat(types).OrderBy(type => type.FullName);
+        var sortedTypes = TypeMap.Concat(types).OrderBy(type => type.FullName).Distinct();
 
         TypeMap = sortedTypes.ToArray();
         AddedKeyData = sortedTypes

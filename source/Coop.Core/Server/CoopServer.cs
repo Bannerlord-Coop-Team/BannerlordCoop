@@ -22,7 +22,7 @@ namespace Coop.Core.Server;
 /// <summary>
 /// Server used for Coop
 /// </summary>
-public interface ICoopServer : INetwork, INatPunchListener, INetEventListener, IDisposable
+public interface ICoopServer : INetwork, INatPunchListener, IDisposable
 {
     IEnumerable<NetPeer> ConnectedPeers { get; }
 }
@@ -40,7 +40,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
-    private readonly NetManager netManager;
     private bool allowJoining = false;
 
     public CoopServer(
@@ -57,14 +56,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
         ModInformation.IsServer = true;
 
-        // TODO add configuration
-        netManager = new NetManager(this);
-
-#if DEBUG
-        // Increase disconnect timeout to prevent disconnect during debugging
-        netManager.DisconnectTimeout = 300 * 1000;
-#endif
-
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
         netManager.NatPunchModule.Init(this);
@@ -72,15 +63,13 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         controllerIdProvider.SetControllerId(ServerControllerId);
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
-
-        netManager.DisconnectAll();
-        netManager.Stop();
+        base.Dispose();
     }
 
-    public void OnConnectionRequest(ConnectionRequest request)
+    public override void OnConnectionRequest(ConnectionRequest request)
     {
         if (allowJoining)
         {
@@ -102,34 +91,34 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         // Not used on server
     }
 
-    public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
+    public override void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
     {
         throw new NotImplementedException();
     }
 
-    public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
+    public override void OnNetworkLatencyUpdate(NetPeer peer, int latency)
     {
 
     }
 
-    public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+    public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
         IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
         packetManager.HandleReceive(peer, packet);
     }
 
-    public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
+    public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
         throw new NotImplementedException();
     }
 
-    public void OnPeerConnected(NetPeer peer)
+    public override void OnPeerConnected(NetPeer peer)
     {
         PlayerConnected message = new PlayerConnected(peer);
         messageBroker.Publish(this, message);
     }
 
-    public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+    public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
     {
         PlayerDisconnected message = new PlayerDisconnected(peer, disconnectInfo);
         messageBroker.Publish(this, message);
@@ -144,11 +133,6 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     public override void Start()
     {
         netManager.Start(Configuration.Port);
-    }
-
-    public override void Stop()
-    {
-        netManager.Stop();
     }
 
     public override void SendAll(IPacket packet)

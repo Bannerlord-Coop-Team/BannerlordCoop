@@ -91,13 +91,18 @@ internal class ObjectManager : IObjectManager
     {
         foreach (var registry in registryCollection)
         {
-            RegistryMap.Add(registry.ManagedType, registry);
+            foreach (var managedType in registry.ManagedTypes)
+            {
+                RegistryMap.Add(managedType, registry);
+            }
         }
     }
 
     public bool AddExisting(string id, object obj)
     {
         if (string.IsNullOrEmpty(id)) return false;
+
+        if (obj == null) return false;
 
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
@@ -112,8 +117,11 @@ internal class ObjectManager : IObjectManager
             obj);
     }
 
-    public bool AddNewObject(object obj, out string newId)
+    public bool AddNewObject(object obj, out string newId )
     {
+        newId = null;
+        if (obj == null) return false;
+
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
             return LogIfRegistrationError(
@@ -129,6 +137,8 @@ internal class ObjectManager : IObjectManager
 
     public bool Contains(object obj)
     {
+        if (obj == null) return false;
+
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
             return registry.TryGetId(obj, out _);
@@ -181,6 +191,8 @@ internal class ObjectManager : IObjectManager
 
     public bool Remove(object obj)
     {
+        if (obj == null) return false;
+
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
             return registry.Remove(obj);

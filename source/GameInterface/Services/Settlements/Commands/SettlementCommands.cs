@@ -69,13 +69,13 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        try
-        {
-            settlement.NumberOfEnemiesSpottedAround = float.Parse(args[1]);
-        } catch (Exception ex)
+
+        if (float.TryParse(args[1], out var num) == false)
         {
             return $"Error setting the value: {args[1]} to a float.";
         }
+
+        settlement.NumberOfEnemiesSpottedAround = num;
 
         return $"Successfully set the Settlement ({settlementId}) NumberOfEnemiesSpottedAround to '{args[1]}'";
     }
@@ -103,14 +103,10 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        try
-        {
-            settlement.NumberOfAlliesSpottedAround = float.Parse(args[1]);
-        }
-        catch (Exception ex)
-        {
+        if (float.TryParse(args[1], out var num) == false)
             return $"Error setting the value: {args[1]} to a float.";
-        }
+
+        settlement.NumberOfAlliesSpottedAround = num;
 
         return $"Successfully set the Settlement ({settlementId}) NumberOfAlliesSpottedAround to '{args[1]}'";
     }
@@ -138,14 +134,10 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        try
-        {
-            settlement.BribePaid = int.Parse(args[1]);
-        }
-        catch (Exception ex)
-        {
+        if (int.TryParse(args[1], out var num) == false)
             return $"Error setting the value: {args[1]} to a int.";
-        }
+
+        settlement.BribePaid = num;
 
         return $"Successfully set the Settlement ({settlementId}) BribePaid to '{args[1]}'";
     }
@@ -173,14 +165,10 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        try
-        {
-            settlement.SettlementHitPoints = float.Parse(args[1]);
-        }
-        catch (Exception ex)
-        {
+        if (float.TryParse(args[1], out var num) == false)
             return $"Error setting the value: {args[1]} to a float.";
-        }
+
+        settlement.SettlementHitPoints = num;
 
         return $"Successfully set the Settlement ({settlementId}) SettlementHitPoints to '{args[1]}'";
     }
@@ -260,14 +248,9 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        SiegeState state;
-        try
-        {
-            state =  (SiegeState)Enum.Parse(typeof(SiegeState), siegeState, true);
-        } catch (Exception ex)
-        {
-            return ex.ToString();
-        }
+        if (Enum.TryParse<SiegeState>(siegeState, true, out var state) == false)
+            return $"{siegeState} was not a valid enum in {nameof(SiegeState)}";
+
 
         settlement.CurrentSiegeState = state;
 
@@ -300,15 +283,9 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        float militia;
-        try
-        {
-            militia = float.Parse(militiaFloat);
-        }
-        catch (Exception ex)
-        {
-            return ex.ToString();
-        }
+
+        if (float.TryParse(militiaFloat, out var militia) == false)
+            return $"Error setting the value: {militiaFloat} to a float.";
 
         settlement.Militia = militia;
 
@@ -340,15 +317,9 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        int wageLimit;
-        try
-        {
-            wageLimit = int.Parse(garrisonInt);
-        }
-        catch (Exception ex)
-        {
-            return ex.ToString();
-        }
+
+        if (int.TryParse(garrisonInt, out var wageLimit) == false)
+            return $"Error setting the value: {garrisonInt} to an int.";
 
         settlement.SetGarrisonWagePaymentLimit(wageLimit);
 
@@ -490,7 +461,7 @@ internal class SettlementCommands
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
         var objectManager = container.Resolve<IObjectManager>();
         string settlementComponentId = args[0];
-        if (!int.TryParse(args[1], out int gold))
+        if (int.TryParse(args[1], out int gold) == false)
         {
             return "Unable to parse gold amount";
         }
@@ -519,7 +490,7 @@ internal class SettlementCommands
         if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
         var objectManager = container.Resolve<IObjectManager>();
         string settlementComponentId = args[0];
-        if (!bool.TryParse(args[1], out bool value))
+        if (bool.TryParse(args[1], out bool value) == false)
         {
             return "Unable to parse IsOwnerUnassigned";
         }

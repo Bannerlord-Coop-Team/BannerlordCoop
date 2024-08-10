@@ -29,9 +29,12 @@ public class MessageLogger
     {
         if (messageType.GetCustomAttribute<DontLogMessageAttribute>() != null) return;
 
+        BatchLog(messageType);
+        return;
+
         if (messageType.GetCustomAttribute<BatchLogMessageAttribute>() != null)
         {
-            BatchLog(messageType);
+            
             return;
         }
 

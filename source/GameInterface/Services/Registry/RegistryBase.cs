@@ -26,7 +26,7 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
         collection.AddRegistry(this);
     }
 
-    public void Dispose()
+    public virtual void Dispose()
     {
         collection.RemoveRegistry(this);
     }
@@ -42,7 +42,7 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
 
     public int Count => objIds.Count;
 
-    public Type ManagedType => typeof(T);
+    public virtual IEnumerable<Type> ManagedTypes { get; } = new Type[] { typeof(T) };
 
     public IEnumerator<KeyValuePair<string, T>> GetEnumerator() => objIds.GetEnumerator();
 
