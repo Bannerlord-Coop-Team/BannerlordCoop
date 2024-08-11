@@ -114,4 +114,9 @@ internal class AutoSyncBuilder<T> : IAutoSyncBuilder<T> where T : class
 
         return this;
     }
-}
+
+    public void Build()
+    {
+
+    }
+ }

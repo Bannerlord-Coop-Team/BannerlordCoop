@@ -5,6 +5,8 @@ using GameInterface.AutoSync.Internal;
 using HarmonyLib;
 using ProtoBuf;
 using ProtoBuf.Meta;
+using System.Threading.Tasks.Sources;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.MapEvents;
 using Xunit.Abstractions;
 using Xunit.Sdk;
@@ -214,7 +216,28 @@ public class AutoSyncTests : IDisposable
             Assert.Equal(mapEventId, clientObj.TestProp.StringId);
         }
     }
+
+    [Fact]
+    public void FieldTest()
+    {
+        const MapEventState TEST_VAL = MapEventState.Wait;
+        var field = AccessTools.Field(typeof(MapEvent), nameof(MapEvent._state));
+
+        var cb = new ClassBuilder();
+        var obj = cb.CreateNewObject(field);
+
+        var setter = AccessTools.Method(obj.GetType(), "FieldSetter");
+
+        var testObj = new MapEvent();
+        
+        setter.Invoke(obj, new object[] { testObj, TEST_VAL });
+
+        Assert.Equal(TEST_VAL, testObj._state);
+    }
+
 }
+
+
 
 [ProtoContract(SkipConstructor = true)]
 public class SomeClass<T>

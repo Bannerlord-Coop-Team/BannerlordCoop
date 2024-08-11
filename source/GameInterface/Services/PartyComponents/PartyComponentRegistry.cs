@@ -29,7 +29,7 @@ internal class PartyComponentRegistry : RegistryBase<PartyComponent>
 
     public override void RegisterAll()
     {
-        foreach (var component in MobileParty.All.Select(p => p.PartyComponent))
+        foreach (var component in MobileParty.All.Select(p => p.PartyComponent).Where(c => c != null))
         {
             RegisterNewObject(component, out var _);
         }

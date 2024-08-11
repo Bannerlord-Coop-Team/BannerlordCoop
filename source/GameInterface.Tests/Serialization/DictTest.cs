@@ -1,4 +1,6 @@
-﻿using GameInterface.Serialization;
+﻿using GameInterface.AutoSync;
+using GameInterface.Serialization;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using Xunit;
@@ -31,7 +33,7 @@ namespace GameInterface.Tests.Serialization
             tDict.Add(OAT, 1);
 
             Assert.True(tDict.ContainsKey(OAT2));
-            
+
             Assert.Throws<ArgumentException>(() => tDict.Add(OAT2, 2));
         }
     }
