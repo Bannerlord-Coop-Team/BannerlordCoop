@@ -29,7 +29,7 @@ internal class DummyNetwork : INetwork
         throw new NotImplementedException();
     }
 
-    public void SendAll(IMessage message)
+    public void SendAll(IMessage message, string subKey = "")
     {
         throw new NotImplementedException();
     }

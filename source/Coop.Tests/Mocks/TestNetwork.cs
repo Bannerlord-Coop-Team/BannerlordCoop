@@ -95,7 +95,7 @@ public class TestNetwork : INetwork
         SentNetworkMessages[netPeer.Id] = messages;
     }
 
-    public void SendAll(IMessage message)
+    public void SendAll(IMessage message, string subKey = "")
     {
         foreach(var peer in Peers)
         {

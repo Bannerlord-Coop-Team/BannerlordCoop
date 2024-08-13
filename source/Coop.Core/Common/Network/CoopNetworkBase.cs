@@ -102,10 +102,10 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         Send(netPeer, eventPacket);
     }
 
-    public void SendAll(IMessage message)
+    public void SendAll(IMessage message, string subKey = "")
     {
         var data = SerializeMessage(message);
-        var eventPacket = new MessagePacket(data);
+        var eventPacket = new MessagePacket(data, subKey);
         SendAll(eventPacket);
     }
 

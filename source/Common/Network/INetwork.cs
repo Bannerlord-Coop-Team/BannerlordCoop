@@ -16,7 +16,7 @@ public interface INetwork : IDisposable
     void SendAll(IPacket packet);
     void SendAllBut(NetPeer excludedPeer, IPacket packet);
     void Send(NetPeer netPeer, IMessage message);
-    void SendAll(IMessage message);
+    void SendAll(IMessage message, string subKey = "");
     void SendAllBut(NetPeer excludedPeer, IMessage message);
     void Start();
 }

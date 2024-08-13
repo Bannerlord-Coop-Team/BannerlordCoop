@@ -20,5 +20,6 @@ namespace Common.PacketHandlers
     {
         PacketType PacketType { get; }
         DeliveryMethod DeliveryMethod { get; }
+        string SubKey { get; }
     }
 }

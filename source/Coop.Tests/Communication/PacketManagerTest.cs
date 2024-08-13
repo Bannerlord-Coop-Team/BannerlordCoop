@@ -3,6 +3,7 @@ using LiteNetLib;
 using Moq;
 using System.Collections.Generic;
 using System.Reflection;
+using ProtoBuf.WellKnownTypes;
 using Xunit;
 
 namespace Coop.Tests.Communication
@@ -123,5 +124,6 @@ namespace Coop.Tests.Communication
         public PacketType PacketType => PacketType.Test;
 
         public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
+        public string SubKey => string.Empty;
     }
 }
