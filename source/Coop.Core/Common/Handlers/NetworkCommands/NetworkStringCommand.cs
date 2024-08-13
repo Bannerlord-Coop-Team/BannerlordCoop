@@ -5,7 +5,6 @@ using ProtoBuf.Meta;
 namespace Coop.Core.Common.Handlers.NetworkCommands;
 
 [ProtoContract(SkipConstructor = true)]
-[ProtoInclude(1000, typeof(NetworkTextObjectCommand))]
 public record NetworkStringCommand : AbstractNetworkCommand<string>
 {
     [ProtoMember(1)]
