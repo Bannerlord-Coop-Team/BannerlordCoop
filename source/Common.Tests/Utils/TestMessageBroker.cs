@@ -11,7 +11,9 @@ public class TestMessageBroker : MessageBroker
 
     private readonly Dictionary<Type, List<WeakDelegate>> _subscribers = new Dictionary<Type, List<WeakDelegate>>();
 
-    public override void Publish<T>(object source, T message)
+    
+    
+    public override void Publish<T>(object source, T message, string subKey = "")
     {
         if (message == null)
             return;
@@ -43,7 +45,7 @@ public class TestMessageBroker : MessageBroker
         }
     }
 
-    public override void Respond<T>(object target, T message)
+    public override void Respond<T>(object target, T message, string subKey = "")
     {
         if (message == null)
             return;
@@ -81,7 +83,7 @@ public class TestMessageBroker : MessageBroker
         }
     }
 
-    public override void Subscribe<T>(Action<MessagePayload<T>> subscription)
+    public override void Subscribe<T>(Action<MessagePayload<T>> subscription, string subKey = "")
     {
         var delegates = _subscribers.ContainsKey(typeof(T)) ?
                         _subscribers[typeof(T)] : new List<WeakDelegate>();
@@ -92,7 +94,7 @@ public class TestMessageBroker : MessageBroker
         _subscribers[typeof(T)] = delegates;
     }
 
-    public override void Unsubscribe<T>(Action<MessagePayload<T>> subscription)
+    public override void Unsubscribe<T>(Action<MessagePayload<T>> subscription, string subKey = "")
     {
         if (!_subscribers.ContainsKey(typeof(T))) return;
         var delegates = _subscribers[typeof(T)];

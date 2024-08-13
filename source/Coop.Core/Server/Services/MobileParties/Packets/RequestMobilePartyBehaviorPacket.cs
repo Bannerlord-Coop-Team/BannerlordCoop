@@ -13,6 +13,8 @@ public struct RequestMobilePartyBehaviorPacket : IPacket
 {
     public PacketType PacketType => PacketType.RequestUpdatePartyBehavior;
     public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableUnordered;
+    public string SubKey => string.Empty;
+
     [ProtoMember(1)]
     public PartyBehaviorUpdateData BehaviorUpdateData { get; }
 

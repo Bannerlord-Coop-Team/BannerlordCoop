@@ -17,14 +17,18 @@ namespace Coop.Tests.Stubs
 
             return total;
         }
+        
+        
 
-        public override void Publish<T>(object? source, T message)
+        public override void Publish<T>(object? source, T message, string subKey = "")
         {
-            if (!subscribers.ContainsKey(typeof(T)))
+            var key = CreateKey(typeof(T), subKey);
+            
+            if (!subscribers.TryGetValue(key, out var delegates))
             {
                 return;
             }
-            var delegates = subscribers[typeof(T)];
+
             if (delegates == null || delegates.Count == 0) return;
             var payload = new MessagePayload<T>(source, message);
             for (int i = 0; i < delegates.Count; i++)
@@ -38,8 +42,6 @@ namespace Coop.Tests.Stubs
 
                 weakDelegate.Invoke(new object[] { payload });
             }
-
-            return;
         }
     }
 }

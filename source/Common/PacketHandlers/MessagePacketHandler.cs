@@ -9,6 +9,7 @@ using ProtoBuf.Meta;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 
@@ -39,30 +40,30 @@ namespace Common.PacketHandlers
             packetManager.RemovePacketHandler(this);
         }
 
-        protected static readonly MethodInfo Publish = typeof(IMessageBroker).GetMethod(nameof(IMessageBroker.Publish));
+        protected static readonly MethodInfo Publish = typeof(IMessageBroker).GetMethods().First(method => method.Name == nameof(IMessageBroker.Publish) && method.GetParameters().Length == 3);
         public virtual void HandlePacket(NetPeer peer, IPacket packet)
         {
             MessagePacket convertedPacket = (MessagePacket)packet;
 
             var networkEvent = serializer.Deserialize<IMessage>(convertedPacket.Data);
 
-            PublishEvent(peer, networkEvent);
+            PublishEvent(peer, networkEvent, packet.SubKey);
         }
-        private Dictionary<string, Action<IMessageBroker, object, object>> publishFunctionCache = new Dictionary<string, Action<IMessageBroker, object, object>>();
-        internal virtual void PublishEvent(NetPeer peer, IMessage message)
+        private Dictionary<string, Action<IMessageBroker, object, object, string>> publishFunctionCache = new();
+        internal virtual void PublishEvent(NetPeer peer, IMessage message, string subKey)
         {
             var msgType = message.GetType();
             if (publishFunctionCache.TryGetValue(msgType.FullName, out var action))
             {
-                action.Invoke(messageBroker, peer, message);
+                action.Invoke(messageBroker, peer, message, subKey);
             }
             else
             {
                 var castedPublish = Publish.MakeGenericMethod(message.GetType());
                 publishFunctionCache.Add(msgType.FullName, 
-                    (messageBrokerParam, peerParam, messageParam) => castedPublish.Invoke(messageBrokerParam, new object[] { peerParam, messageParam }));
+                    (messageBrokerParam, peerParam, messageParam, subKeyParam) => castedPublish.Invoke(messageBrokerParam, new object[] { peerParam, messageParam, subKeyParam }));
 
-                castedPublish.Invoke(messageBroker, new object[] { peer, message });
+                castedPublish.Invoke(messageBroker, new object[] { peer, message, subKey });
             }
         }
     }
@@ -76,10 +77,14 @@ namespace Common.PacketHandlers
 
         [ProtoMember(1)]
         public readonly byte[] Data;
+        
+        [ProtoMember(2)]
+        public string SubKey { get; }
 
-        public MessagePacket(byte[] data)
+        public MessagePacket(byte[] data, string subKey = "")
         {
             Data = data;
+            SubKey = subKey;
         }
     }
 }

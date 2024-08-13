@@ -69,8 +69,9 @@ public class SerializableTypeMapper : ISerializableTypeMapper
                     return Array.Empty<Type>();
                 }
             })
-            .Where(type => {
-                try 
+            .Where(type =>
+            {
+                try
                 {
                     return type.IsDefined(typeof(ProtoContractAttribute), inherit: false);
                 }

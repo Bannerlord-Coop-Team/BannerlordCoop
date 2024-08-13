@@ -17,6 +17,7 @@ namespace Coop.Core.Client.Services.MobileParties.Packets
         public readonly PacketType PacketType => PacketType.UpdatePartyBehavior;
 
         public readonly DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableUnordered;
+        public string SubKey => string.Empty;
 
         public UpdatePartyBehaviorPacket(ref PartyBehaviorUpdateData behaviorUpdateData)
         {

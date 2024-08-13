@@ -53,6 +53,7 @@ namespace Common.PacketHandlers
     {
         public PacketType PacketType => PacketType.PacketWrapper;
         public DeliveryMethod DeliveryMethod { get; }
+        public string SubKey => string.Empty;
 
         [ProtoMember(1)]
         public IPacket Packet { get; }

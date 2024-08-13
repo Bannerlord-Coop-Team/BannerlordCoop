@@ -44,6 +44,7 @@ namespace Common.PacketHandlers
     {
         public PacketType PacketType => PacketType.Example;
         public DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableSequenced;
+        public string SubKey => string.Empty;
         [ProtoMember(1)]
         public byte[] Data { get; }
 

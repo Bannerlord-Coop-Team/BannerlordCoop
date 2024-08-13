@@ -12,7 +12,7 @@
     <Deterministic>true</Deterministic>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
-    <LangVersion>10</LangVersion>
+    <LangVersion>12</LangVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Platforms>x64</Platforms>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
@@ -24,7 +24,7 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <DebugType>full</DebugType>
     <ErrorReport>prompt</ErrorReport>
-    <LangVersion>10</LangVersion>
+    <LangVersion>12</LangVersion>
     <StartAction>Program</StartAction>
     <PlatformTarget>x64</PlatformTarget>
     <StartWorkingDirectory>$(SolutionDir)..\mb2\bin\Win64_Shipping_Client</StartWorkingDirectory>
@@ -39,7 +39,7 @@
     <DebugType>pdbonly</DebugType>
     <PlatformTarget>x64</PlatformTarget>
     <ErrorReport>prompt</ErrorReport>
-    <LangVersion>10</LangVersion>
+    <LangVersion>12</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>

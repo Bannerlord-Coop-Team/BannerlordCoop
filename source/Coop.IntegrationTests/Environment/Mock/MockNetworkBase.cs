@@ -54,7 +54,7 @@ public abstract class MockNetworkBase : INetwork
         networkOrchestrator.SendAll(NetPeer, packet);
     }
 
-    public void SendAll(IMessage message)
+    public void SendAll(IMessage message, string subKey = "")
     {
         NetworkSentMessages.Add(message);
 
