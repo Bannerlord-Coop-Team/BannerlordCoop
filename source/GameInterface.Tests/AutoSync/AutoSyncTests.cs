@@ -1,5 +1,4 @@
 ﻿using Common.Serialization;
-using Common.Util;
 using GameInterface.AutoSync;
 using GameInterface.AutoSync.Builders;
 using GameInterface.Services.ObjectManager;
@@ -45,18 +44,20 @@ public class AutoSyncTests
     }
 
     [Fact]
-    public void FieldSwitchTesting()
+    public void FieldSwitchTestingByValue()
     {
         Assert.NotNull(typeof(ProtoBufSerializer).GetMethods().Where(m => m.Name == nameof(ProtoBufSerializer.Deserialize) && m.IsGenericMethod));
 
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
         var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
 
-        var typeSwitchCreator = new FieldSwitchCreator(moduleBuilder, typeof(SwitchTestClass));
+        var objectManager = new TestObjManager();
+
+        var typeSwitchCreator = new FieldSwitchCreator(moduleBuilder, typeof(SwitchTestClass), objectManager);
 
         var fields = AccessTools.GetDeclaredFields(typeof(SwitchTestClass));
 
-        var objectManager = new TestObjManager();
+        
         var fieldSwitch = typeSwitchCreator.Build(fields.ToArray(), objectManager);
 
         var objId = "MyObj1";
@@ -81,19 +82,63 @@ public class AutoSyncTests
         }
     }
 
+    [Fact]
+    public void FieldSwitchTestingByRef()
+    {
+        Assert.NotNull(typeof(ProtoBufSerializer).GetMethods().Where(m => m.Name == nameof(ProtoBufSerializer.Deserialize) && m.IsGenericMethod));
+
+        var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
+        var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
+
+        var objectManager = new TestObjManager();
+        var typeSwitchCreator = new FieldSwitchCreator(moduleBuilder, typeof(SwitchTestClass), objectManager);
+
+        var fields = AccessTools.GetDeclaredFields(typeof(SwitchTestClass));
+
+        
+        var fieldSwitch = typeSwitchCreator.Build(fields.ToArray(), objectManager);
+
+        var objId = "MyObj1";
+        var obj = new SwitchTestClass();
+        objectManager.AddExisting(objId, obj);
+
+        var refObjId = "RefObjId1";
+        var refObj = new SomeRefClass();
+        objectManager.AddExisting(refObjId, refObj);
+
+
+        Assert.Equal("hi", obj.Name);
+
+        using (MemoryStream internalStream = new MemoryStream())
+        {
+            var newValue = refObjId;
+            Serializer.Serialize(internalStream, newValue);
+            var serializedStr = internalStream.ToArray();
+
+            var packet = new AutoSyncFieldPacket(objId, 0, 2, serializedStr);
+
+            fieldSwitch.FieldSwitch(packet);
+
+            Assert.Equal(refObj, obj.RefClass);
+        }
+    }
+
     public class SwitchTestClass
     {
         public string Name = "hi";
         public int MyInt = 1;
+        public SomeRefClass? RefClass = null;
     }
+
+    public class SomeRefClass { }
 
     private class TestObjManager : IObjectManager
     {
-        private Dictionary<string, SwitchTestClass> idMap = new Dictionary<string, SwitchTestClass>();
+        private Dictionary<string, object> idMap = new Dictionary<string, object>();
 
         public bool AddExisting(string id, object obj)
         {
-            return idMap.TryAdd(id, (SwitchTestClass)obj);
+            return idMap.TryAdd(id, obj);
         }
 
         public bool AddNewObject(object obj, out string newId)
@@ -111,9 +156,15 @@ public class AutoSyncTests
             throw new NotImplementedException();
         }
 
+
+        private HashSet<Type> managedTypes = new HashSet<Type>
+        {
+            typeof(SomeRefClass),
+            typeof(SwitchTestClass) 
+        };
         public bool IsTypeManaged(Type type)
         {
-            throw new NotImplementedException();
+            return managedTypes.Contains(type);
         }
 
         public bool Remove(object obj)

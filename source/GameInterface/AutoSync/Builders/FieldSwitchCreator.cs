@@ -2,6 +2,7 @@
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using ProtoBuf;
+using ProtoBuf.Meta;
 using Serilog;
 using System;
 using System.IO;
@@ -19,11 +20,12 @@ public class FieldSwitchCreator
     private readonly FieldBuilder objectManagerField;
     private readonly FieldBuilder loggerField;
     private readonly Type instanceType;
+    private readonly IObjectManager objectManager;
 
-    public FieldSwitchCreator(ModuleBuilder moduleBuilder, Type type)
+    public FieldSwitchCreator(ModuleBuilder moduleBuilder, Type type, IObjectManager objectManager)
     {
         instanceType = type;
-
+        this.objectManager = objectManager;
         typeBuilder = moduleBuilder.DefineType($"FieldSwitcher_{type.Name}",
                 TypeAttributes.Public |
                 TypeAttributes.Class |
@@ -70,12 +72,13 @@ public class FieldSwitchCreator
 
         var il = methodBuilder.GetILGenerator();
 
-        il.DeclareLocal(instanceType);
+        var instanceLocal = il.DeclareLocal(instanceType);
 
         var labels = fields.Select(i => il.DefineLabel()).ToArray();
 
         var retLabel = il.DefineLabel();
         var switchLabel = il.DefineLabel();
+        
 
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldfld, objectManagerField);
@@ -83,7 +86,7 @@ public class FieldSwitchCreator
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.instanceId)));
 
-        il.Emit(OpCodes.Ldloca_S, 0);
+        il.Emit(OpCodes.Ldloca, instanceLocal);
 
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetObject)).MakeGenericMethod(instanceType));
         il.Emit(OpCodes.Brtrue, switchLabel);
@@ -91,8 +94,8 @@ public class FieldSwitchCreator
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldfld, loggerField);
 
-        var str = $"Unable to find instance of type {instanceType.Name} with id ";
-        il.Emit(OpCodes.Ldstr, str);
+        var errorString = $"Unable to find instance of type {instanceType.Name} with id ";
+        il.Emit(OpCodes.Ldstr, errorString);
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.instanceId)));
 
@@ -100,8 +103,7 @@ public class FieldSwitchCreator
         var stringConcatMethod = AccessTools.Method(typeof(FieldSwitchCreator), nameof(Concat));
 
         il.Emit(OpCodes.Call, stringConcatMethod);
-        il.Emit(OpCodes.Pop);
-        il.Emit(OpCodes.Pop);
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
 
         il.Emit(OpCodes.Ret);
 
@@ -114,18 +116,85 @@ public class FieldSwitchCreator
         for (int i = 0; i < fields.Length; i++)
         {
             il.MarkLabel(labels[i]);
-            il.Emit(OpCodes.Ldloc, 0);
-            il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.value)));
-            il.Emit(OpCodes.Call, AccessTools.Method(typeof(FieldSwitchCreator), nameof(Deserialize)).MakeGenericMethod(fields[i].FieldType));
-            il.Emit(OpCodes.Stfld, fields[i]);
-            il.Emit(OpCodes.Ret);
+
+            if (RuntimeTypeModel.Default.CanSerialize(fields[i].FieldType))
+                CreateByValue(il, fields[i], instanceLocal);
+            else if (objectManager.IsTypeManaged(fields[i].FieldType))
+                CreateByRef(il, fields[i], instanceLocal);
+            else
+                throw new NotSupportedException(
+                    $"{fields[i].FieldType.Name} is not serializable and not managed by the object manager. " +
+                    $"Either manage the type using the object manager or make this type serializable");
+            
+
+            
         }
 
         il.MarkLabel(retLabel);
         il.Emit(OpCodes.Ret);
 
         return methodBuilder;
+    }
+
+    private void CreateByValue(ILGenerator il, FieldInfo field, LocalBuilder instanceLocal)
+    {
+        
+        // Loads the instance (used by strfld)
+        il.Emit(OpCodes.Ldloc, instanceLocal);
+
+        // Load and deserialize the new value casted as field type
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.value)));
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(FieldSwitchCreator), nameof(Deserialize)).MakeGenericMethod(field.FieldType));
+        il.Emit(OpCodes.Stfld, field);
+        il.Emit(OpCodes.Ret);
+    }
+
+    private void CreateByRef(ILGenerator il, FieldInfo field, LocalBuilder instanceLocal)
+    {
+        var errorString = $"Unable to find instance of type {instanceType.Name} with id ";
+        var stringConcatMethod = AccessTools.Method(typeof(FieldSwitchCreator), nameof(Concat));
+
+        var valueLocal = il.DeclareLocal(field.FieldType);
+
+        // Loads the instance (used by strfld)
+        il.Emit(OpCodes.Ldloc, instanceLocal);
+
+        // Load objectmanager
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldfld, objectManagerField);
+
+        var getObjectSuccess = il.DefineLabel();
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.value)));
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(FieldSwitchCreator), nameof(Deserialize)).MakeGenericMethod(typeof(string)));
+
+        il.Emit(OpCodes.Ldloca, valueLocal);
+
+        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetObject)).MakeGenericMethod(field.FieldType));
+        il.Emit(OpCodes.Brtrue, getObjectSuccess);
+
+        // if TryGetObject failes log error
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldfld, loggerField);
+
+        il.Emit(OpCodes.Ldstr, errorString);
+
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.value)));
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(FieldSwitchCreator), nameof(Deserialize)).MakeGenericMethod(typeof(string)));
+
+        il.Emit(OpCodes.Call, stringConcatMethod);
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+
+        il.Emit(OpCodes.Pop);
+        il.Emit(OpCodes.Ret);
+
+        il.MarkLabel(getObjectSuccess);
+
+        il.Emit(OpCodes.Ldloc, valueLocal);
+        il.Emit(OpCodes.Stfld, field);
+        il.Emit(OpCodes.Ret);
     }
 
 
