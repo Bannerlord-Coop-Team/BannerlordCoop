@@ -319,7 +319,8 @@ public class FieldTranspilerCreator
 
             il.Emit(OpCodes.Ldsfld, AccessTools.Field(typeof(OpCodes), nameof(OpCodes.Call)));
 
-            var fieldIntercept = CreateIntercept(typeId, i, interceptFields[i]);
+            // TODO determine by ref or by value
+            var fieldIntercept = CreateInterceptByValue(typeId, i, interceptFields[i]);
 
             il.Emit(OpCodes.Ldtoken, fieldIntercept.DeclaringType);
             il.Emit(OpCodes.Call, AccessTools.Method(typeof(Type), nameof(Type.GetTypeFromHandle)));
@@ -381,30 +382,30 @@ public class FieldTranspilerCreator
         return getEnumerableGenericBuilder;
     }
 
-    private MethodBuilder CreateIntercept(int typeId, int propId, FieldInfo field)
+    private MethodBuilder CreateInterceptByValue(int typeId, int propId, FieldInfo field)
     {
         var methodBuilder = typeBuilder.DefineMethod($"{field.DeclaringType.Name}_{field.Name}_intercept",
             MethodAttributes.Public | MethodAttributes.Static,
             null,
             new Type[] { field.DeclaringType, field.FieldType });
-        methodBuilder.DefineParameter(0, ParameterAttributes.In, "instructions");
+        var instanceParam = methodBuilder.DefineParameter(0, ParameterAttributes.In, "instance");
+        var valueParam = methodBuilder.DefineParameter(1, ParameterAttributes.In, "value");
 
         var il = methodBuilder.GetILGenerator();
 
         IsClientCheck(il, field);
 
         var networkLocal = TryResolve<INetwork>(il);
-        var objectManagerLocal = TryResolve<IObjectManager>(il);
 
+        var objectManagerLocal = TryResolve<IObjectManager>(il);
         var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
-        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
         il.Emit(OpCodes.Ldc_I4, typeId);
         il.Emit(OpCodes.Ldc_I4, propId);
 
-        il.Emit(OpCodes.Ldloc, valueIdLocal);
+        il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Box, field.FieldType);
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Serialize)));
 
@@ -412,11 +413,17 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Box, typeof(AutoSyncFieldPacket));
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
 
+        il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Stfld, field);
         il.Emit(OpCodes.Ret);
 
         return methodBuilder;
+    }
+
+    public static void What(object obj)
+    {
+        ;
     }
 
     private LocalBuilder TryResolve<T>(ILGenerator il)
@@ -434,8 +441,7 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Ldstr, $"Unable to resolve {nameof(T)}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
 
-        // Return false
-        il.Emit(OpCodes.Ldc_I4_0);
+        // Return
         il.Emit(OpCodes.Ret);
 
         il.MarkLabel(validLabel);
@@ -463,8 +469,7 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Ldstr, $"Could not resolve id");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
 
-        // Return false
-        il.Emit(OpCodes.Ldc_I4_0);
+        // Return
         il.Emit(OpCodes.Ret);
 
         il.MarkLabel(validLabel);
@@ -484,8 +489,7 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Ldstr, $"Client attempted to change {field.Name}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
 
-        // Return false
-        il.Emit(OpCodes.Ldc_I4_0);
+        // Return
         il.Emit(OpCodes.Ret);
 
         il.MarkLabel(notClientLabel);

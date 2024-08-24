@@ -89,50 +89,50 @@ public class PatchingTests
 
         return builder.Build();
     }
+}
 
-    class TestNet : INetwork
+public class TestNet : INetwork
+{
+    public readonly List<IPacket> SentPackets = new List<IPacket>();
+
+    public INetworkConfiguration Configuration => throw new System.NotImplementedException();
+
+    public void Dispose()
     {
-        public readonly List<IPacket> SentPackets = new List<IPacket>();
+    }
 
-        public INetworkConfiguration Configuration => throw new System.NotImplementedException();
+    public void Send(NetPeer netPeer, IPacket packet)
+    {
+        throw new System.NotImplementedException();
+    }
 
-        public void Dispose()
-        {
-        }
+    public void Send(NetPeer netPeer, IMessage message)
+    {
+        throw new System.NotImplementedException();
+    }
 
-        public void Send(NetPeer netPeer, IPacket packet)
-        {
-            throw new System.NotImplementedException();
-        }
+    public void SendAll(IPacket packet)
+    {
+        SentPackets.Add(packet);
+    }
 
-        public void Send(NetPeer netPeer, IMessage message)
-        {
-            throw new System.NotImplementedException();
-        }
+    public void SendAll(IMessage message)
+    {
+        throw new System.NotImplementedException();
+    }
 
-        public void SendAll(IPacket packet)
-        {
-            SentPackets.Add(packet);
-        }
+    public void SendAllBut(NetPeer excludedPeer, IPacket packet)
+    {
+        throw new System.NotImplementedException();
+    }
 
-        public void SendAll(IMessage message)
-        {
-            throw new System.NotImplementedException();
-        }
+    public void SendAllBut(NetPeer excludedPeer, IMessage message)
+    {
+        throw new System.NotImplementedException();
+    }
 
-        public void SendAllBut(NetPeer excludedPeer, IPacket packet)
-        {
-            throw new System.NotImplementedException();
-        }
-
-        public void SendAllBut(NetPeer excludedPeer, IMessage message)
-        {
-            throw new System.NotImplementedException();
-        }
-
-        public void Start()
-        {
-            throw new System.NotImplementedException();
-        }
+    public void Start()
+    {
+        throw new System.NotImplementedException();
     }
 }

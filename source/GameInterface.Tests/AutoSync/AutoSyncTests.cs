@@ -130,6 +130,8 @@ public class AutoSyncTests
         public int MyInt = 1;
         public SomeRefClass? RefClass = null;
         public int MyProp { get; set; }
+
+        public void SetMyInt(int val) { MyInt = val; }
     }
 
     public class SomeRefClass { }

@@ -12,4 +12,12 @@ public class RawSerializer
             return memoryStream.ToArray();
         }
     }
+
+    public static T Deserialize<T>(byte[] bytes)
+    {
+        using (MemoryStream memoryStream = new MemoryStream(bytes))
+        {
+            return Serializer.Deserialize<T>(memoryStream);
+        }
+    }
 }
