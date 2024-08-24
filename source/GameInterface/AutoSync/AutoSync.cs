@@ -13,7 +13,7 @@ internal class AutoSync
 
     AssemblyBuilder dynamicAssembly;
 
-    public void AddField(FieldInfo field)
+    public void AddField(FieldInfo field, IEnumerable<MethodInfo> externalUseMethods)
     {
         if (fields.Contains(field))
         {

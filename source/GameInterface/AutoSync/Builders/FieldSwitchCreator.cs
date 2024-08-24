@@ -13,8 +13,6 @@ using System.Reflection.Emit;
 namespace GameInterface.AutoSync.Builders;
 public class FieldSwitchCreator
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<FieldSwitchCreator>();
-
     private readonly TypeBuilder typeBuilder;
 
     private readonly FieldBuilder objectManagerField;
@@ -35,13 +33,17 @@ public class FieldSwitchCreator
                 TypeAttributes.AutoLayout,
                 null);
 
+        loggerField = typeBuilder.DefineField("logger", typeof(ILogger), FieldAttributes.Private | FieldAttributes.InitOnly | FieldAttributes.Static);
+
+        CreateStaticCtor();
+
         var ctorBuilder = typeBuilder.DefineConstructor(
             MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName,
             CallingConventions.Standard | CallingConventions.HasThis,
-            new Type[] { typeof(IObjectManager), typeof(ILogger) });
+            new Type[] { typeof(IObjectManager) });
 
         objectManagerField = typeBuilder.DefineField("objectManager", typeof(IObjectManager), FieldAttributes.Private | FieldAttributes.InitOnly);
-        loggerField = typeBuilder.DefineField("logger", typeof(ILogger), FieldAttributes.Private | FieldAttributes.InitOnly);
+        
 
         var il = ctorBuilder.GetILGenerator();
 
@@ -52,14 +54,25 @@ public class FieldSwitchCreator
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Stfld, objectManagerField);
 
-        il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Ldarg_2);
-        il.Emit(OpCodes.Stfld, loggerField);
+        il.Emit(OpCodes.Ret);
+    }
+
+    private void CreateStaticCtor()
+    {
+        var cctorBuilder = typeBuilder.DefineConstructor(
+            MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName | MethodAttributes.Static,
+            CallingConventions.Standard,
+            null);
+
+        var il = cctorBuilder.GetILGenerator();
+
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(LogManager), nameof(LogManager.GetLogger)).MakeGenericMethod(typeBuilder));
+        il.Emit(OpCodes.Stsfld, loggerField);
 
         il.Emit(OpCodes.Ret);
     }
 
-    
+
 
     private MethodBuilder CreateSwitch(FieldInfo[] fields)
     {
@@ -91,8 +104,7 @@ public class FieldSwitchCreator
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetObject)).MakeGenericMethod(instanceType));
         il.Emit(OpCodes.Brtrue, switchLabel);
 
-        il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Ldfld, loggerField);
+        il.Emit(OpCodes.Ldsfld, loggerField);
 
         var errorString = $"Unable to find instance of type {instanceType.Name} with id ";
         il.Emit(OpCodes.Ldstr, errorString);
@@ -125,9 +137,6 @@ public class FieldSwitchCreator
                 throw new NotSupportedException(
                     $"{fields[i].FieldType.Name} is not serializable and not managed by the object manager. " +
                     $"Either manage the type using the object manager or make this type serializable");
-            
-
-            
         }
 
         il.MarkLabel(retLabel);
@@ -175,8 +184,7 @@ public class FieldSwitchCreator
         il.Emit(OpCodes.Brtrue, getObjectSuccess);
 
         // if TryGetObject failes log error
-        il.Emit(OpCodes.Ldarg_0);
-        il.Emit(OpCodes.Ldfld, loggerField);
+        il.Emit(OpCodes.Ldsfld, loggerField);
 
         il.Emit(OpCodes.Ldstr, errorString);
 
@@ -217,6 +225,6 @@ public class FieldSwitchCreator
 
         var type = typeBuilder.CreateTypeInfo();
 
-        return Activator.CreateInstance(type, objectManager, Logger);
+        return Activator.CreateInstance(type, objectManager);
     }
 }

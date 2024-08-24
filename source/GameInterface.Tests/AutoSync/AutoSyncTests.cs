@@ -1,4 +1,5 @@
-﻿using Common.Serialization;
+﻿using Common.Logging;
+using Common.Serialization;
 using GameInterface.AutoSync;
 using GameInterface.AutoSync.Builders;
 using GameInterface.Services.ObjectManager;
@@ -56,8 +57,8 @@ public class AutoSyncTests
         var typeSwitchCreator = new FieldSwitchCreator(moduleBuilder, typeof(SwitchTestClass), objectManager);
 
         var fields = AccessTools.GetDeclaredFields(typeof(SwitchTestClass));
+        var nameField = AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.Name));
 
-        
         var fieldSwitch = typeSwitchCreator.Build(fields.ToArray(), objectManager);
 
         var objId = "MyObj1";
@@ -74,7 +75,7 @@ public class AutoSyncTests
             Serializer.Serialize(internalStream, newValue);
             var serializedStr = internalStream.ToArray();
 
-            var packet = new AutoSyncFieldPacket(objId, 0, 0, serializedStr);
+            var packet = new AutoSyncFieldPacket(objId, 0, fields.IndexOf(nameField), serializedStr);
 
             fieldSwitch.FieldSwitch(packet);
 
@@ -94,7 +95,7 @@ public class AutoSyncTests
         var typeSwitchCreator = new FieldSwitchCreator(moduleBuilder, typeof(SwitchTestClass), objectManager);
 
         var fields = AccessTools.GetDeclaredFields(typeof(SwitchTestClass));
-
+        var refField = AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.RefClass));
         
         var fieldSwitch = typeSwitchCreator.Build(fields.ToArray(), objectManager);
 
@@ -115,7 +116,7 @@ public class AutoSyncTests
             Serializer.Serialize(internalStream, newValue);
             var serializedStr = internalStream.ToArray();
 
-            var packet = new AutoSyncFieldPacket(objId, 0, 2, serializedStr);
+            var packet = new AutoSyncFieldPacket(objId, 0, fields.IndexOf(refField), serializedStr);
 
             fieldSwitch.FieldSwitch(packet);
 
@@ -128,11 +129,12 @@ public class AutoSyncTests
         public string Name = "hi";
         public int MyInt = 1;
         public SomeRefClass? RefClass = null;
+        public int MyProp { get; set; }
     }
 
     public class SomeRefClass { }
 
-    private class TestObjManager : IObjectManager
+    public class TestObjManager : IObjectManager
     {
         private Dictionary<string, object> idMap = new Dictionary<string, object>();
 
@@ -174,7 +176,19 @@ public class AutoSyncTests
 
         public bool TryGetId(object obj, out string id)
         {
-            throw new NotImplementedException();
+            id = null;
+
+            foreach (var kvp in idMap)
+            {
+                if (kvp.Value == obj)
+                {
+                    id = kvp.Key;
+                    return true;
+                }
+                    
+            }
+
+            return false;
         }
 
         public bool TryGetObject<T>(string id, out T obj) where T : class
