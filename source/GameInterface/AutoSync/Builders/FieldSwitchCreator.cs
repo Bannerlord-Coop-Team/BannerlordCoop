@@ -219,12 +219,10 @@ public class FieldSwitchCreator
         return str1 + str2;
     }
 
-    public dynamic Build(FieldInfo[] fields, IObjectManager objectManager)
+    public TypeInfo Build(FieldInfo[] fields)
     {
         CreateSwitch(fields);
 
-        var type = typeBuilder.CreateTypeInfo();
-
-        return Activator.CreateInstance(type, objectManager);
+        return typeBuilder.CreateTypeInfo();
     }
 }

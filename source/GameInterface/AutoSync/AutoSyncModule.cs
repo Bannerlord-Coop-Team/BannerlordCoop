@@ -13,6 +13,7 @@ internal class AutoSyncModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<AutoSyncPacketHandler>().AsSelf().AutoActivate().InstancePerLifetimeScope();
 
         builder.RegisterType<AutoSyncPatcher>().As<IAutoSyncPatcher>().InstancePerLifetimeScope();
         builder.RegisterType<AutoSyncPropertyMapper>().As<IAutoSyncPropertyMapper>().InstancePerLifetimeScope();

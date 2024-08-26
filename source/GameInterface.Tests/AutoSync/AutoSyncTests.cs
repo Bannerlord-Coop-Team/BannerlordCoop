@@ -11,6 +11,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -30,18 +32,19 @@ public class AutoSyncTests
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
         var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
 
-        var typeSwitchCreator = new TypeSwitchCreator(moduleBuilder);
+        var objectManager = new TestObjManager();
+        var typeSwitchCreator = new TypeSwitchCreator(moduleBuilder, objectManager);
 
-        var types = new Type[] { typeof(int), typeof(float), typeof(string) };
-
-        var typeSwitch = typeSwitchCreator.Build(types);
-
-        typeSwitch.TypeSwitch(0);
-
-        for (var i = 0; i < types.Length; i++)
+        var typeMap = new Dictionary<Type, List<FieldInfo>>
         {
-            Assert.Equal(i, typeSwitch.TypeSwitch(i));
-        }
+            { typeof(Settlement), new List<FieldInfo>() },
+            { typeof(MobileParty), new List<FieldInfo>() },
+        };
+
+        var typeSwitchType = typeSwitchCreator.Build(typeMap);
+        dynamic typeSwitch = Activator.CreateInstance(typeSwitchType, objectManager)!;
+
+        typeSwitch.TypeSwitch(new AutoSyncFieldPacket(null, 0, 0, null));
     }
 
     [Fact]
@@ -59,7 +62,8 @@ public class AutoSyncTests
         var fields = AccessTools.GetDeclaredFields(typeof(SwitchTestClass));
         var nameField = AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.Name));
 
-        var fieldSwitch = typeSwitchCreator.Build(fields.ToArray(), objectManager);
+        var fieldSwitchType = typeSwitchCreator.Build(fields.ToArray());
+        dynamic fieldSwitch = Activator.CreateInstance(fieldSwitchType, objectManager)!;
 
         var objId = "MyObj1";
 
@@ -96,8 +100,9 @@ public class AutoSyncTests
 
         var fields = AccessTools.GetDeclaredFields(typeof(SwitchTestClass));
         var refField = AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.RefClass));
-        
-        var fieldSwitch = typeSwitchCreator.Build(fields.ToArray(), objectManager);
+
+        var fieldSwitchType = typeSwitchCreator.Build(fields.ToArray());
+        dynamic fieldSwitch = Activator.CreateInstance(fieldSwitchType, objectManager)!;
 
         var objId = "MyObj1";
         var obj = new SwitchTestClass();
@@ -196,6 +201,8 @@ public class AutoSyncTests
         public bool TryGetObject<T>(string id, out T obj) where T : class
         {
             obj = null;
+
+            if (string.IsNullOrEmpty(id)) return false;
 
             if (idMap.TryGetValue(id, out var value) == false) return false;
 

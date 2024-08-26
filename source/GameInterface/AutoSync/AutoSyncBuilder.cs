@@ -1,122 +1,156 @@
-﻿using Common.Messaging;
-using Common.Network;
-using GameInterface.AutoSync.Internal;
+﻿using GameInterface.AutoSync.Builders;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Registry;
 using HarmonyLib;
-using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
+using System.Text;
 
 namespace GameInterface.AutoSync;
-
-public interface IAutoSyncBuilder<T> : IDisposable where T : class
+public interface IAutoSyncBuilder
 {
-    IAutoSyncBuilder<T> SyncCreation(Func<IEnumerable<T>> existingObjects = null);
-    IAutoSyncBuilder<T> SyncDeletion(MethodInfo deletionFunction);
-    IAutoSyncBuilder<T> SyncField(FieldInfo field);
-    IAutoSyncBuilder<T> SyncFields(IEnumerable<FieldInfo> fields);
-    IAutoSyncBuilder<T> SyncProperty(PropertyInfo property);
-    IAutoSyncBuilder<T> SyncPropertys(IEnumerable<PropertyInfo> properties);
+    void AddField(FieldInfo field);
+    void AddProperty(PropertyInfo property);
+    Type Build();
+    void SwitchPacket(AutoSyncFieldPacket packet);
 }
-internal class AutoSyncBuilder<T> : IAutoSyncBuilder<T> where T : class
+internal class AutoSyncBuilder : IAutoSyncBuilder, IDisposable
 {
-    private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
+    private readonly List<FieldInfo> fields = new List<FieldInfo>();
+    private readonly List<PropertyInfo> properties = new List<PropertyInfo>();
     private readonly IObjectManager objectManager;
-    private readonly IRegistryCollection registryCollection;
-    private readonly IAutoSyncPatcher autoSyncPatcher;
-    private readonly IAutoSyncPropertyMapper autoSyncTypeMapper;
-    private readonly List<IDisposable> disposables = new List<IDisposable>();
+    private readonly Harmony harmony;
+    private readonly List<(MethodInfo, MethodInfo)> patchedMethods = new List<(MethodInfo, MethodInfo)>();
 
-    public AutoSyncBuilder(
-        IMessageBroker messageBroker,
-        INetwork network,
-        IObjectManager objectManager,
-        IRegistryCollection registryCollection,
-        IAutoSyncPatcher autoSyncPatcher,
-        IAutoSyncPropertyMapper autoSyncTypeMapper)
+    private object PacketSwitcher;
+
+    public AutoSyncBuilder(IObjectManager objectManager, Harmony harmony)
     {
-        this.messageBroker = messageBroker;
-        this.network = network;
         this.objectManager = objectManager;
-        this.registryCollection = registryCollection;
-        this.autoSyncPatcher = autoSyncPatcher;
-        this.autoSyncTypeMapper = autoSyncTypeMapper;
+        this.harmony = harmony;
+    }
+
+    public void AddField(FieldInfo field)
+    {
+        if (fields.Contains(field)) return;
+        fields.Add(field);
+    }
+
+    public void AddProperty(PropertyInfo property)
+    {
+        if (properties.Contains(property)) return;
+        properties.Add(property);
+    }
+
+
+    public Type Build()
+    {
+        UnpatchAll();
+
+        var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("AutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
+        var moduleBuilder = assemblyBuilder.DefineDynamicModule("AutoSyncAsm");
+
+        AllowPrivateAccess(assemblyBuilder);
+
+        // TODO same thing for properties
+        var fieldMap = ConvertFields();
+
+        var types = fieldMap.Keys.ToArray();
+
+        for (int i = 0; i < types.Length; i++)
+        {
+            var type = types[i];
+            var transpilerType = CreateTranspiler(moduleBuilder, type, i, fieldMap[type].ToArray());
+
+            var transpilerMethod = transpilerType.Method("Transpiler");
+
+            foreach (var method in AccessTools.GetDeclaredMethods(type))
+            {
+                harmony.Patch(method, transpiler: new HarmonyMethod(transpilerMethod));
+                patchedMethods.Add((method, transpilerMethod));
+            }
+        }
+
+        var typeSwitchCreator = new TypeSwitchCreator(moduleBuilder, objectManager);
+
+        var typeSwitchType = typeSwitchCreator.Build(fieldMap);
+
+        PacketSwitcher = Activator.CreateInstance(typeSwitchType, objectManager);
+
+        return typeSwitchType;
+    }
+
+    private Type CreateTranspiler(ModuleBuilder moduleBuilder, Type classType, int typeId, FieldInfo[] fieldsToIntercept)
+    {
+        var builder = new FieldTranspilerCreator(moduleBuilder, classType, typeId, fieldsToIntercept);
+
+        return builder.Build();
+    }
+
+    private void AllowPrivateAccess(AssemblyBuilder assemblyBuilder)
+    {
+        var assemblies = fields.Select(field => field.DeclaringType.Assembly).Concat(properties.Select(prop => prop.DeclaringType.Assembly)).Distinct();
+
+        // Allow access from dynamic assembly to private types
+        foreach (var assembly in assemblies)
+        {
+            CustomAttributeBuilder myCABuilder = new CustomAttributeBuilder(
+                AccessTools.Constructor(typeof(IgnoresAccessChecksToAttribute), new Type[] { typeof(string) }),
+                new object[] { assembly.GetName().Name });
+            assemblyBuilder.SetCustomAttribute(myCABuilder);
+        }
+    }
+
+    private Dictionary<Type, List<FieldInfo>> ConvertFields()
+    {
+        var fieldMap = new Dictionary<Type, List<FieldInfo>>();
+        foreach (var field in fields)
+        {
+            if (fieldMap.ContainsKey(field.DeclaringType) == false)
+                fieldMap.Add(field.DeclaringType, new List<FieldInfo>());
+
+            fieldMap[field.DeclaringType].Add(field);
+        }
+
+        return fieldMap;
+    }
+
+    private Dictionary<Type, List<PropertyInfo>> ConvertProperties()
+    {
+        var propertyMap = new Dictionary<Type, List<PropertyInfo>>();
+        foreach (var property in properties)
+        {
+            if (propertyMap.ContainsKey(property.DeclaringType) == false)
+                propertyMap.Add(property.DeclaringType, new List<PropertyInfo>());
+
+            propertyMap[property.DeclaringType].Add(property);
+        }
+
+        return propertyMap;
+    }
+
+    private void UnpatchAll()
+    {
+        foreach (var (patchedMethod, transpiler) in patchedMethods)
+        {
+            harmony.Unpatch(patchedMethod, transpiler);
+        }
+
+        patchedMethods.Clear();
     }
 
     public void Dispose()
     {
-        foreach (IDisposable disposable in disposables) disposable.Dispose();
+        UnpatchAll();
     }
 
-    public IAutoSyncBuilder<T> SyncCreation(Func<IEnumerable<T>> existingObjects = null)
+    public void SwitchPacket(AutoSyncFieldPacket packet)
     {
-        var lifetimeSync = new AutoCreationSync<T>(messageBroker, network, objectManager, registryCollection, autoSyncPatcher, existingObjects);
+        if (PacketSwitcher == null) return;
 
-        disposables.Add(lifetimeSync);
-
-        return this;
+        AccessTools.Method(PacketSwitcher.GetType(), "TypeSwitch").Invoke(PacketSwitcher, new object[] { packet });
     }
-
-    public IAutoSyncBuilder<T> SyncDeletion(MethodInfo deletionFunction)
-    {
-        var deletionSync = new AutoDeletionSync<T>(messageBroker, network, objectManager, autoSyncPatcher, deletionFunction);
-
-        disposables.Add(deletionSync);
-
-        return this;
-    }
-
-    public IAutoSyncBuilder<T> SyncField(FieldInfo field)
-    {
-        return this;
-    }
-
-    public IAutoSyncBuilder<T> SyncProperty(PropertyInfo property)
-    {
-        if (property.SetMethod == null) throw new ArgumentException($"Unable to sync property with no setter: {property.Name}");
-
-        object[] args = new object[] { messageBroker, network, objectManager, autoSyncPatcher, autoSyncTypeMapper, property.SetMethod };
-        Type propertySyncType;
-
-        if (RuntimeTypeModel.Default.CanSerializeBasicType(property.PropertyType))
-        {
-            propertySyncType = typeof(AutoPropertySync<,>).MakeGenericType(typeof(T), property.PropertyType);
-        }
-        else
-        {
-            propertySyncType = typeof(AutoPropertySyncAsRef<,>).MakeGenericType(typeof(T), property.PropertyType);
-        }
-
-        disposables.Add((IDisposable)Activator.CreateInstance(propertySyncType, args));
-
-        return this;
-    }
-
-    public IAutoSyncBuilder<T> SyncFields(IEnumerable<FieldInfo> fields)
-    {
-        foreach (FieldInfo field in fields)
-        {
-            SyncField(field);
-        }
-
-        return this;
-    }
-
-    public IAutoSyncBuilder<T> SyncPropertys(IEnumerable<PropertyInfo> properties)
-    {
-        foreach (PropertyInfo property in properties)
-        {
-            AccessTools.Method(GetType(), nameof(SyncProperty)).MakeGenericMethod(property.PropertyType).Invoke(this, new object[] { property });
-        }
-
-        return this;
-    }
-
-    public void Build()
-    {
-
-    }
- }
+}

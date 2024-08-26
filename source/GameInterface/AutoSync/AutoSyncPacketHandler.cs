@@ -1,6 +1,9 @@
 ﻿using Common.Messaging;
 using Common.PacketHandlers;
+using GameInterface.AutoSync.Builders;
+using GameInterface.Services.ObjectManager;
 using LiteNetLib;
+using System.Reflection.Emit;
 
 namespace GameInterface.AutoSync;
 internal class AutoSyncPacketHandler : IPacketHandler
@@ -8,10 +11,12 @@ internal class AutoSyncPacketHandler : IPacketHandler
     public PacketType PacketType => PacketType.AutoSync;
 
     private readonly IPacketManager packetManager;
+    private readonly IAutoSyncBuilder autoSyncBuilder;
 
-    public AutoSyncPacketHandler(IPacketManager packetManager)
+    public AutoSyncPacketHandler(IPacketManager packetManager, IAutoSyncBuilder autoSyncBuilder)
     {
         this.packetManager = packetManager;
+        this.autoSyncBuilder = autoSyncBuilder;
         packetManager.RegisterPacketHandler(this);
     }
 
@@ -23,7 +28,7 @@ internal class AutoSyncPacketHandler : IPacketHandler
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
         AutoSyncFieldPacket convertedPacket = (AutoSyncFieldPacket)packet;
-        
-        // TODO
+
+        autoSyncBuilder.SwitchPacket(convertedPacket);
     }
 }
