@@ -25,7 +25,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder, IDisposable
     private readonly Harmony harmony;
     private readonly List<(MethodInfo, MethodInfo)> patchedMethods = new List<(MethodInfo, MethodInfo)>();
 
-    private object PacketSwitcher;
+    private ITypeSwitcher PacketSwitcher;
 
     public AutoSyncBuilder(IObjectManager objectManager, Harmony harmony)
     {
@@ -78,7 +78,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder, IDisposable
 
         var typeSwitchType = typeSwitchCreator.Build(fieldMap);
 
-        PacketSwitcher = Activator.CreateInstance(typeSwitchType, objectManager);
+        PacketSwitcher = (ITypeSwitcher)Activator.CreateInstance(typeSwitchType, objectManager);
 
         return typeSwitchType;
     }
@@ -151,6 +151,6 @@ internal class AutoSyncBuilder : IAutoSyncBuilder, IDisposable
     {
         if (PacketSwitcher == null) return;
 
-        AccessTools.Method(PacketSwitcher.GetType(), "TypeSwitch").Invoke(PacketSwitcher, new object[] { packet });
+        PacketSwitcher.TypeSwitch(packet);
     }
 }

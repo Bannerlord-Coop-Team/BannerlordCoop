@@ -9,6 +9,13 @@ using System.Text;
 using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.AutoSync.Builders;
+
+public interface ITypeSwitcher
+{
+    void TypeSwitch(AutoSyncFieldPacket autoSyncFieldPacket);
+}
+
+
 internal class TypeSwitchCreator
 {
     private readonly TypeBuilder typeBuilder;
@@ -24,7 +31,8 @@ internal class TypeSwitchCreator
                 TypeAttributes.AnsiClass |
                 TypeAttributes.BeforeFieldInit |
                 TypeAttributes.AutoLayout,
-                null);
+                null,
+                new Type[] { typeof(ITypeSwitcher) });
 
         this.moduleBuilder = moduleBuilder;
         this.objectManager = objectManager;
@@ -37,10 +45,12 @@ internal class TypeSwitchCreator
         var fieldSwitches = CreateFieldSwitches(fieldMap);
 
         var methodBuilder = typeBuilder.DefineMethod("TypeSwitch",
-            MethodAttributes.Public,
+            MethodAttributes.Public | MethodAttributes.Virtual,
             null,
             new Type[] { typeof(AutoSyncFieldPacket) });
         methodBuilder.DefineParameter(1, ParameterAttributes.In, "packet");
+
+        typeBuilder.DefineMethodOverride(methodBuilder, AccessTools.Method(typeof(ITypeSwitcher), nameof(ITypeSwitcher.TypeSwitch)));
 
         var il = methodBuilder.GetILGenerator();
 
