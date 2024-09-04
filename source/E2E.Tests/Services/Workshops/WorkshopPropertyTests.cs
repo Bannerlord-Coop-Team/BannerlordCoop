@@ -24,6 +24,7 @@ namespace E2E.Tests.Services.Workshops
 
         string WorkshopId { get; set; }
         string WorkshopTypeId { get; set; }
+        string WorkshopTypeId2 { get; set; }
 
         public void Dispose()
         {
@@ -36,19 +37,24 @@ namespace E2E.Tests.Services.Workshops
 
             var workshop = GameObjectCreator.CreateInitializedObject<Workshop>();
             var workshopType = GameObjectCreator.CreateInitializedObject<WorkshopType>();
+            var workshopType2 = GameObjectCreator.CreateInitializedObject<WorkshopType>();
 
             Server.ObjectManager.AddNewObject(workshopType, out string typeId);
+            Server.ObjectManager.AddNewObject(workshopType2, out string typeId2);
             Server.ObjectManager.AddNewObject(workshop, out string workshopId);
 
             WorkshopId = workshopId;
             WorkshopTypeId = typeId;
+            WorkshopTypeId2 = typeId2;
 
             foreach (var client in Clients)
             {
                 var _workshop = GameObjectCreator.CreateInitializedObject<Workshop>();
                 var _workshopType = GameObjectCreator.CreateInitializedObject<WorkshopType>();
+                var _workshopType2 = GameObjectCreator.CreateInitializedObject<WorkshopType>();
                 client.ObjectManager.AddExisting(WorkshopId, _workshop);
                 client.ObjectManager.AddExisting(WorkshopTypeId, _workshopType);
+                client.ObjectManager.AddExisting(WorkshopTypeId2, _workshopType2);
             }
         }
 
@@ -96,7 +102,7 @@ namespace E2E.Tests.Services.Workshops
         public void ServerChangeWorkshopType_SyncAllClients()
         {
             Assert.True(Server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var serverWorkshop));
-            Assert.True(Server.ObjectManager.TryGetObject<WorkshopType>(WorkshopTypeId, out var serverWorkshopType));
+            Assert.True(Server.ObjectManager.TryGetObject<WorkshopType>(WorkshopTypeId2, out var serverWorkshopType));
             // Act
             Server.Call(() =>
             {
