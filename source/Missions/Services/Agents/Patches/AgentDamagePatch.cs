@@ -33,8 +33,6 @@ namespace Missions.Services.Agents.Patches
     [HarmonyPatch(typeof(Agent), "RegisterBlow")]
     public class RegisterBlowPatch
     {
-        private static AllowedInstance<Agent> _allowedInstance;
-
         private static bool Prefix(ref Agent __instance)
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;

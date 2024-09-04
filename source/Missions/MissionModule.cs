@@ -2,6 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
+using Common.Serialization;
 using GameInterface;
 using IntroServer.Config;
 using Missions.Services;
@@ -27,7 +28,9 @@ namespace Missions
             builder.RegisterType<ExceptionLogger>().AsSelf().AutoActivate().SingleInstance();
 
             // Non interface classes
-            builder.RegisterType<NetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
+            builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
 
 
             // TODO create handler collector

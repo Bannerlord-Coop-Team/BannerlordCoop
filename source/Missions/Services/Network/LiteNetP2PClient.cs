@@ -12,6 +12,7 @@ using IntroServer.Server;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Missions.Services.Network.Messages;
+using ProtoBuf.Meta;
 using Serilog;
 using Serilog.Events;
 using System;
@@ -39,17 +40,20 @@ namespace Missions.Services.Network
         private readonly Guid id = Guid.NewGuid();
         private readonly NetManager netManager;
         private readonly NetworkConfiguration networkConfig;
+        private readonly ICommonSerializer serializer;
         private readonly Version version = typeof(MissionTestServer).Assembly.GetName().Version;
         private readonly IMessageBroker messageBroker;
         private readonly Poller poller;
         
         public LiteNetP2PClient(
             NetworkConfiguration config,
+            ICommonSerializer serializer,
             IMessageBroker messageBroker,
             IPacketManager packetManager)
         {
             PacketManager = packetManager;
             networkConfig = config;
+            this.serializer = serializer;
             this.messageBroker = messageBroker;
 
             netManager = new NetManager(this)
@@ -162,7 +166,7 @@ namespace Missions.Services.Network
 
         public void Send(NetPeer netPeer, IPacket packet)
         {
-            byte[] data = ProtoBufSerializer.Serialize(packet);
+            byte[] data = serializer.Serialize(packet);
             netPeer.Send(data, packet.DeliveryMethod);
         }
 
@@ -176,7 +180,7 @@ namespace Missions.Services.Network
 
         public void SendAll(IPacket packet)
         {
-            byte[] data = ProtoBufSerializer.Serialize(packet);
+            byte[] data = serializer.Serialize(packet);
             netManager.SendToAll(data, packet.DeliveryMethod);
         }
 
@@ -266,25 +270,38 @@ namespace Missions.Services.Network
 
         public void Send(NetPeer netPeer, IMessage message)
         {
-            var messagePacket = new MessagePacket(message);
-            Send(netPeer, messagePacket);
+            var data = SerializeMessage(message);
+            var eventPacket = new MessagePacket(data);
+            Send(netPeer, eventPacket);
         }
 
         public void SendAll(IMessage message)
         {
-            var messagePacket = new MessagePacket(message);
-            SendAll(messagePacket);
+            var data = SerializeMessage(message);
+            var eventPacket = new MessagePacket(data);
+            SendAll(eventPacket);
         }
 
         public void SendAllBut(NetPeer excludedPeer, IMessage message)
         {
-            var messagePacket = new MessagePacket(message);
-            SendAllBut(excludedPeer, messagePacket);
+            var data = SerializeMessage(message);
+            var eventPacket = new MessagePacket(data);
+            SendAllBut(excludedPeer, eventPacket);
+        }
+
+        private byte[] SerializeMessage(IMessage message)
+        {
+            if (RuntimeTypeModel.Default.IsDefined(message.GetType()) == false)
+            {
+                throw new ArgumentException($"Type {message.GetType().Name} is not serializable.");
+            }
+
+            return serializer.Serialize(message);
         }
 
         public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
         {
-            IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
+            var packet = serializer.Deserialize<IPacket>(reader.GetRemainingBytes());
 
             PacketManager.HandleReceive(peer, packet);
         }

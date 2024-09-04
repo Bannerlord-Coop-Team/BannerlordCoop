@@ -49,7 +49,7 @@ namespace Common.PacketHandlers
             PublishEvent(peer, networkEvent);
         }
         private Dictionary<string, Action<IMessageBroker, object, object>> publishFunctionCache = new Dictionary<string, Action<IMessageBroker, object, object>>();
-        internal virtual void PublishEvent(NetPeer peer, IMessage message)
+        public virtual void PublishEvent(NetPeer peer, IMessage message)
         {
             var msgType = message.GetType();
             if (publishFunctionCache.TryGetValue(msgType.FullName, out var action))

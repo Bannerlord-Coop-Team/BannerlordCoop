@@ -1,8 +1,10 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.PacketHandlers;
+using Common.Serialization;
 using LiteNetLib;
 using Missions.Services.Network.Messages;
+using ProtoBuf;
 using Serilog;
 using System;
 using System.Collections.Concurrent;
@@ -19,18 +21,19 @@ namespace Missions.Services.Network
     public class EventQueueManager : MessagePacketHandler, IDisposable
     {
         private static readonly ILogger Logger = LogManager.GetLogger<EventQueueManager>();
-
+        private readonly ICommonSerializer serializer;
         Dictionary<NetPeer, ConcurrentQueue<IMessage>> Queues = new Dictionary<NetPeer, ConcurrentQueue<IMessage>>();
 
         Dictionary<NetPeer, bool> ReadyPeers = new Dictionary<NetPeer, bool>();
 
-        public EventQueueManager(IMessageBroker messageBroker, IPacketManager packetManager) : base(messageBroker, packetManager)
+        public EventQueueManager(IMessageBroker messageBroker, IPacketManager packetManager, ICommonSerializer serializer) : base(messageBroker, packetManager, serializer)
         {
             packetManager.RegisterPacketHandler(this);
 
             messageBroker.Subscribe<PeerConnected>(Handle_PeerConnected);
             messageBroker.Subscribe<PeerDisconnected>(Handle_PeerDisconnect);
             messageBroker.Subscribe<PeerReady>(Handle_PeerReady);
+            this.serializer = serializer;
         }
 
         private void Handle_PeerReady(MessagePayload<PeerReady> obj)
@@ -100,13 +103,15 @@ namespace Missions.Services.Network
                 {
                     MessagePacket convertedPacket = (MessagePacket)packet;
 
-                    if(convertedPacket.Message is NetworkMissionJoinInfo)
+                    var message = serializer.Deserialize<IMessage>(convertedPacket.Data);
+
+                    if (message is NetworkMissionJoinInfo)
                     {
                         base.HandlePacket(peer, packet);
                         return;
                     }
 
-                    Queues[peer].Enqueue(convertedPacket.Message);
+                    Queues[peer].Enqueue(message);
                 }
             }
             else

@@ -9,7 +9,9 @@ using Missions.Services.Agents.Messages;
 using Missions.Services.Network.Data;
 using Missions.Services.Network.Messages;
 using Missions.Services.Network.Surrogates;
+using ProtoBuf;
 using ProtoBuf.Meta;
+using ProtoBuf.Serializers;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -20,8 +22,12 @@ namespace IntroductionServerTests
 {
     public class NetworkMessageSerializationTest
     {
+        private ProtoBufSerializer serializer;
+
         public NetworkMessageSerializationTest()
         {
+            serializer = new ProtoBufSerializer(new SerializableTypeMapper());
+
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterType<MessageBroker>().As<IMessageBroker>().SingleInstance();
             builder.RegisterType<ObjectManagerAdapterStub>().As<IObjectManager>().InstancePerLifetimeScope();
@@ -50,11 +56,11 @@ namespace IntroductionServerTests
                 default,
                 Array.Empty<AiAgentData>());
 
-            byte[] bytes = ProtoBufSerializer.Serialize(missionJoinInfo);
+            byte[] bytes = serializer.Serialize(missionJoinInfo);
 
             Assert.NotNull(bytes);
 
-            NetworkMissionJoinInfo newEvent = (NetworkMissionJoinInfo)ProtoBufSerializer.Deserialize(bytes);
+            NetworkMissionJoinInfo newEvent = (NetworkMissionJoinInfo)serializer.Deserialize(bytes);
 
             Assert.Equal(character.StringId, newEvent.CharacterObject.StringId);
         }
@@ -72,11 +78,10 @@ namespace IntroductionServerTests
 
             NetworkDamageAgent missionJoinInfo = new NetworkDamageAgent(attackerGuid, default, default, default);
 
-            byte[] bytes = ProtoBufSerializer.Serialize(missionJoinInfo);
-
+            byte[] bytes = serializer.Serialize(missionJoinInfo);
             Assert.NotNull(bytes);
 
-            NetworkDamageAgent newEvent = (NetworkDamageAgent)ProtoBufSerializer.Deserialize(bytes);
+            NetworkDamageAgent newEvent = (NetworkDamageAgent)serializer.Deserialize(bytes);
 
             Assert.Equal(attackerGuid, newEvent.AttackerAgentId);
         }
