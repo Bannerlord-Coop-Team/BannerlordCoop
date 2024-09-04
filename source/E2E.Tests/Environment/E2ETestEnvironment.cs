@@ -1,0 +1,88 @@
+﻿using Autofac;
+using Common;
+using Common.Messaging;
+using Common.Tests.Utils;
+using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
+using GameInterface;
+using GameInterface.Tests.Bootstrap;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
+using Xunit.Abstractions;
+
+namespace E2E.Tests.Environment;
+
+/// <summary>
+/// Testing environment for End to End testing
+/// </summary>
+internal class E2ETestEnvironment : IDisposable
+{
+    public TestEnvironment IntegrationEnvironment { get; }
+
+    public ITestOutputHelper Output { get; }
+
+    public IEnumerable<EnvironmentInstance> Clients => IntegrationEnvironment.Clients;
+    public EnvironmentInstance Server => IntegrationEnvironment.Server;
+    
+    public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
+    {
+        GameLoopRunner.Instance.SetGameLoopThread();
+
+        GameBootStrap.Initialize();
+        IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
+
+        Server.Resolve<TestMessageBroker>().SetStaticInstance();
+        var gameInterface = Server.Container.Resolve<IGameInterface>();
+
+        gameInterface.PatchAll();
+
+        foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
+        {
+            Server.ObjectManager.AddExisting(settlement.StringId, settlement);
+        }
+
+        Output = output;
+
+        SetupMainHero();
+    }
+
+    public void SetupMainHero()
+    {
+        // Setup main hero
+        Server.Call(() =>
+        {
+            var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+            MBObjectManager.Instance.RegisterObject(characterObject);
+            var mainHero = HeroCreator.CreateSpecialHero(characterObject);
+            characterObject.HeroObject = mainHero;
+            Game.Current.PlayerTroop = characterObject;
+        });
+    }
+
+    public string CreateRegisteredObject<T>() where T : class
+    {
+        string? id = null;
+        Server.Call(() =>
+        {
+            var obj = GameObjectCreator.CreateInitializedObject<T>();
+
+            if (Server.ObjectManager.TryGetId(obj, out id) == false)
+            {
+                throw new Exception($"Server object manager failed to register new object {typeof(T).Name}");
+            }
+        });
+
+        if (id == null)
+        {
+            throw new Exception($"Failed to create {typeof(T).Name} on Server");
+        }
+
+        return id;
+    }
+
+    public void Dispose()
+    {
+    }
+}

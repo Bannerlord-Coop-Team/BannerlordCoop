@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.Audit;
 using Common.Logging;
 using Common.Messaging;
 using Serilog;
@@ -15,6 +16,11 @@ internal class ServiceModule : Module
     protected override void Load(ContainerBuilder builder)
     {
         foreach (var type in GetHandlers())
+        {
+            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+        }
+
+        foreach (var type in GetAuditors())
         {
             builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
         }
@@ -48,7 +54,9 @@ internal class ServiceModule : Module
         var types = assembly.GetTypes()
             .Where(t => t.GetInterface(nameof(IHandler)) != null &&
                         t.Namespace.StartsWith(@namespace) &&
-                        t.IsClass);
+                        t.IsClass &&
+                        t.IsGenericType == false &&
+                        t.IsAbstract == false);
         return types;
     }
 
@@ -59,7 +67,18 @@ internal class ServiceModule : Module
         var types = assembly.GetTypes()
             .Where(t => t.GetInterface(nameof(IGameAbstraction)) != null &&
                         t.Namespace.StartsWith(@namespace) &&
-                        t.IsClass);
+                        t.IsClass &&
+                        t.IsAbstract == false);
+        return types;
+    }
+
+    private IEnumerable<Type> GetAuditors()
+    {
+        var assembly = GetType().Assembly;
+        var types = assembly.GetTypes()
+            .Where(t => t.GetInterface(nameof(IAuditor)) != null &&
+                        t.IsClass &&
+                        t.IsAbstract == false);
         return types;
     }
 }

@@ -10,4 +10,7 @@ public interface INetworkConfiguration
     string P2PToken { get; }
     TimeSpan ConnectionTimeout { get; }
     int MaxPacketsInQueue { get; }
+    TimeSpan AuditTimeout { get; }
+    TimeSpan ObjectCreationTimeout { get; }
+    TimeSpan NetworkPollInterval { get; }
 }

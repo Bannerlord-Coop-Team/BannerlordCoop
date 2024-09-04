@@ -1,5 +1,7 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.GameDebug.Patches;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -16,17 +18,13 @@ namespace GameInterface.Services.MobileParties.Patches
     [HarmonyPatch(typeof(EnterSettlementAction))]
     internal class EnterSettlementActionPatches
     {
-        public static AllowedInstance<MobileParty> AllowedInstance = new AllowedInstance<MobileParty>();
-
         [HarmonyPrefix]
         [HarmonyPatch(nameof(EnterSettlementAction.ApplyForParty))]
         private static bool ApplyForPartyPrefix(ref MobileParty mobileParty, ref Settlement settlement)
         {
             if (mobileParty.CurrentSettlement == settlement) return false;
 
-            CallStackValidator.Validate(mobileParty, AllowedInstance);
-
-            if (AllowedInstance.IsAllowed(mobileParty)) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             var message = new PartyEnterSettlementAttempted(settlement.StringId, mobileParty.StringId);
             MessageBroker.Instance.Publish(mobileParty, message);
@@ -36,11 +34,13 @@ namespace GameInterface.Services.MobileParties.Patches
 
         public static void OverrideApplyForParty(MobileParty mobileParty, Settlement settlement)
         {
-            using(AllowedInstance)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AllowedInstance.Instance = mobileParty;
-                EnterSettlementAction.ApplyForParty(mobileParty, settlement);
-            }
+                using (new AllowedThread())
+                {
+                    EnterSettlementAction.ApplyForParty(mobileParty, settlement);
+                }
+            });
         }
     }
 }

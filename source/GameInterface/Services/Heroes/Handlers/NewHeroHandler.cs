@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.ObjectManager;
@@ -15,15 +16,12 @@ internal class NewHeroHandler : IHandler
 
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
-    private readonly IHeroRegistry heroRegistry;
     public NewHeroHandler(
         IHeroInterface heroInterface,
-        IMessageBroker messageBroker,
-        IHeroRegistry heroRegistry)
+        IMessageBroker messageBroker)
     {
         this.heroInterface = heroInterface;
         this.messageBroker = messageBroker;
-        this.heroRegistry = heroRegistry;
         messageBroker.Subscribe<PackageMainHero>(Handle);
         messageBroker.Subscribe<RegisterNewPlayerHero>(Handle);
     }
@@ -36,16 +34,8 @@ internal class NewHeroHandler : IHandler
 
     private void Handle(MessagePayload<PackageMainHero> obj)
     {
-        try
-        {
-            byte[] bytes = heroInterface.PackageMainHero();
-            messageBroker.Publish(this, new NewHeroPackaged(bytes));
-        }
-        catch (Exception e)
-        {
-            Logger.Error("Error while packing new Hero: {error}", e.Message);
-            Logger.Error(e.StackTrace);
-        }
+        byte[] bytes = heroInterface.PackageMainHero();
+        messageBroker.Publish(this, new NewHeroPackaged(bytes));
     }
 
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
@@ -54,19 +44,12 @@ internal class NewHeroHandler : IHandler
         var controllerId = obj.What.ControllerId;
         var sendingPeer = obj.What.SendingPeer;
 
-        try
-        {
-            var playerData = heroInterface.UnpackHero(controllerId, bytes);
+        var playerData = heroInterface.UnpackHero(controllerId, bytes);
 
-            Logger.Debug("New Hero ID: {id}", playerData.HeroStringId);
+        Logger.Debug("New Hero ID: {id}", playerData.HeroStringId);
 
-            var registerMessage = new NewPlayerHeroRegistered(sendingPeer, playerData);
+        var registerMessage = new NewPlayerHeroRegistered(sendingPeer, playerData);
 
-            messageBroker.Publish(this, registerMessage);
-        }
-        catch (Exception e)
-        {
-            Logger.Error("Error while unpacking new Hero: {error}", e);
-        }
+        messageBroker.Publish(this, registerMessage);
     }
 }

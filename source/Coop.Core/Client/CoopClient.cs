@@ -31,64 +31,46 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     private readonly IMessageBroker messageBroker;
     private readonly IPacketManager packetManager;
-    private readonly NetManager netManager;
 
     private bool isConnected = false;
 
     public CoopClient(
         INetworkConfiguration config,
         IMessageBroker messageBroker,
-        IPacketManager packetManager) : base(config)
+        IPacketManager packetManager,
+        ICommonSerializer serializer) : base(config, serializer)
     {
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
-
-        // TODO add configuration
-        netManager = new NetManager(this);
-
-#if DEBUG
-        // Increase disconnect timeout to prevent disconnect during debugging
-        netManager.DisconnectTimeout = 300 * 1000;
-#endif
     }
 
-    public void Dispose()
-    {
-        Stop();
-    }
-
-    public void Disconnect()
-    {
-        netManager.DisconnectAll();
-    }
-
-    public void OnConnectionRequest(ConnectionRequest request)
+    public override void OnConnectionRequest(ConnectionRequest request)
     {
         request.Reject();
     }
 
-    public void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
+    public override void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
     {
         throw new NotImplementedException();
     }
 
-    public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
+    public override void OnNetworkLatencyUpdate(NetPeer peer, int latency)
     {
         
     }
 
-    public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
+    public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        IPacket packet = (IPacket)ProtoBufSerializer.Deserialize(reader.GetRemainingBytes());
+        IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
         packetManager.HandleReceive(peer, packet);
     }
 
-    public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
+    public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
         throw new NotImplementedException();
     }
 
-    public void OnPeerConnected(NetPeer peer)
+    public override void OnPeerConnected(NetPeer peer)
     {
         if(isConnected == false)
         {
@@ -99,7 +81,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         }
     }
 
-    public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
+    public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
     {
         if (isConnected == true)
         {
@@ -114,17 +96,12 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         if (isConnected)
         {
-            Stop();
+            Dispose();
         }
 
         netManager.Start();
 
         netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
-    }
-
-    public override void Stop()
-    {
-        netManager.Stop();
     }
 
     public override void Update(TimeSpan frameTime)

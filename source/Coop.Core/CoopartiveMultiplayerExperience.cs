@@ -12,20 +12,22 @@ using GameInterface;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
 using System;
+using System.Threading;
 
 namespace Coop.Core
 {
-    public class CoopartiveMultiplayerExperience : IUpdateable
+    public class CoopartiveMultiplayerExperience
     {
         private readonly IMessageBroker messageBroker;
+        private INetworkConfiguration configuration;
         private IContainer container;
         private INetwork network;
 
-        public CoopartiveMultiplayerExperience(IMessageBroker messageBroker)
+        public CoopartiveMultiplayerExperience()
         {
-            this.messageBroker = messageBroker;
-
-            
+            // TODO use DI maybe?
+            messageBroker = MessageBroker.Instance;
+            configuration = new NetworkConfiguration();
             SurrogateCollection.AssignSurrogates();
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
@@ -37,13 +39,13 @@ namespace Coop.Core
         {
             var connectMessage = obj.What;
 
-            var config = new NetworkConfiguration()
+            configuration = new NetworkConfiguration()
             {
                 Address = connectMessage.Address.ToString(),
                 Port = connectMessage.Port,
             };
 
-            StartAsClient(config);
+            StartAsClient(configuration);
         }
 
         private void Handle(MessagePayload<HostSaveGame> obj)
@@ -61,11 +63,6 @@ namespace Coop.Core
         }
 
         public int Priority => 0;
-
-        public void Update(TimeSpan deltaTime)
-        {
-            network?.Update(deltaTime);
-        }
 
         public void StartAsServer()
         {

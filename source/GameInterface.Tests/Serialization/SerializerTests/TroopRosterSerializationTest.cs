@@ -40,13 +40,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-
-        private readonly FieldInfo data = typeof(TroopRoster).GetField("data", BindingFlags.NonPublic | BindingFlags.Instance);
-        private readonly FieldInfo _isInitialized = typeof(TroopRoster).GetField("_isInitialized", BindingFlags.NonPublic | BindingFlags.Instance);
-        private readonly FieldInfo _totalWoundedHeroes = typeof(TroopRoster).GetField("_totalWoundedHeroes", BindingFlags.NonPublic | BindingFlags.Instance);
-        private readonly FieldInfo _totalWoundedRegulars = typeof(TroopRoster).GetField("_totalWoundedRegulars", BindingFlags.NonPublic | BindingFlags.Instance);
-        private readonly FieldInfo _totalHeroes = typeof(TroopRoster).GetField("_totalHeroes", BindingFlags.NonPublic | BindingFlags.Instance);
-        private readonly FieldInfo _totalRegulars = typeof(TroopRoster).GetField("_totalRegulars", BindingFlags.NonPublic | BindingFlags.Instance);
         [Fact]
         public void TroopRoster_Full_Serialization()
         {
@@ -73,12 +66,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             };
 
             TroopRoster.IsPrisonRoster = true;
-            data.SetValue(TroopRoster, elements);
-            _isInitialized.SetValue(TroopRoster, true);
-            _totalHeroes.SetValue(TroopRoster, 33);
-            _totalRegulars.SetValue(TroopRoster, 31);
-            _totalWoundedHeroes.SetValue(TroopRoster, 43);
-            _totalWoundedRegulars.SetValue(TroopRoster, 12);
+            TroopRoster.data = elements;
+            TroopRoster._isInitialized = true;
+            TroopRoster._totalHeroes = 33;
+            TroopRoster._totalRegulars = 31;
+            TroopRoster._totalWoundedHeroes = 43;
+            TroopRoster._totalWoundedRegulars = 12;
 
 
             var factory = container.Resolve<IBinaryPackageFactory>();
@@ -100,11 +93,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             TroopRoster newTroopRoster = returnedPackage.Unpack<TroopRoster>(deserializeFactory);
 
             Assert.Equal(TroopRoster.Count, newTroopRoster.Count);
-            Assert.Equal(_isInitialized.GetValue(TroopRoster), _isInitialized.GetValue(newTroopRoster));
-            Assert.Equal(_totalHeroes.GetValue(TroopRoster), _totalHeroes.GetValue(newTroopRoster));
-            Assert.Equal(_totalRegulars.GetValue(TroopRoster), _totalRegulars.GetValue(newTroopRoster));
-            Assert.Equal(_totalWoundedHeroes.GetValue(TroopRoster), _totalWoundedHeroes.GetValue(newTroopRoster));
-            Assert.Equal(_totalWoundedRegulars.GetValue(TroopRoster), _totalWoundedRegulars.GetValue(newTroopRoster));
+            Assert.Equal(TroopRoster._isInitialized, newTroopRoster._isInitialized);
+            Assert.Equal(TroopRoster._totalHeroes, newTroopRoster._totalHeroes);
+            Assert.Equal(TroopRoster._totalRegulars, newTroopRoster._totalRegulars);
+            Assert.Equal(TroopRoster._totalWoundedHeroes, newTroopRoster._totalWoundedHeroes);
+            Assert.Equal(TroopRoster._totalWoundedRegulars, newTroopRoster._totalWoundedRegulars);
         }
     }
 }

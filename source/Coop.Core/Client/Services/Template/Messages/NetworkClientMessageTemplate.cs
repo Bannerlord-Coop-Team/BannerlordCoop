@@ -6,7 +6,7 @@ namespace Coop.Core.Client.Services.Template.Messages
     /// <summary>
     /// TODO describe what message does
     /// </summary>
-    [ProtoContract]
+    [ProtoContract(SkipConstructor = true)]
     // Name of the message should start with "Network"
     public record NetworkClientMessageTemplate : IEvent
     {

@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.ObjectManager;
+using TaleWorlds.ObjectSystem;
 
 namespace Coop.IntegrationTests.Environment.Mock
 {
@@ -24,13 +25,18 @@ namespace Coop.IntegrationTests.Environment.Mock
             throw new NotImplementedException();
         }
 
+        public bool Remove(object obj)
+        {
+            throw new NotImplementedException();
+        }
+
         public bool TryGetId(object obj, out string id)
         {
             id = default;
             return false;
         }
 
-        public bool TryGetObject<T>(string id, out T obj)
+        public bool TryGetObject<T>(string id, out T obj) where T : class
         {
             obj = default;
             return false;

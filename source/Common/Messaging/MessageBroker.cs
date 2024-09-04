@@ -72,7 +72,7 @@ namespace Common.Messaging
             }
         }
 
-        public void Respond<T>(object target, T message) where T : IResponse
+        public virtual void Respond<T>(object target, T message) where T : IResponse
         {
             if (message == null)
                 return;

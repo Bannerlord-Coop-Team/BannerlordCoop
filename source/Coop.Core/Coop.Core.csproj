@@ -49,6 +49,11 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="7.0.1" />
+    <PackageReference Include="Krafs.Publicizer" Version="2.2.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.Collections.Immutable" Version="7.0.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
@@ -70,10 +75,20 @@
 	<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
 		<_Parameter1>Coop.IntegrationTests</_Parameter1>
 	</AssemblyAttribute>
+	<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+		<_Parameter1>E2E.Tests</_Parameter1>
+	</AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
 	  <Reference Include="TaleWorlds.Library">
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
 	  </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Client\Services\MobileParties\Messages\Data\" />
+    <Folder Include="Server\Services\Kingdoms\Messages\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Publicize Include="TaleWorlds.Library" />
   </ItemGroup>
 </Project>

@@ -16,9 +16,6 @@ namespace GameInterface.Services.GameDebug.Patches
     {
         public static bool AllPartiesVisible = false;
 
-        private static Action<MobileParty, bool> _isVisibleSetter = typeof(MobileParty)
-            .GetField("_isVisible", BindingFlags.NonPublic | BindingFlags.Instance)
-            .BuildUntypedSetter<MobileParty, bool>();
 
         [HarmonyPrefix]
         [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Setter)]
@@ -26,7 +23,7 @@ namespace GameInterface.Services.GameDebug.Patches
         {
             if (AllPartiesVisible == false) return true;
 
-            _isVisibleSetter(__instance, true);
+            __instance._isVisible = true;
             __instance.Party.OnVisibilityChanged(true);
 
             return false;

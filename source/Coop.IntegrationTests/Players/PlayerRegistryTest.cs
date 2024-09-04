@@ -29,7 +29,7 @@ namespace Coop.IntegrationTests.Players
 
             var server1 = TestEnvironment.Server;
 
-            server1.ReceiveMessage(this, message);
+            server1.SimulateMessage(this, message);
 
             // Assert
             foreach (var client in TestEnvironment.Clients)

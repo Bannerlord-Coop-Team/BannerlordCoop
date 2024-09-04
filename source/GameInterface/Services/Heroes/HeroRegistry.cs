@@ -1,24 +1,23 @@
 ﻿using Common;
+using Common.Extensions;
+using System;
 using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Registry;
-
 
 /// <summary>
 /// Registry for identifying ownership of <see cref="Hero"/> objects
 /// </summary>
-internal interface IHeroRegistry : IRegistry<Hero>
+internal class HeroRegistry : RegistryBase<Hero>
 {
-    void RegisterAllHeroes();
-    bool RegisterHero(Hero hero);
-    bool RemoveHero(Hero hero);
-}
+    public static readonly string HeroStringIdPrefix = "CoopHero";
 
-/// <inheritdoc cref="IHeroRegistry"/>
-internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
-{
-    public void RegisterAllHeroes()
+    public HeroRegistry(IRegistryCollection collection) : base(collection) { }
+
+    public override void RegisterAll()
     {
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -31,46 +30,33 @@ internal class HeroRegistry : RegistryBase<Hero>, IHeroRegistry
         var heroes = campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes).ToArray();
         foreach (var hero in heroes)
         {
-            RegisterHero(hero);
+            base.RegisterExistingObject(hero.StringId, hero);
         }
     }
 
-    public bool RegisterHero(Hero hero)
+    public override bool RegisterExistingObject(string id, object obj)
     {
-        if (RegisterExistingObject(hero.StringId, hero) == false)
-        {
-            Logger.Warning("Unable to register hero: {object}", hero.Name);
-            return false;
-        }
+        var result = base.RegisterExistingObject(id, obj);
 
-        return true;
+        AddToCampaignObjectManager(obj);
+
+        return result;
     }
 
-    public bool RemoveHero(Hero hero) => Remove(hero.StringId);
-
-
-    public static readonly string HeroStringIdPrefix = "CoopHero";
-    public override bool RegisterNewObject(Hero obj, out string id)
+    protected override string GetNewId(Hero hero)
     {
-        id = null;
+        hero.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
+        return hero.StringId;
+    }
 
-        // Input validation
-        if (obj == null) return false;
+    private void AddToCampaignObjectManager(object obj)
+    {
+        if (TryCast(obj, out var castedObj) == false) return;
 
-        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
+        var objectManager = Campaign.Current?.CampaignObjectManager;
 
-        if (campaignObjectManager == null) return false;
+        if (objectManager == null) return;
 
-        var newId = campaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
-
-        if (objIds.ContainsKey(newId)) return false;
-
-        obj.StringId = newId;
-
-        objIds.Add(newId, obj);
-
-        id = newId;
-
-        return true;
+        objectManager.OnHeroAdded(castedObj);
     }
 }

@@ -15,11 +15,6 @@ internal class PartiesThinkPatch
     private const int UPDATES_PER_TICK = 100;
     private const int TICK_DELAY_MS = 100;
 
-
-    private static readonly Action<MobilePartyAi, float> AI_Tick = typeof(MobilePartyAi)
-        .GetMethod("Tick", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildDelegate<Action<MobilePartyAi, float>>();
-
     private static Task delay = Task.CompletedTask;
 
     private static int CurrentStartIdx = 0;
@@ -36,7 +31,7 @@ internal class PartiesThinkPatch
         {
             var currentIdx = (CurrentStartIdx + i) % __instance.MobileParties.Count;
 
-            AI_Tick(__instance.MobileParties[currentIdx].Ai, dt);
+            __instance.MobileParties[currentIdx].Ai.Tick(dt);
         }
 
         CurrentStartIdx = (CurrentStartIdx + UPDATES_PER_TICK) % __instance.MobileParties.Count;

@@ -1,44 +1,40 @@
 ﻿using Autofac;
 using GameInterface.Serialization;
 using GameInterface.Services;
-using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
-using GameInterface.Services.Registry;
 using GameInterface.Services.Time;
+using HarmonyLib;
 
 namespace GameInterface;
 
 public class GameInterfaceModule : Module
 {
+    // TODO move to config
+    public const string HarmonyId = "TaleWorlds.MountAndBlade.Bannerlord.Coop";
+
     protected override void Load(ContainerBuilder builder)
     {
-        base.Load(builder);
+        
+        builder.RegisterInstance(new Harmony(HarmonyId)).As<Harmony>().SingleInstance();
+
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
-        builder.RegisterType<MBObjectManagerAdapter>().As<IObjectManager>().InstancePerLifetimeScope();
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
+        
+
         builder.RegisterModule<ServiceModule>();
+        builder.RegisterModule<ObjectManagerModule>();
 
-        builder.RegisterType<MobilePartyRegistry>()
-               .As<IMobilePartyRegistry>()
-               .InstancePerLifetimeScope();
+        foreach(var type in LifetimeSyncCollection.LifetimeSync)
+        {
+            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
+        }
 
-        builder.RegisterType<HeroRegistry>()
-               .As<IHeroRegistry>()
-               .InstancePerLifetimeScope();
-
-        builder.RegisterType<ClanRegistry>()
-               .As<IClanRegistry>()
-               .InstancePerLifetimeScope();
-
-        builder.RegisterType<ControlledEntityRegistry>()
-               .As<IControlledEntityRegistry>()
-               .InstancePerLifetimeScope();
+        base.Load(builder);
     }
 }

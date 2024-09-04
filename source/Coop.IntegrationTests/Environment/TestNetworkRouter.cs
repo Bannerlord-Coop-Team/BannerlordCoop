@@ -1,17 +1,21 @@
-﻿using Common.Messaging;
+﻿using Autofac;
+using Common.Messaging;
 using Common.PacketHandlers;
+using Common.Serialization;
 using Coop.IntegrationTests.Environment.Instance;
 using LiteNetLib;
+using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 
 namespace Coop.IntegrationTests.Environment;
 
 /// <summary>
 /// Network message router for simulating messages across the network
 /// </summary>
-internal class TestNetworkRouter
+public class TestNetworkRouter
 {
     private ServerInstance Server;
     private List<ClientInstance> Clients = new List<ClientInstance>();
+
     public void AddServer(ServerInstance instance)
     {
         Server = instance;
@@ -24,7 +28,7 @@ internal class TestNetworkRouter
 
     public void Send(NetPeer sender, NetPeer receiver, IMessage message)
     {
-        if(receiver == Server.NetPeer)
+        if (receiver == Server.NetPeer)
         {
             Server.SimulateMessage(sender, message);
         }
@@ -39,7 +43,7 @@ internal class TestNetworkRouter
     {
         if (sender == Server.NetPeer)
         {
-            foreach(var client in Clients)
+            foreach (var client in Clients)
             {
                 client.SimulateMessage(sender, message);
             }

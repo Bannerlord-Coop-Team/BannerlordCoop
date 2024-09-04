@@ -29,7 +29,11 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="7.0.1" />
-    <PackageReference Include="Bannerlord.Lib.Harmony" Version="2.2.2" />
+    <PackageReference Include="Krafs.Publicizer" Version="2.2.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Lib.Harmony" Version="2.3.3" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.3.2" />
     <PackageReference Include="MonoMod.RuntimeDetour" Version="22.7.31.1" />
     <PackageReference Include="MonoMod.Utils" Version="22.7.31.1" />
@@ -62,6 +66,9 @@
     <Reference Include="TaleWorlds.Localization">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.ModuleManager">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
@@ -80,9 +87,23 @@
       <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
       <Name>Common</Name>
     </ProjectReference>
+    <ProjectReference Include="..\Coop.Tests\Coop.Tests.csproj" />
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">
       <Project>{d22cb8fa-40cc-4f47-986f-1c5a4415980b}</Project>
       <Name>GameInterface</Name>
     </ProjectReference>
   </ItemGroup>
-  </Project>
+  <ItemGroup>
+    <Publicize Include="SandBox" />
+    <Publicize Include="TaleWorlds.CampaignSystem" />
+    <Publicize Include="TaleWorlds.Core" />
+    <Publicize Include="TaleWorlds.Engine" />
+    <Publicize Include="TaleWorlds.Library" />
+    <Publicize Include="TaleWorlds.Localization" />
+    <Publicize Include="TaleWorlds.ModuleManager" />
+    <Publicize Include="TaleWorlds.MountAndBlade" />
+    <Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library" />
+    <Publicize Include="TaleWorlds.ObjectSystem" />
+    <Publicize Include="TaleWorlds.SaveSystem" />
+  </ItemGroup>
+</Project>

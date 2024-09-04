@@ -35,14 +35,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.NotEmpty(bytes);
         }
-        private static readonly FieldInfo _amount = typeof(ItemRosterElement).GetField("_amount", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
-        private static readonly PropertyInfo EquipmentElementProperty = typeof(ItemRosterElement).GetProperty("EquipmentElement");
+
         [Fact]
         public void ItemRosterElement_Full_Serialization()
         {
             ItemRosterElement itemRosterElement = new ItemRosterElement();
-            _amount.SetValue(itemRosterElement, 5);
-            EquipmentElementProperty.SetValue(itemRosterElement, new EquipmentElement());
+            itemRosterElement._amount = 5;
+            itemRosterElement.EquipmentElement = new EquipmentElement();
             var factory = container.Resolve<IBinaryPackageFactory>();
             ItemRosterElementBinaryPackage package = new ItemRosterElementBinaryPackage(itemRosterElement, factory);
 

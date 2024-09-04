@@ -184,6 +184,20 @@ namespace Common.Extensions
         };
 
         /// <summary>
+        /// Returns random value of <typeparamref name="T"/>
+        /// </summary>
+        /// <typeparam name="T">Type of random value</typeparam>
+        /// <returns>Random value of <typeparamref name="T"/> or default of <typeparamref name="T"/> if failed</returns>
+        public static T Random<T>()
+        {
+            if (TryChooseRandomType(typeof(T), out var result))
+            {
+                return (T)result;
+            }
+            return default(T);
+        }
+
+        /// <summary>
         /// Sets the field of an object to a random type if it is handled
         /// </summary>
         /// <param name="field">Field to assign</param>

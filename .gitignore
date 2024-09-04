@@ -13,6 +13,7 @@ reated by https://www.gitignore.io/api/csharp,powershell,dotnetcore,visualstudio
 *.user
 *.userosscache
 *.sln.docstates
+*.idea
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
@@ -544,4 +545,6 @@ source/.editorconfig
 # Rider IDE
 source/.idea
 !*ClientDebug.csproj.user
+!*ClientDebug2.csproj.user
+!*Coop.csproj.user
 !*MissionTestMod.csproj.user

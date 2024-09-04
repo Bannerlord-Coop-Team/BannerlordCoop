@@ -18,6 +18,7 @@ namespace Common.Logging;
 public class MessageLogger
 {
     private readonly ILogger logger;
+    private readonly BatchLogger batchLogger = new BatchLogger(TimeSpan.FromSeconds(1));
 
     public MessageLogger(ILogger logger)
     {
@@ -28,32 +29,20 @@ public class MessageLogger
     {
         if (messageType.GetCustomAttribute<DontLogMessageAttribute>() != null) return;
 
+        BatchLog(messageType);
+        return;
+
         if (messageType.GetCustomAttribute<BatchLogMessageAttribute>() != null)
         {
-            BatchLog(messageType);
+            
             return;
         }
 
         logger.Verbose("Publishing {msgName} from {sourceName}", messageType.Name, source?.GetType().Name ?? "Static Method");
     }
 
-    private ConcurrentDictionary<Type, BatchLogger> loggers = new ConcurrentDictionary<Type, BatchLogger>();
     private void BatchLog(Type messageType)
     {
-        if (loggers.TryGetValue(messageType, out var batchLogger))
-        {
-            batchLogger.LogOne();
-        }
-        else
-        {
-            var newBatchLogger = new BatchLogger(messageType.Name, TimeSpan.FromSeconds(1));
-            if (loggers.TryAdd(messageType, newBatchLogger) == false)
-            {
-                logger.Error("Unable to add {messageType} to batch loggers", messageType);
-                return;
-            }
-
-            newBatchLogger.LogOne();
-        }
+        batchLogger.LogOne(messageType);
     }
 }
