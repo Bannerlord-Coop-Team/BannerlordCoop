@@ -97,7 +97,6 @@ namespace E2E.Tests.Services.Workshops
             }
         }
 
-        //This one does nothing atm.... Campaign.Current.Workshops is empty??
         [Fact]
         public void ServerChangeWorkshopType_SyncAllClients()
         {
