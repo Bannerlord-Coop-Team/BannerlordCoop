@@ -182,7 +182,7 @@ public class AutoSyncTests
             throw new NotImplementedException();
         }
 
-        public bool TryGetId(object obj, out string id)
+        public bool TryGetId(object obj, out string? id)
         {
             id = null;
 

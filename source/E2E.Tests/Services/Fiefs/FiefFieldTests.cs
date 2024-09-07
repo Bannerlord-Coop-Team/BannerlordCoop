@@ -16,29 +16,21 @@ public class FiefFieldTests : IDisposable
 
     IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
-
     private readonly string FiefId;
-    private readonly ITestOutputHelper output;
 
     public FiefFieldTests(ITestOutputHelper output)
     {
-        this.output = output;
-
         TestEnvironment = new E2ETestEnvironment(output);
 
         var fief = new Town();
 
-        fief.StringId = "TestTown";
-        
-
+        // Create fief on the server
         Assert.True(Server.ObjectManager.AddNewObject(fief, out FiefId));
-        
 
+        // Create fief on all clients
         foreach (var client in Clients)
         {
             var client_fief = new Town();
-            client_fief.StringId = FiefId;
-
             Assert.True(client.ObjectManager.AddExisting(FiefId, client_fief));
         }
     }
@@ -56,11 +48,14 @@ public class FiefFieldTests : IDisposable
 
         var field = AccessTools.Field(typeof(Fief), nameof(Fief.GarrisonPartyComponent));
 
+        // Get field intercept to use on the server to simulate the field changing
         var intercept = TestEnvironment.GetIntercept(field);
 
+        // Create garrison instances on server
         GarrisonPartyComponent garrison = ObjectHelper.SkipConstructor<GarrisonPartyComponent>();
         Assert.True(server.ObjectManager.AddNewObject(garrison, out var garrisonId));
 
+        // Create garrison instances on all clients
         foreach (var client in Clients)
         {
             var client_garrison = ObjectHelper.SkipConstructor<GarrisonPartyComponent>();
@@ -75,14 +70,13 @@ public class FiefFieldTests : IDisposable
 
             Assert.Null(fief.GarrisonPartyComponent);
 
+            // Simulate the field changing
             intercept.Invoke(null, new object[] { fief, garrisonComponent });
 
             Assert.Same(garrisonComponent, fief.GarrisonPartyComponent);
         });
 
         // Assert
-        var t = server.NetworkSentMessages.ToArray();
-
         foreach (var client in Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<Town>(FiefId, out var fief));

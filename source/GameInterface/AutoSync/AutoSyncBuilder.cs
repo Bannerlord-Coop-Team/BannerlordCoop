@@ -28,8 +28,6 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
     private Dictionary<FieldInfo, MethodInfo> interceptMap = new Dictionary<FieldInfo, MethodInfo>();
 
-    private readonly ITypeSwitcher PacketSwitcher;
-
     public AutoSyncBuilder(IObjectManager objectManager, Harmony harmony, IPacketSwitchProvider packetSwitchProvider, IAutoSyncPatchCollector patchCollector)
     {
         this.objectManager = objectManager;

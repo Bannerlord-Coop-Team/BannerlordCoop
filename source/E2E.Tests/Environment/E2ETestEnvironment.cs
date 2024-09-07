@@ -47,7 +47,7 @@ internal class E2ETestEnvironment : IDisposable
         SetupMainHero();
     }
 
-    public void SetupAutoSync()
+    private void SetupAutoSync()
     {
         Server.Resolve<IAutoSyncBuilder>().Build();
 
@@ -57,7 +57,7 @@ internal class E2ETestEnvironment : IDisposable
         }
     }
 
-    public void SetupMainHero()
+    private void SetupMainHero()
     {
         // Setup main hero
         Server.Call(() =>
@@ -70,7 +70,15 @@ internal class E2ETestEnvironment : IDisposable
         });
     }
 
-    // TODO add comments
+    /// <summary>
+    /// Creates a new object of type <typeparamref name="T"/> that is registered on the server and all clients.
+    /// </summary>
+    /// <remarks>
+    /// This uses the <see cref="GameObjectCreator"/> to generate objects.
+    /// </remarks>
+    /// <typeparam name="T">Type of object to create</typeparam>
+    /// <returns>New object of type <typeparamref name="T"/></returns>
+    /// <exception cref="Exception">Failed to create object exception</exception>
     public string CreateRegisteredObject<T>() where T : class
     {
         string? id = null;
@@ -92,6 +100,11 @@ internal class E2ETestEnvironment : IDisposable
         return id;
     }
 
+    /// <summary>
+    /// Gets the field changed intercept from the given <paramref name="field"/>
+    /// </summary>
+    /// <param name="field">Field to get intercept from</param>
+    /// <returns>Field intercept as <see cref="MethodInfo"/></returns>
     public MethodInfo GetIntercept(FieldInfo field)
     {
         Assert.True(Server.Resolve<IAutoSyncBuilder>().TryGetIntercept(field, out var intercept));
