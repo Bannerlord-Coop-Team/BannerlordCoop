@@ -56,7 +56,6 @@ public class AutoSyncTests : IDisposable
 
         server.Call(() =>
         {
-            
             var testClass = server.GetRegisteredObject<AutoSyncTestClass>(instanceId);
 
             testClass.SetMyInt(newMyIntValue);

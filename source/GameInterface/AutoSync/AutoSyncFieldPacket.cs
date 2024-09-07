@@ -27,5 +27,4 @@ public readonly struct AutoSyncFieldPacket : IPacket
     public readonly PacketType PacketType => PacketType.AutoSync;
 
     public readonly DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
-
 }

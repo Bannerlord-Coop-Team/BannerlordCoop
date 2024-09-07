@@ -149,7 +149,6 @@ public class FieldSwitchCreator
 
     private void CreateByValue(ILGenerator il, FieldInfo field, LocalBuilder instanceLocal)
     {
-        
         // Loads the instance (used by strfld)
         il.Emit(OpCodes.Ldloc, instanceLocal);
 

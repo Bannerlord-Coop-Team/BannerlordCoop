@@ -15,8 +15,8 @@ internal class SettlementComponentRegistry : RegistryBase<SettlementComponent>
         typeof(Village),
         typeof(Hideout),
         typeof(RetirementSettlementComponent),
-
     };
+
     public SettlementComponentRegistry(IRegistryCollection collection) : base(collection)
     {
     }

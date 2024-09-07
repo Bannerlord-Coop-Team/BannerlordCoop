@@ -193,7 +193,6 @@ public class AutoSyncTests
                     id = kvp.Key;
                     return true;
                 }
-                    
             }
 
             return false;

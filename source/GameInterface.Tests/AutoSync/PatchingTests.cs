@@ -76,7 +76,6 @@ public class PatchingTests
             var packet = Assert.IsType<AutoSyncFieldPacket>(Assert.Single(network.SentPackets));
 
             Assert.Equal(objId, packet.instanceId);
-
         }
     }
 
