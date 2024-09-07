@@ -11,6 +11,8 @@ using System.Reflection;
 using System.Text;
 using System.Collections;
 using System.Linq;
+using ProtoBuf;
+using ProtoBuf.Meta;
 
 namespace GameInterface.AutoSync.Builders;
 public class FieldTranspilerCreator
@@ -18,11 +20,16 @@ public class FieldTranspilerCreator
     private readonly TypeBuilder typeBuilder;
 
     private readonly FieldBuilder loggerField;
+    private readonly IObjectManager objectManager;
+    private readonly Dictionary<FieldInfo, MethodInfo> interceptMap;
 
     public TypeInfo NestedEnumeratorType { get; }
 
-    public FieldTranspilerCreator(ModuleBuilder moduleBuilder, Type type, int typeId, FieldInfo[] interceptFields)
+    public FieldTranspilerCreator(IObjectManager objectManager, ModuleBuilder moduleBuilder, Type type, int typeId, FieldInfo[] interceptFields, Dictionary<FieldInfo, MethodInfo> interceptMap)
     {
+        this.objectManager = objectManager;
+        this.interceptMap = interceptMap;
+
         typeBuilder = moduleBuilder.DefineType($"{type.Name}_Transpilers",
             TypeAttributes.Public |
             TypeAttributes.Class |
@@ -71,7 +78,7 @@ public class FieldTranspilerCreator
 
     private TypeInfo CreateNestedEnumeratorType(ModuleBuilder moduleBuilder, int typeId, FieldInfo[] interceptFields)
     {
-        var nested_enumerable = moduleBuilder.DefineType("internal_enumerable",
+        var nested_enumerable = moduleBuilder.DefineType($"internal_enumerable_{typeId}",
             TypeAttributes.Public |
             TypeAttributes.BeforeFieldInit |
             TypeAttributes.Sealed |
@@ -110,7 +117,14 @@ public class FieldTranspilerCreator
         var getEnumeratorMethodGeneric = CreateGetEnumeratorGeneric(nested_enumerable, getEnumeratorMethod);
         nested_enumerable.DefineMethodOverride(getEnumeratorMethodGeneric, AccessTools.Method(typeof(IEnumerable), nameof(IEnumerable.GetEnumerator)));
 
-        var moveNextMethod = CreateMoveNext(typeId, interceptFields, nested_enumerable, stateField, instructionsField, instructionsEnumeratorField, currentField, finallyMethod);
+        var moveNextMethod = CreateMoveNext(typeId,
+            interceptFields,
+            nested_enumerable,
+            stateField,
+            instructionsField,
+            instructionsEnumeratorField,
+            currentField,
+            finallyMethod);
         nested_enumerable.DefineMethodOverride(moveNextMethod, AccessTools.Method(typeof(IEnumerator), nameof(IEnumerator.MoveNext)));
 
         return nested_enumerable.CreateTypeInfo();
@@ -319,8 +333,25 @@ public class FieldTranspilerCreator
 
             il.Emit(OpCodes.Ldsfld, AccessTools.Field(typeof(OpCodes), nameof(OpCodes.Call)));
 
+            MethodBuilder fieldIntercept;
+
             // TODO determine by ref or by value
-            var fieldIntercept = CreateInterceptByValue(typeId, i, interceptFields[i]);
+            if (RuntimeTypeModel.Default.CanSerialize(interceptFields[i].FieldType))
+            {
+                fieldIntercept = CreateInterceptByValue(typeId, i, interceptFields[i]);
+            }
+            else if (objectManager.IsTypeManaged(interceptFields[i].FieldType))
+            {
+                fieldIntercept = CreateInterceptByRef(typeId, i, interceptFields[i]);
+            }
+            else
+            {
+                throw new NotSupportedException(
+                    $"{interceptFields[i].FieldType} is not serializable or managed by the {nameof(IObjectManager)}. " +
+                    $"Create a registry for this type or make this type serializable using a surrogate");
+            }
+
+            interceptMap.Add(interceptFields[i], fieldIntercept);
 
             il.Emit(OpCodes.Ldtoken, fieldIntercept.DeclaringType);
             il.Emit(OpCodes.Call, AccessTools.Method(typeof(Type), nameof(Type.GetTypeFromHandle)));
@@ -421,9 +452,44 @@ public class FieldTranspilerCreator
         return methodBuilder;
     }
 
-    public static void What(object obj)
+    private MethodBuilder CreateInterceptByRef(int typeId, int propId, FieldInfo field)
     {
-        ;
+        var methodBuilder = typeBuilder.DefineMethod($"{field.DeclaringType.Name}_{field.Name}_intercept",
+            MethodAttributes.Public | MethodAttributes.Static,
+            null,
+            new Type[] { field.DeclaringType, field.FieldType });
+        var instanceParam = methodBuilder.DefineParameter(0, ParameterAttributes.In, "instance");
+        var valueParam = methodBuilder.DefineParameter(1, ParameterAttributes.In, "value");
+
+        var il = methodBuilder.GetILGenerator();
+
+        IsClientCheck(il, field);
+
+        var networkLocal = TryResolve<INetwork>(il);
+        var objectManagerLocal = TryResolve<IObjectManager>(il);
+
+        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
+        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal);
+
+        il.Emit(OpCodes.Ldloc, networkLocal);
+        il.Emit(OpCodes.Ldloc, idLocal);
+        il.Emit(OpCodes.Ldc_I4, typeId);
+        il.Emit(OpCodes.Ldc_I4, propId);
+
+        il.Emit(OpCodes.Ldloc, valueIdLocal);
+        
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Serialize)));
+
+        il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(AutoSyncFieldPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
+        il.Emit(OpCodes.Box, typeof(AutoSyncFieldPacket));
+        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
+
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Stfld, field);
+        il.Emit(OpCodes.Ret);
+
+        return methodBuilder;
     }
 
     private LocalBuilder TryResolve<T>(ILGenerator il)

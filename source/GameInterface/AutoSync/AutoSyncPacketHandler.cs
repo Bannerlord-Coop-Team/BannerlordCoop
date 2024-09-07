@@ -11,12 +11,13 @@ internal class AutoSyncPacketHandler : IPacketHandler
     public PacketType PacketType => PacketType.AutoSync;
 
     private readonly IPacketManager packetManager;
-    private readonly IAutoSyncBuilder autoSyncBuilder;
+    private readonly IPacketSwitchProvider packetSwitchProvider;
 
-    public AutoSyncPacketHandler(IPacketManager packetManager, IAutoSyncBuilder autoSyncBuilder)
+    public AutoSyncPacketHandler(IPacketManager packetManager, IPacketSwitchProvider packetSwitchProvider)
     {
         this.packetManager = packetManager;
-        this.autoSyncBuilder = autoSyncBuilder;
+        this.packetSwitchProvider = packetSwitchProvider;
+
         packetManager.RegisterPacketHandler(this);
     }
 
@@ -27,8 +28,10 @@ internal class AutoSyncPacketHandler : IPacketHandler
 
     public void HandlePacket(NetPeer peer, IPacket packet)
     {
+        if (packetSwitchProvider.Switcher == null) return;
+
         AutoSyncFieldPacket convertedPacket = (AutoSyncFieldPacket)packet;
 
-        autoSyncBuilder.SwitchPacket(convertedPacket);
+        packetSwitchProvider.Switcher.TypeSwitch(convertedPacket);
     }
 }

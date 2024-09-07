@@ -10,47 +10,56 @@ using System.Runtime.CompilerServices;
 using System.Text;
 
 namespace GameInterface.AutoSync;
-public interface IAutoSyncBuilder
+public interface IAutoSyncBuilder : IDisposable
 {
     void AddField(FieldInfo field);
     void AddProperty(PropertyInfo property);
     Type Build();
-    void SwitchPacket(AutoSyncFieldPacket packet);
+    bool TryGetIntercept(FieldInfo field, out MethodInfo intercept);
 }
-internal class AutoSyncBuilder : IAutoSyncBuilder, IDisposable
+internal class AutoSyncBuilder : IAutoSyncBuilder
 {
     private readonly List<FieldInfo> fields = new List<FieldInfo>();
     private readonly List<PropertyInfo> properties = new List<PropertyInfo>();
     private readonly IObjectManager objectManager;
     private readonly Harmony harmony;
-    private readonly List<(MethodInfo, MethodInfo)> patchedMethods = new List<(MethodInfo, MethodInfo)>();
+    private readonly IPacketSwitchProvider packetSwitchProvider;
+    private readonly IAutoSyncPatchCollector patchCollector;
+
+    private Dictionary<FieldInfo, MethodInfo> interceptMap = new Dictionary<FieldInfo, MethodInfo>();
 
     private ITypeSwitcher PacketSwitcher;
 
-    public AutoSyncBuilder(IObjectManager objectManager, Harmony harmony)
+    public AutoSyncBuilder(IObjectManager objectManager, Harmony harmony, IPacketSwitchProvider packetSwitchProvider, IAutoSyncPatchCollector patchCollector)
     {
         this.objectManager = objectManager;
         this.harmony = harmony;
+        this.packetSwitchProvider = packetSwitchProvider;
+        this.patchCollector = patchCollector;
     }
 
     public void AddField(FieldInfo field)
     {
+        if (field == null) throw new ArgumentNullException(nameof(field));
+
         if (fields.Contains(field)) return;
         fields.Add(field);
     }
 
     public void AddProperty(PropertyInfo property)
     {
+        if (property == null) throw new ArgumentNullException(nameof(property));
+
         if (properties.Contains(property)) return;
         properties.Add(property);
     }
 
-
+    public static int AsmCounter = 1;
     public Type Build()
     {
-        UnpatchAll();
+        ClearCollections();
 
-        var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("AutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
+        var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName($"AutoSyncAsm_{AsmCounter++}"), AssemblyBuilderAccess.RunAndCollect);
         var moduleBuilder = assemblyBuilder.DefineDynamicModule("AutoSyncAsm");
 
         AllowPrivateAccess(assemblyBuilder);
@@ -69,8 +78,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder, IDisposable
 
             foreach (var method in AccessTools.GetDeclaredMethods(type))
             {
-                harmony.Patch(method, transpiler: new HarmonyMethod(transpilerMethod));
-                patchedMethods.Add((method, transpilerMethod));
+                patchCollector.AddTranspiler(method, transpilerMethod);
             }
         }
 
@@ -78,21 +86,38 @@ internal class AutoSyncBuilder : IAutoSyncBuilder, IDisposable
 
         var typeSwitchType = typeSwitchCreator.Build(fieldMap);
 
-        PacketSwitcher = (ITypeSwitcher)Activator.CreateInstance(typeSwitchType, objectManager);
+        // Set packet switcher
+        packetSwitchProvider.Switcher = (ITypeSwitcher)Activator.CreateInstance(typeSwitchType, objectManager);
 
         return typeSwitchType;
     }
 
     private Type CreateTranspiler(ModuleBuilder moduleBuilder, Type classType, int typeId, FieldInfo[] fieldsToIntercept)
     {
-        var builder = new FieldTranspilerCreator(moduleBuilder, classType, typeId, fieldsToIntercept);
+        var builder = new FieldTranspilerCreator(objectManager, moduleBuilder, classType, typeId, fieldsToIntercept, interceptMap);
 
-        return builder.Build();
+        var compiledType = builder.Build();
+
+        ConvertStoredInterceptsToActual(compiledType);
+
+        return compiledType;
+    }
+
+    private void ConvertStoredInterceptsToActual(Type compiledType)
+    {
+        interceptMap = interceptMap.ToDictionary(kvp => kvp.Key, kvp =>
+        {
+            var method = kvp.Value;
+            var genericParams = method.IsGenericMethod ? method.GetGenericArguments() : null;
+            var actualMethod = AccessTools.Method(compiledType, method.Name, method.GetParameters().Select(p => p.ParameterType).ToArray(), genericParams);
+
+            return actualMethod;
+        });
     }
 
     private void AllowPrivateAccess(AssemblyBuilder assemblyBuilder)
     {
-        var assemblies = fields.Select(field => field.DeclaringType.Assembly).Concat(properties.Select(prop => prop.DeclaringType.Assembly)).Distinct();
+        var assemblies = fields.Select(field => field.DeclaringType.Assembly).Concat(properties?.Select(prop => prop.DeclaringType.Assembly)).Distinct();
 
         // Allow access from dynamic assembly to private types
         foreach (var assembly in assemblies)
@@ -132,25 +157,15 @@ internal class AutoSyncBuilder : IAutoSyncBuilder, IDisposable
         return propertyMap;
     }
 
-    private void UnpatchAll()
+    private void ClearCollections()
     {
-        foreach (var (patchedMethod, transpiler) in patchedMethods)
-        {
-            harmony.Unpatch(patchedMethod, transpiler);
-        }
-
-        patchedMethods.Clear();
+        interceptMap.Clear();
     }
 
     public void Dispose()
     {
-        UnpatchAll();
+        ClearCollections();
     }
 
-    public void SwitchPacket(AutoSyncFieldPacket packet)
-    {
-        if (PacketSwitcher == null) return;
-
-        PacketSwitcher.TypeSwitch(packet);
-    }
+    public bool TryGetIntercept(FieldInfo field, out MethodInfo intercept) => interceptMap.TryGetValue(field, out intercept);
 }

@@ -54,14 +54,21 @@ public class VillagerPartyComponentTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        var villageId = TestEnvironment.CreateRegisteredObject<Village>();
+        var village = GameObjectCreator.CreateInitializedObject<Village>();
+        server.ObjectManager.AddNewObject(village, out var villageId);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            var clientVillage = GameObjectCreator.CreateInitializedObject<Village>();
+            client.ObjectManager.AddExisting(villageId, clientVillage);
+        }
 
         // Act
-        string partyId = "TestId";
+        const string partyId = "TestId";
         client1.Call(() =>
         {
             Assert.True(client1.ObjectManager.TryGetObject<Village>(villageId, out var village));
-            VillagerPartyComponent.CreateVillagerParty("TestId", village, 5);
+            VillagerPartyComponent.CreateVillagerParty(partyId, village, 5);
         });
 
         // Assert

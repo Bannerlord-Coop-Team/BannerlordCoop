@@ -24,7 +24,6 @@ public enum PropertyType
     CustomName,
     LastVisitedSettlement,
     Aggressiveness,
-    ArmyPositionAdder,
     Objective,
     Ai,
     IsActive,
@@ -133,26 +132,6 @@ public class MobilePartyPropertyPatches
         }
 
         var message = new MobilePartyPropertyChanged(PropertyType.Aggressiveness, __instance.StringId, value.ToString());
-        MessageBroker.Instance.Publish(__instance, message);
-
-        return ModInformation.IsServer;
-    }
-
-    // TODO remove
-    //[HarmonyPatch(nameof(MobileParty.ArmyPositionAdder), MethodType.Setter)]
-    //[HarmonyPrefix]
-    private static bool SetArmyPositionAdderPrefix(MobileParty __instance, Vec2 value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", nameof(MobileParty.ArmyPositionAdder), Environment.StackTrace);
-            return false;
-        }
-
-        var message = new MobilePartyPropertyChanged(PropertyType.ArmyPositionAdder, __instance.StringId, value.x.ToString(), value.y.ToString());
         MessageBroker.Instance.Publish(__instance, message);
 
         return ModInformation.IsServer;

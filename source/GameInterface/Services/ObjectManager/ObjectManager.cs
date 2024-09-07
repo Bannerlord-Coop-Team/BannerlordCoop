@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Registry;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -268,7 +269,14 @@ internal class ObjectManager : IObjectManager
             if (TryCastToMBObject(obj, out var mbObject) == false) return false;
             mbObject.StringId = id;
 
-            return objectManager.RegisterPresumedObject(mbObject) != null;
+            return RegisterExistingObjectMethod.MakeGenericMethod(obj.GetType()).Invoke(objectManager, new object[] { obj }) != null;
+        }
+
+        private readonly MethodInfo RegisterExistingObjectMethod = AccessTools.Method(typeof(MBObjectManager), nameof(MBObjectManager.RegisterPresumedObject));
+
+        private T Cast<T>(object obj)
+        {
+            return (T)obj;
         }
 
         public bool AddNewObject(object obj, out string newId)
@@ -347,6 +355,6 @@ internal class ObjectManager : IObjectManager
             return mbObject != null;
         }
 
-        public bool IsTypeManaged(Type type) => objectManager.HasType(type);
+        public bool IsTypeManaged(Type type) => objectManager?.HasType(type) ?? false;
     }
 }

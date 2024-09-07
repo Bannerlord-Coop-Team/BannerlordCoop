@@ -1,6 +1,4 @@
-﻿using static GameInterface.Tests.AutoSync.AutoSyncTests;
-
-namespace GameInterface.AutoSync.Builders;
+﻿namespace GameInterface.AutoSync.Builders;
 internal class AutoSyncTestClass
 {
     public string Name = "hi";

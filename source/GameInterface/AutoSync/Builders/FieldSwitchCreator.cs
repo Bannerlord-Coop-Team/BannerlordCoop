@@ -9,6 +9,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.AutoSync.Builders;
 public class FieldSwitchCreator
@@ -166,7 +168,6 @@ public class FieldSwitchCreator
 
         var valueLocal = il.DeclareLocal(field.FieldType);
 
-        // Loads the instance (used by strfld)
         il.Emit(OpCodes.Ldloc, instanceLocal);
 
         // Load objectmanager

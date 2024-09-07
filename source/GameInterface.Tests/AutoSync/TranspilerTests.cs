@@ -3,11 +3,12 @@ using Common.Network;
 using GameInterface.AutoSync;
 using GameInterface.AutoSync.Builders;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Registry;
 using HarmonyLib;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using TaleWorlds.Library;
 using Xunit;
 using Xunit.Abstractions;
 using static GameInterface.Tests.AutoSync.AutoSyncTests;
@@ -25,16 +26,18 @@ public class TranspilerTests
     [Fact]
     public void TranspileTest()
     {
+        var container = CreateContainer();
+
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
         var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
 
         const int typeId = 0;
 
-        var builder = new FieldTranspilerCreator(moduleBuilder, typeof(SwitchTestClass), typeId, new FieldInfo[]
+        var builder = new FieldTranspilerCreator(container.Resolve<IObjectManager>(), moduleBuilder, typeof(SwitchTestClass), typeId, new FieldInfo[]
         {
             AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.MyInt)),
             AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.RefClass)),
-        });
+        }, new Dictionary<FieldInfo, MethodInfo>());
 
         var transpilerType = builder.Build();
 
@@ -56,6 +59,10 @@ public class TranspilerTests
     [Fact]
     public void InterceptSendsPacket()
     {
+        var container = CreateContainer();
+        var network = container.Resolve<TestNet>();
+        var objManager = container.Resolve<IObjectManager>();
+
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
         var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
 
@@ -67,7 +74,7 @@ public class TranspilerTests
             AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.RefClass)),
         };
 
-        var builder = new FieldTranspilerCreator(moduleBuilder, typeof(SwitchTestClass), typeId, syncedFields);
+        var builder = new FieldTranspilerCreator(objManager, moduleBuilder, typeof(SwitchTestClass), typeId, syncedFields, new Dictionary<FieldInfo, MethodInfo>());
 
         var transpilerType = builder.Build();
 
@@ -80,9 +87,7 @@ public class TranspilerTests
             harmony.Patch(method, transpiler: new HarmonyMethod(transpilerType.Method("Transpiler")));
         }
 
-        var container = CreateContainer();
-        var network = container.Resolve<TestNet>();
-        var objManager = container.Resolve<IObjectManager>();
+        
 
         var testClass = new SwitchTestClass();
 

@@ -1,15 +1,12 @@
-﻿using Autofac;
-using Common;
-using Common.Messaging;
+﻿using Common;
 using Common.Tests.Utils;
-using Coop.Core.Client;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
+using GameInterface.AutoSync;
 using GameInterface.AutoSync.Internal;
-using GameInterface.Services.Registry;
 using GameInterface.Tests.Bootstrap;
-using HarmonyLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -31,10 +28,14 @@ internal class E2ETestEnvironment : IDisposable
 
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
+        
+
         GameLoopRunner.Instance.SetGameLoopThread();
 
         GameBootStrap.Initialize();
         IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
+
+        SetupAutoSync();
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
@@ -47,6 +48,21 @@ internal class E2ETestEnvironment : IDisposable
         Output = output;
 
         SetupMainHero();
+    }
+
+    private Type[] autoSyncTypes;
+
+    public void SetupAutoSync()
+    {
+        List<Type> types = new List<Type>();
+        types.Add(Server.Resolve<IAutoSyncBuilder>().Build());
+
+        foreach (var client in Clients)
+        {
+            types.Add(client.Resolve<IAutoSyncBuilder>().Build());
+        }
+
+        autoSyncTypes = types.ToArray();
     }
 
     public void SetupMainHero()
@@ -62,6 +78,7 @@ internal class E2ETestEnvironment : IDisposable
         });
     }
 
+    // TODO add comments
     public string CreateRegisteredObject<T>() where T : class
     {
         string? id = null;
@@ -81,6 +98,13 @@ internal class E2ETestEnvironment : IDisposable
         }
 
         return id;
+    }
+
+    public MethodInfo GetIntercept(FieldInfo field)
+    {
+        Assert.True(Server.Resolve<IAutoSyncBuilder>().TryGetIntercept(field, out var intercept));
+
+        return intercept;
     }
 
     public void Dispose()

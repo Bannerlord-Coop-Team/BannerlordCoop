@@ -1,6 +1,4 @@
-﻿using GameInterface.AutoSync;
-using GameInterface.Serialization;
-using HarmonyLib;
+﻿using GameInterface.Serialization;
 using System;
 using System.Collections.Generic;
 using Xunit;

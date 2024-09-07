@@ -3,14 +3,10 @@ using Common.Network;
 using Common.PacketHandlers;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
-using ProtoBuf;
 using Serilog;
 using System;
-using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using TaleWorlds.Library;
 
 namespace GameInterface.AutoSync.Builders;
 internal class PropertySyncByRefPatchCreator

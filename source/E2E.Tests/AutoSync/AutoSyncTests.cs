@@ -55,8 +55,11 @@ public class AutoSyncTests : IDisposable
             autosyncBuilder.Build();
         }
 
+        server.Resolve<IAutoSyncPatchCollector>().PatchAll();
+
         server.Call(() =>
         {
+            
             var testClass = server.GetRegisteredObject<AutoSyncTestClass>(instanceId);
 
             testClass.SetMyInt(newMyIntValue);

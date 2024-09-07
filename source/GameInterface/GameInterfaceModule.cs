@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common.PacketHandlers;
 using GameInterface.AutoSync;
 using GameInterface.Serialization;
 using GameInterface.Services;
@@ -7,8 +8,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Time;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface;
 
@@ -30,6 +29,10 @@ public class GameInterfaceModule : Module
         builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
 
         builder.RegisterType<AutoSyncBuilder>().As<IAutoSyncBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<PacketSwitchProvider>().As<IPacketSwitchProvider>().InstancePerLifetimeScope();
+        builder.RegisterType<AutoSyncPatchCollector>().As<IAutoSyncPatchCollector>().InstancePerLifetimeScope();
+
+        builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
 
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
