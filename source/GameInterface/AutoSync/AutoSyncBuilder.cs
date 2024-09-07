@@ -28,7 +28,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
     private Dictionary<FieldInfo, MethodInfo> interceptMap = new Dictionary<FieldInfo, MethodInfo>();
 
-    private ITypeSwitcher PacketSwitcher;
+    private readonly ITypeSwitcher PacketSwitcher;
 
     public AutoSyncBuilder(IObjectManager objectManager, Harmony harmony, IPacketSwitchProvider packetSwitchProvider, IAutoSyncPatchCollector patchCollector)
     {

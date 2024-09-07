@@ -7,6 +7,7 @@ using HarmonyLib;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -143,7 +144,7 @@ public class AutoSyncTests
 
     public class TestObjManager : IObjectManager
     {
-        private Dictionary<string, object> idMap = new Dictionary<string, object>();
+        private readonly Dictionary<string, object> idMap = new Dictionary<string, object>();
 
         public bool AddExisting(string id, object obj)
         {
@@ -166,7 +167,7 @@ public class AutoSyncTests
         }
 
 
-        private HashSet<Type> managedTypes = new HashSet<Type>
+        private readonly HashSet<Type> managedTypes = new HashSet<Type>
         {
             typeof(SomeRefClass),
             typeof(SwitchTestClass) 
@@ -198,7 +199,7 @@ public class AutoSyncTests
             return false;
         }
 
-        public bool TryGetObject<T>(string id, out T obj) where T : class
+        public bool TryGetObject<T>(string id, out T? obj) where T : class
         {
             obj = null;
 

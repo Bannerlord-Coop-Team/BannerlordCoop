@@ -4,7 +4,6 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
-using GameInterface.AutoSync.Internal;
 using GameInterface.Tests.Bootstrap;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -28,8 +27,6 @@ internal class E2ETestEnvironment : IDisposable
 
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
-        
-
         GameLoopRunner.Instance.SetGameLoopThread();
 
         GameBootStrap.Initialize();
@@ -50,19 +47,14 @@ internal class E2ETestEnvironment : IDisposable
         SetupMainHero();
     }
 
-    private Type[] autoSyncTypes;
-
     public void SetupAutoSync()
     {
-        List<Type> types = new List<Type>();
-        types.Add(Server.Resolve<IAutoSyncBuilder>().Build());
+        Server.Resolve<IAutoSyncBuilder>().Build();
 
         foreach (var client in Clients)
         {
-            types.Add(client.Resolve<IAutoSyncBuilder>().Build());
+            client.Resolve<IAutoSyncBuilder>().Build();
         }
-
-        autoSyncTypes = types.ToArray();
     }
 
     public void SetupMainHero()
@@ -109,6 +101,6 @@ internal class E2ETestEnvironment : IDisposable
 
     public void Dispose()
     {
-        Server.Resolve<IAutoSyncPatcher>().UnpatchAll();
+        Server.Resolve<IAutoSyncPatchCollector>().UnpatchAll();
     }
 }

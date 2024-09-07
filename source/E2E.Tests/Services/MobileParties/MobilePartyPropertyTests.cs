@@ -48,6 +48,10 @@ public class MobilePartyPropertyTests : IDisposable
 
             PartyId2 = party2.StringId;
         });
+
+        Assert.NotNull(PartyId);
+        Assert.NotNull(PartyId2);
+        Assert.NotNull(HeroId);
     }
 
     public void Dispose()

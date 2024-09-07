@@ -17,15 +17,7 @@ public class FiefFieldTests : IDisposable
     IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
 
-    private int Ctr { get
-        {
-            return ctr++;
-        }
-    }
-    private int ctr = 0;
-
     private readonly string FiefId;
-    private readonly string MapEventSideId;
     private readonly ITestOutputHelper output;
 
     public FiefFieldTests(ITestOutputHelper output)

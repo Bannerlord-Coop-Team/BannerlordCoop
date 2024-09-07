@@ -19,9 +19,6 @@ public class AutoSyncTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
 
-    readonly List<MethodInfo> PatchMethods;
-    readonly Type TranspilerType;
-    readonly Harmony Harmony;
     public AutoSyncTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
