@@ -30,32 +30,24 @@ public class PartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        PartyComponent? component = null;
-        MobileParty? newParty = null;
-        server.Call(() =>
-        {
-            component = GameObjectCreator.CreateInitializedObject<MobileParty>().PartyComponent;
-            newParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-        });
-
-        Assert.NotNull(component);
-        Assert.NotNull(newParty);
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var party2Id = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         // Act
         server.Call(() =>
         {
-            component.MobileParty = newParty;
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party1));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(party2Id, out var party2));
+
+            party1.PartyComponent.MobileParty = party2;
         });
 
         // Assert
 
-        Assert.True(server.ObjectManager.TryGetId(component, out var componentId));
-
-        Assert.Equal(component.MobileParty.StringId, newParty.StringId);
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<PartyComponent>(componentId, out var clientComponent));
-            Assert.Equal(clientComponent.MobileParty.StringId, newParty.StringId);
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party1));
+            Assert.Equal(party1.PartyComponent.MobileParty.StringId, party2Id);
         }
     }
 
@@ -65,37 +57,25 @@ public class PartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        PartyComponent? component = null;
-        MobileParty? newParty = null;
-        server.Call(() =>
-        {
-            component = GameObjectCreator.CreateInitializedObject<MobileParty>().PartyComponent;
-            newParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-        });
-
-        Assert.NotNull(component);
-        Assert.NotNull(newParty);
-
-        Assert.True(server.ObjectManager.TryGetId(component, out var componentId));
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+        var party2Id = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         // Act
         var firstClient = TestEnvironment.Clients.First();
 
         firstClient.Call(() =>
         {
-            Assert.True(firstClient.ObjectManager.TryGetObject<PartyComponent>(componentId, out var clientComponent));
-            Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(newParty.StringId, out var clientNewParty));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party1));
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(party2Id, out var party2));
 
-            clientComponent.MobileParty = clientNewParty;
+            party1.PartyComponent.MobileParty = party2;
         });
 
         // Assert
-
-        Assert.NotEqual(component.MobileParty.StringId, newParty.StringId);
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<PartyComponent>(componentId, out var clientComponent));
-            Assert.NotEqual(clientComponent.MobileParty.StringId, newParty.StringId);
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party1));
+            Assert.NotEqual(party1.PartyComponent.MobileParty.StringId, party2Id);
         }
     }
 }

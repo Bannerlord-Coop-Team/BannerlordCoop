@@ -65,8 +65,6 @@ internal class MobilePartyDataHandler : IHandler
             return;
         }
 
-        objectManager.Remove(componentId);
-
         party._partyComponent = component;
     }
 }

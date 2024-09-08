@@ -11,10 +11,10 @@
 
   <ItemGroup>
     <PackageReference Include="Bannerlord.Lib.Harmony" Version="2.2.2" />
-    <PackageReference Include="Krafs.Publicizer" Version="2.2.1">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+	<PackageReference Include="Krafs.Publicizer" Version="2.2.1">
+		<PrivateAssets>all</PrivateAssets>
+		<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+	</PackageReference>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
     <PackageReference Include="MonoMod.RuntimeDetour" Version="22.7.31.1" />
     <PackageReference Include="MonoMod.Utils" Version="22.7.31.1" />
@@ -66,11 +66,17 @@
 	  <_Parameter1_IsLiteral>true</_Parameter1_IsLiteral>
 	</AssemblyAttribute>
   </ItemGroup>
-  <ItemGroup>
-    <Publicize Include="TaleWorlds.CampaignSystem" />
-    <Publicize Include="TaleWorlds.Core" />
-    <Publicize Include="TaleWorlds.Library" />
-    <Publicize Include="TaleWorlds.Localization" />
-    <Publicize Include="TaleWorlds.ObjectSystem" />
-  </ItemGroup>
+<ItemGroup>
+	<Publicize Include="SandBox" />
+	<Publicize Include="TaleWorlds.CampaignSystem" />
+	<Publicize Include="TaleWorlds.Core" />
+	<Publicize Include="TaleWorlds.Engine" />
+	<Publicize Include="TaleWorlds.Library" />
+	<Publicize Include="TaleWorlds.Localization" />
+	<Publicize Include="TaleWorlds.ModuleManager" />
+	<Publicize Include="TaleWorlds.MountAndBlade" />
+	<Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library" />
+	<Publicize Include="TaleWorlds.ObjectSystem" />
+	<Publicize Include="TaleWorlds.SaveSystem" />
+</ItemGroup>
 </Project>

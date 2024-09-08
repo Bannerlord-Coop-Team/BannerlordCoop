@@ -61,7 +61,6 @@ namespace Common.PacketHandlers
                 var castedPublish = Publish.MakeGenericMethod(message.GetType());
                 publishFunctionCache.Add(msgType.FullName, 
                     (messageBrokerParam, peerParam, messageParam) => castedPublish.Invoke(messageBrokerParam, new object[] { peerParam, messageParam }));
-
                 castedPublish.Invoke(messageBroker, new object[] { peer, message });
             }
         }

@@ -47,6 +47,6 @@ internal class ServerPartyLifetimeHandler : IHandler
 
         var triggerMessage = new NetworkCreateParty(payload.What.Data);
         var notifyMessage = new NewPartySynced();
-        responseProtocol.StartResponseProtocol(triggerMessage, notifyMessage);
+        responseProtocol.StartResponseProtocol(triggerMessage, notifyMessage).Wait();
     }
 }

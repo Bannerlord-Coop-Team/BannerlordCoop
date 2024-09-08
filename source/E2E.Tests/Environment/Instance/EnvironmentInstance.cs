@@ -17,7 +17,7 @@ namespace E2E.Tests.Environment.Instance;
 /// <summary>
 /// Single instance of a server or client. Stores relevant test information.
 /// </summary>
-public abstract class EnvironmentInstance
+public abstract class EnvironmentInstance : IDisposable
 {
     public NetPeer NetPeer => mockNetwork.NetPeer;
     /// <summary>
@@ -140,8 +140,7 @@ public abstract class EnvironmentInstance
         public StaticScope(EnvironmentInstance instance)
         {
             Monitor.Enter(GameInstance.@lock);
-            instance.GameInstance.SetStatics();
-
+            
             // Save previous static values
             wasServer = ModInformation.IsServer;
             if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
@@ -151,6 +150,8 @@ public abstract class EnvironmentInstance
             }
 
             // Set new static values
+            instance.GameInstance.SetStatics();
+
             ModInformation.IsServer = instance is ServerInstance;
             instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
             GameInterface.ContainerProvider.SetContainer(instance.Container);
@@ -206,4 +207,6 @@ public abstract class EnvironmentInstance
 
         return serializer.Deserialize<T>(bytes);
     }
+
+    public abstract void Dispose();
 }

@@ -1,16 +1,13 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Data;
 using GameInterface.Services.PartyComponents.Messages;
-using GameInterface.Services.PartyComponents.Patches.Lifetime;
+using GameInterface.Services.PartyComponents.Patches;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Library;
@@ -51,6 +48,9 @@ internal class PartyComponentHandler : IHandler
     {
         messageBroker.Unsubscribe<PartyComponentCreated>(Handle);
         messageBroker.Unsubscribe<NetworkCreatePartyComponent>(Handle);
+
+        messageBroker.Unsubscribe<PartyComponentMobilePartyChanged>(Handle);
+        messageBroker.Unsubscribe<NetworkChangePartyComponentMobileParty>(Handle);
     }
 
     private void Handle(MessagePayload<NetworkChangePartyComponentMobileParty> payload)
@@ -73,8 +73,6 @@ internal class PartyComponentHandler : IHandler
         PartyComponentPatches.OverrideSetParty(component, party);
     }
 
-    
-
     private void Handle(MessagePayload<PartyComponentMobilePartyChanged> payload)
     {
         var component = payload.What.Component;
@@ -92,6 +90,8 @@ internal class PartyComponentHandler : IHandler
 
     private void Handle(MessagePayload<PartyComponentCreated> payload)
     {
+        var isServer = ModInformation.IsServer;
+
         objectManager.AddNewObject(payload.What.Instance, out var id);
 
         var typeIndex = partyTypes.IndexOf(payload.What.Instance.GetType());

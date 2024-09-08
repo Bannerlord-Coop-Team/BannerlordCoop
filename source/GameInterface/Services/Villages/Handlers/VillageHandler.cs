@@ -1,10 +1,9 @@
-﻿﻿using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;
 using GameInterface.Services.Villages.Patches;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Villages.Handlers;
@@ -113,6 +112,4 @@ public class VillageHandler : IHandler
 
         VillagePatches.RunVillageStateChange(village, (Village.VillageStates)obj.State);
     }
-
-
 }

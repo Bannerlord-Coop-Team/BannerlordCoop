@@ -1,4 +1,6 @@
 ﻿using Autofac;
+using Common.PacketHandlers;
+using GameInterface.AutoSync;
 using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Entity;
@@ -25,15 +27,17 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
-        
+
+        builder.RegisterType<AutoSyncBuilder>().As<IAutoSyncBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<PacketSwitchProvider>().As<IPacketSwitchProvider>().InstancePerLifetimeScope();
+        builder.RegisterType<AutoSyncPatchCollector>().As<IAutoSyncPatchCollector>().InstancePerLifetimeScope();
+
+        builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
 
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
+        builder.RegisterModule<AutoSyncModule>();
 
-        foreach(var type in LifetimeSyncCollection.LifetimeSync)
-        {
-            builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
-        }
 
         base.Load(builder);
     }

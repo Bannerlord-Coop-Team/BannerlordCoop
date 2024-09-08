@@ -25,9 +25,12 @@ internal class MobilePartyBuilder : IObjectBuilder
 
         var party = LordPartyComponent.CreateLordParty("TestParty", leaderHero, Vec2.Zero, 0, spawnSettlement, leaderHero);
 
+        party.PartyComponent.MobileParty = party;
         party.LordPartyComponent.SetMobilePartyInternal(party);
 
         party.Initialize();
+
+        party.ActualClan = clan;
 
         return party;
     }

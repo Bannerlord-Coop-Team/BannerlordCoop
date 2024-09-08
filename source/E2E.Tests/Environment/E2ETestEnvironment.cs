@@ -1,12 +1,11 @@
-﻿using Autofac;
-using Common;
-using Common.Messaging;
+﻿using Common;
 using Common.Tests.Utils;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
+using GameInterface.AutoSync;
 using GameInterface.Tests.Bootstrap;
-using HarmonyLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -19,13 +18,13 @@ namespace E2E.Tests.Environment;
 /// </summary>
 internal class E2ETestEnvironment : IDisposable
 {
-    public TestEnvironment IntegrationEnvironment { get; }
-
     public ITestOutputHelper Output { get; }
 
     public IEnumerable<EnvironmentInstance> Clients => IntegrationEnvironment.Clients;
     public EnvironmentInstance Server => IntegrationEnvironment.Server;
-    
+
+    private TestEnvironment IntegrationEnvironment { get; }
+
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
         GameLoopRunner.Instance.SetGameLoopThread();
@@ -33,10 +32,10 @@ internal class E2ETestEnvironment : IDisposable
         GameBootStrap.Initialize();
         IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
 
-        Server.Resolve<TestMessageBroker>().SetStaticInstance();
-        var gameInterface = Server.Container.Resolve<IGameInterface>();
+        SetupAutoSync();
 
-        gameInterface.PatchAll();
+        Server.Resolve<TestMessageBroker>().SetStaticInstance();
+        Server.Resolve<IGameInterface>().PatchAll();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
@@ -48,7 +47,17 @@ internal class E2ETestEnvironment : IDisposable
         SetupMainHero();
     }
 
-    public void SetupMainHero()
+    private void SetupAutoSync()
+    {
+        Server.Resolve<IAutoSyncBuilder>().Build();
+
+        foreach (var client in Clients)
+        {
+            client.Resolve<IAutoSyncBuilder>().Build();
+        }
+    }
+
+    private void SetupMainHero()
     {
         // Setup main hero
         Server.Call(() =>
@@ -61,6 +70,15 @@ internal class E2ETestEnvironment : IDisposable
         });
     }
 
+    /// <summary>
+    /// Creates a new object of type <typeparamref name="T"/> that is registered on the server and all clients.
+    /// </summary>
+    /// <remarks>
+    /// This uses the <see cref="GameObjectCreator"/> to generate objects.
+    /// </remarks>
+    /// <typeparam name="T">Type of object to create</typeparam>
+    /// <returns>New object of type <typeparamref name="T"/></returns>
+    /// <exception cref="Exception">Failed to create object exception</exception>
     public string CreateRegisteredObject<T>() where T : class
     {
         string? id = null;
@@ -82,7 +100,20 @@ internal class E2ETestEnvironment : IDisposable
         return id;
     }
 
+    /// <summary>
+    /// Gets the field changed intercept from the given <paramref name="field"/>
+    /// </summary>
+    /// <param name="field">Field to get intercept from</param>
+    /// <returns>Field intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetIntercept(FieldInfo field)
+    {
+        Assert.True(Server.Resolve<IAutoSyncBuilder>().TryGetIntercept(field, out var intercept));
+
+        return intercept;
+    }
+
     public void Dispose()
     {
+        Server.Resolve<IAutoSyncPatchCollector>().UnpatchAll();
     }
 }

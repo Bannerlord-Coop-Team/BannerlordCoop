@@ -48,6 +48,11 @@
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="Server\Services\Kingdoms\Messages\**" />
+    <EmbeddedResource Remove="Server\Services\Kingdoms\Messages\**" />
+    <None Remove="Server\Services\Kingdoms\Messages\**" />
+  </ItemGroup>
+  <ItemGroup>
     <PackageReference Include="Autofac" Version="7.0.1" />
     <PackageReference Include="Krafs.Publicizer" Version="2.2.1">
       <PrivateAssets>all</PrivateAssets>
@@ -86,7 +91,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Client\Services\MobileParties\Messages\Data\" />
-    <Folder Include="Server\Services\Kingdoms\Messages\" />
   </ItemGroup>
   <ItemGroup>
     <Publicize Include="TaleWorlds.Library" />
