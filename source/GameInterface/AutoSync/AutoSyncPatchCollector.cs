@@ -7,6 +7,7 @@ namespace GameInterface.AutoSync;
 
 public interface IAutoSyncPatchCollector : IDisposable
 {
+    void AddPrefix(MethodInfo patchMethod, MethodInfo patch);
     void AddTranspiler(MethodInfo patchMethod, MethodInfo patch);
     void PatchAll();
     void UnpatchAll();
@@ -17,6 +18,7 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
     private readonly Harmony harmony;
 
     private readonly List<(MethodInfo, MethodInfo)> transpilers = new List<(MethodInfo, MethodInfo)>();
+    private readonly List<(MethodInfo, MethodInfo)> prefixes = new List<(MethodInfo, MethodInfo)>();
 
     private static bool IsPatched = false;
 
@@ -25,8 +27,18 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
         this.harmony = harmony;
     }
 
+    public void AddPrefix(MethodInfo patchMethod, MethodInfo patch)
+    {
+        if (patchMethod == null) throw new ArgumentNullException(nameof(patchMethod));
+        if (patch == null) throw new ArgumentNullException(nameof(patch));
+
+        prefixes.Add((patchMethod, patch));
+    }
     public void AddTranspiler(MethodInfo patchMethod, MethodInfo patch)
     {
+        if (patchMethod == null) throw new ArgumentNullException(nameof(patchMethod));
+        if (patch == null) throw new ArgumentNullException(nameof(patch));
+
         transpilers.Add((patchMethod, patch));
     }
 
@@ -39,6 +51,11 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
         foreach (var (method, patch) in transpilers) {
             harmony.Patch(method, transpiler: new HarmonyMethod(patch));
         }
+
+        foreach (var (method, patch) in prefixes)
+        {
+            harmony.Patch(method, prefix: new HarmonyMethod(patch));
+        }
     }
 
     public void UnpatchAll()
@@ -46,6 +63,11 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
         IsPatched = false;
 
         foreach (var (method, patch) in transpilers)
+        {
+            harmony.Unpatch(method, patch);
+        }
+
+        foreach (var (method, patch) in prefixes)
         {
             harmony.Unpatch(method, patch);
         }

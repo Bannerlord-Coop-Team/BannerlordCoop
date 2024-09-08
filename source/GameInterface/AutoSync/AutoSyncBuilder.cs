@@ -1,4 +1,5 @@
-﻿using GameInterface.AutoSync.Builders;
+﻿using GameInterface.AutoSync.Fields;
+using GameInterface.AutoSync.Properties;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System;
@@ -7,14 +8,13 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace GameInterface.AutoSync;
 public interface IAutoSyncBuilder : IDisposable
 {
     void AddField(FieldInfo field);
     void AddProperty(PropertyInfo property);
-    Type Build();
+    void Build();
     bool TryGetIntercept(FieldInfo field, out MethodInfo intercept);
 }
 internal class AutoSyncBuilder : IAutoSyncBuilder
@@ -53,7 +53,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
     }
 
     public static int AsmCounter = 1;
-    public Type Build()
+    public void Build()
     {
         ClearCollections();
 
@@ -62,11 +62,16 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
         AllowPrivateAccess(assemblyBuilder);
 
-        // TODO same thing for properties
+        CreateFieldSync(moduleBuilder);
+
+        CreatePropertySync(moduleBuilder);
+    }
+
+    private void CreateFieldSync(ModuleBuilder moduleBuilder)
+    {
         var fieldMap = ConvertFields();
 
         var types = fieldMap.Keys.ToArray();
-
         for (int i = 0; i < types.Length; i++)
         {
             var type = types[i];
@@ -80,15 +85,41 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
             }
         }
 
-        var typeSwitchCreator = new TypeSwitchCreator(moduleBuilder, objectManager);
+        var typeSwitchCreator = new FieldTypeSwitchCreator(moduleBuilder, objectManager);
 
         var typeSwitchType = typeSwitchCreator.Build(fieldMap);
 
         // Set packet switcher
-        packetSwitchProvider.Switcher = (ITypeSwitcher)Activator.CreateInstance(typeSwitchType, objectManager);
-
-        return typeSwitchType;
+        packetSwitchProvider.FieldSwitch = (IFieldTypeSwitcher)Activator.CreateInstance(typeSwitchType, objectManager);
     }
+
+    private void CreatePropertySync(ModuleBuilder moduleBuilder)
+    {
+        // TODO finish
+        var propertyMap = ConvertProperties();
+
+        var types = propertyMap.Keys.ToArray();
+        for (int i = 0; i < types.Length; i++)
+        {
+            var type = types[i];
+            var prefixType = CreatePropertyPrefix(moduleBuilder, type, i, propertyMap[type].ToArray());
+
+            var transpilerMethod = prefixType.Method("Transpiler");
+
+            foreach (var method in AccessTools.GetDeclaredMethods(type))
+            {
+                patchCollector.AddTranspiler(method, transpilerMethod);
+            }
+        }
+
+        var typeSwitchCreator = new PropertyTypeSwitchCreator(moduleBuilder, objectManager);
+
+        var typeSwitchType = typeSwitchCreator.Build(propertyMap);
+
+        // Set packet switcher
+        packetSwitchProvider.PropertySwitch = (IPropertyTypeSwitcher)Activator.CreateInstance(typeSwitchType, objectManager);
+    }
+
 
     private Type CreateTranspiler(ModuleBuilder moduleBuilder, Type classType, int typeId, FieldInfo[] fieldsToIntercept)
     {
@@ -99,6 +130,13 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         ConvertStoredInterceptsToActual(compiledType);
 
         return compiledType;
+    }
+
+    private Type CreatePropertyPrefix(ModuleBuilder moduleBuilder, Type classType, int typeId, PropertyInfo[] propertiesToIntercept)
+    {
+        var builder = new PropertyPrefixCreator(objectManager, moduleBuilder, classType, typeId, propertiesToIntercept);
+
+        return builder.Build();
     }
 
     private void ConvertStoredInterceptsToActual(Type compiledType)

@@ -2,12 +2,12 @@
 using LiteNetLib;
 using ProtoBuf;
 
-namespace GameInterface.AutoSync;
+namespace GameInterface.AutoSync.Fields;
 
 [ProtoContract(SkipConstructor = true)]
-public readonly struct AutoSyncFieldPacket : IPacket
+public readonly struct FieldAutoSyncPacket : IPacket
 {
-    public AutoSyncFieldPacket(string instanceId, int typeId, int fieldId, byte[] value)
+    public FieldAutoSyncPacket(string instanceId, int typeId, int fieldId, byte[] value)
     {
         this.instanceId = instanceId;
         this.typeId = typeId;
@@ -24,7 +24,7 @@ public readonly struct AutoSyncFieldPacket : IPacket
     [ProtoMember(4)]
     public readonly byte[] value;
 
-    public readonly PacketType PacketType => PacketType.AutoSync;
+    public readonly PacketType PacketType => PacketType.FieldAutoSync;
 
     public readonly DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
 }

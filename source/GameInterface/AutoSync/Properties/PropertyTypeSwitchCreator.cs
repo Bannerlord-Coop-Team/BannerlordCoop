@@ -1,30 +1,29 @@
-﻿using HarmonyLib;
+﻿using GameInterface.AutoSync.Fields;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.Emit;
 using System.Reflection;
-using System.Runtime.CompilerServices;
-using System.Text;
-using GameInterface.Services.ObjectManager;
+using System.Reflection.Emit;
 
-namespace GameInterface.AutoSync.Builders;
+namespace GameInterface.AutoSync.Properties;
 
-public interface ITypeSwitcher
+public interface IPropertyTypeSwitcher
 {
-    void TypeSwitch(AutoSyncFieldPacket autoSyncFieldPacket);
+    void TypeSwitch(PropertyAutoSyncPacket autoSyncFieldPacket);
 }
 
 
-internal class TypeSwitchCreator
+internal class PropertyTypeSwitchCreator
 {
     private readonly TypeBuilder typeBuilder;
     private readonly ModuleBuilder moduleBuilder;
     private readonly IObjectManager objectManager;
 
-    public TypeSwitchCreator(ModuleBuilder moduleBuilder, IObjectManager objectManager)
+    public PropertyTypeSwitchCreator(ModuleBuilder moduleBuilder, IObjectManager objectManager)
     {
-        typeBuilder = moduleBuilder.DefineType("TypeSwitcher",
+        typeBuilder = moduleBuilder.DefineType("PropertyTypeSwitcher",
                 TypeAttributes.Public |
                 TypeAttributes.Class |
                 TypeAttributes.AutoClass |
@@ -32,32 +31,32 @@ internal class TypeSwitchCreator
                 TypeAttributes.BeforeFieldInit |
                 TypeAttributes.AutoLayout,
                 null,
-                new Type[] { typeof(ITypeSwitcher) });
+                new Type[] { typeof(IPropertyTypeSwitcher) });
 
         this.moduleBuilder = moduleBuilder;
         this.objectManager = objectManager;
     }
 
-    private MethodBuilder CreateSwitch(Dictionary<Type, List<FieldInfo>> fieldMap)
+    private MethodBuilder CreateSwitch(Dictionary<Type, List<PropertyInfo>> propertyMap)
     {
-        var types = fieldMap.Keys.ToArray();
+        var types = propertyMap.Keys.ToArray();
 
-        var fieldSwitches = CreateFieldSwitches(fieldMap);
+        var fieldSwitches = CreateFieldSwitches(propertyMap);
 
         var methodBuilder = typeBuilder.DefineMethod("TypeSwitch",
             MethodAttributes.Public | MethodAttributes.Virtual,
             null,
-            new Type[] { typeof(AutoSyncFieldPacket) });
+            new Type[] { typeof(PropertyAutoSyncPacket) });
         methodBuilder.DefineParameter(1, ParameterAttributes.In, "packet");
 
-        typeBuilder.DefineMethodOverride(methodBuilder, AccessTools.Method(typeof(ITypeSwitcher), nameof(ITypeSwitcher.TypeSwitch)));
+        typeBuilder.DefineMethodOverride(methodBuilder, AccessTools.Method(typeof(IPropertyTypeSwitcher), nameof(IPropertyTypeSwitcher.TypeSwitch)));
 
         var il = methodBuilder.GetILGenerator();
 
         var labels = types.Select(i => il.DefineLabel()).ToArray();
 
         il.Emit(OpCodes.Ldarg_1);
-        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.typeId)));
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(PropertyAutoSyncPacket), nameof(PropertyAutoSyncPacket.typeId)));
         il.Emit(OpCodes.Switch, labels);
 
         for (int i = 0; i < types.Length; i++)
@@ -66,22 +65,22 @@ internal class TypeSwitchCreator
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldfld, fieldSwitches[i]);
             il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Callvirt, AccessTools.Method(fieldSwitches[i].FieldType, "FieldSwitch"));
+            il.Emit(OpCodes.Callvirt, AccessTools.Method(fieldSwitches[i].FieldType, "PropertySwitch"));
             il.Emit(OpCodes.Ret);
         }
 
         return methodBuilder;
     }
 
-    private FieldBuilder[] CreateFieldSwitches(Dictionary<Type, List<FieldInfo>> fieldMap)
+    private FieldBuilder[] CreateFieldSwitches(Dictionary<Type, List<PropertyInfo>> propertyMap)
     {
-        var types = fieldMap.Keys.ToArray();
+        var types = propertyMap.Keys.ToArray();
         var ctorBuilder = typeBuilder.DefineConstructor(
             MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName,
             CallingConventions.Standard | CallingConventions.HasThis,
             new Type[] { typeof(IObjectManager) });
 
-        var fieldSwitches = new List<FieldBuilder>();
+        var propertySwitches = new List<FieldBuilder>();
 
         var objectManagerField = typeBuilder.DefineField("objectManager", typeof(IObjectManager), FieldAttributes.Private | FieldAttributes.InitOnly);
 
@@ -95,27 +94,27 @@ internal class TypeSwitchCreator
 
         foreach (var type in types)
         {
-            var fieldSwitchBuilder = new FieldSwitchCreator(moduleBuilder, type, objectManager);
-            var fieldSwitchType = fieldSwitchBuilder.Build(fieldMap[type].ToArray());
+            var propertySwitchBuilder = new PropertySwitchCreator(moduleBuilder, type, objectManager);
+            var propertySwitchType = propertySwitchBuilder.Build(propertyMap[type].ToArray());
 
-            var fieldSwitchField = typeBuilder.DefineField(fieldSwitchType.Name, fieldSwitchType, FieldAttributes.Private | FieldAttributes.InitOnly);
+            var propertySwitchField = typeBuilder.DefineField(propertySwitchType.Name, propertySwitchType, FieldAttributes.Private | FieldAttributes.InitOnly);
 
-            fieldSwitches.Add(fieldSwitchField);
+            propertySwitches.Add(propertySwitchField);
 
             il.Emit(OpCodes.Ldarg_0);
             il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Newobj, fieldSwitchType.Constructor(new Type[] { typeof(IObjectManager) }));
-            il.Emit(OpCodes.Stfld, fieldSwitchField);
+            il.Emit(OpCodes.Newobj, propertySwitchType.Constructor(new Type[] { typeof(IObjectManager) }));
+            il.Emit(OpCodes.Stfld, propertySwitchField);
         }
 
         il.Emit(OpCodes.Ret);
 
-        return fieldSwitches.ToArray();
+        return propertySwitches.ToArray();
     }
 
-    public TypeInfo Build(Dictionary<Type, List<FieldInfo>> fieldMap)
+    public TypeInfo Build(Dictionary<Type, List<PropertyInfo>> propertyMap)
     {
-        CreateSwitch(fieldMap);
+        CreateSwitch(propertyMap);
 
         return typeBuilder.CreateTypeInfo();
     }

@@ -1,4 +1,6 @@
 ﻿using Autofac;
+using GameInterface.AutoSync.Fields;
+using GameInterface.AutoSync.Properties;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,7 +14,7 @@ internal class AutoSyncModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
-        builder.RegisterType<AutoSyncPacketHandler>().AsSelf().AutoActivate().InstancePerLifetimeScope();
+        builder.RegisterType<FieldAutoSyncPacketHandler>().AsSelf().AutoActivate().InstancePerLifetimeScope();
 
         foreach(var type in GetAutoSyncClasses())
         {
