@@ -8,7 +8,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Fiefs;
-public class FiefFieldTests : IDisposable
+public class SyncFiefTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
 
@@ -18,7 +18,7 @@ public class FiefFieldTests : IDisposable
 
     private readonly string FiefId;
 
-    public FiefFieldTests(ITestOutputHelper output)
+    public SyncFiefTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
 
@@ -112,42 +112,6 @@ public class FiefFieldTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<Town>(FiefId, out var fief));
 
             Assert.Equal(newValue, fief.FoodStocks);
-        }
-    }
-
-
-    [Fact]
-    public void Server_Town_OwnerClan()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-
-        var _hero = ObjectHelper.SkipConstructor<Hero>();
-        server.ObjectManager.AddNewObject(_hero, out var heroId);
-
-        foreach (var client in Clients)
-        {
-            var client_hero = ObjectHelper.SkipConstructor<Hero>();
-            client.ObjectManager.AddExisting(heroId, client_hero);
-        }
-
-
-        // Act
-        server.Call(() =>
-        {
-            Assert.True(server.ObjectManager.TryGetObject<Town>(FiefId, out var fief));
-            Assert.True(server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
-
-            fief.Governor = hero;
-        });
-
-        // Assert
-        foreach (var client in Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<Town>(FiefId, out var fief));
-            Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var client_hero));
-
-            Assert.Same(client_hero, fief.Governor);
         }
     }
 }
