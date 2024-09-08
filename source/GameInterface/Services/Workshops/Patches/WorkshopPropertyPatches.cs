@@ -16,7 +16,8 @@ namespace GameInterface.Services.Workshops.Patches
     {
         Capital,
         LastRunCampaignTime,
-        WorkshopType
+        WorkshopType,
+        InitialCapital,
     }
 
     [HarmonyPatch(typeof(Workshop))]
@@ -84,6 +85,31 @@ namespace GameInterface.Services.Workshops.Patches
             objectManager.TryGetId(value, out string typeId);
 
             var message = new WorkshopPropertyChanged(PropertyType.WorkshopType, __instance, typeId);
+            MessageBroker.Instance.Publish(__instance, message);
+
+            return ModInformation.IsServer;
+        }
+
+        [HarmonyPatch(nameof(Workshop.InitialCapital), MethodType.Setter)]
+        [HarmonyPrefix]
+        private static bool SetInitialCapitalPrefix(Workshop __instance, int value)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client tried to set {name}\n"
+                    + "Callstack: {callstack}", nameof(Workshop.InitialCapital), Environment.StackTrace);
+                return false;
+            }
+
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            {
+                Logger.Error("Unable to resolve {objectManager}", typeof(IObjectManager));
+                return true;
+            }
+
+            var message = new WorkshopPropertyChanged(PropertyType.InitialCapital, __instance, value.ToString());
             MessageBroker.Instance.Publish(__instance, message);
 
             return ModInformation.IsServer;

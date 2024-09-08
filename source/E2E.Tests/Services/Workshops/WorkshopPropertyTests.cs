@@ -22,9 +22,9 @@ namespace E2E.Tests.Services.Workshops
         EnvironmentInstance Server => TestEnvironement.Server;
         IEnumerable<EnvironmentInstance> Clients => TestEnvironement.Clients;
 
-        string WorkshopId { get; set; }
-        string WorkshopTypeId { get; set; }
-        string WorkshopTypeId2 { get; set; }
+        string WorkshopId { get; }
+        string WorkshopTypeId { get; }
+        string WorkshopTypeId2 { get; }
 
         public void Dispose()
         {
@@ -39,22 +39,22 @@ namespace E2E.Tests.Services.Workshops
             var workshopType = GameObjectCreator.CreateInitializedObject<WorkshopType>();
             var workshopType2 = GameObjectCreator.CreateInitializedObject<WorkshopType>();
 
-            Server.ObjectManager.AddNewObject(workshopType, out string typeId);
-            Server.ObjectManager.AddNewObject(workshopType2, out string typeId2);
-            Server.ObjectManager.AddNewObject(workshop, out string workshopId);
+            Server.ObjectManager.AddNewObject(workshopType, out string WorkshopTypeId);
+            Server.ObjectManager.AddNewObject(workshopType2, out string WorkshopTypeId2);
+            Server.ObjectManager.AddNewObject(workshop, out string WorkshopId);
 
-            WorkshopId = workshopId;
-            WorkshopTypeId = typeId;
-            WorkshopTypeId2 = typeId2;
+            this.WorkshopId = WorkshopId;
+            this.WorkshopTypeId = WorkshopTypeId;
+            this.WorkshopTypeId2 = WorkshopTypeId2;
 
             foreach (var client in Clients)
             {
                 var _workshop = GameObjectCreator.CreateInitializedObject<Workshop>();
                 var _workshopType = GameObjectCreator.CreateInitializedObject<WorkshopType>();
                 var _workshopType2 = GameObjectCreator.CreateInitializedObject<WorkshopType>();
-                client.ObjectManager.AddExisting(WorkshopId, _workshop);
-                client.ObjectManager.AddExisting(WorkshopTypeId, _workshopType);
-                client.ObjectManager.AddExisting(WorkshopTypeId2, _workshopType2);
+                client.ObjectManager.AddExisting(this.WorkshopId, _workshop);
+                client.ObjectManager.AddExisting(this.WorkshopTypeId, _workshopType);
+                client.ObjectManager.AddExisting(this.WorkshopTypeId2, _workshopType2);
             }
         }
 
@@ -75,6 +75,26 @@ namespace E2E.Tests.Services.Workshops
             {
                 Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
                 Assert.Equal(serverWorkshop.Capital, clientWorkshop.Capital);
+            }
+        }
+
+        [Fact]
+        public void ServerChangeWorkshopInitialCapital_SyncAllClients()
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var serverWorkshop));
+
+            // Act
+            Server.Call(() =>
+            {
+                serverWorkshop.InitialCapital = 5;
+            });
+
+
+            // Assert
+            foreach (var client in TestEnvironement.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
+                Assert.Equal(serverWorkshop.InitialCapital, clientWorkshop.InitialCapital);
             }
         }
 

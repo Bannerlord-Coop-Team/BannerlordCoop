@@ -82,6 +82,10 @@ namespace GameInterface.Services.Workshops.Handlers
                     }
                     instance.WorkshopType = type;
                     break;
+
+                case PropertyType.InitialCapital:
+                    instance.InitialCapital = int.Parse(data.mainData);
+                    break;
             }
         }
 
