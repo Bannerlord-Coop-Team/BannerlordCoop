@@ -15,6 +15,16 @@ public interface IAutoSyncBuilder : IDisposable
     void AddField(FieldInfo field);
     void AddProperty(PropertyInfo property);
     void Build();
+
+    /// <summary>
+    /// Attempt to retreive the intercept for a specified sync field
+    /// </summary>
+    /// <remarks>
+    /// Mainly used for testing
+    /// </remarks>
+    /// <param name="field">Field to get intercept</param>
+    /// <param name="intercept">Out parameter</param>
+    /// <returns>True if successful, false if otherwise</returns>
     bool TryGetIntercept(FieldInfo field, out MethodInfo intercept);
 }
 internal class AutoSyncBuilder : IAutoSyncBuilder
@@ -47,6 +57,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
     public void AddProperty(PropertyInfo property)
     {
         if (property == null) throw new ArgumentNullException(nameof(property));
+        if (property.CanWrite == false) throw new ArgumentException($"{property.Name} does not have a set method");
 
         if (properties.Contains(property)) return;
         properties.Add(property);
@@ -102,13 +113,13 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         for (int i = 0; i < types.Length; i++)
         {
             var type = types[i];
-            var prefixType = CreatePropertyPrefix(moduleBuilder, type, i, propertyMap[type].ToArray());
+            var properties = propertyMap[type].ToArray();
+            var patchType = CreatePropertyPrefix(moduleBuilder, type, i, properties);
 
-            var transpilerMethod = prefixType.Method("Transpiler");
-
-            foreach (var method in AccessTools.GetDeclaredMethods(type))
+            foreach (var property in properties)
             {
-                patchCollector.AddTranspiler(method, transpilerMethod);
+                var prefix = AccessTools.Method(patchType, $"{property.DeclaringType.Name}_{property.Name}_Prefix");
+                patchCollector.AddPrefix(property.GetSetMethod(), prefix);
             }
         }
 
@@ -203,5 +214,6 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         ClearCollections();
     }
 
+    /// <inheritdoc/>
     public bool TryGetIntercept(FieldInfo field, out MethodInfo intercept) => interceptMap.TryGetValue(field, out intercept);
 }

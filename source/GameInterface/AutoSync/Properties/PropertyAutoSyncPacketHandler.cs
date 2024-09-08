@@ -5,7 +5,7 @@ using LiteNetLib;
 namespace GameInterface.AutoSync.Properties;
 internal class PropertyAutoSyncPacketHandler : IPacketHandler
 {
-    public PacketType PacketType => PacketType.FieldAutoSync;
+    public PacketType PacketType => PacketType.PropertyAutoSync;
 
     private readonly IPacketManager packetManager;
     private readonly IPacketSwitchProvider packetSwitchProvider;

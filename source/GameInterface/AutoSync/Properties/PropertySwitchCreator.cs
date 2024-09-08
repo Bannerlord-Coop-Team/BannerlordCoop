@@ -1,4 +1,5 @@
 ﻿using Common.Logging;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using ProtoBuf;
@@ -144,7 +145,7 @@ public class PropertySwitchCreator
 
     private void CreateByValue(ILGenerator il, PropertyInfo property, LocalBuilder instanceLocal)
     {
-        // Loads the instance (used by strfld)
+        // Loads the instance (used by set method)
         il.Emit(OpCodes.Ldloc, instanceLocal);
 
         // Load and deserialize the new value casted as field type
@@ -152,7 +153,10 @@ public class PropertySwitchCreator
         il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(PropertyAutoSyncPacket), nameof(PropertyAutoSyncPacket.value)));
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertySwitchCreator), nameof(Deserialize)).MakeGenericMethod(property.PropertyType));
 
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.AllowThisThread)));
         il.Emit(OpCodes.Callvirt, property.GetSetMethod());
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.RevokeThisThread)));
+
         il.Emit(OpCodes.Ret);
     }
 
@@ -197,11 +201,18 @@ public class PropertySwitchCreator
         il.MarkLabel(getObjectSuccess);
 
         il.Emit(OpCodes.Ldloc, valueLocal);
+
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.AllowThisThread)));
         il.Emit(OpCodes.Callvirt, property.GetSetMethod());
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.RevokeThisThread)));
+
         il.Emit(OpCodes.Ret);
     }
 
-
+    public static void Test(object instance, float value)
+    {
+        ;
+    }
     public static T Deserialize<T>(byte[] bytes)
     {
         using (var ms = new MemoryStream(bytes))

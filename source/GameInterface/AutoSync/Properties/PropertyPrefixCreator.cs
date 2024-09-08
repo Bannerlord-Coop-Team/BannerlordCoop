@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Network;
 using Common.PacketHandlers;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using ProtoBuf.Meta;
@@ -11,7 +12,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 
 namespace GameInterface.AutoSync.Properties;
-internal class PropertyPrefixCreator
+public class PropertyPrefixCreator
 {
     private readonly TypeBuilder typeBuilder;
 
@@ -67,16 +68,23 @@ internal class PropertyPrefixCreator
         il.Emit(OpCodes.Ret);
     }
 
+    public string GetPrefixName(PropertyInfo property)
+    {
+        return $"{property.DeclaringType.Name}_{property.Name}_Prefix";
+    }
+
     private MethodBuilder CreatePropertyByValPrefix(int typeId, int propId, PropertyInfo prop)
     {
-        var methodBuilder = typeBuilder.DefineMethod($"{prop.DeclaringType.Name}_{prop.Name}_Prefix",
+        var methodBuilder = typeBuilder.DefineMethod(GetPrefixName(prop),
             MethodAttributes.Public | MethodAttributes.Static,
             typeof(bool),
             new Type[] { prop.DeclaringType, prop.PropertyType });
-        methodBuilder.DefineParameter(0, ParameterAttributes.In, "__instance");
-        methodBuilder.DefineParameter(1, ParameterAttributes.In, "value");
+        var instanceArg = methodBuilder.DefineParameter(1, ParameterAttributes.In, "__instance");
+        var valueArg = methodBuilder.DefineParameter(2, ParameterAttributes.In, "value");
 
         var il = methodBuilder.GetILGenerator();
+
+        IsThreadAllowed(il);
 
         IsClientCheck(il, prop);
 
@@ -96,6 +104,7 @@ internal class PropertyPrefixCreator
 
         il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(PropertyAutoSyncPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
         il.Emit(OpCodes.Box, typeof(PropertyAutoSyncPacket));
+
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
 
         il.Emit(OpCodes.Ldc_I4_1);
@@ -106,14 +115,16 @@ internal class PropertyPrefixCreator
 
     private MethodBuilder CreatePropertyByRefPrefix(int typeId, int propId, PropertyInfo prop)
     {
-        var methodBuilder = typeBuilder.DefineMethod($"{prop.DeclaringType.Name}_{prop.Name}_Prefix",
+        var methodBuilder = typeBuilder.DefineMethod(GetPrefixName(prop),
             MethodAttributes.Public | MethodAttributes.Static,
             typeof(bool),
             new Type[] { prop.DeclaringType, prop.PropertyType });
-        methodBuilder.DefineParameter(0, ParameterAttributes.In, "__instance");
-        methodBuilder.DefineParameter(1, ParameterAttributes.In, "value");
+        var instanceArg = methodBuilder.DefineParameter(1, ParameterAttributes.In, "__instance");
+        var valueArg = methodBuilder.DefineParameter(2, ParameterAttributes.In, "value");
 
         var il = methodBuilder.GetILGenerator();
+
+        IsThreadAllowed(il);
 
         IsClientCheck(il, prop);
 
@@ -193,6 +204,18 @@ internal class PropertyPrefixCreator
         il.MarkLabel(validLabel);
 
         return idLocal;
+    }
+
+    private void IsThreadAllowed(ILGenerator il)
+    {
+        var notAllowedLabel = il.DefineLabel();
+
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.IsThisThreadAllowed)));
+        il.Emit(OpCodes.Brfalse, notAllowedLabel);
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Ret);
+
+        il.MarkLabel(notAllowedLabel);
     }
 
     private void IsClientCheck(ILGenerator il, MemberInfo field)

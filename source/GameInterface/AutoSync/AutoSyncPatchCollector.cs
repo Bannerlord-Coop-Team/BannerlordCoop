@@ -76,5 +76,8 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
     public void Dispose()
     {
         UnpatchAll();
+
+        transpilers.Clear();
+        prefixes.Clear();
     }
 }

@@ -1,5 +1,4 @@
-﻿using GameInterface.AutoSync.Fields;
-using GameInterface.Services.ObjectManager;
+﻿using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -41,7 +40,7 @@ internal class PropertyTypeSwitchCreator
     {
         var types = propertyMap.Keys.ToArray();
 
-        var fieldSwitches = CreateFieldSwitches(propertyMap);
+        var propertySwitches = CreateSwitches(propertyMap);
 
         var methodBuilder = typeBuilder.DefineMethod("TypeSwitch",
             MethodAttributes.Public | MethodAttributes.Virtual,
@@ -63,16 +62,16 @@ internal class PropertyTypeSwitchCreator
         {
             il.MarkLabel(labels[i]);
             il.Emit(OpCodes.Ldarg_0);
-            il.Emit(OpCodes.Ldfld, fieldSwitches[i]);
+            il.Emit(OpCodes.Ldfld, propertySwitches[i]);
             il.Emit(OpCodes.Ldarg_1);
-            il.Emit(OpCodes.Callvirt, AccessTools.Method(fieldSwitches[i].FieldType, "PropertySwitch"));
+            il.Emit(OpCodes.Callvirt, AccessTools.Method(propertySwitches[i].FieldType, "PropertySwitch"));
             il.Emit(OpCodes.Ret);
         }
 
         return methodBuilder;
     }
 
-    private FieldBuilder[] CreateFieldSwitches(Dictionary<Type, List<PropertyInfo>> propertyMap)
+    private FieldBuilder[] CreateSwitches(Dictionary<Type, List<PropertyInfo>> propertyMap)
     {
         var types = propertyMap.Keys.ToArray();
         var ctorBuilder = typeBuilder.DefineConstructor(

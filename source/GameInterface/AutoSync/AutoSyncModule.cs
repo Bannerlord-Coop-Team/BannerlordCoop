@@ -15,8 +15,9 @@ internal class AutoSyncModule : Module
     protected override void Load(ContainerBuilder builder)
     {
         builder.RegisterType<FieldAutoSyncPacketHandler>().AsSelf().AutoActivate().InstancePerLifetimeScope();
+        builder.RegisterType<PropertyAutoSyncPacketHandler>().AsSelf().AutoActivate().InstancePerLifetimeScope();
 
-        foreach(var type in GetAutoSyncClasses())
+        foreach (var type in GetAutoSyncClasses())
         {
             builder.RegisterType(type).AsSelf().InstancePerLifetimeScope().AutoActivate();
         }

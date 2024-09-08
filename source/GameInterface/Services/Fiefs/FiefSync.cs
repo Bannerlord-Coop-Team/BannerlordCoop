@@ -12,5 +12,7 @@ class FiefSync : IAutoSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Fief), nameof(Fief.GarrisonPartyComponent)));
 
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Fief), nameof(Fief.FoodStocks)));
+
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Governor)));
     }
 }

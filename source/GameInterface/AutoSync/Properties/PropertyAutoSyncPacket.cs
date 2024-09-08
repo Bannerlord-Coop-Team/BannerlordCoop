@@ -24,7 +24,7 @@ public readonly struct PropertyAutoSyncPacket : IPacket
     [ProtoMember(4)]
     public readonly byte[] value;
 
-    public readonly PacketType PacketType => PacketType.FieldAutoSync;
+    public readonly PacketType PacketType => PacketType.PropertyAutoSync;
 
     public readonly DeliveryMethod DeliveryMethod => DeliveryMethod.ReliableOrdered;
 }
