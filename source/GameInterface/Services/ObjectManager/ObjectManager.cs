@@ -1,20 +1,12 @@
 ﻿using Common;
 using Common.Logging;
-using GameInterface.Services.Armies;
-using GameInterface.Services.Clans;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.Registry;
-using GameInterface.Services.Settlements;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ObjectManager;
@@ -74,6 +66,7 @@ public interface IObjectManager
     /// <param name="obj">Object to remove</param>
     /// <returns>True if successful, false if failed</returns>
     bool Remove(object obj);
+    bool IsTypeManaged(Type type);
 }
 
 /// <summary>
@@ -85,17 +78,11 @@ internal class ObjectManager : IObjectManager
 
     private readonly GameObjectManager defaultObjectManager = new GameObjectManager();
 
-    private readonly Dictionary<Type, IRegistry> RegistryMap = new Dictionary<Type, IRegistry>();
+    IReadOnlyDictionary<Type, IRegistry> RegistryMap => registryCollection.RegistryMap;
 
     public ObjectManager(IRegistryCollection registryCollection)
     {
-        foreach (var registry in registryCollection)
-        {
-            foreach (var managedType in registry.ManagedTypes)
-            {
-                RegistryMap.Add(managedType, registry);
-            }
-        }
+        this.registryCollection = registryCollection;
     }
 
     public bool AddExisting(string id, object obj)
@@ -174,6 +161,8 @@ internal class ObjectManager : IObjectManager
 
     private static readonly MethodInfo GetObject = typeof(MBObjectManager)
         .GetMethod(nameof(MBObjectManager.GetObject), new Type[] { typeof(string) });
+    private readonly IRegistryCollection registryCollection;
+
     public bool TryGetObject<T>(string id, out T obj) where T : class
     {
         obj = default;
@@ -200,6 +189,11 @@ internal class ObjectManager : IObjectManager
 
         /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
         return defaultObjectManager.Remove(obj);
+    }
+
+    public bool IsTypeManaged(Type type)
+    {
+        return RegistryMap.ContainsKey(type) || defaultObjectManager.IsTypeManaged(type);
     }
 
     #region LogHelpers
@@ -275,7 +269,14 @@ internal class ObjectManager : IObjectManager
             if (TryCastToMBObject(obj, out var mbObject) == false) return false;
             mbObject.StringId = id;
 
-            return objectManager.RegisterPresumedObject(mbObject) != null;
+            return RegisterExistingObjectMethod.MakeGenericMethod(obj.GetType()).Invoke(objectManager, new object[] { obj }) != null;
+        }
+
+        private readonly MethodInfo RegisterExistingObjectMethod = AccessTools.Method(typeof(MBObjectManager), nameof(MBObjectManager.RegisterPresumedObject));
+
+        private T Cast<T>(object obj)
+        {
+            return (T)obj;
         }
 
         public bool AddNewObject(object obj, out string newId)
@@ -353,5 +354,7 @@ internal class ObjectManager : IObjectManager
 
             return mbObject != null;
         }
+
+        public bool IsTypeManaged(Type type) => objectManager?.HasType(type) ?? false;
     }
 }

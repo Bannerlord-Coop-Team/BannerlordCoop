@@ -59,20 +59,8 @@ public class ArmyCreationTests : IDisposable
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        string? kingdomId = null;
-        string? partyId = null;
-
-        server.Call(() =>
-        {
-            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
-            var mobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-
-            Assert.True(server.ObjectManager.TryGetId(kingdom, out kingdomId));
-            Assert.True(server.ObjectManager.TryGetId(mobileParty, out partyId));
-        });
-
-        Assert.NotNull(kingdomId);
-        Assert.NotNull(partyId);
+        var kingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         // Act
         string? armyId = null;

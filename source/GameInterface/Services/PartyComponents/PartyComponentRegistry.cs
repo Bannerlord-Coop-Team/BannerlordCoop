@@ -1,6 +1,8 @@
 ﻿using GameInterface.Services.Registry;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.PartyComponents;
@@ -27,7 +29,10 @@ internal class PartyComponentRegistry : RegistryBase<PartyComponent>
 
     public override void RegisterAll()
     {
-        // Not required for party component
+        foreach (var component in MobileParty.All.Select(p => p.PartyComponent).Where(c => c != null))
+        {
+            RegisterNewObject(component, out var _);
+        }
     }
 
     protected override string GetNewId(PartyComponent party)

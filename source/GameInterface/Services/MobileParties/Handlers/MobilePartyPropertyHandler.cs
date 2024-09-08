@@ -87,10 +87,6 @@ namespace GameInterface.Services.MobileParties.Handlers
                     instance.Aggressiveness = float.Parse(data.Value2);
                     return;
 
-                case PropertyType.ArmyPositionAdder:
-                    instance.ArmyPositionAdder = new Vec2(float.Parse(data.Value2), float.Parse(data.Value3));
-                    return;
-
                 case PropertyType.Objective:
                     instance.Objective = (MobileParty.PartyObjective)int.Parse(data.Value2);
                     return;

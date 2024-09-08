@@ -16,14 +16,11 @@ namespace Coop.Core.Client.Services.Clans.Handler
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
-        private readonly IClientLogic clientLogic;
-        private readonly ILogger Logger = LogManager.GetLogger<ClientClanInfluenceHandler>();
 
-        public ClientClanInfluenceHandler(IMessageBroker messageBroker, INetwork network, IClientLogic clientLogic)
+        public ClientClanInfluenceHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.network = network;
-            this.clientLogic = clientLogic;
             messageBroker.Subscribe<ClanInfluenceChanged>(Handle);
             messageBroker.Subscribe<NetworkClanChangeInfluenceApproved>(Handle);
         }

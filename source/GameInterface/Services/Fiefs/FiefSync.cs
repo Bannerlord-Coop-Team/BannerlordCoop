@@ -1,0 +1,14 @@
+﻿using GameInterface.AutoSync;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Settlements;
+
+namespace GameInterface.Services.Fiefs;
+
+class FiefSync : IAutoSync
+{
+    public FiefSync(IAutoSyncBuilder autoSyncBuilder)
+    {
+        autoSyncBuilder.AddField(AccessTools.Field(typeof(Fief), nameof(Fief.GarrisonPartyComponent)));
+    }
+}

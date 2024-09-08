@@ -11,7 +11,7 @@ using TaleWorlds.CampaignSystem.Siege;
 namespace E2E.Tests.Util;
 internal class GameObjectCreator
 {
-    private static Dictionary<Type, IObjectBuilder> ObjectBuilders = new Dictionary<Type, IObjectBuilder>
+    private readonly static Dictionary<Type, IObjectBuilder> ObjectBuilders = new Dictionary<Type, IObjectBuilder>
     {
         { typeof(CharacterObject), new CharacterObjectBuilder() },
         { typeof(Settlement), new SettlementBuilder() },
