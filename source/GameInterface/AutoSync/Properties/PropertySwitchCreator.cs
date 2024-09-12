@@ -209,10 +209,6 @@ public class PropertySwitchCreator
         il.Emit(OpCodes.Ret);
     }
 
-    public static void Test(object instance, float value)
-    {
-        ;
-    }
     public static T Deserialize<T>(byte[] bytes)
     {
         using (var ms = new MemoryStream(bytes))

@@ -250,7 +250,6 @@ public class PropertyPrefixCreator
                 throw new NotSupportedException(
                     $"{propType.Name} is not serializable and not managed by the object manager. " +
                     $"Either manage the type using the object manager or make this type serializable");
-            
         }
 
         return typeBuilder.CreateTypeInfo();
