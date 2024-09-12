@@ -2,27 +2,22 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.BasicCultureObjects.Messages;
-using GameInterface.Services.CraftingService.Messages;
-using GameInterface.Services.CraftingService.Patches;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.Core;
-using TaleWorlds.Localization;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.BasicCultureObjects.Patches
 {
     [HarmonyPatch]
-    internal class BasicCultureObjectLifetimePatches
+    internal class CultureObjectLifetimePatches
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<BasicCultureObjectLifetimePatches>();
+        private static readonly ILogger Logger = LogManager.GetLogger<CultureObjectLifetimePatches>();
 
-        [HarmonyPatch(typeof(BasicCultureObject), MethodType.Constructor)]
+        [HarmonyPatch(typeof(CultureObject), MethodType.Constructor)]
         [HarmonyPrefix]
-        private static bool ctorPrefix(ref BasicCultureObject __instance)
+        private static bool ctorPrefix(ref CultureObject __instance)
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -30,14 +25,14 @@ namespace GameInterface.Services.BasicCultureObjects.Patches
             if (ModInformation.IsClient)
             {
                 Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(BasicCultureObject), Environment.StackTrace);
+                    + "Callstack: {callstack}", typeof(CultureObject), Environment.StackTrace);
 
                 return true;
             }
 
             if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             {
-                var message = new BasicCultureObjectCreated(__instance);
+                var message = new CultureObjectCreated(__instance);
 
                 MessageBroker.Instance.Publish(null, message);
             }
