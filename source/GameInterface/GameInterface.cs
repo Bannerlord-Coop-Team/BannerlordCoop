@@ -30,15 +30,15 @@ public class GameInterface : IGameInterface
 
     public void PatchAll()
     {
-        // This needs to be here to patch all autosync at the beginning of all tests
-        patchCollector.PatchAll();
-
         // NOTE: Patching in constructor causes issues with tests and CI
         if (Harmony.HasAnyPatches(GameInterfaceModule.HarmonyId)) return;
 
         var assembly = typeof(GameInterface).Assembly;
+
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
+
+        patchCollector.PatchAll();
     }
 
     public void UnpatchAll()

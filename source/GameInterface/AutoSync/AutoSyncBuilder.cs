@@ -2,6 +2,7 @@
 using GameInterface.AutoSync.Properties;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,8 +13,27 @@ using System.Runtime.CompilerServices;
 namespace GameInterface.AutoSync;
 public interface IAutoSyncBuilder : IDisposable
 {
+    /// <summary>
+    /// Add a field to automatically sync across the network
+    /// </summary>
+    /// <param name="field">Field to auto sync</param>
     void AddField(FieldInfo field);
+
+    /// <summary>
+    /// Add a property to automatically sync across the network
+    /// </summary>
+    /// <param name="property">Property to auto sync</param>
     void AddProperty(PropertyInfo property);
+
+    /// <summary>
+    /// Add a field external to the declaring class that updates a public field as those are not synced automatically
+    /// </summary>
+    /// <param name="methodInfo">Method to add as an external setter</param>
+    void AddFieldChangeMethod(MethodInfo methodInfo);
+
+    /// <summary>
+    /// Build autosync and dynamic assembly
+    /// </summary>
     void Build();
 
     /// <summary>
@@ -29,8 +49,9 @@ public interface IAutoSyncBuilder : IDisposable
 }
 internal class AutoSyncBuilder : IAutoSyncBuilder
 {
-    private readonly List<FieldInfo> fields = new List<FieldInfo>();
-    private readonly List<PropertyInfo> properties = new List<PropertyInfo>();
+    private readonly HashSet<FieldInfo> fields = new HashSet<FieldInfo>();
+    private readonly HashSet<PropertyInfo> properties = new HashSet<PropertyInfo>();
+    private readonly HashSet<MethodInfo> externalFieldChangeMethods = new HashSet<MethodInfo>();
     private readonly IObjectManager objectManager;
     private readonly Harmony harmony;
     private readonly IPacketSwitchProvider packetSwitchProvider;
@@ -50,7 +71,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
     {
         if (field == null) throw new ArgumentNullException(nameof(field));
 
-        if (fields.Contains(field)) return;
+        if (fields.Contains(field)) throw new ArgumentException($"{field.Name} has already been registered as a synced field");
         fields.Add(field);
     }
 
@@ -59,8 +80,16 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         if (property == null) throw new ArgumentNullException(nameof(property));
         if (property.CanWrite == false) throw new ArgumentException($"{property.Name} does not have a set method");
 
-        if (properties.Contains(property)) return;
+        if (properties.Contains(property)) throw new ArgumentException($"{property.Name} has already been registered as a synced property");
         properties.Add(property);
+    }
+
+    public void AddFieldChangeMethod(MethodInfo methodInfo)
+    {
+        if (methodInfo == null) throw new ArgumentNullException(nameof(methodInfo));
+        if (externalFieldChangeMethods.Contains(methodInfo)) throw new ArgumentException($"{methodInfo.Name} has already been registered as an external method");
+
+        externalFieldChangeMethods.Add(methodInfo);
     }
 
     public static int AsmCounter = 1;
@@ -92,6 +121,12 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
             foreach (var method in AccessTools.GetDeclaredMethods(type))
             {
+                patchCollector.AddTranspiler(method, transpilerMethod);
+            }
+
+            foreach (var method in externalFieldChangeMethods)
+            {
+                // This patches all external methods with all transpilers (might be slow if we have a lot)
                 patchCollector.AddTranspiler(method, transpilerMethod);
             }
         }

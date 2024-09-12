@@ -2,7 +2,6 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;

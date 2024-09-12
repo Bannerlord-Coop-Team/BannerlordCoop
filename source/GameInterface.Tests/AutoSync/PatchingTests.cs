@@ -84,7 +84,7 @@ public class PatchingTests
         prefix.Invoke(null, new object[] { testInstance, 5 });
 
         // Assert
-        var packet = Assert.IsType<FieldAutoSyncPacket>(Assert.Single(network.SentPackets));
+        var packet = Assert.IsType<PropertyAutoSyncPacket>(Assert.Single(network.SentPackets));
 
         Assert.Equal(objId, packet.instanceId);
     }
