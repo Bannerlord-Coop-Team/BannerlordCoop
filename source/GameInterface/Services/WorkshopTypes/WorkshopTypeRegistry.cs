@@ -7,7 +7,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 
-namespace GameInterface.Services.Workshops
+namespace GameInterface.Services.WorkshopTypes
 {
     internal class WorkshopTypeRegistry : RegistryBase<WorkshopType>
     {
@@ -15,7 +15,7 @@ namespace GameInterface.Services.Workshops
 
         public override void RegisterAll()
         {
-            foreach(WorkshopType workshopType in WorkshopType.All)
+            foreach (WorkshopType workshopType in WorkshopType.All)
             {
                 RegisterNewObject(workshopType, out var _);
             }
