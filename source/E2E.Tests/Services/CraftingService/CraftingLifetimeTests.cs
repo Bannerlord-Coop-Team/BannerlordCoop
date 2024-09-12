@@ -39,8 +39,8 @@ namespace E2E.Tests.Services.CraftingService
             server.Call(() =>
             {
                 CraftingTemplate craftingTemplate = new CraftingTemplate();
-                BasicCultureObject basicCultureObject = new BasicCultureObject();
-                Crafting crafting = new Crafting(craftingTemplate, basicCultureObject, new TextObject("test"));
+                CultureObject cultureObject = new CultureObject();
+                Crafting crafting = new Crafting(craftingTemplate, cultureObject, new TextObject("test"));
                 
                 Assert.True(server.ObjectManager.TryGetId(crafting, out string foundCraftingId));
                 craftingId = foundCraftingId;
