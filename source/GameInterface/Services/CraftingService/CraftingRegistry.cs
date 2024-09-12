@@ -1,8 +1,5 @@
 ﻿using GameInterface.Services.Registry;
 using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.CraftingService
@@ -13,7 +10,7 @@ namespace GameInterface.Services.CraftingService
 
         public override void RegisterAll()
         {
-
+            //Not needed
         }
 
         protected override string GetNewId(Crafting craft)

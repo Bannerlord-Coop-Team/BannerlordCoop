@@ -2,14 +2,10 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.BasicCultureObjects.Handlers;
-using GameInterface.Services.BasicCultureObjects.Messages;
 using GameInterface.Services.CraftingTemplates.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.CraftingTemplates.Handlers
@@ -45,11 +41,11 @@ namespace GameInterface.Services.CraftingTemplates.Handlers
 
         private void Handle(MessagePayload<NetworkCreateCraftingTemplate> obj)
         {
-            var newCultureObject = ObjectHelper.SkipConstructor<BasicCultureObject>();
+            var newCraftingTemplate = ObjectHelper.SkipConstructor<CraftingTemplate>();
 
             var payload = obj.What;
 
-            objectManager.AddExisting(payload.CraftingTemplateId, newCultureObject);
+            objectManager.AddExisting(payload.CraftingTemplateId, newCraftingTemplate);
         }
     }
 }

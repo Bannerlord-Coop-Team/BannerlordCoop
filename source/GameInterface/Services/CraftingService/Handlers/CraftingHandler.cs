@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.CraftingService.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -47,7 +48,7 @@ namespace GameInterface.Services.CraftingService.Handlers
             var payload = obj.What.Data;
 
             if (objectManager.TryGetObject(payload.CraftingTemplateId, out CraftingTemplate template) == false) return;
-            if (objectManager.TryGetObject(payload.CultureId, out BasicCultureObject cultureObj) == false) return;
+            if (objectManager.TryGetObject(payload.CultureId, out CultureObject cultureObj) == false) return;
 
             GameLoopRunner.RunOnMainThread(() =>
             {

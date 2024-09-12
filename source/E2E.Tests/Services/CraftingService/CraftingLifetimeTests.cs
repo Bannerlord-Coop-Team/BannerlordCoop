@@ -33,15 +33,13 @@ namespace E2E.Tests.Services.CraftingService
 
             // Act
             string? craftingId = null;
-            string? craftingTemplateId = null;
-            string? basicCultureObjectId = null;
 
             server.Call(() =>
             {
                 CraftingTemplate craftingTemplate = new CraftingTemplate();
                 CultureObject cultureObject = new CultureObject();
                 Crafting crafting = new Crafting(craftingTemplate, cultureObject, new TextObject("test"));
-                
+
                 Assert.True(server.ObjectManager.TryGetId(crafting, out string foundCraftingId));
                 craftingId = foundCraftingId;
             });
@@ -59,23 +57,19 @@ namespace E2E.Tests.Services.CraftingService
         public void ClientCreateCrafting_DoesNothing()
         {
             // Arrange
-            var server = TestEnvironment.Server;
+            var client1 = TestEnvironment.Clients.First();
 
             // Act
-            string? clanId = null;
-            TestEnvironment.Clients.First().Call(() =>
+            string? CraftingId = null;
+            client1.Call(() =>
             {
-                var clan = Clan.CreateClan("");
-                clanId = clan.StringId;
+                var Crafting = new Crafting(new CraftingTemplate(), new CultureObject(), new TextObject());
+
+                Assert.False(client1.ObjectManager.TryGetId(Crafting, out CraftingId));
             });
 
             // Assert
-            Assert.False(server.ObjectManager.TryGetObject<Clan>(clanId, out var _));
-
-            foreach (var client in TestEnvironment.Clients)
-            {
-                Assert.False(client.ObjectManager.TryGetObject<Clan>(clanId, out var _));
-            }
+            Assert.Null(CraftingId);
         }
     }
 }
