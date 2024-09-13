@@ -1,14 +1,13 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Fiefs;
-public class FiefFieldTests : IDisposable
+public class SyncFiefTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
 
@@ -18,7 +17,7 @@ public class FiefFieldTests : IDisposable
 
     private readonly string FiefId;
 
-    public FiefFieldTests(ITestOutputHelper output)
+    public SyncFiefTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
 
@@ -39,6 +38,7 @@ public class FiefFieldTests : IDisposable
     {
         TestEnvironment.Dispose();
     }
+
 
     [Fact]
     public void Server_Fief_GarrisonPartyComponent()
@@ -84,6 +84,33 @@ public class FiefFieldTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<GarrisonPartyComponent>(garrisonId, out var clientComponent));
 
             Assert.True(clientComponent == fief.GarrisonPartyComponent);
+        }
+    }
+
+
+    [Fact]
+    public void Server_Fief_FoodStacks()
+    {
+        // Arrange
+        var server = TestEnvironment.Server;
+
+        // Act
+        const float newValue = 551;
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<Town>(FiefId, out var fief));
+
+            fief.FoodStocks = newValue;
+
+            Assert.Equal(newValue, fief.FoodStocks);
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<Town>(FiefId, out var fief));
+
+            Assert.Equal(newValue, fief.FoodStocks);
         }
     }
 }

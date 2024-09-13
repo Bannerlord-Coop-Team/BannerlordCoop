@@ -1,13 +1,10 @@
-﻿using Common.Logging;
-using Common.Serialization;
-using GameInterface.AutoSync;
-using GameInterface.AutoSync.Builders;
+﻿using Common.Serialization;
+using GameInterface.AutoSync.Fields;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -34,7 +31,7 @@ public class AutoSyncTests
         var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
 
         var objectManager = new TestObjManager();
-        var typeSwitchCreator = new TypeSwitchCreator(moduleBuilder, objectManager);
+        var typeSwitchCreator = new FieldTypeSwitchCreator(moduleBuilder, objectManager);
 
         var typeMap = new Dictionary<Type, List<FieldInfo>>
         {
@@ -45,7 +42,7 @@ public class AutoSyncTests
         var typeSwitchType = typeSwitchCreator.Build(typeMap);
         dynamic typeSwitch = Activator.CreateInstance(typeSwitchType, objectManager)!;
 
-        typeSwitch.TypeSwitch(new AutoSyncFieldPacket(null, 0, 0, null));
+        typeSwitch.TypeSwitch(new FieldAutoSyncPacket(null, 0, 0, null));
     }
 
     [Fact]
@@ -80,7 +77,7 @@ public class AutoSyncTests
             Serializer.Serialize(internalStream, newValue);
             var serializedStr = internalStream.ToArray();
 
-            var packet = new AutoSyncFieldPacket(objId, 0, fields.IndexOf(nameField), serializedStr);
+            var packet = new FieldAutoSyncPacket(objId, 0, fields.IndexOf(nameField), serializedStr);
 
             fieldSwitch.FieldSwitch(packet);
 
@@ -122,7 +119,7 @@ public class AutoSyncTests
             Serializer.Serialize(internalStream, newValue);
             var serializedStr = internalStream.ToArray();
 
-            var packet = new AutoSyncFieldPacket(objId, 0, fields.IndexOf(refField), serializedStr);
+            var packet = new FieldAutoSyncPacket(objId, 0, fields.IndexOf(refField), serializedStr);
 
             fieldSwitch.FieldSwitch(packet);
 

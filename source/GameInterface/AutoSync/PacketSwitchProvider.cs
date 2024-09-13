@@ -1,13 +1,16 @@
-﻿using GameInterface.AutoSync.Builders;
+﻿using GameInterface.AutoSync.Fields;
+using GameInterface.AutoSync.Properties;
 
 namespace GameInterface.AutoSync;
 
 public interface IPacketSwitchProvider
 {
-    ITypeSwitcher Switcher { get; set; }
+    IFieldTypeSwitcher FieldSwitch { get; set; }
+    IPropertyTypeSwitcher PropertySwitch { get; set; }
 }
 
 class PacketSwitchProvider : IPacketSwitchProvider
 {
-    public ITypeSwitcher Switcher { get; set; }
+    public IFieldTypeSwitcher FieldSwitch { get; set; }
+    public IPropertyTypeSwitcher PropertySwitch { get; set; }
 }

@@ -34,6 +34,7 @@ public class GameInterface : IGameInterface
         if (Harmony.HasAnyPatches(GameInterfaceModule.HarmonyId)) return;
 
         var assembly = typeof(GameInterface).Assembly;
+
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
 
