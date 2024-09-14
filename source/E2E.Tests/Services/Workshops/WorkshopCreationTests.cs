@@ -33,8 +33,7 @@ public class WorkshopCreationTests : IDisposable
         {
             Settlement settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             var Workshop = new Workshop(settlement, "test");
-            Assert.True(server.ObjectManager.TryGetId(Workshop, out string foundWorkshopId));
-            WorkshopId = foundWorkshopId;
+            Assert.True(server.ObjectManager.TryGetId(Workshop, out WorkshopId));
         });
 
         // Assert
@@ -58,10 +57,14 @@ public class WorkshopCreationTests : IDisposable
         {
             Settlement settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             var Workshop = new Workshop(settlement, "test");
-            Assert.False(client1.ObjectManager.TryGetId(Workshop, out string _));
+            Assert.False(client1.ObjectManager.TryGetId(Workshop, out WorkshopId));
         });
 
         // Assert
-        
+        Assert.False(server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var _));
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.False(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var _));
+        }
     }
 }
