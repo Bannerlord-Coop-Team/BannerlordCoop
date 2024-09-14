@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.CraftingService.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -29,6 +30,8 @@ namespace GameInterface.Services.CraftingService.Handlers
             this.network = network;
             messageBroker.Subscribe<CraftingCreated>(Handle);
             messageBroker.Subscribe<NetworkCreateCrafting>(Handle);
+            messageBroker.Subscribe<CraftingRemoved>(Handle);
+            messageBroker.Subscribe<NetworkRemoveCrafting>(Handle);
         }
 
         public void Dispose()
@@ -58,6 +61,21 @@ namespace GameInterface.Services.CraftingService.Handlers
                     objectManager.AddExisting(payload.CraftingId, crafting);
                 }
             });
+        }
+
+        private void Handle(MessagePayload<CraftingRemoved> payload)
+        {
+            NetworkRemoveCrafting message = new(payload.What.craftingId);
+            network.SendAll(message);
+        }
+
+        private void Handle(MessagePayload<NetworkRemoveCrafting> obj)
+        {
+            var payload = obj.What;
+
+            if (objectManager.TryGetObject(payload.CraftingId, out Crafting crafting) == false) return;
+
+            objectManager.Remove(crafting);
         }
     }
 }

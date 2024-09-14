@@ -6,11 +6,8 @@ using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
-using static TaleWorlds.CampaignSystem.Army;
 
 namespace GameInterface.Services.CraftingService.Patches
 {
