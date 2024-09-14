@@ -38,6 +38,8 @@ namespace GameInterface.Services.CraftingService.Handlers
         {
             messageBroker.Unsubscribe<CraftingCreated>(Handle);
             messageBroker.Unsubscribe<NetworkCreateCrafting>(Handle);
+            messageBroker.Unsubscribe<CraftingRemoved>(Handle);
+            messageBroker.Unsubscribe<NetworkRemoveCrafting>(Handle);
         }
 
         private void Handle(MessagePayload<CraftingCreated> payload)
