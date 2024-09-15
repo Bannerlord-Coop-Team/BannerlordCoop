@@ -13,14 +13,14 @@ using TaleWorlds.Localization;
 
 namespace GameInterface.Services.CraftingService.Patches
 {
-    [HarmonyPatch]
+    [HarmonyPatch(typeof(Crafting))]
     public class CraftingLifetimePatches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CraftingLifetimePatches>();
 
         [HarmonyPatch(typeof(Crafting), MethodType.Constructor, typeof(CraftingTemplate), typeof(BasicCultureObject), typeof(TextObject))]
         [HarmonyPrefix]
-        private static bool CreateCraftingPrefix(ref Crafting __instance, CraftingTemplate craftingTemplate, BasicCultureObject culture, TextObject name)
+        static bool CreateCraftingPrefix(ref Crafting __instance, CraftingTemplate craftingTemplate, BasicCultureObject culture, TextObject name)
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -48,7 +48,7 @@ namespace GameInterface.Services.CraftingService.Patches
 
         [HarmonyPatch(typeof(Crafting), nameof(Crafting.CreatePreCraftedWeapon))]
         [HarmonyPostfix]
-        private static void CreatePreCraftedWeaponPostfix(ref Crafting __instance, ItemObject itemObject, WeaponDesignElement[] usedPieces, string templateId, TextObject weaponName, ItemModifierGroup itemModifierGroup)
+        static void CreatePreCraftedWeaponPostfix(ref Crafting __instance, ItemObject itemObject, WeaponDesignElement[] usedPieces, string templateId, TextObject weaponName, ItemModifierGroup itemModifierGroup)
         {
             if (ModInformation.IsClient)
             {
@@ -64,7 +64,7 @@ namespace GameInterface.Services.CraftingService.Patches
 
         [HarmonyPatch(typeof(Crafting), nameof(Crafting.InitializePreCraftedWeaponOnLoad))]
         [HarmonyPostfix]
-        private static void InitializePreCraftedWeaponOnLoadPostfix(ref Crafting __instance, ItemObject itemObject, WeaponDesign craftedData, TextObject itemName, BasicCultureObject culture)
+        static void InitializePreCraftedWeaponOnLoadPostfix(ref Crafting __instance, ItemObject itemObject, WeaponDesign craftedData, TextObject itemName, BasicCultureObject culture)
         {
             if (ModInformation.IsClient)
             {
@@ -80,7 +80,7 @@ namespace GameInterface.Services.CraftingService.Patches
 
         [HarmonyPatch(typeof(Crafting), nameof(Crafting.CreateRandomCraftedItem))]
         [HarmonyPostfix]
-        private static void CreateRandomCraftedItemPostfix(ref Crafting __instance, BasicCultureObject culture)
+        static void CreateRandomCraftedItemPostfix(ref Crafting __instance, BasicCultureObject culture, ref ItemObject __result)
         {
             if (ModInformation.IsClient)
             {
@@ -93,10 +93,16 @@ namespace GameInterface.Services.CraftingService.Patches
 
             MessageBroker.Instance.Publish(null, message);
         }
+    }
+
+    [HarmonyPatch(typeof(CraftingState))]
+    public class CraftingStateLifetimePatch
+    {
+        private static readonly ILogger Logger = LogManager.GetLogger<CraftingStateLifetimePatch>();
 
         [HarmonyPatch(nameof(CraftingState.CraftingLogic), MethodType.Setter)]
         [HarmonyPrefix]
-        private static bool CraftingLogicSetterPrefix(ref CraftingState __instance, ref Crafting value)
+        static bool Prefix(ref CraftingState __instance, ref Crafting value)
         {
             if (ModInformation.IsClient)
             {
