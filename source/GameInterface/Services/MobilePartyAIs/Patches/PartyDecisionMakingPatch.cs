@@ -1,7 +1,5 @@
 ﻿using HarmonyLib;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 

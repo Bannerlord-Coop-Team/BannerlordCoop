@@ -1,18 +1,10 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.Heroes.Patches;
-using GameInterface.Services.MobileParties.Data;
-using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.MobilePartyAIs.Messages;
-using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
@@ -61,5 +53,4 @@ class MobilePartyAiLifetimePatches
 
         MessageBroker.Instance.Publish(ai, new MobilePartyAiDestroyed(ai));
     }
-
 }
