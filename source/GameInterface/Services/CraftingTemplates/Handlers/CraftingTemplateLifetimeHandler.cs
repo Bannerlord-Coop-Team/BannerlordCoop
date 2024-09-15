@@ -5,7 +5,6 @@ using Common.Util;
 using GameInterface.Services.CraftingTemplates.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.CraftingTemplates.Handlers
@@ -34,7 +33,11 @@ namespace GameInterface.Services.CraftingTemplates.Handlers
 
         private void Handle(MessagePayload<CraftingTemplateCreated> payload)
         {
-            objectManager.AddNewObject(payload.What.CraftingTemplate, out string newId);
+            if(objectManager.AddNewObject(payload.What.CraftingTemplate, out string newId) == false)
+            {
+                Logger.Error("Failed to add {type} to manager", typeof(CraftingTemplate));
+                return;
+            }
             NetworkCreateCraftingTemplate message = new(newId);
             network.SendAll(message);
         }
@@ -45,7 +48,11 @@ namespace GameInterface.Services.CraftingTemplates.Handlers
 
             var payload = obj.What;
 
-            objectManager.AddExisting(payload.CraftingTemplateId, newCraftingTemplate);
+            if(objectManager.AddExisting(payload.CraftingTemplateId, newCraftingTemplate) == false)
+            {
+                Logger.Error("Failed to add {type} to manager with id {id}", typeof(CraftingTemplate), payload.CraftingTemplateId);
+                return;
+            }
         }
     }
 }

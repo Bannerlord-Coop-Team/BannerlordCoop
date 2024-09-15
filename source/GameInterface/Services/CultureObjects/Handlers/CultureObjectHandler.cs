@@ -6,6 +6,7 @@ using GameInterface.Services.BasicCultureObjects.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.BasicCultureObjects.Handlers
 {
@@ -33,7 +34,11 @@ namespace GameInterface.Services.BasicCultureObjects.Handlers
 
         private void Handle(MessagePayload<CultureObjectCreated> payload)
         {
-            objectManager.AddNewObject(payload.What.CultureObject, out string newId);
+            if(objectManager.AddNewObject(payload.What.CultureObject, out string newId) == false)
+            {
+                Logger.Error("Failed to add {type} to manager", typeof(CultureObject));
+                return;
+            }
             NetworkCreateCultureObject message = new(newId);
             network.SendAll(message);
         }
@@ -44,7 +49,11 @@ namespace GameInterface.Services.BasicCultureObjects.Handlers
 
             var payload = obj.What;
 
-            objectManager.AddExisting(payload.CultureObjectId, newCultureObject);
+            if(objectManager.AddExisting(payload.CultureObjectId, newCultureObject) == false)
+            {
+                Logger.Error("Failed to add {type} to manager with id {id}", typeof(CraftingTemplate), payload.CultureObjectId);
+                return;
+            }
         }
     }
 }

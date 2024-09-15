@@ -2,7 +2,6 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.CraftingTemplates.Messages;
-using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -30,12 +29,9 @@ namespace GameInterface.Services.CraftingTemplates.Patches
                 return true;
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-            {
-                var message = new CraftingTemplateCreated(__instance);
+            var message = new CraftingTemplateCreated(__instance);
 
-                MessageBroker.Instance.Publish(null, message);
-            }
+            MessageBroker.Instance.Publish(null, message);
 
             return true;
         }

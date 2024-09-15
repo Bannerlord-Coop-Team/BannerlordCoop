@@ -6,7 +6,6 @@ using Common.Util;
 using GameInterface.Services.CraftingService.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
@@ -44,7 +43,14 @@ namespace GameInterface.Services.CraftingService.Handlers
 
         private void Handle(MessagePayload<CraftingCreated> payload)
         {
-            NetworkCreateCrafting message = new(payload.What.Data);
+            objectManager.AddNewObject(payload.What.Crafting, out string newCraftingId);
+
+            CraftingCreatedData data = new(newCraftingId, 
+                payload.What.CraftingTemplate.StringId, 
+                payload.What.CultureObject.StringId, 
+                payload.What.TextObject.Value);
+
+            NetworkCreateCrafting message = new(data);
             network.SendAll(message);
         }
 
@@ -52,8 +58,16 @@ namespace GameInterface.Services.CraftingService.Handlers
         {
             var payload = obj.What.Data;
 
-            if (objectManager.TryGetObject(payload.CraftingTemplateId, out CraftingTemplate template) == false) return;
-            if (objectManager.TryGetObject(payload.CultureId, out CultureObject cultureObj) == false) return;
+            if (objectManager.TryGetObject(payload.CraftingTemplateId, out CraftingTemplate template) == false)
+            {
+                Logger.Error("Failed to get object for {type} with id {id}", typeof(CraftingTemplate), payload.CraftingTemplateId);
+                return;
+            }
+            if (objectManager.TryGetObject(payload.CultureId, out CultureObject cultureObj) == false)
+            {
+                Logger.Error("Failed to get object for {type} with id {id}", typeof(CultureObject), payload.CultureId);
+                return;
+            }
 
             GameLoopRunner.RunOnMainThread(() =>
             {
@@ -67,8 +81,16 @@ namespace GameInterface.Services.CraftingService.Handlers
 
         private void Handle(MessagePayload<CraftingRemoved> payload)
         {
-            objectManager.TryGetId(payload.What.crafting, out string craftingId);
-            objectManager.Remove(payload.What.crafting);
+            if(objectManager.TryGetId(payload.What.crafting, out string craftingId) == false)
+            {
+                Logger.Error("Failed to get ID for {type}", typeof(Crafting));
+                return;
+            }
+            if(objectManager.Remove(payload.What.crafting) == false)
+            {
+                Logger.Error("Failed to remove {type}", typeof(Crafting));
+                return;
+            }
             NetworkRemoveCrafting message = new(craftingId);
             network.SendAll(message);
         }
@@ -77,7 +99,11 @@ namespace GameInterface.Services.CraftingService.Handlers
         {
             var payload = obj.What;
 
-            if (objectManager.TryGetObject(payload.CraftingId, out Crafting crafting) == false) return;
+            if (objectManager.TryGetObject(payload.CraftingId, out Crafting crafting) == false)
+            {
+                Logger.Error("Failed to get object for {type} with id {id}", typeof(Crafting), payload.CraftingId);
+                return;
+            }
 
             objectManager.Remove(crafting);
         }

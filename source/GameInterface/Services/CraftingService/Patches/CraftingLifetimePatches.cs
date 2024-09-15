@@ -2,7 +2,6 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.CraftingService.Messages;
-using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -33,15 +32,9 @@ namespace GameInterface.Services.CraftingService.Patches
                 return true;
             }
 
-            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-            {
-                objectManager.AddNewObject(__instance, out var newId);
+            var message = new CraftingCreated(__instance, craftingTemplate, culture, name);
 
-                var data = new CraftingCreatedData(newId, craftingTemplate.StringId, culture.StringId, name.Value);
-                var message = new CraftingCreated(data);
-
-                MessageBroker.Instance.Publish(null, message);
-            }
+            MessageBroker.Instance.Publish(null, message);
 
             return true;
         }
