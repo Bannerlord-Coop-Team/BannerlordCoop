@@ -6,6 +6,8 @@ using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -40,6 +42,72 @@ namespace GameInterface.Services.CraftingService.Patches
 
                 MessageBroker.Instance.Publish(null, message);
             }
+
+            return true;
+        }
+
+        [HarmonyPatch(typeof(Crafting), nameof(Crafting.CreatePreCraftedWeapon))]
+        [HarmonyPostfix]
+        private static void CreatePreCraftedWeaponPostfix(ref Crafting __instance, ItemObject itemObject, WeaponDesignElement[] usedPieces, string templateId, TextObject weaponName, ItemModifierGroup itemModifierGroup)
+        {
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client created unmanaged {name}\n"
+                    + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
+                return;
+            }
+
+            var message = new CraftingRemoved(__instance);
+
+            MessageBroker.Instance.Publish(null, message);
+        }
+
+        [HarmonyPatch(typeof(Crafting), nameof(Crafting.InitializePreCraftedWeaponOnLoad))]
+        [HarmonyPostfix]
+        private static void InitializePreCraftedWeaponOnLoadPostfix(ref Crafting __instance, ItemObject itemObject, WeaponDesign craftedData, TextObject itemName, BasicCultureObject culture)
+        {
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client created unmanaged {name}\n"
+                    + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
+                return;
+            }
+
+            var message = new CraftingRemoved(__instance);
+
+            MessageBroker.Instance.Publish(null, message);
+        }
+
+        [HarmonyPatch(typeof(Crafting), nameof(Crafting.CreateRandomCraftedItem))]
+        [HarmonyPostfix]
+        private static void CreateRandomCraftedItemPostfix(ref Crafting __instance, BasicCultureObject culture)
+        {
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client created unmanaged {name}\n"
+                    + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
+                return;
+            }
+
+            var message = new CraftingRemoved(__instance);
+
+            MessageBroker.Instance.Publish(null, message);
+        }
+
+        [HarmonyPatch(nameof(CraftingState.CraftingLogic), MethodType.Setter)]
+        [HarmonyPrefix]
+        private static bool CraftingLogicSetterPrefix(ref CraftingState __instance, ref Crafting value)
+        {
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client created unmanaged {name}\n"
+                    + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
+                return false;
+            }
+
+            var message = new CraftingRemoved(value);
+
+            MessageBroker.Instance.Publish(null, message);
 
             return true;
         }

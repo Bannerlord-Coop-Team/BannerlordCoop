@@ -1,14 +1,15 @@
 ﻿using Common.Messaging;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.CraftingService.Messages
 {
     internal record CraftingRemoved : IEvent
     {
-        public string craftingId;
+        public Crafting crafting;
 
-        public CraftingRemoved(string craftingId)
+        public CraftingRemoved(Crafting crafting)
         {
-            this.craftingId = craftingId;
+            this.crafting = crafting;
         }
     }
 }

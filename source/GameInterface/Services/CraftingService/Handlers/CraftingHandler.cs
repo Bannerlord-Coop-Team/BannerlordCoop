@@ -67,7 +67,9 @@ namespace GameInterface.Services.CraftingService.Handlers
 
         private void Handle(MessagePayload<CraftingRemoved> payload)
         {
-            NetworkRemoveCrafting message = new(payload.What.craftingId);
+            objectManager.TryGetId(payload.What.crafting, out string craftingId);
+            objectManager.Remove(payload.What.crafting);
+            NetworkRemoveCrafting message = new(craftingId);
             network.SendAll(message);
         }
 
