@@ -25,7 +25,7 @@ public enum PropertyType
     LastVisitedSettlement,
     Aggressiveness,
     Objective,
-    Ai,
+    //Ai,
     IsActive,
     ShortTermBehaviour,
     IsPartyTradeActive,
@@ -156,24 +156,24 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.Ai), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetAiPrefix(MobileParty __instance, MobilePartyAi value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //[HarmonyPatch(nameof(MobileParty.Ai), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetAiPrefix(MobileParty __instance, MobilePartyAi value)
+    //{
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", nameof(MobileParty.Ai), Environment.StackTrace);
-            return false;
-        }
+    //    if (ModInformation.IsClient)
+    //    {
+    //        Logger.Error("Client tried to set {name}\n"
+    //            + "Callstack: {callstack}", nameof(MobileParty.Ai), Environment.StackTrace);
+    //        return false;
+    //    }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value._mobileParty?.StringId);
-        MessageBroker.Instance.Publish(__instance, message);
+    //    var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value._mobileParty?.StringId);
+    //    MessageBroker.Instance.Publish(__instance, message);
 
-        return ModInformation.IsServer;
-    }
+    //    return ModInformation.IsServer;
+    //}
 
     [HarmonyPatch(nameof(MobileParty.IsActive), MethodType.Setter)]
     [HarmonyPrefix]

@@ -91,14 +91,15 @@ namespace GameInterface.Services.MobileParties.Handlers
                     instance.Objective = (MobileParty.PartyObjective)int.Parse(data.Value2);
                     return;
 
-                case PropertyType.Ai:
-                    if (objectManager.TryGetObject<MobileParty>(data.Value2, out var mobilePartyForAi) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
-                        return;
-                    }
-                    instance.Ai = new MobilePartyAi(mobilePartyForAi);
-                    return;
+                // Moved to autosync
+                //case PropertyType.Ai:
+                //    if (objectManager.TryGetObject<MobileParty>(data.Value2, out var mobilePartyForAi) == false)
+                //    {
+                //        Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
+                //        return;
+                //    }
+                //    instance.Ai = new MobilePartyAi(mobilePartyForAi);
+                //    return;
 
                 case PropertyType.IsActive:
                     instance.IsActive = bool.Parse(data.Value2);

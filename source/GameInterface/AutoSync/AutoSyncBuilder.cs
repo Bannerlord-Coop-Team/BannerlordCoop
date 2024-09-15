@@ -141,7 +141,6 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
     private void CreatePropertySync(ModuleBuilder moduleBuilder)
     {
-        // TODO finish
         var propertyMap = ConvertProperties();
 
         var types = propertyMap.Keys.ToArray();
@@ -154,7 +153,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
             foreach (var property in properties)
             {
                 var prefix = AccessTools.Method(patchType, $"{property.DeclaringType.Name}_{property.Name}_Prefix");
-                patchCollector.AddPrefix(property.GetSetMethod(), prefix);
+                patchCollector.AddPrefix(AccessTools.PropertySetter(property.DeclaringType, property.Name), prefix);
             }
         }
 

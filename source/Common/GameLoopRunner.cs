@@ -46,10 +46,11 @@ public class GameLoopRunner : IUpdateable
             }
         }
 
-        if (toBeRun.Count > 0)
-        {
-            Logger.Debug("Processing {count} actions in the game loop", toBeRun.Count);
-        }
+        // TODO remove dead code
+        //if (toBeRun.Count > 0)
+        //{
+        //    Logger.Debug("Processing {count} actions in the game loop", toBeRun.Count);
+        //}
         
         foreach ((Action, EventWaitHandle) task in toBeRun)
         {
