@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.BasicCultureObjects.Messages
+namespace GameInterface.Services.CultureObjects.Messages
 {
     [ProtoContract(SkipConstructor = true)]
     internal class NetworkCreateCultureObject : ICommand

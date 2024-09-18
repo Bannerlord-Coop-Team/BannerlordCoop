@@ -15,14 +15,14 @@ namespace GameInterface.Services.CraftingService.Handlers
     /// <summary>
     /// Handles all changes to clans on client.
     /// </summary>
-    public class CraftingHandler : IHandler
+    public class CraftingLifetimeHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
-        private readonly ILogger Logger = LogManager.GetLogger<CraftingHandler>();
+        private readonly ILogger Logger = LogManager.GetLogger<CraftingLifetimeHandler>();
 
-        public CraftingHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+        public CraftingLifetimeHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;

@@ -1,13 +1,13 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.BasicCultureObjects.Messages;
+using GameInterface.Services.CultureObjects.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.BasicCultureObjects.Patches
+namespace GameInterface.Services.CultureObjects.Patches
 {
     [HarmonyPatch]
     internal class CultureObjectLifetimePatches

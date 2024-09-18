@@ -43,6 +43,8 @@ namespace GameInterface.Services.CraftingService.Patches
         [HarmonyPostfix]
         static void CreatePreCraftedWeaponPostfix(ref Crafting __instance, ItemObject itemObject, WeaponDesignElement[] usedPieces, string templateId, TextObject weaponName, ItemModifierGroup itemModifierGroup)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
             if (ModInformation.IsClient)
             {
                 Logger.Error("Client created unmanaged {name}\n"
@@ -59,6 +61,8 @@ namespace GameInterface.Services.CraftingService.Patches
         [HarmonyPostfix]
         static void InitializePreCraftedWeaponOnLoadPostfix(ref Crafting __instance, ItemObject itemObject, WeaponDesign craftedData, TextObject itemName, BasicCultureObject culture)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
             if (ModInformation.IsClient)
             {
                 Logger.Error("Client created unmanaged {name}\n"
@@ -75,6 +79,8 @@ namespace GameInterface.Services.CraftingService.Patches
         [HarmonyPostfix]
         static void CreateRandomCraftedItemPostfix(ref Crafting __instance, BasicCultureObject culture, ref ItemObject __result)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
             if (ModInformation.IsClient)
             {
                 Logger.Error("Client created unmanaged {name}\n"
@@ -97,6 +103,8 @@ namespace GameInterface.Services.CraftingService.Patches
         [HarmonyPrefix]
         static bool Prefix(ref CraftingState __instance, ref Crafting value)
         {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             if (ModInformation.IsClient)
             {
                 Logger.Error("Client created unmanaged {name}\n"

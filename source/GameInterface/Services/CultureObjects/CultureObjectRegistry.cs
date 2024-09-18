@@ -1,9 +1,8 @@
 ﻿using GameInterface.Services.Registry;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.BasicCultureObjects
+namespace GameInterface.Services.CultureObjects
 {
     internal class CultureObjectRegistry : RegistryBase<CultureObject>
     {
