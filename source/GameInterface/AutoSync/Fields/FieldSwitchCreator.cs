@@ -9,10 +9,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
-using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.AutoSync.Builders;
+namespace GameInterface.AutoSync.Fields;
 public class FieldSwitchCreator
 {
     private readonly TypeBuilder typeBuilder;
@@ -45,7 +43,6 @@ public class FieldSwitchCreator
             new Type[] { typeof(IObjectManager) });
 
         objectManagerField = typeBuilder.DefineField("objectManager", typeof(IObjectManager), FieldAttributes.Private | FieldAttributes.InitOnly);
-        
 
         var il = ctorBuilder.GetILGenerator();
 
@@ -74,14 +71,12 @@ public class FieldSwitchCreator
         il.Emit(OpCodes.Ret);
     }
 
-
-
     private MethodBuilder CreateSwitch(FieldInfo[] fields)
     {
         var methodBuilder = typeBuilder.DefineMethod("FieldSwitch",
             MethodAttributes.Public,
             null,
-            new Type[] { typeof(AutoSyncFieldPacket) });
+            new Type[] { typeof(FieldAutoSyncPacket) });
         methodBuilder.DefineParameter(1, ParameterAttributes.In, "packet");
 
 
@@ -93,13 +88,13 @@ public class FieldSwitchCreator
 
         var retLabel = il.DefineLabel();
         var switchLabel = il.DefineLabel();
-        
+
 
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldfld, objectManagerField);
 
         il.Emit(OpCodes.Ldarg_1);
-        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.instanceId)));
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(FieldAutoSyncPacket), nameof(FieldAutoSyncPacket.instanceId)));
 
         il.Emit(OpCodes.Ldloca, instanceLocal);
 
@@ -111,7 +106,7 @@ public class FieldSwitchCreator
         var errorString = $"Unable to find instance of type {instanceType.Name} with id ";
         il.Emit(OpCodes.Ldstr, errorString);
         il.Emit(OpCodes.Ldarg_1);
-        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.instanceId)));
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(FieldAutoSyncPacket), nameof(FieldAutoSyncPacket.instanceId)));
 
         // Concat strings
         var stringConcatMethod = AccessTools.Method(typeof(FieldSwitchCreator), nameof(Concat));
@@ -124,7 +119,7 @@ public class FieldSwitchCreator
 
         il.MarkLabel(switchLabel);
         il.Emit(OpCodes.Ldarg_1);
-        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.fieldId)));
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(FieldAutoSyncPacket), nameof(FieldAutoSyncPacket.fieldId)));
         il.Emit(OpCodes.Switch, labels);
 
         for (int i = 0; i < fields.Length; i++)
@@ -154,7 +149,7 @@ public class FieldSwitchCreator
 
         // Load and deserialize the new value casted as field type
         il.Emit(OpCodes.Ldarg_1);
-        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.value)));
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(FieldAutoSyncPacket), nameof(FieldAutoSyncPacket.value)));
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(FieldSwitchCreator), nameof(Deserialize)).MakeGenericMethod(field.FieldType));
         il.Emit(OpCodes.Stfld, field);
         il.Emit(OpCodes.Ret);
@@ -175,7 +170,7 @@ public class FieldSwitchCreator
 
         var getObjectSuccess = il.DefineLabel();
         il.Emit(OpCodes.Ldarg_1);
-        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.value)));
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(FieldAutoSyncPacket), nameof(FieldAutoSyncPacket.value)));
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(FieldSwitchCreator), nameof(Deserialize)).MakeGenericMethod(typeof(string)));
 
         il.Emit(OpCodes.Ldloca, valueLocal);
@@ -189,7 +184,7 @@ public class FieldSwitchCreator
         il.Emit(OpCodes.Ldstr, errorString);
 
         il.Emit(OpCodes.Ldarg_1);
-        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(AutoSyncFieldPacket), nameof(AutoSyncFieldPacket.value)));
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(FieldAutoSyncPacket), nameof(FieldAutoSyncPacket.value)));
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(FieldSwitchCreator), nameof(Deserialize)).MakeGenericMethod(typeof(string)));
 
         il.Emit(OpCodes.Call, stringConcatMethod);
