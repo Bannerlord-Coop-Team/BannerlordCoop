@@ -548,3 +548,4 @@ source/.idea
 !*ClientDebug2.csproj.user
 !*Coop.csproj.user
 !*MissionTestMod.csproj.user
+/source/E2E.Tests/Services/Equipments/EquipmentTests.cs
