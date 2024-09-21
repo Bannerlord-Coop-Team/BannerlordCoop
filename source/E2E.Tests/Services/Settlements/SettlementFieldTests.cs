@@ -1,11 +1,5 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
@@ -15,11 +9,7 @@ namespace E2E.Tests.Services.Settlements
     {
         E2ETestEnvironment TestEnvironment { get; }
 
-        EnvironmentInstance Server => TestEnvironment.Server;
-
         IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
-
-        private string SettlementId;
 
         public SettlementFieldTests(ITestOutputHelper output)
         {
@@ -43,28 +33,27 @@ namespace E2E.Tests.Services.Settlements
             const float newFloat = 540;
             const int newInt = 5;
 
-
+            string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
 
             server.Call(() =>
             {
-                var settlement = new Settlement();
 
-                Assert.True(server.ObjectManager.TryGetId(settlement, out SettlementId));
+                Assert.True(server.ObjectManager.TryGetObject<Settlement>(settlementId, out var serverSettlement));
 
-                settlement.CanBeClaimed = newInt;
-                settlement.ClaimValue = newFloat;
+                serverSettlement.CanBeClaimed = newInt;
+                serverSettlement.ClaimValue = newFloat;
 
-                Assert.Equal(newInt, settlement.CanBeClaimed);
-                Assert.Equal(newFloat, settlement.ClaimValue);
+                Assert.Equal(newInt, serverSettlement.CanBeClaimed);
+                Assert.Equal(newFloat, serverSettlement.ClaimValue);
             });
 
             // Assert
             foreach (var client in Clients)
             {
-                Assert.True(client.ObjectManager.TryGetObject<Settlement>(SettlementId, out var settlement));
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var clientSettlement));
 
-                Assert.Equal(newFloat, settlement.ClaimValue);
-                Assert.Equal(newInt, settlement.CanBeClaimed);
+                Assert.Equal(newFloat, clientSettlement.ClaimValue);
+                Assert.Equal(newInt, clientSettlement.CanBeClaimed);
 
             }
         }
