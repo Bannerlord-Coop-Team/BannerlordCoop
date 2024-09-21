@@ -12,7 +12,6 @@ internal class PartyBaseRegistry : RegistryBase<PartyBase>
     public override void RegisterAll()
     {
         foreach (var party in MobileParty.All)
-        
         {
             if(RegisterNewObject(party.Party, out var _) == false)
             {
