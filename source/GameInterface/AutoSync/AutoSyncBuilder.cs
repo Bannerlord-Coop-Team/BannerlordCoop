@@ -1,26 +1,57 @@
-﻿using GameInterface.AutoSync.Builders;
+﻿using GameInterface.AutoSync.Fields;
+using GameInterface.AutoSync.Properties;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace GameInterface.AutoSync;
 public interface IAutoSyncBuilder : IDisposable
 {
+    /// <summary>
+    /// Add a field to automatically sync across the network
+    /// </summary>
+    /// <param name="field">Field to auto sync</param>
     void AddField(FieldInfo field);
+
+    /// <summary>
+    /// Add a property to automatically sync across the network
+    /// </summary>
+    /// <param name="property">Property to auto sync</param>
     void AddProperty(PropertyInfo property);
-    Type Build();
+
+    /// <summary>
+    /// Add a field external to the declaring class that updates a public field as those are not synced automatically
+    /// </summary>
+    /// <param name="methodInfo">Method to add as an external setter</param>
+    void AddFieldChangeMethod(MethodInfo methodInfo);
+
+    /// <summary>
+    /// Build autosync and dynamic assembly
+    /// </summary>
+    void Build();
+
+    /// <summary>
+    /// Attempt to retreive the intercept for a specified sync field
+    /// </summary>
+    /// <remarks>
+    /// Mainly used for testing
+    /// </remarks>
+    /// <param name="field">Field to get intercept</param>
+    /// <param name="intercept">Out parameter</param>
+    /// <returns>True if successful, false if otherwise</returns>
     bool TryGetIntercept(FieldInfo field, out MethodInfo intercept);
 }
 internal class AutoSyncBuilder : IAutoSyncBuilder
 {
-    private readonly List<FieldInfo> fields = new List<FieldInfo>();
-    private readonly List<PropertyInfo> properties = new List<PropertyInfo>();
+    private readonly HashSet<FieldInfo> fields = new HashSet<FieldInfo>();
+    private readonly HashSet<PropertyInfo> properties = new HashSet<PropertyInfo>();
+    private readonly HashSet<MethodInfo> externalFieldChangeMethods = new HashSet<MethodInfo>();
     private readonly IObjectManager objectManager;
     private readonly Harmony harmony;
     private readonly IPacketSwitchProvider packetSwitchProvider;
@@ -40,20 +71,29 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
     {
         if (field == null) throw new ArgumentNullException(nameof(field));
 
-        if (fields.Contains(field)) return;
+        if (fields.Contains(field)) throw new ArgumentException($"{field.Name} has already been registered as a synced field");
         fields.Add(field);
     }
 
     public void AddProperty(PropertyInfo property)
     {
         if (property == null) throw new ArgumentNullException(nameof(property));
+        if (property.CanWrite == false) throw new ArgumentException($"{property.Name} does not have a set method");
 
-        if (properties.Contains(property)) return;
+        if (properties.Contains(property)) throw new ArgumentException($"{property.Name} has already been registered as a synced property");
         properties.Add(property);
     }
 
+    public void AddFieldChangeMethod(MethodInfo methodInfo)
+    {
+        if (methodInfo == null) throw new ArgumentNullException(nameof(methodInfo));
+        if (externalFieldChangeMethods.Contains(methodInfo)) throw new ArgumentException($"{methodInfo.Name} has already been registered as an external method");
+
+        externalFieldChangeMethods.Add(methodInfo);
+    }
+
     public static int AsmCounter = 1;
-    public Type Build()
+    public void Build()
     {
         ClearCollections();
 
@@ -62,11 +102,16 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
         AllowPrivateAccess(assemblyBuilder);
 
-        // TODO same thing for properties
+        CreateFieldSync(moduleBuilder);
+
+        CreatePropertySync(moduleBuilder);
+    }
+
+    private void CreateFieldSync(ModuleBuilder moduleBuilder)
+    {
         var fieldMap = ConvertFields();
 
         var types = fieldMap.Keys.ToArray();
-
         for (int i = 0; i < types.Length; i++)
         {
             var type = types[i];
@@ -78,17 +123,49 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
             {
                 patchCollector.AddTranspiler(method, transpilerMethod);
             }
+
+            foreach (var method in externalFieldChangeMethods)
+            {
+                // This patches all external methods with all transpilers (might be slow if we have a lot)
+                patchCollector.AddTranspiler(method, transpilerMethod);
+            }
         }
 
-        var typeSwitchCreator = new TypeSwitchCreator(moduleBuilder, objectManager);
+        var typeSwitchCreator = new FieldTypeSwitchCreator(moduleBuilder, objectManager);
 
         var typeSwitchType = typeSwitchCreator.Build(fieldMap);
 
         // Set packet switcher
-        packetSwitchProvider.Switcher = (ITypeSwitcher)Activator.CreateInstance(typeSwitchType, objectManager);
-
-        return typeSwitchType;
+        packetSwitchProvider.FieldSwitch = (IFieldTypeSwitcher)Activator.CreateInstance(typeSwitchType, objectManager);
     }
+
+    private void CreatePropertySync(ModuleBuilder moduleBuilder)
+    {
+        // TODO finish
+        var propertyMap = ConvertProperties();
+
+        var types = propertyMap.Keys.ToArray();
+        for (int i = 0; i < types.Length; i++)
+        {
+            var type = types[i];
+            var properties = propertyMap[type].ToArray();
+            var patchType = CreatePropertyPrefix(moduleBuilder, type, i, properties);
+
+            foreach (var property in properties)
+            {
+                var prefix = AccessTools.Method(patchType, $"{property.DeclaringType.Name}_{property.Name}_Prefix");
+                patchCollector.AddPrefix(property.GetSetMethod(), prefix);
+            }
+        }
+
+        var typeSwitchCreator = new PropertyTypeSwitchCreator(moduleBuilder, objectManager);
+
+        var typeSwitchType = typeSwitchCreator.Build(propertyMap);
+
+        // Set packet switcher
+        packetSwitchProvider.PropertySwitch = (IPropertyTypeSwitcher)Activator.CreateInstance(typeSwitchType, objectManager);
+    }
+
 
     private Type CreateTranspiler(ModuleBuilder moduleBuilder, Type classType, int typeId, FieldInfo[] fieldsToIntercept)
     {
@@ -99,6 +176,13 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         ConvertStoredInterceptsToActual(compiledType);
 
         return compiledType;
+    }
+
+    private Type CreatePropertyPrefix(ModuleBuilder moduleBuilder, Type classType, int typeId, PropertyInfo[] propertiesToIntercept)
+    {
+        var builder = new PropertyPrefixCreator(objectManager, moduleBuilder, classType, typeId, propertiesToIntercept);
+
+        return builder.Build();
     }
 
     private void ConvertStoredInterceptsToActual(Type compiledType)
@@ -165,5 +249,6 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         ClearCollections();
     }
 
+    /// <inheritdoc/>
     public bool TryGetIntercept(FieldInfo field, out MethodInfo intercept) => interceptMap.TryGetValue(field, out intercept);
 }

@@ -32,10 +32,11 @@ internal class E2ETestEnvironment : IDisposable
         GameBootStrap.Initialize();
         IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
 
-        SetupAutoSync();
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
+
+        SetupAutoSync();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
@@ -50,10 +51,12 @@ internal class E2ETestEnvironment : IDisposable
     private void SetupAutoSync()
     {
         Server.Resolve<IAutoSyncBuilder>().Build();
+        Server.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
         foreach (var client in Clients)
         {
             client.Resolve<IAutoSyncBuilder>().Build();
+            client.Resolve<IAutoSyncPatchCollector>().PatchAll();
         }
     }
 

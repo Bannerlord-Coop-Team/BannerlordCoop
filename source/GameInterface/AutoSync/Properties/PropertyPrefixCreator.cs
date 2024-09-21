@@ -1,23 +1,33 @@
 ﻿using Common.Logging;
 using Common.Network;
 using Common.PacketHandlers;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using ProtoBuf.Meta;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 
-namespace GameInterface.AutoSync.Builders;
-internal class PropertySyncByRefPatchCreator
+namespace GameInterface.AutoSync.Properties;
+public class PropertyPrefixCreator
 {
     private readonly TypeBuilder typeBuilder;
 
     private readonly FieldBuilder loggerField;
+    private readonly IObjectManager objectManager;
+    private readonly int typeId;
+    private readonly PropertyInfo[] properties;
 
-    public PropertySyncByRefPatchCreator(ModuleBuilder moduleBuilder, Type type)
+    public PropertyPrefixCreator(IObjectManager objectManager, ModuleBuilder moduleBuilder, Type type, int typeId, PropertyInfo[] interceptProperties)
     {
-        typeBuilder = moduleBuilder.DefineType($"{type.Name}_Patches",
+        this.objectManager = objectManager;
+        this.typeId = typeId;
+        this.properties = interceptProperties;
+
+        typeBuilder = moduleBuilder.DefineType($"{type.Name}PropertyPrefixes",
             TypeAttributes.Public |
             TypeAttributes.Class |
             TypeAttributes.AutoClass |
@@ -58,24 +68,63 @@ internal class PropertySyncByRefPatchCreator
         il.Emit(OpCodes.Ret);
     }
 
-    public void CreatePropertyPrefixes(int typeId, PropertyInfo[] properties)
+    public string GetPrefixName(PropertyInfo property)
     {
-        for (int i = 0; i < properties.Length; i++)
-        {
-            CreatePropertyPrefix(typeId, i, properties[i]);
-        }
+        return $"{property.DeclaringType.Name}_{property.Name}_Prefix";
     }
 
-    private MethodBuilder CreatePropertyPrefix(int typeId, int propId, PropertyInfo prop)
+    private MethodBuilder CreatePropertyByValPrefix(int typeId, int propId, PropertyInfo prop)
     {
-        var methodBuilder = typeBuilder.DefineMethod($"{prop.DeclaringType.Name}_{prop.Name}_Prefix",
+        var methodBuilder = typeBuilder.DefineMethod(GetPrefixName(prop),
             MethodAttributes.Public | MethodAttributes.Static,
             typeof(bool),
             new Type[] { prop.DeclaringType, prop.PropertyType });
-        methodBuilder.DefineParameter(0, ParameterAttributes.In, "__instance");
-        methodBuilder.DefineParameter(1, ParameterAttributes.In, "value");
+        var instanceArg = methodBuilder.DefineParameter(1, ParameterAttributes.In, "__instance");
+        var valueArg = methodBuilder.DefineParameter(2, ParameterAttributes.In, "value");
 
         var il = methodBuilder.GetILGenerator();
+
+        IsThreadAllowed(il);
+
+        IsClientCheck(il, prop);
+
+        var networkLocal = TryResolve<INetwork>(il);
+
+        var objectManagerLocal = TryResolve<IObjectManager>(il);
+        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
+
+        il.Emit(OpCodes.Ldloc, networkLocal);
+        il.Emit(OpCodes.Ldloc, idLocal);
+        il.Emit(OpCodes.Ldc_I4, typeId);
+        il.Emit(OpCodes.Ldc_I4, propId);
+
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Box, prop.PropertyType);
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Serialize)));
+
+        il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(PropertyAutoSyncPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
+        il.Emit(OpCodes.Box, typeof(PropertyAutoSyncPacket));
+
+        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
+
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Ret);
+
+        return methodBuilder;
+    }
+
+    private MethodBuilder CreatePropertyByRefPrefix(int typeId, int propId, PropertyInfo prop)
+    {
+        var methodBuilder = typeBuilder.DefineMethod(GetPrefixName(prop),
+            MethodAttributes.Public | MethodAttributes.Static,
+            typeof(bool),
+            new Type[] { prop.DeclaringType, prop.PropertyType });
+        var instanceArg = methodBuilder.DefineParameter(1, ParameterAttributes.In, "__instance");
+        var valueArg = methodBuilder.DefineParameter(2, ParameterAttributes.In, "value");
+
+        var il = methodBuilder.GetILGenerator();
+
+        IsThreadAllowed(il);
 
         IsClientCheck(il, prop);
 
@@ -94,8 +143,8 @@ internal class PropertySyncByRefPatchCreator
         il.Emit(OpCodes.Box, prop.PropertyType);
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Serialize)));
 
-        il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(AutoSyncFieldPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
-        il.Emit(OpCodes.Box, typeof(AutoSyncFieldPacket));
+        il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(PropertyAutoSyncPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
+        il.Emit(OpCodes.Box, typeof(PropertyAutoSyncPacket));
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
 
         il.Emit(OpCodes.Ldc_I4_1);
@@ -157,6 +206,18 @@ internal class PropertySyncByRefPatchCreator
         return idLocal;
     }
 
+    private void IsThreadAllowed(ILGenerator il)
+    {
+        var notAllowedLabel = il.DefineLabel();
+
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.IsThisThreadAllowed)));
+        il.Emit(OpCodes.Brfalse, notAllowedLabel);
+        il.Emit(OpCodes.Ldc_I4_1);
+        il.Emit(OpCodes.Ret);
+
+        il.MarkLabel(notAllowedLabel);
+    }
+
     private void IsClientCheck(ILGenerator il, MemberInfo field)
     {
         il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(ModInformation), nameof(ModInformation.IsClient)));
@@ -176,10 +237,22 @@ internal class PropertySyncByRefPatchCreator
         il.MarkLabel(notClientLabel);
     }
 
-    public Type Build(int typeId, PropertyInfo[] props)
+    public Type Build()
     {
-        CreatePropertyPrefixes(typeId, props);
+        for (int i = 0; i < properties.Length; i++)
+        {
+            var propType = properties[i].PropertyType;
+            if (RuntimeTypeModel.Default.CanSerialize(propType))
+                CreatePropertyByValPrefix(typeId, i, properties[i]);
+            else if (objectManager.IsTypeManaged(propType))
+                CreatePropertyByRefPrefix(typeId, i, properties[i]);
+            else
+                throw new NotSupportedException(
+                    $"{propType.Name} is not serializable and not managed by the object manager. " +
+                    $"Either manage the type using the object manager or make this type serializable");
+        }
 
         return typeBuilder.CreateTypeInfo();
     }
 }
+

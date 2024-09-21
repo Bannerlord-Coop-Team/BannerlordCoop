@@ -1,9 +1,9 @@
 ﻿using Autofac;
 using Common.Network;
 using GameInterface.AutoSync;
-using GameInterface.AutoSync.Builders;
+using GameInterface.AutoSync.Fields;
+using GameInterface.AutoSync.Properties;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Registry;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
@@ -104,7 +104,7 @@ public class TranspilerTests
             Assert.Equal(newValue, testClass.MyInt);
         }
 
-        var packet = Assert.IsType<AutoSyncFieldPacket>(network.SentPackets.First());
+        var packet = Assert.IsType<FieldAutoSyncPacket>(network.SentPackets.First());
 
         Assert.Equal(typeId, packet.typeId);
         Assert.Equal(0, packet.fieldId);

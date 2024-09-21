@@ -14,7 +14,7 @@ using System.Linq;
 using ProtoBuf;
 using ProtoBuf.Meta;
 
-namespace GameInterface.AutoSync.Builders;
+namespace GameInterface.AutoSync.Fields;
 public class FieldTranspilerCreator
 {
     private readonly TypeBuilder typeBuilder;
@@ -186,7 +186,7 @@ public class FieldTranspilerCreator
 
         il.Emit(OpCodes.Ret);
 
-        
+
         il.MarkLabel(finallyLabel);
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Callvirt, finallyMethod);
@@ -335,7 +335,6 @@ public class FieldTranspilerCreator
 
             MethodBuilder fieldIntercept;
 
-            // TODO determine by ref or by value
             if (RuntimeTypeModel.Default.CanSerialize(interceptFields[i].FieldType))
             {
                 fieldIntercept = CreateInterceptByValue(typeId, i, interceptFields[i]);
@@ -440,8 +439,8 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Box, field.FieldType);
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Serialize)));
 
-        il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(AutoSyncFieldPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
-        il.Emit(OpCodes.Box, typeof(AutoSyncFieldPacket));
+        il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(FieldAutoSyncPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
+        il.Emit(OpCodes.Box, typeof(FieldAutoSyncPacket));
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
 
         il.Emit(OpCodes.Ldarg_0);
@@ -477,11 +476,11 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Ldc_I4, propId);
 
         il.Emit(OpCodes.Ldloc, valueIdLocal);
-        
+
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Serialize)));
 
-        il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(AutoSyncFieldPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
-        il.Emit(OpCodes.Box, typeof(AutoSyncFieldPacket));
+        il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(FieldAutoSyncPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
+        il.Emit(OpCodes.Box, typeof(FieldAutoSyncPacket));
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
 
         il.Emit(OpCodes.Ldarg_0);

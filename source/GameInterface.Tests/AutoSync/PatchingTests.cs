@@ -3,8 +3,8 @@ using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
-using GameInterface.AutoSync;
-using GameInterface.AutoSync.Builders;
+using GameInterface.AutoSync.Fields;
+using GameInterface.AutoSync.Properties;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using LiteNetLib;
@@ -21,6 +21,12 @@ public class PatchingTests
     [Fact]
     public void PropertyPatchCreation()
     {
+        // Arrange
+        var container = CreateContainer();
+
+        var network = container.Resolve<TestNet>();
+        var objManager = container.Resolve<IObjectManager>();
+
         Assert.NotNull(typeof(ProtoBufSerializer).GetMethods().Where(m => m.Name == nameof(ProtoBufSerializer.Deserialize) && m.IsGenericMethod));
 
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
@@ -28,10 +34,12 @@ public class PatchingTests
 
         var props = AccessTools.GetDeclaredProperties(typeof(SwitchTestClass)).ToArray();
 
-        var patchCreator = new PropertySyncByValuePatchCreator(moduleBuilder, typeof(SwitchTestClass));
+        var patchCreator = new PropertyPrefixCreator(objManager, moduleBuilder, typeof(SwitchTestClass), 0, props);
 
-        var patchType = patchCreator.Build(0, props);
+        // Act
+        var patchType = patchCreator.Build();
 
+        // Assert
         Assert.NotEmpty(props);
 
         foreach (var prop in props)
@@ -43,6 +51,12 @@ public class PatchingTests
     [Fact]
     public void PropertyPatchSendsPacket()
     {
+        // Arrange
+        var container = CreateContainer();
+
+        var network = container.Resolve<TestNet>();
+        var objManager = container.Resolve<IObjectManager>();
+
         ModInformation.IsServer = true;
         Assert.NotNull(typeof(ProtoBufSerializer).GetMethods().Where(m => m.Name == nameof(ProtoBufSerializer.Deserialize) && m.IsGenericMethod));
 
@@ -51,32 +65,28 @@ public class PatchingTests
 
         var props = AccessTools.GetDeclaredProperties(typeof(SwitchTestClass)).ToArray();
 
-        var patchCreator = new PropertySyncByValuePatchCreator(moduleBuilder, typeof(SwitchTestClass));
+        var patchCreator = new PropertyPrefixCreator(objManager, moduleBuilder, typeof(SwitchTestClass), 0, props);
 
-        var patchType = patchCreator.Build(0, props);
+        var patchType = patchCreator.Build();
 
-        var container = CreateContainer();
-
-        var network = container.Resolve<TestNet>();
-        var objManager = container.Resolve<IObjectManager>();
         var prop = props.First();
 
-        using (ContainerProvider.UseContainerThreadSafe(container))
-        {
-            var prefix = AccessTools.Method(patchType, $"{prop.DeclaringType!.Name}_{prop.Name}_Prefix");
-            Assert.NotNull(prefix);
+        
+        using (ContainerProvider.UseContainerThreadSafe(container));
+        var prefix = AccessTools.Method(patchType, $"{prop.DeclaringType!.Name}_{prop.Name}_Prefix");
+        Assert.NotNull(prefix);
 
-            var testInstance = new SwitchTestClass();
+        var testInstance = new SwitchTestClass();
 
-            var objId = "ObjId1";
-            objManager.AddExisting(objId, testInstance);
+        var objId = "ObjId1";
+        objManager.AddExisting(objId, testInstance);
+        // Act
+        prefix.Invoke(null, new object[] { testInstance, 5 });
 
-            prefix.Invoke(null, new object[] { testInstance, 5 });
+        // Assert
+        var packet = Assert.IsType<PropertyAutoSyncPacket>(Assert.Single(network.SentPackets));
 
-            var packet = Assert.IsType<AutoSyncFieldPacket>(Assert.Single(network.SentPackets));
-
-            Assert.Equal(objId, packet.instanceId);
-        }
+        Assert.Equal(objId, packet.instanceId);
     }
 
     private IContainer CreateContainer()
