@@ -27,6 +27,7 @@ internal class MobilePartyAiRegistry : RegistryBase<MobilePartyAi>
             if (partyAi == null)
             {
                 Logger.Warning("{partyName}'s Ai was null when registering", party.Name);
+                continue;
             }
 
             var newId = GetNewId(partyAi);

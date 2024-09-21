@@ -1,4 +1,7 @@
-﻿using HarmonyLib;
+﻿using Common.Logging;
+using HarmonyLib;
+using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -10,13 +13,14 @@ namespace GameInterface.Services.GameDebug.Patches;
 [HarmonyPatch(typeof(MobileParty))]
 class TestPatch
 {
+    static ILogger Logger = LogManager.GetLogger<TestPatch>();
     static object _lock = new object();
 
     [HarmonyPatch(nameof(MobileParty.InitializeCachedPartyVariables))]
     [HarmonyPrefix]
     static bool ParallelInitializeCachedPartyVariablesPrefix(MobileParty __instance, ref CachedPartyVariables variables)
     {
-        lock(_lock)
+        try
         {
             variables.HasMapEvent = __instance.MapEvent != null;
             variables.CurrentPosition = __instance.Position2D;
@@ -37,6 +41,10 @@ class TestPatch
                     variables.IsMoving = __instance.IsMoving || __instance.Army.LeaderParty.IsMoving;
                 }
             }
+        }
+        catch(Exception e)
+        {
+            Logger.Error("Parallel stuff got the following error: {error}", e);
         }
 
         return false;

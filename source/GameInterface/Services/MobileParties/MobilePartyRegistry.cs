@@ -18,15 +18,6 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>
     public MobilePartyRegistry(IRegistryCollection collection, IMessageBroker messageBroker) : base(collection)
     {
         this.messageBroker = messageBroker;
-
-        messageBroker.Subscribe<PartyDestroyed>(Handle_PartyDestroyed);
-    }
-
-    public override void Dispose()
-    {
-        messageBroker.Unsubscribe<PartyDestroyed>(Handle_PartyDestroyed);
-
-        base.Dispose();
     }
 
     public override void RegisterAll()
@@ -69,12 +60,5 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>
     {
         party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>(PartyStringIdPrefix);
         return party.StringId;
-    }
-
-    private void Handle_PartyDestroyed(MessagePayload<PartyDestroyed> payload)
-    {
-        var stringId = payload.What.Data.StringId;
-
-        Remove(stringId);
     }
 }

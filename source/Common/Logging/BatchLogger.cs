@@ -39,7 +39,7 @@ public sealed class BatchLogger : IDisposable
 	{
 		var messageName = messageType.Name;
 
-		LogMap.AddOrUpdate(messageName, 1, (name, value) => value++);
+        LogMap.AddOrUpdate(messageName, 1, (name, value) => value++);
     }
 
     // A method to poll for messages to log.

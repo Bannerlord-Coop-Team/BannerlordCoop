@@ -34,7 +34,7 @@ public class MessageLogger
 
         if (messageType.GetCustomAttribute<BatchLogMessageAttribute>() != null)
         {
-            
+
             return;
         }
 
