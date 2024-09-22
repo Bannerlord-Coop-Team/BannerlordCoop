@@ -2,6 +2,7 @@
 using E2E.Tests.Environment.Instance;
 using HarmonyLib;
 using System.Runtime.InteropServices;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
@@ -36,30 +37,38 @@ namespace E2E.Tests.Services.Settlements
             const int newInt = 5;
 
             string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+            string heroId = TestEnvironment.CreateRegisteredObject<Hero>();
 
-            var field = AccessTools.Field(typeof(Settlement), nameof(Settlement.CanBeClaimed));
-            
-            var canBeClaimedIntercept = TestEnvironment.GetIntercept(field);
-            
+            var canBeClaimedIntercept = TestEnvironment.GetIntercept(AccessTools.Field(typeof(Settlement), nameof(Settlement.CanBeClaimed)));
+            var claimValueIntercept = TestEnvironment.GetIntercept(AccessTools.Field(typeof(Settlement), nameof(Settlement.ClaimValue)));
+            var claimedByIntercept = TestEnvironment.GetIntercept(AccessTools.Field(typeof(Settlement), nameof(Settlement.ClaimedBy)));
+
+
             server.Call(() =>
             {
 
                 Assert.True(server.ObjectManager.TryGetObject<Settlement>(settlementId, out var serverSettlement));
+                Assert.True(server.ObjectManager.TryGetObject<Hero>(heroId, out var serverHero));
+
 
                 canBeClaimedIntercept.Invoke(null, new object[] { serverSettlement, newInt });
-                //claimValueIntercept.Invoke(null, new object[] { serverSettlement, newFloat });
+                claimValueIntercept.Invoke(null, new object[] { serverSettlement, newFloat });
+                claimValueIntercept.Invoke(null, new object[] { serverSettlement, serverHero });
 
                 Assert.Equal(newInt, serverSettlement.CanBeClaimed);
                 Assert.Equal(newFloat, serverSettlement.ClaimValue);
+                Assert.Same(serverHero, serverSettlement.ClaimedBy);
             });
 
             // Assert
             foreach (var client in Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var clientSettlement));
+                Assert.True(server.ObjectManager.TryGetObject<Hero>(heroId, out var clientHero));
 
                 Assert.Equal(newFloat, clientSettlement.ClaimValue);
                 Assert.Equal(newInt, clientSettlement.CanBeClaimed);
+                Assert.Same(clientHero, clientSettlement.ClaimedBy);
 
             }
         }
