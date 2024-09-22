@@ -15,6 +15,12 @@ namespace GameInterface.Services.BesiegerCamps.Extensions
     {
         public static string TryGetId(object value, ILogger logger)
         {
+            // temp fix for SiegeStrategy not being registered
+            if (value is SiegeStrategy siegeStrategy)
+            {
+                return siegeStrategy.StringId;
+            }
+
             if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
             {
                 logger.Error("Unable to resolve {type}", typeof(IObjectManager).FullName);

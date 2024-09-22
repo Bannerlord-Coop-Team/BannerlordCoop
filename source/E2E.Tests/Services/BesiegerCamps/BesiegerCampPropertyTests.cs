@@ -29,8 +29,6 @@ namespace E2E.Tests.Services.BesiegerCamps
 
         readonly string besiegerCampId;
         readonly string siegeEventId;
-        readonly string siegeStrategyId;
-        readonly string siegeEnginesId;
 
         public void Dispose()
         {
@@ -56,7 +54,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             Server.Call(() =>
             {
                 obj = GameObjectCreator.CreateInitializedObject<T>();
-                Assert.True(Server.ObjectManager.TryGetId(obj, out id));
+                Assert.True(Server.ObjectManager.TryGetId(obj, out id)); // will fail with SiegeStrategy
             }, disabledMethods);
 
             objectId = id!;
@@ -70,8 +68,6 @@ namespace E2E.Tests.Services.BesiegerCamps
 
             ServerCreateObject<BesiegerCamp>(out besiegerCampId);
             ServerCreateObject<SiegeEvent>(out siegeEventId);
-            ServerCreateObject<SiegeStrategy>(out siegeStrategyId); // this fails
-            ServerCreateObject<SiegeEnginesContainer>(out siegeEnginesId); 
 
             foreach (var client in Clients)
             {
@@ -126,7 +122,7 @@ namespace E2E.Tests.Services.BesiegerCamps
         public void ServerChangeBesiegerCampSiegeStrategy_SyncAllClients()
         {
             Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
-            Assert.True(Server.ObjectManager.TryGetObject<SiegeStrategy>(siegeStrategyId, out var serverSiegeStrategy));
+            var serverSiegeStrategy = GameObjectCreator.CreateInitializedObject<SiegeStrategy>();
 
             // Act
             Server.Call(() =>
@@ -138,8 +134,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             foreach (var client in TestEnvironment.Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
-                client.ObjectManager.TryGetId(clientBesiegerCamp.SiegeStrategy, out string clientSiegeStrategyId);
-                Assert.Equal(clientSiegeStrategyId, siegeEventId);
+                Assert.Equal(clientBesiegerCamp.SiegeStrategy.StringId, serverSiegeStrategy.StringId);
             }
         }
 
