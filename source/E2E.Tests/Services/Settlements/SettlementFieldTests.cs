@@ -42,22 +42,22 @@ namespace E2E.Tests.Services.Settlements
             var canBeClaimedIntercept = TestEnvironment.GetIntercept(AccessTools.Field(typeof(Settlement), nameof(Settlement.CanBeClaimed)));
             var claimValueIntercept = TestEnvironment.GetIntercept(AccessTools.Field(typeof(Settlement), nameof(Settlement.ClaimValue)));
             var claimedByIntercept = TestEnvironment.GetIntercept(AccessTools.Field(typeof(Settlement), nameof(Settlement.ClaimedBy)));
-
+            var hasVisitedIntercept = TestEnvironment.GetIntercept(AccessTools.Field(typeof(Settlement), nameof(Settlement.HasVisited)));
 
             server.Call(() =>
             {
 
                 Assert.True(server.ObjectManager.TryGetObject<Settlement>(settlementId, out var serverSettlement));
                 Assert.True(server.ObjectManager.TryGetObject<Hero>(heroId, out var serverHero));
-
-
+                
                 canBeClaimedIntercept.Invoke(null, new object[] { serverSettlement, newInt });
                 claimValueIntercept.Invoke(null, new object[] { serverSettlement, newFloat });
-                claimValueIntercept.Invoke(null, new object[] { serverSettlement, serverHero });
+                claimedByIntercept.Invoke(null, new object[] { serverSettlement, serverHero });
+                hasVisitedIntercept.Invoke(null, new object[] { serverSettlement, true });
 
                 Assert.Equal(newInt, serverSettlement.CanBeClaimed);
                 Assert.Equal(newFloat, serverSettlement.ClaimValue);
-                Assert.Same(serverHero, serverSettlement.ClaimedBy);
+                Assert.Equal(serverHero, serverSettlement.ClaimedBy);
             });
 
             // Assert
@@ -68,7 +68,7 @@ namespace E2E.Tests.Services.Settlements
 
                 Assert.Equal(newFloat, clientSettlement.ClaimValue);
                 Assert.Equal(newInt, clientSettlement.CanBeClaimed);
-                Assert.Same(clientHero, clientSettlement.ClaimedBy);
+                Assert.Same(clientHero.StringId, clientSettlement.ClaimedBy.StringId);
 
             }
         }

@@ -56,7 +56,7 @@ namespace GameInterface.Services.Settlements.Patches
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Village)));
 
             //_gatePosition (Vec2 surrogate required)
-            //autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._gatePosition)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._gatePosition)));
 
             //_isVisible
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._isVisible)));
