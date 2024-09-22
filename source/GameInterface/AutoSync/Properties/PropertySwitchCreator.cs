@@ -203,7 +203,7 @@ public class PropertySwitchCreator
         il.Emit(OpCodes.Ldloc, valueLocal);
 
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.AllowThisThread)));
-        il.Emit(OpCodes.Callvirt, property.GetSetMethod());
+        il.Emit(OpCodes.Callvirt, AccessTools.PropertySetter(property.DeclaringType, property.Name));
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.RevokeThisThread)));
 
         il.Emit(OpCodes.Ret);
