@@ -10,9 +10,13 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
+using GameInterface.Services.BesiegerCampss.Messages;
+using GameInterface.Services.BesiegerCamps.Patches;
+using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
 
 namespace GameInterface.Services.BesiegerCamps.Handlers;
 internal class BesiegerCampPropertyHandler : IHandler
@@ -29,38 +33,104 @@ internal class BesiegerCampPropertyHandler : IHandler
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        messageBroker.Subscribe<BesiegerCampSiegeEventChanged>(Handle);
-        messageBroker.Subscribe<NetworkChangeBesiegerCampSiegeEvent>(Handle);
-    }
-
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<BesiegerCampSiegeEventChanged>(Handle);
-        messageBroker.Unsubscribe<NetworkChangeBesiegerCampSiegeEvent>(Handle);
+        messageBroker.Subscribe<BesiegerCampPropertyChanged>(Handle_PropertyChanged);
+        messageBroker.Subscribe<NetworkBesiegerCampChangeProperty>(Handle_ChangeProperty);
     }
 
 
-    private void Handle(MessagePayload<BesiegerCampSiegeEventChanged> payload)
+    private void Handle_PropertyChanged(MessagePayload<BesiegerCampPropertyChanged> payload)
     {
-        if (objectManager.TryGetId(payload.What.BesiegerCamp, out var besiegerCampId) == false) return;
-        if (objectManager.TryGetId(payload.What.SiegeEvent, out var siegeEventId) == false) return;
+        var data = payload.What;
 
-        network.SendAll(new NetworkChangeBesiegerCampSiegeEvent(besiegerCampId, siegeEventId));
+        var message = data.CreateNetworkMessage(Logger);
+
+        network.SendAll(message);
     }
 
-
-    private void Handle(MessagePayload<NetworkChangeBesiegerCampSiegeEvent> payload)
+    private void Handle_ChangeProperty(MessagePayload<NetworkBesiegerCampChangeProperty> payload)
     {
-        if (objectManager.TryGetObject<BesiegerCamp>(payload.What.BesiegerCampId, out var besiegerCamp) == false) return;
-        if (objectManager.TryGetObject<SiegeEvent>(payload.What.SiegeEventId, out var siegeEvent) == false) return;
+        var data = payload.What;
+        if (objectManager.TryGetObject<BesiegerCamp>(data.besiegerCampId, out var instance) == false)
+        {
+            Logger.Error("Unable to find {type} with id: {id}", typeof(BesiegerCamp), data.besiegerCampId);
+            return;
+        }
 
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                besiegerCamp.SiegeEvent = siegeEvent;
+                HandleDataChanged(instance, data);
             }
         });
-        
     }
+
+    private bool TryGetObject<T>(string id) where T : class
+    {
+        if (objectManager.TryGetObject(id, out T type) == false)
+        {
+            Logger.Error("Unable to find {type} with id: {id}", typeof(T), id);
+            return false;
+        }
+        return true;
+    }
+
+
+
+    private void HandleDataChanged(BesiegerCamp instance, NetworkBesiegerCampChangeProperty data)
+    {
+        var propInfo = typeof(BesiegerCamp).GetProperty(data.propertyName);
+        if (propInfo == null)
+        {
+            Logger.Error("Unable to find property with name {propName} on type: {type}", data.propertyName, typeof(BesiegerCamp));
+            return;
+        }
+        object obj;
+
+        if (!propInfo.PropertyType.IsClass) // Obj is simple struct and was serialized, just deserialize it
+        {
+            obj = Deserialize(data.serializedValue);
+        }
+        else
+        {
+            if (!objectManager.TryGetObject(data.objectId, out obj)) // Obj is a class, use ObjectManager
+            {
+                Logger.Error("Unable to find {type} with id: {id}", propInfo.PropertyType.Name, data.objectId);
+                return;
+            }
+        }
+
+        propInfo.SetValue(instance, obj);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<BesiegerCampPropertyChanged>(Handle_PropertyChanged);
+        messageBroker.Unsubscribe<NetworkBesiegerCampChangeProperty>(Handle_ChangeProperty);
+    }
+
+
+    //private void Handle(MessagePayload<BesiegerCampSiegeEventChanged> payload)
+    //{
+    //    if (objectManager.TryGetId(payload.What.BesiegerCamp, out var besiegerCampId) == false) return;
+    //    if (objectManager.TryGetId(payload.What.SiegeEvent, out var siegeEventId) == false) return;
+
+    //    network.SendAll(new NetworkChangeBesiegerCampSiegeEvent(besiegerCampId, siegeEventId));
+    //}
+
+
+    //private void Handle(MessagePayload<NetworkChangeBesiegerCampSiegeEvent> payload)
+    //{
+    //    if (objectManager.TryGetObject<BesiegerCamp>(payload.What.BesiegerCampId, out var besiegerCamp) == false) return;
+    //    if (objectManager.TryGetObject<SiegeEvent>(payload.What.SiegeEventId, out var siegeEvent) == false) return;
+
+    //    GameLoopRunner.RunOnMainThread(() =>
+    //    {
+    //        using (new AllowedThread())
+    //        {
+    //            besiegerCamp.SiegeEvent = siegeEvent;
+    //        }
+    //    });
+
+    //}
 }
