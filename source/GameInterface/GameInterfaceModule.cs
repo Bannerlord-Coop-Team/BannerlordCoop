@@ -7,6 +7,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Time;
+using GameInterface.Surrogates;
 using HarmonyLib;
 
 namespace GameInterface;
@@ -20,6 +21,8 @@ public class GameInterfaceModule : Module
     {
         
         builder.RegisterInstance(new Harmony(HarmonyId)).As<Harmony>().SingleInstance();
+
+        builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
 
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
