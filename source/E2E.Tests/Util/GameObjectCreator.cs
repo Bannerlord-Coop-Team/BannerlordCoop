@@ -33,6 +33,7 @@ internal class GameObjectCreator
         { typeof(SiegeEvent), new SiegeEventBuilder() },
         { typeof(Workshop), new WorkshopBuilder() },
         { typeof(WorkshopType), new WorkshopTypeBuilder() },
+        { typeof(SiegeStrategy), new SiegeStrategyBuilder() }
     };
 
     public static T CreateInitializedObject<T>()

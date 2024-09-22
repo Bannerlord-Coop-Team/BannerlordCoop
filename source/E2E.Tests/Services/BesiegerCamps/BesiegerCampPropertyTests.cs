@@ -8,140 +8,140 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
+using static Common.Extensions.ReflectionExtensions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace E2E.Tests.Services.BesiegerCamps
 {
     public class BesiegerCampPropertyTests : IDisposable
     {
-        E2ETestEnvironment TestEnvironement { get; }
+        private List<MethodBase> disabledMethods = new();
 
-        EnvironmentInstance Server => TestEnvironement.Server;
-        IEnumerable<EnvironmentInstance> Clients => TestEnvironement.Clients;
+        E2ETestEnvironment TestEnvironment { get; }
 
-        string BesiegerCampId;
+        EnvironmentInstance Server => TestEnvironment.Server;
+        IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
+
+        readonly string besiegerCampId;
+        readonly string siegeEventId;
+        readonly string siegeStrategyId;
+        readonly string siegeEnginesId;
 
         public void Dispose()
         {
-            TestEnvironement.Dispose();
+            TestEnvironment.Dispose();
         }
 
-        private BesiegerCamp CreateCamp(out string beseigerCampId)
+        private void DisableMethods()
+        {
+            disabledMethods = new List<MethodBase> {
+                AccessTools.Method(typeof (MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+                AccessTools.Method(typeof (BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
+                AccessTools.Method(typeof (BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide))
+        };
+
+            disabledMethods.AddRange(AccessTools.GetDeclaredConstructors(typeof(SiegeEvent)));
+        }
+
+        private T ServerCreateObject<T>(out string objectId)
         {
             string? id = null;
-            BesiegerCamp? beseigerCamp = null;
+            T? obj = default;
+
             Server.Call(() =>
             {
-                beseigerCamp = GameObjectCreator.CreateInitializedObject<BesiegerCamp>();
-                Assert.True(Server.ObjectManager.TryGetId(beseigerCamp, out id));
-            }, new MethodBase[] {
-            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
-            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
-        });
-            beseigerCampId = id!;
-            return beseigerCamp!;
+                obj = GameObjectCreator.CreateInitializedObject<T>();
+                Assert.True(Server.ObjectManager.TryGetId(obj, out id));
+            }, disabledMethods);
+
+            objectId = id!;
+            return obj ?? throw new InvalidOperationException("Failed to create object.");
         }
 
         public BesiegerCampPropertyTests(ITestOutputHelper output)
         {
-            TestEnvironement = new E2ETestEnvironment(output);
+            TestEnvironment = new E2ETestEnvironment(output);
+            DisableMethods();
 
-            CreateCamp(out BesiegerCampId);
-
-            //Server.ObjectManager.AddNewObject(besiegerCamp, out string BesiegerCampId);
+            ServerCreateObject<BesiegerCamp>(out besiegerCampId);
+            ServerCreateObject<SiegeEvent>(out siegeEventId);
+            ServerCreateObject<SiegeStrategy>(out siegeStrategyId); // this fails
+            ServerCreateObject<SiegeEnginesContainer>(out siegeEnginesId); 
 
             foreach (var client in Clients)
             {
                 var _besiegerCamp = new BesiegerCamp(null);
 
-                client.ObjectManager.AddExisting(this.BesiegerCampId, _besiegerCamp);
+                client.ObjectManager.AddExisting(this.besiegerCampId, _besiegerCamp);
             }
         }
 
         [Fact]
         public void ServerChangeBesiegerCampNumber_SyncAllClients()
         {
-            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(BesiegerCampId, out var serverBesiegerCamp));
+            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
 
             // Act
             Server.Call(() =>
             {
-                serverBesiegerCamp.NumberOfTroopsKilledOnSide = new Random().Next(0, 10000);
-            }, new MethodBase[] {
-            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
-            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
-        });
+                serverBesiegerCamp.NumberOfTroopsKilledOnSide = Random<int>();
+            });
 
 
             // Assert
-            foreach (var client in TestEnvironement.Clients)
+            foreach (var client in TestEnvironment.Clients)
             {
-                Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(BesiegerCampId, out var clientBesiegerCamp));
+                Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 Assert.Equal(serverBesiegerCamp.NumberOfTroopsKilledOnSide, clientBesiegerCamp.NumberOfTroopsKilledOnSide);
             }
         }
 
-        //[Fact]
-        //public void ServerChangeBesiegerCampInitialCapital_SyncAllClients()
-        //{
-        //    Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(BesiegerCampId, out var serverBesiegerCamp));
+        [Fact]
+        public void ServerChangeBesiegerCampSiegeEvent_SyncAllClients()
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
+            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var serverSiegeEvent));
 
-        //    // Act
-        //    Server.Call(() =>
-        //    {
-        //        serverBesiegerCamp.InitialCapital = 5;
-        //    });
+            // Act
+            Server.Call(() =>
+            {
+                serverBesiegerCamp.SiegeEvent = serverSiegeEvent;
+            });
 
+            // Assert
+            foreach (var client in TestEnvironment.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
+                client.ObjectManager.TryGetId(clientBesiegerCamp.SiegeEvent, out string clientSiegeEventId);
+                Assert.Equal(clientSiegeEventId, siegeEventId);
+            }
+        }
 
-        //    // Assert
-        //    foreach (var client in TestEnvironement.Clients)
-        //    {
-        //        Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(BesiegerCampId, out var clientBesiegerCamp));
-        //        Assert.Equal(serverBesiegerCamp.InitialCapital, clientBesiegerCamp.InitialCapital);
-        //    }
-        //}
+        [Fact]
+        public void ServerChangeBesiegerCampSiegeStrategy_SyncAllClients()
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
+            Assert.True(Server.ObjectManager.TryGetObject<SiegeStrategy>(siegeStrategyId, out var serverSiegeStrategy));
 
-        //[Fact]
-        //public void ServerChangeBesiegerCampLastRunCampaignTime_SyncAllClients()
-        //{
-        //    Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(BesiegerCampId, out var serverBesiegerCamp));
+            // Act
+            Server.Call(() =>
+            {
+                serverBesiegerCamp.SiegeStrategy = serverSiegeStrategy;
+            });
 
-        //    // Act
-        //    Server.Call(() =>
-        //    {
-        //        serverBesiegerCamp.LastRunCampaignTime = new CampaignTime(500);
-        //    });
+            // Assert
+            foreach (var client in TestEnvironment.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
+                client.ObjectManager.TryGetId(clientBesiegerCamp.SiegeStrategy, out string clientSiegeStrategyId);
+                Assert.Equal(clientSiegeStrategyId, siegeEventId);
+            }
+        }
 
-        //    // Assert
-        //    foreach (var client in TestEnvironement.Clients)
-        //    {
-        //        Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(BesiegerCampId, out var clientBesiegerCamp));
-        //        Assert.Equal(serverBesiegerCamp.LastRunCampaignTime, clientBesiegerCamp.LastRunCampaignTime);
-        //    }
-        //}
-
-        //[Fact]
-        //public void ServerChangeBesiegerCampType_SyncAllClients()
-        //{
-        //    Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(BesiegerCampId, out var serverBesiegerCamp));
-        //    Assert.True(Server.ObjectManager.TryGetObject<BesiegerCampType>(BesiegerCampTypeId2, out var serverBesiegerCampType));
-        //    // Act
-        //    Server.Call(() =>
-        //    {
-        //        serverBesiegerCamp.BesiegerCampType = serverBesiegerCampType;
-        //    });
-
-        //    // Assert
-        //    foreach (var client in TestEnvironement.Clients)
-        //    {
-        //        Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(BesiegerCampId, out var clientBesiegerCamp));
-        //        Assert.Equal(serverBesiegerCamp.BesiegerCampType.StringId, clientBesiegerCamp.BesiegerCampType.StringId);
-        //    }
-        //}
     }
 }
