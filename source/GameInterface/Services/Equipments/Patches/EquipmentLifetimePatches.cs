@@ -32,17 +32,11 @@ internal class EquipmentLifetimePatches
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
 
-
             return true;
         }
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-        {
-            objectManager.AddNewObject(__instance, out var newEquipmentId);
+        MessageBroker.Instance.Publish(__instance, new EquipmentCreated(__instance));
             
-            MessageBroker.Instance.Publish(null, new EquipmentCreated(new EquipmentCreatedData(newEquipmentId)));
-        }
-
         return true;
     }
 
@@ -62,24 +56,29 @@ internal class EquipmentLifetimePatches
             return true;
         }
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-        {
-            objectManager.AddNewObject(__instance, out var newEquipmentId);
-            string parameterId;
-            if (objectManager.TryGetId(equipment, out parameterId) == false)
-            {
-                // Maybe need to add parameterEquipment in that case to object manager
-                // or check in default Object Manager
-                Logger.Error("Failed to find object in objectManager {name}\n"
-            + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
-            }
-
-            var data = new EquipmentCreatedData(newEquipmentId, parameterId);
-            MessageBroker.Instance.Publish(null, new EquipmentCreated(data));
-        }
+            MessageBroker.Instance.Publish(null, new EquipmentCreated(__instance, equipment));
 
         return true;
     }
 
-    
+    [HarmonyPatch(typeof(Equipment), MethodType.Constructor, typeof(bool))]
+    [HarmonyPrefix]
+    private static bool CreateEquipmentCivilPrefix(ref Equipment __instance, bool isCivilian)
+    {
+        // Call original if we call this function
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
+
+
+            return true;
+        }
+
+            MessageBroker.Instance.Publish(null, new EquipmentCreated(__instance,  null, isCivilian));
+
+        return true;
+    }
 }

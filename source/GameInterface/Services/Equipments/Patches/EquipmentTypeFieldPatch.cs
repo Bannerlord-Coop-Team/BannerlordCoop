@@ -1,7 +1,6 @@
-/*using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.Equipments.Data;
 using GameInterface.Services.Equipments.Messages.Events;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -73,4 +72,3 @@ public class EquipmentTypeFieldPatch
         }
     }
 }
-*/
