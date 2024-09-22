@@ -1,5 +1,7 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using HarmonyLib;
+using System.Runtime.InteropServices;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
@@ -35,13 +37,17 @@ namespace E2E.Tests.Services.Settlements
 
             string settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
 
+            var field = AccessTools.Field(typeof(Settlement), nameof(Settlement.CanBeClaimed));
+            
+            var canBeClaimedIntercept = TestEnvironment.GetIntercept(field);
+            
             server.Call(() =>
             {
 
                 Assert.True(server.ObjectManager.TryGetObject<Settlement>(settlementId, out var serverSettlement));
 
-                serverSettlement.CanBeClaimed = newInt;
-                serverSettlement.ClaimValue = newFloat;
+                canBeClaimedIntercept.Invoke(null, new object[] { serverSettlement, newInt });
+                //claimValueIntercept.Invoke(null, new object[] { serverSettlement, newFloat });
 
                 Assert.Equal(newInt, serverSettlement.CanBeClaimed);
                 Assert.Equal(newFloat, serverSettlement.ClaimValue);
