@@ -17,6 +17,8 @@ using TaleWorlds.Library;
 using GameInterface.Services.BesiegerCampss.Messages;
 using GameInterface.Services.BesiegerCamps.Patches;
 using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
+using System.Linq;
+using System.Reflection;
 
 namespace GameInterface.Services.BesiegerCamps.Handlers;
 internal class BesiegerCampPropertyHandler : IHandler
@@ -65,6 +67,38 @@ internal class BesiegerCampPropertyHandler : IHandler
         });
     }
 
+    private object ResolvePropertyValue(NetworkBesiegerCampChangeProperty data, PropertyInfo propInfo)
+    {
+        object obj;
+        Type propType = propInfo.PropertyType;
+
+        // special case for this pesky type because its not working really well with object manager
+        if (propType == typeof(SiegeStrategy))
+        {
+            obj = SiegeStrategy.All.FirstOrDefault(x => string.Equals(x.StringId, data.objectId));
+            if (obj == null)
+            {
+                Logger.Error("Unable to find SiegeStrategy with id: {id}", data.objectId);
+            }
+            return obj;
+        }
+
+        if (!propType.IsClass) // Obj is simple struct and was serialized, just deserialize it
+        {
+            obj = Deserialize(data.serializedValue);
+        }
+        else
+        {
+            if (!objectManager.TryGetObject(data.objectId, propType, out obj)) // Obj is a class, use ObjectManager
+            {
+                Logger.Error("Unable to find {type} with id: {id}", propType.Name, data.objectId);
+            }
+        }
+
+        return obj;
+    }
+
+
     private void HandleDataChanged(BesiegerCamp instance, NetworkBesiegerCampChangeProperty data)
     {
         var propInfo = typeof(BesiegerCamp).GetProperty(data.propertyName);
@@ -73,22 +107,8 @@ internal class BesiegerCampPropertyHandler : IHandler
             Logger.Error("Unable to find property with name {propName} on type: {type}", data.propertyName, typeof(BesiegerCamp));
             return;
         }
-        object obj;
-
-        if (!propInfo.PropertyType.IsClass) // Obj is simple struct and was serialized, just deserialize it
-        {
-            obj = Deserialize(data.serializedValue);
-        }
-        else
-        {
-            if (!objectManager.TryGetObject(data.objectId, propInfo.PropertyType, out obj)) // Obj is a class, use ObjectManager
-            {
-                Logger.Error("Unable to find {type} with id: {id}", propInfo.PropertyType.Name, data.objectId);
-                return;
-            }
-        }
-
-        propInfo.SetValue(instance, obj);
+        object newValue = ResolvePropertyValue(data, propInfo);
+        propInfo.SetValue(instance, newValue);
     }
 
     public void Dispose()
