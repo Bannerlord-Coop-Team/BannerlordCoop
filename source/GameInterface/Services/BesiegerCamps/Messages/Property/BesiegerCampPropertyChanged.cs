@@ -3,6 +3,7 @@ using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensi
 using GameInterface.Services.BesiegerCampss.Messages;
 using Serilog;
 using System;
+using static Common.Serialization.BinaryFormatterSerializer;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Siege;
 
