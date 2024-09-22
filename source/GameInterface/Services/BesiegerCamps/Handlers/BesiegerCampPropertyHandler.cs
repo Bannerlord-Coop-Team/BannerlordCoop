@@ -9,7 +9,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Text;
+using static Common.Serialization.BinaryFormatterSerializer;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
@@ -65,18 +65,6 @@ internal class BesiegerCampPropertyHandler : IHandler
         });
     }
 
-    private bool TryGetObject<T>(string id) where T : class
-    {
-        if (objectManager.TryGetObject(id, out T type) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(T), id);
-            return false;
-        }
-        return true;
-    }
-
-
-
     private void HandleDataChanged(BesiegerCamp instance, NetworkBesiegerCampChangeProperty data)
     {
         var propInfo = typeof(BesiegerCamp).GetProperty(data.propertyName);
@@ -93,7 +81,7 @@ internal class BesiegerCampPropertyHandler : IHandler
         }
         else
         {
-            if (!objectManager.TryGetObject(data.objectId, out obj)) // Obj is a class, use ObjectManager
+            if (!objectManager.TryGetObject(data.objectId, propInfo.PropertyType, out obj)) // Obj is a class, use ObjectManager
             {
                 Logger.Error("Unable to find {type} with id: {id}", propInfo.PropertyType.Name, data.objectId);
                 return;
