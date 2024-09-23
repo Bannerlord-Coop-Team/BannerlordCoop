@@ -7,6 +7,7 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.Siege;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace E2E.Tests.Util;
 internal class GameObjectCreator
@@ -33,7 +34,8 @@ internal class GameObjectCreator
         { typeof(SiegeEvent), new SiegeEventBuilder() },
         { typeof(Workshop), new WorkshopBuilder() },
         { typeof(WorkshopType), new WorkshopTypeBuilder() },
-        { typeof(SiegeStrategy), new SiegeStrategyBuilder() }
+        { typeof(SiegeStrategy), new SiegeStrategyBuilder() },
+        { typeof(SiegeEnginesContainer), new SiegeEnginesBuilder() }
     };
 
     public static T CreateInitializedObject<T>()
