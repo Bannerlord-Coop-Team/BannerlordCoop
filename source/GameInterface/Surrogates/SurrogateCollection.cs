@@ -1,5 +1,6 @@
 ﻿using ProtoBuf.Meta;
 using TaleWorlds.Library;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Surrogates;
 
@@ -11,5 +12,8 @@ internal class SurrogateCollection : ISurrogateCollection
     {
         if (RuntimeTypeModel.Default.CanSerialize(typeof(Vec2)) == false)
             RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(TextObject)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<TextObject, TextObjectSurrogate>();
     }
 }

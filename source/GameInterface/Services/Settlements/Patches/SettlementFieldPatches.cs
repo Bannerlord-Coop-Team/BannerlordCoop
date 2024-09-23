@@ -55,7 +55,7 @@ namespace GameInterface.Services.Settlements.Patches
             //Village
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Village)));
 
-            //_gatePosition (Vec2 surrogate required)
+            //_gatePosition
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._gatePosition)));
 
             //_isVisible
@@ -67,8 +67,8 @@ namespace GameInterface.Services.Settlements.Patches
             //_locatorNodeIndex
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._locatorNodeIndex)));
 
-            //_name (TextObject surrogate required)
-            //autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._name)));
+            //_name
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._name)));
 
             //_nextLocatable
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._nextLocatable)));
@@ -77,9 +77,9 @@ namespace GameInterface.Services.Settlements.Patches
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._numberOfLordPartiesAt)));
 
             //_position
-            //autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._position)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._position)));
 
-            //_readyMilita (Vec2 surrogate required)
+            //_readyMilita
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._readyMilitia)));
         }
     }
