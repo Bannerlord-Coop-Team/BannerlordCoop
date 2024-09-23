@@ -10,6 +10,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
@@ -42,11 +43,9 @@ namespace GameInterface.Services.Buildings.Handlers
         {
             var payload = obj.What;
 
-            if (objectManager.TryGetId(payload.Town, out var townId) == false) return;
-
             objectManager.AddNewObject(payload.Building, out string buildingId);
 
-            var message = new NetworkCreateBuilding(buildingId, payload.BuildingType.StringId, townId, payload.BuildingProgress, payload.CurrentLevel);
+            var message = new NetworkCreateBuilding(buildingId, payload.BuildingType.StringId, payload.Town.StringId, payload.BuildingProgress, payload.CurrentLevel);
             network.SendAll(message);
         }
 
