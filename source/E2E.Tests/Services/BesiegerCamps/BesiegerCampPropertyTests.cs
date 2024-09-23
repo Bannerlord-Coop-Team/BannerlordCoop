@@ -30,7 +30,7 @@ namespace E2E.Tests.Services.BesiegerCamps
         readonly string besiegerCampId;
         readonly string siegeEventId;
         readonly string siegeEnginesId;
-        readonly string siegePreparationsId;
+        //readonly string siegePreparationsId;
 
         public void Dispose()
         {
@@ -196,7 +196,6 @@ namespace E2E.Tests.Services.BesiegerCamps
             // Arrange
             Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
             Assert.True(Server.ObjectManager.TryGetObject<SiegeEnginesContainer>(siegeEnginesId, out var serverSiegeEngines));
-           // Assert.True(Server.ObjectManager.TryGetObject<SiegeEngineConstructionProgress>(siegePreparationsId, out var serverSiegePreparations));
 
             float testVal = 51;
 
