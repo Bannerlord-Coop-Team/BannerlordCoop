@@ -8,9 +8,9 @@ using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.BesiegerCamps;
-internal class BeseigerCampRegistry : RegistryBase<BesiegerCamp>
+internal class BesiegerCampRegistry : RegistryBase<BesiegerCamp>
 {
-    public BeseigerCampRegistry(IRegistryCollection collection) : base(collection) { }
+    public BesiegerCampRegistry(IRegistryCollection collection) : base(collection) { }
 
     public override void RegisterAll()
     {

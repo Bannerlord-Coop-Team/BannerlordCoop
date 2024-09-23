@@ -22,7 +22,7 @@ namespace GameInterface.Services.SiegeEngineConstructionProgresss.Patches
 
         [HarmonyPatch(nameof(SiegeEngineConstructionProgress.Progress), MethodType.Setter)]
         [HarmonyPrefix]
-        private static bool SetSiegeEventPrefix(SiegeEngineConstructionProgress __instance, SiegeEvent value)
+        private static bool SetSiegeEngineConstructionProgressPrefix(SiegeEngineConstructionProgress __instance, SiegeEvent value)
         {
             return HandlePropertySet(__instance, nameof(SiegeEngineConstructionProgress.Progress), value);
         }
