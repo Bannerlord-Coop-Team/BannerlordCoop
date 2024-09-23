@@ -6,10 +6,12 @@ using System.Text;
 namespace GameInterface.Services.SiegeEnginesContainers.Messages;
 internal class NetworkCreateSiegeEnginesContainer : ICommand
 {
-    public string Id { get; }
+    public string SiegeEnginesId { get; }
+    public string SiegeConstructionProgressId { get; }
 
-    public NetworkCreateSiegeEnginesContainer(string id)
+    public NetworkCreateSiegeEnginesContainer(string siegeEnginesId, string siegeConstructionProgressId)
     {
-        Id = id;
+        SiegeEnginesId = siegeEnginesId;
+        SiegeConstructionProgressId = siegeConstructionProgressId;
     }
 }
