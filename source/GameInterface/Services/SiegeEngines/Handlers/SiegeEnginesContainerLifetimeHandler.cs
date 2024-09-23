@@ -6,6 +6,8 @@ using GameInterface.Services.SiegeEnginesContainers.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
+using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
+using HarmonyLib;
 
 namespace GameInterface.Services.SiegeEnginesContainers.Handlers;
 internal class SiegeEnginesContainerLifetimeHandler : IHandler
@@ -35,19 +37,33 @@ internal class SiegeEnginesContainerLifetimeHandler : IHandler
 
     private void Handle(MessagePayload<SiegeEnginesContainerCreated> payload)
     {
-        objectManager.AddNewObject(payload.What.Instance, out var id);
+        var siegeEnginesInstance = payload.What.SiegeEnginesContainerInstance;
+        var siegeProgressInstance = payload.What.SiegeEngineConstructionProgressInstance;
 
-        network.SendAll(new NetworkCreateSiegeEnginesContainer(id));
+        var constructionProgressId = TryGetId(siegeProgressInstance, Logger);
+
+        objectManager.AddNewObject(siegeEnginesInstance, out var id);
+
+        network.SendAll(new NetworkCreateSiegeEnginesContainer(id, constructionProgressId));
     }
 
 
     private void Handle(MessagePayload<NetworkCreateSiegeEnginesContainer> payload)
     {
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            Logger.Error("Unable to resolve {type}", typeof(IObjectManager).FullName);
+            return;
+        }
+
+        SiegeEngineConstructionProgress siegeProgress;
+        objectManager.TryGetObject(payload.What.SiegeConstructionProgressId, out siegeProgress);
+
         var newSiegeEnginesContainer = ObjectHelper.SkipConstructor<SiegeEnginesContainer>();
 
         // TODO change setting to constructor patch
-        //AccessTools.Field(typeof(SiegeEnginesContainer), nameof(SiegeEnginesContainer._besiegerParties)).SetValue(newSiegeEnginesContainer, new MBList<MobileParty>());
+        AccessTools.Field(typeof(SiegeEnginesContainer), nameof(SiegeEnginesContainer.SiegePreparations)).SetValue(newSiegeEnginesContainer, siegeProgress);
 
-        objectManager.AddExisting(payload.What.Id, newSiegeEnginesContainer);
+        objectManager.AddExisting(payload.What.SiegeEnginesId, newSiegeEnginesContainer);
     }
 }

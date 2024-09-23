@@ -30,6 +30,7 @@ namespace E2E.Tests.Services.BesiegerCamps
         readonly string besiegerCampId;
         readonly string siegeEventId;
         readonly string siegeEnginesId;
+        readonly string siegePreparationsId;
 
         public void Dispose()
         {
@@ -161,7 +162,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 client.ObjectManager.TryGetId(clientBesiegerCamp.SiegeEngines, out string clientSiegeEnginesId);
-                Assert.Equal(clientSiegeEnginesId, siegeEventId);
+                Assert.Equal(clientSiegeEnginesId, siegeEnginesId);
             }
         }
 
@@ -186,6 +187,35 @@ namespace E2E.Tests.Services.BesiegerCamps
             foreach (var client in TestEnvironment.Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<SiegeEnginesContainer>(siegeEngineId, out var _));
+            }
+        }
+
+        [Fact]
+        public void ServerChangeBesiegerCampPreparationProgress_SyncAllClients()
+        {
+            // Arrange
+            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
+            Assert.True(Server.ObjectManager.TryGetObject<SiegeEnginesContainer>(siegeEnginesId, out var serverSiegeEngines));
+           // Assert.True(Server.ObjectManager.TryGetObject<SiegeEngineConstructionProgress>(siegePreparationsId, out var serverSiegePreparations));
+
+            float testVal = 51;
+
+            // Act
+            Server.Call(() =>
+            {
+                serverBesiegerCamp.SiegeEngines = serverSiegeEngines;
+
+                serverBesiegerCamp.SiegeEngines.SiegePreparations.SetProgress(testVal);
+            });
+
+            // Assert
+            foreach (var client in TestEnvironment.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
+                client.ObjectManager.TryGetId(clientBesiegerCamp.SiegeEngines, out string clientSiegeEnginesId);
+                Assert.Equal(clientSiegeEnginesId, siegeEnginesId);
+                Assert.Equal(testVal, clientBesiegerCamp.SiegeEngines.SiegePreparations.Progress);
+
             }
         }
 
