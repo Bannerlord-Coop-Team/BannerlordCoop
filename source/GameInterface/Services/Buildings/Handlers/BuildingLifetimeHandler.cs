@@ -1,25 +1,18 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.Armies.Handlers;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace GameInterface.Services.Buildings.Handlers
 {
     internal class BuildingLifetimeHandler : IHandler
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<ArmyHandler>();
+        private static readonly ILogger Logger = LogManager.GetLogger<BuildingLifetimeHandler>();
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
@@ -43,9 +36,9 @@ namespace GameInterface.Services.Buildings.Handlers
         {
             var payload = obj.What;
 
-            objectManager.AddNewObject(payload.Building, out string buildingId);
+            if (objectManager.AddNewObject(payload.Building, out string buildingId) == false) return;
 
-            var message = new NetworkCreateBuilding(buildingId, payload.BuildingType.StringId, payload.Town.StringId, payload.BuildingProgress, payload.CurrentLevel);
+            var message = new NetworkCreateBuilding(buildingId);
             network.SendAll(message);
         }
 
@@ -53,18 +46,12 @@ namespace GameInterface.Services.Buildings.Handlers
         {
             var payload = obj.What;
 
-            if (objectManager.TryGetObject(payload.TownId, out Town town) == false) return;
-
-            BuildingType buildingType = BuildingType.All.Find(x => x.StringId == payload.BuildingTypeId);
-
-            GameLoopRunner.RunOnMainThread(() =>
+            var building = ObjectHelper.SkipConstructor<Building>();
+            if (objectManager.AddExisting(payload.BuildingId, building) == false)
             {
-                using (new AllowedThread())
-                {
-                    var building = new Building(buildingType, town, payload.BuildingProgress, payload.CurrentLevel);
-                    objectManager.AddExisting(payload.BuildingId, building);
-                }
-            });
+                Logger.Error("Failed to add existing Building, {id}", payload.BuildingId);
+                return;
+            }
         }
     }
 }

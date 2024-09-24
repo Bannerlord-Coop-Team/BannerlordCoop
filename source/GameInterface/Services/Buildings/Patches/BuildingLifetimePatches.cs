@@ -32,7 +32,7 @@ namespace GameInterface.Services.Buildings.Patches
                 return true;
             }
 
-            var message = new BuildingCreated(__instance, buildingType, town, buildingProgress, currentLevel);
+            var message = new BuildingCreated(__instance);
 
             MessageBroker.Instance.Publish(__instance, message);
 
