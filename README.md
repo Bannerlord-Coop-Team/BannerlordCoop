@@ -1,3 +1,5 @@
+I f*cked this branch up, use [837-sync-besiegercamp-properties_v2](https://github.com/Bannerlord-Coop-Team/BannerlordCoop/tree/837-sync-besiegercamp-properties_v2) instead
+
 # Bannerlord Coop
 
 ## Summary
