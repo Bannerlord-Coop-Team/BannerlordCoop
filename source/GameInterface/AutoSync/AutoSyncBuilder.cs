@@ -189,9 +189,17 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         interceptMap = interceptMap.ToDictionary(kvp => kvp.Key, kvp =>
         {
             var method = kvp.Value;
+
+            if (compiledType.Name.StartsWith(kvp.Key.DeclaringType.Name) == false) return kvp.Value;
+
             var genericParams = method.IsGenericMethod ? method.GetGenericArguments() : null;
             var actualMethod = AccessTools.Method(compiledType, method.Name, method.GetParameters().Select(p => p.ParameterType).ToArray(), genericParams);
 
+            if (actualMethod == null)
+            {
+                throw new NullReferenceException($"Failed to get {method.Name} from compiled class");
+            } 
+            
             return actualMethod;
         });
     }
