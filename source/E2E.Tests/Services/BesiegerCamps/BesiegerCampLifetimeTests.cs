@@ -9,20 +9,20 @@ using TaleWorlds.CampaignSystem.Siege;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.BesiegerCamps;
+
 public class BesiegerCampLifetimeTests : IDisposable
 {
     private List<MethodBase> disabledMethods = new();
 
-    E2ETestEnvironment TestEnvironment { get; }
+    private E2ETestEnvironment TestEnvironment { get; }
 
-    EnvironmentInstance Server => TestEnvironment.Server;
-    IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
+    private EnvironmentInstance Server => TestEnvironment.Server;
+    private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
     public BesiegerCampLifetimeTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
         DisableMethods();
-
     }
 
     public void Dispose()

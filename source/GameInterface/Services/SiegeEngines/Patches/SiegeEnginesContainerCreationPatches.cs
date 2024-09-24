@@ -1,14 +1,10 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.SiegeEngineConstructionProgresss.Messages;
 using GameInterface.Services.SiegeEnginesContainers.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
-using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
@@ -19,9 +15,9 @@ namespace GameInterface.Services.SiegeEnginesContainers.Patches;
 [HarmonyPatch(new Type[] { typeof(BattleSideEnum), typeof(SiegeEngineConstructionProgress) })] // Constructor signature
 internal class SiegeEnginesContainerCreationPatches
 {
-    static readonly ILogger Logger = LogManager.GetLogger<SiegeEnginesContainerCreationPatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<SiegeEnginesContainerCreationPatches>();
 
-    static bool Prefix(ref SiegeEnginesContainer __instance, BattleSideEnum side, SiegeEngineConstructionProgress siegePreparations)
+    private static bool Prefix(ref SiegeEnginesContainer __instance, BattleSideEnum side, SiegeEngineConstructionProgress siegePreparations)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
@@ -40,7 +36,6 @@ internal class SiegeEnginesContainerCreationPatches
         return true; // Continue with the original constructor
     }
 }
-
 
 //[HarmonyPatch]
 //internal class SiegeEnginesContainerCreationPatches

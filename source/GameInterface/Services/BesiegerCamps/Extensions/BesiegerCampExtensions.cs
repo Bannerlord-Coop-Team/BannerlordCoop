@@ -1,12 +1,7 @@
 ﻿using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
-using System.Runtime.Serialization.Formatters.Binary;
-using System.Text;
-using System.Text.Json;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.BesiegerCamps.Extensions
@@ -51,6 +46,5 @@ namespace GameInterface.Services.BesiegerCamps.Extensions
 
             return result;
         }
-
     }
 }

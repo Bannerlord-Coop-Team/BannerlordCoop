@@ -4,23 +4,18 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.BesiegerCamps.Messages;
+using GameInterface.Services.BesiegerCampss.Messages;
 using GameInterface.Services.ObjectManager;
-using HarmonyLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using static Common.Serialization.BinaryFormatterSerializer;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Library;
-using GameInterface.Services.BesiegerCampss.Messages;
-using GameInterface.Services.BesiegerCamps.Patches;
-using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.CampaignSystem.Siege;
+using static Common.Serialization.BinaryFormatterSerializer;
+using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
 
 namespace GameInterface.Services.BesiegerCamps.Handlers;
+
 internal class BesiegerCampPropertyHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<BesiegerCampLifetimeHandler>();
@@ -28,7 +23,6 @@ internal class BesiegerCampPropertyHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-
 
     public BesiegerCampPropertyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
@@ -38,7 +32,6 @@ internal class BesiegerCampPropertyHandler : IHandler
         messageBroker.Subscribe<BesiegerCampPropertyChanged>(Handle_PropertyChanged);
         messageBroker.Subscribe<NetworkBesiegerCampChangeProperty>(Handle_ChangeProperty);
     }
-
 
     private void Handle_PropertyChanged(MessagePayload<BesiegerCampPropertyChanged> payload)
     {
@@ -98,7 +91,6 @@ internal class BesiegerCampPropertyHandler : IHandler
         return obj;
     }
 
-
     private void HandleDataChanged(BesiegerCamp instance, NetworkBesiegerCampChangeProperty data)
     {
         var propInfo = typeof(BesiegerCamp).GetProperty(data.propertyName);
@@ -117,7 +109,6 @@ internal class BesiegerCampPropertyHandler : IHandler
         messageBroker.Unsubscribe<NetworkBesiegerCampChangeProperty>(Handle_ChangeProperty);
     }
 
-
     //private void Handle(MessagePayload<BesiegerCampSiegeEventChanged> payload)
     //{
     //    if (objectManager.TryGetId(payload.What.BesiegerCamp, out var besiegerCampId) == false) return;
@@ -125,7 +116,6 @@ internal class BesiegerCampPropertyHandler : IHandler
 
     //    network.SendAll(new NetworkChangeBesiegerCampSiegeEvent(besiegerCampId, siegeEventId));
     //}
-
 
     //private void Handle(MessagePayload<NetworkChangeBesiegerCampSiegeEvent> payload)
     //{

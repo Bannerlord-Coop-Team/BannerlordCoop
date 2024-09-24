@@ -2,6 +2,7 @@
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.BesiegerCamps.Messages;
+
 internal class BesiegerCampCreated : IEvent
 {
     public BesiegerCampCreated(BesiegerCamp instance)

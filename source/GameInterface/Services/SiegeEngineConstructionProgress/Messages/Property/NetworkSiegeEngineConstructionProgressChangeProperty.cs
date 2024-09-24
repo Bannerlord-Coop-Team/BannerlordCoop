@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.SiegeEngineConstructionProgresss.Patches;
 using ProtoBuf;
 
 namespace GameInterface.Services.SiegeEngineConstructionProgressss.Messages

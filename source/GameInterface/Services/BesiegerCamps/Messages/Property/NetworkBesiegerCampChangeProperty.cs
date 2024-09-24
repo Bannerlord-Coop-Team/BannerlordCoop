@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.BesiegerCamps.Patches;
 using ProtoBuf;
 
 namespace GameInterface.Services.BesiegerCampss.Messages

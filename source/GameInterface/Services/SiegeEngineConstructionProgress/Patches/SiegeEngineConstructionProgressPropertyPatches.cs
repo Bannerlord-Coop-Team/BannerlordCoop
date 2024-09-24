@@ -7,14 +7,9 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Siege;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
-using TaleWorlds.Core;
-using GameInterface.Services.ObjectManager;
-using Newtonsoft.Json.Linq;
-using System.Reflection;
 
 namespace GameInterface.Services.SiegeEngineConstructionProgresss.Patches
 {
-
     [HarmonyPatch(typeof(SiegeEngineConstructionProgress))]
     internal class SiegeEngineConstructionProgressPropertyPatches
     {

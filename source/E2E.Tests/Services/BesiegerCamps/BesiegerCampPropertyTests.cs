@@ -2,18 +2,11 @@
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using static Common.Extensions.ReflectionExtensions;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Localization;
 using Xunit.Abstractions;
+using static Common.Extensions.ReflectionExtensions;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace E2E.Tests.Services.BesiegerCamps
@@ -91,7 +84,6 @@ namespace E2E.Tests.Services.BesiegerCamps
             {
                 serverBesiegerCamp.NumberOfTroopsKilledOnSide = Random<int>();
             });
-
 
             // Assert
             foreach (var client in TestEnvironment.Clients)
@@ -214,9 +206,7 @@ namespace E2E.Tests.Services.BesiegerCamps
                 client.ObjectManager.TryGetId(clientBesiegerCamp.SiegeEngines, out string clientSiegeEnginesId);
                 Assert.Equal(clientSiegeEnginesId, siegeEnginesId);
                 Assert.Equal(testVal, clientBesiegerCamp.SiegeEngines.SiegePreparations.Progress);
-
             }
         }
-
     }
 }

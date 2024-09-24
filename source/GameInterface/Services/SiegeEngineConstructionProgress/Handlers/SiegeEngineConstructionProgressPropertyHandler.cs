@@ -3,17 +3,18 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.SiegeEngineConstructionProgresss.Messages;
+using GameInterface.Services.BesiegerCamps.Extensions;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.SiegeEngineConstructionProgresss.Messages;
+using GameInterface.Services.SiegeEngineConstructionProgressss.Messages;
 using Serilog;
 using System;
-using static Common.Serialization.BinaryFormatterSerializer;
-using GameInterface.Services.SiegeEngineConstructionProgressss.Messages;
 using System.Reflection;
+using static Common.Serialization.BinaryFormatterSerializer;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
-using GameInterface.Services.BesiegerCamps.Extensions;
 
 namespace GameInterface.Services.SiegeEngineConstructionProgresss.Handlers;
+
 internal class SiegeEngineConstructionProgressPropertyHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeEngineConstructionProgressLifetimeHandler>();
@@ -21,7 +22,6 @@ internal class SiegeEngineConstructionProgressPropertyHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-
 
     public SiegeEngineConstructionProgressPropertyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
@@ -31,7 +31,6 @@ internal class SiegeEngineConstructionProgressPropertyHandler : IHandler
         messageBroker.Subscribe<SiegeEngineConstructionProgressPropertyChanged>(Handle_PropertyChanged);
         messageBroker.Subscribe<NetworkSiegeEngineConstructionProgressChangeProperty>(Handle_ChangeProperty);
     }
-
 
     private void Handle_PropertyChanged(MessagePayload<SiegeEngineConstructionProgressPropertyChanged> payload)
     {
@@ -80,7 +79,6 @@ internal class SiegeEngineConstructionProgressPropertyHandler : IHandler
         return obj;
     }
 
-
     private void HandleDataChanged(SiegeEngineConstructionProgress instance, NetworkSiegeEngineConstructionProgressChangeProperty data)
     {
         var propInfo = typeof(SiegeEngineConstructionProgress).GetProperty(data.propertyName);
@@ -98,5 +96,4 @@ internal class SiegeEngineConstructionProgressPropertyHandler : IHandler
         messageBroker.Unsubscribe<SiegeEngineConstructionProgressPropertyChanged>(Handle_PropertyChanged);
         messageBroker.Unsubscribe<NetworkSiegeEngineConstructionProgressChangeProperty>(Handle_ChangeProperty);
     }
-
 }

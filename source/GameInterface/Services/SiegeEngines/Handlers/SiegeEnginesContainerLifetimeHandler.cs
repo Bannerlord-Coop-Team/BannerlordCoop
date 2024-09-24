@@ -2,14 +2,15 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.SiegeEnginesContainers.Messages;
 using GameInterface.Services.ObjectManager;
-using Serilog;
-using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
-using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
+using GameInterface.Services.SiegeEnginesContainers.Messages;
 using HarmonyLib;
+using Serilog;
+using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEnginesContainers.Handlers;
+
 internal class SiegeEnginesContainerLifetimeHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SiegeEnginesContainerLifetimeHandler>();
@@ -17,7 +18,6 @@ internal class SiegeEnginesContainerLifetimeHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-
 
     public SiegeEnginesContainerLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
@@ -34,7 +34,6 @@ internal class SiegeEnginesContainerLifetimeHandler : IHandler
         messageBroker.Unsubscribe<NetworkCreateSiegeEnginesContainer>(Handle);
     }
 
-
     private void Handle(MessagePayload<SiegeEnginesContainerCreated> payload)
     {
         var siegeEnginesInstance = payload.What.SiegeEnginesContainerInstance;
@@ -46,7 +45,6 @@ internal class SiegeEnginesContainerLifetimeHandler : IHandler
 
         network.SendAll(new NetworkCreateSiegeEnginesContainer(id, constructionProgressId));
     }
-
 
     private void Handle(MessagePayload<NetworkCreateSiegeEnginesContainer> payload)
     {

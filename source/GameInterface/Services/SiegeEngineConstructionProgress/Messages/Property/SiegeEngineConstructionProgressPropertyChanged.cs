@@ -1,9 +1,8 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.SiegeEngineConstructionProgressss.Messages;
 using Serilog;
-using System;
-using static Common.Serialization.BinaryFormatterSerializer;
 using System.Reflection;
+using static Common.Serialization.BinaryFormatterSerializer;
 using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
@@ -39,6 +38,5 @@ namespace GameInterface.Services.SiegeEngineConstructionProgresss.Messages
                 return new NetworkSiegeEngineConstructionProgressChangeProperty(property.Name, besiegeCampId, serializedValue);
             }
         }
-
     }
 }

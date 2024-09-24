@@ -1,11 +1,10 @@
 ﻿using Common.Messaging;
-using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
 using GameInterface.Services.BesiegerCampss.Messages;
 using Serilog;
-using System;
-using static Common.Serialization.BinaryFormatterSerializer;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Siege;
+using static Common.Serialization.BinaryFormatterSerializer;
+using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
 
 namespace GameInterface.Services.BesiegerCamps.Messages
 {
@@ -39,6 +38,5 @@ namespace GameInterface.Services.BesiegerCamps.Messages
                 return new NetworkBesiegerCampChangeProperty(property.Name, besiegeCampId, serializedValue);
             }
         }
-
     }
 }

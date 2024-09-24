@@ -3,20 +3,15 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.BesiegerCamps.Messages;
-using GameInterface.Services.MapEvents.Handlers;
-using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.BesiegerCamps.Handlers;
+
 internal class BesiegerCampLifetimeHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<BesiegerCampLifetimeHandler>();
@@ -24,7 +19,6 @@ internal class BesiegerCampLifetimeHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-
 
     public BesiegerCampLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
@@ -41,14 +35,12 @@ internal class BesiegerCampLifetimeHandler : IHandler
         messageBroker.Unsubscribe<NetworkCreateBesiegerCamp>(Handle);
     }
 
-
     private void Handle(MessagePayload<BesiegerCampCreated> payload)
     {
         objectManager.AddNewObject(payload.What.Instance, out var id);
 
         network.SendAll(new NetworkCreateBesiegerCamp(id));
     }
-
 
     private void Handle(MessagePayload<NetworkCreateBesiegerCamp> payload)
     {

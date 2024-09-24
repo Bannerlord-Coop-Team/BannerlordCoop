@@ -10,9 +10,10 @@ using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 
 namespace E2E.Tests.Util;
+
 internal class GameObjectCreator
 {
-    private readonly static Dictionary<Type, IObjectBuilder> ObjectBuilders = new Dictionary<Type, IObjectBuilder>
+    private static readonly Dictionary<Type, IObjectBuilder> ObjectBuilders = new Dictionary<Type, IObjectBuilder>
     {
         { typeof(CharacterObject), new CharacterObjectBuilder() },
         { typeof(Settlement), new SettlementBuilder() },

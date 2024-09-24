@@ -1,7 +1,4 @@
-﻿using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Workshops;
-using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Core;
+﻿using TaleWorlds.Core;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace E2E.Tests.Util.ObjectBuilders

@@ -7,14 +7,9 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Siege;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
-using TaleWorlds.Core;
-using GameInterface.Services.ObjectManager;
-using Newtonsoft.Json.Linq;
-using System.Reflection;
 
 namespace GameInterface.Services.BesiegerCamps.Patches
 {
-
     [HarmonyPatch(typeof(BesiegerCamp))]
     internal class BesiegerCampPropertyPatches
     {
@@ -87,12 +82,10 @@ namespace GameInterface.Services.BesiegerCamps.Patches
 
         //string Serialize<T>(T obj) where T: struct
         //{
-
         //}
 
         //T Deserialize<T>(T obj) where T: struct
         //{
-
         //}
 
         private static bool HandlePropertySet<T>(BesiegerCamp instance, string propName, T value)

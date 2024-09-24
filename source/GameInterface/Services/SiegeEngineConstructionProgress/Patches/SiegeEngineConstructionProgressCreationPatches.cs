@@ -7,7 +7,6 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.Siege;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEngineConstructionProgresss.Patches;
@@ -15,11 +14,11 @@ namespace GameInterface.Services.SiegeEngineConstructionProgresss.Patches;
 [HarmonyPatch]
 internal class SiegeEngineConstructionProgressCreationPatches
 {
-    static readonly ILogger Logger = LogManager.GetLogger<SiegeEngineConstructionProgressCreationPatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<SiegeEngineConstructionProgressCreationPatches>();
 
-    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(SiegeEngineConstructionProgress));
+    private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(SiegeEngineConstructionProgress));
 
-    static bool Prefix(ref SiegeEngineConstructionProgress __instance)
+    private static bool Prefix(ref SiegeEngineConstructionProgress __instance)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;

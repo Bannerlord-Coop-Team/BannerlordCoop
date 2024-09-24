@@ -1,21 +1,10 @@
 ﻿using Autofac;
-using Common.Extensions;
-using GameInterface.Services.GameDebug.Commands;
-using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.BesiegerCamps.Patches;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.Serialization;
-using System.Text;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
-using static TaleWorlds.Library.CommandLineFunctionality;
 using TaleWorlds.CampaignSystem.Siege;
+using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
 
@@ -73,7 +62,7 @@ public class BesiegerCampDebugCommand
 
     // coop.debug.besiegercamp.set_progress
     /// <summary>
-    /// Set siege preparations progress 
+    /// Set siege preparations progress
     /// </summary>
     /// <param name="args">first arg : besiegerCampId ; second arg : value</param>
     /// <returns></returns>
@@ -150,5 +139,4 @@ public class BesiegerCampDebugCommand
 
         return $"SiegeStrategy for BesiegerCamp {besiegerCampId} has been set to: {siegeStrategy.StringId}";
     }
-
 }
