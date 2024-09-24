@@ -47,7 +47,7 @@ namespace GameInterface.Services.Settlements.Patches
             autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(KingdomManager), nameof(KingdomManager.UpdateLordPartyVariablesRelatedToSettlements)));
 
             //Stash (TODO)
-            //autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash)));
 
             //Town
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Town)));
