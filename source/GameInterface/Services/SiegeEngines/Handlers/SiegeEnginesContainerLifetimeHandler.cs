@@ -56,13 +56,14 @@ internal class SiegeEnginesContainerLifetimeHandler : IHandler
             return;
         }
 
-        SiegeEngineConstructionProgress siegeProgress;
-        objectManager.TryGetObject(payload.What.SiegeConstructionProgressId, out siegeProgress);
-
         var newSiegeEnginesContainer = ObjectHelper.SkipConstructor<SiegeEnginesContainer>();
 
-        // TODO change setting to constructor patch
-        AccessTools.Field(typeof(SiegeEnginesContainer), nameof(SiegeEnginesContainer.SiegePreparations)).SetValue(newSiegeEnginesContainer, siegeProgress);
+        if (payload.What.SiegeConstructionProgressId != null)
+        {
+            SiegeEngineConstructionProgress siegeProgress;
+            objectManager.TryGetObject(payload.What.SiegeConstructionProgressId, out siegeProgress);
+            AccessTools.Field(typeof(SiegeEnginesContainer), nameof(SiegeEnginesContainer.SiegePreparations)).SetValue(newSiegeEnginesContainer, siegeProgress);
+        }
 
         objectManager.AddExisting(payload.What.SiegeEnginesId, newSiegeEnginesContainer);
     }

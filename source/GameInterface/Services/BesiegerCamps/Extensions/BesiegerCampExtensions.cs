@@ -15,6 +15,8 @@ namespace GameInterface.Services.BesiegerCamps.Extensions
     {
         public static string TryGetId(object value, ILogger logger)
         {
+            if (value == null) return null;
+
             // temp fix for SiegeStrategy not being registered
             if (value is SiegeStrategy siegeStrategy)
             {
