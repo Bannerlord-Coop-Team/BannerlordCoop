@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Coop.Core": {
+      "commandName": "Project",
+      "nativeDebugging": false
+    }
+  }
+}

@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Equipments.Data;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Equipments.Messages.Events;

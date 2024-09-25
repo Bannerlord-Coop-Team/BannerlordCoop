@@ -74,6 +74,8 @@ public class GameLoopRunner : IUpdateable
         }
         else
         {
+            // Crashed here once after "Wait in Village" bug
+
             EventWaitHandle ewh = blocking ?
                 new EventWaitHandle(false, EventResetMode.ManualReset) :
                 null;

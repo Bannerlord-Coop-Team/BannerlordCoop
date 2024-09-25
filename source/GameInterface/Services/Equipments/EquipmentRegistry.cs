@@ -1,14 +1,11 @@
 ﻿using GameInterface.Services.Registry;
 using System;
-using TaleWorlds.CampaignSystem.Settlements.Workshops;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
 
-namespace GameInterface.Services.Sieges;
+namespace GameInterface.Services.Equipments;
 
 /// <summary>
 /// Registry for <see cref="Equipment"/> objects
@@ -25,11 +22,17 @@ internal class EquipmentRegistry : RegistryBase<Equipment> {
             Logger.Error("Unable to register objects when CampaignObjectManager is null");
             return;
         }
-        var characters = objectManager.GetObjectTypeList<CharacterObject>();
-        foreach (var character in characters)
+
+        // Not sure if this can be skipped since due constructor patching all equipment will already be registered.
+        foreach (var equipmentRoster in Campaign.Current.AllEquipmentRosters)
         {
-            foreach (Equipment equipment in character.AllEquipments)
+            if (equipmentRoster == null) continue;
+            foreach (Equipment equipment in equipmentRoster.AllEquipments)
             {
+                if (TryGetId(equipment, out _)) {
+
+                    continue;
+                }
                 RegisterNewObject(equipment, out var _);
             }
         }
