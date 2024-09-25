@@ -60,6 +60,18 @@ internal class BesiegerCampPropertyHandler : IHandler
         });
     }
 
+    private void HandleDataChanged(BesiegerCamp instance, NetworkBesiegerCampChangeProperty data)
+    {
+        var propInfo = typeof(BesiegerCamp).GetProperty(data.propertyName);
+        if (propInfo == null)
+        {
+            Logger.Error("Unable to find property with name {propName} on type: {type}", data.propertyName, typeof(BesiegerCamp));
+            return;
+        }
+        object newValue = ResolvePropertyValue(data, propInfo);
+        propInfo.SetValue(instance, newValue);
+    }
+
     private object ResolvePropertyValue(NetworkBesiegerCampChangeProperty data, PropertyInfo propInfo)
     {
         object obj;
@@ -91,44 +103,10 @@ internal class BesiegerCampPropertyHandler : IHandler
         return obj;
     }
 
-    private void HandleDataChanged(BesiegerCamp instance, NetworkBesiegerCampChangeProperty data)
-    {
-        var propInfo = typeof(BesiegerCamp).GetProperty(data.propertyName);
-        if (propInfo == null)
-        {
-            Logger.Error("Unable to find property with name {propName} on type: {type}", data.propertyName, typeof(BesiegerCamp));
-            return;
-        }
-        object newValue = ResolvePropertyValue(data, propInfo);
-        propInfo.SetValue(instance, newValue);
-    }
-
     public void Dispose()
     {
         messageBroker.Unsubscribe<BesiegerCampPropertyChanged>(Handle_PropertyChanged);
         messageBroker.Unsubscribe<NetworkBesiegerCampChangeProperty>(Handle_ChangeProperty);
     }
 
-    //private void Handle(MessagePayload<BesiegerCampSiegeEventChanged> payload)
-    //{
-    //    if (objectManager.TryGetId(payload.What.BesiegerCamp, out var besiegerCampId) == false) return;
-    //    if (objectManager.TryGetId(payload.What.SiegeEvent, out var siegeEventId) == false) return;
-
-    //    network.SendAll(new NetworkChangeBesiegerCampSiegeEvent(besiegerCampId, siegeEventId));
-    //}
-
-    //private void Handle(MessagePayload<NetworkChangeBesiegerCampSiegeEvent> payload)
-    //{
-    //    if (objectManager.TryGetObject<BesiegerCamp>(payload.What.BesiegerCampId, out var besiegerCamp) == false) return;
-    //    if (objectManager.TryGetObject<SiegeEvent>(payload.What.SiegeEventId, out var siegeEvent) == false) return;
-
-    //    GameLoopRunner.RunOnMainThread(() =>
-    //    {
-    //        using (new AllowedThread())
-    //        {
-    //            besiegerCamp.SiegeEvent = siegeEvent;
-    //        }
-    //    });
-
-    //}
 }

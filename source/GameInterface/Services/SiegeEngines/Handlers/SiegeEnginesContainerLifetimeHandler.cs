@@ -40,7 +40,6 @@ internal class SiegeEnginesContainerLifetimeHandler : IHandler
         var siegeProgressInstance = payload.What.SiegeEngineConstructionProgressInstance;
 
         var constructionProgressId = TryGetId(siegeProgressInstance, Logger);
-
         objectManager.AddNewObject(siegeEnginesInstance, out var id);
 
         network.SendAll(new NetworkCreateSiegeEnginesContainer(id, constructionProgressId));
@@ -56,6 +55,7 @@ internal class SiegeEnginesContainerLifetimeHandler : IHandler
 
         var newSiegeEnginesContainer = ObjectHelper.SkipConstructor<SiegeEnginesContainer>();
 
+        // attach SiegeConstructionProgress to SiegeEngine 
         if (payload.What.SiegeConstructionProgressId != null)
         {
             SiegeEngineConstructionProgress siegeProgress;

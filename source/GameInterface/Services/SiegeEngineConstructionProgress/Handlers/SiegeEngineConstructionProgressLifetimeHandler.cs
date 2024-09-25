@@ -43,9 +43,6 @@ internal class SiegeEngineConstructionProgressLifetimeHandler : IHandler
     {
         var newSiegeEngineConstructionProgress = ObjectHelper.SkipConstructor<SiegeEngineConstructionProgress>();
 
-        // TODO change setting to constructor patch
-        //AccessTools.Field(typeof(SiegeEngineConstructionProgress), nameof(SiegeEngineConstructionProgress._besiegerParties)).SetValue(newSiegeEngineConstructionProgress, new MBList<MobileParty>());
-
         objectManager.AddExisting(payload.What.Id, newSiegeEngineConstructionProgress);
     }
 }

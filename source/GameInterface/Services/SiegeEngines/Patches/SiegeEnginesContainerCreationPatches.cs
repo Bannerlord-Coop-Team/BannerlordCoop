@@ -30,36 +30,6 @@ internal class SiegeEnginesContainerCreationPatches
         var siegeEnginesCreateMessage = new SiegeEnginesContainerCreated(__instance, siegePreparations);
         MessageBroker.Instance.Publish(__instance, siegeEnginesCreateMessage);
 
-        //var siegePreparationsCreationMessage = new SiegeEngineConstructionProgressCreated(siegePreparations);
-        //MessageBroker.Instance.Publish(siegePreparations, siegePreparationsCreationMessage);
-
         return true; // Continue with the original constructor
     }
 }
-
-//[HarmonyPatch]
-//internal class SiegeEnginesContainerCreationPatches
-//{
-//    static readonly ILogger Logger = LogManager.GetLogger<SiegeEnginesContainerCreationPatches>();
-
-//    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(SiegeEnginesContainer));
-
-//    static bool Prefix(ref SiegeEnginesContainer __instance)
-//    {
-//        // Call original if we call this function
-//        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-//        if (ModInformation.IsClient)
-//        {
-//            Logger.Error("Client created unmanaged {name}\n"
-//                + "Callstack: {callstack}", typeof(SiegeEnginesContainer), Environment.StackTrace);
-//            return true;
-//        }
-
-//        var message = new SiegeEnginesContainerCreated(__instance);
-
-//        MessageBroker.Instance.Publish(__instance, message);
-
-//        return true;
-//    }
-//}

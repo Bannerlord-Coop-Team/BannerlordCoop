@@ -36,57 +36,12 @@ namespace GameInterface.Services.BesiegerCamps.Patches
             return HandlePropertySet(__instance, nameof(BesiegerCamp.SiegeStrategy), value);
         }
 
-        //[HarmonyPatch(nameof(BesiegerCamp.BattleSide), MethodType.Setter)]
-        //[HarmonyPrefix]
-        //private static bool SetBattleSidePrefix(BesiegerCamp __instance, BattleSideEnum value)
-        //{
-        //    return HandlePropertySet(__instance, nameof(BesiegerCamp.BattleSide), value);
-        //}
-
-        //[HarmonyPatch(nameof(BesiegerCamp.IsReadyToBesiege), MethodType.Setter)]
-        //[HarmonyPrefix]
-        //private static bool SetIsReadyToBesiegePrefix(BesiegerCamp __instance, bool value)
-        //{
-        //    return HandlePropertySet(__instance, nameof(BesiegerCamp.IsReadyToBesiege), value);
-        //}
-
         [HarmonyPatch(nameof(BesiegerCamp.NumberOfTroopsKilledOnSide), MethodType.Setter)]
         [HarmonyPrefix]
         private static bool SetNumberOfTroopsKilledOnSidePrefix(BesiegerCamp __instance, int value)
         {
             return HandlePropertySet(__instance, nameof(BesiegerCamp.NumberOfTroopsKilledOnSide), value);
         }
-
-        //private static bool TryGetTypeId<T>(T value, out string typeId)
-        //{
-        //    typeId = null;
-        //    if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-        //    {
-        //        Logger.Error("Unable to resolve {type}", typeof(IObjectManager).FullName);
-        //        return false;
-        //    }
-
-        //    if (typeof(T).IsClass)
-        //    {
-        //        if (!objectManager.TryGetId(value, out typeId))
-        //        {
-        //            Logger.Error("Unable to get ID for instance of type {type}", typeof(T).FullName);
-        //            return false;
-        //        }
-        //        return true;
-        //    }
-
-        //    typeId = value.ToString(); // is this ok?
-        //    return true;
-        //}
-
-        //string Serialize<T>(T obj) where T: struct
-        //{
-        //}
-
-        //T Deserialize<T>(T obj) where T: struct
-        //{
-        //}
 
         private static bool HandlePropertySet<T>(BesiegerCamp instance, string propName, T value)
         {
@@ -100,8 +55,6 @@ namespace GameInterface.Services.BesiegerCamps.Patches
                     + "Callstack: {callstack}", propInfo.Name, Environment.StackTrace);
                 return false;
             }
-
-            //if (!TryGetTypeId<T>(value, out string typeId)) return false;
 
             var message = new BesiegerCampPropertyChanged(propInfo, instance, value);
             MessageBroker.Instance.Publish(instance, message);

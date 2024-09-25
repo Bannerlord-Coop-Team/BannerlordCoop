@@ -35,8 +35,6 @@ namespace GameInterface.Services.SiegeEngineConstructionProgresss.Patches
                 return false;
             }
 
-            //if (!TryGetTypeId<T>(value, out string typeId)) return false;
-
             var message = new SiegeEngineConstructionProgressPropertyChanged(propInfo, instance, value);
             MessageBroker.Instance.Publish(instance, message);
 
