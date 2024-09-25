@@ -13,5 +13,6 @@ internal class MobilePartySync : IAutoSync
     {
         // Sync a property
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Ai)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Party)));
     }
 }

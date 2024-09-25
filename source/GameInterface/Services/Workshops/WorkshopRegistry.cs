@@ -1,17 +1,15 @@
 ﻿using GameInterface.Services.Registry;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using TaleWorlds.CampaignSystem;
+using System.Threading;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
-using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Workshops
 {
     internal class WorkshopRegistry : RegistryBase<Workshop>
     {
+        private const string WorkshopIdPrefix = "CoopWorkshop";
+        private static int InstanceCounter = 0;
         public WorkshopRegistry(IRegistryCollection collection) : base(collection) { }
 
         public override void RegisterAll()
@@ -37,7 +35,7 @@ namespace GameInterface.Services.Workshops
 
         protected override string GetNewId(Workshop shop)
         {
-            return Guid.NewGuid().ToString();
+            return $"{WorkshopIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
         }
     }
 }

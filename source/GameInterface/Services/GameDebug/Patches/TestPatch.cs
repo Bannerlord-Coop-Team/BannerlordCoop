@@ -16,12 +16,14 @@ class TestPatch
     static ILogger Logger = LogManager.GetLogger<TestPatch>();
     static object _lock = new object();
 
-    [HarmonyPatch(nameof(MobileParty.InitializeCachedPartyVariables))]
-    [HarmonyPrefix]
+    //[HarmonyPatch(nameof(MobileParty.InitializeCachedPartyVariables))]
+    //[HarmonyPrefix]
     static bool ParallelInitializeCachedPartyVariablesPrefix(MobileParty __instance, ref CachedPartyVariables variables)
     {
         try
         {
+            if (__instance.Party == null) return false;
+
             variables.HasMapEvent = __instance.MapEvent != null;
             variables.CurrentPosition = __instance.Position2D;
             variables.TargetPartyPositionAtFrameStart = Vec2.Invalid;

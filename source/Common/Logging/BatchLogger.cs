@@ -48,13 +48,13 @@ public sealed class BatchLogger : IDisposable
 		if (LogMap.Count == 0) return;
 
         var stringBuilder = new StringBuilder();
-		stringBuilder.AppendLine($"Batch Logged messaged (every {pollInterval.Seconds} seconds)");
+		stringBuilder.AppendLine($"Batch Logged messaged (every {dt.Seconds} seconds)");
 
         foreach (var messageName in LogMap.Keys)
 		{
 			if (LogMap.TryRemove(messageName, out var count) && count > 0)
 			{
-                stringBuilder.AppendLine($"\t{messageName}: {count} messages per {pollInterval.Seconds} second(s)");
+                stringBuilder.AppendLine($"\t{messageName}: {count} messages per {dt.Seconds} second(s)");
             }
 		}
 
