@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using Helpers;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.CraftingService.Patches
 {
