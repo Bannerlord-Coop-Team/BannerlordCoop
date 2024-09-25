@@ -4,6 +4,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.Siege;
@@ -33,6 +34,8 @@ internal class GameObjectCreator
         { typeof(SiegeEvent), new SiegeEventBuilder() },
         { typeof(Workshop), new WorkshopBuilder() },
         { typeof(WorkshopType), new WorkshopTypeBuilder() },
+        { typeof(MilitiaPartyComponent), new MilitiaPartyComponentBuilder() },
+        { typeof(ItemRoster), new ItemRosterBuilder() },
     };
 
     public static T CreateInitializedObject<T>()

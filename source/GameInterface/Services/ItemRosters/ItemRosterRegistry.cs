@@ -1,6 +1,5 @@
 ﻿using GameInterface.Services.Registry;
 using System.Threading;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -14,6 +13,10 @@ namespace GameInterface.Services.ItemRosters
 
         public override void RegisterAll()
         {
+            foreach(Settlement settlement in Settlement.All)
+            {
+                RegisterNewObject(settlement, out _);
+            }
         }
 
         protected override string GetNewId(ItemRoster itemRoster)

@@ -46,7 +46,7 @@ namespace GameInterface.Services.Settlements.Patches
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
             autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(KingdomManager), nameof(KingdomManager.UpdateLordPartyVariablesRelatedToSettlements)));
 
-            //Stash (TODO)
+            //Stash
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash)));
 
             //Town
