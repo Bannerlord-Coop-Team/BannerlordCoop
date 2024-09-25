@@ -25,16 +25,16 @@ namespace E2E.Tests.Services.CultureObjects
 
             // Act
             string? cultureId = null;
+            CultureObject? culture = null;
 
             server.Call(() =>
             {
                 CultureObject cultureObject = new CultureObject();
 
-                Assert.True(server.ObjectManager.TryGetId(cultureObject, out cultureId));
-            });
+                cultureId = cultureObject.StringId;
 
-            // Assert
-            Assert.True(server.ObjectManager.TryGetObject<CultureObject>(cultureId, out var _));
+                Assert.True(server.ObjectManager.TryGetObject(cultureId, out CultureObject culture));
+            });
 
             foreach (var client in TestEnvironment.Clients)
             {

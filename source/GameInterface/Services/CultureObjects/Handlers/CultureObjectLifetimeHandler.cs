@@ -51,7 +51,7 @@ namespace GameInterface.Services.BasicCultureObjects.Handlers
 
             if(objectManager.AddExisting(payload.CultureObjectId, newCultureObject) == false)
             {
-                Logger.Error("Failed to add {type} to manager with id {id}", typeof(CraftingTemplate), payload.CultureObjectId);
+                Logger.Error("Failed to add {type} to manager with id {id}", typeof(CultureObject), payload.CultureObjectId);
                 return;
             }
         }
