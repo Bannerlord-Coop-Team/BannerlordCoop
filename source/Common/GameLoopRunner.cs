@@ -74,13 +74,14 @@ public class GameLoopRunner : IUpdateable
         }
         else
         {
-            // Crashed here once after "Wait in Village" bug
+            
 
             EventWaitHandle ewh = blocking ?
                 new EventWaitHandle(false, EventResetMode.ManualReset) :
                 null;
             lock (Instance.m_QueueLock)
             {
+                // Crashed here once after "Wait in Village" bug or after entering many villages in a row and leaving again (Called from GameloopRunner.RunOnMainThread in MobilePropertyHandler)
                 Instance.m_Queue.Enqueue((action, ewh));
             }
 

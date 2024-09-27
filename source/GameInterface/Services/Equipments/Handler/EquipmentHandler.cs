@@ -86,22 +86,28 @@ namespace GameInterface.Services.Equipments.Handlers
             {
                 using (new AllowedThread())
                 {
+                    // TODO: Add skip constructor logic and auto sync equipment type
+
                     Equipment Equipment = null;
+
                     if (propertyEquipment != null)
                     {
-                        Equipment = new Equipment(propertyEquipment);
+                        Equipment = ObjectHelper.SkipConstructor<Equipment>();
+                            //Equipment = new Equipment(propertyEquipment);
                     }
-                    else if(payload.IsCivil != null)
+                    else if (payload.IsCivil != null)
                     {
-                        Equipment = new Equipment();
-                        Equipment._equipmentType = ((bool)payload.IsCivil ? Equipment.EquipmentType.Civilian : Equipment.EquipmentType.Battle);
+                            //Equipment = new Equipment((bool)payload.IsCivil);
+                        Equipment = ObjectHelper.SkipConstructor<Equipment>();
+                            //Equipment._equipmentType = ((bool)payload.IsCivil ? Equipment.EquipmentType.Civilian : Equipment.EquipmentType.Battle);
                     }
                     else
                     {
-                        Equipment = new Equipment();
+                            //Equipment = new Equipment();
+                        Equipment = ObjectHelper.SkipConstructor<Equipment>();
                     }
                     objectManager.AddExisting(payload.EquipmentId, Equipment);
-                }
+                 }
             });
         }
     }

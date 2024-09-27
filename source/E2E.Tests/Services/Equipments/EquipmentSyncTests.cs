@@ -7,13 +7,15 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using GameInterface.Services.ObjectManager;
 using Xunit.Sdk;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace E2E.Tests.Services.Equipments;
 
-public class EquipmentCreationTests : IDisposable
+public class EquipmentSyncTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
-    public EquipmentCreationTests(ITestOutputHelper output)
+    public EquipmentSyncTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
@@ -29,11 +31,12 @@ public class EquipmentCreationTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        // Act
         string? EquipmentId = null;
         string? EquipmentWithEquipParamId = null;
         string? civilEquipmentId = null;
         Equipment? parameter = null;
+
+        // Act
 
         server.Call(() =>
         {
@@ -82,7 +85,7 @@ public class EquipmentCreationTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
-        // Act
+
         string? EquipmentId = null;
         string? EquipmentWithEquipParamId = null;
         string? EquipmentWithExistingEquipId = null;
@@ -92,12 +95,16 @@ public class EquipmentCreationTests : IDisposable
         server.Call(() =>
         {
             ServerEquip = new Equipment();
-            server.ObjectManager.TryGetId(ServerEquip, out EquipmentWithExistingEquipId);
+            server.ObjectManager.TryGetId(ServerEquip, out EquipmentWithExistingEquipId); // for Equipment(Equipment equipment) test in client1.call
         });
+
+        // Act
+
 
         client1.Call(() =>
         {
-            var Equip = new Equipment();
+            Equipment Equip = new Equipment();
+            Assert.False(server.ObjectManager.TryGetId(Equip, out EquipmentId));
 
             // Equipment(bool IsCivil) 
             bool isCivil = true;
@@ -108,8 +115,10 @@ public class EquipmentCreationTests : IDisposable
             var EquipWithEquipParam = new Equipment(Equip);
             Assert.False(server.ObjectManager.TryGetId(EquipWithEquipParam, out EquipmentWithEquipParamId));
 
-            
+
             client1.ObjectManager.TryGetObject<Equipment>(EquipmentWithExistingEquipId, out var EquipParam);
+
+            // For this test to pass requires working server-side syncing
             var EquipWithExistingEquip = new Equipment(EquipParam);
             Assert.False(server.ObjectManager.TryGetId(EquipWithExistingEquip, out EquipmentWithExistingEquipId));
 
@@ -129,5 +138,39 @@ public class EquipmentCreationTests : IDisposable
             Assert.False(client.ObjectManager.TryGetObject<Equipment>(EquipmentWithExistingEquipId, out var _));
 
         }
+    }
+
+    [Fact]
+    public void Server_EquipmentType() {
+
+        // Arrange
+        var server = TestEnvironment.Server;
+
+        var Equipment = new Equipment();
+
+        Assert.True(server.ObjectManager.AddNewObject(Equipment, out string EquipmentId));
+
+        var field = AccessTools.Field(typeof(Equipment), nameof(Equipment._equipmentType));
+
+
+        // Get field intercept to use on the server to simulate the field changing
+        var intercept = TestEnvironment.GetIntercept(field);
+
+
+        Equipment.EquipmentType equipmentType = Equipment.EquipmentType.Civilian;
+
+        // Act
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var equipment));
+
+            Assert.NotEqual(equipment._equipmentType, equipmentType);
+
+            // Simulate the field changing
+            intercept.Invoke(null, new object[] { equipment, equipmentType });
+
+            Assert.Equal(equipmentType, equipment._equipmentType);
+        });
+
     }
 }
