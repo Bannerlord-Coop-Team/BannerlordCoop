@@ -2,9 +2,9 @@
 <Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
     <StartAction>Program</StartAction>
-    <StartProgram>E:\Bannerlord COOP\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
+    <StartProgram>..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
     <StartArguments>/singleplayer /server _MODULES_%2aNative%2aSandBoxCore%2aSandBox%2aStoryMode%2aCoop%2a_MODULES_</StartArguments>
-    <StartWorkingDirectory>E:\Bannerlord COOP\mb2\bin\Win64_Shipping_Client\</StartWorkingDirectory>
+    <StartWorkingDirectory>..\..\..\..\mb2\bin\Win64_Shipping_Client\</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|AnyCPU'">
     <StartAction>Program</StartAction>

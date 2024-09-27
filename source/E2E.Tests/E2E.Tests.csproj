@@ -10,10 +10,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Services\Equipments\EquipmentFieldTests.cs" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="Bannerlord.Lib.Harmony" Version="2.2.2" />
 	<PackageReference Include="Krafs.Publicizer" Version="2.2.1">
 		<PrivateAssets>all</PrivateAssets>
