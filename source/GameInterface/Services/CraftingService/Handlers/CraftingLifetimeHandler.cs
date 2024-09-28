@@ -47,7 +47,7 @@ namespace GameInterface.Services.CraftingService.Handlers
 
             CraftingCreatedData data = new(newCraftingId, 
                 payload.What.CraftingTemplate.StringId, 
-                payload.What.CultureObject.StringId, 
+                payload.What.CultureObject?.StringId, 
                 payload.What.TextObject.Value);
 
             NetworkCreateCrafting message = new(data);
