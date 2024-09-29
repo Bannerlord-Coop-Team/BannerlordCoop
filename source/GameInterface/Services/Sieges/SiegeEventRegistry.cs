@@ -25,6 +25,6 @@ internal class SiegeEventRegistry : RegistryBase<SiegeEvent>
 
     protected override string GetNewId(SiegeEvent party)
     {
-        return SeigeEventPrefix + Interlocked.Increment(ref InstanceCounter);
+        return $"{SeigeEventPrefix}_{ Interlocked.Increment(ref InstanceCounter)}";
     }
 }

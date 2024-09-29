@@ -1,5 +1,6 @@
 ﻿using GameInterface.Services.Registry;
 using System;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
@@ -11,6 +12,9 @@ namespace GameInterface.Services.Armies;
 /// </summary>
 internal class BuildingRegistry : RegistryBase<Building>
 {
+    private const string BuildingIdPrefix = "CoopBuilding";
+    private static int InstanceCounter = 0;
+
     public BuildingRegistry(IRegistryCollection collection) : base(collection) { }
 
     public override void RegisterAll()
@@ -21,13 +25,16 @@ internal class BuildingRegistry : RegistryBase<Building>
 
             foreach(Building building in settlement.Town.Buildings)
             {
-                RegisterNewObject(building, out var _);
+                if (RegisterNewObject(building, out var _) == false)
+                {
+                    Logger.Error($"Unable to register {building}");
+                }
             }
         }
     }
 
     protected override string GetNewId(Building obj)
     {
-        return Guid.NewGuid().ToString();
+        return $"{BuildingIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
     }
 }
