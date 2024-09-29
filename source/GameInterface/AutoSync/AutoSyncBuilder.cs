@@ -141,7 +141,6 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
     private void CreatePropertySync(ModuleBuilder moduleBuilder)
     {
-        // TODO finish
         var propertyMap = ConvertProperties();
 
         var types = propertyMap.Keys.ToArray();
@@ -154,7 +153,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
             foreach (var property in properties)
             {
                 var prefix = AccessTools.Method(patchType, $"{property.DeclaringType.Name}_{property.Name}_Prefix");
-                patchCollector.AddPrefix(property.GetSetMethod(), prefix);
+                patchCollector.AddPrefix(AccessTools.PropertySetter(property.DeclaringType, property.Name), prefix);
             }
         }
 
@@ -190,9 +189,17 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         interceptMap = interceptMap.ToDictionary(kvp => kvp.Key, kvp =>
         {
             var method = kvp.Value;
+
+            if (compiledType.Name.StartsWith(kvp.Key.DeclaringType.Name) == false) return kvp.Value;
+
             var genericParams = method.IsGenericMethod ? method.GetGenericArguments() : null;
             var actualMethod = AccessTools.Method(compiledType, method.Name, method.GetParameters().Select(p => p.ParameterType).ToArray(), genericParams);
 
+            if (actualMethod == null)
+            {
+                throw new NullReferenceException($"Failed to get {method.Name} from compiled class");
+            } 
+            
             return actualMethod;
         });
     }

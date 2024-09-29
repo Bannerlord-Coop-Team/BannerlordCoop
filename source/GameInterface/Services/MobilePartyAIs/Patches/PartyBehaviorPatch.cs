@@ -1,10 +1,11 @@
-﻿using Common.Extensions;
+﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using SandBox.View.Map;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,6 +25,8 @@ namespace GameInterface.Services.MobilePartyAIs.Patches;
 [HarmonyPatch(typeof(MobilePartyAi))]
 static class PartyBehaviorPatch
 {
+
+    static readonly ILogger Logger = LogManager.GetLogger<MobilePartyAi>();
 
     /// <summary>
     /// This prevents the tick method being called without the need for an update
@@ -92,6 +95,14 @@ static class PartyBehaviorPatch
     public static void SetAiBehavior(
         MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint)
     {
+        if (partyAi == null)
+        {
+            var callStack = Environment.StackTrace;
+
+            Logger.Error("PartyAI was null\n{stacktrace}", callStack);
+            return;
+        }
+
         partyAi.DefaultBehavior = newBehavior;
 
         var mobileParty = partyAi._mobileParty;

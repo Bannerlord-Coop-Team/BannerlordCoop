@@ -1,7 +1,7 @@
 ﻿using ProtoBuf;
 using TaleWorlds.Library;
 
-namespace Coop.Core.Surrogates;
+namespace GameInterface.Surrogates;
 
 [ProtoContract]
 internal struct Vec2Surrogate
