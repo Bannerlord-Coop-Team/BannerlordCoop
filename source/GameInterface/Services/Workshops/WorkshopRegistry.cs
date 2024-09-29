@@ -8,8 +8,9 @@ namespace GameInterface.Services.Workshops
 {
     internal class WorkshopRegistry : RegistryBase<Workshop>
     {
-        private const string WorkshopIdPrefix = "CoopWorkshop";
+        private const string WorkshopTypePrefix = $"Coop{nameof(Workshop)}";
         private static int InstanceCounter = 0;
+
         public WorkshopRegistry(IRegistryCollection collection) : base(collection) { }
 
         public override void RegisterAll()
@@ -28,9 +29,7 @@ namespace GameInterface.Services.Workshops
                 {
                     RegisterNewObject(workshop, out var _);
                 }
-             
             }
-
         }
 
         protected override string GetNewId(Workshop shop)
