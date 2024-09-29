@@ -1,12 +1,15 @@
 ﻿using GameInterface.Services.Registry;
 using System;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem;
+using System.Threading;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.SettlementComponents;
 internal class SettlementComponentRegistry : RegistryBase<SettlementComponent>
 {
+    private const string SettlementComponentIdPrefix = "CoopSettlementComponent";
+    private static int InstanceCounter = 0;
+
     public override IEnumerable<Type> ManagedTypes { get; } = new Type[]
     {
         typeof(SettlementComponent),
@@ -37,6 +40,6 @@ internal class SettlementComponentRegistry : RegistryBase<SettlementComponent>
 
     protected override string GetNewId(SettlementComponent obj)
     {
-        return Guid.NewGuid().ToString();
+        return $"{SettlementComponentIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
     }
 }
