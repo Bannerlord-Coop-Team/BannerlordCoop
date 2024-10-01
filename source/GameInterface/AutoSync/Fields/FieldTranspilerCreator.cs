@@ -260,7 +260,6 @@ public class FieldTranspilerCreator
 
     private MethodBuilder CreateReset(TypeBuilder typeBuilder)
     {
-        // TODO
         var resetBuilder = typeBuilder.DefineMethod(nameof(IEnumerator<CodeInstruction>.Reset),
             MethodAttributes.Public | MethodAttributes.HideBySig | MethodAttributes.Virtual | MethodAttributes.Final | MethodAttributes.NewSlot,
             null,
@@ -360,6 +359,19 @@ public class FieldTranspilerCreator
             il.Emit(OpCodes.Call, AccessTools.Method(typeof(AccessTools), nameof(AccessTools.Method), new Type[] { typeof(Type), typeof(string), typeof(Type[]), typeof(Type[]) }));
 
             il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(CodeInstruction), new Type[] { typeof(OpCode), typeof(object) }));
+
+            // Store existing labels in new intercept
+            il.Emit(OpCodes.Dup);
+            il.Emit(OpCodes.Ldloc, currentLocal);
+            il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(CodeInstruction), nameof(CodeInstruction.labels)));
+            il.Emit(OpCodes.Stfld, AccessTools.Field(typeof(CodeInstruction), nameof(CodeInstruction.labels)));
+
+            // Store existing blocks in new intercept
+            il.Emit(OpCodes.Dup);
+            il.Emit(OpCodes.Ldloc, currentLocal);
+            il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(CodeInstruction), nameof(CodeInstruction.blocks)));
+            il.Emit(OpCodes.Stfld, AccessTools.Field(typeof(CodeInstruction), nameof(CodeInstruction.blocks)));
+
             il.Emit(OpCodes.Stloc, currentLocal);
 
             il.Emit(OpCodes.Ldarg_0);

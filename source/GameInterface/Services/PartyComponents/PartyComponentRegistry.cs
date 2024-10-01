@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
@@ -12,6 +13,9 @@ namespace GameInterface.Services.PartyComponents;
 /// </summary>
 internal class PartyComponentRegistry : RegistryBase<PartyComponent>
 {
+    private const string PartyComponentIdPrefix = "CoopPartyComponent";
+    private static int InstanceCounter = 0;
+
     public PartyComponentRegistry(IRegistryCollection collection) : base(collection) { }
 
     public override IEnumerable<Type> ManagedTypes { get; } = new Type[]
@@ -37,7 +41,8 @@ internal class PartyComponentRegistry : RegistryBase<PartyComponent>
 
     protected override string GetNewId(PartyComponent party)
     {
-        return Guid.NewGuid().ToString();
+        return $"{PartyComponentIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+
     }
 }
 

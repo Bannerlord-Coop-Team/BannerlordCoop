@@ -68,7 +68,9 @@ namespace Common.Messaging
                     continue;
                 }
 
-                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+                //Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+
+                weakDelegate.Invoke(new object[] { payload });
             }
         }
 
