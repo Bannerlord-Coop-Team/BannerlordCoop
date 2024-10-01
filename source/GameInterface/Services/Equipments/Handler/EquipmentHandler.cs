@@ -10,6 +10,8 @@ using Serilog;
 using TaleWorlds.Core;
 using System;
 using GameInterface.Services.Equipments.Data;
+using HarmonyLib;
+using System.Reflection;
 
 
 namespace GameInterface.Services.Equipments.Handlers
@@ -23,6 +25,9 @@ namespace GameInterface.Services.Equipments.Handlers
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
         private readonly ILogger Logger = LogManager.GetLogger<EquipmentHandler>();
+        private static readonly ConstructorInfo Equipment_ctor = AccessTools.Constructor(typeof(Equipment));
+        private static readonly ConstructorInfo EquipmentParam_ctor = AccessTools.Constructor(typeof(Equipment), new Type[] { typeof(Equipment) });
+        private static readonly ConstructorInfo EquipmentCivil_ctor = AccessTools.Constructor(typeof(Equipment), new Type[] { typeof(bool) });
 
         public EquipmentHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
         {
@@ -31,6 +36,7 @@ namespace GameInterface.Services.Equipments.Handlers
             this.network = network;
             messageBroker.Subscribe<EquipmentCreated>(Handle);
             messageBroker.Subscribe<NetworkCreateEquipment>(Handle);
+
         }
 
         public void Dispose()
@@ -82,31 +88,34 @@ namespace GameInterface.Services.Equipments.Handlers
                 }
             }
 
+            Equipment newEquipment = ObjectHelper.SkipConstructor<Equipment>();
             GameLoopRunner.RunOnMainThread(() =>
             {
                 using (new AllowedThread())
                 {
-                    // TODO: Add skip constructor logic and auto sync equipment type
-
-                    Equipment Equipment = null;
 
                     if (propertyEquipment != null)
                     {
-                        Equipment = ObjectHelper.SkipConstructor<Equipment>();
-                            //Equipment = new Equipment(propertyEquipment);
+                        using (new AllowedThread())
+                        {
+                            EquipmentParam_ctor.Invoke(newEquipment, new object[] { propertyEquipment });
+                        }
                     }
                     else if (payload.IsCivil != null)
                     {
-                            //Equipment = new Equipment((bool)payload.IsCivil);
-                        Equipment = ObjectHelper.SkipConstructor<Equipment>();
-                            //Equipment._equipmentType = ((bool)payload.IsCivil ? Equipment.EquipmentType.Civilian : Equipment.EquipmentType.Battle);
+                        using (new AllowedThread())
+                        {
+                            EquipmentCivil_ctor.Invoke(newEquipment, new object[] { payload.IsCivil });
+                        }
                     }
                     else
                     {
-                            //Equipment = new Equipment();
-                        Equipment = ObjectHelper.SkipConstructor<Equipment>();
+                        using (new AllowedThread())
+                        {
+                            Equipment_ctor.Invoke(newEquipment, Array.Empty<object>());
+                        }
                     }
-                    objectManager.AddExisting(payload.EquipmentId, Equipment);
+                    objectManager.AddExisting(payload.EquipmentId, newEquipment);
                  }
             });
         }
