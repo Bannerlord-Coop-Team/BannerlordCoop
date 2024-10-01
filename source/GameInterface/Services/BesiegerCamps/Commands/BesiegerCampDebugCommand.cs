@@ -1,8 +1,10 @@
 ﻿using Autofac;
 using GameInterface.Services.ObjectManager;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
@@ -138,5 +140,42 @@ public class BesiegerCampDebugCommand
         besiegerCamp.SiegeStrategy = siegeStrategy;
 
         return $"SiegeStrategy for BesiegerCamp {besiegerCampId} has been set to: {siegeStrategy.StringId}";
+    }
+
+    // coop.debug.besiegerCamp.set_leader_party
+    /// <summary>
+    /// Sets the leader party field of a specific besieger camp.
+    /// </summary>
+    /// <param name="args">besiegerCampId and the partyId to set</param>
+    /// <returns>information if it changed</returns>
+    [CommandLineArgumentFunction("set_leader_party", "coop.debug.besiegerCamp")]
+    public static string SetBesiegerCampLeaderParty(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.besiegerCamp.set_leader_party <besiegerCampId> <partyId> ";
+        }
+
+        string besiegerCampId = args[0];
+        string partyId = args[1];
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (objectManager.TryGetObject(besiegerCampId, out BesiegerCamp camp) == false)
+        {
+            return $"{nameof(BesiegerCamp)} with ID: '{besiegerCampId}' not found";
+        }
+
+        if (objectManager.TryGetObject(partyId, out MobileParty party) == false)
+        {
+            return $"{nameof(MobileParty)} with ID: '{partyId}' not found";
+        }
+
+        AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty)).SetValue(camp, party);
+
+        return $"{nameof(BesiegerCamp._leaderParty)} has changed to: {camp._leaderParty.Name} party with ID: {camp._leaderParty.StringId}";
     }
 }
