@@ -22,7 +22,7 @@ namespace GameInterface.Services.Settlements.Patches
     /// </summary>
     [HarmonyPatch(typeof(ChangeOwnerOfSettlementAction), "ApplyInternal")]
     public class ChangeOwnerOfSettlementPatch
-    {    
+    {
         public static bool Prefix(Settlement settlement, Hero newOwner, Hero capturerHero, ChangeOwnerOfSettlementDetail detail)
         {
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -41,8 +41,7 @@ namespace GameInterface.Services.Settlements.Patches
                 {
                     ChangeOwnerOfSettlementAction.ApplyInternal(settlement, newOwner, capturerHero, detail);
                 }
-            });
+            }, true);
         }
-    
     }
 }

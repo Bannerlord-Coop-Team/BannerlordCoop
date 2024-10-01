@@ -24,11 +24,14 @@ namespace GameInterface.Services.MobileParties.Patches;
 /// <summary>
 /// Patches for lifecycle of <see cref="MobileParty"/> objects.
 /// </summary>
+ 
+// TODO fix patch
 [HarmonyPatch(typeof(MobileParty))]
 internal class PartyLifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroLifetimePatches>();
 
+    
     [HarmonyPatch(typeof(MobileParty), MethodType.Constructor)]
     private static bool Prefix(ref MobileParty __instance)
     {

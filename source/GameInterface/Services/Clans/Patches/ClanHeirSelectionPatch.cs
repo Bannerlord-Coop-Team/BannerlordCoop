@@ -89,7 +89,7 @@ namespace GameInterface.Services.Clans.Patches
                 ChangePlayerCharacterAction.Apply(heir);
                 Campaign.Current.TimeControlMode = CampaignTimeControlMode.Stop;
 
-            }, true);
+            });
         }
         private static void TransferCaravanOwnerships(Hero newLeader, Clan playerClan)
         {

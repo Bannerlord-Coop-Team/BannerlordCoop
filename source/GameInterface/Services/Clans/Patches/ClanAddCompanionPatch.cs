@@ -28,7 +28,7 @@ namespace GameInterface.Services.Clans.Patches
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
-                using (new AllowedThread())
+                using(new AllowedThread())
                 {
                     AddCompanionAction.Apply(clan, companion);
                 }

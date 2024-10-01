@@ -21,6 +21,8 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -133,7 +135,13 @@ internal class HeroInterface : IHeroInterface
         {
             Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
 
-            ChangePlayerCharacterAction.Apply(resolvedHero);
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                ChangePlayerCharacterAction.Apply(resolvedHero);
+                Campaign.Current.MainParty = resolvedHero.PartyBelongedTo;
+
+                Campaign.Current.PlayerDefaultFaction = resolvedHero.Clan;
+            });
         }
         else
         {
@@ -179,6 +187,11 @@ internal class HeroInterface : IHeroInterface
         var party = hero.PartyBelongedTo;
         party.IsVisible = true;
         party.Party.SetVisualAsDirty();
+
+        party.MemberRoster.VersionNo = 1;
+        party.PrisonRoster.VersionNo = 1;
+        party.MemberRoster._troopRosterElements = new MBList<TroopRosterElement>();
+        party.PrisonRoster._troopRosterElements = new MBList<TroopRosterElement>();
 
         party.RecoverPositionsForNavMeshUpdate();
         party.CurrentNavigationFace = Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D);

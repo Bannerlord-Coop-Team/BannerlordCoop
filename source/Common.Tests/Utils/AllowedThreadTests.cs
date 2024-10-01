@@ -2,7 +2,7 @@
 
 namespace Common.Tests.Utils
 {
-    public class AllowedInstanceTests
+    public class AllowedThreadTests
     {
         [Fact]
         public void AllowedInstance_DoesNotAllowChange()

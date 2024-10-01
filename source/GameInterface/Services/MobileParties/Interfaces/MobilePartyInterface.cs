@@ -1,10 +1,12 @@
 ﻿using Common;
+using Common.Extensions;
 using Common.Logging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
@@ -87,6 +89,9 @@ internal class MobilePartyInterface : IMobilePartyInterface
 
     public void StartPlayerSettlementEncounter(string partyId, string settlementId)
     {
+        // If player is already in an encounter we can skip
+        if (PlayerEncounter.Current is not null) return;
+
         if (objectManager.TryGetObject(partyId, out MobileParty mobileParty) == false)
         {
             Logger.Error("PartyId not found: {id}", partyId);
@@ -105,9 +110,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
             Logger.Error("Settlement {settlementName} did not have a party value", settlement.Name);
             return;
         }
-
-        if (PlayerEncounter.Current is not null) return;
-
+        
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())

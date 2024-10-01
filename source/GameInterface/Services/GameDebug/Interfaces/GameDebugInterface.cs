@@ -62,7 +62,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
 
         public void ShowAllParties()
         {
-            PartyVisibilityPatch.AllPartiesVisible = true;
+            //PartyVisibilityPatch.AllPartiesVisible = true;
 
             GameLoopRunner.RunOnMainThread(() =>
             {

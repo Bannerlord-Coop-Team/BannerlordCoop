@@ -50,6 +50,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance.IsPregnant = data.IsPregnant;
         }
@@ -60,10 +61,12 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             if (objectManager.TryGetObject<Settlement>(data.SettlementStringId, out var settlement) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.SettlementStringId);
+                return;
             }
             instance._homeSettlement = settlement;
         }
@@ -74,11 +77,13 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             //Add CultureObject to objectManager?
             if (objectManager.TryGetObject<CultureObject>(data.CultureStringId, out var culture) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance.Culture = culture;
         }
@@ -89,6 +94,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance._power = data.Power;
         }
@@ -99,6 +105,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance._birthDay = new CampaignTime(data.BirthDay);
         }
@@ -109,6 +116,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance._defaultAge = data.Age;
         }
@@ -119,6 +127,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance.SpcDaysInLocation = data.Days;
         }
@@ -129,6 +138,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance.Level = data.HeroLevel;
         }
@@ -139,6 +149,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance._heroState = (Hero.CharacterStates)data.HeroState;
         }
@@ -148,6 +159,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance.TattooTags = data.TattooTags;
         }
@@ -158,6 +170,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance.BeardTags = data.BeardTags;
         }
@@ -168,6 +181,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance.HairTags = data.HairTags;
         }
@@ -178,6 +192,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance._name = new TextObject(data.NewName);
         }
@@ -188,6 +203,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             instance._firstName = new TextObject(data.NewName);
         }
@@ -197,10 +213,12 @@ namespace GameInterface.Services.Heroes.Handlers
             if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
             if (objectManager.TryGetObject<CharacterObject>(data.CharacterObjectId, out var character) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(CharacterObject), data.CharacterObjectId);
+                return;
             }
 
             instance._characterObject = character;
@@ -211,6 +229,7 @@ namespace GameInterface.Services.Heroes.Handlers
             if(objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
             }
 
             instance.LastTimeStampForActivity = data.LastTimeStamp;

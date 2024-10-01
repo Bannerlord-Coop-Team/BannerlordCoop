@@ -31,7 +31,7 @@ namespace GameInterface.Services.Clans.Patches
         {
             GameLoopRunner.RunOnMainThread(() =>
             {
-                using (new AllowedThread())
+                using(new AllowedThread())
                 {
                     ChangeKingdomAction.ApplyInternal(clan, newKingdom, detail, awardMultiplier, byRebellion, showNotification);
                 }
