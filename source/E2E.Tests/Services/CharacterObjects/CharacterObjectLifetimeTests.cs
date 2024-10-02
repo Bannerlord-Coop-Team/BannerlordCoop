@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
@@ -14,23 +15,9 @@ namespace E2E.Tests.Services.CharacterObjects
     {
         E2ETestEnvironment TestEnvironment { get; }
 
-        private readonly string CharacterObjectId;
-
         public CharacterObjectLifetimeTests(ITestOutputHelper output)
         {
             TestEnvironment = new E2ETestEnvironment(output);
-
-            var characterObject = new CharacterObject();
-
-            //Create object on server
-            Assert.True(TestEnvironment.Server.ObjectManager.AddNewObject(characterObject, out CharacterObjectId));
-
-            // Create object on all clients
-            foreach (var client in TestEnvironment.Clients)
-            {
-                var client_characterObject = new CharacterObject();
-                Assert.True(client.ObjectManager.AddExisting(CharacterObjectId, client_characterObject));
-            }
         }
 
         public void Dispose()
@@ -40,31 +27,50 @@ namespace E2E.Tests.Services.CharacterObjects
 
         [Fact]
         public void ServerCreateCharacterObject_SyncAllClients()
-        {
+        { 
+            // Arrange
             var server = TestEnvironment.Server;
 
+            // Act
+            string? characterId = null;
             server.Call(() =>
             {
-                Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(CharacterObjectId, out var _));            
+                var characterObject = new CharacterObject();
+                Assert.True(server.ObjectManager.TryGetId(characterObject, out characterId));
             });
 
-            foreach(var client in TestEnvironment.Clients)
+            // Assert
+            Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(characterId, out var _));
+
+            foreach (var client in TestEnvironment.Clients)
             {
-                Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(CharacterObjectId, out var _));
+                Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(characterId, out var _));
             }
         }
 
 
         [Fact]
-        public void ClientCreateCharacterObejct_DoesNothing()
+        public void ClientCreateCharacterObject_DoesNothing()
         {
+            // Arrange
             var client1 = TestEnvironment.Clients.First();
+            var server = TestEnvironment.Server;
 
+            // Act
+            string? characterId = null;
             client1.Call(() =>
             {
-                CharacterObject character = new CharacterObject();
-                Assert.False(client1.ObjectManager.TryGetId(character, out var _));
+                var characterObject = new CharacterObject();
+                Assert.False(client1.ObjectManager.TryGetId(characterObject, out characterId));
             });
+
+            // Assert
+            Assert.False(server.ObjectManager.TryGetObject<CharacterObject>(characterId, out var _));
+
+            foreach (var client in TestEnvironment.Clients)
+            {
+                Assert.False(client.ObjectManager.TryGetObject<CharacterObject>(characterId, out var _));
+            }
         }
     }
 }
