@@ -65,9 +65,6 @@ namespace E2E.Tests.Services.CharacterObjects
                 CharacterObject character = new CharacterObject();
                 Assert.False(client1.ObjectManager.TryGetId(character, out var _));
             });
-
-
-
         }
     }
 }
