@@ -1,21 +1,22 @@
 ﻿using ProtoBuf;
 using System;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Equipments.Data
 {
     [ProtoContract(SkipConstructor = true)]
-    internal record EquipmentCreatedData
+    internal record ItemSlotsCreatedData
     {
         [ProtoMember(1)]
         public string EquipmentId { get; }
         [ProtoMember(2)]
-        public string EquipmentPropertyId { get; }
+        public EquipmentElement[] ItemSlots { get; }
 
 
-        public EquipmentCreatedData(string equipmentId, string equipmentPropertyId = null)
+        public ItemSlotsCreatedData(string equipmentId, EquipmentElement[] itemSlots)
         {
             EquipmentId = equipmentId;
-            EquipmentPropertyId = equipmentPropertyId;
+            ItemSlots = itemSlots;
         }
     }
 }

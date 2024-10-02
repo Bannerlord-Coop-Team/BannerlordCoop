@@ -4,37 +4,30 @@ using GameInterface.Policies;
 using GameInterface.Services.Equipments.Messages.Events;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
-using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.Core;
-
 /*
-namespace GameInterface.Services.Equipments.Patches;
-
-[HarmonyPatch]
-public class EquipmentTypeFieldPatch
+[HarmonyPatch(typeof(Equipment))]
+internal class EquipmentFieldPatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<EquipmentTypeFieldPatch>();
-
-    private static IEnumerable<MethodBase> TargetMethods()
-    {
-        return AccessTools.GetDeclaredMethods(typeof(Equipment));
-    }
-
+    private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(Equipment));
     [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> EquipmentTypeTranspiler(IEnumerable<CodeInstruction> instructions)
+    private static IEnumerable<CodeInstruction> UpdateClanSettlementAutoRecruitment(IEnumerable<CodeInstruction> instructions)
     {
-        var field = AccessTools.Field(typeof(Equipment), nameof(Equipment._equipmentType));
-        var fieldIntercept = AccessTools.Method(typeof(EquipmentTypeFieldPatch), nameof(EquipmentTypeIntercept));
-
+        var itemSlots = AccessTools.Field(typeof(Equipment), nameof(Equipment._itemSlots));
         foreach (var instruction in instructions)
         {
-            if (instruction.StoresField(field))
+            // When storing the field _itemSlots
+            if (instruction.opcode == OpCodes.Stfld &&
+                instruction.operand as FieldInfo == itemSlots)
             {
-                yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                yield return instruction;
+                // This adds a call after when _itemSlots field is set for all methods in the Equipment class
+                yield return new CodeInstruction(OpCodes.Ldarg_0); // loads the Equipment instance onto the stack
+                yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(EquipmentFieldPatches), nameof(ItemSlotsCreatedIntercept)));
+
             }
             else
             {
@@ -42,35 +35,14 @@ public class EquipmentTypeFieldPatch
             }
         }
     }
-
-    public static void EquipmentTypeIntercept(Equipment instance, Equipment.EquipmentType newEquipmentType)
+    public static void ItemSlotsCreatedIntercept(Equipment instance)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            instance._equipmentType = newEquipmentType;
-            return;
-        }
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-            instance._equipmentType = newEquipmentType;
-            return;
-        }
+        // Publish a message here (should only contain the instance)
+        // Handle in handler
+        // Send to all clients
+        // Set _itemSlots to "new EquipmentElement[12]" manually on the network handler
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-        {
-            objectManager.TryGetId(instance, out var EquipmentId);
-
-            MessageBroker.Instance.Publish(instance, new EquipmentTypeChanged((int)newEquipmentType, EquipmentId));
-
-            instance._equipmentType = newEquipmentType;
-        }
-        else
-        {
-            Logger.Error("ObjectManager not resolved: {callstack}", Environment.StackTrace);
-            instance._equipmentType = newEquipmentType;
-            return;
-        }
+        MessageBroker.Instance.Publish(instance, new ItemSlotsCreated(instance));
     }
 }
 */

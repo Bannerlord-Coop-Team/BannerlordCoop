@@ -2,10 +2,9 @@
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Equipments.Messages.Events;
-internal record EquipmentCreated(Equipment Data, Equipment Param = null) : IEvent
+internal record EquipmentWithParamCreated(Equipment Data, Equipment Param) : IEvent
 {
     public Equipment Data { get; } = Data;
     public Equipment Param { get; } = Param;
-    
 
 }
