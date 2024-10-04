@@ -1,16 +1,17 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.BesiegerCamps.Messages.Collection;
 
 namespace GameInterface.Services.BesiegerCamps.Messages;
 
 /// <summary>
-/// Command to remove an attached party
+/// Command to remove an besieger party on <see cref="BesiegerCamp._besiegerParties"/>
 /// </summary>
 public record NetworkRemoveBesiegerParty : ICommand
 {
-    public NetworkRemoveBesiegerParty(string besiegerCampId, string besiegerPartyId)
+    public NetworkRemoveBesiegerParty(BesiegerPartyData besiegerPartyData)
     {
-        BesiegerCampId = besiegerCampId;
-        BesiegerPartyId = besiegerPartyId;
+        BesiegerCampId = besiegerPartyData.BesiegerCampId;
+        BesiegerPartyId = besiegerPartyData.BesiegerPartyId;
     }
 
     public string BesiegerCampId { get; }

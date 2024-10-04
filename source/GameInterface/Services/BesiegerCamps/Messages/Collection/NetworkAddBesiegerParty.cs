@@ -1,16 +1,19 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.BesiegerCamps.Messages.Collection;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.BesiegerCamps.Messages;
 
 /// <summary>
-/// Command to add an attached party
+/// Command to add an besieger party on <see cref="BesiegerCamp._besiegerParties"/>
 /// </summary>
 public record NetworkAddBesiegerParty : ICommand
 {
-    public NetworkAddBesiegerParty(string besiegerCampId, string besiegerPartyId)
+    public NetworkAddBesiegerParty(BesiegerPartyData besiegerPartyData)
     {
-        BesiegerCampId = besiegerCampId;
-        BesiegerPartyId = besiegerPartyId;
+        BesiegerCampId = besiegerPartyData.BesiegerCampId;
+        BesiegerPartyId = besiegerPartyData.BesiegerPartyId;
     }
 
     public string BesiegerCampId { get; }

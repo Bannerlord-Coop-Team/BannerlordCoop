@@ -21,16 +21,16 @@ namespace GameInterface.Services.BesiegerCamps.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<BesiegerCampCollectionPatches>();
 
-        private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(BesiegerCamp));
+        private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(BesiegerCamp));
 
         [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> ExSpousesTranspiler(IEnumerable<CodeInstruction> instructions)
+        private static IEnumerable<CodeInstruction> BesiegerPartiesTranspiler(IEnumerable<CodeInstruction> instructions)
         {
             var listAddMethod = AccessTools.Method(typeof(List<MobileParty>), "Add");
             var listAddOverrideMethod = AccessTools.Method(typeof(BesiegerCampCollectionPatches), nameof(ListAddOverride));
 
-            var removeMethod = typeof(List<MobileParty>).GetMethod("Remove");
-            var removeIntercept = typeof(MobilePartyCollectionPatches).GetMethod(nameof(ListRemoveOverride));
+            var listRemoveMethod = AccessTools.Method(typeof(List<MobileParty>), "Remove");
+            var listRemoveOverrideMethod = AccessTools.Method(typeof(BesiegerCampCollectionPatches), nameof(ListRemoveOverride));
 
             foreach (var instruction in instructions)
             {
@@ -39,10 +39,10 @@ namespace GameInterface.Services.BesiegerCamps.Patches
                     yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, listAddOverrideMethod);
                 }
-                else if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == removeMethod)
+                else if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == listRemoveMethod)
                 {
                     yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, removeIntercept);
+                    yield return new CodeInstruction(OpCodes.Call, listRemoveOverrideMethod);
                 }
                 else
                 {
@@ -67,8 +67,8 @@ namespace GameInterface.Services.BesiegerCamps.Patches
                 _mobileParties.Add(mobileParty);
                 return;
             }
-            var instanceId = TryGetId(instance, Logger);
-            MessageBroker.Instance.Publish(instance, new NetworkAddBesiegerParty(instanceId, mobileParty.StringId));
+
+            MessageBroker.Instance.Publish(instance, new BesiegerPartyAdded(instance, mobileParty));
 
             _mobileParties.Add(mobileParty);
         }
@@ -89,8 +89,7 @@ namespace GameInterface.Services.BesiegerCamps.Patches
             }
 
             var instanceId = TryGetId(instance, Logger);
-
-            MessageBroker.Instance.Publish(instance, new NetworkRemoveBesiegerParty(instanceId, mobileParty.StringId));
+            MessageBroker.Instance.Publish(instance, new BesiegerPartyRemoved(instance, mobileParty));
 
             return _mobileParties.Remove(mobileParty);
         }
