@@ -30,13 +30,13 @@ public class BesiegerCampDebugCommand
     /// Set the number of tropps killed
     /// </summary>
     /// <param name="args">first arg : besiegerCampId ; second arg : value</param>
-    /// <returns></returns>
-    [CommandLineArgumentFunction("set_number_of_troops_killed_on_side", "coop.debug.BesiegerCamp")]
+    /// <returns>Result of the operation as a string</returns>
+    [CommandLineArgumentFunction("set_number_of_troops_killed_on_side", "coop.debug.besiegercamp")]
     public static string SetBesiegerCampNumberOfTroopsKilledOnSide(List<string> args)
     {
         if (args.Count != 2)
         {
-            return "Usage: coop.debug.besiegerCamp.set_number_of_troops_killed_on_side <besiegerCampId> <value> ";
+            return "Usage: coop.debug.besiegercamp.set_number_of_troops_killed_on_side <besiegerCampId> <value> ";
         }
 
         string besiegerCampId = args[0];
@@ -67,13 +67,13 @@ public class BesiegerCampDebugCommand
     /// Set siege preparations progress
     /// </summary>
     /// <param name="args">first arg : besiegerCampId ; second arg : value</param>
-    /// <returns></returns>
-    [CommandLineArgumentFunction("coop.debug.besiegercamp.set_progress", "coop.debug.BesiegerCamp")]
+    /// <returns>Result of the operation as a string</returns>
+    [CommandLineArgumentFunction("coop.debug.besiegercamp.set_progress", "coop.debug.besiegercamp")]
     public static string SetBesiegerCampPreparationsProgress(List<string> args)
     {
         if (args.Count != 2)
         {
-            return "Usage: coop.debug.besiegerCamp.set_progress <besiegerCampId> <progress> ";
+            return "Usage: coop.debug.besiegercamp.set_progress <besiegerCampId> <progress> ";
         }
 
         string besiegerCampId = args[0];
@@ -105,7 +105,7 @@ public class BesiegerCampDebugCommand
     /// </summary>
     /// <param name="args">first arg: besiegerCampId; second arg: strategyId</param>
     /// <returns>Result of the operation as a string</returns>
-    [CommandLineArgumentFunction("set_siege_strategy", "coop.debug.BesiegerCamp")]
+    [CommandLineArgumentFunction("set_siege_strategy", "coop.debug.besiegercamp")]
     public static string SetBesiegerCampSiegeStrategy(List<string> args)
     {
         string getPossibleStragegyIds() => string.Join(Environment.NewLine, SiegeStrategy.All.Select(x => x.StringId));
@@ -113,7 +113,7 @@ public class BesiegerCampDebugCommand
 
         if (args.Count != 2)
         {
-            return "Usage: coop.debug.besiegerCamp.set_siege_strategy <besiegerCampId> <strategyId>" + idTipMsg;
+            return "Usage: coop.debug.besiegercamp.set_siege_strategy <besiegerCampId> <strategyId>" + idTipMsg;
         }
 
         string besiegerCampId = args[0];
@@ -147,13 +147,13 @@ public class BesiegerCampDebugCommand
     /// Sets the leader party field of a specific besieger camp.
     /// </summary>
     /// <param name="args">besiegerCampId and the partyId to set</param>
-    /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_leader_party", "coop.debug.besiegerCamp")]
+    /// <returns>Result of the operation as a string</returns>
+    [CommandLineArgumentFunction("set_leader_party", "coop.debug.besiegercamp")]
     public static string SetBesiegerCampLeaderParty(List<string> args)
     {
         if (args.Count != 2)
         {
-            return "Usage: coop.debug.besiegerCamp.set_leader_party <besiegerCampId> <partyId> ";
+            return "Usage: coop.debug.besiegercamp.set_leader_party <besiegerCampId> <partyId> ";
         }
 
         string besiegerCampId = args[0];
@@ -178,4 +178,84 @@ public class BesiegerCampDebugCommand
 
         return $"{nameof(BesiegerCamp._leaderParty)} has changed to: {camp._leaderParty.Name} party with ID: {camp._leaderParty.StringId}";
     }
+
+
+    // coop.debug.besiegercamp.add_party
+    /// <summary>
+    /// Adds a party as a besieger party to a besieger camp.
+    /// </summary>
+    /// <param name="args">besiegerCampId and the partyId to add</param>
+    /// <returns>Result of the operation as a string</returns>
+    [CommandLineArgumentFunction("add_besiegerparty", "coop.debug.besiegercamp")]
+    public static string AddPartyToBesiegerCamp(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.besiegercamp.add_party <besiegerCampId> <partyId>";
+        }
+
+        string besiegerCampId = args[0];
+        string partyId = args[1];
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var besiegerCamp))
+        {
+            return $"BesiegerCamp with ID: '{besiegerCampId}' not found";
+        }
+
+        if (!objectManager.TryGetObject<MobileParty>(partyId, out var mobileParty))
+        {
+            return $"MobileParty with ID: '{partyId}' not found";
+        }
+
+        besiegerCamp._besiegerParties.Add(mobileParty);
+
+        return $"MobileParty {partyId} added to BesiegerCamp {besiegerCampId}";
+    }
+
+    // coop.debug.besiegercamp.remove_party
+    /// <summary>
+    /// Removes a besieger party from a besieger camp.
+    /// </summary>
+    /// <param name="args">besiegerCampId and the partyId to remove</param>
+    /// <returns>Result of the operation as a string</returns>
+    [CommandLineArgumentFunction("remove_party", "coop.debug.besiegercamp")]
+    public static string RemovePartyFromBesiegerCamp(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.besiegercamp.remove_party <besiegerCampId> <partyId>";
+        }
+
+        string besiegerCampId = args[0];
+        string partyId = args[1];
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (!objectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var besiegerCamp))
+        {
+            return $"BesiegerCamp with ID: '{besiegerCampId}' not found";
+        }
+
+        if (!objectManager.TryGetObject<MobileParty>(partyId, out var mobileParty))
+        {
+            return $"MobileParty with ID: '{partyId}' not found";
+        }
+
+        if (!besiegerCamp._besiegerParties.Remove(mobileParty))
+        {
+            return $"MobileParty {partyId} not found in BesiegerCamp {besiegerCampId}";
+        }
+
+        return $"MobileParty {partyId} removed from BesiegerCamp {besiegerCampId}";
+    }
+
+
 }
