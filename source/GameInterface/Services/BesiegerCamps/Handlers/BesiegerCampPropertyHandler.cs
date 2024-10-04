@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.BesiegerCamps.Messages;
 using GameInterface.Services.BesiegerCampss.Messages;
 using GameInterface.Services.ObjectManager;
+using Newtonsoft.Json.Linq;
 using Serilog;
 using System;
 using System.Linq;
@@ -37,7 +38,7 @@ internal class BesiegerCampPropertyHandler : IHandler
     {
         var data = payload.What;
 
-        var message = data.CreateNetworkMessage(Logger);
+        var message = CreateNetworkMessage(data);
 
         network.SendAll(message);
     }
@@ -45,9 +46,9 @@ internal class BesiegerCampPropertyHandler : IHandler
     private void Handle_ChangeProperty(MessagePayload<NetworkBesiegerCampChangeProperty> payload)
     {
         var data = payload.What;
-        if (objectManager.TryGetObject<BesiegerCamp>(data.besiegerCampId, out var instance) == false)
+        if (objectManager.TryGetObject<BesiegerCamp>(data.BesiegerCampId, out var instance) == false)
         {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(BesiegerCamp), data.besiegerCampId);
+            Logger.Error("Unable to find {type} with id: {id}", typeof(BesiegerCamp), data.BesiegerCampId);
             return;
         }
 
@@ -62,10 +63,10 @@ internal class BesiegerCampPropertyHandler : IHandler
 
     private void HandleDataChanged(BesiegerCamp instance, NetworkBesiegerCampChangeProperty data)
     {
-        var propInfo = typeof(BesiegerCamp).GetProperty(data.propertyName);
+        var propInfo = typeof(BesiegerCamp).GetProperty(data.PropertyName);
         if (propInfo == null)
         {
-            Logger.Error("Unable to find property with name {propName} on type: {type}", data.propertyName, typeof(BesiegerCamp));
+            Logger.Error("Unable to find property with name {propName} on type: {type}", data.PropertyName, typeof(BesiegerCamp));
             return;
         }
         object newValue = ResolvePropertyValue(data, propInfo);
@@ -80,27 +81,45 @@ internal class BesiegerCampPropertyHandler : IHandler
         // special case for this pesky type because its not working really well with object manager
         if (propType == typeof(SiegeStrategy))
         {
-            obj = SiegeStrategy.All.FirstOrDefault(x => string.Equals(x.StringId, data.objectId));
+            obj = SiegeStrategy.All.FirstOrDefault(x => string.Equals(x.StringId, data.ObjectId));
             if (obj == null)
             {
-                Logger.Error("Unable to find SiegeStrategy with id: {id}", data.objectId);
+                Logger.Error("Unable to find SiegeStrategy with id: {id}", data.ObjectId);
             }
             return obj;
         }
 
         if (!propType.IsClass) // Obj is simple struct and was serialized, just deserialize it
         {
-            obj = Deserialize(data.serializedValue);
+            obj = Deserialize(data.SerializedValue);
         }
         else
         {
-            if (!objectManager.TryGetObject(data.objectId, propType, out obj)) // Obj is a class, use ObjectManager
+            if (!objectManager.TryGetObject(data.ObjectId, propType, out obj)) // Obj is a class, use ObjectManager
             {
-                Logger.Error("Unable to find {type} with id: {id}", propType.Name, data.objectId);
+                Logger.Error("Unable to find {type} with id: {id}", propType.Name, data.ObjectId);
             }
         }
 
         return obj;
+    }
+
+    public NetworkBesiegerCampChangeProperty CreateNetworkMessage(BesiegerCampPropertyChanged internalMessage)
+    {
+        string besiegeCampId = objectManager.TryGetId(internalMessage.BesiegerCamp, Logger);
+        PropertyInfo property = internalMessage.PropertyInfo;
+        bool isClass = property.PropertyType.IsClass;
+
+        if (isClass)
+        {
+            var id = objectManager.TryGetId(internalMessage.Value, Logger);
+            return new NetworkBesiegerCampChangeProperty(property.Name, besiegeCampId, id);
+        }
+        else
+        {
+            var serializedValue = Serialize(internalMessage.Value);
+            return new NetworkBesiegerCampChangeProperty(property.Name, besiegeCampId, serializedValue);
+        }
     }
 
     public void Dispose()

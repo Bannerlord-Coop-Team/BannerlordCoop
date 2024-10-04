@@ -7,26 +7,26 @@ namespace GameInterface.Services.BesiegerCampss.Messages
     public record NetworkBesiegerCampChangeProperty : ICommand
     {
         [ProtoMember(1)]
-        public string propertyName;
+        public string PropertyName;
         [ProtoMember(2)]
-        public string besiegerCampId;
+        public string BesiegerCampId;
         [ProtoMember(3)]
-        public string objectId;
+        public string ObjectId;
         [ProtoMember(4)]
-        public byte[] serializedValue;
+        public byte[] SerializedValue;
 
         public NetworkBesiegerCampChangeProperty(string propertyName, string besiegerCampId, string objectId)
         {
-            this.propertyName = propertyName;
-            this.besiegerCampId = besiegerCampId;
-            this.objectId = objectId;
+            this.PropertyName = propertyName;
+            this.BesiegerCampId = besiegerCampId;
+            this.ObjectId = objectId;
         }
 
         public NetworkBesiegerCampChangeProperty(string propertyName, string besiegerCampId, byte[] serializedValue)
         {
-            this.propertyName = propertyName;
-            this.besiegerCampId = besiegerCampId;
-            this.serializedValue = serializedValue;
+            this.PropertyName = propertyName;
+            this.BesiegerCampId = besiegerCampId;
+            this.SerializedValue = serializedValue;
         }
     }
 }

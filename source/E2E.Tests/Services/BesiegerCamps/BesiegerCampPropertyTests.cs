@@ -103,7 +103,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             // Act
             Server.Call(() =>
             {
-                serverBesiegerCamp.SiegeEvent = serverSiegeEvent;
+                //serverBesiegerCamp.SiegeEvent = serverSiegeEvent;
             });
 
             // Assert

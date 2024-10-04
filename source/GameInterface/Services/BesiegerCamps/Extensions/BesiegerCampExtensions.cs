@@ -8,9 +8,21 @@ namespace GameInterface.Services.BesiegerCamps.Extensions
 {
     public static class BesiegerCampExtensions
     {
-        public static string TryGetId(object value, ILogger logger)
+        private static IObjectManager ResolveObjectManager(ILogger logger)
+        {
+            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+            {
+                logger.Error("Unable to resolve {type}", typeof(IObjectManager).FullName);
+                return null;
+            }
+            return objectManager;
+        }
+
+        public static string TryGetId(object value, ILogger logger) => TryGetId(ResolveObjectManager(logger), value, logger);
+        public static string TryGetId(this IObjectManager src, object value, ILogger logger)
         {
             if (value == null) return null;
+            if (src == null) return null;
 
             // temp fix for SiegeStrategy not being registered
             if (value is SiegeStrategy siegeStrategy)
@@ -18,13 +30,7 @@ namespace GameInterface.Services.BesiegerCamps.Extensions
                 return siegeStrategy.StringId;
             }
 
-            if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-            {
-                logger.Error("Unable to resolve {type}", typeof(IObjectManager).FullName);
-                return null;
-            }
-
-            if (!objectManager.TryGetId(value, out string typeId))
+            if (!src.TryGetId(value, out string typeId))
             {
                 logger.Error("Unable to get ID for instance of type {type}", value.GetType().Name);
                 return null;
