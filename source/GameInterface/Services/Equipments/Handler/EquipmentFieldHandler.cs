@@ -68,7 +68,7 @@ namespace GameInterface.Services.Equipments.Handlers
             {
                 using (new AllowedThread())
                 {
-                  // newEquipment._itemSlots = new EquipmentElement[12];
+                    //newEquipment._itemSlots = new EquipmentElement[12];
                     objectManager.AddExisting(payload.EquipmentId, newEquipment);
                 }
             });

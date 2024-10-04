@@ -28,12 +28,13 @@ internal class EquipmentLifetimePatches
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
+        // Joining a game with client triggers this to be true a lot, so lots of errors in the log. Maybe better to remove Logger Error here?
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
 
-            return true;
+            return true; // Is it maybe better to return false here?
         }
 
         MessageBroker.Instance.Publish(__instance, new EquipmentCreated(__instance));

@@ -76,7 +76,6 @@ public class GameLoopRunner : IUpdateable
                 null;
             lock (Instance.m_QueueLock)
             {
-                // Crashed here once after "Wait in Village" bug or after entering many villages in a row and leaving again (Called from GameloopRunner.RunOnMainThread in MobilePropertyHandler)
                 Instance.m_Queue.Enqueue((action, ewh));
             }
 

@@ -11,6 +11,10 @@ using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using static System.Net.Mime.MediaTypeNames;
 using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
+using TaleWorlds.CampaignSystem.Inventory;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+
 
 namespace E2E.Tests.Services.Equipments;
 
@@ -38,6 +42,7 @@ public class EquipmentSyncTests : IDisposable
         string? civilEquipmentId = null;
         Equipment? parameter = null;
 
+
         // Act
 
         server.Call(() =>
@@ -49,14 +54,19 @@ public class EquipmentSyncTests : IDisposable
             // EquipmentType Param
             bool isCivil = true;
             var civilEquip = new Equipment(isCivil);
+            string test2 = civilEquip.CalculateEquipmentCode();
             Assert.True(server.ObjectManager.TryGetId(civilEquip, out civilEquipmentId));
 
             // Equipment Param
-            parameter = civilEquip;
+            Hero hero = GameObjectCreator.CreateInitializedObject<Hero>();
+            hero.ResetEquipments();
+            parameter = hero.BattleEquipment;
+            
+            // Use AccessTools to set the itemSlot field of the equipment to ssomething like new ItemObject("test");
+
+
             var EquipWithEquipParam = new Equipment(parameter);
             Assert.True(server.ObjectManager.TryGetId(EquipWithEquipParam, out EquipmentWithEquipParamId));
-
-
 
         });
 
@@ -71,7 +81,7 @@ public class EquipmentSyncTests : IDisposable
         //  Test failing because equipment itemSlots field is null / not properly instantiated
         for (int i=0; i<12; i++)
         {
-            Assert.Same(serverEquipment._itemSlots[i], parameter._itemSlots[i]);
+            Assert.True(serverEquipment._itemSlots[i].IsEqualTo(parameter._itemSlots[i]));
         }
         Assert.Equal(parameter._equipmentType, serverEquipment._equipmentType);
 
@@ -116,23 +126,23 @@ public class EquipmentSyncTests : IDisposable
         client1.Call(() =>
         {
             Equipment Equip = new Equipment();
-            Assert.False(server.ObjectManager.TryGetId(Equip, out EquipmentId));
+            Assert.False(client1.ObjectManager.TryGetId(Equip, out EquipmentId));
 
             // Equipment(bool IsCivil) 
             bool isCivil = true;
             var civilEquip = new Equipment(isCivil);
-            Assert.False(server.ObjectManager.TryGetId(civilEquip, out civilEquipmentId));
+            Assert.False(client1.ObjectManager.TryGetId(civilEquip, out civilEquipmentId));
 
             // Equipment(Equipment equipment) 
             var EquipWithEquipParam = new Equipment(Equip);
-            Assert.False(server.ObjectManager.TryGetId(EquipWithEquipParam, out EquipmentWithEquipParamId));
+            Assert.False(client1.ObjectManager.TryGetId(EquipWithEquipParam, out EquipmentWithEquipParamId));
 
 
             client1.ObjectManager.TryGetObject<Equipment>(EquipmentWithExistingEquipId, out var EquipParam);
 
             // For this test to pass requires working server-side syncing
             var EquipWithExistingEquip = new Equipment(EquipParam);
-            Assert.False(server.ObjectManager.TryGetId(EquipWithExistingEquip, out EquipmentWithExistingEquipId));
+            Assert.False(client1.ObjectManager.TryGetId(EquipWithExistingEquip, out EquipmentWithExistingEquipId));
 
         });
 
