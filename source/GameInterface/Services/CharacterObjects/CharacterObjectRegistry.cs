@@ -19,12 +19,11 @@ internal class CharacterObjectRegistry : RegistryBase<CharacterObject>
 
     public override void RegisterAll()
     {
-        foreach(CharacterObject character in Campaign.Current.Characters)
+        foreach (CharacterObject character in Campaign.Current.Characters)
         {
-            if (RegisterNewObject(character, out var _) == false)
-            {
-                Logger.Error($"Unable to register {character}");
-            }
+            if (TryGetId(character, out _) == true) continue;
+
+            RegisterExistingObject(character.StringId, character);
         }
     }
 
