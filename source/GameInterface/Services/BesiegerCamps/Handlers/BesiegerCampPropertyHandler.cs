@@ -6,7 +6,6 @@ using Common.Util;
 using GameInterface.Services.BesiegerCamps.Messages;
 using GameInterface.Services.BesiegerCampss.Messages;
 using GameInterface.Services.ObjectManager;
-using Newtonsoft.Json.Linq;
 using Serilog;
 using System;
 using System.Linq;
@@ -127,5 +126,4 @@ internal class BesiegerCampPropertyHandler : IHandler
         messageBroker.Unsubscribe<BesiegerCampPropertyChanged>(Handle_PropertyChanged);
         messageBroker.Unsubscribe<NetworkBesiegerCampChangeProperty>(Handle_ChangeProperty);
     }
-
 }

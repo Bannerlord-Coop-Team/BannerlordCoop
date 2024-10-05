@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.BesiegerCamps.Messages.Collection;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.BesiegerCamps.Messages;

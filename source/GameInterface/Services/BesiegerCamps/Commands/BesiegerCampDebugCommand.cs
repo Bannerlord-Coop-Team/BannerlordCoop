@@ -179,7 +179,6 @@ public class BesiegerCampDebugCommand
         return $"{nameof(BesiegerCamp._leaderParty)} has changed to: {camp._leaderParty.Name} party with ID: {camp._leaderParty.StringId}";
     }
 
-
     // coop.debug.besiegercamp.add_party
     /// <summary>
     /// Adds a party as a besieger party to a besieger camp.
@@ -256,6 +255,4 @@ public class BesiegerCampDebugCommand
 
         return $"MobileParty {partyId} removed from BesiegerCamp {besiegerCampId}";
     }
-
-
 }

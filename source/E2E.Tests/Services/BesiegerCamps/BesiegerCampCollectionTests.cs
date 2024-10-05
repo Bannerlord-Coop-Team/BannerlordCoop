@@ -1,14 +1,12 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.BesiegerCamps.Patches;
 using HarmonyLib;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit.Abstractions;
-using GameInterface.Services.BesiegerCamps.Patches;
 
 namespace E2E.Tests.Services.BesiegerCamps
 {
@@ -57,7 +55,7 @@ namespace E2E.Tests.Services.BesiegerCamps
         }
 
         [Fact]
-        void ServerAddBesiegerParty_SyncAllClients()
+        private void ServerAddBesiegerParty_SyncAllClients()
         {
             //Arrange
             var besiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
@@ -80,9 +78,9 @@ namespace E2E.Tests.Services.BesiegerCamps
         }
 
         [Fact]
-        void ServerRemoveBesiegerParty_SyncAllClients()
+        private void ServerRemoveBesiegerParty_SyncAllClients()
         {
-            // Arrange 
+            // Arrange
             var besiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
             var besiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
             Server.Call(() =>
@@ -96,13 +94,13 @@ namespace E2E.Tests.Services.BesiegerCamps
                 Assert.Contains(clientBesiegerParty, clientBesiegerCamp._besiegerParties);
             }
 
-            // Act 
+            // Act
             Server.Call(() =>
             {
                 BesiegerCampCollectionPatches.ListRemoveOverride(besiegerCamp._besiegerParties, besiegerParty, besiegerCamp);
             });
 
-            // Assert 
+            // Assert
             foreach (var client in Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
@@ -112,9 +110,9 @@ namespace E2E.Tests.Services.BesiegerCamps
         }
 
         [Fact]
-        void ClientAddBesiegerParty_DoesNothing()
+        private void ClientAddBesiegerParty_DoesNothing()
         {
-            // Arrange 
+            // Arrange
             var besiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
             var besiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
             foreach (var client in Clients)
@@ -139,7 +137,7 @@ namespace E2E.Tests.Services.BesiegerCamps
         }
 
         [Fact]
-        void ClientRemoveBesiegerParty_DoesNothing()
+        private void ClientRemoveBesiegerParty_DoesNothing()
         {
             // Arrange
             var besiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
@@ -155,14 +153,14 @@ namespace E2E.Tests.Services.BesiegerCamps
                 Assert.Contains<MobileParty>(clientBesiegerParty, clientBesiegerCamp._besiegerParties);
             }
 
-            // Act 
+            // Act
             var firstClient = Clients.First();
             firstClient.Call(() =>
             {
                 BesiegerCampCollectionPatches.ListRemoveOverride(besiegerCamp._besiegerParties, besiegerParty, besiegerCamp);
             });
 
-            // Assert 
+            // Assert
             foreach (var client in Clients.Where(c => c != firstClient))
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
@@ -170,7 +168,5 @@ namespace E2E.Tests.Services.BesiegerCamps
                 Assert.Contains<MobileParty>(clientBesiegerParty, clientBesiegerCamp._besiegerParties);
             }
         }
-
-
     }
 }

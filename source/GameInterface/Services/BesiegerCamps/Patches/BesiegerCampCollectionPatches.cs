@@ -2,7 +2,6 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.BesiegerCamps.Messages;
-using GameInterface.Services.MobileParties.Patches;
 using HarmonyLib;
 using Serilog;
 using System;

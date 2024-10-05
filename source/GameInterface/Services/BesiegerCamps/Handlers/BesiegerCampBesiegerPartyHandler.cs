@@ -3,10 +3,8 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.BesiegerCamps.Messages;
 using GameInterface.Services.BesiegerCamps.Messages.Collection;
-using GameInterface.Services.BesiegerCampss.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
@@ -116,5 +114,4 @@ internal class BesiegerCampBesiegerPartyHandler : IHandler
 
         return (campId != null && partyId != null) ? new BesiegerPartyData(campId, partyId) : null;
     }
-
 }

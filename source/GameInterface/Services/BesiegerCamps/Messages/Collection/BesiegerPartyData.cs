@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace GameInterface.Services.BesiegerCamps.Messages.Collection
+﻿namespace GameInterface.Services.BesiegerCamps.Messages.Collection
 {
     //public record BesiegerPartyData(string BesiegerCampId, string BesiegerPartyId); // Need that IsExternalInit for this sweet syntax
 
@@ -16,6 +12,5 @@ namespace GameInterface.Services.BesiegerCamps.Messages.Collection
             BesiegerCampId = besiegerCampId;
             BesiegerPartyId = besiegerPartyId;
         }
-
     }
 }
