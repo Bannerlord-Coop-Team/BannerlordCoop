@@ -21,7 +21,7 @@ internal class CharacterObjectRegistry : RegistryBase<CharacterObject>
     {
         foreach (CharacterObject character in Campaign.Current.Characters)
         {
-            if (TryGetId(character, out _) == true) continue;
+            if (TryGetId(character, out _)) continue;
 
             RegisterExistingObject(character.StringId, character);
         }
