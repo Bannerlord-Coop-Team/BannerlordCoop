@@ -15,15 +15,14 @@ namespace E2E.Tests.Services.BesiegerCamps
     {
         private List<MethodBase> disabledMethods = new();
 
-        E2ETestEnvironment TestEnvironment { get; }
+        private E2ETestEnvironment TestEnvironment { get; }
 
-        EnvironmentInstance Server => TestEnvironment.Server;
-        IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
+        private EnvironmentInstance Server => TestEnvironment.Server;
+        private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
-        readonly string besiegerCampId;
-        readonly string siegeEventId;
-        readonly string siegeEnginesId;
-        //readonly string siegePreparationsId;
+        private readonly string besiegerCampId;
+        private readonly string siegeEventId;
+        private readonly string siegeEnginesId;
 
         public void Dispose()
         {
@@ -36,7 +35,7 @@ namespace E2E.Tests.Services.BesiegerCamps
                 AccessTools.Method(typeof (MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
                 AccessTools.Method(typeof (BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
                 AccessTools.Method(typeof (BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide))
-        };
+            };
 
             disabledMethods.AddRange(AccessTools.GetDeclaredConstructors(typeof(SiegeEvent)));
         }
@@ -165,7 +164,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             string? siegeEngineId = null;
 
             // Act
-            Server.Call((Action)(() =>
+            Server.Call((() =>
             {
                 var siegeEngines = GameObjectCreator.CreateInitializedObject<SiegeEnginesContainer>();
 

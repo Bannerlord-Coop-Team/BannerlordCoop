@@ -18,25 +18,27 @@ namespace GameInterface.Services.BesiegerCamps.Extensions
             return objectManager;
         }
 
-        public static string TryGetId(object value, ILogger logger) => TryGetId(ResolveObjectManager(logger), value, logger);
-        public static string TryGetId(this IObjectManager src, object value, ILogger logger)
+        public static bool TryGetId(object value, ILogger logger, out string id) => TryGetId(ResolveObjectManager(logger), value, logger, out id);
+
+        public static bool TryGetId(this IObjectManager src, object value, ILogger logger, out string id)
         {
-            if (value == null) return null;
-            if (src == null) return null;
+            id = null;
+            if (value == null || src == null) return false;
 
             // temp fix for SiegeStrategy not being registered
             if (value is SiegeStrategy siegeStrategy)
             {
-                return siegeStrategy.StringId;
+                id = siegeStrategy.StringId;
+                return true;
             }
 
-            if (!src.TryGetId(value, out string typeId))
+            if (!src.TryGetId(value, out id))
             {
                 logger.Error("Unable to get ID for instance of type {type}", value.GetType().Name);
-                return null;
+                return false;
             }
 
-            return typeId;
+            return true;
         }
 
         // quick and dirty way to pass the type as refference isntead of type arg

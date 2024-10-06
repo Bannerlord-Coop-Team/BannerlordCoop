@@ -23,13 +23,13 @@ namespace GameInterface.Services.SiegeEngineConstructionProgresss.Messages
 
         public NetworkSiegeEngineConstructionProgressChangeProperty CreateNetworkMessage(ILogger logger)
         {
-            string besiegeCampId = TryGetId(siegeEngineConstructionProgress, logger);
+            TryGetId(siegeEngineConstructionProgress, logger, out string besiegeCampId);
             PropertyInfo property = propertyInfo;
             bool isClass = property.PropertyType.IsClass;
 
             if (isClass)
             {
-                var id = TryGetId(value, logger);
+                TryGetId(value, logger, out string id);
                 return new NetworkSiegeEngineConstructionProgressChangeProperty(property.Name, besiegeCampId, id);
             }
             else

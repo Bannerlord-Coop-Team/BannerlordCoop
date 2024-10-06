@@ -1,6 +1,5 @@
 ﻿using Autofac;
 using GameInterface.Services.ObjectManager;
-using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -164,7 +163,7 @@ public class BesiegerCampDebugCommand
             return "Unable to resolve ObjectManager";
         }
 
-        if (objectManager.TryGetObject(besiegerCampId, out BesiegerCamp camp) == false)
+        if (objectManager.TryGetObject(besiegerCampId, out BesiegerCamp besiegerCamp) == false)
         {
             return $"{nameof(BesiegerCamp)} with ID: '{besiegerCampId}' not found";
         }
@@ -174,9 +173,9 @@ public class BesiegerCampDebugCommand
             return $"{nameof(MobileParty)} with ID: '{partyId}' not found";
         }
 
-        AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty)).SetValue(camp, party);
+        besiegerCamp._leaderParty = party;
 
-        return $"{nameof(BesiegerCamp._leaderParty)} has changed to: {camp._leaderParty.Name} party with ID: {camp._leaderParty.StringId}";
+        return $"{nameof(BesiegerCamp._leaderParty)} has changed to: {besiegerCamp._leaderParty.Name} party with ID: {besiegerCamp._leaderParty.StringId}";
     }
 
     // coop.debug.besiegercamp.add_party

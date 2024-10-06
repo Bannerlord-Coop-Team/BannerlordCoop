@@ -11,7 +11,6 @@ using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
-using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
 
 namespace GameInterface.Services.BesiegerCamps.Patches
 {
@@ -87,7 +86,6 @@ namespace GameInterface.Services.BesiegerCamps.Patches
                 return _mobileParties.Remove(mobileParty);
             }
 
-            var instanceId = TryGetId(instance, Logger);
             MessageBroker.Instance.Publish(instance, new BesiegerPartyRemoved(instance, mobileParty));
 
             return _mobileParties.Remove(mobileParty);

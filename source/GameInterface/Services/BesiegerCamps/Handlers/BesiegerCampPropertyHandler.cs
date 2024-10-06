@@ -105,13 +105,13 @@ internal class BesiegerCampPropertyHandler : IHandler
 
     public NetworkBesiegerCampChangeProperty CreateNetworkMessage(BesiegerCampPropertyChanged internalMessage)
     {
-        string besiegeCampId = objectManager.TryGetId(internalMessage.BesiegerCamp, Logger);
+        objectManager.TryGetId(internalMessage.BesiegerCamp, Logger, out string besiegeCampId);
         PropertyInfo property = internalMessage.PropertyInfo;
         bool isClass = property.PropertyType.IsClass;
 
         if (isClass)
         {
-            var id = objectManager.TryGetId(internalMessage.Value, Logger);
+            objectManager.TryGetId(internalMessage.Value, Logger, out string id);
             return new NetworkBesiegerCampChangeProperty(property.Name, besiegeCampId, id);
         }
         else
