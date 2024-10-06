@@ -30,11 +30,10 @@ internal class EquipmentLifetimePatches
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        // Joining a game with client triggers this to be true a lot, so lots of errors in the log. Maybe better to remove Logger Error here?
+        
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
+            // Joining a game with client triggers this to be true a lot, so lots of errors in the log. Removed logger here
 
             return true; // Is it maybe better to return false here?
         }
@@ -53,10 +52,9 @@ internal class EquipmentLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
+            // Joining a game with client triggers this to be true a lot, so lots of errors in the log. Removed logger here
 
-
+            // Is it maybe better to return false here?
             return true;
         }
 
