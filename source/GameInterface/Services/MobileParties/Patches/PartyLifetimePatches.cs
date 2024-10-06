@@ -82,13 +82,13 @@ internal class PartyCtorPatches
     }
 
     [HarmonyPrefix]
-    private static bool Prefix(ref MobileParty __instance)
+    private static void Prefix(ref MobileParty __instance)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             __instance.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>("COOP_PARTY");
-            return true;
+            return;
         }
 
         if (ModInformation.IsClient)
@@ -98,11 +98,11 @@ internal class PartyCtorPatches
 
             __instance.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>("ERROR_PARTY");
 
-            return true;
+            return;
         }
 
         MessageBroker.Instance.Publish(__instance, new PartyCreated(__instance));
 
-        return true;
+        return;
     }
 }

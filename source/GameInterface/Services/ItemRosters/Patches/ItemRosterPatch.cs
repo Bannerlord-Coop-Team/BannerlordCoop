@@ -90,7 +90,7 @@ namespace GameInterface.Services.ItemRosters.Patches
             {
                 using (new AllowedThread())
                 {
-                    itemRoster.AddToCounts(rosterElement, amount);
+                    itemRoster?.AddToCounts(rosterElement, amount);
                 }
             });
         }
@@ -101,7 +101,7 @@ namespace GameInterface.Services.ItemRosters.Patches
             {
                 using (new AllowedThread())
                 {
-                    itemRoster.Clear();
+                    itemRoster?.Clear();
                 }
             });
         }

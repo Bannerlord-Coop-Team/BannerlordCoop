@@ -13,48 +13,33 @@ using TaleWorlds.Core;
 
 namespace GameInterface.Services.PartyBases.Patches;
 
-[HarmonyPatch(typeof(PartyBase))]
+[HarmonyPatch]
 internal class PartyBaseLifetimePatches
 {
     static ILogger Logger = LogManager.GetLogger<PartyBase>();
 
-    [HarmonyPatch(MethodType.Constructor, new Type[] { typeof(MobileParty), typeof(Settlement) })]
-    static bool Prefix(PartyBase __instance)
+    static IEnumerable<MethodBase> TargetMethods() => new[] {
+       AccessTools.Constructor(typeof(PartyBase), new Type[] { typeof(MobileParty) }),
+       AccessTools.Constructor(typeof(PartyBase), new Type[] { typeof(Settlement) }),
+    };
+
+    [HarmonyPrefix]
+    static void Prefix(ref PartyBase __instance)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
 
-            return true;
+            return;
         }
 
         var message = new PartyBaseCreated(__instance);
         MessageBroker.Instance.Publish(__instance, message);
 
-        return true;
-    }
-}
-
-[HarmonyPatch]
-internal class PartyBaseLifetimePatches2
-{
-    static ILogger Logger = LogManager.GetLogger<PartyBase>();
-
-    static IEnumerable<MethodBase> TargetMethods()
-    {
-        var arr = new[] {
-            AccessTools.PropertySetter(typeof(PartyBase), nameof(PartyBase.MobileParty))
-        };
-
-        return arr;
-    }
-
-    static void Prefix(PartyBase __instance)
-    {
-        ;
+        return;
     }
 }

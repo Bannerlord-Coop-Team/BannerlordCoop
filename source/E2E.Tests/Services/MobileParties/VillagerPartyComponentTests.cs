@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -69,7 +70,7 @@ public class VillagerPartyComponentTests : IDisposable
         {
             Assert.True(client1.ObjectManager.TryGetObject<Village>(villageId, out var village));
             VillagerPartyComponent.CreateVillagerParty(partyId, village, 5);
-        });
+        }, new[] { AccessTools.Method(typeof(MobileParty), nameof(MobileParty.ResetCached)) });
 
         // Assert
         foreach (var client in TestEnvironment.Clients)

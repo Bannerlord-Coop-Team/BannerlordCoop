@@ -48,7 +48,8 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
         IsPatched = true;
 
-        foreach (var (method, patch) in transpilers) {
+        foreach (var (method, patch) in transpilers)
+        {
             harmony.Patch(method, transpiler: new HarmonyMethod(patch));
         }
 

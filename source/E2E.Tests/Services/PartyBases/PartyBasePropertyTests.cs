@@ -6,6 +6,7 @@ using E2E.Tests.Util;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyBases;
@@ -35,12 +36,9 @@ public class PartyBaseLifetimeTests : IDisposable
         string? partyId = null;
         server.Call(() =>
         {
-            var party = new MobileParty();
+            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
 
             partyId = party.StringId;
-
-            var pb = new PartyBase(party);
-
             Assert.True(server.ObjectManager.TryGetId(party.Party, out partyBaseId));
         });
 
@@ -48,12 +46,9 @@ public class PartyBaseLifetimeTests : IDisposable
         Assert.NotNull(partyBaseId);
         Assert.NotNull(partyId);
 
-        // TODO MobileParty set prefix not being called??/???????
-
-        var msgs = DebugMessageLogger.Messages;
-
         foreach (var client in TestEnvironment.Clients)
         {
+            
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
             Assert.True(client.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var clientPartyBase));
             Assert.Equal(clientPartyBase.MobileParty, clientParty);
