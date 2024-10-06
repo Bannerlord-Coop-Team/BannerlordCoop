@@ -1,11 +1,14 @@
 ﻿using GameInterface.Services.Registry;
-using System;
+using System.Threading;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEngines
 {
     internal class SiegeEnginesContainerRegistry : RegistryBase<SiegeEnginesContainer>
     {
+        private const string SiegeEnginesContainerIdPrefix = "CoopSiegeEnginesContainer";
+        private static int InstanceCounter = 0;
+
         public SiegeEnginesContainerRegistry(IRegistryCollection collection) : base(collection)
         {
         }
@@ -16,7 +19,7 @@ namespace GameInterface.Services.SiegeEngines
 
         protected override string GetNewId(SiegeEnginesContainer obj)
         {
-            return Guid.NewGuid().ToString();
+            return $"{SiegeEnginesContainerIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
         }
     }
 }
