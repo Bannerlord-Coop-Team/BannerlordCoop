@@ -40,7 +40,7 @@ namespace GameInterface.Services.MobileParties.Patches
                 {
                     EnterSettlementAction.ApplyForParty(mobileParty, settlement);
                 }
-            });
+            }, blocking: true);
         }
     }
 }

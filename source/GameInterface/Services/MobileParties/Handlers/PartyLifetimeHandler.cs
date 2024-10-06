@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.GameDebug.Handlers;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -59,7 +60,7 @@ internal class PartyLifetimeHandler : IHandler
 
         var isClient = ModInformation.IsClient ? "Client" : "Server";
 
-        Logger.Debug("Creating party {partyId} for {instnace}", stringId, isClient);
+        Logger.Debug("Creating party {partyId} for {instance}", stringId, isClient);
 
         var newParty = ObjectHelper.SkipConstructor<MobileParty>();
 
@@ -91,7 +92,7 @@ internal class PartyLifetimeHandler : IHandler
 
         var isClient = ModInformation.IsClient ? "Client" : "Server";
 
-        Logger.Debug("Destroying party {partyId} for {instnace}", stringId, isClient);
+        Logger.Debug("Destroying party {partyId} for {instance}", stringId, isClient);
 
         if (objectManager.TryGetObject<MobileParty>(stringId, out var party) == false) return;
 

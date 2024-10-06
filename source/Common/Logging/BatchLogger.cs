@@ -3,6 +3,7 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Text;
+using System.Threading;
 
 namespace Common.Logging;
 
@@ -29,7 +30,8 @@ public sealed class BatchLogger : IDisposable
 	{
         this.pollInterval = pollInterval;
         poller = new Poller(Poll, pollInterval);
-        poller.Start();
+		// TODO re-enable
+        //poller.Start();
     }
 
 	/// <summary>
@@ -39,7 +41,7 @@ public sealed class BatchLogger : IDisposable
 	{
 		var messageName = messageType.Name;
 
-        LogMap.AddOrUpdate(messageName, 1, (name, value) => value++);
+        LogMap.AddOrUpdate(messageName, 1, (name, value) => Interlocked.Increment(ref value));
     }
 
     // A method to poll for messages to log.

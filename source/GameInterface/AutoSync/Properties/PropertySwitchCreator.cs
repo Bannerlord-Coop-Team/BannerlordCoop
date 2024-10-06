@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using TaleWorlds.Diamond;
 
 namespace GameInterface.AutoSync.Properties;
 public class PropertySwitchCreator
@@ -126,6 +127,9 @@ public class PropertySwitchCreator
         for (int i = 0; i < properties.Length; i++)
         {
             il.MarkLabel(labels[i]);
+
+            il.Emit(OpCodes.Ldstr, $"Setting {properties[i].PropertyType} for {properties[i].DeclaringType}");
+            il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(PropertyPrefixCreator.LogMessage)));
 
             if (RuntimeTypeModel.Default.CanSerialize(properties[i].PropertyType))
                 CreateByValue(il, properties[i], instanceLocal);

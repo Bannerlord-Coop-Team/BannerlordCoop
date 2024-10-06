@@ -155,7 +155,6 @@ public abstract class EnvironmentInstance : IDisposable
             ModInformation.IsServer = instance is ServerInstance;
             instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
             GameInterface.ContainerProvider.SetContainer(instance.Container);
-
         }
 
         public void Dispose()

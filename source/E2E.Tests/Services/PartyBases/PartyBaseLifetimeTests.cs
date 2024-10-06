@@ -7,11 +7,11 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyBases;
 
-public class PartyBaseLifetimeTests : IDisposable
+public class PartyBasePropertyTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
 
-    public PartyBaseLifetimeTests(ITestOutputHelper output)
+    public PartyBasePropertyTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
     }
@@ -22,31 +22,40 @@ public class PartyBaseLifetimeTests : IDisposable
     }
 
     [Fact]
-    public void ServerCreate_PartyBase_SyncAllClients()
+    public void Server_MobileParty_SyncAllClients()
     {
         // Arrange
         var server = TestEnvironment.Server;
 
         // Act
         string? partyBaseId = null;
+        string? partyId = null;
         server.Call(() =>
         {
             var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
+            partyId = party.StringId;
+            var partyBase = new PartyBase(default(MobileParty));
 
             Assert.True(server.ObjectManager.TryGetId(party.Party, out partyBaseId));
+
+
+            partyBase.MobileParty = party;
         });
 
         // Assert
         Assert.NotNull(partyBaseId);
+        Assert.NotNull(partyId);
 
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var _));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var clientPartyBase));
+            Assert.Equal(clientParty, clientPartyBase.MobileParty);
         }
     }
 
     [Fact]
-    public void ClientCreate_PartyBase_DoesNothing()
+    public void Client_MobileParty_DoesNothing()
     {
         // Arrange
         var server = TestEnvironment.Server;
@@ -57,85 +66,13 @@ public class PartyBaseLifetimeTests : IDisposable
         var firstClient = TestEnvironment.Clients.First();
         firstClient.Call(() =>
         {
-            var party = new PartyBase((MobileParty)null);
+            var party = new PartyBase(default(MobileParty));
 
             Assert.False(server.ObjectManager.TryGetId(party, out partyBaseId));
         });
 
         // Assert
         Assert.Null(partyBaseId);
-    }
-
-    [Fact]
-    public void ServerDestroy_PartyBase_SyncAllClients()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-
-        string? partyId = null;
-        string? partyBaseId = null;
-        server.Call(() =>
-        {
-            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
-
-            Assert.True(server.ObjectManager.TryGetId(party, out partyId));
-            Assert.True(server.ObjectManager.TryGetId(party.Party, out partyBaseId));
-        });
-
-
-        // Act
-        server.Call(() =>
-        {
-            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-
-            // PartyBase will be removed with party as they are coupled
-            MessageBroker.Instance.Publish(this, new PartyDestroyed(party));
-        });
-
-        // Assert
-        Assert.NotNull(partyBaseId);
-
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.False(client.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var _));
-        }
-    }
-
-    [Fact]
-    public void ClientDestroy_PartyBase_DoesNothing()
-    {
-        // Arrange
-        var server = TestEnvironment.Server;
-
-        string? partyId = null;
-        string? partyBaseId = null;
-        server.Call(() =>
-        {
-            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
-
-            Assert.True(server.ObjectManager.TryGetId(party, out partyId));
-            Assert.True(server.ObjectManager.TryGetId(party.Party, out partyBaseId));
-        });
-
-
-        // Act
-
-        var firstClient = TestEnvironment.Clients.First();
-        firstClient.Call(() =>
-        {
-            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
-
-            // PartyBase will be removed with party as they are coupled
-            MessageBroker.Instance.Publish(this, new PartyDestroyed(party));
-        });
-
-        // Assert
-        Assert.NotNull(partyBaseId);
-
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var _));
-        }
     }
 }
 

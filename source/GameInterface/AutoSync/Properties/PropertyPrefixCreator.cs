@@ -7,7 +7,6 @@ using HarmonyLib;
 using ProtoBuf.Meta;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -36,9 +35,9 @@ public class PropertyPrefixCreator
             TypeAttributes.AutoLayout,
             null);
 
-        loggerField = typeBuilder.DefineField("logger", typeof(ILogger), FieldAttributes.Private | FieldAttributes.InitOnly | FieldAttributes.Static);
+        //loggerField = typeBuilder.DefineField("logger", typeof(ILogger), FieldAttributes.Private | FieldAttributes.InitOnly | FieldAttributes.Static);
 
-        CreateStaticCtor();
+        //CreateStaticCtor();
 
         var ctorBuilder = typeBuilder.DefineConstructor(
             MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName,
@@ -124,7 +123,13 @@ public class PropertyPrefixCreator
 
         var il = methodBuilder.GetILGenerator();
 
+        il.Emit(OpCodes.Ldstr, $"Prefix for  {prop.DeclaringType.Name}::{prop.Name} called");
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
+
         IsThreadAllowed(il);
+        
+        il.Emit(OpCodes.Ldstr, $"Prefix for  {prop.DeclaringType.Name}::{prop.Name} called after allowed");
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         IsClientCheck(il, prop);
 
@@ -147,6 +152,9 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Box, typeof(PropertyAutoSyncPacket));
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
 
+        il.Emit(OpCodes.Ldstr, $"Syncing {prop.Name} for {prop.DeclaringType}");
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
+
         il.Emit(OpCodes.Ldc_I4_1);
         il.Emit(OpCodes.Ret);
 
@@ -164,9 +172,10 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Brtrue, validLabel);
 
         // Log error
-        il.Emit(OpCodes.Ldsfld, loggerField);
+        //il.Emit(OpCodes.Ldsfld, loggerField);
         il.Emit(OpCodes.Ldstr, $"Unable to resolve {nameof(T)}");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+        //il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
         il.Emit(OpCodes.Ldc_I4_0);
@@ -193,9 +202,10 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Brtrue, validLabel);
 
         // Log error
-        il.Emit(OpCodes.Ldsfld, loggerField);
+        //il.Emit(OpCodes.Ldsfld, loggerField);
         il.Emit(OpCodes.Ldstr, $"Could not resolve id");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+        //il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
         il.Emit(OpCodes.Ldc_I4_0);
@@ -226,9 +236,10 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Brfalse, notClientLabel);
 
         // Log error
-        il.Emit(OpCodes.Ldsfld, loggerField);
+        //il.Emit(OpCodes.Ldsfld, loggerField);
         il.Emit(OpCodes.Ldstr, $"Client attempted to change {field.Name}");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+        //il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
         il.Emit(OpCodes.Ldc_I4_0);
@@ -253,6 +264,11 @@ public class PropertyPrefixCreator
         }
 
         return typeBuilder.CreateTypeInfo();
+    }
+
+    public static void LogMessage(string message)
+    {
+        DebugMessageLogger.Write(message);
     }
 }
 
