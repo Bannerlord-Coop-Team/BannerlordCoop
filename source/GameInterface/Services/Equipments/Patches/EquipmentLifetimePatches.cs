@@ -6,6 +6,8 @@ using Serilog;
 using System;
 using TaleWorlds.Core;
 using GameInterface.Services.Equipments.Messages.Events;
+using GameInterface.Services.Heroes.Messages;
+using TaleWorlds.CampaignSystem;
 
 
 namespace GameInterface.Services.Equipments.Patches;
@@ -61,6 +63,46 @@ internal class EquipmentLifetimePatches
             MessageBroker.Instance.Publish(__instance, new EquipmentWithParamCreated(__instance, equipment));
 
         return true;
-    } 
+    }
+
+    [HarmonyPatch(typeof(Hero), nameof(Hero.OnDeath))]
+    [HarmonyPrefix]
+    private static bool OnDeathPrefix(ref Hero __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
+            return true;
+        }
+
+        var message = new EquipmentRemoved(__instance.BattleEquipment, __instance.CivilianEquipment);
+
+        MessageBroker.Instance.Publish(__instance, message);
+        return true;
+    }
+
+
+    [HarmonyPatch(typeof(Hero), nameof(Hero.ResetEquipments))]
+    [HarmonyPrefix]
+    private static void ResetEquipmentPrefix(ref Hero __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
+            return;
+        }
+
+        var message = new EquipmentRemoved(__instance.BattleEquipment, __instance.CivilianEquipment);
+
+        MessageBroker.Instance.Publish(__instance, message);
+
+    }
+
 
 }

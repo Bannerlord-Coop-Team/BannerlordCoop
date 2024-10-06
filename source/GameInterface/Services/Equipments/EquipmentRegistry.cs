@@ -4,18 +4,25 @@ using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
+using TaleWorlds.CampaignSystem.Siege;
+using System.Threading;
 
 namespace GameInterface.Services.Equipments;
 
 /// <summary>
 /// Registry for <see cref="Equipment"/> objects
 /// </summary>
-internal class EquipmentRegistry : RegistryBase<Equipment> { 
+internal class EquipmentRegistry : RegistryBase<Equipment> {
+
+    private const string EquipmentPrefix = $"Coop{nameof(Equipment)}";
+    private static int InstanceCounter = 0;
+
     public EquipmentRegistry(IRegistryCollection collection) : base(collection) { }
 
     public override void RegisterAll()
     {
         var objectManager = MBObjectManager.Instance;
+
 
         if (objectManager == null)
         {
@@ -40,6 +47,6 @@ internal class EquipmentRegistry : RegistryBase<Equipment> {
 
     protected override string GetNewId(Equipment equipment)
     {
-        return Guid.NewGuid().ToString();
+        return EquipmentPrefix + Interlocked.Increment(ref InstanceCounter);
     }
 }

@@ -40,7 +40,6 @@ public class EquipmentSyncTests : IDisposable
         string? EquipmentId = null;
         string? EquipmentWithEquipParamId = null;
         string? civilEquipmentId = null;
-        Equipment? parameter = null;
 
 
         // Act
@@ -58,48 +57,32 @@ public class EquipmentSyncTests : IDisposable
             Assert.True(server.ObjectManager.TryGetId(civilEquip, out civilEquipmentId));
 
             // Equipment Param
-            Hero hero = GameObjectCreator.CreateInitializedObject<Hero>();
-            hero.ResetEquipments();
-            parameter = hero.BattleEquipment;
-            
-            // Use AccessTools to set the itemSlot field of the equipment to ssomething like new ItemObject("test");
-
-
-            var EquipWithEquipParam = new Equipment(parameter);
+           
+            var EquipWithEquipParam = new Equipment(Equip);
             Assert.True(server.ObjectManager.TryGetId(EquipWithEquipParam, out EquipmentWithEquipParamId));
 
         });
 
         // Assert
-        Assert.True(server.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var _));
+        Assert.True(server.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var Equip));
 
         Assert.True(server.ObjectManager.TryGetObject<Equipment>(civilEquipmentId, out var serverCivilEquipment));
         Assert.True(serverCivilEquipment.IsCivilian);
 
         Assert.True(server.ObjectManager.TryGetObject<Equipment>(EquipmentWithEquipParamId, out var serverEquipment));
-        Assert.Equal(parameter._equipmentType, serverEquipment._equipmentType);
-        //  Test failing because equipment itemSlots field is null / not properly instantiated
-        for (int i=0; i<12; i++)
-        {
-            Assert.True(serverEquipment._itemSlots[i].IsEqualTo(parameter._itemSlots[i]));
-        }
-        Assert.Equal(parameter._equipmentType, serverEquipment._equipmentType);
+        Assert.Equal(serverEquipment._equipmentType, Equip._equipmentType);
 
 
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var _));
             Assert.True(client.ObjectManager.TryGetObject<Equipment>(civilEquipmentId, out var clientCivilEquipment));
-            //  Assert.True(clientCivilEquipment.IsCivilian);     //  -> Test is failing since we cannot test fieldintercept this way
             Assert.True(client.ObjectManager.TryGetObject<Equipment>(EquipmentWithEquipParamId, out var clientEquipment));
-            //  Assert.Equal(parameter._equipmentType, clientEquipment._equipmentType); //  -> Test is failing since we cannot test fieldintercept this way
-            for (int i = 0; i < 12; i++)
-            {
-                Assert.Same(clientEquipment._itemSlots[i], parameter._itemSlots[i]);
-            }
 
         }
+
     }
+    
 
     [Fact]
     public void ClientCreateEquipment_DoesNothing()

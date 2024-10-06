@@ -39,6 +39,9 @@ namespace GameInterface.Services.Equipments.Handlers
 
             messageBroker.Subscribe<NetworkCreateEquipment>(Handle);
             messageBroker.Subscribe<NetworkCreateEquipmentWithParam>(Handle);
+
+            messageBroker.Subscribe<EquipmentRemoved>(Handle);
+            messageBroker.Subscribe<NetworkRemoveEquipment>(Handle);
         }
 
         public void Dispose()
@@ -47,14 +50,15 @@ namespace GameInterface.Services.Equipments.Handlers
             messageBroker.Unsubscribe<NetworkCreateEquipment>(Handle);
             messageBroker.Unsubscribe<EquipmentWithParamCreated>(Handle);
             messageBroker.Unsubscribe<NetworkCreateEquipmentWithParam>(Handle);
+            messageBroker.Unsubscribe<EquipmentRemoved>(Handle);
+            messageBroker.Unsubscribe<NetworkRemoveEquipment>(Handle);
         }
 
         private void Handle(MessagePayload<EquipmentCreated> payload)
         {
 
             if (objectManager.TryGetId(payload.What.Data, out string newEquipmentId) )
-            {   //  Check if we want to construct via chained constructor
-                
+            {                
                 Logger.Error("Server already has {name} in object manager\n"
                     + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
                     
@@ -92,52 +96,27 @@ namespace GameInterface.Services.Equipments.Handlers
         {
             var payload = obj.What.Data;
 
-            objectManager.TryGetObject<Equipment>(payload.EquipmentId, out var testEquipment);
-
- /*           if (payload.EquipmentPropertyId != null)
-            {
-                if (objectManager.TryGetObject(payload.EquipmentPropertyId, out propertyEquipment) == false)
-                {
-                    return;
-                }
-            }
-*/
             Equipment newEquipment = ObjectHelper.SkipConstructor<Equipment>();
             GameLoopRunner.RunOnMainThread(() =>
             {
-                using (new AllowedThread())
-                {
-/*
-                    if (propertyEquipment != null)
-                    {
-                        using (new AllowedThread())
-                        {
-                            EquipmentParam_ctor.Invoke(newEquipment, new object[] { propertyEquipment });
-                        }
-                    }
-
-                    else    */
-                    {
-                        using (new AllowedThread())
-                        {
-                            Equipment_ctor.Invoke(newEquipment, Array.Empty<object>());
-                        }
-                    }
-                    objectManager.AddExisting(payload.EquipmentId, newEquipment);
-                 }
+                  using (new AllowedThread())
+                  {
+                      Equipment_ctor.Invoke(newEquipment, Array.Empty<object>());
+                  }
+                  objectManager.AddExisting(payload.EquipmentId, newEquipment);
+               
             });
         }
         private void Handle(MessagePayload<NetworkCreateEquipmentWithParam> obj)
         {
             var payload = obj.What.Data;
 
-            objectManager.TryGetObject<Equipment>(payload.EquipmentId, out var testEquipment);
             Equipment propertyEquipment = null;
             if (payload.EquipmentPropertyId != null)
             {
                 if (objectManager.TryGetObject(payload.EquipmentPropertyId, out propertyEquipment) == false)
                 {
-                    Logger.Error("Equipment param not found in object manager");
+                    Logger.Error("Equipment param not found in object manager. Breaking field sync inside ctor.");
                     return;
                 }
             }
@@ -146,22 +125,62 @@ namespace GameInterface.Services.Equipments.Handlers
             {
                 using (new AllowedThread())
                 {
-                    /*
-                     * if (propertyEquipment != null)
-                                        {
-                                            using (new AllowedThread())
-                                            {
-                                                EquipmentParam_ctor.Invoke(newEquipment, new object[] { propertyEquipment });
-                                            }
-                                        }
-
-                                        else    */
-                    
                     EquipmentParam_ctor.Invoke(newEquipment, new object[] { propertyEquipment });
                     
                     objectManager.AddExisting(payload.EquipmentId, newEquipment);
                 }
             });
+        }
+
+        private void Handle(MessagePayload<EquipmentRemoved> obj)
+        {
+            var payload = obj.What;
+            if (objectManager.TryGetId(payload.battleEquipment, out string battleEquipmentId) == false)
+            {
+                Logger.Error("Failed to get ID for server removal of {type}", typeof(Equipment));
+                return;
+            }
+            if (objectManager.TryGetId(payload.civilEquipment, out string civEquipmentId) == false)
+            {
+                Logger.Error("Failed to get ID for server removal of {type}", typeof(Equipment));
+                return;
+            }
+            if (objectManager.Remove(payload.battleEquipment) == false)
+            {
+                Logger.Error("Failed to remove {type}", typeof(Equipment));
+                return;
+            }
+            if (objectManager.Remove(payload.civilEquipment) == false)
+            {
+                Logger.Error("Failed to remove {type}", typeof(Equipment));
+                return;
+            }
+            NetworkRemoveEquipment message = new(battleEquipmentId, civEquipmentId);
+            network.SendAll(message);
+        }
+
+        private void Handle(MessagePayload<NetworkRemoveEquipment> payload) { 
+            
+            if (objectManager.TryGetObject(payload.What.BattleEquipmentId, out Equipment BattleEquipment) == false)
+            {
+                Logger.Error("Failed to get object for {type} with id {id}", typeof(Equipment), payload.What.BattleEquipmentId);
+                return;
+            }
+            if (objectManager.TryGetObject(payload.What.CivilEquipmentId, out Equipment CivilEquipment) == false)
+            {
+                Logger.Error("Failed to get object for {type} with id {id}", typeof(Equipment), payload.What.BattleEquipmentId);
+                return;
+            }
+            if (objectManager.Remove(BattleEquipment) == false)
+            {
+                Logger.Error("Failed to remove {type} with id { id}", typeof(Equipment), payload.What.BattleEquipmentId);
+                return;
+            }
+            if (objectManager.Remove(CivilEquipment) == false)
+            {
+                Logger.Error("Failed to remove {type} with id { id}", typeof(Equipment), payload.What.CivilEquipmentId);
+                return;
+            }
         }
     }
     
