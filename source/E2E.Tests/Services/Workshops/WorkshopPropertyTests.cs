@@ -132,15 +132,13 @@ namespace E2E.Tests.Services.Workshops
         [Fact]
         public void ServerChangeWorkshopOwner_SyncAllClients()
         {
-
             Assert.True(Server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var serverWorkshop));
-            Assert.True(Server.ObjectManager.TryGetObject<WorkshopType>(WorkshopTypeId, out var serverWorkshopType));
             var newOwner = GameObjectCreator.CreateInitializedObject<Hero>();
 
             // Act
             Server.Call(() =>
             {
-                serverWorkshop.ChangeOwnerOfWorkshop(newOwner, serverWorkshopType, serverWorkshop.Capital);
+                serverWorkshop.ChangeOwnerOfWorkshop(newOwner, serverWorkshop.WorkshopType, serverWorkshop.Capital);
             });
 
             // Assert
