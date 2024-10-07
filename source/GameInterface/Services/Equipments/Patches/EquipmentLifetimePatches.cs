@@ -33,9 +33,10 @@ internal class EquipmentLifetimePatches
         
         if (ModInformation.IsClient)
         {
-            // Joining a game with client triggers this to be true a lot, so lots of errors in the log. Removed logger here
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
 
-            return true; // Is it maybe better to return false here?
+            return true;
         }
 
         MessageBroker.Instance.Publish(__instance, new EquipmentCreated(__instance));
@@ -52,9 +53,10 @@ internal class EquipmentLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            // Joining a game with client triggers this to be true a lot, so lots of errors in the log. Removed logger here
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
 
-            // Is it maybe better to return false here?
+
             return true;
         }
 
