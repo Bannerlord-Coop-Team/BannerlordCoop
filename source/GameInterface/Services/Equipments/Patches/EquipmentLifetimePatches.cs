@@ -32,10 +32,10 @@ internal class EquipmentLifetimePatches
 
         
         if (ModInformation.IsClient)
-        {
+        {   /*
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
-
+            */
             return true;
         }
 
@@ -53,10 +53,10 @@ internal class EquipmentLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
+           /* Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
 
-
+            */
             return true;
         }
 
