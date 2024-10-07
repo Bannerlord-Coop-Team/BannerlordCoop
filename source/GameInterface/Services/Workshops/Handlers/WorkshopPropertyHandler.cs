@@ -8,11 +8,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Workshops.Messages;
 using GameInterface.Services.Workshops.Patches;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 
 namespace GameInterface.Services.Workshops.Handlers
@@ -85,6 +81,21 @@ namespace GameInterface.Services.Workshops.Handlers
 
                 case PropertyType.InitialCapital:
                     instance.InitialCapital = int.Parse(data.mainData);
+                    break;
+
+                case PropertyType.CustomName:
+                    instance.SetCustomName(new TaleWorlds.Localization.TextObject(data.mainData));
+                    break;
+
+                case PropertyType.Owner:
+                    if (objectManager.TryGetObject<Hero>(data.mainData, out Hero newOwner))
+                    {
+                        instance.ChangeOwnerOfWorkshop(newOwner, instance.WorkshopType, int.Parse(data.mainData));
+                    }
+                    else
+                    {
+                        Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.mainData);
+                    }
                     break;
             }
         }

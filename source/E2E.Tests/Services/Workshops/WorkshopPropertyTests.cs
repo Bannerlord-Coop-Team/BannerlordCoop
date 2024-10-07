@@ -1,14 +1,7 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -135,5 +128,76 @@ namespace E2E.Tests.Services.Workshops
                 Assert.Equal(serverWorkshop.WorkshopType.StringId, clientWorkshop.WorkshopType.StringId);
             }
         }
+
+        [Fact]
+        public void ServerChangeWorkshopOwner_SyncAllClients()
+        {
+
+            Assert.True(Server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var serverWorkshop));
+            Assert.True(Server.ObjectManager.TryGetObject<WorkshopType>(WorkshopTypeId, out var serverWorkshopType));
+            var newOwner = GameObjectCreator.CreateInitializedObject<Hero>();
+
+            // Act
+            Server.Call(() =>
+            {
+                serverWorkshop.ChangeOwnerOfWorkshop(newOwner, serverWorkshopType, serverWorkshop.Capital);
+            });
+
+            // Assert
+            foreach (var client in TestEnvironement.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
+                Assert.Equal(newOwner.StringId, clientWorkshop.Owner.StringId);
+            }
+        }
+        [Fact]
+        public void ServerChangeWorkshopCustomName_SyncAllClients()
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var serverWorkshop));
+            var newCustomName = new TextObject("New Workshop Name");
+
+            // Act
+            Server.Call(() =>
+            {
+                serverWorkshop.SetCustomName(newCustomName);
+            });
+
+            // Assert
+            foreach (var client in TestEnvironement.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
+                Assert.Equal(newCustomName.ToString(), clientWorkshop._customName.ToString());
+            }
+        }
+
+        [Fact]
+        public void WorkshopTag_SyncAllClients()
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var serverWorkshop));
+            var originalTag = serverWorkshop.Tag;
+
+            // Assert
+            foreach (var client in TestEnvironement.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
+                Assert.Equal(originalTag, clientWorkshop.Tag);  // Ensure client has the correct tag
+            }
+        }
+
+        [Fact]
+        public void WorkshopSettlement_SyncAllClients()
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var serverWorkshop));
+            var originalSettlement = serverWorkshop.Settlement;
+
+            // Assert
+            foreach (var client in TestEnvironement.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
+                Assert.Equal(originalSettlement.StringId, clientWorkshop.Settlement.StringId);  // Ensure client has the correct settlement
+            }
+        }
+
+
     }
 }

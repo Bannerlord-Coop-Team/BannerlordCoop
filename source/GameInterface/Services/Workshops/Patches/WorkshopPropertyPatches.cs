@@ -7,7 +7,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 
 namespace GameInterface.Services.Workshops.Patches
@@ -18,6 +18,10 @@ namespace GameInterface.Services.Workshops.Patches
         LastRunCampaignTime,
         WorkshopType,
         InitialCapital,
+        CustomName,
+        Owner,
+        Settlement,
+        Tag
     }
 
     [HarmonyPatch(typeof(Workshop))]
@@ -110,6 +114,78 @@ namespace GameInterface.Services.Workshops.Patches
             }
 
             var message = new WorkshopPropertyChanged(PropertyType.InitialCapital, __instance, value.ToString());
+            MessageBroker.Instance.Publish(__instance, message);
+
+            return ModInformation.IsServer;
+        }
+
+        [HarmonyPatch(nameof(Workshop.SetCustomName), MethodType.Normal)]
+        [HarmonyPrefix]
+        private static bool SetCustomNamePrefix(Workshop __instance, TaleWorlds.Localization.TextObject value)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client tried to set {name}\nCallstack: {callstack}", nameof(Workshop.SetCustomName), Environment.StackTrace);
+                return false;
+            }
+
+            var message = new WorkshopPropertyChanged(PropertyType.CustomName, __instance, value.ToString());
+            MessageBroker.Instance.Publish(__instance, message);
+
+            return ModInformation.IsServer;
+        }
+
+        [HarmonyPatch(nameof(Workshop.Owner), MethodType.Setter)]
+        [HarmonyPrefix]
+        private static bool SetOwnerPrefix(Workshop __instance, Hero value)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client tried to set {name}\nCallstack: {callstack}", nameof(Workshop.Owner), Environment.StackTrace);
+                return false;
+            }
+
+            var message = new WorkshopPropertyChanged(PropertyType.Owner, __instance, value.StringId);
+            MessageBroker.Instance.Publish(__instance, message);
+
+            return ModInformation.IsServer;
+        }
+
+        [HarmonyPatch(nameof(Workshop.Settlement), MethodType.Setter)]
+        [HarmonyPrefix]
+        private static bool SetSettlementPrefix(Workshop __instance, Settlement value)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client tried to set {name}\nCallstack: {callstack}", nameof(Workshop.Settlement), Environment.StackTrace);
+                return false;
+            }
+
+            var message = new WorkshopPropertyChanged(PropertyType.Settlement, __instance, value.StringId);
+            MessageBroker.Instance.Publish(__instance, message);
+
+            return ModInformation.IsServer;
+        }
+
+        [HarmonyPatch(nameof(Workshop.Tag), MethodType.Setter)]
+        [HarmonyPrefix]
+        private static bool SetTagPrefix(Workshop __instance, string value)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client tried to set {name}\nCallstack: {callstack}", nameof(Workshop.Tag), Environment.StackTrace);
+                return false;
+            }
+
+            var message = new WorkshopPropertyChanged(PropertyType.Tag, __instance, value);
             MessageBroker.Instance.Publish(__instance, message);
 
             return ModInformation.IsServer;
