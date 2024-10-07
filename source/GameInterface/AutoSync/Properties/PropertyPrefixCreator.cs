@@ -123,13 +123,7 @@ public class PropertyPrefixCreator
 
         var il = methodBuilder.GetILGenerator();
 
-        il.Emit(OpCodes.Ldstr, $"Prefix for  {prop.DeclaringType.Name}::{prop.Name} called");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
-
         IsThreadAllowed(il);
-        
-        il.Emit(OpCodes.Ldstr, $"Prefix for  {prop.DeclaringType.Name}::{prop.Name} called after allowed");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         IsClientCheck(il, prop);
 
@@ -152,6 +146,8 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Box, typeof(PropertyAutoSyncPacket));
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
 
+        // Log error
+        il.Emit(OpCodes.Ldsfld, loggerField);
         il.Emit(OpCodes.Ldstr, $"Syncing {prop.Name} for {prop.DeclaringType}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
@@ -265,7 +261,8 @@ public class PropertyPrefixCreator
 
     public static void LogMessage(ILogger logger, string message)
     {
-        DebugMessageLogger.Write(message);
+        logger.Debug(message);
+        //DebugMessageLogger.Write(message);
     }
 }
 
