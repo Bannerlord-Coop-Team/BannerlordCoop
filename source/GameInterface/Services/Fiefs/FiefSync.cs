@@ -1,7 +1,5 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
-using Serilog;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Fiefs;

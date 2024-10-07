@@ -30,8 +30,7 @@ public sealed class BatchLogger : IDisposable
 	{
         this.pollInterval = pollInterval;
         poller = new Poller(Poll, pollInterval);
-		// TODO re-enable
-        //poller.Start();
+        poller.Start();
     }
 
 	/// <summary>

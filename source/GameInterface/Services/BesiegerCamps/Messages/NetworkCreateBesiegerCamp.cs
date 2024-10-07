@@ -6,7 +6,6 @@ namespace GameInterface.Services.BesiegerCamps.Messages;
 [ProtoContract(SkipConstructor = true)]
 internal class NetworkCreateBesiegerCamp : ICommand
 {
-
     [ProtoMember(1)]
     public string BesiegerCampId { get; }
 

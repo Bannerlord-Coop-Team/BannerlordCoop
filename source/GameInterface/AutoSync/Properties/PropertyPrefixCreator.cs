@@ -35,9 +35,9 @@ public class PropertyPrefixCreator
             TypeAttributes.AutoLayout,
             null);
 
-        //loggerField = typeBuilder.DefineField("logger", typeof(ILogger), FieldAttributes.Private | FieldAttributes.InitOnly | FieldAttributes.Static);
+        loggerField = typeBuilder.DefineField("logger", typeof(ILogger), FieldAttributes.Private | FieldAttributes.InitOnly | FieldAttributes.Static);
 
-        //CreateStaticCtor();
+        CreateStaticCtor();
 
         var ctorBuilder = typeBuilder.DefineConstructor(
             MethodAttributes.Public | MethodAttributes.SpecialName | MethodAttributes.RTSpecialName,
@@ -172,9 +172,8 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Brtrue, validLabel);
 
         // Log error
-        //il.Emit(OpCodes.Ldsfld, loggerField);
+        il.Emit(OpCodes.Ldsfld, loggerField);
         il.Emit(OpCodes.Ldstr, $"Unable to resolve {nameof(T)}");
-        //il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
@@ -202,9 +201,8 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Brtrue, validLabel);
 
         // Log error
-        //il.Emit(OpCodes.Ldsfld, loggerField);
+        il.Emit(OpCodes.Ldsfld, loggerField);
         il.Emit(OpCodes.Ldstr, $"Could not resolve id");
-        //il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
@@ -236,9 +234,8 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Brfalse, notClientLabel);
 
         // Log error
-        //il.Emit(OpCodes.Ldsfld, loggerField);
+        il.Emit(OpCodes.Ldsfld, loggerField);
         il.Emit(OpCodes.Ldstr, $"Client attempted to change {field.Name}");
-        //il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
@@ -266,7 +263,7 @@ public class PropertyPrefixCreator
         return typeBuilder.CreateTypeInfo();
     }
 
-    public static void LogMessage(string message)
+    public static void LogMessage(ILogger logger, string message)
     {
         DebugMessageLogger.Write(message);
     }

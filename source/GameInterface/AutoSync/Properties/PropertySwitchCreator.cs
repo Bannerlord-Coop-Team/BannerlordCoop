@@ -128,9 +128,6 @@ public class PropertySwitchCreator
         {
             il.MarkLabel(labels[i]);
 
-            il.Emit(OpCodes.Ldstr, $"Setting {properties[i].PropertyType} for {properties[i].DeclaringType}");
-            il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(PropertyPrefixCreator.LogMessage)));
-
             if (RuntimeTypeModel.Default.CanSerialize(properties[i].PropertyType))
                 CreateByValue(il, properties[i], instanceLocal);
             else if (objectManager.IsTypeManaged(properties[i].PropertyType))

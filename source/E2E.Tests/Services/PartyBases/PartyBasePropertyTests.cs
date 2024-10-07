@@ -48,7 +48,6 @@ public class PartyBaseLifetimeTests : IDisposable
 
         foreach (var client in TestEnvironment.Clients)
         {
-            
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
             Assert.True(client.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var clientPartyBase));
             Assert.Equal(clientPartyBase.MobileParty, clientParty);

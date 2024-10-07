@@ -253,6 +253,5 @@ namespace GameInterface.Services.Heroes.Handlers
 
             instance.LastTimeStampForActivity = data.LastTimeStamp;
         }
-        
     }
 }
