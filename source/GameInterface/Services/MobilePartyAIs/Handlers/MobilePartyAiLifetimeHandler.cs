@@ -64,7 +64,7 @@ internal class MobilePartyAiLifetimeHandler : IHandler
 
         if (objectManager.TryGetObject<MobileParty>(partyId, out var party) == false) return;
 
-        var newAi = new MobilePartyAi(party);
+        var newAi = ObjectHelper.SkipConstructor<MobilePartyAi>();
 
         objectManager.AddExisting(aiId, newAi);
     }

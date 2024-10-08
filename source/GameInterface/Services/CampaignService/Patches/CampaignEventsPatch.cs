@@ -1,9 +1,7 @@
 ﻿using HarmonyLib;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.CampaignService.Patches
@@ -28,7 +26,8 @@ namespace GameInterface.Services.CampaignService.Patches
         {
             return typeof(CampaignEventDispatcher).GetMethods()
                 .Where(m => m.Name.ToLower().Contains("tick"))
-                .Where(m => m.Name.StartsWith("get_") == false);
+                .Where(m => m.Name.StartsWith("get_") == false)
+                .AddItem(AccessTools.Method(typeof(Campaign), nameof(Campaign.Tick)));
         }
 
         public static bool Prefix() => ModInformation.IsServer;

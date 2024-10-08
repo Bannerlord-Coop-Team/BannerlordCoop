@@ -2,6 +2,7 @@
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.Registry;
 using System;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -13,20 +14,12 @@ namespace GameInterface.Services.MobileParties;
 internal class MobilePartyRegistry : RegistryBase<MobileParty>
 {
     private const string PartyStringIdPrefix = "CoopParty";
+    private int InstanceCounter = 0;
     private readonly IMessageBroker messageBroker;
 
     public MobilePartyRegistry(IRegistryCollection collection, IMessageBroker messageBroker) : base(collection)
     {
         this.messageBroker = messageBroker;
-
-        messageBroker.Subscribe<PartyDestroyed>(Handle_PartyDestroyed);
-    }
-
-    public override void Dispose()
-    {
-        messageBroker.Unsubscribe<PartyDestroyed>(Handle_PartyDestroyed);
-
-        base.Dispose();
     }
 
     public override void RegisterAll()
@@ -67,14 +60,7 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>
 
     protected override string GetNewId(MobileParty party)
     {
-        party.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<MobileParty>(PartyStringIdPrefix);
+        party.StringId = $"{PartyStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
         return party.StringId;
-    }
-
-    private void Handle_PartyDestroyed(MessagePayload<PartyDestroyed> payload)
-    {
-        var stringId = payload.What.Data.StringId;
-
-        Remove(stringId);
     }
 }
