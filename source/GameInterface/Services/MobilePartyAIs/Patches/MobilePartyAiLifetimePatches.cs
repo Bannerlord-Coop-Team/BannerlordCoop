@@ -17,22 +17,22 @@ class MobilePartyAiLifetimePatches
 
     [HarmonyPatch(typeof(MobilePartyAi), MethodType.Constructor, typeof(MobileParty))]
     [HarmonyPrefix]
-    static bool CtorPrefix(MobilePartyAi __instance, MobileParty mobileParty)
+    static void CtorPrefix(MobilePartyAi __instance, MobileParty mobileParty)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
 
-            return true;
+            return;
         }
 
         MessageBroker.Instance.Publish(__instance, new MobilePartyAiCreated(__instance, mobileParty));
 
-        return true;
+        return;
     }
 
     [HarmonyPatch(typeof(MobileParty), nameof(MobileParty.RemoveParty))]

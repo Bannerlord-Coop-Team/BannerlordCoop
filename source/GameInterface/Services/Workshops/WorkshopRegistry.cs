@@ -8,7 +8,7 @@ namespace GameInterface.Services.Workshops
 {
     internal class WorkshopRegistry : RegistryBase<Workshop>
     {
-        private const string WorkshopTypePrefix = $"Coop{nameof(Workshop)}";
+        private const string WorkshopIdPrefix = $"Coop{nameof(Workshop)}";
         private static int InstanceCounter = 0;
 
         public WorkshopRegistry(IRegistryCollection collection) : base(collection) { }
@@ -34,7 +34,7 @@ namespace GameInterface.Services.Workshops
 
         protected override string GetNewId(Workshop shop)
         {
-            return WorkshopTypePrefix + Interlocked.Increment(ref InstanceCounter);
+            return $"{WorkshopIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
         }
     }
 }

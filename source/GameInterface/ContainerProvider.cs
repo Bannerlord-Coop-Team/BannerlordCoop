@@ -1,7 +1,5 @@
 ﻿using Autofac;
 using Common.Logging;
-using Common.Messaging;
-using Common.Util;
 using Serilog;
 using System;
 using System.Threading;
@@ -13,6 +11,8 @@ public class ContainerProvider
     private static ILogger Logger = LogManager.GetLogger<ContainerProvider>();
 
     private static ILifetimeScope _lifetimeScope;
+
+    public static bool Alive { get; } = _lifetimeScope != null;
 
     public static void SetContainer(ILifetimeScope lifetimeScope)
     {

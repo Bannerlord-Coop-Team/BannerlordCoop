@@ -1,10 +1,12 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Tests.Utils;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.Tests.Bootstrap;
+using Serilog;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -27,10 +29,12 @@ internal class E2ETestEnvironment : IDisposable
 
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
+        LogManager.Configuration = new LoggerConfiguration().WriteTo.TestOutput(output);
+
         GameLoopRunner.Instance.SetGameLoopThread();
 
         GameBootStrap.Initialize();
-        IntegrationEnvironment = new TestEnvironment(numClients, registerGameInterface: true);
+        IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
@@ -56,7 +60,6 @@ internal class E2ETestEnvironment : IDisposable
         foreach (var client in Clients)
         {
             client.Resolve<IAutoSyncBuilder>().Build();
-            client.Resolve<IAutoSyncPatchCollector>().PatchAll();
         }
     }
 

@@ -59,7 +59,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                 case PropertyType.Army:
                     if (data.Value2 == null)
                     {
-                        instance.Army = null;
+                        instance._army = null;
                         return;
                     }
                     if (objectManager.TryGetObject<Army>(data.Value2, out var army) == false)

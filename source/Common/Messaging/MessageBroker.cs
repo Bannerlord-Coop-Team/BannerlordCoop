@@ -68,6 +68,7 @@ namespace Common.Messaging
                     continue;
                 }
 
+                // Making synchronous to maintain sequencing of packets
                 //Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
 
                 weakDelegate.Invoke(new object[] { payload });
