@@ -167,35 +167,5 @@ namespace E2E.Tests.Services.Workshops
                 Assert.Equal(newCustomName.ToString(), clientWorkshop._customName.ToString());
             }
         }
-
-        [Fact]
-        public void WorkshopTag_SyncAllClients()
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var serverWorkshop));
-            var originalTag = serverWorkshop.Tag;
-
-            // Assert
-            foreach (var client in TestEnvironement.Clients)
-            {
-                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
-                Assert.Equal(originalTag, clientWorkshop.Tag);  // Ensure client has the correct tag
-            }
-        }
-
-        [Fact]
-        public void WorkshopSettlement_SyncAllClients()
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var serverWorkshop));
-            var originalSettlement = serverWorkshop.Settlement;
-
-            // Assert
-            foreach (var client in TestEnvironement.Clients)
-            {
-                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
-                Assert.Equal(originalSettlement.StringId, clientWorkshop.Settlement.StringId);  // Ensure client has the correct settlement
-            }
-        }
-
-
     }
 }

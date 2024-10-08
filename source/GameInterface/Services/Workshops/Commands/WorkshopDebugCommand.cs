@@ -113,7 +113,5 @@ namespace GameInterface.Services.Workshops.Commands
 
             return $"Workshop owner has been changed to: {newOwner.Name} with the type {workshop.WorkshopType} and with a capital of {workshop.Capital}";
         }
-
-
     }
 }
