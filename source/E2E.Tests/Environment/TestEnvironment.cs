@@ -10,6 +10,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using GameInterface;
 using GameInterface.Policies;
+using Xunit.Abstractions;
 using ContainerProvider = Coop.Core.ContainerProvider;
 
 namespace E2E.Tests.Environment;
@@ -29,21 +30,21 @@ public class TestEnvironment
     /// Constructor for TestEnvironment
     /// </summary>
     /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
-    public TestEnvironment(int numClients = 2, bool registerGameInterface = false)
+    public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false)
     {
         this.registerGameInterface = registerGameInterface;
 
         // Setup test network
         networkOrchestrator = new TestNetworkRouter();
 
-        Server = CreateServer();
+        Server = CreateServer(output);
 
         var serverNetwork = Server.Container.Resolve<MockServer>();
 
         var clients = new EnvironmentInstance[numClients];
         for (int i = 0; i < numClients; i++)
         {
-            clients[i] = CreateClient();
+            clients[i] = CreateClient(output);
             serverNetwork.AddPeer(clients[i].NetPeer);
         }
 
@@ -56,7 +57,7 @@ public class TestEnvironment
 
     private readonly bool registerGameInterface;
 
-    private EnvironmentInstance CreateClient()
+    private EnvironmentInstance CreateClient(ITestOutputHelper output)
     {
         containerProvider = new ContainerProvider();
 
@@ -80,7 +81,7 @@ public class TestEnvironment
         return instance;
     }
 
-    private EnvironmentInstance CreateServer()
+    private EnvironmentInstance CreateServer(ITestOutputHelper output)
     {
         containerProvider = new ContainerProvider();
 

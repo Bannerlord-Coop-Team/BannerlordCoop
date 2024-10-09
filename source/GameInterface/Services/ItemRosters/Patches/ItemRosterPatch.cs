@@ -26,10 +26,10 @@ namespace GameInterface.Services.ItemRosters.Patches
             if (ModInformation.IsClient)
             {
                 __result = -1;
-                return false; // Disallow not allowed clients
+                return false; // Disallow clients
             }
 
-            return true; // Allow server calls
+            return true; // Allow on server
         }
 
         [HarmonyPatch(nameof(ItemRoster.AddToCounts), new[] { typeof(EquipmentElement), typeof(int) })]
@@ -59,8 +59,29 @@ namespace GameInterface.Services.ItemRosters.Patches
                         partyBase.Id,
                         rosterElement.Item.StringId,
                         rosterElement.ItemModifier?.StringId,
-                        number
-                ));
+                        number));
+        }
+
+        [HarmonyPatch(nameof(ItemRoster.Clear))]
+        [HarmonyPrefix]
+        public static bool ClearPrefix(ItemRoster __instance)
+        {
+            // Skip this prefix, if called by the mod
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient)
+            {
+                return false; // Disallow on clients
+            }
+
+            if (ItemRosterLookup.TryGetValue(__instance, out var partyBase) == false)
+            {
+                Logger.Error("Unable to find party from item roster");
+                return false;
+            }
+
+            MessageBroker.Instance.Publish(__instance, new ItemRosterCleared(partyBase.Id));
+            return true; // Allow on server
         }
 
         public static void AddToCountsOverride(ItemRoster itemRoster, EquipmentElement rosterElement, int amount)
@@ -69,7 +90,18 @@ namespace GameInterface.Services.ItemRosters.Patches
             {
                 using (new AllowedThread())
                 {
-                    itemRoster.AddToCounts(rosterElement, amount);
+                    itemRoster?.AddToCounts(rosterElement, amount);
+                }
+            });
+        }
+
+        public static void ClearOverride(ItemRoster itemRoster)
+        {
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                using (new AllowedThread())
+                {
+                    itemRoster?.Clear();
                 }
             });
         }

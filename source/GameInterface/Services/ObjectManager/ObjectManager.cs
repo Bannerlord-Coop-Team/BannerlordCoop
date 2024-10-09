@@ -1,20 +1,13 @@
 ﻿using Common;
 using Common.Logging;
-using GameInterface.Services.Armies;
-using GameInterface.Services.Clans;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.Registry;
-using GameInterface.Services.Settlements;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.Serialization;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
+using System.Runtime.InteropServices;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ObjectManager;
@@ -74,6 +67,7 @@ public interface IObjectManager
     /// <param name="obj">Object to remove</param>
     /// <returns>True if successful, false if failed</returns>
     bool Remove(object obj);
+    bool IsTypeManaged(Type type);
 }
 
 /// <summary>
@@ -81,21 +75,18 @@ public interface IObjectManager
 /// </summary>
 internal class ObjectManager : IObjectManager
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<ObjectManager>();
+    private readonly ILogger logger;
 
-    private readonly GameObjectManager defaultObjectManager = new GameObjectManager();
+    private readonly GameObjectManager defaultObjectManager;
 
-    private readonly Dictionary<Type, IRegistry> RegistryMap = new Dictionary<Type, IRegistry>();
+    IReadOnlyDictionary<Type, IRegistry> RegistryMap => registryCollection.RegistryMap;
 
-    public ObjectManager(IRegistryCollection registryCollection)
+    public ObjectManager(IRegistryCollection registryCollection, ILogger logger)
     {
-        foreach (var registry in registryCollection)
-        {
-            foreach (var managedType in registry.ManagedTypes)
-            {
-                RegistryMap.Add(managedType, registry);
-            }
-        }
+        this.registryCollection = registryCollection;
+        this.logger = logger;
+
+        defaultObjectManager = new GameObjectManager(logger);
     }
 
     public bool AddExisting(string id, object obj)
@@ -103,7 +94,7 @@ internal class ObjectManager : IObjectManager
         if (string.IsNullOrEmpty(id)) return false;
 
         if (obj == null) return false;
-
+        
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
             return LogIfRegistrationError(
@@ -174,6 +165,8 @@ internal class ObjectManager : IObjectManager
 
     private static readonly MethodInfo GetObject = typeof(MBObjectManager)
         .GetMethod(nameof(MBObjectManager.GetObject), new Type[] { typeof(string) });
+    private readonly IRegistryCollection registryCollection;
+
     public bool TryGetObject<T>(string id, out T obj) where T : class
     {
         obj = default;
@@ -202,6 +195,11 @@ internal class ObjectManager : IObjectManager
         return defaultObjectManager.Remove(obj);
     }
 
+    public bool IsTypeManaged(Type type)
+    {
+        return RegistryMap.ContainsKey(type) || defaultObjectManager.IsTypeManaged(type);
+    }
+
     #region LogHelpers
     private bool LogIfRegistrationError(bool result, object registerObject)
     {
@@ -211,7 +209,7 @@ internal class ObjectManager : IObjectManager
         var className = nameof(ObjectManager);
         var stackTrace = Environment.StackTrace;
 
-        Logger.Error("Unable to register {name} with {objectManager}\n" +
+        logger.Error("Unable to register {name} with {objectManager}\n" +
                      "StackTrace: {stackTrace}",
                      objectType,
                      className,
@@ -228,7 +226,7 @@ internal class ObjectManager : IObjectManager
         var className = nameof(ObjectManager);
         var stackTrace = Environment.StackTrace;
 
-        Logger.Error("Unable to get {name} with {objectManager}\n" +
+        logger.Error("Unable to get {name} with {objectManager}\n" +
                      "StackTrace: {stackTrace}",
                      objectType,
                      className,
@@ -246,7 +244,7 @@ internal class ObjectManager : IObjectManager
         var className = nameof(ObjectManager);
         var stackTrace = Environment.StackTrace;
 
-        Logger.Error("Unable to get {name} with {stringId} in {objectManager}\n" +
+        logger.Error("Unable to get {name} with {stringId} in {objectManager}\n" +
                      "StackTrace: {stackTrace}",
                      objectType,
                      stringId,
@@ -275,7 +273,20 @@ internal class ObjectManager : IObjectManager
             if (TryCastToMBObject(obj, out var mbObject) == false) return false;
             mbObject.StringId = id;
 
-            return objectManager.RegisterPresumedObject(mbObject) != null;
+            return RegisterExistingObjectMethod.MakeGenericMethod(obj.GetType()).Invoke(objectManager, new object[] { obj }) != null;
+        }
+
+        private readonly MethodInfo RegisterExistingObjectMethod = AccessTools.Method(typeof(MBObjectManager), nameof(MBObjectManager.RegisterPresumedObject));
+        private readonly ILogger logger;
+
+        public GameObjectManager(ILogger logger)
+        {
+            this.logger = logger;
+        }
+
+        private T Cast<T>(object obj)
+        {
+            return (T)obj;
         }
 
         public bool AddNewObject(object obj, out string newId)
@@ -348,10 +359,12 @@ internal class ObjectManager : IObjectManager
 
             if (mbObject == null)
             {
-                Logger.Error("Attempted to register object with {type} type that does not derive from {mbObject}", obj.GetType(), typeof(MBObjectBase));
+                logger.Error("Attempted to register object with {type} type that does not derive from {mbObject}", obj.GetType(), typeof(MBObjectBase));
             }
 
             return mbObject != null;
         }
+
+        public bool IsTypeManaged(Type type) => objectManager?.HasType(type) ?? false;
     }
 }

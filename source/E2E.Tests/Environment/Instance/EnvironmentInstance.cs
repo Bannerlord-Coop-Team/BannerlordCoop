@@ -10,6 +10,7 @@ using GameInterface;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using LiteNetLib;
+using ProtoBuf.Meta;
 using System.Reflection;
 
 namespace E2E.Tests.Environment.Instance;
@@ -17,7 +18,7 @@ namespace E2E.Tests.Environment.Instance;
 /// <summary>
 /// Single instance of a server or client. Stores relevant test information.
 /// </summary>
-public abstract class EnvironmentInstance
+public abstract class EnvironmentInstance : IDisposable
 {
     public NetPeer NetPeer => mockNetwork.NetPeer;
     /// <summary>
@@ -140,8 +141,7 @@ public abstract class EnvironmentInstance
         public StaticScope(EnvironmentInstance instance)
         {
             Monitor.Enter(GameInstance.@lock);
-            instance.GameInstance.SetStatics();
-
+            
             // Save previous static values
             wasServer = ModInformation.IsServer;
             if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
@@ -151,10 +151,11 @@ public abstract class EnvironmentInstance
             }
 
             // Set new static values
+            instance.GameInstance.SetStatics();
+
             ModInformation.IsServer = instance is ServerInstance;
             instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
             GameInterface.ContainerProvider.SetContainer(instance.Container);
-
         }
 
         public void Dispose()
@@ -200,10 +201,17 @@ public abstract class EnvironmentInstance
 
     public T EnsureSerializable<T>(T obj)
     {
+        if (RuntimeTypeModel.Default.CanSerialize(obj?.GetType()) == false)
+        {
+            Assert.Fail($"ProtoBuf is unable to serialize type {obj?.GetType().Name}");
+        }
+
         var serializer = Container.Resolve<ICommonSerializer>();
 
         byte[] bytes = serializer.Serialize(obj);
 
         return serializer.Deserialize<T>(bytes);
     }
+
+    public abstract void Dispose();
 }

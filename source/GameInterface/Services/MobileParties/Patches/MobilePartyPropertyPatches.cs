@@ -8,7 +8,6 @@ using HarmonyLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -24,9 +23,8 @@ public enum PropertyType
     CustomName,
     LastVisitedSettlement,
     Aggressiveness,
-    ArmyPositionAdder,
     Objective,
-    Ai,
+    //Ai,
     IsActive,
     ShortTermBehaviour,
     IsPartyTradeActive,
@@ -139,25 +137,6 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.ArmyPositionAdder), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetArmyPositionAdderPrefix(MobileParty __instance, Vec2 value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", nameof(MobileParty.ArmyPositionAdder), Environment.StackTrace);
-            return false;
-        }
-
-        var message = new MobilePartyPropertyChanged(PropertyType.ArmyPositionAdder, __instance.StringId, value.x.ToString(), value.y.ToString());
-        MessageBroker.Instance.Publish(__instance, message);
-
-        return ModInformation.IsServer;
-    }
-
     [HarmonyPatch(nameof(MobileParty.Objective), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool SetObjectivePrefix(MobileParty __instance, int value)
@@ -177,24 +156,24 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.Ai), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetAiPrefix(MobileParty __instance, MobilePartyAi value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //[HarmonyPatch(nameof(MobileParty.Ai), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetAiPrefix(MobileParty __instance, MobilePartyAi value)
+    //{
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", nameof(MobileParty.Ai), Environment.StackTrace);
-            return false;
-        }
+    //    if (ModInformation.IsClient)
+    //    {
+    //        Logger.Error("Client tried to set {name}\n"
+    //            + "Callstack: {callstack}", nameof(MobileParty.Ai), Environment.StackTrace);
+    //        return false;
+    //    }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value._mobileParty?.StringId);
-        MessageBroker.Instance.Publish(__instance, message);
+    //    var message = new MobilePartyPropertyChanged(PropertyType.Ai, __instance.StringId, value._mobileParty?.StringId);
+    //    MessageBroker.Instance.Publish(__instance, message);
 
-        return ModInformation.IsServer;
-    }
+    //    return ModInformation.IsServer;
+    //}
 
     [HarmonyPatch(nameof(MobileParty.IsActive), MethodType.Setter)]
     [HarmonyPrefix]

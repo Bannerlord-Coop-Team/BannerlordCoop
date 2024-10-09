@@ -1,10 +1,4 @@
 ﻿using Common.Util;
-using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -25,9 +19,12 @@ internal class MobilePartyBuilder : IObjectBuilder
 
         var party = LordPartyComponent.CreateLordParty("TestParty", leaderHero, Vec2.Zero, 0, spawnSettlement, leaderHero);
 
+        party.PartyComponent.MobileParty = party;
         party.LordPartyComponent.SetMobilePartyInternal(party);
 
         party.Initialize();
+
+        party.ActualClan = clan;
 
         return party;
     }

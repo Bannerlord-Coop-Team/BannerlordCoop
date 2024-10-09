@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -26,13 +27,12 @@ public class VillagerPartyComponentTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        var village = GameObjectCreator.CreateInitializedObject<Village>();
-
         // Act
         string? partyId = null;
 
         server.Call(() =>
         {
+            var village = GameObjectCreator.CreateInitializedObject<Village>();
             var newParty = VillagerPartyComponent.CreateVillagerParty("TestId", village, 5);
             partyId = newParty.StringId;
         });
@@ -56,13 +56,21 @@ public class VillagerPartyComponentTests : IDisposable
         var client1 = TestEnvironment.Clients.First();
 
         var village = GameObjectCreator.CreateInitializedObject<Village>();
+        server.ObjectManager.AddNewObject(village, out var villageId);
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            var clientVillage = GameObjectCreator.CreateInitializedObject<Village>();
+            client.ObjectManager.AddExisting(villageId, clientVillage);
+        }
 
         // Act
-        string partyId = "TestId";
+        const string partyId = "TestId";
         client1.Call(() =>
         {
-            VillagerPartyComponent.CreateVillagerParty("TestId", village, 5);
-        });
+            Assert.True(client1.ObjectManager.TryGetObject<Village>(villageId, out var village));
+            VillagerPartyComponent.CreateVillagerParty(partyId, village, 5);
+        }, new[] { AccessTools.Method(typeof(MobileParty), nameof(MobileParty.ResetCached)) });
 
         // Assert
         foreach (var client in TestEnvironment.Clients)

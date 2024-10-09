@@ -11,4 +11,9 @@ public class ServerInstance : EnvironmentInstance
         base(messageBroker, server, containerProvider)
     {
     }
+
+    public override void Dispose()
+    {
+        Container.Dispose();
+    }
 }

@@ -35,15 +35,13 @@ namespace GameInterface.Services.MobileParties.Patches
 
         public static void OverrideApplyForParty(MobileParty mobileParty, Settlement settlement)
         {
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                GameLoopRunner.RunOnMainThread(() =>
+                using (new AllowedThread())
                 {
-                    using (new AllowedThread())
-                    {
-                        EnterSettlementAction.ApplyForParty(mobileParty, settlement);
-                    }
-                });
-            }
+                    EnterSettlementAction.ApplyForParty(mobileParty, settlement);
+                }
+            }, blocking: true);
         }
     }
 }

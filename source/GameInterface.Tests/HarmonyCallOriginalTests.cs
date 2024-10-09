@@ -156,5 +156,4 @@ namespace GameInterface.Tests
             NewValue = newVal;
         }
     }
-
 }

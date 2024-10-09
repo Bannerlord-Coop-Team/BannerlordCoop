@@ -48,7 +48,15 @@
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Autofac" Version="7.0.1" />
+    <Compile Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <Compile Remove="Server\Services\Kingdoms\Messages\**" />
+    <EmbeddedResource Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <EmbeddedResource Remove="Server\Services\Kingdoms\Messages\**" />
+    <None Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <None Remove="Server\Services\Kingdoms\Messages\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Autofac" Version="8.1.0" />
     <PackageReference Include="Krafs.Publicizer" Version="2.2.1">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -83,10 +91,6 @@
 	  <Reference Include="TaleWorlds.Library">
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
 	  </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Client\Services\MobileParties\Messages\Data\" />
-    <Folder Include="Server\Services\Kingdoms\Messages\" />
   </ItemGroup>
   <ItemGroup>
     <Publicize Include="TaleWorlds.Library" />

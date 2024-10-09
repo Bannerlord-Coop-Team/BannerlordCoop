@@ -27,5 +27,25 @@ namespace Coop.IntegrationTests.ItemRosters
                 Assert.Equal(1, client.InternalMessages.GetMessageCount<UpdateItemRoster>());
             }
         }
+
+        /// <summary>
+        /// Checks if ItemRosterCleared triggered on server, triggers ClearItemRoster on all clients.
+        /// </summary>
+        [Fact]
+        public void ServerReceivesItemRosterCleared_PublishesClearItemRoster_AllClients()
+        {
+            var triggerMessage = new ItemRosterCleared("partybase");
+
+            var server = TestEnvironment.Server;
+
+            server.SimulateMessage(this, triggerMessage);
+
+            Assert.Equal(1, server.InternalMessages.GetMessageCount<ItemRosterCleared>());
+
+            foreach (EnvironmentInstance client in TestEnvironment.Clients)
+            {
+                Assert.Equal(1, client.InternalMessages.GetMessageCount<ClearItemRoster>());
+            }
+        }
     }
 }

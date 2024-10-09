@@ -59,7 +59,7 @@ namespace GameInterface.Services.MobileParties.Handlers
                 case PropertyType.Army:
                     if (data.Value2 == null)
                     {
-                        instance.Army = null;
+                        instance._army = null;
                         return;
                     }
                     if (objectManager.TryGetObject<Army>(data.Value2, out var army) == false)
@@ -87,22 +87,19 @@ namespace GameInterface.Services.MobileParties.Handlers
                     instance.Aggressiveness = float.Parse(data.Value2);
                     return;
 
-                case PropertyType.ArmyPositionAdder:
-                    instance.ArmyPositionAdder = new Vec2(float.Parse(data.Value2), float.Parse(data.Value3));
-                    return;
-
                 case PropertyType.Objective:
                     instance.Objective = (MobileParty.PartyObjective)int.Parse(data.Value2);
                     return;
 
-                case PropertyType.Ai:
-                    if (objectManager.TryGetObject<MobileParty>(data.Value2, out var mobilePartyForAi) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
-                        return;
-                    }
-                    instance.Ai = new MobilePartyAi(mobilePartyForAi);
-                    return;
+                // Moved to autosync
+                //case PropertyType.Ai:
+                //    if (objectManager.TryGetObject<MobileParty>(data.Value2, out var mobilePartyForAi) == false)
+                //    {
+                //        Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
+                //        return;
+                //    }
+                //    instance.Ai = new MobilePartyAi(mobilePartyForAi);
+                //    return;
 
                 case PropertyType.IsActive:
                     instance.IsActive = bool.Parse(data.Value2);

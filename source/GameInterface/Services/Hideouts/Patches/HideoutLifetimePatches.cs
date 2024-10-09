@@ -2,15 +2,11 @@
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Hideouts.Messages;
-using GameInterface.Services.Kingdoms.Messages;
-using GameInterface.Services.Kingdoms.Patches;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Hideouts.Patches;
@@ -18,7 +14,7 @@ namespace GameInterface.Services.Hideouts.Patches;
 [HarmonyPatch]
 internal class HideoutLifetimePatches
 {
-    private static ILogger Logger = LogManager.GetLogger<KingdomLifetimePatches>();
+    private static ILogger Logger = LogManager.GetLogger<HideoutLifetimePatches>();
 
     private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(Hideout));
 

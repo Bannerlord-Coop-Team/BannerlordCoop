@@ -18,7 +18,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class BanditPartyComponentSerializationTest
     {
-        IContainer container;
+        readonly IContainer container;
         public BanditPartyComponentSerializationTest()
         {
             GameBootStrap.Initialize();
@@ -55,7 +55,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             allhideouts.Add(hideout);
 
-            Campaign.Current._hideouts = allhideouts;
+            Assert.NotNull(Campaign.Current);
+
+            Campaign.Current!._hideouts = allhideouts;
 
             MobileParty mobileParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
             PartyBase party = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));

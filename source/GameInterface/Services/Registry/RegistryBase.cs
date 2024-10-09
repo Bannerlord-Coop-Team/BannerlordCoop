@@ -79,6 +79,7 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
         var newId = GetNewId(castedObj);
 
         if (objIds.ContainsKey(newId)) return false;
+        if (idObjs.TryGetValue(castedObj, out var _)) return false;
 
         if (obj is MBObjectBase mbObject)
         {
@@ -98,10 +99,15 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
 
         if (idObjs.TryGetValue(castedObj, out var id) == false) return false;
 
-        return objIds.Remove(id);
+        return objIds.Remove(id) && idObjs.Remove(castedObj);
     }
 
-    public virtual bool Remove(string id) => objIds.Remove(id);
+    public virtual bool Remove(string id)
+    {
+        if (objIds.TryGetValue(id, out var obj) == false) return false;
+
+        return objIds.Remove(id) && idObjs.Remove(obj);
+    }
 
     public virtual bool TryGetId(object obj, out string id)
     {

@@ -28,42 +28,31 @@ public class PartyDestructionTests : IDisposable
         // Arrange
         var server = TestEnvironment.Server;
 
-        MobileParty? party = null;
-        server.Call(() =>
-        {
-            party = GameObjectCreator.CreateInitializedObject<MobileParty>();
-        });
-
-        Assert.NotNull(party);
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
 
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(party.StringId, out var clientParty));
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+
+
             Assert.NotNull(clientParty);
             Assert.NotNull(clientParty.LordPartyComponent.Clan);
-        }
-
-        // TODO make game instanced
-        foreach(var mobileParty in Campaign.Current.MobileParties)
-        {
-            if (mobileParty.Ai != null) continue;
-
-            mobileParty.Ai = new MobilePartyAi(mobileParty);
         }
 
         // Act
 
         server.Call(() =>
         {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             party.RemoveParty();
         });
 
         // Assert
-        Assert.False(server.ObjectManager.TryGetObject<MobileParty>(party.StringId, out var _));
+        Assert.False(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
 
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(party.StringId, out var _));
+            Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
         }
     }
 

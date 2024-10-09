@@ -5,6 +5,9 @@ using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.ItemRosters
 {
+    /// <summary>
+    /// Used for looking up PartyBase of a ItemRoster. Useful when patching ItemRoster functions.
+    /// </summary>
     internal static class ItemRosterLookup
     {
         private static readonly ConditionalWeakTable<ItemRoster, PartyBase> table = new();
