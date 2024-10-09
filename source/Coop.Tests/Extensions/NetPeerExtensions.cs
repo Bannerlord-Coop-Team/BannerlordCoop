@@ -48,7 +48,7 @@ namespace Coop.Tests.Extensions
 
             FieldInfo OutgoingQueue = BaseChannelType.GetField("OutgoingQueue", BindingFlags.NonPublic | BindingFlags.Instance)!;
             
-            Type QueueType = typeof(ConcurrentQueue<>).MakeGenericType(NetPacketType);
+            Type QueueType = typeof(Queue<>).MakeGenericType(NetPacketType);
             MethodInfo Enqueue = QueueType.GetMethod("Enqueue")!;
             MethodInfo Dequeue = QueueType.GetMethod("Clear")!;
             MethodInfo Array_GetValue = typeof(Array).GetMethod(nameof(Array.GetValue), BindingFlags.Public | BindingFlags.Instance, new Type[] { typeof(int) })!;

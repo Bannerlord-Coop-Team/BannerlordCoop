@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using TaleWorlds.Diamond;
 
 namespace GameInterface.AutoSync.Properties;
 public class PropertySwitchCreator
