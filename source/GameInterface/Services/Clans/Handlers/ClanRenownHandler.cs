@@ -42,7 +42,7 @@ namespace GameInterface.Services.Clans.Handlers
                 return;
             }
 
-            ClanAddRenownPatch.RunOriginalAddRenown(clan, payload.Amount, payload.ShouldNotify);
+            //ClanAddRenownPatch.RunOriginalAddRenown(clan, payload.Amount, payload.ShouldNotify);
         }
     }
 }

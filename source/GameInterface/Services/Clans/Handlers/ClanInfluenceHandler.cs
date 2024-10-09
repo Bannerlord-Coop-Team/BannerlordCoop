@@ -43,7 +43,7 @@ namespace GameInterface.Services.Clans.Handlers
                 return;
             }
 
-            ClanChangeInfluencePatch.RunOriginalChangeClanInfluence(clan, payload.Amount);
+            //ClanChangeInfluencePatch.RunOriginalChangeClanInfluence(clan, payload.Amount);
         }
     }
 }

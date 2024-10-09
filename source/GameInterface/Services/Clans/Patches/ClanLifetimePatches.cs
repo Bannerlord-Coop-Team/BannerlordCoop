@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.Clans.Messages;
 using GameInterface.Services.Clans.Messages.Lifetime;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
@@ -11,13 +10,11 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Reflection.Emit;
 using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.ObjectSystem;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 
 namespace GameInterface.Services.MobileParties.Patches;
 

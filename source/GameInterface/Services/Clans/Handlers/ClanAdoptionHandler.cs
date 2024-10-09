@@ -55,7 +55,7 @@ namespace GameInterface.Services.Clans.Handlers
                 return;
             }
 
-            ClanAdoptHeroPatch.RunFixedAdoptHero(adoptedHero, playerClan, playerHero);
+            //ClanAdoptHeroPatch.RunFixedAdoptHero(adoptedHero, playerClan, playerHero);
         }
     }
 }

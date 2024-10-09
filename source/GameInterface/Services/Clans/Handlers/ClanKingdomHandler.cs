@@ -49,8 +49,8 @@ namespace GameInterface.Services.Clans.Handlers
                 return;
             }
 
-            ClanChangeKingdomPatch.RunOriginalChangeClanKingdom(clan, newKingdom, (ChangeKingdomAction.ChangeKingdomActionDetail)payload.DetailId, 
-                payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
+            //ClanChangeKingdomPatch.RunOriginalChangeClanKingdom(clan, newKingdom, (ChangeKingdomAction.ChangeKingdomActionDetail)payload.DetailId, 
+             //   payload.AwardMultiplier, payload.ByRebellion, payload.ShowNotification);
 
         }
     }

@@ -43,7 +43,7 @@ namespace GameInterface.Services.Clans.Handlers
                 return;
             }
 
-            ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
+            //ClanNameChangePatch.RunOriginalChangeClanName(clan, new TextObject(payload.Name), new TextObject(payload.InformalName));
         }
     }
 }

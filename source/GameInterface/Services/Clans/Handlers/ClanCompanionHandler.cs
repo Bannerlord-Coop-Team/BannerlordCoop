@@ -49,7 +49,7 @@ namespace GameInterface.Services.Clans.Handlers
                 return;
             }
 
-            ClanAddCompanionPatch.RunOriginalAddCompanion(clan, companion);
+            //ClanAddCompanionPatch.RunOriginalAddCompanion(clan, companion);
         }
     }
 }

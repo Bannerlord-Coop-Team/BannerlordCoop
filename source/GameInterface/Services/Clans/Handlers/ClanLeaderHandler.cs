@@ -46,11 +46,11 @@ namespace GameInterface.Services.Clans.Handlers
             if (payload.NewLeaderId != null)
             {
                 objectManager.TryGetObject<Hero>(payload.NewLeaderId, out var newLeader);
-                ClanLeaderChangePatch.RunOriginalChangeClanLeader(clan, newLeader);
+                //ClanLeaderChangePatch.RunOriginalChangeClanLeader(clan, newLeader);
                 return;
             }
 
-            ClanLeaderChangePatch.RunOriginalChangeClanLeader(clan);
+            //ClanLeaderChangePatch.RunOriginalChangeClanLeader(clan);
 
         }
     }
