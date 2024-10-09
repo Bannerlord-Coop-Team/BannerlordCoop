@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.PacketHandlers;
 using E2E.Tests.Environment.Instance;
 using LiteNetLib;
+using ProtoBuf.Meta;
 
 namespace E2E.Tests.Environment;
 
@@ -26,6 +27,8 @@ public class TestNetworkRouter
 
     public void Send(NetPeer sender, NetPeer receiver, IMessage message)
     {
+        Server.EnsureSerializable(message);
+
         if (receiver == Server.NetPeer)
         {
             Server.SimulateMessage(sender, message);
@@ -39,6 +42,8 @@ public class TestNetworkRouter
     }
     public void SendAll(NetPeer sender, IMessage message)
     {
+        Server.EnsureSerializable(message);
+
         if (sender == Server.NetPeer)
         {
             foreach (var client in Clients)
@@ -54,6 +59,8 @@ public class TestNetworkRouter
 
     public void SendAllBut(NetPeer sender, NetPeer ignored, IMessage message)
     {
+        Server.EnsureSerializable(message);
+
         if (sender == Server.NetPeer)
         {
             foreach (var client in Clients.Where(c => c.NetPeer != ignored))
