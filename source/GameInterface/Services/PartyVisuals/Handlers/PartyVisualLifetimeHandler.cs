@@ -51,14 +51,6 @@ namespace GameInterface.Services.PartyVisuals.Handlers
             PartyVisual newVisual = new PartyVisual(partyBase);
 
             objectManager.AddExisting(payload.What.PartyVisualId, newVisual);
-
-            GameLoopRunner.RunOnMainThread(() =>
-            {
-                using (new AllowedThread())
-                {
-                    newVisual.OnStartup();
-                }
-            });
         }
 
         private void Handle(MessagePayload<PartyVisualDestroyed> payload)

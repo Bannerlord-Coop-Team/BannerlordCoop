@@ -42,7 +42,7 @@
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
     </Reference>
     <Reference Include="SandBox.View">
-      <HintPath>..\GameInterface\obj\x64\Debug\netstandard2.0\PublicizedAssemblies\SandBox.View.9EE93C805E31DD7BCC72752AA1EA4735\SandBox.View.dll</HintPath>
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.CampaignSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>

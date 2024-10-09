@@ -44,23 +44,35 @@ namespace E2E.Tests.Services.PartyVisuals
             }
         }
 
-        //[Fact]
-        //public void ClientCreatePartyVisual_DoesNothing()
-        //{
-        //    // Arrange
-        //    var client1 = TestEnvironment.Clients.First();
+        [Fact]
+        public void ClientCreatePartyVisual_DoesNothing()
+        {
+            // Arrange
+            var client1 = TestEnvironment.Clients.First();
+            var server = TestEnvironment.Server;
 
-        //    // Act
-        //    string? KingdomId = null;
-        //    client1.Call(() =>
-        //    {
-        //        var Kingdom = new Kingdom();
+            // Act
+            string? PartyVisualId = null;
+            string? baseId = null;
 
-        //        Assert.False(client1.ObjectManager.TryGetId(Kingdom, out KingdomId));
-        //    });
+            server.Call(() =>
+            {
+                var MobileParty = new MobileParty();
+                var partyBase = new PartyBase(MobileParty);
 
-        //    // Assert
-        //    Assert.Null(KingdomId);
-        //}
+                Assert.True(server.ObjectManager.TryGetId(partyBase, out baseId));
+            });
+
+            client1.Call(() =>
+            {
+                Assert.True(server.ObjectManager.TryGetObject(baseId, out PartyBase baseParty));
+                var partyVisual = new PartyVisual(baseParty);
+
+                Assert.False(client1.ObjectManager.TryGetId(partyVisual, out PartyVisualId));
+            });
+
+            // Assert
+            Assert.Null(PartyVisualId);
+        }
     }
 }
