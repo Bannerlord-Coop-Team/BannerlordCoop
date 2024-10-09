@@ -2,7 +2,6 @@
 using GameInterface.AutoSync.Properties;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
-using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,8 +27,8 @@ public interface IAutoSyncBuilder : IDisposable
     /// <summary>
     /// Add a field external to the declaring class that updates a public field as those are not synced automatically
     /// </summary>
-    /// <param name="methodInfo">Method to add as an external setter</param>
-    void AddFieldChangeMethod(MethodInfo methodInfo);
+    /// <param name="methodBase">Method to add as an external setter</param>
+    void AddFieldChangeMethod(MethodBase methodBase);
 
     /// <summary>
     /// Build autosync and dynamic assembly
@@ -51,7 +50,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 {
     private readonly HashSet<FieldInfo> fields = new HashSet<FieldInfo>();
     private readonly HashSet<PropertyInfo> properties = new HashSet<PropertyInfo>();
-    private readonly HashSet<MethodInfo> externalFieldChangeMethods = new HashSet<MethodInfo>();
+    private readonly HashSet<MethodBase> externalFieldChangeMethods = new HashSet<MethodBase>();
     private readonly IObjectManager objectManager;
     private readonly Harmony harmony;
     private readonly IPacketSwitchProvider packetSwitchProvider;
@@ -84,12 +83,12 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         properties.Add(property);
     }
 
-    public void AddFieldChangeMethod(MethodInfo methodInfo)
+    public void AddFieldChangeMethod(MethodBase methodBase)
     {
-        if (methodInfo == null) throw new ArgumentNullException(nameof(methodInfo));
-        if (externalFieldChangeMethods.Contains(methodInfo)) throw new ArgumentException($"{methodInfo.Name} has already been registered as an external method");
+        if (methodBase == null) throw new ArgumentNullException(nameof(methodBase));
+        if (externalFieldChangeMethods.Contains(methodBase)) throw new ArgumentException($"{methodBase.Name} has already been registered as an external method");
 
-        externalFieldChangeMethods.Add(methodInfo);
+        externalFieldChangeMethods.Add(methodBase);
     }
 
     public static int AsmCounter = 1;
@@ -124,6 +123,11 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
                 patchCollector.AddTranspiler(method, transpilerMethod);
             }
 
+            foreach (var method in AccessTools.GetDeclaredConstructors(type))
+            {
+                patchCollector.AddTranspiler(method, transpilerMethod);
+            }
+
             foreach (var method in externalFieldChangeMethods)
             {
                 // This patches all external methods with all transpilers (might be slow if we have a lot)
@@ -141,7 +145,6 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
     private void CreatePropertySync(ModuleBuilder moduleBuilder)
     {
-        // TODO finish
         var propertyMap = ConvertProperties();
 
         var types = propertyMap.Keys.ToArray();
@@ -154,7 +157,12 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
             foreach (var property in properties)
             {
                 var prefix = AccessTools.Method(patchType, $"{property.DeclaringType.Name}_{property.Name}_Prefix");
-                patchCollector.AddPrefix(property.GetSetMethod(), prefix);
+                var setter = property.GetSetMethod() ?? property.GetSetMethod(true);
+
+                if (prefix == null) throw new NullReferenceException("Prefix was null, likely an issue mapping the name");
+                if (setter == null) throw new NullReferenceException("Setter was null, likely no set method exists");
+
+                patchCollector.AddPrefix(setter, prefix);
             }
         }
 
@@ -190,9 +198,17 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         interceptMap = interceptMap.ToDictionary(kvp => kvp.Key, kvp =>
         {
             var method = kvp.Value;
+
+            if (compiledType.Name.StartsWith(kvp.Key.DeclaringType.Name) == false) return kvp.Value;
+
             var genericParams = method.IsGenericMethod ? method.GetGenericArguments() : null;
             var actualMethod = AccessTools.Method(compiledType, method.Name, method.GetParameters().Select(p => p.ParameterType).ToArray(), genericParams);
 
+            if (actualMethod == null)
+            {
+                throw new NullReferenceException($"Failed to get {method.Name} from compiled class");
+            } 
+            
             return actualMethod;
         });
     }

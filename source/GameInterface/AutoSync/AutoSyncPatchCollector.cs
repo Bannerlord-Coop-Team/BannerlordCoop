@@ -7,8 +7,8 @@ namespace GameInterface.AutoSync;
 
 public interface IAutoSyncPatchCollector : IDisposable
 {
-    void AddPrefix(MethodInfo patchMethod, MethodInfo patch);
-    void AddTranspiler(MethodInfo patchMethod, MethodInfo patch);
+    void AddPrefix(MethodBase patchMethod, MethodInfo patch);
+    void AddTranspiler(MethodBase patchMethod, MethodInfo patch);
     void PatchAll();
     void UnpatchAll();
 }
@@ -17,8 +17,8 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 {
     private readonly Harmony harmony;
 
-    private readonly List<(MethodInfo, MethodInfo)> transpilers = new List<(MethodInfo, MethodInfo)>();
-    private readonly List<(MethodInfo, MethodInfo)> prefixes = new List<(MethodInfo, MethodInfo)>();
+    private readonly List<(MethodBase, MethodInfo)> transpilers = new List<(MethodBase, MethodInfo)>();
+    private readonly List<(MethodBase, MethodInfo)> prefixes = new List<(MethodBase, MethodInfo)>();
 
     private static bool IsPatched = false;
 
@@ -27,14 +27,14 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
         this.harmony = harmony;
     }
 
-    public void AddPrefix(MethodInfo patchMethod, MethodInfo patch)
+    public void AddPrefix(MethodBase patchMethod, MethodInfo patch)
     {
         if (patchMethod == null) throw new ArgumentNullException(nameof(patchMethod));
         if (patch == null) throw new ArgumentNullException(nameof(patch));
 
         prefixes.Add((patchMethod, patch));
     }
-    public void AddTranspiler(MethodInfo patchMethod, MethodInfo patch)
+    public void AddTranspiler(MethodBase patchMethod, MethodInfo patch)
     {
         if (patchMethod == null) throw new ArgumentNullException(nameof(patchMethod));
         if (patch == null) throw new ArgumentNullException(nameof(patch));
@@ -48,7 +48,8 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
         IsPatched = true;
 
-        foreach (var (method, patch) in transpilers) {
+        foreach (var (method, patch) in transpilers)
+        {
             harmony.Patch(method, transpiler: new HarmonyMethod(patch));
         }
 

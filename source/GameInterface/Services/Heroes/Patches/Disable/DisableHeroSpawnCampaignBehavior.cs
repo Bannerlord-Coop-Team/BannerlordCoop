@@ -1,4 +1,6 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Policies;
+using GameInterface.Services.Towns.Messages;
+using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -11,17 +13,8 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 [HarmonyPatch]
 internal class DisableHeroSpawnCampaignBehavior
 {
-    static IEnumerable<MethodBase> TargetMethods()
-    {
-        return new MethodBase[]
-        {
-            AccessTools.Method(typeof(HeroSpawnCampaignBehavior), "OnNonBanditClanDailyTick"),
-            AccessTools.Method(typeof(HeroSpawnCampaignBehavior), "OnHeroComesOfAge"),
-            AccessTools.Method(typeof(HeroSpawnCampaignBehavior), "OnHeroDailyTick"),
-            AccessTools.Method(typeof(HeroSpawnCampaignBehavior), "OnCompanionRemoved")
-        };
-    }
+    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(HeroSpawnCampaignBehavior));
 
     [HarmonyPrefix]
-    static bool Prefix() => ModInformation.IsServer;
+    static bool Prefix() => ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed();
 }

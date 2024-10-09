@@ -5,6 +5,8 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace E2E.Tests.Util;
@@ -30,6 +32,9 @@ internal class GameObjectCreator
         { typeof(MapEventSide), new MapEventSideBuilder() },
         { typeof(BesiegerCamp), new BesiegerCampBuilder() },
         { typeof(SiegeEvent), new SiegeEventBuilder() },
+        { typeof(Workshop), new WorkshopBuilder() },
+        { typeof(WorkshopType), new WorkshopTypeBuilder() },
+        { typeof(Building), new BuildingBuilder() },
     };
 
     public static T CreateInitializedObject<T>()
