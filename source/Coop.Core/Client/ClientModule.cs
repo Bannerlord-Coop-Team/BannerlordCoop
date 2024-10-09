@@ -18,6 +18,8 @@ public class ClientModule : CommonModule
 {
     protected override void Load(ContainerBuilder builder)
     {
+        base.Load(builder);
+
         builder.RegisterType<ClientLogic>().As<ILogic>().As<IClientLogic>().InstancePerLifetimeScope();
         builder.RegisterType<CoopClient>().As<ICoopClient>().As<INetwork>().As<INetEventListener>().InstancePerLifetimeScope();
 
@@ -28,7 +30,5 @@ public class ClientModule : CommonModule
         RegisterAllTypesWithInterface<ClientModule, IPacketHandler>(builder, autoInstantiate: true);
 
         RegisterAllTypesWithInterface<ClientModule, IClientState>(builder);
-
-        base.Load(builder);
     }
 }
