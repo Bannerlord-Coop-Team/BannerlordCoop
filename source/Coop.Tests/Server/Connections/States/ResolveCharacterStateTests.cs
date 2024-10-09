@@ -13,6 +13,8 @@ using System.Linq;
 using GameInterface.Services.Modules;
 using Xunit;
 using Xunit.Abstractions;
+using Coop.Core.Client.States;
+using TaleWorlds.Library;
 
 namespace Coop.Tests.Server.Connections.States
 {
@@ -94,6 +96,25 @@ namespace Coop.Tests.Server.Connections.States
 
             var castedMessage = (NetworkModuleVersionsValidated)message;
             Assert.True(castedMessage.Matches);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidate_ModulesMismatch()
+        {
+            // Arrange
+            var currentState = connectionLogic.SetState<ResolveCharacterState>();
+
+            // Act
+            var payload = new MessagePayload<NetworkModuleVersionsValidate>(
+                playerPeer, new NetworkModuleVersionsValidate(new List<ModuleInfo> { new ModuleInfo("1", true, new ApplicationVersion())}));
+            currentState.ModuleVersionsValidateHandler(payload);
+
+            // Assert
+            var message = Assert.Single(serverComponent.TestNetwork.GetPeerMessages(playerPeer));
+            Assert.IsType<NetworkModuleVersionsValidated>(message);
+
+            var castedMessage = (NetworkModuleVersionsValidated)message;
+            Assert.False(castedMessage.Matches);
         }
 
         [Fact]

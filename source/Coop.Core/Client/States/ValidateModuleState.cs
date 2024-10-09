@@ -33,9 +33,9 @@ public class ValidateModuleState : ClientStateBase
         this.controllerIdProvider = controllerIdProvider;
         this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
-        messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
+        messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
+        messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
 
 #if DEBUG
         controllerIdProvider.SetControllerFromProgramArgs();
@@ -49,9 +49,22 @@ public class ValidateModuleState : ClientStateBase
     public override void Dispose()
     {
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
-        messageBroker.Unsubscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
-        messageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
         messageBroker.Unsubscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
+        messageBroker.Unsubscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
+        messageBroker.Unsubscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
+    }
+
+    internal void Handle_NetworkModuleVersionsValidated(MessagePayload<NetworkModuleVersionsValidated> obj)
+    {
+        if (obj.What.Matches)
+        {
+            network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
+        }
+        else
+        {
+            messageBroker.Publish(this, new SendInformationMessage("Module validation failed!\nReason: " + obj.What.Reason));
+            Logic.Disconnect();
+        }
     }
 
     internal void Handle_NetworkClientValidated(MessagePayload<NetworkClientValidated> obj)
@@ -64,19 +77,6 @@ public class ValidateModuleState : ClientStateBase
         else
         {
             Logic.StartCharacterCreation();   
-        }
-    }
-
-    internal void Handle_NetworkModuleVersionsValidated(MessagePayload<NetworkModuleVersionsValidated> obj)
-    {
-        if (obj.What.Matches)
-        {
-            network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
-        }
-        else
-        {
-            messageBroker.Publish(this, new SendInformationMessage("Module validation failed!\nReason: " + obj.What.Reason));
-            Logic.SetState<ReceivingSavedDataState>();
         }
     }
 
