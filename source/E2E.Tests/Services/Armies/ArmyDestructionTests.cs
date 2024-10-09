@@ -60,7 +60,7 @@ public class ArmyDestructionTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<Army>(armyId, out var army));
 
             DisbandArmyAction.ApplyByObjectiveFinished(army);
-        });
+        }, new[] { AccessTools.Method(typeof(PartyBase), nameof(PartyBase.UpdateVisibilityAndInspected)) });
 
         // Assert
         Assert.False(server.ObjectManager.TryGetObject<Army>(armyId, out var _));

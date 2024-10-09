@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ObjectManager;
@@ -74,15 +75,18 @@ public interface IObjectManager
 /// </summary>
 internal class ObjectManager : IObjectManager
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<ObjectManager>();
+    private readonly ILogger logger;
 
-    private readonly GameObjectManager defaultObjectManager = new GameObjectManager();
+    private readonly GameObjectManager defaultObjectManager;
 
     IReadOnlyDictionary<Type, IRegistry> RegistryMap => registryCollection.RegistryMap;
 
-    public ObjectManager(IRegistryCollection registryCollection)
+    public ObjectManager(IRegistryCollection registryCollection, ILogger logger)
     {
         this.registryCollection = registryCollection;
+        this.logger = logger;
+
+        defaultObjectManager = new GameObjectManager(logger);
     }
 
     public bool AddExisting(string id, object obj)
@@ -90,7 +94,7 @@ internal class ObjectManager : IObjectManager
         if (string.IsNullOrEmpty(id)) return false;
 
         if (obj == null) return false;
-
+        
         if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
         {
             return LogIfRegistrationError(
@@ -205,7 +209,7 @@ internal class ObjectManager : IObjectManager
         var className = nameof(ObjectManager);
         var stackTrace = Environment.StackTrace;
 
-        Logger.Error("Unable to register {name} with {objectManager}\n" +
+        logger.Error("Unable to register {name} with {objectManager}\n" +
                      "StackTrace: {stackTrace}",
                      objectType,
                      className,
@@ -222,7 +226,7 @@ internal class ObjectManager : IObjectManager
         var className = nameof(ObjectManager);
         var stackTrace = Environment.StackTrace;
 
-        Logger.Error("Unable to get {name} with {objectManager}\n" +
+        logger.Error("Unable to get {name} with {objectManager}\n" +
                      "StackTrace: {stackTrace}",
                      objectType,
                      className,
@@ -240,7 +244,7 @@ internal class ObjectManager : IObjectManager
         var className = nameof(ObjectManager);
         var stackTrace = Environment.StackTrace;
 
-        Logger.Error("Unable to get {name} with {stringId} in {objectManager}\n" +
+        logger.Error("Unable to get {name} with {stringId} in {objectManager}\n" +
                      "StackTrace: {stackTrace}",
                      objectType,
                      stringId,
@@ -273,6 +277,12 @@ internal class ObjectManager : IObjectManager
         }
 
         private readonly MethodInfo RegisterExistingObjectMethod = AccessTools.Method(typeof(MBObjectManager), nameof(MBObjectManager.RegisterPresumedObject));
+        private readonly ILogger logger;
+
+        public GameObjectManager(ILogger logger)
+        {
+            this.logger = logger;
+        }
 
         private T Cast<T>(object obj)
         {
@@ -349,7 +359,7 @@ internal class ObjectManager : IObjectManager
 
             if (mbObject == null)
             {
-                Logger.Error("Attempted to register object with {type} type that does not derive from {mbObject}", obj.GetType(), typeof(MBObjectBase));
+                logger.Error("Attempted to register object with {type} type that does not derive from {mbObject}", obj.GetType(), typeof(MBObjectBase));
             }
 
             return mbObject != null;

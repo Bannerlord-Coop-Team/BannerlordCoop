@@ -38,60 +38,6 @@ namespace GameInterface.Services.CraftingService.Patches
 
             return true;
         }
-
-        [HarmonyPatch(typeof(Crafting), nameof(Crafting.CreatePreCraftedWeapon))]
-        [HarmonyPostfix]
-        static void CreatePreCraftedWeaponPostfix(ref Crafting __instance, ItemObject itemObject, WeaponDesignElement[] usedPieces, string templateId, TextObject weaponName, ItemModifierGroup itemModifierGroup)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
-                return;
-            }
-
-            var message = new CraftingRemoved(__instance);
-
-            MessageBroker.Instance.Publish(null, message);
-        }
-
-        [HarmonyPatch(typeof(Crafting), nameof(Crafting.InitializePreCraftedWeaponOnLoad))]
-        [HarmonyPostfix]
-        static void InitializePreCraftedWeaponOnLoadPostfix(ref Crafting __instance, ItemObject itemObject, WeaponDesign craftedData, TextObject itemName, BasicCultureObject culture)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
-                return;
-            }
-
-            var message = new CraftingRemoved(__instance);
-
-            MessageBroker.Instance.Publish(null, message);
-        }
-
-        [HarmonyPatch(typeof(Crafting), nameof(Crafting.CreateRandomCraftedItem))]
-        [HarmonyPostfix]
-        static void CreateRandomCraftedItemPostfix(ref Crafting __instance, BasicCultureObject culture, ref ItemObject __result)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
-                return;
-            }
-
-            var message = new CraftingRemoved(__instance);
-
-            MessageBroker.Instance.Publish(null, message);
-        }
     }
 
     [HarmonyPatch(typeof(CraftingState))]

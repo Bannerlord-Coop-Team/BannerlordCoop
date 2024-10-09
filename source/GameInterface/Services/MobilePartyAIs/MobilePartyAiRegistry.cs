@@ -1,11 +1,15 @@
 ﻿using GameInterface.Services.Registry;
 using System;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs;
 internal class MobilePartyAiRegistry : RegistryBase<MobilePartyAi>
 {
+    private const string MobilePartyAiIdPrefix = "CoopMobilePartyAi";
+    private static int InstanceCounter = 0;
+
     public MobilePartyAiRegistry(IRegistryCollection collection) : base(collection)
     {
     }
@@ -27,6 +31,7 @@ internal class MobilePartyAiRegistry : RegistryBase<MobilePartyAi>
             if (partyAi == null)
             {
                 Logger.Warning("{partyName}'s Ai was null when registering", party.Name);
+                continue;
             }
 
             var newId = GetNewId(partyAi);
@@ -37,6 +42,6 @@ internal class MobilePartyAiRegistry : RegistryBase<MobilePartyAi>
 
     protected override string GetNewId(MobilePartyAi obj)
     {
-        return Guid.NewGuid().ToString();
+        return $"{MobilePartyAiIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
     }
 }
