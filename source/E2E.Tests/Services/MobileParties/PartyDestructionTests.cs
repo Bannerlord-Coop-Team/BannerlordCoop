@@ -1,6 +1,7 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.Library;
@@ -10,43 +11,46 @@ namespace E2E.Tests.Services.MobileParties;
 
 public class PartyDestructionTests : IDisposable
 {
-    E2ETestEnvironment TestEnvironement { get; }
+    E2ETestEnvironment TestEnvironment { get; }
     public PartyDestructionTests(ITestOutputHelper output)
     {
-        TestEnvironement = new E2ETestEnvironment(output);
+        TestEnvironment = new E2ETestEnvironment(output);
     }
 
     public void Dispose()
     {
-        TestEnvironement.Dispose();
+        TestEnvironment.Dispose();
     }
 
     [Fact]
     public void ServerDestroyParty_SyncAllClients()
     {
         // Arrange
-        var server = TestEnvironement.Server;
+        var server = TestEnvironment.Server;
 
-        var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
+        var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
+
+
+            Assert.NotNull(clientParty);
+            Assert.NotNull(clientParty.LordPartyComponent.Clan);
+        }
 
         // Act
-        string? partyId = null;
+
         server.Call(() =>
         {
-            var party = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
-            {
-                partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
-            });
-
-            partyId = party.StringId;
-
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party));
             party.RemoveParty();
         });
 
         // Assert
         Assert.False(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
 
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             Assert.False(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
         }
@@ -56,18 +60,20 @@ public class PartyDestructionTests : IDisposable
     public void ClientDestroyParty_DoesNothing()
     {
         // Arrange
-        var server = TestEnvironement.Server;
-        var client1 = TestEnvironement.Clients.First();
-
-        var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
+        var server = TestEnvironment.Server;
+        var client1 = TestEnvironment.Clients.First();
 
         string? partyId = null;
         server.Call(() =>
         {
+            var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var party = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
             {
+                party.ActualClan = clan;
                 partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
             });
+
             partyId = party.StringId;
         });
 
@@ -84,7 +90,7 @@ public class PartyDestructionTests : IDisposable
         // Assert
         Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
 
-        foreach (var client in TestEnvironement.Clients)
+        foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));
         }

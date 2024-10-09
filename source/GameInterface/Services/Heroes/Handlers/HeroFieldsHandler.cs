@@ -44,177 +44,6 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<ChangePregnant>(Handle);
         }
 
-        private void Handle(MessagePayload<ChangePregnant> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance.IsPregnant = data.IsPregnant;
-        }
-
-        private void Handle(MessagePayload<ChangeHomeSettlement> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            if (objectManager.TryGetObject<Settlement>(data.SettlementStringId, out var settlement) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.SettlementStringId);
-            }
-            instance._homeSettlement = settlement;
-        }
-
-        private void Handle(MessagePayload<ChangeCulture> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            //Add CultureObject to objectManager?
-            if (objectManager.TryGetObject<CultureObject>(data.CultureStringId, out var culture) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance.Culture = culture;
-        }
-
-        private void Handle(MessagePayload<ChangePower> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance._power = data.Power;
-        }
-
-        private void Handle(MessagePayload<ChangeBirthDay> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance._birthDay = new CampaignTime(data.BirthDay);
-        }
-
-        private void Handle(MessagePayload<ChangeDefaultAge> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance._defaultAge = data.Age;
-        }
-
-        private void Handle(MessagePayload<ChangeSpcDaysInLocation> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance.SpcDaysInLocation = data.Days;
-        }
-
-        private void Handle(MessagePayload<ChangeHeroLevel> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance.Level = data.HeroLevel;
-        }
-
-        private void Handle(MessagePayload<ChangeHeroState> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance._heroState = (Hero.CharacterStates)data.HeroState;
-        }
-        private void Handle(MessagePayload<ChangeTattooTags> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance.TattooTags = data.TattooTags;
-        }
-
-        private void Handle(MessagePayload<ChangeBeardTags> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance.BeardTags = data.BeardTags;
-        }
-
-        private void Handle(MessagePayload<ChangeHairTags> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance.HairTags = data.HairTags;
-        }
-
-        private void Handle(MessagePayload<ChangeName> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance._name = new TextObject(data.NewName);
-        }
-
-        private void Handle(MessagePayload<ChangeFirstName> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            instance._firstName = new TextObject(data.NewName);
-        }
-        private void Handle(MessagePayload<ChangeCharacterObject> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-            if (objectManager.TryGetObject<CharacterObject>(data.CharacterObjectId, out var character) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(CharacterObject), data.CharacterObjectId);
-            }
-
-            instance._characterObject = character;
-        }
-        private void Handle(MessagePayload<ChangeLastTimeStamp> payload)
-        {
-            var data = payload.What;
-            if(objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-            }
-
-            instance.LastTimeStampForActivity = data.LastTimeStamp;
-        }
         public void Dispose()
         {
             messageBroker.Unsubscribe<ChangeLastTimeStamp>(Handle);
@@ -232,6 +61,197 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Unsubscribe<ChangePower>(Handle);
             messageBroker.Unsubscribe<ChangeCulture>(Handle);
             messageBroker.Unsubscribe<ChangePregnant>(Handle);
+        }
+
+        private void Handle(MessagePayload<ChangePregnant> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance.IsPregnant = data.IsPregnant;
+        }
+
+        private void Handle(MessagePayload<ChangeHomeSettlement> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            if (objectManager.TryGetObject<Settlement>(data.SettlementStringId, out var settlement) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.SettlementStringId);
+                return;
+            }
+            instance._homeSettlement = settlement;
+        }
+
+        private void Handle(MessagePayload<ChangeCulture> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            //Add CultureObject to objectManager?
+            if (objectManager.TryGetObject<CultureObject>(data.CultureStringId, out var culture) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance.Culture = culture;
+        }
+
+        private void Handle(MessagePayload<ChangePower> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance._power = data.Power;
+        }
+
+        private void Handle(MessagePayload<ChangeBirthDay> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance._birthDay = new CampaignTime(data.BirthDay);
+        }
+
+        private void Handle(MessagePayload<ChangeDefaultAge> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance._defaultAge = data.Age;
+        }
+
+        private void Handle(MessagePayload<ChangeSpcDaysInLocation> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance.SpcDaysInLocation = data.Days;
+        }
+
+        private void Handle(MessagePayload<ChangeHeroLevel> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance.Level = data.HeroLevel;
+        }
+
+        private void Handle(MessagePayload<ChangeHeroState> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance._heroState = (Hero.CharacterStates)data.HeroState;
+        }
+        private void Handle(MessagePayload<ChangeTattooTags> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance.TattooTags = data.TattooTags;
+        }
+
+        private void Handle(MessagePayload<ChangeBeardTags> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance.BeardTags = data.BeardTags;
+        }
+
+        private void Handle(MessagePayload<ChangeHairTags> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance.HairTags = data.HairTags;
+        }
+
+        private void Handle(MessagePayload<ChangeName> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance._name = new TextObject(data.NewName);
+        }
+
+        private void Handle(MessagePayload<ChangeFirstName> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            instance._firstName = new TextObject(data.NewName);
+        }
+        private void Handle(MessagePayload<ChangeCharacterObject> payload)
+        {
+            var data = payload.What;
+            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+            if (objectManager.TryGetObject<CharacterObject>(data.CharacterObjectId, out var character) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(CharacterObject), data.CharacterObjectId);
+                return;
+            }
+
+            instance._characterObject = character;
+        }
+        private void Handle(MessagePayload<ChangeLastTimeStamp> payload)
+        {
+            var data = payload.What;
+            if(objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
+            {
+                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
+                return;
+            }
+
+            instance.LastTimeStampForActivity = data.LastTimeStamp;
         }
     }
 }

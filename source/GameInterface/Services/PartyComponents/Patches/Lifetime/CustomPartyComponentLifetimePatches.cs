@@ -25,7 +25,7 @@ internal class CustomPartyComponentLifetimePatches
 
     private static bool Prefix(CustomPartyComponent __instance)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

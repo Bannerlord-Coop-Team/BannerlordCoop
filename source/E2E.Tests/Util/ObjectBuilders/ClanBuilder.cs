@@ -17,8 +17,6 @@ internal class ClanBuilder : IObjectBuilder
         var defaultTemplate = ObjectHelper.SkipConstructor<PartyTemplateObject>();
         clan._defaultPartyTemplate = defaultTemplate;
 
-        clan.StringId = Guid.NewGuid().ToString();
-
         return clan;
     }
 }

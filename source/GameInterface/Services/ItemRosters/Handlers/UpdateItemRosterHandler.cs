@@ -51,10 +51,22 @@ namespace GameInterface.Services.ItemRosters.Handlers
             ItemRoster roster;
             if (objectManager.TryGetObject(msg.PartyBaseID, out Settlement s))
             {
+                if (s.Party == null)
+                {
+                    Logger.Error("Attempted to set itemroster for invalid party");
+                    return;
+                }
+
                 roster = s.ItemRoster;
             }
             else if (objectManager.TryGetObject(msg.PartyBaseID, out MobileParty p))
             {
+                if (p.Party == null)
+                {
+                    Logger.Error("Attempted to set itemroster for invalid party");
+                    return;
+                }
+
                 roster = p.ItemRoster;
             }
             else

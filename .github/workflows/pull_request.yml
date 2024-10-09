@@ -4,6 +4,7 @@ on:
   pull_request:
     types:
       [opened, synchronize]
+    drafts: false
     
 jobs:
   build-and-test:
