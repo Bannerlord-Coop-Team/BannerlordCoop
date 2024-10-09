@@ -6,7 +6,6 @@ namespace Coop.Core.Server.Connections.Messages;
 [ProtoContract(SkipConstructor = true)]
 public class NetworkModuleInfo
 {
-
     [ProtoMember(1)]
     public string Id { get; }
     [ProtoMember(2)]
