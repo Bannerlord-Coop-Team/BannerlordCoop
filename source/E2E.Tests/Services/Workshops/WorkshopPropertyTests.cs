@@ -1,14 +1,9 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Util;
+using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -135,5 +130,83 @@ namespace E2E.Tests.Services.Workshops
                 Assert.Equal(serverWorkshop.WorkshopType.StringId, clientWorkshop.WorkshopType.StringId);
             }
         }
+        [Fact]
+        public void Server_Workshop_Owner()
+        {
+            // Arrange
+            var server = TestEnvironement.Server;
+
+            var field = AccessTools.Field(typeof(Workshop), "_owner");
+
+            // Get field intercept to use on the server to simulate the field changing
+            var intercept = TestEnvironement.GetIntercept(field);
+
+            // Create hero instances on server
+            var newOwner = ObjectHelper.SkipConstructor<Hero>();
+            Assert.True(server.ObjectManager.AddNewObject(newOwner, out var newOwnerId));
+
+            // Create hero instances on all clients
+            foreach (var client in Clients)
+            {
+                var clientOwner = ObjectHelper.SkipConstructor<Hero>();
+                Assert.True(client.ObjectManager.AddExisting(newOwnerId, clientOwner));
+            }
+
+            // Act
+            server.Call(() =>
+            {
+                Assert.True(server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var workshop));
+                Assert.True(server.ObjectManager.TryGetObject<Hero>(newOwnerId, out var owner));
+
+                Assert.Null(workshop.Owner);
+
+                // Simulate the field changing
+                intercept.Invoke(null, new object[] { workshop, owner });
+
+                Assert.Same(owner, workshop.Owner);
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
+                Assert.True(client.ObjectManager.TryGetObject<Hero>(newOwnerId, out var clientOwner));
+
+                Assert.True(clientOwner == clientWorkshop.Owner);
+            }
+        }
+        [Fact]
+        public void Server_Workshop_CustomName()
+        {
+            // Arrange
+            var server = TestEnvironement.Server;
+
+            var field = AccessTools.Field(typeof(Workshop), "_customName");
+
+            // Get field intercept to use on the server to simulate the field changing
+            var intercept = TestEnvironement.GetIntercept(field);
+
+            // Create custom name instances on server
+            TextObject newCustomName = new TextObject("New Workshop Name");
+
+            // Act
+            server.Call(() =>
+            {
+                Assert.True(server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var workshop));
+
+                // Simulate the field changing
+                intercept.Invoke(null, new object[] { workshop, newCustomName });
+
+                Assert.Equal(newCustomName, workshop.Name);
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
+                Assert.Equal(newCustomName, clientWorkshop.Name);
+            }
+        }
+
     }
 }
