@@ -181,7 +181,7 @@ namespace E2E.Tests.Services.Workshops
             // Arrange
             var server = TestEnvironement.Server;
 
-            var field = AccessTools.Field(typeof(Workshop), "_customName");
+            var field = AccessTools.Field(typeof(Workshop), nameof(Workshop._customName));
 
             // Get field intercept to use on the server to simulate the field changing
             var intercept = TestEnvironement.GetIntercept(field);
@@ -204,7 +204,7 @@ namespace E2E.Tests.Services.Workshops
             foreach (var client in Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
-                Assert.Equal(newCustomName, clientWorkshop.Name);
+                Assert.Equal(newCustomName.ToString(), clientWorkshop.Name.ToString());
             }
         }
 
