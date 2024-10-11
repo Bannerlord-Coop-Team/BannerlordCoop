@@ -82,21 +82,6 @@ namespace GameInterface.Services.Workshops.Handlers
                 case PropertyType.InitialCapital:
                     instance.InitialCapital = int.Parse(data.mainData);
                     break;
-
-                case PropertyType.CustomName:
-                    instance.SetCustomName(new TaleWorlds.Localization.TextObject(data.mainData));
-                    break;
-
-                case PropertyType.Owner:
-                    if (objectManager.TryGetObject<Hero>(data.mainData, out Hero newOwner))
-                    {
-                        instance.ChangeOwnerOfWorkshop(newOwner, instance.WorkshopType, int.Parse(data.mainData));
-                    }
-                    else
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.mainData);
-                    }
-                    break;
             }
         }
 

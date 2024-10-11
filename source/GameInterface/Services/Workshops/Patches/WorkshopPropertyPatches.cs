@@ -117,39 +117,5 @@ namespace GameInterface.Services.Workshops.Patches
 
             return ModInformation.IsServer;
         }
-
-        [HarmonyPatch(nameof(Workshop.SetCustomName), MethodType.Normal)]
-        [HarmonyPrefix]
-        private static bool SetCustomNamePrefix(Workshop __instance, TaleWorlds.Localization.TextObject customName)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client tried to set {name}\nCallstack: {callstack}", nameof(Workshop.SetCustomName), Environment.StackTrace);
-                return false;
-            }
-
-            var message = new WorkshopPropertyChanged(PropertyType.CustomName, __instance, customName.ToString());
-            MessageBroker.Instance.Publish(__instance, message);
-
-            return ModInformation.IsServer;
-        }
-
-        [HarmonyPatch(typeof(Workshop), nameof(Workshop.ChangeOwnerOfWorkshop), MethodType.Normal)]
-        [HarmonyPrefix]
-        private static void ChangeOwnerPrefix(Workshop __instance, Hero newOwner, WorkshopType type, int capital)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client tried to change owner.\nCallstack: {callstack}", Environment.StackTrace);
-                return;
-            }
-
-            var message = new WorkshopPropertyChanged(PropertyType.Owner, __instance, newOwner.StringId);
-            MessageBroker.Instance.Publish(__instance, message);
-        }
     }
 }
