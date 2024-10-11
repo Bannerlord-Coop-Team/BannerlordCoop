@@ -17,10 +17,6 @@ namespace GameInterface.Services.Workshops.Patches
         LastRunCampaignTime,
         WorkshopType,
         InitialCapital,
-        CustomName,
-        Owner,
-        Settlement,
-        Tag
     }
 
     [HarmonyPatch(typeof(Workshop))]
