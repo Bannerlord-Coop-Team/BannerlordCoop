@@ -1,5 +1,4 @@
 ﻿using E2E.Tests.Util.ObjectBuilders;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
@@ -8,6 +7,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
 
 namespace E2E.Tests.Util;
 internal class GameObjectCreator
@@ -35,6 +35,7 @@ internal class GameObjectCreator
         { typeof(Workshop), new WorkshopBuilder() },
         { typeof(WorkshopType), new WorkshopTypeBuilder() },
         { typeof(Building), new BuildingBuilder() },
+        { typeof(ItemCategory), new ItemCategoryBuilder() },
     };
 
     public static T CreateInitializedObject<T>()
