@@ -68,7 +68,7 @@ public class PartyCreationTests : IDisposable
             });
 
             partyId = clientParty.StringId;
-        });
+        }, new[] { AccessTools.Method(typeof(MobileParty), nameof(MobileParty.ResetCached)) });
 
         // Assert
         Assert.False(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var _));

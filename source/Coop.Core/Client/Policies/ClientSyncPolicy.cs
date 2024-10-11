@@ -26,9 +26,7 @@ internal class ClientSyncPolicy : ISyncPolicy
 
     public bool AllowOriginal()
     {
-        // When the client state is not in Campaign or Mission allow original calls
-        if (syncStates.Contains(clientLogic.State.GetType()) == false) return true;
-
-        return false;
+        // Allow original calls if not in map state or mission state
+        return syncStates.Contains(clientLogic.State.GetType()) == false;
     }
 }

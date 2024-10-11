@@ -7,7 +7,6 @@ using HarmonyLib;
 using ProtoBuf.Meta;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -147,6 +146,11 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Box, typeof(PropertyAutoSyncPacket));
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
 
+        // Log error
+        il.Emit(OpCodes.Ldsfld, loggerField);
+        il.Emit(OpCodes.Ldstr, $"Syncing {prop.Name} for {prop.DeclaringType}");
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
+
         il.Emit(OpCodes.Ldc_I4_1);
         il.Emit(OpCodes.Ret);
 
@@ -166,7 +170,7 @@ public class PropertyPrefixCreator
         // Log error
         il.Emit(OpCodes.Ldsfld, loggerField);
         il.Emit(OpCodes.Ldstr, $"Unable to resolve {nameof(T)}");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
         il.Emit(OpCodes.Ldc_I4_0);
@@ -195,7 +199,7 @@ public class PropertyPrefixCreator
         // Log error
         il.Emit(OpCodes.Ldsfld, loggerField);
         il.Emit(OpCodes.Ldstr, $"Could not resolve id");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
         il.Emit(OpCodes.Ldc_I4_0);
@@ -228,7 +232,7 @@ public class PropertyPrefixCreator
         // Log error
         il.Emit(OpCodes.Ldsfld, loggerField);
         il.Emit(OpCodes.Ldstr, $"Client attempted to change {field.Name}");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
         il.Emit(OpCodes.Ldc_I4_0);
@@ -253,6 +257,12 @@ public class PropertyPrefixCreator
         }
 
         return typeBuilder.CreateTypeInfo();
+    }
+
+    public static void LogMessage(ILogger logger, string message)
+    {
+        logger.Debug(message);
+        //DebugMessageLogger.Write(message);
     }
 }
 

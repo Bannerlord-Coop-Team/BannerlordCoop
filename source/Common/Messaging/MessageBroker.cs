@@ -68,8 +68,10 @@ namespace Common.Messaging
                     continue;
                 }
 
-                // Commenting this out to run tasks sequentially to maintain message order
-                Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+                // Making synchronous to maintain sequencing of packets
+                //Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
+
+                weakDelegate.Invoke(new object[] { payload });
             }
         }
 
