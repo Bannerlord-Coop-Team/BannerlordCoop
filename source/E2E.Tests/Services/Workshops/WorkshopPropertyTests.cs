@@ -4,6 +4,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -131,12 +132,12 @@ namespace E2E.Tests.Services.Workshops
             }
         }
         [Fact]
-        public void Server_Workshop_Owner()
+        public void ServerChangeWorkshopOwner_SyncAllClients()
         {
             // Arrange
             var server = TestEnvironement.Server;
 
-            var field = AccessTools.Field(typeof(Workshop), "_owner");
+            var field = AccessTools.Field(typeof(Workshop), nameof(Workshop._owner));
 
             // Get field intercept to use on the server to simulate the field changing
             var intercept = TestEnvironement.GetIntercept(field);
@@ -176,7 +177,7 @@ namespace E2E.Tests.Services.Workshops
             }
         }
         [Fact]
-        public void Server_Workshop_CustomName()
+        public void ServerChangeWorkshopCustomName_SyncAllClients()
         {
             // Arrange
             var server = TestEnvironement.Server;
@@ -207,6 +208,82 @@ namespace E2E.Tests.Services.Workshops
                 Assert.Equal(newCustomName.ToString(), clientWorkshop.Name.ToString());
             }
         }
+        [Fact]
+        public void ServerChangeWorkshopTag_SyncAllClients()
+        {
+            // Arrange
+            var server = TestEnvironement.Server;
 
+            var field = AccessTools.Field(typeof(Workshop), nameof(Workshop._tag));
+
+            // Get field intercept to use on the server to simulate the field changing
+            var intercept = TestEnvironement.GetIntercept(field);
+
+            // Create tag instance on server
+            string newTag = "New Workshop Tag";
+
+            // Act
+            server.Call(() =>
+            {
+                Assert.True(server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var workshop));
+
+                // Simulate the field changing
+                intercept.Invoke(null, new object[] { workshop, newTag });
+
+                Assert.Equal(newTag, workshop.Tag);
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
+                Assert.Equal(newTag, clientWorkshop.Tag);
+            }
+        }
+        [Fact]
+        public void ServerChangeWorkshopSettlement_SyncAllClients()
+        {
+            // Arrange
+            var server = TestEnvironement.Server;
+
+            var field = AccessTools.Field(typeof(Workshop), nameof(Workshop._settlement));
+
+            // Get field intercept to use on the server to simulate the field changing
+            var intercept = TestEnvironement.GetIntercept(field);
+
+            // Create settlement instances on server
+            var newSettlement = ObjectHelper.SkipConstructor<Settlement>();
+            Assert.True(server.ObjectManager.AddNewObject(newSettlement, out var newSettlementId));
+
+            // Create settlement instances on all clients
+            foreach (var client in Clients)
+            {
+                var clientSettlement = ObjectHelper.SkipConstructor<Settlement>();
+                Assert.True(client.ObjectManager.AddExisting(newSettlementId, clientSettlement));
+            }
+
+            // Act
+            server.Call(() =>
+            {
+                Assert.True(server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var workshop));
+                Assert.True(server.ObjectManager.TryGetObject<Settlement>(newSettlementId, out var settlement));
+
+                Assert.Null(workshop.Settlement);  // Before changing, verify the workshop has no settlement
+
+                // Simulate the field changing
+                intercept.Invoke(null, new object[] { workshop, settlement });
+
+                Assert.Same(settlement, workshop.Settlement);
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var clientWorkshop));
+                Assert.True(client.ObjectManager.TryGetObject<Settlement>(newSettlementId, out var clientSettlement));
+
+                Assert.True(clientSettlement == clientWorkshop.Settlement);
+            }
+        }
     }
 }
