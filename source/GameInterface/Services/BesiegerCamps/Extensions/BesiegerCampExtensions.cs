@@ -40,19 +40,5 @@ namespace GameInterface.Services.BesiegerCamps.Extensions
 
             return true;
         }
-
-        //// quick and dirty way to pass the type as refference isntead of type arg
-        //public static bool TryGetObject(this IObjectManager src, string id, Type type, out object obj)
-        //{
-        //    MethodInfo method = src.GetType().GetMethod(nameof(IObjectManager.TryGetObject));
-        //    MethodInfo genericMethod = method.MakeGenericMethod(type);
-
-        //    object[] parameters = new object[] { id, null };
-        //    bool result = (bool)genericMethod.Invoke(src, parameters);
-
-        //    obj = parameters[1];
-
-        //    return result;
-        //}
     }
 }
