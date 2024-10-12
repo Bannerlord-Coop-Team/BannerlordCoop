@@ -1,11 +1,10 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.BesiegerCamps
 {
-    class BesiegerCampSync : IAutoSync
+    internal class BesiegerCampSync : IAutoSync
     {
         public BesiegerCampSync(IAutoSyncBuilder autoSyncBuilder)
         {

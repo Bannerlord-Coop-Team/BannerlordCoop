@@ -1,7 +1,5 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Siege;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEnginesConstructionProgress

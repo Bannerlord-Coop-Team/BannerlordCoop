@@ -1,7 +1,5 @@
 ﻿using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.BesiegerCamps.Extensions

@@ -2,7 +2,6 @@
 using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Siege;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEngines
