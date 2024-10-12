@@ -19,6 +19,8 @@ namespace E2E.Tests.Services.BesiegerCamps
         private EnvironmentInstance Server => TestEnvironment.Server;
         private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
+        private IEnumerable<EnvironmentInstance> AllEnvironmentInstances => Clients.Append(Server);
+
         public BesiegerCampCollectionTests(ITestOutputHelper output)
         {
             TestEnvironment = new E2ETestEnvironment(output);
@@ -58,18 +60,18 @@ namespace E2E.Tests.Services.BesiegerCamps
         private void ServerAddBesiegerParty_SyncAllClients()
         {
             //Arrange
-            var besiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
-            var besiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
+            var serverBesiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
+            var serverBesiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
 
             //Act
             Server.Call(() =>
             {
-                //besiegerCamp._besiegerParties.Add(besiegerParty); // Doesn't call override, must call it directly
-                BesiegerCampCollectionPatches.ListAddOverride(besiegerCamp._besiegerParties, besiegerParty, besiegerCamp);
+                BesiegerCampCollectionPatches.ListAddOverride(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
+                Assert.Contains<MobileParty>(serverBesiegerParty, serverBesiegerCamp._besiegerParties);
             });
 
             //Assert
-            foreach (var client in Clients)
+            foreach (var client in Clients.Append(Server))
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 Assert.True(client.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var clientBesiegerParty));
@@ -81,11 +83,12 @@ namespace E2E.Tests.Services.BesiegerCamps
         private void ServerRemoveBesiegerParty_SyncAllClients()
         {
             // Arrange
-            var besiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
-            var besiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
+            var serverBesiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
+            var serverBesiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
             Server.Call(() =>
             {
-                BesiegerCampCollectionPatches.ListAddOverride(besiegerCamp._besiegerParties, besiegerParty, besiegerCamp);
+                BesiegerCampCollectionPatches.ListAddOverride(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
+                Assert.Contains<MobileParty>(serverBesiegerParty, serverBesiegerCamp._besiegerParties);
             });
             foreach (var client in Clients)
             {
@@ -97,11 +100,11 @@ namespace E2E.Tests.Services.BesiegerCamps
             // Act
             Server.Call(() =>
             {
-                BesiegerCampCollectionPatches.ListRemoveOverride(besiegerCamp._besiegerParties, besiegerParty, besiegerCamp);
+                BesiegerCampCollectionPatches.ListRemoveOverride(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
             });
 
             // Assert
-            foreach (var client in Clients)
+            foreach (var client in Clients.Append(Server).Append(Server))
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 Assert.True(client.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var clientBesiegerParty));
@@ -113,8 +116,8 @@ namespace E2E.Tests.Services.BesiegerCamps
         private void ClientAddBesiegerParty_DoesNothing()
         {
             // Arrange
-            var besiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
-            var besiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
+            var serverBesiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
+            var serverBesiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
             foreach (var client in Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var syncedCamp));
@@ -124,11 +127,13 @@ namespace E2E.Tests.Services.BesiegerCamps
             var firstClient = Clients.First();
             firstClient.Call(() =>
             {
-                BesiegerCampCollectionPatches.ListAddOverride(besiegerCamp._besiegerParties, besiegerParty, besiegerCamp);
+                Assert.True(firstClient.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
+                Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var clientBesiegerParty));
+                BesiegerCampCollectionPatches.ListAddOverride(clientBesiegerCamp._besiegerParties, clientBesiegerParty, clientBesiegerCamp);
             });
 
             // Assert
-            foreach (var client in Clients.Where(c => c != firstClient))
+            foreach (var client in Clients.Where(c => c != firstClient).Append(Server))
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 Assert.True(client.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var clientBesiegerParty));
@@ -140,14 +145,18 @@ namespace E2E.Tests.Services.BesiegerCamps
         private void ClientRemoveBesiegerParty_DoesNothing()
         {
             // Arrange
-            var besiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
-            var besiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
+            var serverBesiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
+            var serverBesiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
             Server.Call(() =>
             {
-                BesiegerCampCollectionPatches.ListAddOverride(besiegerCamp._besiegerParties, besiegerParty, besiegerCamp);
+                /// Server adds besiegerParty to besiegerCamp
+                BesiegerCampCollectionPatches.ListAddOverride(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
+                Assert.Contains<MobileParty>(serverBesiegerParty, serverBesiegerCamp._besiegerParties);
             });
-            foreach (var client in Clients)
+
+            foreach (var client in AllEnvironmentInstances)
             {
+                /// All clients sync
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 Assert.True(client.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var clientBesiegerParty));
                 Assert.Contains<MobileParty>(clientBesiegerParty, clientBesiegerCamp._besiegerParties);
@@ -157,12 +166,16 @@ namespace E2E.Tests.Services.BesiegerCamps
             var firstClient = Clients.First();
             firstClient.Call(() =>
             {
-                BesiegerCampCollectionPatches.ListRemoveOverride(besiegerCamp._besiegerParties, besiegerParty, besiegerCamp);
+                /// A client removes besiegerParty from besiegerCamp
+                Assert.True(firstClient.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
+                Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var clientBesiegerParty));
+                BesiegerCampCollectionPatches.ListRemoveOverride(clientBesiegerCamp._besiegerParties, clientBesiegerParty, clientBesiegerCamp);
             });
 
             // Assert
-            foreach (var client in Clients.Where(c => c != firstClient))
+            foreach (var client in AllEnvironmentInstances.Where(c => c != firstClient))
             {
+                /// It affects no one
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 Assert.True(client.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var clientBesiegerParty));
                 Assert.Contains<MobileParty>(clientBesiegerParty, clientBesiegerCamp._besiegerParties);

@@ -48,7 +48,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             Server.Call(() =>
             {
                 obj = GameObjectCreator.CreateInitializedObject<T>();
-                Assert.True(Server.ObjectManager.TryGetId(obj, out id)); // will fail with SiegeStrategy
+                Assert.True(Server.ObjectManager.TryGetId(obj, out id));
             }, disabledMethods);
 
             objectId = id!;
@@ -60,6 +60,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             TestEnvironment = new E2ETestEnvironment(output);
             DisableMethods();
 
+            //besiegerCampId=TestEnvironment.CreateRegisteredObject<BesiegerCamp>() //Still need a way to pass disabled methods :/
             ServerCreateObject<BesiegerCamp>(out besiegerCampId);
             ServerCreateObject<SiegeEvent>(out siegeEventId);
             ServerCreateObject<SiegeEnginesContainer>(out siegeEnginesId);

@@ -47,10 +47,10 @@ public class BesiegerCampFieldTests : IDisposable
         var field = AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty));
         var intercept = TestEnvironment.GetIntercept(field);
 
-        // Create garrison instances on server
+        /// Create instances on server
         Assert.True(Server.ObjectManager.AddNewObject(ObjectHelper.SkipConstructor<MobileParty>(), out var mobilePartyId));
 
-        // Create garrison instances on all clients
+        /// Create instances on all clients
         foreach (var client in Clients)
         {
             var clientParty = ObjectHelper.SkipConstructor<MobileParty>();
@@ -65,7 +65,7 @@ public class BesiegerCampFieldTests : IDisposable
 
             Assert.Null(BesiegerCamp._leaderParty);
 
-            // Simulate the field changing
+            /// Simulate the field changing
             intercept.Invoke(null, new object[] { BesiegerCamp, serverParty });
 
             Assert.Same(serverParty, BesiegerCamp._leaderParty);
