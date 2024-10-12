@@ -1,5 +1,8 @@
 ﻿using GameInterface.Services.Registry;
+using System.Linq;
 using System.Threading;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Siege;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEngines
@@ -15,6 +18,10 @@ namespace GameInterface.Services.SiegeEngines
 
         public override void RegisterAll()
         {
+            foreach (var siegeEnginesContainer in Campaign.Current.SiegeEventManager.SiegeEvents.Select(siegeEvent => siegeEvent.BesiegerCamp.SiegeEngines))
+            {
+                RegisterNewObject(siegeEnginesContainer, out _);
+            }
         }
 
         protected override string GetNewId(SiegeEnginesContainer obj)
