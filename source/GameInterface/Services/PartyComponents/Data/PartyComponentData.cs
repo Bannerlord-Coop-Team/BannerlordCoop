@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.PartyComponents.Data;
 
 [ProtoContract(SkipConstructor = true)]
-public record PartyComponentData(int TypeIndex, string Id, string SettlementId = null)
+public record PartyComponentData(int TypeIndex, string Id)
 {
     [ProtoMember(1)]
     public int TypeIndex = TypeIndex;
@@ -13,6 +13,4 @@ public record PartyComponentData(int TypeIndex, string Id, string SettlementId =
     [ProtoMember(2)]
     public string Id { get; } = Id;
 
-    [ProtoMember(3)]
-    public string SettlementId { get; } = SettlementId;
 }

@@ -35,7 +35,7 @@ internal class MilitiaPartyComponentLifetimePatches
                 + "Callstack: {callstack}", typeof(MilitiaPartyComponent), Environment.StackTrace);
             return true;
         }
-        __instance.Settlement = settlement;
+
         var message = new PartyComponentCreated(__instance);
 
         MessageBroker.Instance.Publish(__instance, message);

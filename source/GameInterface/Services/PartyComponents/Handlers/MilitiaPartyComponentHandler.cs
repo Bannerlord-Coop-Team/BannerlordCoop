@@ -11,6 +11,8 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using Common.Logging;
 using Serilog;
 using Common;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.PartyComponents.Handlers;
 internal class MilitiaPartyComponentHandler : IHandler
@@ -27,45 +29,58 @@ internal class MilitiaPartyComponentHandler : IHandler
         this.network = network;
         this.objectManager = objectManager;
 
-        messageBroker.Subscribe<MilitiaPartyComponentSettlementFinalized>(Handle);
+        messageBroker.Subscribe<MilitiaPartyComponentSettlementChanged>(Handle);
+        messageBroker.Subscribe<NetworkChangeSettlementMilitiaPartyComponent>(Handle);
     }
 
-    private void Handle(MessagePayload<MilitiaPartyComponentSettlementFinalized> payload)
+    private void Handle(MessagePayload<MilitiaPartyComponentSettlementChanged> payload)
     {
         var component = payload.What.Instance;
         if (objectManager.TryGetId(component, out var componentID) == false)
         {
-            Logger.Error("MilitiaPartyComponent was not registered with PartyComponentRegistry");
+            Logger.Error("Changing settlement failed on server. {name} was not registered with PartyComponentRegistry\n"
+                + "Callstack: {callstack}", typeof(MilitiaPartyComponent), Environment.StackTrace);
+
             return;
         }
 
-        var message = new NetworkFinalizeMilitiaPartyComponent(componentID);
+        var message = new NetworkChangeSettlementMilitiaPartyComponent(componentID, payload.What.SettlementId);
         network.SendAll(message);
         return;
     }
-    private void Handle(MessagePayload<NetworkFinalizeMilitiaPartyComponent> payload)
+    private void Handle(MessagePayload<NetworkChangeSettlementMilitiaPartyComponent> payload)
     {
         var componentId = payload.What.ComponentId;
 
         if (objectManager.TryGetObject(componentId, out MilitiaPartyComponent component) == false)
         {
-            Logger.Error("MilitiaPartyComponent was not registered with PartyComponentRegistry");
+            Logger.Error("{name} was not registered with PartyComponentRegistry\n"
+                + "Callstack: {callstack}", typeof(MilitiaPartyComponent), Environment.StackTrace);
+
             return;
         }
 
-      /*  GameLoopRunner.RunOnMainThread(() =>
+        if (objectManager.TryGetObject(payload.What.SettlementId, out Settlement settlement) == false)
+        {
+            Logger.Error("Changing settlement failed on client. {name} was not registered with ObjectManager\n"
+                + "Callstack: {callstack}", typeof(Settlement), Environment.StackTrace);
+
+            return;
+        }
+
+        GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                component.OnFinalize();
+                component.Settlement = settlement;
             }
-        }); */
+        }); 
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<MilitiaPartyComponentSettlementFinalized>(Handle);
-        messageBroker.Unsubscribe<NetworkFinalizeMilitiaPartyComponent>(Handle);
+        messageBroker.Unsubscribe<MilitiaPartyComponentSettlementChanged>(Handle);
+        messageBroker.Unsubscribe<NetworkChangeSettlementMilitiaPartyComponent>(Handle);
     }
 }
 
