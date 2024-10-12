@@ -89,6 +89,7 @@ public class MilitiaPartyComponentTests : IDisposable
 
             // The settlement is not synced during ctor. Check how other public properties have been implemented to sync durinng ctor.
             MilitiaPartyComponent militiaPartyComponent = new MilitiaPartyComponent(settlement);
+            militiaPartyComponent.Settlement = settlement;
             Assert.True(server.ObjectManager.TryGetId(militiaPartyComponent, out militiaCompId));
 
             Assert.Equal(settlement.StringId, militiaPartyComponent.Settlement.StringId);
