@@ -18,7 +18,7 @@ internal class MilitiaPartyComponentPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MilitiaPartyComponentPatches>();
 
-    [HarmonyPatch("Settlement", MethodType.Setter)]
+    [HarmonyPatch(nameof(MilitiaPartyComponent.Settlement), MethodType.Setter)]
     [HarmonyPrefix]
     static bool SettlementPrefix(MilitiaPartyComponent __instance, Settlement value)
     {
