@@ -16,114 +16,114 @@ using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensi
 
 namespace GameInterface.Services.BesiegerCamps.Handlers;
 
-internal class BesiegerCampPropertyHandler : IHandler
-{
-    private static readonly ILogger Logger = LogManager.GetLogger<BesiegerCampLifetimeHandler>();
+//internal class BesiegerCampPropertyHandler : IHandler
+//{
+//    private static readonly ILogger Logger = LogManager.GetLogger<BesiegerCampLifetimeHandler>();
 
-    private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
-    private readonly IObjectManager objectManager;
+//    private readonly IMessageBroker messageBroker;
+//    private readonly INetwork network;
+//    private readonly IObjectManager objectManager;
 
-    public BesiegerCampPropertyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
-    {
-        this.messageBroker = messageBroker;
-        this.network = network;
-        this.objectManager = objectManager;
-        messageBroker.Subscribe<BesiegerCampPropertyChanged>(Handle_PropertyChanged);
-        messageBroker.Subscribe<NetworkBesiegerCampChangeProperty>(Handle_ChangeProperty);
-    }
+//    public BesiegerCampPropertyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+//    {
+//        this.messageBroker = messageBroker;
+//        this.network = network;
+//        this.objectManager = objectManager;
+//        messageBroker.Subscribe<BesiegerCampPropertyChanged>(Handle_PropertyChanged);
+//        messageBroker.Subscribe<NetworkBesiegerCampChangeProperty>(Handle_ChangeProperty);
+//    }
 
-    private void Handle_PropertyChanged(MessagePayload<BesiegerCampPropertyChanged> payload)
-    {
-        var data = payload.What;
+//    private void Handle_PropertyChanged(MessagePayload<BesiegerCampPropertyChanged> payload)
+//    {
+//        var data = payload.What;
 
-        var message = CreateNetworkMessage(data);
+//        var message = CreateNetworkMessage(data);
 
-        network.SendAll(message);
-    }
+//        network.SendAll(message);
+//    }
 
-    private void Handle_ChangeProperty(MessagePayload<NetworkBesiegerCampChangeProperty> payload)
-    {
-        var data = payload.What;
-        if (objectManager.TryGetObject<BesiegerCamp>(data.BesiegerCampId, out var instance) == false)
-        {
-            Logger.Error("Unable to find {type} with id: {id}", typeof(BesiegerCamp), data.BesiegerCampId);
-            return;
-        }
+//    private void Handle_ChangeProperty(MessagePayload<NetworkBesiegerCampChangeProperty> payload)
+//    {
+//        var data = payload.What;
+//        if (objectManager.TryGetObject<BesiegerCamp>(data.BesiegerCampId, out var instance) == false)
+//        {
+//            Logger.Error("Unable to find {type} with id: {id}", typeof(BesiegerCamp), data.BesiegerCampId);
+//            return;
+//        }
 
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            using (new AllowedThread())
-            {
-                HandleDataChanged(instance, data);
-            }
-        });
-    }
+//        GameLoopRunner.RunOnMainThread(() =>
+//        {
+//            using (new AllowedThread())
+//            {
+//                HandleDataChanged(instance, data);
+//            }
+//        });
+//    }
 
-    private void HandleDataChanged(BesiegerCamp instance, NetworkBesiegerCampChangeProperty data)
-    {
-        var propInfo = typeof(BesiegerCamp).GetProperty(data.PropertyName);
-        if (propInfo == null)
-        {
-            Logger.Error("Unable to find property with name {propName} on type: {type}", data.PropertyName, typeof(BesiegerCamp));
-            return;
-        }
-        object newValue = ResolvePropertyValue(data, propInfo);
-        propInfo.SetValue(instance, newValue);
-    }
+//    private void HandleDataChanged(BesiegerCamp instance, NetworkBesiegerCampChangeProperty data)
+//    {
+//        var propInfo = typeof(BesiegerCamp).GetProperty(data.PropertyName);
+//        if (propInfo == null)
+//        {
+//            Logger.Error("Unable to find property with name {propName} on type: {type}", data.PropertyName, typeof(BesiegerCamp));
+//            return;
+//        }
+//        object newValue = ResolvePropertyValue(data, propInfo);
+//        propInfo.SetValue(instance, newValue);
+//    }
 
-    private object ResolvePropertyValue(NetworkBesiegerCampChangeProperty data, PropertyInfo propInfo)
-    {
-        object obj;
-        Type propType = propInfo.PropertyType;
+//    private object ResolvePropertyValue(NetworkBesiegerCampChangeProperty data, PropertyInfo propInfo)
+//    {
+//        object obj;
+//        Type propType = propInfo.PropertyType;
 
-        // special case for this pesky type because its not working really well with object manager
-        if (propType == typeof(SiegeStrategy))
-        {
-            obj = SiegeStrategy.All.FirstOrDefault(x => string.Equals(x.StringId, data.ObjectId));
-            if (obj == null)
-            {
-                Logger.Error("Unable to find SiegeStrategy with id: {id}", data.ObjectId);
-            }
-            return obj;
-        }
+//        // special case for this pesky type because its not working really well with object manager
+//        if (propType == typeof(SiegeStrategy))
+//        {
+//            obj = SiegeStrategy.All.FirstOrDefault(x => string.Equals(x.StringId, data.ObjectId));
+//            if (obj == null)
+//            {
+//                Logger.Error("Unable to find SiegeStrategy with id: {id}", data.ObjectId);
+//            }
+//            return obj;
+//        }
 
-        if (!propType.IsClass) // Obj is simple struct and was serialized, just deserialize it
-        {
-            obj = Deserialize(data.SerializedValue);
-        }
-        else
-        {
-            if (!objectManager.TryGetObject(data.ObjectId, propType, out obj)) // Obj is a class, use ObjectManager
-            {
-                Logger.Error("Unable to find {type} with id: {id}", propType.Name, data.ObjectId);
-            }
-        }
+//        if (!propType.IsClass) // Obj is simple struct and was serialized, just deserialize it
+//        {
+//            obj = Deserialize(data.SerializedValue);
+//        }
+//        else
+//        {
+//            if (!objectManager.TryGetObject(data.ObjectId, propType, out obj)) // Obj is a class, use ObjectManager
+//            {
+//                Logger.Error("Unable to find {type} with id: {id}", propType.Name, data.ObjectId);
+//            }
+//        }
 
-        return obj;
-    }
+//        return obj;
+//    }
 
-    public NetworkBesiegerCampChangeProperty CreateNetworkMessage(BesiegerCampPropertyChanged internalMessage)
-    {
-        objectManager.TryGetId(internalMessage.BesiegerCamp, Logger, out string besiegeCampId);
-        PropertyInfo property = internalMessage.PropertyInfo;
-        bool isClass = property.PropertyType.IsClass;
+//    public NetworkBesiegerCampChangeProperty CreateNetworkMessage(BesiegerCampPropertyChanged internalMessage)
+//    {
+//        objectManager.TryGetId(internalMessage.BesiegerCamp, Logger, out string besiegeCampId);
+//        PropertyInfo property = internalMessage.PropertyInfo;
+//        bool isClass = property.PropertyType.IsClass;
 
-        if (isClass)
-        {
-            objectManager.TryGetId(internalMessage.Value, Logger, out string id);
-            return new NetworkBesiegerCampChangeProperty(property.Name, besiegeCampId, id);
-        }
-        else
-        {
-            var serializedValue = Serialize(internalMessage.Value);
-            return new NetworkBesiegerCampChangeProperty(property.Name, besiegeCampId, serializedValue);
-        }
-    }
+//        if (isClass)
+//        {
+//            objectManager.TryGetId(internalMessage.Value, Logger, out string id);
+//            return new NetworkBesiegerCampChangeProperty(property.Name, besiegeCampId, id);
+//        }
+//        else
+//        {
+//            var serializedValue = Serialize(internalMessage.Value);
+//            return new NetworkBesiegerCampChangeProperty(property.Name, besiegeCampId, serializedValue);
+//        }
+//    }
 
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<BesiegerCampPropertyChanged>(Handle_PropertyChanged);
-        messageBroker.Unsubscribe<NetworkBesiegerCampChangeProperty>(Handle_ChangeProperty);
-    }
-}
+//    public void Dispose()
+//    {
+//        messageBroker.Unsubscribe<BesiegerCampPropertyChanged>(Handle_PropertyChanged);
+//        messageBroker.Unsubscribe<NetworkBesiegerCampChangeProperty>(Handle_ChangeProperty);
+//    }
+//}
