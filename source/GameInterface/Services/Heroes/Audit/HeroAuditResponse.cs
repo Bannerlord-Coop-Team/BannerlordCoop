@@ -3,7 +3,7 @@ using ProtoBuf;
 
 namespace GameInterface.Services.Heroes.Audit;
 [ProtoContract(SkipConstructor = true)]
-internal record HeroAuditResponse : IEvent
+internal record HeroAuditResponse : IAuditResponse<HeroAuditData>
 {
     [ProtoMember(1)]
     public HeroAuditData[] Data { get; }

@@ -59,7 +59,7 @@ internal class ServerSettlementHandler : IHandler
     private void Handle_Respond(MessagePayload<SettlementAuditResponse> payload)
     {
         var obj = payload.What;
-        network.SendAll(new NetworkSettlementAuditResults(obj.Data, obj.ServerAuditResults));
+        network.SendAll(new NetworkSettlementAuditResults(obj.Data, obj.ServerAuditResult));
     }
 
     private void Handle_Request(MessagePayload<RequestSettlementAudit> payload)

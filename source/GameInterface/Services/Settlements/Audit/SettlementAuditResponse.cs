@@ -8,16 +8,16 @@ namespace GameInterface.Services.Settlements.Audit;
 /// </summary>
 /// 
 [ProtoContract(SkipConstructor = true)]
-public record SettlementAuditResponse : IEvent
+public record SettlementAuditResponse : IAuditResponse<SettlementAuditData>
 {
     [ProtoMember(1)]
     public SettlementAuditData[] Data { get; }
     [ProtoMember(2)]
-    public string ServerAuditResults { get; }
+    public string ServerAuditResult { get; }
 
     public SettlementAuditResponse(SettlementAuditData[] data, string serverAuditResults)
     {
         Data = data;
-        ServerAuditResults = serverAuditResults;
+        ServerAuditResult = serverAuditResults;
     }
 }

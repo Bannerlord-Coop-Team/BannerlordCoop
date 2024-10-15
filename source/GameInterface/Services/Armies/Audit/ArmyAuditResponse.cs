@@ -7,7 +7,7 @@ namespace GameInterface.Services.Armies.Audit;
 /// Response message for the army audit.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-internal record ArmyAuditResponse : IEvent
+internal record ArmyAuditResponse : IAuditResponse <ArmyAuditData>
 {
     [ProtoMember(1)]
     public ArmyAuditData[] Data { get; }

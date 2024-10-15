@@ -8,7 +8,7 @@ namespace GameInterface.Services.Armies.Audit;
 /// Audit data for an army.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-internal record ArmyAuditData
+internal record ArmyAuditData : IAuditInfo
 {
     [ProtoMember(1)]
     public string StringId { get; }

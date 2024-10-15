@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem;
 namespace GameInterface.Services.Heroes.Audit;
 
 [ProtoContract(SkipConstructor = true)]
-internal record HeroAuditData
+internal record HeroAuditData : IAuditInfo
 {
     [ProtoMember(1)]
     public string StringId { get; }

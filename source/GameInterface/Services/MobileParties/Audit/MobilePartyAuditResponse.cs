@@ -4,7 +4,7 @@ using ProtoBuf;
 namespace GameInterface.Services.MobileParties.Audit;
 
 [ProtoContract(SkipConstructor = true)]
-internal record MobilePartyAuditResponse : IEvent
+internal record MobilePartyAuditResponse : IAuditResponse<MobilePartyAuditData>
 {
     [ProtoMember(1)]
     public MobilePartyAuditData[] Data { get; }
