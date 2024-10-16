@@ -155,7 +155,7 @@ public class PropertySwitchCreator
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertySwitchCreator), nameof(Deserialize)).MakeGenericMethod(property.PropertyType));
 
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.AllowThisThread)));
-        il.Emit(OpCodes.Callvirt, property.GetSetMethod());
+        il.Emit(OpCodes.Callvirt, property.GetSetMethod() ?? property.GetSetMethod(true) ?? throw new InvalidOperationException($"{property.Name} does not have a set method"));
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.RevokeThisThread)));
 
         il.Emit(OpCodes.Ret);
