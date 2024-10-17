@@ -12,33 +12,26 @@ namespace E2E.Tests.Services.BesiegerCamps;
 
 public class BesiegerCampLifetimeTests : IDisposable
 {
-    private List<MethodBase> disabledMethods = new();
-
+    private readonly List<MethodBase> disabledMethods;
     private E2ETestEnvironment TestEnvironment { get; }
-
     private EnvironmentInstance Server => TestEnvironment.Server;
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
     public BesiegerCampLifetimeTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
-        DisableMethods();
+
+        disabledMethods = new List<MethodBase> {
+                AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+                AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
+                AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide))
+        };
+        disabledMethods.AddRange(AccessTools.GetDeclaredConstructors(typeof(SiegeEvent)));
     }
 
     public void Dispose()
     {
         TestEnvironment.Dispose();
-    }
-
-    private void DisableMethods()
-    {
-        disabledMethods = new List<MethodBase> {
-                AccessTools.Method(typeof (MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
-                AccessTools.Method(typeof (BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
-                AccessTools.Method(typeof (BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide))
-        };
-
-        disabledMethods.AddRange(AccessTools.GetDeclaredConstructors(typeof(SiegeEvent)));
     }
 
     [Fact]

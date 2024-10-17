@@ -1,6 +1,5 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
 using GameInterface.Services.BesiegerCamps.Patches;
 using HarmonyLib;
 using System.Reflection;
@@ -12,19 +11,27 @@ namespace E2E.Tests.Services.BesiegerCamps
 {
     public class BesiegerCampCollectionTests : IDisposable
     {
-        private List<MethodBase> disabledMethods = new();
-
+        private readonly List<MethodBase> disabledMethods;
         private E2ETestEnvironment TestEnvironment { get; }
-
         private EnvironmentInstance Server => TestEnvironment.Server;
         private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
-
         private IEnumerable<EnvironmentInstance> AllEnvironmentInstances => Clients.Append(Server);
+
+        private readonly string besiegerCampId;
+        private readonly string besiegerPartyId;
 
         public BesiegerCampCollectionTests(ITestOutputHelper output)
         {
             TestEnvironment = new E2ETestEnvironment(output);
-            DisableMethods();
+
+            disabledMethods = new List<MethodBase> {
+                AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+                AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
+                AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide))
+            };
+
+            besiegerCampId = TestEnvironment.CreateRegisteredObject<BesiegerCamp>(disabledMethods);
+            besiegerPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>(disabledMethods);
         }
 
         public void Dispose()
@@ -32,36 +39,12 @@ namespace E2E.Tests.Services.BesiegerCamps
             TestEnvironment.Dispose();
         }
 
-        private void DisableMethods()
-        {
-            disabledMethods = new List<MethodBase> {
-                AccessTools.Method(typeof (MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
-                AccessTools.Method(typeof (BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
-                AccessTools.Method(typeof (BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide))
-            };
-        }
-
-        private T ServerCreateObject<T>(out string objectId)
-        {
-            string? id = null;
-            T? obj = default;
-
-            Server.Call(() =>
-            {
-                obj = GameObjectCreator.CreateInitializedObject<T>();
-                Assert.True(Server.ObjectManager.TryGetId(obj, out id));
-            }, disabledMethods);
-
-            objectId = id!;
-            return obj ?? throw new InvalidOperationException("Failed to create object.");
-        }
-
         [Fact]
         private void ServerAddBesiegerParty_SyncAllClients()
         {
             //Arrange
-            var serverBesiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
-            var serverBesiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
+            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var serverBesiegerParty));
 
             //Act
             Server.Call(() =>
@@ -83,13 +66,15 @@ namespace E2E.Tests.Services.BesiegerCamps
         private void ServerRemoveBesiegerParty_SyncAllClients()
         {
             // Arrange
-            var serverBesiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
-            var serverBesiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
+            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var serverBesiegerParty));
+
             Server.Call(() =>
             {
                 BesiegerCampCollectionPatches.ListAddOverride(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
                 Assert.Contains<MobileParty>(serverBesiegerParty, serverBesiegerCamp._besiegerParties);
             });
+
             foreach (var client in Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
@@ -116,8 +101,9 @@ namespace E2E.Tests.Services.BesiegerCamps
         private void ClientAddBesiegerParty_DoesNothing()
         {
             // Arrange
-            var serverBesiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
-            var serverBesiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
+            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var serverBesiegerParty));
+
             foreach (var client in Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var syncedCamp));
@@ -145,8 +131,9 @@ namespace E2E.Tests.Services.BesiegerCamps
         private void ClientRemoveBesiegerParty_DoesNothing()
         {
             // Arrange
-            var serverBesiegerCamp = ServerCreateObject<BesiegerCamp>(out string besiegerCampId);
-            var serverBesiegerParty = ServerCreateObject<MobileParty>(out string besiegerPartyId);
+            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var serverBesiegerParty));
+
             Server.Call(() =>
             {
                 /// Server adds besiegerParty to besiegerCamp

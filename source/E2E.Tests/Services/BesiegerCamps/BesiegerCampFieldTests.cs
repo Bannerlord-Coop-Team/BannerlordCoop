@@ -16,7 +16,7 @@ public class BesiegerCampFieldTests : IDisposable
 
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
-    private readonly string BesiegerCampId;
+    private readonly string besiegerCampId;
 
     public BesiegerCampFieldTests(ITestOutputHelper output)
     {
@@ -25,13 +25,13 @@ public class BesiegerCampFieldTests : IDisposable
         var BesiegerCamp = ObjectHelper.SkipConstructor<BesiegerCamp>();
 
         // Create BesiegerCamp on the server
-        Assert.True(Server.ObjectManager.AddNewObject(BesiegerCamp, out BesiegerCampId));
+        Assert.True(Server.ObjectManager.AddNewObject(BesiegerCamp, out besiegerCampId));
 
         // Create BesiegerCamp on all clients
         foreach (var client in Clients)
         {
             var clientBesiegerCamp = ObjectHelper.SkipConstructor<BesiegerCamp>();
-            Assert.True(client.ObjectManager.AddExisting(BesiegerCampId, clientBesiegerCamp));
+            Assert.True(client.ObjectManager.AddExisting(besiegerCampId, clientBesiegerCamp));
         }
     }
 
@@ -60,7 +60,7 @@ public class BesiegerCampFieldTests : IDisposable
         // Act
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(BesiegerCampId, out var BesiegerCamp));
+            Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var BesiegerCamp));
             Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var serverParty));
 
             Assert.Null(BesiegerCamp._leaderParty);
@@ -74,7 +74,7 @@ public class BesiegerCampFieldTests : IDisposable
         // Assert
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(BesiegerCampId, out var BesiegerCamp));
+            Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var BesiegerCamp));
 
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var clientParty));
 
