@@ -7,7 +7,6 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
-using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
 
 namespace GameInterface.Services.BesiegerCamps.Handlers;
 

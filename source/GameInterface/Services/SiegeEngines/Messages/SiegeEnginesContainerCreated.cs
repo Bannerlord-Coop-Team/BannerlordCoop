@@ -5,13 +5,11 @@ namespace GameInterface.Services.SiegeEnginesContainers.Messages;
 
 internal class SiegeEnginesContainerCreated : IEvent
 {
-    public SiegeEnginesContainerCreated(SiegeEnginesContainer instance, SiegeEngineConstructionProgress progressInstance)
+
+    public SiegeEnginesContainerCreated(SiegeEnginesContainer instance)
     {
         SiegeEnginesContainerInstance = instance;
-        SiegeEngineConstructionProgressInstance = progressInstance;
     }
 
     public SiegeEnginesContainer SiegeEnginesContainerInstance { get; }
-
-    public SiegeEngineConstructionProgress SiegeEngineConstructionProgressInstance { get; set; }
 }

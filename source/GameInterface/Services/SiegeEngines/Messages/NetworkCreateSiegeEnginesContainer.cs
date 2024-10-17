@@ -7,14 +7,10 @@ namespace GameInterface.Services.SiegeEnginesContainers.Messages;
 internal class NetworkCreateSiegeEnginesContainer : ICommand
 {
     [ProtoMember(1)]
-    public string SiegeEnginesId { get; }
+    public string SiegeEnginesContainerId { get; }
 
-    [ProtoMember(2)]
-    public string SiegeConstructionProgressId { get; }
-
-    public NetworkCreateSiegeEnginesContainer(string siegeEnginesId, string siegeConstructionProgressId)
+    public NetworkCreateSiegeEnginesContainer(string siegeEnginesId)
     {
-        SiegeEnginesId = siegeEnginesId;
-        SiegeConstructionProgressId = siegeConstructionProgressId;
+        SiegeEnginesContainerId = siegeEnginesId;
     }
 }

@@ -4,9 +4,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.SiegeEnginesContainers.Messages;
-using HarmonyLib;
 using Serilog;
-using static GameInterface.Services.BesiegerCamps.Extensions.BesiegerCampExtensions;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEnginesContainers.Handlers;
@@ -28,25 +26,13 @@ internal class SiegeEnginesContainerLifetimeHandler : IHandler
         messageBroker.Subscribe<NetworkCreateSiegeEnginesContainer>(Handle);
     }
 
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<SiegeEnginesContainerCreated>(Handle);
-        messageBroker.Unsubscribe<NetworkCreateSiegeEnginesContainer>(Handle);
-    }
-
     private void Handle(MessagePayload<SiegeEnginesContainerCreated> payload)
     {
         var siegeEnginesInstance = payload.What.SiegeEnginesContainerInstance;
-        var siegeProgressInstance = payload.What.SiegeEngineConstructionProgressInstance;
-
-        if (!TryGetId(siegeProgressInstance, Logger, out string constructionProgressId))
-        {
-            return;
-        }
 
         objectManager.AddNewObject(siegeEnginesInstance, out var id);
 
-        network.SendAll(new NetworkCreateSiegeEnginesContainer(id, constructionProgressId));
+        network.SendAll(new NetworkCreateSiegeEnginesContainer(id));
     }
 
     private void Handle(MessagePayload<NetworkCreateSiegeEnginesContainer> payload)
@@ -58,15 +44,12 @@ internal class SiegeEnginesContainerLifetimeHandler : IHandler
         }
 
         var newSiegeEnginesContainer = ObjectHelper.SkipConstructor<SiegeEnginesContainer>();
+        objectManager.AddExisting(payload.What.SiegeEnginesContainerId, newSiegeEnginesContainer);
+    }
 
-        // attach SiegeConstructionProgress to SiegeEngine
-        if (payload.What.SiegeConstructionProgressId != null)
-        {
-            SiegeEngineConstructionProgress siegeProgress;
-            objectManager.TryGetObject(payload.What.SiegeConstructionProgressId, out siegeProgress);
-            AccessTools.Field(typeof(SiegeEnginesContainer), nameof(SiegeEnginesContainer.SiegePreparations)).SetValue(newSiegeEnginesContainer, siegeProgress);
-        }
-
-        objectManager.AddExisting(payload.What.SiegeEnginesId, newSiegeEnginesContainer);
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<SiegeEnginesContainerCreated>(Handle);
+        messageBroker.Unsubscribe<NetworkCreateSiegeEnginesContainer>(Handle);
     }
 }
