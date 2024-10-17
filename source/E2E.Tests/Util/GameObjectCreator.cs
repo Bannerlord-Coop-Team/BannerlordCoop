@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
+using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace E2E.Tests.Util;
 
@@ -33,10 +34,12 @@ internal class GameObjectCreator
         { typeof(MapEventSide), new MapEventSideBuilder() },
         { typeof(BesiegerCamp), new BesiegerCampBuilder() },
         { typeof(SiegeEvent), new SiegeEventBuilder() },
+        { typeof(SiegeStrategy), new SiegeStrategyBuilder() },
+        { typeof(SiegeEnginesContainer), new SiegeEnginesBuilder() },
         { typeof(Workshop), new WorkshopBuilder() },
         { typeof(WorkshopType), new WorkshopTypeBuilder() },
         { typeof(Building), new BuildingBuilder() },
-        { typeof(ItemCategory), new ItemCategoryBuilder() },
+        { typeof(ItemCategory), new ItemCategoryBuilder() }
     };
 
     public static T CreateInitializedObject<T>()
