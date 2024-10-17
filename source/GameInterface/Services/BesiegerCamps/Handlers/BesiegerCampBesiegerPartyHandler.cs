@@ -109,9 +109,23 @@ internal class BesiegerCampBesiegerPartyHandler : IHandler
 
     private BesiegerPartyData CreateNetworkMessageData(BesiegerCamp camp, MobileParty party)
     {
-        if (!objectManager.TryGetId(camp, Logger, out string campId)) return null;
-        if (!objectManager.TryGetId(party, Logger, out string partyId)) return null;
+        if (!TryGetId(camp, out string campId)) return null;
+        if (!TryGetId(party, out string partyId)) return null;
 
         return new BesiegerPartyData(campId, partyId);
+    }
+
+    private bool TryGetId(object value, out string id)
+    {
+        id = null;
+        if (value == null) return false;
+
+        if (!objectManager.TryGetId(value, out id))
+        {
+            Logger.Error("Unable to get ID for instance of type {type}", value.GetType().Name);
+            return false;
+        }
+
+        return true;
     }
 }

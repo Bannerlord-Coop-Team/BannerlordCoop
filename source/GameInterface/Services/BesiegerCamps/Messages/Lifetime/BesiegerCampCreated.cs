@@ -9,6 +9,5 @@ internal class BesiegerCampCreated : IEvent
     {
         Instance = instance;
     }
-
     public BesiegerCamp Instance { get; }
 }
