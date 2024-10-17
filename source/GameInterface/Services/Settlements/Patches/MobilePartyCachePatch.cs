@@ -24,7 +24,7 @@ public class MobilePartyCachePatch
     [HarmonyPatch("AddMobileParty")]
     [HarmonyPrefix]
     private static bool AddMobilePartyPrefix(ref Settlement __instance, ref MobileParty mobileParty)
-    {
+    {   // Maybe need to add some more logic to add militiaPartyComponent to Settlement here or in other method
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)

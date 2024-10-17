@@ -58,7 +58,7 @@ internal class PartyComponentHandler : IHandler
         var componentId = payload.What.ComponentId;
         var partyId = payload.What.PartyId;
 
-        if(objectManager.TryGetObject<PartyComponent>(componentId, out var component) == false)
+        if (objectManager.TryGetObject<PartyComponent>(componentId, out var component) == false)
         {
             Logger.Error("Could not find PartyComponent with id {componentId}", componentId);
             return;
@@ -77,8 +77,8 @@ internal class PartyComponentHandler : IHandler
     {
         var component = payload.What.Component;
         var party = payload.What.Party;
-        
-        if(objectManager.TryGetId(component, out var componentId) == false)
+
+        if (objectManager.TryGetId(component, out var componentId) == false)
         {
             Logger.Error("PartyComponent was not registered with party PartyComponentRegistry");
             return;
@@ -97,6 +97,7 @@ internal class PartyComponentHandler : IHandler
         var typeIndex = partyTypes.IndexOf(payload.What.Instance.GetType());
         var data = new PartyComponentData(typeIndex, id);
         network.SendAll(new NetworkCreatePartyComponent(data));
+
     }
 
     private void Handle(MessagePayload<NetworkCreatePartyComponent> payload)
@@ -107,5 +108,6 @@ internal class PartyComponentHandler : IHandler
         var obj = ObjectHelper.SkipConstructor(partyTypes[typeIdx]);
 
         objectManager.AddExisting(data.Id, obj);
+
     }
 }

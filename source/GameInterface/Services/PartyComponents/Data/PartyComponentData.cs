@@ -1,4 +1,6 @@
 ﻿using ProtoBuf;
+using System.Runtime.InteropServices.ComTypes;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.PartyComponents.Data;
 
@@ -10,4 +12,5 @@ public record PartyComponentData(int TypeIndex, string Id)
 
     [ProtoMember(2)]
     public string Id { get; } = Id;
+
 }
