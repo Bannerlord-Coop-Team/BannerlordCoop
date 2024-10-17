@@ -5,12 +5,15 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.BesiegerCamps;
+
 internal class BeseigerCampRegistry : RegistryBase<BesiegerCamp>
 {
     private const string BeseigerCampIdPrefix = "CoopBeseigerCamp";
     private static int InstanceCounter = 0;
 
-    public BeseigerCampRegistry(IRegistryCollection collection) : base(collection) { }
+    public BeseigerCampRegistry(IRegistryCollection collection) : base(collection)
+    {
+    }
 
     public override void RegisterAll()
     {
