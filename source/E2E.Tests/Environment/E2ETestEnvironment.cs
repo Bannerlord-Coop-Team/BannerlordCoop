@@ -83,9 +83,10 @@ internal class E2ETestEnvironment : IDisposable
     /// This uses the <see cref="GameObjectCreator"/> to generate objects.
     /// </remarks>
     /// <typeparam name="T">Type of object to create</typeparam>
+    /// <param name="disabledMethods">Methods to disable while calling this method</param>
     /// <returns>New object of type <typeparamref name="T"/></returns>
     /// <exception cref="Exception">Failed to create object exception</exception>
-    public string CreateRegisteredObject<T>() where T : class
+    public string CreateRegisteredObject<T>(IEnumerable<MethodBase>? disabledMethods = null) where T : class
     {
         string? id = null;
         Server.Call(() =>
@@ -96,7 +97,7 @@ internal class E2ETestEnvironment : IDisposable
             {
                 throw new Exception($"Server object manager failed to register new object {typeof(T).Name}");
             }
-        });
+        }, disabledMethods);
 
         if (id == null)
         {
