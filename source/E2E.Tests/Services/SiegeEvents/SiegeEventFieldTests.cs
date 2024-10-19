@@ -17,7 +17,7 @@ public class SiegeEventFieldTests : IDisposable
 
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
-    private readonly string SiegeEventId;
+    private readonly string siegeEventId;
 
     public SiegeEventFieldTests(ITestOutputHelper output)
     {
@@ -26,13 +26,13 @@ public class SiegeEventFieldTests : IDisposable
         var SiegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>();
 
         // Create SiegeEvent on the server
-        Assert.True(Server.ObjectManager.AddNewObject(SiegeEvent, out SiegeEventId));
+        Assert.True(Server.ObjectManager.AddNewObject(SiegeEvent, out siegeEventId));
 
         // Create SiegeEvent on all clients
         foreach (var client in Clients)
         {
             var clientSiegeEvent = ObjectHelper.SkipConstructor<SiegeEvent>();
-            Assert.True(client.ObjectManager.AddExisting(SiegeEventId, clientSiegeEvent));
+            Assert.True(client.ObjectManager.AddExisting(siegeEventId, clientSiegeEvent));
         }
     }
 
@@ -57,7 +57,7 @@ public class SiegeEventFieldTests : IDisposable
         // Act
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(SiegeEventId, out var serverSiegeEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var serverSiegeEvent));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var serverSettlement));
             Assert.Null(serverSiegeEvent.BesiegedSettlement);
 
@@ -69,7 +69,7 @@ public class SiegeEventFieldTests : IDisposable
         // Assert
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(SiegeEventId, out var clientSiegeEvent));
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var clientSiegeEvent));
 
             Assert.True(client.ObjectManager.TryGetObject<Settlement>(settlementId, out var clientSettlement));
 
@@ -93,7 +93,7 @@ public class SiegeEventFieldTests : IDisposable
         // Act
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(SiegeEventId, out var serverSiegeEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var serverSiegeEvent));
             Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
             Assert.Null(serverSiegeEvent.BesiegerCamp);
 
@@ -105,7 +105,7 @@ public class SiegeEventFieldTests : IDisposable
         // Assert
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(SiegeEventId, out var clientSiegeEvent));
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var clientSiegeEvent));
 
             Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
 
@@ -123,7 +123,7 @@ public class SiegeEventFieldTests : IDisposable
         // Act
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(SiegeEventId, out var serverSiegeEvent));
+            Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var serverSiegeEvent));
             Assert.False(serverSiegeEvent._isBesiegerDefeated);
 
             /// Simulate the field changing
@@ -135,7 +135,7 @@ public class SiegeEventFieldTests : IDisposable
         // Assert
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(SiegeEventId, out var clientSiegeEvent));
+            Assert.True(client.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var clientSiegeEvent));
             Assert.True(clientSiegeEvent._isBesiegerDefeated);
         }
     }
