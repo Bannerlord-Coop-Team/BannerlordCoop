@@ -1,15 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.Localization;
+﻿using TaleWorlds.CampaignSystem.Siege;
 
 namespace E2E.Tests.Util.ObjectBuilders;
+
 internal class BesiegerCampBuilder : IObjectBuilder
 {
     public object Build()
