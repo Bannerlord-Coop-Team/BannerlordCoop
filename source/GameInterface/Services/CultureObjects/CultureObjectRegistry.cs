@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.Registry;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
 
@@ -7,6 +8,7 @@ namespace GameInterface.Services.CultureObjects
     internal class CultureObjectRegistry : RegistryBase<CultureObject>
     {
         private const string CultureStringIdPrefix = "CoopCulture";
+        private static int ObjectCounter = 0;
 
         public CultureObjectRegistry(IRegistryCollection collection) : base(collection) { }
 
@@ -28,8 +30,7 @@ namespace GameInterface.Services.CultureObjects
 
         protected override string GetNewId(CultureObject culture)
         {
-            culture.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<CultureObject>(CultureStringIdPrefix);
-            return culture.StringId;
+            return $"{CultureStringIdPrefix}_{Interlocked.Increment(ref ObjectCounter)}";
         }
     }
 }
