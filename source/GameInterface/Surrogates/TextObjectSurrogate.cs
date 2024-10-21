@@ -11,7 +11,7 @@ internal struct TextObjectSurrogate
 
     public TextObjectSurrogate(TextObject textObject)
     {
-        Text = textObject.Value;
+        Text = textObject?.Value;
     }
 
     public static implicit operator TextObjectSurrogate(TextObject textObject)

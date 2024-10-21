@@ -10,6 +10,7 @@ using GameInterface;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using LiteNetLib;
+using ProtoBuf.Meta;
 using System.Reflection;
 
 namespace E2E.Tests.Environment.Instance;
@@ -200,6 +201,11 @@ public abstract class EnvironmentInstance : IDisposable
 
     public T EnsureSerializable<T>(T obj)
     {
+        if (RuntimeTypeModel.Default.CanSerialize(obj?.GetType()) == false)
+        {
+            Assert.Fail($"ProtoBuf is unable to serialize type {obj?.GetType().Name}");
+        }
+
         var serializer = Container.Resolve<ICommonSerializer>();
 
         byte[] bytes = serializer.Serialize(obj);
