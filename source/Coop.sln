@@ -32,7 +32,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Coop.IntegrationTests", "Co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientDebug2", "ClientDebug 2\ClientDebug2.csproj", "{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "E2E.Tests", "E2E.Tests\E2E.Tests.csproj", "{239E3ABE-646A-4DCE-AD4C-AD102DC014C0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "E2E.Tests", "E2E.Tests\E2E.Tests.csproj", "{239E3ABE-646A-4DCE-AD4C-AD102DC014C0}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Scaffolderlord", "Scaffolderlord\Scaffolderlord.csproj", "{5D9A9CF6-3816-4596-B688-D4837F6A9531}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -146,6 +148,14 @@ Global
 		{239E3ABE-646A-4DCE-AD4C-AD102DC014C0}.Release|Any CPU.Build.0 = Release|Any CPU
 		{239E3ABE-646A-4DCE-AD4C-AD102DC014C0}.Release|x64.ActiveCfg = Release|Any CPU
 		{239E3ABE-646A-4DCE-AD4C-AD102DC014C0}.Release|x64.Build.0 = Release|Any CPU
+		{5D9A9CF6-3816-4596-B688-D4837F6A9531}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5D9A9CF6-3816-4596-B688-D4837F6A9531}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5D9A9CF6-3816-4596-B688-D4837F6A9531}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5D9A9CF6-3816-4596-B688-D4837F6A9531}.Debug|x64.Build.0 = Debug|Any CPU
+		{5D9A9CF6-3816-4596-B688-D4837F6A9531}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5D9A9CF6-3816-4596-B688-D4837F6A9531}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5D9A9CF6-3816-4596-B688-D4837F6A9531}.Release|x64.ActiveCfg = Release|Any CPU
+		{5D9A9CF6-3816-4596-B688-D4837F6A9531}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

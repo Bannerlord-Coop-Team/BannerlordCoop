@@ -1,0 +1,5 @@
+<#@ output extension=".cs" #>
+<#@ template language="C#" hostspecific="true" #>
+<#@parameter type="System.String" name="ClassName" #>
+public class <#=ClassName#>
+{  }
