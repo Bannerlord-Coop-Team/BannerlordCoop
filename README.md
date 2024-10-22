@@ -1,7 +1,7 @@
 # Bannerlord Coop
 
 ## Summary
-Concept for a dotnet CLI scaffolding tool, ****, for the Bannerlord Coop project using `Mono.TextTemplating` and T4 templates.
+Concept for a dotnet CLI scaffolding tool for the Bannerlord Coop project using `Mono.TextTemplating` and T4 templates.
 
 ```bash
 scaffolderlord create <TypeFullyQualifiedName> <PropertyNames> <FieldNames> <CollectionNames>
