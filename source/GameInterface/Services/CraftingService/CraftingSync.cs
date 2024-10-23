@@ -10,6 +10,10 @@ namespace GameInterface.Services.CraftingService
         {
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Crafting), nameof(Crafting._currentHistoryIndex)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Crafting), nameof(Crafting._craftedItemObject)));
+
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Crafting), nameof(Crafting.CurrentWeaponDesign)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Crafting), nameof(Crafting.CurrentItemModifierGroup)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Crafting), nameof(Crafting.CraftedWeaponName)));
         }
     }
 }

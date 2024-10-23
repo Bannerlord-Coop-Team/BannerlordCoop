@@ -1,9 +1,11 @@
-﻿using E2E.Tests.Environment;
+﻿using Common.Util;
+using E2E.Tests.Environment;
 using HarmonyLib;
 using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -55,7 +57,29 @@ namespace E2E.Tests.Services.CraftingService
             server.Call(() =>
             {
                 currentHistoryIntercept.Invoke(null, new object[] { serverCrafting, 69 });
-                craftingItemObjectIntercept.Invoke(null, new object[] { serverCrafting, new ItemObject("need lifetime sync") });
+                craftingItemObjectIntercept.Invoke(null, new object[] { serverCrafting, new ItemObject("item") });
+                ItemModifierGroup img = new ItemModifierGroup();
+                ItemModifier modifier = new ItemModifier();
+                modifier.Armor = 10;
+                modifier.Damage = 10;
+                modifier.ChargeDamage = 10;
+                modifier.HitPoints = 10;
+                modifier.ItemQuality = ItemQuality.Poor;
+                modifier.LootDropScore = 10;
+                modifier.Maneuver = 10;
+                modifier.MissileSpeed = 10;
+                modifier.MountHitPoints = 10;
+                modifier.MountSpeed = 10;
+                modifier.Name = new TextObject("test");
+                modifier.PriceMultiplier = 10;
+                modifier.ProductionDropScore = 10;
+                modifier.Speed = 10;
+                modifier.StackCount = 10;
+                img.AddItemModifier(modifier);
+                serverCrafting.CurrentItemModifierGroup = img;
+                serverCrafting.CraftedWeaponName = new TextObject("craftedWeapon");
+                WeaponDesign weaponDesign = ObjectHelper.SkipConstructor<WeaponDesign>();
+                serverCrafting.CurrentWeaponDesign = weaponDesign;
             });
 
             foreach (var client in TestEnvironment.Clients)
@@ -63,7 +87,9 @@ namespace E2E.Tests.Services.CraftingService
                 Assert.True(client.ObjectManager.TryGetObject(craftingId, out Crafting clientCrafting));
                 Assert.Equal(serverCrafting._currentHistoryIndex, clientCrafting._currentHistoryIndex);
                 Assert.Equal(serverCrafting._craftedItemObject, clientCrafting._craftedItemObject);
-
+                Assert.Equal(serverCrafting.CurrentWeaponDesign, clientCrafting.CurrentWeaponDesign);
+                Assert.Equal(serverCrafting.CurrentItemModifierGroup, clientCrafting.CurrentItemModifierGroup);
+                Assert.Equal(serverCrafting.CraftedWeaponName, clientCrafting.CraftedWeaponName);
             }
         }
     }
