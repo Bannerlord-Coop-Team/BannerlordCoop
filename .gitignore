@@ -550,3 +550,4 @@ source/.idea
 !*MissionTestMod.csproj.user
 # CodeRush
 /source/.cr/personal
+/source/Scaffolderlord/Properties
