@@ -3,6 +3,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace E2E.Tests.Util.ObjectBuilders;
+
 internal class SiegeEventBuilder : IObjectBuilder
 {
     public object Build()

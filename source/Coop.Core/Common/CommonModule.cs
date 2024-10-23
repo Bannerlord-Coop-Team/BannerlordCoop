@@ -8,6 +8,8 @@ using Coop.Core.Common.Configuration;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
 
 namespace Coop.Core.Common;
 
@@ -18,6 +20,7 @@ public abstract class CommonModule : Module
 {
     protected override void Load(ContainerBuilder builder)
     {
+        builder.RegisterType<TaleWorldsModuleInfoProvider>().As<IModuleInfoProvider>().SingleInstance();
         builder.RegisterType<StateFactory>().As<IStateFactory>().InstancePerLifetimeScope();
 
         #region Serialization
@@ -37,6 +40,7 @@ public abstract class CommonModule : Module
 
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<DeferredHeroRepository>().As<IDeferredHeroRepository>().InstancePerLifetimeScope();
+        builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
 
         builder.RegisterType<CoopFinalizer>().As<ICoopFinalizer>().InstancePerLifetimeScope();
 

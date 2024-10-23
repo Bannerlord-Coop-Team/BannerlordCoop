@@ -548,3 +548,5 @@ source/.idea
 !*ClientDebug2.csproj.user
 !*Coop.csproj.user
 !*MissionTestMod.csproj.user
+# CodeRush
+/source/.cr/personal

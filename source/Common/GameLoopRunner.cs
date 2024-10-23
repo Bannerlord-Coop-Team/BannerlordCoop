@@ -69,6 +69,8 @@ public class GameLoopRunner : IUpdateable
         }
         else
         {
+            
+
             EventWaitHandle ewh = blocking ?
                 new EventWaitHandle(false, EventResetMode.ManualReset) :
                 null;

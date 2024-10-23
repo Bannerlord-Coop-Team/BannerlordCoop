@@ -14,11 +14,11 @@ namespace GameInterface.Services.BesiegerCamps.Patches;
 [HarmonyPatch]
 internal class BesiegerCampCreationPatches
 {
-    static readonly ILogger Logger = LogManager.GetLogger<BesiegerCampCreationPatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<BesiegerCampCreationPatches>();
 
-    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(BesiegerCamp));
+    private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(BesiegerCamp));
 
-    static bool Prefix(ref BesiegerCamp __instance)
+    private static bool Prefix(ref BesiegerCamp __instance)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
