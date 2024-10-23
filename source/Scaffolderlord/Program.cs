@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Scaffolderlord.Models;
+using System;
 using static Scaffolderlord.Extensions;
 
 namespace Scaffolderlord
@@ -7,16 +8,11 @@ namespace Scaffolderlord
     {
         static async Task Main(string[] args)
         {
-            //var templatePath = GetTemplatePath("RegistryTemplate");
-            //var output = GetRelativePath(@"Output\\test.tt");
+            var typeInfo = ReflectionHelper.GetServiceTypeInfo("TaleWorlds.CampaignSystem.Settlements.Fief, TaleWorlds.CampaignSystem");
+            var registryTemplateModel = new RegistryTemplateModel(typeInfo);
 
-            //var scaffolder = new Scaffolder(templatePath,"output.cs");
-            //await scaffolder.Generate();
-
-            var test = ReflectionHelper.GetServiceTypeInfo("TaleWorlds.CampaignSystem.Siege.BesiegerCamp, TaleWorlds.CampaignSystem",
-                new[] { "NumberOfTroopsKilledOnSide", "SiegeEvent", "SiegeEngines", "SiegeStrategy" },
-                new[] { "_leaderParty" }
-                );
+            var scaffolder = new Scaffolder();
+            await scaffolder.Generate(registryTemplateModel);
         }
     }
 }

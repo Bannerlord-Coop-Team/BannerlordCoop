@@ -1,20 +1,49 @@
-﻿using GameInterface.Services.Villages.Commands;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem.Siege;
 
 namespace Scaffolderlord
 {
     public static class Extensions
     {
+        #region Path
+        public static string GetMainProjectPath(string subPath)
+        {
+            var bannerlordCoopDir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).FullName;
+            return Path.Combine(bannerlordCoopDir, subPath);
+        }
         public static string GetRelativePath(string subPath) => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, subPath);
+        public static bool IsValidPath(string path, FileAttributes attrFilter = FileAttributes.Directory)
+        {
+            try
+            {
+                DirectoryInfo dirInfo = new(path);
+                return dirInfo.Attributes == attrFilter;
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+        public static string GetUniqueFilePath(string filePath)
+        {
+            string directory = Path.GetDirectoryName(filePath);
+            string fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
+            string extension = Path.GetExtension(filePath);
 
-        public static string GetTemplatePath(string fileName) => Path.Combine(GetRelativePath("Templates"), $"{fileName}.tt");
+            string uniqueFilePath = filePath;
+            int counter = 1;
 
+            while (File.Exists(uniqueFilePath))
+            {
+                uniqueFilePath = Path.Combine(directory, $"{fileNameWithoutExtension}({counter++}){extension}");
+            }
+
+            return uniqueFilePath;
+        }
+        #endregion
+
+        #region Reflection
         public static IEnumerable<PropertyInfo> GetPropertiesWithSetters(Type type)
         {
             var properties = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic);
@@ -22,6 +51,7 @@ namespace Scaffolderlord
             return properties
                 .Where(prop => prop.CanWrite);
         }
+        #endregion
     }
 
 }

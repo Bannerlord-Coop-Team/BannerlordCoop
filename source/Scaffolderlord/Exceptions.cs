@@ -38,5 +38,20 @@ namespace Scaffolderlord.Exceptions
         }
     }
 
+    public class TemplateFileNotFoundException : Exception
+    {
+        public TemplateFileNotFoundException(string path)
+            : base($"No valid template was found at path '{path}'")
+        {
+        }
+    }
+
+    public class InvalidOutputPathException : Exception
+    {
+        public InvalidOutputPathException(string path)
+            : base($"Not a valid output path: {path}'")
+        {
+        }
+    }
 
 }
