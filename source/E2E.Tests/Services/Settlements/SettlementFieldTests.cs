@@ -155,7 +155,7 @@ namespace E2E.Tests.Services.Settlements
                 Assert.True(clientSettlement._isVisible);
                 Assert.Equal(clientAttackerParty, clientSettlement._lastAttackerParty);
                 Assert.Equal(newInt, clientSettlement._locatorNodeIndex);
-                Assert.Equal(newText, clientSettlement._name);
+                Assert.Equal(newText.ToString(), clientSettlement._name.ToString());
                 Assert.Equal(clientSettlement, clientSettlement._nextLocatable);
                 Assert.Equal(newInt, clientSettlement._numberOfLordPartiesAt);
                 Assert.Equal(newVec2, clientSettlement._position);
