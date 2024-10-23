@@ -22,12 +22,6 @@
 		<Service Include="{508349b6-6b84-4df5-91f0-309beebad82d}" />
 	</ItemGroup>
 
-	<ItemGroup>
-		<None Update="Templates\RegistryTemplate.tt">
-			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</None>
-	</ItemGroup>
-
 
 	<!--taleworlds codebase-->
 	<ItemGroup>
@@ -200,6 +194,12 @@
 		<Reference Include="TaleWorlds.TwoDimension.Standalone">
 			<HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.Standalone.dll</HintPath>
 		</Reference>
+	</ItemGroup>
+	<ItemGroup>
+	  <None Update="Templates\RegistryTemplate.tt">
+	    <Generator></Generator>
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
 	</ItemGroup>
 </Project>
 

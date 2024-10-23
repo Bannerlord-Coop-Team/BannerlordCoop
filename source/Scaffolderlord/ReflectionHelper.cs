@@ -1,5 +1,6 @@
 ﻿using HarmonyLib;
 using Scaffolderlord.Exceptions;
+using Scaffolderlord.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,23 +10,14 @@ using System.Threading.Tasks;
 
 namespace Scaffolderlord
 {
-    public record ServiceTypeInfo
-    {
-        public ServiceTypeInfo(Type type)
-        {
-            this.Type = type;
-        }
-
-        public Type Type { get; set; }
-        public List<PropertyInfo> Properties { get; set; } = new();
-        public List<FieldInfo> Fields { get; set; } = new();
-        public List<MemberInfo> Collections { get; set; } = new();
-    }
-
     public class ReflectionHelper
     {
-        public static ServiceTypeInfo GetServiceTypeInfo(string typeFullyQualifiedName, string[] propertyNames, string[] fieldNames, string[] collectionNames = null)
+        public static ServiceTypeInfo GetServiceTypeInfo(string typeFullyQualifiedName, string[]? propertyNames = null, string[]? fieldNames = null, string[]? collectionNames = null)
         {
+            propertyNames ??= Array.Empty<string>();
+            fieldNames ??= Array.Empty<string>();
+            collectionNames ??= Array.Empty<string>();
+
             Type type = Type.GetType(typeFullyQualifiedName) ?? throw new TypeNotFoundException(typeFullyQualifiedName);
 
             var serviceTypeInfo = new ServiceTypeInfo(type);
