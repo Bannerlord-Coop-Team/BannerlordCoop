@@ -30,8 +30,7 @@ internal class <#= Model.TypeName #>Registry : RegistryBase<<#= Model.TypeName #
 
     public override void RegisterAll()
     {
-        // Implement RegisterAll
-        throw new NotImplementedException();
+        // Implement RegisterAll if needed
     }
 
     protected override string GetNewId(<#= Model.TypeName #> obj)
