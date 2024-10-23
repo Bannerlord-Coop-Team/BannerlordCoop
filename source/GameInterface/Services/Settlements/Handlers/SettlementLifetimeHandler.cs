@@ -4,9 +4,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
-using GameInterface.Services.Sieges.Messages;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.Settlements.Handlers;
 internal class SettlementLifetimeHandler : IHandler
@@ -14,7 +12,6 @@ internal class SettlementLifetimeHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-
 
     public SettlementLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
