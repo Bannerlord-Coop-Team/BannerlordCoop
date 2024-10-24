@@ -25,8 +25,8 @@ internal struct ItemModifierGroupSurrogate
         }
         else
         {
-            NoModifierLootScore = -1;
-            NoModifierProductionScore = -1;
+            NoModifierLootScore = 0;
+            NoModifierProductionScore = 0;
         }
     }
 
@@ -48,8 +48,6 @@ internal struct ItemModifierGroupSurrogate
 
         itemModifierGroup.NoModifierLootScore = surrogate.NoModifierLootScore;
         itemModifierGroup.NoModifierProductionScore = surrogate.NoModifierProductionScore;
-
-        itemModifierGroup.InitializeDropScoreLists();
 
         return itemModifierGroup;
     }

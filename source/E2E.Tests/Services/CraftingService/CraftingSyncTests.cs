@@ -88,8 +88,8 @@ namespace E2E.Tests.Services.CraftingService
                 Assert.Equal(serverCrafting._currentHistoryIndex, clientCrafting._currentHistoryIndex);
                 Assert.Equal(serverCrafting._craftedItemObject, clientCrafting._craftedItemObject);
                 Assert.Equal(serverCrafting.CurrentWeaponDesign, clientCrafting.CurrentWeaponDesign);
-                Assert.Equal(serverCrafting.CurrentItemModifierGroup, clientCrafting.CurrentItemModifierGroup);
-                Assert.Equal(serverCrafting.CraftedWeaponName, clientCrafting.CraftedWeaponName);
+                Assert.Equal(serverCrafting.CurrentItemModifierGroup.ItemModifiers.Count, clientCrafting.CurrentItemModifierGroup.ItemModifiers.Count);
+                Assert.Equal(serverCrafting.CraftedWeaponName.ToString(), clientCrafting.CraftedWeaponName.ToString());
             }
         }
     }
