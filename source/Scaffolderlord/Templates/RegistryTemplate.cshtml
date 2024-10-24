@@ -1,0 +1,33 @@
+﻿@using RazorLight
+@using Scaffolderlord.Models
+@inherits TemplatePage<RegistryTemplateModel>
+
+@foreach (var item in Model.Usings)
+{
+	<text>using @item;</text>
+}
+
+namespace @Model.Namespace
+@{
+	string className = $"{Model.TypeName}Registry";
+	string parentClassName = $"RegistryBase<{Model.TypeName}>";
+}
+internal class @className : @parentClassName
+{
+	private const string @(Model.TypeName)IdPrefix = "Coop@(Model.TypeName)";
+	private static int InstanceCounter = 0;
+
+	public @className (IRegistryCollection collection) : base(collection)
+	{
+	}
+
+	public override void RegisterAll()
+	{
+		// Implement RegisterAll if needed
+	}
+
+	protected override string GetNewId(@Model.TypeName obj)
+	{
+		return $"{@(Model.TypeName)IdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+	}
+}
