@@ -13,18 +13,6 @@ namespace Scaffolderlord
             return Path.Combine(bannerlordCoopDir, subPath);
         }
         public static string GetRelativePath(string subPath) => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, subPath);
-        public static bool IsValidPath(string path, FileAttributes attrFilter = FileAttributes.Directory)
-        {
-            try
-            {
-                DirectoryInfo dirInfo = new(path);
-                return dirInfo.Attributes == attrFilter;
-            }
-            catch (Exception)
-            {
-                return false;
-            }
-        }
         public static string GetUniqueFilePath(string filePath)
         {
             string directory = Path.GetDirectoryName(filePath);
