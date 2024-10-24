@@ -1,4 +1,5 @@
 ﻿using ProtoBuf.Meta;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -15,5 +16,11 @@ internal class SurrogateCollection : ISurrogateCollection
 
         if (RuntimeTypeModel.Default.CanSerialize(typeof(TextObject)) == false)
             RuntimeTypeModel.Default.SetSurrogate<TextObject, TextObjectSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(ItemModifier)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<ItemModifier, ItemModifierSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(ItemModifierGroup)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<ItemModifierGroup, ItemModifierGroupSurrogate>();
     }
 }
