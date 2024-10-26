@@ -5,6 +5,13 @@ using System.Reflection;
 using System.Threading.Tasks;
 using Scaffolderlord.CLI.Commands;
 using Scaffolderlord.Models;
+using Microsoft.Extensions.DependencyInjection;
+using RazorLight;
+using DotMake.CommandLine;
+using Scaffolderlord.Services;
+using Scaffolderlord.CLI;
+using Scaffolderlord.Services.Impl;
+using Microsoft.Extensions.Logging;
 
 namespace Scaffolderlord
 {
@@ -12,19 +19,23 @@ namespace Scaffolderlord
 	{
 		static async Task<int> Main(string[] args)
 		{
-			var rootCommand = new RootCommand("Scaffolding CLI tool for generating files for the BannerlordCoop project");
-
-			InitializeCommands(rootCommand);
-
-			return await rootCommand.InvokeAsync(args);
+			InitializeDI();
+			return await Cli.RunAsync<RootCliCommand>(args);
 		}
 
-		private static void InitializeCommands(RootCommand rootCommand)
+		private static void InitializeDI()
 		{
-			GenerateRegistryCommand.InitializeCommand(rootCommand);
-			GenerateAutoSyncCommand.InitializeCommand(rootCommand);
+			Cli.Ext.ConfigureServices(services =>
+			{
+				services.AddSingleton<IRazorLightEngine>(provider =>
+					new RazorLightEngineBuilder()
+						.DisableEncoding()
+						.UseMemoryCachingProvider()
+						.Build())
+				.AddTransient<IScaffoldingService, ScaffoldingService>()
+				.AddLogging(builder => builder.AddProvider(new LoggerProvider()));
+			});
 		}
-
 
 	}
 }

@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Scaffolderlord
 {
-    public static class Settings
+    public static class GlobalOptions
     {
         public static bool OverrideExistingFiles { get; set; } = false;
     }

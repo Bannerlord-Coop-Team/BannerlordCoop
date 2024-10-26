@@ -12,8 +12,8 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<PackageReference Include="DotMake.CommandLine" Version="1.8.8" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="6.0.0" />
-		<PackageReference Include="Mono.TextTemplating" Version="3.0.0" />
 		<PackageReference Include="RazorLight" Version="2.3.1" />
 		<PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
 	</ItemGroup>

@@ -1,6 +1,7 @@
 ﻿using Microsoft.CodeAnalysis.Operations;
-using Mono.TextTemplating;
+using Microsoft.Extensions.Logging;
 using RazorLight;
+using RazorLight.Internal;
 using Scaffolderlord.Exceptions;
 using Scaffolderlord.Models;
 using System;
@@ -13,24 +14,24 @@ using System.Threading.Tasks;
 using TaleWorlds.Library;
 using static Scaffolderlord.Extensions;
 
-namespace Scaffolderlord
+namespace Scaffolderlord.Services.Impl
 {
-	public class Scaffolder
+	public class ScaffoldingService : IScaffoldingService
 	{
-		private readonly RazorLightEngine engine;
+		private readonly ILogger _logger;
+		private readonly IRazorLightEngine _engine;
 
-		public Scaffolder()
+		public ScaffoldingService(IRazorLightEngine engine, ILogger<ScaffoldingService> logger)
 		{
-			engine = new RazorLightEngineBuilder()
-				.DisableEncoding()
-				.Build();
+			_engine = engine;
+			_logger = logger;
 		}
 
 		public async Task Generate(ITemplateModel templateModel)
 			=> await Generate(templateModel.GetTemplateFilePath(), templateModel.GetOutputPath(), templateModel);
 
 
-		public async Task Generate(string templatePath, string outputPath, object model)
+		public async Task Generate(string templatePath, string outputPath, ITemplateModel model)
 		{
 			Stopwatch stopwatch = Stopwatch.StartNew();
 			var safeOutputPath = CheckOutputPath(outputPath);
@@ -38,7 +39,7 @@ namespace Scaffolderlord
 			var renderedTemplateContent = await RenderTemplate(templateContent, model);
 			await SaveFile(safeOutputPath, renderedTemplateContent);
 			stopwatch.Stop();
-			Console.WriteLine($"Created {safeOutputPath} ({stopwatch.ElapsedMilliseconds} ms)");
+			_logger.LogInformation("Created {path} ({took} ms)", safeOutputPath, stopwatch.ElapsedMilliseconds);
 		}
 
 		private async Task SaveFile(string outputPath, string content)
@@ -53,9 +54,9 @@ namespace Scaffolderlord
 			}
 		}
 
-		private async Task<string> RenderTemplate(string templateContent, object model)
+		private async Task<string> RenderTemplate(string templateContent, ITemplateModel model)
 		{
-			return await engine.CompileRenderStringAsync("templateKey", templateContent, model);
+			return await _engine.CompileRenderStringAsync(model.TemplateFileName, templateContent, model);
 		}
 
 		private string ReadTemplateContent(string templatePath)
@@ -70,19 +71,19 @@ namespace Scaffolderlord
 			string fileName = Path.GetFileName(outputPath);
 			if (!Directory.Exists(dir))
 			{
-				Console.WriteLine($"Creating directory: {dir}");
+				_logger.LogInformation($"Creating directory: {dir}");
 				Directory.CreateDirectory(dir);
 			}
 
 			if (File.Exists(outputPath))
 			{
-				if (Settings.OverrideExistingFiles)
+				if (GlobalOptions.OverrideExistingFiles)
 				{
-					Console.WriteLine($"Warning: output file {fileName} already exists and will be overwritten!");
+					_logger.LogWarning($"Output file {fileName} already exists and will be overwritten!");
 				}
 				else
 				{
-					Console.WriteLine($"Warning: output file {fileName} already exists, adding a suffix to avoid overwrite!");
+					_logger.LogInformation($"Output file {fileName} already exists, adding a suffix to avoid overwrite");
 					return GetUniqueFilePath(outputPath);
 				}
 			}

@@ -39,7 +39,12 @@ namespace Scaffolderlord
             return properties
                 .Where(prop => prop.CanWrite);
         }
-        #endregion
-    }
+
+		public static T CreateInstance<T>(params object[] paramArray)
+		{
+			return (T)Activator.CreateInstance(typeof(T), args: paramArray);
+		}
+		#endregion
+	}
 
 }
