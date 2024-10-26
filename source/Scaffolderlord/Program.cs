@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
+using Scaffolderlord.CLI.Commands;
 using Scaffolderlord.Models;
 
 namespace Scaffolderlord
@@ -20,33 +21,10 @@ namespace Scaffolderlord
 
 		private static void InitializeCommands(RootCommand rootCommand)
 		{
-			var typeNameOption = new Option<string>(
-	"--typeName",
-	"Specify the fully qualified name of the type using the format: '<namespace>.<type name>, <assembly name>'. Example: 'TaleWorlds.CampaignSystem.Siege.BesiegerCamp, TaleWorlds.CampaignSystem'")
-			{
-				IsRequired = true
-			};
-
-			var registryCommand = new Command("registry", "Generates a Registry class")
-			{
-				typeNameOption
-			};
-
-			registryCommand.SetHandler(async (typeName) =>
-			{
-				await GenerateRegistry(typeName);
-			},
-	typeNameOption);
-
-			rootCommand.AddCommand(registryCommand);
+			GenerateRegistryCommand.InitializeCommand(rootCommand);
+			GenerateAutoSyncCommand.InitializeCommand(rootCommand);
 		}
 
-		private static async Task GenerateRegistry(string typeName)
-		{
-			var typeInfo = ReflectionHelper.GetServiceTypeInfo(typeName);
-			var registryTemplateModel = new RegistryTemplateModel(typeInfo);
-			var scaffolder = new Scaffolder();
-			await scaffolder.Generate(registryTemplateModel);
-		}
+
 	}
 }

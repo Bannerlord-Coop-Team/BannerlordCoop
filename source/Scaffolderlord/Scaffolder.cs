@@ -5,6 +5,7 @@ using Scaffolderlord.Exceptions;
 using Scaffolderlord.Models;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Reflection;
 using System.Text;
@@ -31,16 +32,17 @@ namespace Scaffolderlord
 
 		public async Task Generate(string templatePath, string outputPath, object model)
 		{
+			Stopwatch stopwatch = Stopwatch.StartNew();
 			var safeOutputPath = CheckOutputPath(outputPath);
 			var templateContent = ReadTemplateContent(templatePath);
 			var renderedTemplateContent = await RenderTemplate(templateContent, model);
 			await SaveFile(safeOutputPath, renderedTemplateContent);
-			Console.WriteLine("It's almost harvesting season!");
+			stopwatch.Stop();
+			Console.WriteLine($"Created {safeOutputPath} ({stopwatch.ElapsedMilliseconds} ms)");
 		}
 
 		private async Task SaveFile(string outputPath, string content)
 		{
-			Console.WriteLine($"Creating {outputPath}");
 			try
 			{
 				await File.WriteAllTextAsync(outputPath, content);

@@ -1,0 +1,34 @@
+﻿@using RazorLight
+@using Scaffolderlord.Models
+@inherits TemplatePage<AutoSyncTemplateModel>
+
+@foreach (var item in Model.Usings)
+{
+	<text>using @item;</text>
+}
+using GameInterface.AutoSync;
+using HarmonyLib;
+
+namespace @Model.Namespace
+@{
+	string className = $"{Model.TypeName}Sync";
+}
+internal class @className : IAutoSync
+{
+		public @(className)Sync(IAutoSyncBuilder autoSyncBuilder)
+		{
+			// Fields
+@foreach (var field in Model.Fields)
+{
+	string fieldAcessor = $"{Model.TypeName}.{field.Name}";
+	<text>autoSyncBuilder.AddField(AccessTools.Field(typeof(@Model.TypeName), nameof(@fieldAcessor)));</text>if (field.IsPublic){<text>$"// WARNING: {field.Name} is a public field, for AutoSync to work you must also add any methods outside declaring class that change its value"</text>}
+
+			// Properties
+@foreach (var prop in Model.Properties)
+{
+	string propAcessor = $"{Model.TypeName}.{prop.Name}";
+	<text>autoSyncBuilder.AddProperty(AccessTools.Property(typeof(@Model.TypeName), nameof(@propAcessor)));</text>
+}
+
+		}
+}

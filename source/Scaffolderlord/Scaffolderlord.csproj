@@ -199,17 +199,21 @@
 			<HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.Standalone.dll</HintPath>
 		</Reference>
 	</ItemGroup>
-	<ItemGroup>
+	
+	<!--<ItemGroup>
+	  <None Update="Templates\AutoSyncTemplate.cshtml">
+	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+	  </None>
 	  <None Update="Templates\RegistryTemplate.cshtml">
 	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
 	  </None>
-	  <None Update="Templates\RegistryTemplate.tt">
-	    <Generator></Generator>
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	</ItemGroup>
+	</ItemGroup>-->
+
 	<ItemGroup>
-	  <Folder Include="CLI\" />
+		<None Include="Templates\**">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
+
 </Project>
 
