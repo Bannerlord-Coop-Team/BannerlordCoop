@@ -8,14 +8,20 @@ using static Scaffolderlord.Extensions;
 
 namespace Scaffolderlord.Models
 {
-	//public abstract class ServiceTypeTemplateModel
-	//{
-	//	protected ServiceTypeInfo ServiceTypeInfo { get; set; }
-	//	public ServiceTypeTemplateModel(ServiceTypeInfo serviceTypeInfo)
-	//	{
-	//		ServiceTypeInfo = serviceTypeInfo;
-	//	}
-	//}
+	public abstract class BaseTemplateModel
+	{
+		/// <summary>
+		/// Returns an newline
+		/// </summary>
+		public string NewLine => "\r\n";
+
+		/// <summary>
+		/// Returns an tab for each level
+		/// </summary>
+		/// <param name="level"></param>
+		/// <returns></returns>
+		public string Indent(int level = 1) => new string('\t', level);
+	}
 
 	public interface ITemplateModel
 	{

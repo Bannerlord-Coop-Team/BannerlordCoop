@@ -2,7 +2,7 @@
 using Scaffolderlord.Helpers;
 using Scaffolderlord.Models;
 using Scaffolderlord.Services;
-using static Scaffolderlord.Extensions;
+using static Scaffolderlord.Helpers.ReflectionHelper;
 
 namespace Scaffolderlord.CLI.Commands
 {
@@ -36,9 +36,11 @@ namespace Scaffolderlord.CLI.Commands
 			GlobalOptions.OverrideExistingFiles = this.OverwriteExistingFiles;
 		}
 
+		protected virtual ServiceTypeInfo GetServiceTypeInfo() => ReflectionHelper.GetServiceTypeInfo(TypeFullyQualifiedName!);
+
 		protected virtual ITemplateModel GetTemplateModel()
 		{
-			var typeInfo = ReflectionHelper.GetServiceTypeInfo(TypeFullyQualifiedName!);
+			var typeInfo = GetServiceTypeInfo();
 			return CreateInstance<TModel>(typeInfo);
 		}
 

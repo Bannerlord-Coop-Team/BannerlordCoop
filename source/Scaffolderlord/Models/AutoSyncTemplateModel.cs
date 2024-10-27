@@ -9,7 +9,7 @@ using static Scaffolderlord.Extensions;
 
 namespace Scaffolderlord.Models
 {
-	public class AutoSyncTemplateModel : ITemplateModel
+	public class AutoSyncTemplateModel : BaseTemplateModel, ITemplateModel
 	{
 		public string TypeName { get; }
 		public string? Namespace { get; }

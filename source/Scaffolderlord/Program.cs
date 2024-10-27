@@ -33,7 +33,8 @@ namespace Scaffolderlord
 						.UseMemoryCachingProvider()
 						.Build())
 				.AddTransient<IScaffoldingService, ScaffoldingService>()
-				.AddLogging(builder => builder.AddProvider(new LoggerProvider()));
+				.AddLogging(builder => builder.AddProvider(new LoggerProvider()))
+				.PropagateLogger();
 			});
 		}
 

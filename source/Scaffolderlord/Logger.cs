@@ -13,16 +13,13 @@ namespace Scaffolderlord
 		private readonly LogLevel _minLogLevel;
 		private static readonly object _consoleLock = new object();
 		private readonly bool _includeTimestamp;
-		private readonly bool _includeLogLevel;
 
 		public Logger(
 			LogLevel minLogLevel = LogLevel.Information,
-			bool includeTimestamp = false,
-			bool includeLogLevel = false)
+			bool includeTimestamp = false)
 		{
 			_minLogLevel = minLogLevel;
 			_includeTimestamp = includeTimestamp;
-			_includeLogLevel = includeLogLevel;
 		}
 
 		public IDisposable BeginScope<TState>(TState state) => NullScope.Instance;
@@ -76,11 +73,10 @@ namespace Scaffolderlord
 				components.Add(timestamp);
 			}
 
-			if (_includeLogLevel)
+			if (logLevel >= LogLevel.Warning)
 			{
 				components.Add($"[{logLevel}]");
 			}
-
 			components.Add(message);
 
 			return string.Join(" ", components);
@@ -101,21 +97,18 @@ namespace Scaffolderlord
 	{
 		private readonly LogLevel _minLogLevel;
 		private readonly bool _includeTimestamp;
-		private readonly bool _includeLogLevel;
 
 		public LoggerProvider(
 			LogLevel minLogLevel = LogLevel.Information,
-			bool includeTimestamp = false,
-			bool includeLogLevel = false)
+			bool includeTimestamp = false)
 		{
 			_minLogLevel = minLogLevel;
 			_includeTimestamp = includeTimestamp;
-			_includeLogLevel = includeLogLevel;
 		}
 
 		public ILogger CreateLogger(string categoryName)
 		{
-			return new Logger(_minLogLevel, _includeTimestamp, _includeLogLevel);
+			return new Logger(_minLogLevel, _includeTimestamp);
 		}
 
 		public void Dispose()
