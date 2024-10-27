@@ -1,19 +1,52 @@
 # Bannerlord Coop
 
 ## Summary
-Concept for a dotnet CLI scaffolding tool for the Bannerlord Coop project using `Mono.TextTemplating` and T4 templates.
+Concept for a dotnet CLI scaffolding tool for the Bannerlord Coop project using razor.
 
-```bash
-scaffolderlord create <TypeFullyQualifiedName> <PropertyNames> <FieldNames> <CollectionNames>
-```
+These are the files the CLI can generate
 
-### Parameters
+| Command                    | Output Path                                                                 | Namespace                                         |
+|--------------------------|------------------------------------------------------------------------------|--------------------------------------------------|
+| registry                 | Gameinterface\\Services\\`TypeName`s\\`TypeName`Registry.cs                 | GameInterface.Services.`TypeName`s               |
+| AutoSync                 | Gameinterface\\Services\\`TypeName`s\\`TypeName`Sync.cs                     | GameInterface.Services.`TypeName`s               |
+| LifeTimeHandler          | Gameinterface\\Services\\`TypeName`s\\Handlers\\`TypeName`LifetimeHandler.cs| GameInterface.Services.`TypeName`s.Handlers      |
+| LifeTimePatches          | Gameinterface\\Services\\`TypeName`s\\Patches\\`TypeName`LifetimePatches.cs | GameInterface.Services.`TypeName`s.Patches       |
+| CreatedMessage           | Gameinterface\\Services\\`TypeName`s\\Messages\\Lifetime\\`TypeName`Created.cs | GameInterface.Services.`TypeName`s.Messages    |
+| DestroyedMessage         | Gameinterface\\Services\\`TypeName`s\\Messages\\Lifetime\\`TypeName`Destroyed.c | GameInterface.Services.`TypeName`s.Messages   |
+| NetworkCreateMessage     | Gameinterface\\Services\\`TypeName`s\\Messages\\Lifetime\\NetworkCreate`TypeName`.cs | GameInterface.Services.`TypeName`s.Messages |
+| NetworkDestroyMessage    | Gameinterface\\Services\\`TypeName`s\\Messages\\Lifetime\\NetworkDestroy`TypeName`.cs| GameInterface.Services.`TypeName`s.Messages |
+| CollectionHandler        | Gameinterface\\Services\\`TypeName`s\\Handlers\\`CollectionName`Handler.cs  | GameInterface.Services.`TypeName`s.Handlers      |
+| CollectionPatches        | Gameinterface\\Services\\`TypeName`s\\Patches\\`CollectionName`Patches.cs   | GameInterface.Services.`TypeName`s.Patches       |
+| CollectionAddedMessage   | Gameinterface\\Services\\`TypeName`s\\Messages\\Collections\\`CollectionName`Added.cs | GameInterface.Services.`TypeName`s.Messages |
+| CollectionRemovedMessage | Gameinterface\\Services\\`TypeName`s\\Messages\\Collections\\`CollectionName`Removed.cs | GameInterface.Services.`TypeName`s.Messages |
+| CollectionNetworkAddMessage | Gameinterface\\Services\\`TypeName`s\\Messages\\Collections\\NetworkAdd`CollectionName`.cs | GameInterface.Services.`TypeName`s.Messages |
+| CollectionNetworkRemoveMessage | Gameinterface\\Services\\`TypeName`s\\Messages\\Collections\\NetworkRemove`CollectionName`.cs | GameInterface.Services.`TypeName`s.Messages |
 
-- `<TypeFullyQualifiedName>`: The fully qualified name of the type (e.g., `TaleWorlds.CampaignSystem.Siege.BesiegerCamp, TaleWorlds.CampaignSystem`).
-- `<PropertyNames>`: Comma-separated list of property names to sync.
-- `<FieldNames>`: Comma-separated list of field names to sync.
-- `<CollectionNames>`: Comma-separated list of collection names to sync.
+## Commands
 
-  
+### Working
 
+- **`registry <type-fully-qualified-name> [--overwrite]`**  
+  Generates a registry class for the specified type.
 
+- **`sync <type-fully-qualified-name> [--members] [--overwrite]`**  
+  Generates a sync class for the specified type. Use `--members` to include member synchronization.
+
+- **`lifetime <type-fully-qualified-name> [--overwrite]`**  
+  Generates a lifetime handler for the specified type.
+
+### WIP
+
+- **`commands`**  
+  Generates command-related classes (under development).
+
+- **`collections`**  
+  Generates collection-related classes (under development).
+
+- **`e2e`**  
+  Generates end-to-end tests (under development).
+
+## Options
+
+- **`--overwrite`**: Overwrites existing files.
+- **`--members`**: (For sync command) Includes member synchronization.
