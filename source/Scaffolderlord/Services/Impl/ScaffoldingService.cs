@@ -40,6 +40,7 @@ namespace Scaffolderlord.Services.Impl
 			await SaveFile(safeOutputPath, renderedTemplateContent);
 			stopwatch.Stop();
 			_logger.LogInformation("Created {path} ({took} ms)", safeOutputPath, stopwatch.ElapsedMilliseconds);
+			Console.WriteLine("");
 		}
 
 		private async Task SaveFile(string outputPath, string content)
@@ -56,7 +57,14 @@ namespace Scaffolderlord.Services.Impl
 
 		private async Task<string> RenderTemplate(string templateContent, ITemplateModel model)
 		{
-			return await _engine.CompileRenderStringAsync(model.TemplateFileName, templateContent, model);
+			try
+			{
+				return await _engine.CompileRenderStringAsync(model.TemplateFileName, templateContent, model);
+			}
+			catch (Exception ex)
+			{
+				throw new Exception("Failed to render template", ex);
+			}
 		}
 
 		private string ReadTemplateContent(string templatePath)

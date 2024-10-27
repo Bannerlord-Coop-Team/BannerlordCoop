@@ -1,6 +1,6 @@
 ﻿@using RazorLight
 @using Scaffolderlord.Models.Lifetime
-@inherits TemplatePage<NetworkCreateMessageTemplateModel>
+@inherits TemplatePage<NetworkDestroyMessageTemplateModel>
 using Common.Messaging;
 using ProtoBuf;
 @foreach (var item in Model.Usings)
@@ -19,6 +19,6 @@ internal class NetworkCreate@(Model.TypeName) : ICommand
 
 	public NetworkCreate@(Model.TypeName)(string @(Model.TypeName)Id)
 	{
-		@(Model.TypeName)Id = @(Model.TypeName)Id;
+@(Model.TypeName)Id = @(Model.TypeName)Id;
 	}
 }

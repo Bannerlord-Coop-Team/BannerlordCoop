@@ -14,7 +14,7 @@ namespace Scaffolderlord.Models.Lifetime
         public string? Namespace { get; }
         public string[] Usings { get; }
 
-        public string TemplateFileName => "LifetimePatchesTemplate";
+        public string TemplateFileName => @"Lifetime\LifetimePatchesTemplate.cshtml";
 
         public string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\Patches\{TypeName}LifetimePatches.cs");
 

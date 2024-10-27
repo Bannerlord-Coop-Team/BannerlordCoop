@@ -14,7 +14,7 @@ namespace Scaffolderlord.Models
 		public string? Namespace { get; }
 		public string[] Usings { get; }
 
-		public string TemplateFileName => "RegistryTemplate";
+		public string TemplateFileName => "RegistryTemplate.cshtml";
 
 		public string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\{TypeName}Registry.cs");
 

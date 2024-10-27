@@ -19,7 +19,7 @@ namespace Scaffolderlord.Models
 		public IEnumerable<PropertyInfo> Properties { get; }
 		public IEnumerable<MemberInfo> Collections { get; }
 
-		public string TemplateFileName => "AutoSyncTemplate";
+		public string TemplateFileName => "AutoSyncTemplate.cshtml";
 
 		public string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\{TypeName}Sync.cs");
 

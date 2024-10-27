@@ -44,7 +44,7 @@ namespace Scaffolderlord.Models
 
 		string GetTemplateFilePath()
 		{
-			return Path.Combine(GetRelativePath("Templates"), $"{TemplateFileName}.cshtml");
+			return Path.Combine(GetRelativePath("Templates"), TemplateFileName);
 		}
 		string GetOutputPath();
 	}
