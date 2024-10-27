@@ -1,0 +1,57 @@
+﻿@using RazorLight
+@using Scaffolderlord.Models.Lifetime
+@inherits TemplatePage<LifetimeHandlerTemplateModel>
+using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using Common.Util;
+using GameInterface.Services.@(Model.TypeName)s.Messages;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
+using TaleWorlds.Library;
+@foreach (var item in Model.Usings)
+{
+	<text>using @item;</text>
+}
+
+
+namespace @Model.Namespace
+@{
+	string className = $"{Model.TypeName}LifetimeHandler";
+}
+
+internal class @className: IHandler
+{
+	private static readonly ILogger Logger = LogManager.GetLogger<@(Model.TypeName)LifetimeHandler>();
+	private readonly IMessageBroker messageBroker;
+	private readonly INetwork network;
+	private readonly IObjectManager objectManager;
+	public @(classNamee)LifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+	{
+		this.messageBroker = messageBroker;
+		this.network = network;
+		this.objectManager = objectManager;
+		messageBroker.Subscribe<@(Model.TypeName)Created>(HandleEvent);
+		messageBroker.Subscribe<NetworkCreate@(Model.TypeName)>(HandleCommand);
+	}
+
+	public void Dispose()
+	{
+		messageBroker.Unsubscribe<@(Model.TypeName)Created>(HandleEvent);
+		messageBroker.Unsubscribe<NetworkCreate@(Model.TypeName)>(HandleCommand);
+	}
+
+	private void HandleEvent(MessagePayload<@(Model.TypeName)Created>payload)
+	{
+		objectManager.AddNewObject(payload.What.Instance, out var id);
+		network.SendAll(new NetworkCreate@(Model.TypeName)(id));
+	}
+
+	private void HandleCommand(MessagePayload<NetworkCreate@(Model.TypeName)>payload)
+	{
+		var new @(Model.TypeName)= ObjectHelper.SkipConstructor<@(Model.TypeName)>();
+		AccessTools.Field(typeof(@(Model.TypeName)), nameof(@(Model.TypeName)._besiegerParties)).SetValue(new @(Model.TypeName), new MBList<MobileParty>());
+		objectManager.AddExisting(payload.What.@(Model.TypeName)Id, new @(Model.TypeName));
+	}
+}

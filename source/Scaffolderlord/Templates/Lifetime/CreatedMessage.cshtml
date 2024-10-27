@@ -1,0 +1,19 @@
+﻿@using RazorLight
+@using Scaffolderlord.Models.Lifetime
+@inherits TemplatePage<CreatedMessageTemplateModel>
+using Common.Messaging;
+@foreach (var item in Model.Usings)
+{
+	<text>using @item;</text>
+}
+
+namespace @Model.Namespace
+
+internal class @(Model.TypeName)Created : IEvent
+{
+	public @(Model.TypeName)Created(@(Model.TypeName) instance)
+	{
+		Instance = instance;
+	}
+	public @(Model.TypeName) Instance { get; }
+}

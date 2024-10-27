@@ -215,5 +215,13 @@
 		</None>
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Models\E2E\" />
+	  <Folder Include="Models\Commands\" />
+	  <Folder Include="Templates\Collections\" />
+	  <Folder Include="Templates\E2E\" />
+	  <Folder Include="Templates\Commands\" />
+	</ItemGroup>
+
 </Project>
 

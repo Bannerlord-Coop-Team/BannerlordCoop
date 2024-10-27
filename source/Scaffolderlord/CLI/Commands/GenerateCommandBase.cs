@@ -6,10 +6,15 @@ using static Scaffolderlord.Helpers.ReflectionHelper;
 
 namespace Scaffolderlord.CLI.Commands
 {
+	public interface ICliCommand
+	{
+		Task RunAsync();
+	}
+
 	/// <summary>
 	/// Base for all generate commands
 	/// </summary>
-	public abstract class GenerateCommandBase<TModel> where TModel : ITemplateModel
+	public abstract class GenerateCommandBase<TModel> : ICliCommand where TModel : ITemplateModel
 	{
 		protected IScaffoldingService scaffolder;
 

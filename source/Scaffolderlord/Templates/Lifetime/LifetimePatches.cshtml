@@ -1,0 +1,50 @@
+﻿@using RazorLight
+@using Scaffolderlord.Models.Lifetime
+@inherits TemplatePage<LifetimePatchesTemplateModel>
+using Common.Logging;
+using Common.Messaging;
+using GameInterface.Policies;
+using GameInterface.Services.@(Model.TypeName)s.Messages;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+@foreach (var item in Model.Usings)
+{
+	<text>using @item;</text>
+}
+
+
+namespace @Model.Namespace
+@{
+	string className = $"{Model.TypeName}LifetimePatches";
+}
+[HarmonyPatch]
+internal class @className
+{
+	private static readonly ILogger Logger = LogManager.GetLogger<@className>
+	();
+
+	private static IEnumerable<MethodBase>
+		TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(@Model.TypeName));
+
+		private static bool Prefix(ref @Model.TypeName __instance)
+		{
+		// Call original if we call this function
+		if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+		if (ModInformation.IsClient)
+		{
+		Logger.Error("Client created unmanaged {name}\n"
+		+ "Callstack: {callstack}", typeof(@Model.TypeName), Environment.StackTrace);
+		return true;
+		}
+
+		var message = new @(Model.TypeName)Created(__instance);
+
+		MessageBroker.Instance.Publish(__instance, message);
+
+		return true;
+		}
+		}

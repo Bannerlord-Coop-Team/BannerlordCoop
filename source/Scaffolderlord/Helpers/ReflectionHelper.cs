@@ -1,7 +1,9 @@
-﻿using HarmonyLib;
+﻿using DotMake.CommandLine;
+using HarmonyLib;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Scaffolderlord.CLI.Commands;
 using Scaffolderlord.Exceptions;
 using Scaffolderlord.Models;
 using System;
@@ -64,5 +66,35 @@ namespace Scaffolderlord.Helpers
 		{
 			return (T)Activator.CreateInstance(typeof(T), args: paramArray);
 		}
+
+		/// <summary>
+		/// Propagates options and arguments to another CliCommand
+		/// </summary>
+		public static void PropagateCliArgumentsAndOptions(this ICliCommand sourceCommand, ICliCommand targetCommand)
+		{
+			if (sourceCommand == null) throw new ArgumentNullException(nameof(sourceCommand));
+			if (targetCommand == null) throw new ArgumentNullException(nameof(targetCommand));
+
+			var sourceProperties = sourceCommand.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance)
+				.Where(prop => Attribute.IsDefined(prop, typeof(CliArgumentAttribute)) || Attribute.IsDefined(prop, typeof(CliOptionAttribute)));
+
+			var targetType = targetCommand.GetType();
+
+			foreach (var sourceProp in sourceProperties)
+			{
+				var targetProp = targetType.GetProperty(sourceProp.Name, BindingFlags.Public | BindingFlags.Instance);
+
+				if (targetProp != null && targetProp.CanWrite && targetProp.PropertyType.IsAssignableFrom(sourceProp.PropertyType))
+				{
+					var value = sourceProp.GetValue(sourceCommand);
+					targetProp.SetValue(targetCommand, value);
+				}
+			}
+		}
+		public static void PropagateCliArgumentsAndOptions(this ICliCommand sourceCommand, params ICliCommand[] targetCommands)
+		{
+			foreach (var target in targetCommands) sourceCommand.PropagateCliArgumentsAndOptions(target);
+		}
+
 	}
 }

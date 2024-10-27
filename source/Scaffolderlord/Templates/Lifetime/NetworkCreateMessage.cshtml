@@ -1,0 +1,23 @@
+﻿@using RazorLight
+@using Scaffolderlord.Models.Lifetime
+@inherits TemplatePage<NetworkCreateMessageTemplateModel>
+using Common.Messaging;
+using ProtoBuf;
+@foreach (var item in Model.Usings)
+{
+	<text>using @item;</text>
+}
+
+namespace @Model.Namespace
+
+[ProtoContract(SkipConstructor = true)]
+internal class NetworkCreate@(Model.TypeName) : ICommand
+{
+	[ProtoMember(1)]
+	public string @(Model.TypeName)Id { get; }
+
+	public NetworkCreate@(Model.TypeName)(string @(Model.TypeName)Id)
+	{
+		@(Model.TypeName)Id = @(Model.TypeName)Id;
+	}
+}
