@@ -15,36 +15,56 @@ using System.Reflection;
 	<text>using @item;</text>
 }
 
-
 namespace @Model.Namespace
 @{
 	string className = $"{Model.TypeName}LifetimePatches";
 }
-[HarmonyPatch]
+
+@Model.XmlDoc(@$"Patches for managing lifetime of <see cref=""{Model.TypeName}""/> objects.")
+[HarmonyPatch(typeof(@Model.TypeName))]
 internal class @className
 {
 	private static readonly ILogger Logger = LogManager.GetLogger<@className>
 	();
 
-	private static IEnumerable<MethodBase>
-		TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(@Model.TypeName));
+	[HarmonyPatch(typeof(@Model.TypeName))]
+	[HarmonyPatch(MethodType.Constructor)]
+	[HarmonyPrefix]
+	private static bool ConstructorPrefix(ref @Model.TypeName __instance)
+	{
+	// Call original if we call this function
+	if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-		private static bool Prefix(ref @Model.TypeName __instance)
-		{
-		// Call original if we call this function
-		if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+	if (ModInformation.IsClient)
+	{
+	Logger.Error("Client created unmanaged {name}\n"
+	+ "Callstack: {callstack}", typeof(@Model.TypeName), Environment.StackTrace);
+	return true;
+	}
 
-		if (ModInformation.IsClient)
-		{
-		Logger.Error("Client created unmanaged {name}\n"
-		+ "Callstack: {callstack}", typeof(@Model.TypeName), Environment.StackTrace);
-		return true;
-		}
+	var message = new @(Model.TypeName)Created(__instance);
 
-		var message = new @(Model.TypeName)Created(__instance);
+	MessageBroker.Instance.Publish(__instance, message);
 
-		MessageBroker.Instance.Publish(__instance, message);
+	return true;
+	}
 
-		return true;
-		}
-		}
+	//[HarmonyPatch(typeof(@Model.TypeName), "Remove method name here!")]
+	[HarmonyPrefix]
+	private static bool RemovePrefix(ref @Model.TypeName __instance)
+	{
+	// Call original if we call this function
+	if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+	if (ModInformation.IsClient)
+	{
+	Logger.Error("Client destroyed unmanaged {name}\n"
+	+ "Callstack: {callstack}", typeof(@Model.TypeName), Environment.StackTrace);
+	return false;
+	}
+
+	MessageBroker.Instance.Publish(__instance, new @(Model.TypeName)Destroyed(__instance));
+
+	return true;
+	}
+	}

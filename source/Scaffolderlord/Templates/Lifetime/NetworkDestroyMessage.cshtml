@@ -10,6 +10,7 @@ using ProtoBuf;
 
 namespace @Model.Namespace
 
+@Model.XmlDoc($"An event published to clients, commanding them to destroy a {Model.TypeName}.")
 [ProtoContract(SkipConstructor = true)]
 internal class NetworkCreate@(Model.TypeName) : ICommand
 {

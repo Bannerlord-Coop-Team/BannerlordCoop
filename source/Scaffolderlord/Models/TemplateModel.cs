@@ -21,6 +21,19 @@ namespace Scaffolderlord.Models
 		/// <param name="level"></param>
 		/// <returns></returns>
 		public string Indent(int level = 1) => new string('\t', level);
+
+		/// <summary>
+		/// Creates simple XML doc
+		/// </summary>
+		/// <param name="comment"></param>
+		/// <returns></returns>
+		public string XmlDoc(string comment)
+		{
+			return $@"
+/// <summary>
+/// {comment}
+/// </summary>";
+		}
 	}
 
 	public interface ITemplateModel

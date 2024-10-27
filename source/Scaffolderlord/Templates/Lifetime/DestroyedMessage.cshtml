@@ -1,6 +1,6 @@
 ﻿@using RazorLight
 @using Scaffolderlord.Models.Lifetime
-@inherits TemplatePage<CreatedMessageTemplateModel>
+@inherits TemplatePage<DestroyedMessageTemplateModel>
 using Common.Messaging;
 @foreach (var item in Model.Usings)
 {
@@ -9,9 +9,10 @@ using Common.Messaging;
 
 namespace @Model.Namespace
 
-internal class @(Model.TypeName)Created : IEvent
+@Model.XmlDoc($"An event that is published internally when a {Model.TypeName} is destroyed.")
+internal class @(Model.TypeName)Destroyed : IEvent
 {
-	public @(Model.TypeName)Created(@(Model.TypeName) instance)
+	public @(Model.TypeName)Destroyed(@(Model.TypeName) instance)
 	{
 		Instance = instance;
 	}

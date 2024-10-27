@@ -15,43 +15,85 @@ using TaleWorlds.Library;
 	<text>using @item;</text>
 }
 
-
 namespace @Model.Namespace
 @{
 	string className = $"{Model.TypeName}LifetimeHandler";
 }
 
+@Model.XmlDoc(@$"Lifetime handler for <see cref=""{Model.TypeName}""/> objects.")
 internal class @className: IHandler
 {
 	private static readonly ILogger Logger = LogManager.GetLogger<@(Model.TypeName)LifetimeHandler>();
 	private readonly IMessageBroker messageBroker;
 	private readonly INetwork network;
 	private readonly IObjectManager objectManager;
-	public @(classNamee)LifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+	public @(className)LifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
 	{
 		this.messageBroker = messageBroker;
 		this.network = network;
 		this.objectManager = objectManager;
-		messageBroker.Subscribe<@(Model.TypeName)Created>(HandleEvent);
-		messageBroker.Subscribe<NetworkCreate@(Model.TypeName)>(HandleCommand);
+		messageBroker.Subscribe<@(Model.TypeName)Created>(HandleCreatedEvent);
+		messageBroker.Subscribe<NetworkCreate@(Model.TypeName)>(HandleCreateCommand);
+		messageBroker.Subscribe<@(Model.TypeName)Destroyed>(HandleDestroyedEvent);
+		messageBroker.Subscribe<NetworkDestroy@(Model.TypeName)>(HandleDestroyCommand);
 	}
 
 	public void Dispose()
 	{
-		messageBroker.Unsubscribe<@(Model.TypeName)Created>(HandleEvent);
-		messageBroker.Unsubscribe<NetworkCreate@(Model.TypeName)>(HandleCommand);
+		messageBroker.Unsubscribe<@(Model.TypeName)Created>(HandleCreatedEvent);
+		messageBroker.Unsubscribe<NetworkCreate@(Model.TypeName)>(HandleCreateCommand);
 	}
 
-	private void HandleEvent(MessagePayload<@(Model.TypeName)Created>payload)
+	private void HandleCreatedEvent(MessagePayload<@(Model.TypeName)Created> payload)
 	{
-		objectManager.AddNewObject(payload.What.Instance, out var id);
+		if (!objectManager.AddNewObject(payload.What.Instance, out var id))
+		{
+			Logger.Error("Failed to AddNewObject on {EventHandler}", nameof(@(Model.TypeName)Created));
+			return;
+		}
+
 		network.SendAll(new NetworkCreate@(Model.TypeName)(id));
 	}
 
-	private void HandleCommand(MessagePayload<NetworkCreate@(Model.TypeName)>payload)
+	private void HandleCreateCommand(MessagePayload<NetworkCreate@(Model.TypeName)> payload)
 	{
-		var new @(Model.TypeName)= ObjectHelper.SkipConstructor<@(Model.TypeName)>();
-		AccessTools.Field(typeof(@(Model.TypeName)), nameof(@(Model.TypeName)._besiegerParties)).SetValue(new @(Model.TypeName), new MBList<MobileParty>());
-		objectManager.AddExisting(payload.What.@(Model.TypeName)Id, new @(Model.TypeName));
+		var new@(Model.TypeName) = ObjectHelper.SkipConstructor<@(Model.TypeName)>();
+
+@* 		AccessTools.Field(typeof(@(Model.TypeName)), nameof(@(Model.TypeName)._besiegerParties)).SetValue(new@(Model.TypeName), new MBList<MobileParty>()); *@
+	// TODO:Initialize null lists!
+
+		if (!objectManager.AddExisting(payload.What.@(Model.TypeName)Id, new@(Model.TypeName)))
+		{
+			Logger.Error("Failed to create {ObjectName} on {EventHandler}", nameof(@(Model.TypeName)), nameof(NetworkCreate@(Model.TypeName)));
+			return;
+		}
+	}
+
+	private void HandleDestroyedEvent(MessagePayload<@(Model.TypeName)Destroyed> payload)
+	{
+		var obj = payload.What.Instance;
+
+		if (!objectManager.TryGetId(obj, out var id)) return;
+
+		if (!objectManager.Remove(obj))
+		{
+			Logger.Error("Unable to remove {ObjectName} with id: {Id} on {EventHandler}", nameof(@(Model.TypeName)), id, nameof(@(Model.TypeName)Destroyed));
+			return;
+		}
+
+		network.SendAll(new NetworkDestroyParty(id));
+	}
+
+	private void HandleDestroyCommand(MessagePayload<NetworkDestroy@(Model.TypeName)> payload)
+	{
+		var id = payload.What.@(Model.TypeName)Id;
+
+		if (!objectManager.TryGetObject<@Model.TypeName>(id, out var obj)) return;
+
+		if (!objectManager.Remove(obj))
+		{
+			Logger.Error("Failed to remove {ObjectName} with Id: {Id} on {EventHandler}", nameof(@(Model.TypeName)), id, nameof(NetworkDestroy@(Model.TypeName)));
+			return;
+		}
 	}
 }

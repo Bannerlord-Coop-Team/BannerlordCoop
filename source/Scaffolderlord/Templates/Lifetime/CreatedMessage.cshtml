@@ -9,6 +9,7 @@ using Common.Messaging;
 
 namespace @Model.Namespace
 
+@Model.XmlDoc($"An event that is published internally when a {Model.TypeName} is created.")
 internal class @(Model.TypeName)Created : IEvent
 {
 	public @(Model.TypeName)Created(@(Model.TypeName) instance)
