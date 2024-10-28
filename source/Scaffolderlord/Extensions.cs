@@ -12,9 +12,10 @@ namespace Scaffolderlord
 	{
 		public static string GetMainProjectPath(string subPath)
 		{
-			var bannerlordCoopDir = Directory.GetParent(AppDomain.CurrentDomain.BaseDirectory).FullName;
+			var bannerlordCoopDir = Environment.CurrentDirectory;
 			return Path.Combine(bannerlordCoopDir, subPath);
 		}
+
 		public static string GetRelativePath(string subPath) => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, subPath);
 		public static string GetUniqueFilePath(string filePath)
 		{

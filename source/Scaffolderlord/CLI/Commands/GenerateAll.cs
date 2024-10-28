@@ -13,7 +13,7 @@ namespace Scaffolderlord.CLI.Commands
 {
 	[CliCommand(
 	Name = "all",
-	Description = "Generates all classes(registry,sync)",
+	Description = "Generates all classes(registry,sync,lifetime)",
 	Parent = typeof(RootCliCommand)
 	)]
 	public class GenerateAllCommand : GenerateAutoSyncCommand
@@ -27,11 +27,15 @@ namespace Scaffolderlord.CLI.Commands
 		// This is kinda dumb but I don't know any better way
 		public override async Task RunAsync()
 		{
-			var registryCommand = new GenerateRegistryCommand(scaffolder);
-			var syncCommand = new GenerateAutoSyncCommand(scaffolder);
-			this.PropagateCliArgumentsAndOptions(registryCommand, syncCommand);
-			await registryCommand.RunAsync();
-			await syncCommand.RunAsync();
+			var commands = new ICliCommand[]
+			{
+				new GenerateRegistryCommand(scaffolder),
+				new GenerateAutoSyncCommand(scaffolder),
+				new GenerateLifetimeCommand(scaffolder)
+			};
+			this.PropagateCliArgumentsAndOptions(commands);
+
+			foreach (var command in commands) await command.RunAsync();
 		}
 	}
 }

@@ -2,13 +2,16 @@
 
 	<PropertyGroup>
 		<PackAsTool>true</PackAsTool>
-		<ToolCommandName>scaffolderlord</ToolCommandName>
+		<ToolCommandName>coop-create</ToolCommandName>
 		<PackageOutputPath>./nupkg</PackageOutputPath>
 		<OutputType>Exe</OutputType>
 		<TargetFramework>net6.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<PreserveCompilationContext>true</PreserveCompilationContext>
+		<PackageVersion>1.0.1</PackageVersion>
+		<Authors>Bruno Rodrigues</Authors>
+		<Description>Scaffolding CLI Tool for the Bannerlord Coop Project.</Description>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -199,15 +202,8 @@
 			<HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.Standalone.dll</HintPath>
 		</Reference>
 	</ItemGroup>
-	
-	<!--<ItemGroup>
-	  <None Update="Templates\AutoSyncTemplate.cshtml">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	  <None Update="Templates\RegistryTemplate.cshtml">
-	    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-	  </None>
-	</ItemGroup>-->
+
+
 
 	<ItemGroup>
 		<None Include="Templates\**">
@@ -216,11 +212,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Folder Include="Models\E2E\" />
-	  <Folder Include="Models\Commands\" />
-	  <Folder Include="Templates\Collections\" />
-	  <Folder Include="Templates\E2E\" />
-	  <Folder Include="Templates\Commands\" />
+		<Folder Include="Models\E2E\" />
+		<Folder Include="Models\Commands\" />
+		<Folder Include="Templates\Collections\" />
+		<Folder Include="Templates\E2E\" />
+		<Folder Include="Templates\Commands\" />
 	</ItemGroup>
 
 </Project>

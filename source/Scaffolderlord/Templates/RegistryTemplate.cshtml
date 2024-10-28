@@ -1,6 +1,9 @@
 ﻿@using RazorLight
 @using Scaffolderlord.Models
 @inherits TemplatePage<RegistryTemplateModel>
+using GameInterface.Services.Registry;
+using System.Linq;
+using System.Threading;
 @foreach (var item in Model.Usings)
 {
 	<text>using @item;</text>

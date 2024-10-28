@@ -12,7 +12,7 @@ namespace Scaffolderlord.CLI.Commands
 {
 	[CliCommand(
 	Name = "lifetime",
-	Description = "Generates all lifetime classes for a type",
+	Description = "Generates all lifetime classes for a type (patches, handler, messages)",
 	Parent = typeof(RootCliCommand)
 	)]
 	public class GenerateLifetimeCommand : GenerateLifetimeHandlerCommand
