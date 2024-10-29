@@ -1,8 +1,29 @@
-# Bannerlord Coop
+# Bannerlord Coop - Scaffolding
+A dotnet CLI scaffolding tool for the Bannerlord Coop project using razor.
 
+#### **Do not merge this branch**
+This branch is meant exclusively for developing the CLI tool, and its not a separate repository only for convinience
+
+## Usage
+
+### Install via NuGet:
+To install the Bannerlord Coop CLI tool, run the following command in your terminal:
+
+```bash
+dotnet tool install --global BannerlordCoop.CLI.Scaffolding
+```
+
+### Build from source
+1. Clone branch, build 'Scaffolderlord' project
+2. Pack:
+```bash
+dotnet pack --configuration Release
+```
+3. Install from local folder:
+```bash
+dotnet tool install --global --add-source ./bin/Release BannerlordCoop
+```
 ## Summary
-Concept for a dotnet CLI scaffolding tool for the Bannerlord Coop project using razor.
-
 These are the files the CLI can generate
 
 | Command                    | Output Path                                                                 | Namespace                                         |
