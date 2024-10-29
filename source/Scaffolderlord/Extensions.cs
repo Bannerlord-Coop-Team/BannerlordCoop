@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Humanizer;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Scaffolderlord.CLI;
 using Scaffolderlord.Helpers;
@@ -40,6 +41,21 @@ namespace Scaffolderlord
             return src;
         }
 
+        public static string PascalCase(string input, bool removeSpecialChars = false)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+            input = removeSpecialChars ? new string(input.Where(char.IsLetterOrDigit).ToArray()) : input;
+            return input.Pascalize();
+        }
+
+        public static string CamelCase(string input, bool removeSpecialChars = false)
+        {
+            if (string.IsNullOrEmpty(input))
+                return input;
+            input = removeSpecialChars ? new string(input.Where(char.IsLetterOrDigit).ToArray()) : input;
+            return input.Camelize();
+        }
 
         /// This is a integral part of the code, do not remove
         public static string GetRandomWarbandQuote() => Quotes[new Random().Next(Quotes.Length)];

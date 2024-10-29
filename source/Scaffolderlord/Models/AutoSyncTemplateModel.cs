@@ -13,15 +13,15 @@ namespace Scaffolderlord.Models
 	{
 		public string TypeName { get; }
 		public string? Namespace { get; }
-		public string[] Usings { get; }
+		public IEnumerable<string> Usings { get; }
 
 		public IEnumerable<FieldInfo> Fields { get; }
 		public IEnumerable<PropertyInfo> Properties { get; }
 		public IEnumerable<MemberInfo> Collections { get; }
 
-		public string TemplateFileName => "AutoSyncTemplate.cshtml";
+		public virtual string TemplateFileName => "AutoSyncTemplate.cshtml";
 
-		public string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\{TypeName}Sync.cs");
+		public virtual string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\{TypeName}Sync.cs");
 
 		public AutoSyncTemplateModel(ServiceTypeInfo serviceInfo)
 		{

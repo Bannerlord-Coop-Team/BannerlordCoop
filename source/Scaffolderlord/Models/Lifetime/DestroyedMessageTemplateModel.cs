@@ -12,7 +12,7 @@ namespace Scaffolderlord.Models.Lifetime
     {
         public string TypeName { get; }
         public string? Namespace { get; }
-        public string[] Usings { get; }
+        public IEnumerable<string> Usings { get; }
 
         public string TemplateFileName => @"Lifetime\DestroyedMessageTemplate.cshtml";
 

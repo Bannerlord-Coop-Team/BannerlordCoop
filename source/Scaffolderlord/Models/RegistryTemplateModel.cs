@@ -12,7 +12,7 @@ namespace Scaffolderlord.Models
 	{
 		public string TypeName { get; }
 		public string? Namespace { get; }
-		public string[] Usings { get; }
+		public IEnumerable<string> Usings { get; }
 
 		public string TemplateFileName => "RegistryTemplate.cshtml";
 

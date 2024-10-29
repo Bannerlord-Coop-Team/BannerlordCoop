@@ -40,7 +40,7 @@ namespace Scaffolderlord.Models
 	{
 		string TemplateFileName { get; }
 		string? Namespace { get; }
-		string[] Usings { get; }
+		IEnumerable<string> Usings { get; }
 
 		string GetTemplateFilePath()
 		{

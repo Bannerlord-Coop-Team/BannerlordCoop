@@ -6,28 +6,33 @@ using Scaffolderlord.Services;
 using System;
 using System.Collections.Generic;
 using System.CommandLine;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using static Scaffolderlord.Extensions;
 
 namespace Scaffolderlord.CLI.Commands
 {
-	[CliCommand(
-		Name = "e2e",
-		Description = "Generates all e2e tests for a specified type",
-		Parent = typeof(RootCliCommand)
-		)]
-	public class GenerateE2ECommand : GenerateAutoSyncCommand
-	{
-		public GenerateE2ECommand(IScaffoldingService scaffoldingService) : base(scaffoldingService)
-		{
-		}
+    [CliCommand(
+        Name = "e2e",
+        Description = "Generates all e2e tests for a specified type",
+        Parent = typeof(RootCliCommand)
+        )]
+    public class GenerateE2ECommand : GenerateAutoSyncCommand
+    {
+        public GenerateE2ECommand(IScaffoldingService scaffoldingService) : base(scaffoldingService)
+        {
+        }
 
-		protected override ITemplateModel GetTemplateModel() => null;
+        protected override ITemplateModel GetTemplateModel() => null;
+        public override async Task RunAsync()
+        {
+            var commands = new ICliCommand[]
+            {
+                new GeneratePropertyTests(scaffolder),
+                new GenerateFieldTests(scaffolder)
+            };
+            this.PropagateCliArgumentsAndOptions(commands);
+            foreach (var command in commands) await command.RunAsync();
 
-		public override async Task RunAsync()
-		{
-			throw new NotImplementedException();
-		}
-	}
+            PrintCommandSucceededMessage();
+        }
+    }
 }

@@ -16,6 +16,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="DotMake.CommandLine" Version="1.8.8" />
+		<PackageReference Include="Humanizer" Version="2.14.1" />
 		<PackageReference Include="Microsoft.Extensions.Configuration.CommandLine" Version="6.0.0" />
 		<PackageReference Include="RazorLight" Version="2.3.1" />
 		<PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
@@ -212,10 +213,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Folder Include="Models\E2E\" />
 		<Folder Include="Models\Commands\" />
 		<Folder Include="Templates\Collections\" />
-		<Folder Include="Templates\E2E\" />
 		<Folder Include="Templates\Commands\" />
 	</ItemGroup>
 

@@ -11,7 +11,7 @@ namespace Scaffolderlord.Models.Collections
 	{
 		public string TypeName { get; protected set; }
 		public string? Namespace { get; protected set; }
-		public string[] Usings { get; protected set; }
+		public IEnumerable<string> Usings { get; protected set; }
 
 		public abstract string TemplateFileName { get; }
 

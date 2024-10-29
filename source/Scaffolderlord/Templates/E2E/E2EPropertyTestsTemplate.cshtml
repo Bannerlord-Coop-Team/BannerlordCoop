@@ -1,0 +1,111 @@
+﻿@using RazorLight
+@using Scaffolderlord.Models.E2E
+@inherits TemplatePage<E2EPropertyTestsTemplateModel>
+@foreach (var item in Model.Usings)
+{
+	<text>using @item;</text>
+	@Model.NewLine
+}
+using E2E.Tests.Environment;
+using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
+using HarmonyLib;
+using System.Reflection;
+using Xunit.Abstractions;
+using static Common.Extensions.ReflectionExtensions;
+@{
+    var typeNameSnakeCase = char.ToLowerInvariant(Model.TypeName[0]) + Model.TypeName.Substring(1);
+}
+@Model.Namespace
+{
+    public class @(Model.TypeName)FieldsTests : IDisposable
+    {
+        private readonly List<MethodBase> disabledMethods;
+        private E2ETestEnvironment TestEnvironment { get; }
+        private EnvironmentInstance Server => TestEnvironment.Server;
+        private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
+        private IEnumerable<EnvironmentInstance> AllEnvironmentInstances => Clients.Append(Server);
+
+        private readonly string @(Model.TypeName)Id;
+
+        public @(Model.TypeName)FieldsTests(ITestOutputHelper output)
+        {
+            TestEnvironment = new E2ETestEnvironment(output);
+
+            disabledMethods = new List<MethodBase> {
+                //Add your disabled methods
+            };
+
+            // Create @(Model.TypeName) on the server
+            @(typeNameSnakeCase)Id = TestEnvironment.CreateRegisteredObject<@(Model.TypeName)>(disabledMethods);
+
+            // Create @(Model.TypeName) on all clients
+            foreach (var client in Clients)
+            {
+                var client@(Model.TypeName) = ObjectHelper.SkipConstructor<@(Model.TypeName)>();
+                Assert.True(client.ObjectManager.AddExisting(@(typeNameSnakeCase)Id, client@(Model.TypeName)));
+            }
+        }
+
+        public void Dispose()
+        {
+            TestEnvironment.Dispose();
+        }
+
+    @foreach(var structProp in Model.GetStructProps())
+    {
+        <text>
+        [Fact]
+        public void ServerChange@($"{Model.TypeName}{structProp.Name}")_SyncAllClients()
+        {
+            // Arrange
+            Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var server@(Model.TypeName)));
+            var newValue=Random<@structProp.PropertyType.Name>();
+
+            // Act
+            Server.Call(() =>
+            {
+                server@(Model.TypeName).@structProp.Name = newValue;
+            });
+
+            // Assert
+            foreach (var client in TestEnvironment.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var client@(Model.TypeName)));
+                Assert.Equal(server@(Model.TypeName).@structProp.Name, client@(Model.TypeName).@structProp.Name);
+            }
+        }  
+        </text>
+    }
+
+    @foreach(var classProp in Model.GetClassProps())
+    {
+        var propName=classProp.Name;
+        var propNameSnakeCase=char.ToLowerInvariant(propName[0]) + propName.Substring(1);
+        <text>
+        [Fact]
+        public void ServerChange@(Model.TypeName)@(propName)_SyncAllClients()
+        {
+            // Arrange
+            Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var server@(Model.TypeName)));
+            Assert.True(Server.ObjectManager.TryGetObject<@(classProp.PropertyType.Name)>(@(propNameSnakeCase)Id, out var server@(propName)));
+
+            // Act
+            Server.Call(() =>
+            {
+                server@(Model.TypeName).@(propName) = server@(propName);
+            });
+
+            // Assert
+            foreach (var client in TestEnvironment.Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var client@(Model.TypeName)));
+                client.ObjectManager.TryGetId(client@(Model.TypeName).@(propName), out string client@(propName)Id);
+                Assert.Equal(client@(propName)Id, @(propNameSnakeCase)Id);
+            }
+        }
+        </text>
+    }
+    }
+}  
+    
