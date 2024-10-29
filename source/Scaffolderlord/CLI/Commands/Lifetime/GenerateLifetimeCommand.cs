@@ -6,7 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using static Scaffolderlord.Extensions;
 
 namespace Scaffolderlord.CLI.Commands
 {
@@ -35,8 +35,9 @@ namespace Scaffolderlord.CLI.Commands
 				new GenerateNetworkDestroyMessageCommand(scaffolder)
 			};
 			this.PropagateCliArgumentsAndOptions(commands);
-
 			foreach (var command in commands) await command.RunAsync();
+
+			PrintCommandSucceededMessage();
 		}
 	}
 
