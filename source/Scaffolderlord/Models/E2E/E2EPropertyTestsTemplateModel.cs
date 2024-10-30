@@ -17,9 +17,9 @@ namespace Scaffolderlord.Models.E2E
 		public IEnumerable<string> Usings { get; }
 		public IEnumerable<PropertyInfo> Properties { get; }
 
-		public string TemplateFileName => "E2EPropertyTestsTemplate.cshtml";
+		public string TemplateFileName => @"E2E\E2EPropertyTestsTemplate.cshtml";
 
-		public string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\{TypeName}PropertyTests.cs");
+		public string GetOutputPath() => GetMainProjectPath(@$"E2E.Tests\Services\{TypeName}s\{TypeName}PropertyTests.cs");
 
 		public IEnumerable<PropertyInfo> GetStructProps() => Properties.Where(x => x.PropertyType.IsStruct());
 		public IEnumerable<PropertyInfo> GetClassProps() => Properties.Where(x => !x.PropertyType.IsStruct());

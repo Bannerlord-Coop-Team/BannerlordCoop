@@ -18,11 +18,18 @@ namespace Scaffolderlord.CLI.Commands
         Description = "Generates E2E field tests for the specified type (server side tests)",
         Parent = typeof(RootCliCommand)
         )]
-    public class GenerateFieldTests : GenerateCommandBase<E2EPropertyTestsTemplateModel>
+    public class GenerateFieldTests : GenerateCommandBase<E2EFieldTestsTemplateModel>
     {
         public GenerateFieldTests(IScaffoldingService scaffoldingService) : base(scaffoldingService)
         {
         }
+
+        [CliOption(Name = "--members",
+        Description = "Specify the name of members to create tests for",
+        AllowMultipleArgumentsPerToken = true)]
+        public string[] MembersOption { get; set; } = Array.Empty<string>();
+
+        protected override ServiceTypeInfo GetServiceTypeInfo() => ReflectionHelper.GetServiceTypeInfo(TypeFullyQualifiedName!, MembersOption);
 
     }
 }

@@ -23,5 +23,12 @@ namespace Scaffolderlord.CLI.Commands
         public GeneratePropertyTests(IScaffoldingService scaffoldingService) : base(scaffoldingService)
         {
         }
+
+        [CliOption(Name = "--members",
+        Description = "Specify the name of members to create tests for",
+        AllowMultipleArgumentsPerToken = true)]
+        public string[] MembersOption { get; set; } = Array.Empty<string>();
+
+        protected override ServiceTypeInfo GetServiceTypeInfo() => ReflectionHelper.GetServiceTypeInfo(TypeFullyQualifiedName!, MembersOption);
     }
 }

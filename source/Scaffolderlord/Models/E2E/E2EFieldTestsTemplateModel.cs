@@ -17,9 +17,9 @@ namespace Scaffolderlord.Models.E2E
 		public IEnumerable<string> Usings { get; }
 		public IEnumerable<FieldInfo> Fields { get; }
 
-		public string TemplateFileName => "E2EFieldTestsTemplate.cshtml";
+		public string TemplateFileName => @"E2E\E2EFieldTestsTemplate.cshtml";
 
-		public string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\{TypeName}FieldTests.cs");
+		public string GetOutputPath() => GetMainProjectPath(@$"E2E.Tests\Services\{TypeName}s\{TypeName}FieldTests.cs");
 
 		public IEnumerable<FieldInfo> GetStructFields() => Fields.Where(x => x.FieldType.IsStruct());
 		public IEnumerable<FieldInfo> GetClassFields() => Fields.Where(x => !x.FieldType.IsStruct());
