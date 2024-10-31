@@ -1,4 +1,5 @@
 ﻿@using RazorLight
+@using Scaffolderlord
 @using Scaffolderlord.Models
 @inherits TemplatePage<RegistryTemplateModel>
 using GameInterface.Services.Registry;
@@ -16,6 +17,7 @@ namespace @Model.Namespace
 	string parentClassName = $"RegistryBase<{Model.TypeName}>";
 }
 
+@Model.XmlDoc($"Registry manager for {Model.TypeName}")
 internal class @className : @parentClassName
 {
 	private const string @(Model.TypeName)IdPrefix = "Coop@(Model.TypeName)";
@@ -32,6 +34,6 @@ internal class @className : @parentClassName
 
 	protected override string GetNewId(@Model.TypeName obj)
 	{
-		return $"{@(Model.TypeName)IdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+		return $"{@(Model.TypeName))IdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
 	}
 }

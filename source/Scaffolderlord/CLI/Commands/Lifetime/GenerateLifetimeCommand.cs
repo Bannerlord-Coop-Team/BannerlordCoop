@@ -37,8 +37,8 @@ namespace Scaffolderlord.CLI.Commands
 			this.PropagateCliArgumentsAndOptions(commands);
 			foreach (var command in commands) await command.RunAsync();
 
-			PrintCommandSucceededMessage();
-		}
+			if(!CommandPropagated) PrintCommandSucceededMessage();
+        }
 	}
 
 }

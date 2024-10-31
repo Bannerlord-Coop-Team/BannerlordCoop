@@ -13,7 +13,7 @@ namespace Scaffolderlord.Models.Collections
 	{
 		public override string TemplateFileName => "NetworkRemoveMessageTemplate";
 
-		public override string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\Messages\Collections\NetworkRemove{CollectionName}.cs");
+		public override string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\Messages\Collections\NetworkRemove{CollectionName}.cs");
 
 		public NetworkRemoveMessageTemplateModel(ServiceTypeInfo serviceInfo, MemberInfo selectedCollection) : base(selectedCollection)
 		{

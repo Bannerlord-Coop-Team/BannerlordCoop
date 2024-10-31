@@ -14,9 +14,10 @@ namespace @Model.Namespace
 	string className = $"{Model.TypeName}Sync";
 }
 
+@Model.XmlDoc($"Configures AutoSync for {Model.TypeName}")
 internal class @className : IAutoSync
 {
-	public @(className)Sync(IAutoSyncBuilder autoSyncBuilder)
+	public @(className)(IAutoSyncBuilder autoSyncBuilder)
 	{
 		// Fields
 @foreach (var field in Model.Fields)
@@ -26,7 +27,7 @@ internal class @className : IAutoSync
 	<text>autoSyncBuilder.AddField(AccessTools.Field(typeof(@Model.TypeName), nameof(@fieldAcessor)));</text>
 	if (field.IsPublic)
 	{
-		<text>$"// WARNING: {field.Name} is a public field, for AutoSync to work you must also add any methods outside declaring class that change its value"</text>
+		<text>// WARNING: @(field.Name) is a public field, for AutoSync to work you must also add any methods outside declaring class that change its value</text>
 	}
 	@Model.NewLine
 }

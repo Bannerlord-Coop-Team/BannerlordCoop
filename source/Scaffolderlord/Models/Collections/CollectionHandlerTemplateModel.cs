@@ -13,7 +13,7 @@ namespace Scaffolderlord.Models.Collections
 	{
 		public override string TemplateFileName => "CollectionHandlerTemplate";
 
-		public override string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\Handlers\{CollectionName}Handler.cs");
+		public override string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\Handlers\{CollectionName}Handler.cs");
 
 		public CollectionHandlerTemplateModel(ServiceTypeInfo serviceInfo, MemberInfo selectedCollection) : base(selectedCollection)
 		{

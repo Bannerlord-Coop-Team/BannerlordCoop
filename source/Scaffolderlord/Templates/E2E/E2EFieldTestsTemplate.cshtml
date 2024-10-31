@@ -14,127 +14,125 @@ using HarmonyLib;
 using System.Reflection;
 using Xunit.Abstractions;
 using static Common.Extensions.ReflectionExtensions;
-@{
-    var typeNameCamelCase = CamelCase(Model.TypeName, true);
-}
-@Model.Namespace
+using Common.Util;
+
+namespace @Model.Namespace
+
+public class @(Model.TypeName)FieldTests : IDisposable
 {
-    public class @(Model.TypeName)FieldsTests : IDisposable
+    private readonly List<MethodBase> disabledMethods;
+    private E2ETestEnvironment TestEnvironment { get; }
+    private EnvironmentInstance Server => TestEnvironment.Server;
+    private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
+    private IEnumerable<EnvironmentInstance> AllEnvironmentInstances => Clients.Append(Server);
+
+    private readonly string @(Model.TypeName.CamelCase())Id;
+
+    public @(Model.TypeName)FieldsTests(ITestOutputHelper output)
     {
-        private readonly List<MethodBase> disabledMethods;
-        private E2ETestEnvironment TestEnvironment { get; }
-        private EnvironmentInstance Server => TestEnvironment.Server;
-        private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
-        private IEnumerable<EnvironmentInstance> AllEnvironmentInstances => Clients.Append(Server);
+        TestEnvironment = new E2ETestEnvironment(output);
 
-        private readonly string @(Model.TypeName)Id;
+        disabledMethods = new List<MethodBase> {
+            //Add your disabled methods
+        };
 
-        public @(Model.TypeName)FieldsTests(ITestOutputHelper output)
+        // Create @(Model.TypeName) on the server
+        @(Model.TypeName.CamelCase())Id = TestEnvironment.CreateRegisteredObject<@(Model.TypeName)>(disabledMethods);
+
+        // Create @(Model.TypeName) on all clients
+        foreach (var client in Clients)
         {
-            TestEnvironment = new E2ETestEnvironment(output);
-
-            disabledMethods = new List<MethodBase> {
-                //Add your disabled methods
-            };
-
-            // Create @(Model.TypeName) on the server
-            @(typeNameCamelCase)Id = TestEnvironment.CreateRegisteredObject<@(Model.TypeName)>(disabledMethods);
-
-            // Create @(Model.TypeName) on all clients
-            foreach (var client in Clients)
-            {
-                var client@(Model.TypeName) = ObjectHelper.SkipConstructor<@(Model.TypeName)>();
-                Assert.True(client.ObjectManager.AddExisting(@(typeNameCamelCase)Id, client@(Model.TypeName)));
-            }
+            var client@(Model.TypeName) = ObjectHelper.SkipConstructor<@(Model.TypeName)>();
+            Assert.True(client.ObjectManager.AddExisting(@(Model.TypeName.CamelCase())Id, client@(Model.TypeName)));
         }
-
-        public void Dispose()
-        {
-            TestEnvironment.Dispose();
-        }
-
-    @foreach(var classField in Model.GetClassFields())
-    {
-        var fieldNamePascalCase=PascalCase(classField.Name,true);
-        var fieldNameCamelCase=CamelCase(classField.Name,true);
-        <text>
-        [Fact]
-        public void ServerChange@(Model.TypeName)@(fieldNamePascalCase)_SyncAllClients()
-        {
-            // Arrange
-            var field = AccessTools.Field(typeof(@(Model.TypeName)), nameof(@(Model.TypeName).@(classField.Name)));
-            var intercept = TestEnvironment.GetIntercept(field);
-
-            /// Create instances on server
-            Assert.True(Server.ObjectManager.AddNewObject(ObjectHelper.SkipConstructor<@(classField.FieldType.Name)>(), out var @(classField.FieldType.Name)Id));
-
-            /// Create instances on all clients
-            foreach (var client in Clients)
-            {
-                var client@(classField.FieldType.Name) = ObjectHelper.SkipConstructor<@(classField.FieldType.Name)>();
-                Assert.True(client.ObjectManager.AddExisting(@(fieldNameCamelCase)Id, client@(fieldNamePascalCase)));
-            }
-
-            // Act
-            Server.Call(() =>
-            {
-                Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var @(Model.TypeName)));
-                Assert.True(Server.ObjectManager.TryGetObject<@(classField.FieldType.Name)>(@(fieldNameCamelCase)Id, out var server@(fieldNamePascalCase)));
-
-                Assert.Null(@(Model.TypeName).@(classField.Name));
-
-                /// Simulate the field changing
-                intercept.Invoke(null, new object[] { @(Model.TypeName), server@(fieldNamePascalCase)});
-
-                Assert.Same(server@(fieldNamePascalCase), @(Model.TypeName).@(classField.Name));
-            });
-
-            // Assert
-            foreach (var client in Clients)
-            {
-                Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var @(Model.TypeName)));
-
-                Assert.True(client.ObjectManager.TryGetObject<@(classField.FieldType.Name)>(@(fieldNameCamelCase)Id, out var client@(fieldNamePascalCase)));
-
-                Assert.True(client@(fieldNamePascalCase) == @(Model.TypeName).@(classField.Name));
-            }
-        }
-        </text>
     }
 
-    @foreach(var structField in Model.GetStructFields())
+    public void Dispose()
     {
-        var fieldNamePascalCase=PascalCase(structField.Name,true);
-        var fieldNameCamelCase=CamelCase(structField.Name,true);
-        <text>
-        [Fact]
-        public void ServerChange@($"{Model.TypeName}{fieldNamePascalCase}")_SyncAllClients()
+        TestEnvironment.Dispose();
+    }
+
+@foreach(var classField in Model.GetClassFields())
+{
+    var fieldNamePascalCase=classField.Name.PascalCase(true);
+    var fieldNameCamelCase=classField.Name.CamelCase(true);
+    <text>
+    [Fact]
+    public void ServerChange@(Model.TypeName)@(fieldNamePascalCase)_SyncAllClients()
+    {
+        // Arrange
+        var field = AccessTools.Field(typeof(@(Model.TypeName)), nameof(@(Model.TypeName).@(classField.Name)));
+        var intercept = TestEnvironment.GetIntercept(field);
+
+        /// Create instances on server
+        Assert.True(Server.ObjectManager.AddNewObject(ObjectHelper.SkipConstructor<@(classField.FieldType.Name)>(), out var @(fieldNameCamelCase)Id));
+
+        /// Create instances on all clients
+        foreach (var client in Clients)
         {
-            // Arrange
-            var field = AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty));
-            var intercept = TestEnvironment.GetIntercept(field);
-            Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var server@(Model.TypeName)));
-            var newValue=Random<@structField.FieldType.Name>();
+            var client@(classField.FieldType.Name) = ObjectHelper.SkipConstructor<@(classField.FieldType.Name)>();
+            Assert.True(client.ObjectManager.AddExisting(@(fieldNameCamelCase)Id, client@(fieldNamePascalCase)));
+        }
 
-            // Act
-            Server.Call(() =>
-            {
-                /// Simulate the field changing
-                intercept.Invoke(null, new object[] { server@(Model.TypeName), newValue });
+        // Act
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var @(Model.TypeName)));
+            Assert.True(Server.ObjectManager.TryGetObject<@(classField.FieldType.Name)>(@(fieldNameCamelCase)Id, out var server@(fieldNamePascalCase)));
 
-                Assert.Same(newValue, server@(Model.TypeName).@structField.Name);
-            });
+            Assert.Null(@(Model.TypeName).@(classField.Name));
 
-            // Assert
-            foreach (var client in TestEnvironment.Clients)
-            {
-                Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var client@(Model.TypeName)));
-                Assert.Equal(server@(Model.TypeName).@structField.Name, client@(Model.TypeName).@structField.Name);
-            }
-        }  
-        </text>
+            /// Simulate the field changing
+            intercept.Invoke(null, new object[] { @(Model.TypeName), server@(fieldNamePascalCase)});
+
+            Assert.Same(server@(fieldNamePascalCase), @(Model.TypeName).@(classField.Name));
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var @(Model.TypeName)));
+
+            Assert.True(client.ObjectManager.TryGetObject<@(classField.FieldType.Name)>(@(fieldNameCamelCase)Id, out var client@(fieldNamePascalCase)));
+
+            Assert.True(client@(fieldNamePascalCase) == @(Model.TypeName).@(classField.Name));
+        }
     }
+    </text>
+}
 
-    }
-}  
+@foreach(var structField in Model.GetStructFields())
+{
+    var fieldNamePascalCase=structField.Name.PascalCase(true);
+    var fieldNameCamelCase=structField.Name.CamelCase(true);
+    <text>
+    [Fact]
+    public void ServerChange@($"{Model.TypeName}{fieldNamePascalCase}")_SyncAllClients()
+    {
+        // Arrange
+        var field = AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty));
+        var intercept = TestEnvironment.GetIntercept(field);
+        Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var server@(Model.TypeName)));
+        var newValue=Random<@structField.FieldType.Name>();
+
+        // Act
+        Server.Call(() =>
+        {
+            /// Simulate the field changing
+            intercept.Invoke(null, new object[] { server@(Model.TypeName), newValue });
+
+            Assert.Same(newValue, server@(Model.TypeName).@structField.Name);
+        });
+
+        // Assert
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var client@(Model.TypeName)));
+            Assert.Equal(server@(Model.TypeName).@structField.Name, client@(Model.TypeName).@structField.Name);
+        }
+    }  
+    </text>
+}
+}
+
     

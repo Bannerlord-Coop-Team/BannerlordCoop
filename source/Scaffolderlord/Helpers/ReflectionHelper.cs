@@ -18,7 +18,7 @@ namespace Scaffolderlord.Helpers
 {
     public static class ReflectionHelper
     {
-        public static ILogger Logger { get; set; } = NullLogger.Instance;
+        static ILogger Logger => GlobalOptions.GlobalLogger;
 
         public static ServiceTypeInfo GetServiceTypeInfo(string typeFullyQualifiedName, string[]? memberNames = null)
         {
@@ -104,10 +104,9 @@ namespace Scaffolderlord.Helpers
         /// <returns>true if the type is a struct; otherwise, false.</returns>
         public static bool IsStruct(this Type type)
         {
-            return type.IsValueType &&
-                   !type.IsPrimitive &&
-                   !type.IsEnum &&
-                   Nullable.GetUnderlyingType(type) == null;
+            return type.IsValueType ||
+                   type.IsPrimitive ||
+                   type.IsEnum;
         }
     }
 }

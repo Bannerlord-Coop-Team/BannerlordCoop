@@ -1,4 +1,5 @@
 ﻿@using RazorLight
+@using Scaffolderlord
 @using Scaffolderlord.Models.Lifetime
 @inherits TemplatePage<NetworkDestroyMessageTemplateModel>
 using Common.Messaging;
@@ -12,13 +13,13 @@ namespace @Model.Namespace
 
 @Model.XmlDoc($"An event published to clients, commanding them to destroy a {Model.TypeName}.")
 [ProtoContract(SkipConstructor = true)]
-internal class NetworkCreate@(Model.TypeName) : ICommand
+internal class NetworkDestroy@(Model.TypeName) : ICommand
 {
 	[ProtoMember(1)]
 	public string @(Model.TypeName)Id { get; }
 
-	public NetworkCreate@(Model.TypeName)(string @(Model.TypeName)Id)
+	public NetworkDestroy@(Model.TypeName)(string @(Model.TypeName.CamelCase())Id)
 	{
-@(Model.TypeName)Id = @(Model.TypeName)Id;
+		@(Model.TypeName)Id = @(Model.TypeName.CamelCase())Id;
 	}
 }

@@ -16,7 +16,7 @@ namespace Scaffolderlord.Models.Lifetime
 
         public string TemplateFileName => @"Lifetime\LifetimeHandlerTemplate.cshtml";
 
-        public string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\Handlers\{TypeName}LifetimeHandler.cs");
+        public string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\Handlers\{TypeName}LifetimeHandler.cs");
 
         public LifetimeHandlerTemplateModel(ServiceTypeInfo serviceInfo)
         {

@@ -27,7 +27,7 @@ internal class @className: IHandler
 	private readonly IMessageBroker messageBroker;
 	private readonly INetwork network;
 	private readonly IObjectManager objectManager;
-	public @(className)LifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+	public @(className)(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
 	{
 		this.messageBroker = messageBroker;
 		this.network = network;
@@ -81,7 +81,7 @@ internal class @className: IHandler
 			return;
 		}
 
-		network.SendAll(new NetworkDestroyParty(id));
+		network.SendAll(new NetworkDestroy@(Model.TypeName)(id));
 	}
 
 	private void HandleDestroyCommand(MessagePayload<NetworkDestroy@(Model.TypeName)> payload)

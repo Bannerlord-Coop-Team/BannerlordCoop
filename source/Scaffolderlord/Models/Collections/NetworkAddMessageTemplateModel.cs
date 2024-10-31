@@ -13,7 +13,7 @@ namespace Scaffolderlord.Models.Collections
 	{
 		public override string TemplateFileName => "NetworkAddMessageTemplate";
 
-		public override string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\Messages\Collections\Network{CollectionName}Add.cs");
+		public override string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\Messages\Collections\Network{CollectionName}Add.cs");
 
 		public NetworkAddMessageTemplateModel(ServiceTypeInfo serviceInfo, MemberInfo selectedCollection) : base(selectedCollection)
 		{

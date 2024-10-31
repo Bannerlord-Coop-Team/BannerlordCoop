@@ -16,7 +16,7 @@ namespace Scaffolderlord.Models
 
 		public string TemplateFileName => "RegistryTemplate.cshtml";
 
-		public string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\{TypeName}Registry.cs");
+		public string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\{TypeName}Registry.cs");
 
 		public RegistryTemplateModel(ServiceTypeInfo serviceInfo)
 		{

@@ -13,7 +13,7 @@ namespace Scaffolderlord.Models.Collections
 	{
 		public override string TemplateFileName => "RemovedMessageTemplateModel";
 
-		public override string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\Messages\Collections\{CollectionName}Removed.cs");
+		public override string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\Messages\Collections\{CollectionName}Removed.cs");
 
 		public RemovedMessageTemplateModel(ServiceTypeInfo serviceInfo, MemberInfo selectedCollection) : base(selectedCollection)
 		{

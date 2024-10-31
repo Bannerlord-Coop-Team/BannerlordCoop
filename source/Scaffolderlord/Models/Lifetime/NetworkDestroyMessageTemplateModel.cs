@@ -16,7 +16,7 @@ namespace Scaffolderlord.Models.Lifetime
 
 		public string TemplateFileName => @"Lifetime\NetworkDestroyMessageTemplate.cshtml";
 
-		public string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\Messages\Lifetime\NetworkDestroy{TypeName}.cs");
+		public string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\Messages\Lifetime\NetworkDestroy{TypeName}.cs");
 
 		public NetworkDestroyMessageTemplateModel(ServiceTypeInfo serviceInfo)
 		{

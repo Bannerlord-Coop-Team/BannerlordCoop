@@ -19,7 +19,7 @@ namespace Scaffolderlord.Models.E2E
 
 		public string TemplateFileName => @"E2E\E2EPropertyTestsTemplate.cshtml";
 
-		public string GetOutputPath() => GetMainProjectPath(@$"E2E.Tests\Services\{TypeName}s\{TypeName}PropertyTests.cs");
+		public string GetOutputPath() => GetRelativeDirectory(@$"E2E.Tests\Services\{TypeName}s\{TypeName}PropertyTests.cs");
 
 		public IEnumerable<PropertyInfo> GetStructProps() => Properties.Where(x => x.PropertyType.IsStruct());
 		public IEnumerable<PropertyInfo> GetClassProps() => Properties.Where(x => !x.PropertyType.IsStruct());
@@ -37,10 +37,9 @@ namespace Scaffolderlord.Models.E2E
 			var requiredNamespaces = Properties
 				.Select(x => x.PropertyType.Namespace)
 				.Where(x => x != null)
-				.Distinct();
+				.Distinct() ?? Array.Empty<string>();
 
-
-			if (requiredNamespaces.Any()) (Usings as List<string>)!.AddRange(requiredNamespaces!);
+			Usings = Usings.Concat(requiredNamespaces).Distinct();
 		}
 	}
 }

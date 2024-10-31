@@ -1,4 +1,5 @@
 ﻿@using RazorLight
+@using Scaffolderlord
 @using Scaffolderlord.Models.E2E
 @inherits TemplatePage<E2EPropertyTestsTemplateModel>
 @foreach (var item in Model.Usings)
@@ -12,100 +13,96 @@ using E2E.Tests.Util;
 using HarmonyLib;
 using System.Reflection;
 using Xunit.Abstractions;
+using Common.Util;
 using static Common.Extensions.ReflectionExtensions;
-@{
-    var typeNameSnakeCase = char.ToLowerInvariant(Model.TypeName[0]) + Model.TypeName.Substring(1);
-}
-@Model.Namespace
+
+namespace @Model.Namespace
+
+public class @(Model.TypeName)PropertyTests : IDisposable
 {
-    public class @(Model.TypeName)FieldsTests : IDisposable
+    private readonly List<MethodBase> disabledMethods;
+    private E2ETestEnvironment TestEnvironment { get; }
+    private EnvironmentInstance Server => TestEnvironment.Server;
+    private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
+    private IEnumerable<EnvironmentInstance> AllEnvironmentInstances => Clients.Append(Server);
+
+    private readonly string @(Model.TypeName.CamelCase())Id;
+
+    public @(Model.TypeName)PropertyTests(ITestOutputHelper output)
     {
-        private readonly List<MethodBase> disabledMethods;
-        private E2ETestEnvironment TestEnvironment { get; }
-        private EnvironmentInstance Server => TestEnvironment.Server;
-        private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
-        private IEnumerable<EnvironmentInstance> AllEnvironmentInstances => Clients.Append(Server);
+        TestEnvironment = new E2ETestEnvironment(output);
 
-        private readonly string @(Model.TypeName)Id;
+        disabledMethods = new List<MethodBase> {
+            //Add your disabled methods
+        };
 
-        public @(Model.TypeName)FieldsTests(ITestOutputHelper output)
+        // Create @(Model.TypeName) on the server
+        @(Model.TypeName.CamelCase())Id = TestEnvironment.CreateRegisteredObject<@(Model.TypeName)>(disabledMethods);
+
+        // Create @(Model.TypeName) on all clients
+        foreach (var client in Clients)
         {
-            TestEnvironment = new E2ETestEnvironment(output);
-
-            disabledMethods = new List<MethodBase> {
-                //Add your disabled methods
-            };
-
-            // Create @(Model.TypeName) on the server
-            @(typeNameSnakeCase)Id = TestEnvironment.CreateRegisteredObject<@(Model.TypeName)>(disabledMethods);
-
-            // Create @(Model.TypeName) on all clients
-            foreach (var client in Clients)
-            {
-                var client@(Model.TypeName) = ObjectHelper.SkipConstructor<@(Model.TypeName)>();
-                Assert.True(client.ObjectManager.AddExisting(@(typeNameSnakeCase)Id, client@(Model.TypeName)));
-            }
+            var client@(Model.TypeName) = ObjectHelper.SkipConstructor<@(Model.TypeName)>();
+            Assert.True(client.ObjectManager.AddExisting(@(Model.TypeName.CamelCase())Id, client@(Model.TypeName)));
         }
-
-        public void Dispose()
-        {
-            TestEnvironment.Dispose();
-        }
-
-    @foreach(var structProp in Model.GetStructProps())
-    {
-        <text>
-        [Fact]
-        public void ServerChange@($"{Model.TypeName}{structProp.Name}")_SyncAllClients()
-        {
-            // Arrange
-            Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var server@(Model.TypeName)));
-            var newValue=Random<@structProp.PropertyType.Name>();
-
-            // Act
-            Server.Call(() =>
-            {
-                server@(Model.TypeName).@structProp.Name = newValue;
-            });
-
-            // Assert
-            foreach (var client in TestEnvironment.Clients)
-            {
-                Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var client@(Model.TypeName)));
-                Assert.Equal(server@(Model.TypeName).@structProp.Name, client@(Model.TypeName).@structProp.Name);
-            }
-        }  
-        </text>
     }
 
-    @foreach(var classProp in Model.GetClassProps())
+    public void Dispose()
     {
-        var propName=classProp.Name;
-        var propNameSnakeCase=char.ToLowerInvariant(propName[0]) + propName.Substring(1);
-        <text>
-        [Fact]
-        public void ServerChange@(Model.TypeName)@(propName)_SyncAllClients()
+        TestEnvironment.Dispose();
+    }
+
+@foreach(var structProp in Model.GetStructProps())
+{
+    <text>
+    [Fact]
+    public void ServerChange@($"{Model.TypeName}{structProp.Name}")_SyncAllClients()
+    {
+        // Arrange
+        Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var server@(Model.TypeName)));
+        var newValue=Random<@structProp.PropertyType.Name>();
+
+        // Act
+        Server.Call(() =>
         {
-            // Arrange
-            Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var server@(Model.TypeName)));
-            Assert.True(Server.ObjectManager.TryGetObject<@(classProp.PropertyType.Name)>(@(propNameSnakeCase)Id, out var server@(propName)));
+            server@(Model.TypeName).@structProp.Name = newValue;
+        });
 
-            // Act
-            Server.Call(() =>
-            {
-                server@(Model.TypeName).@(propName) = server@(propName);
-            });
-
-            // Assert
-            foreach (var client in TestEnvironment.Clients)
-            {
-                Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var client@(Model.TypeName)));
-                client.ObjectManager.TryGetId(client@(Model.TypeName).@(propName), out string client@(propName)Id);
-                Assert.Equal(client@(propName)Id, @(propNameSnakeCase)Id);
-            }
+        // Assert
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
+            Assert.Equal(server@(Model.TypeName).@structProp.Name, client@(Model.TypeName).@structProp.Name);
         }
-        </text>
+    }  
+    </text>
+}
+
+@foreach(var classProp in Model.GetClassProps())
+{
+    <text>
+    [Fact]
+    public void ServerChange@(Model.TypeName)@(classProp.Name.PascalCase())_SyncAllClients()
+    {
+        // Arrange
+        string @(classProp.Name.CamelCase())Id;
+        Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var server@(Model.TypeName)));
+        Assert.True(Server.ObjectManager.TryGetObject<@(classProp.PropertyType.Name)>(@(classProp.Name.CamelCase())Id, out var server@(classProp.Name.PascalCase())));
+
+        // Act
+        Server.Call(() =>
+        {
+            server@(Model.TypeName).@(classProp.Name) = server@(classProp.Name.PascalCase());
+        });
+
+        // Assert
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
+            client.ObjectManager.TryGetId(client@(Model.TypeName).@(classProp.Name), out string client@(classProp.Name.PascalCase())Id);
+            Assert.Equal(client@(classProp.Name.PascalCase())Id, @(classProp.Name.CamelCase())Id);
+        }
     }
-    }
-}  
-    
+    </text>
+}
+}

@@ -10,21 +10,18 @@ using static Scaffolderlord.Extensions;
 
 namespace Scaffolderlord.Models.E2E
 {
-	public class E2EFieldTestsTemplateModel : BaseTemplateModel, ITemplateModel
+	public class E2ELifetimeTestsTemplateModel : BaseTemplateModel, ITemplateModel
 	{
 		public string TypeName { get; }
 		public string? Namespace { get; }
 		public IEnumerable<string> Usings { get; }
 		public IEnumerable<FieldInfo> Fields { get; }
 
-		public string TemplateFileName => @"E2E\E2EFieldTestsTemplate.cshtml";
+		public string TemplateFileName => @"E2E\E2ELifetimeTestsTemplate.cshtml";
 
-		public string GetOutputPath() => GetRelativeDirectory(@$"E2E.Tests\Services\{TypeName}s\{TypeName}FieldTests.cs");
+		public string GetOutputPath() => GetRelativeDirectory(@$"E2E.Tests\Services\{TypeName}s\{TypeName}LifetimeTests.cs");
 
-		public IEnumerable<FieldInfo> GetStructFields() => Fields.Where(x => x.FieldType.IsStruct());
-		public IEnumerable<FieldInfo> GetClassFields() => Fields.Where(x => !x.FieldType.IsStruct());
-
-		public E2EFieldTestsTemplateModel(ServiceTypeInfo serviceInfo)
+		public E2ELifetimeTestsTemplateModel(ServiceTypeInfo serviceInfo)
 		{
 			TypeName = serviceInfo.Type.Name;
 			Namespace = $"E2E.Tests.Services.{serviceInfo.Type.Name}s;";
@@ -38,8 +35,6 @@ namespace Scaffolderlord.Models.E2E
 				.Select(x => x.FieldType.Namespace)
 				.Where(x => x != null)
 				.Distinct() ?? Array.Empty<string>();
-
-			Usings = Usings.Concat(requiredNamespaces).Distinct();
 		}
 	}
 }

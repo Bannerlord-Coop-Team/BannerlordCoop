@@ -14,7 +14,7 @@ namespace Scaffolderlord.CLI.Commands
 {
     [CliCommand(
     Name = "all",
-    Description = "Generates all classes(registry,sync,lifetime)",
+    Description = "Generates all classes",
     Parent = typeof(RootCliCommand)
     )]
     public class GenerateAllCommand : GenerateAutoSyncCommand
@@ -32,7 +32,8 @@ namespace Scaffolderlord.CLI.Commands
             {
                 new GenerateRegistryCommand(scaffolder),
                 new GenerateAutoSyncCommand(scaffolder),
-                new GenerateLifetimeCommand(scaffolder)
+                new GenerateLifetimeCommand(scaffolder),
+                new GenerateE2ECommand(scaffolder)
             };
             this.PropagateCliArgumentsAndOptions(commands);
             foreach (var command in commands) await command.RunAsync();

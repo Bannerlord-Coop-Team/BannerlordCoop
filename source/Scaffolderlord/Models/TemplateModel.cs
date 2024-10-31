@@ -8,45 +8,42 @@ using static Scaffolderlord.Extensions;
 
 namespace Scaffolderlord.Models
 {
-	public abstract class BaseTemplateModel
-	{
-		/// <summary>
-		/// Returns an newline
-		/// </summary>
-		public string NewLine => "\r\n";
+    public abstract class BaseTemplateModel
+    {
+        /// <summary>
+        /// Returns an newline
+        /// </summary>
+        public string NewLine => "\r\n";
 
-		/// <summary>
-		/// Returns an tab for each level
-		/// </summary>
-		/// <param name="level"></param>
-		/// <returns></returns>
-		public string Indent(int level = 1) => new string('\t', level);
+        /// <summary>
+        /// Returns an tab for each level
+        /// </summary>
+        /// <param name="level"></param>
+        /// <returns></returns>
+        public string Indent(int level = 1) => new string('\t', level);
 
-		/// <summary>
-		/// Creates simple XML doc
-		/// </summary>
-		/// <param name="comment"></param>
-		/// <returns></returns>
-		public string XmlDoc(string comment)
-		{
-			return $@"
+        /// <summary>
+        /// Creates simple XML doc
+        /// </summary>
+        /// <param name="comment"></param>
+        /// <returns></returns>
+        public string XmlDoc(string comment)
+        {
+            return $@"
 /// <summary>
 /// {comment}
 /// </summary>";
-		}
-	}
+        }
+    }
 
-	public interface ITemplateModel
-	{
-		string TemplateFileName { get; }
-		string? Namespace { get; }
-		IEnumerable<string> Usings { get; }
+    public interface ITemplateModel
+    {
+        string TemplateFileName { get; }
+        string? Namespace { get; }
+        IEnumerable<string> Usings { get; }
 
-		string GetTemplateFilePath()
-		{
-			return Path.Combine(GetRelativePath("Templates"), TemplateFileName);
-		}
-		string GetOutputPath();
-	}
+        string GetTemplateFilePath() => Path.Combine(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Templates"), TemplateFileName);
+        string GetOutputPath();
+    }
 
 }

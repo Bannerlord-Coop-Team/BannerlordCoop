@@ -16,7 +16,7 @@ namespace Scaffolderlord.Models.Lifetime
 
         public string TemplateFileName => @"Lifetime\CreatedMessageTemplate.cshtml";
 
-        public string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\Messages\Lifetime\{TypeName}Created.cs");
+        public string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\Messages\Lifetime\{TypeName}Created.cs");
 
         public CreatedMessageTemplateModel(ServiceTypeInfo serviceInfo)
         {

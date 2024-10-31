@@ -27,12 +27,13 @@ namespace Scaffolderlord.CLI.Commands
             var commands = new ICliCommand[]
             {
                 new GeneratePropertyTests(scaffolder),
-                new GenerateFieldTests(scaffolder)
+                new GenerateFieldTests(scaffolder),
+                new GenerateLifetimeTests(scaffolder)
             };
             this.PropagateCliArgumentsAndOptions(commands);
             foreach (var command in commands) await command.RunAsync();
 
-            PrintCommandSucceededMessage();
+            if (!CommandPropagated) PrintCommandSucceededMessage();
         }
     }
 }

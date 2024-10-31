@@ -13,7 +13,7 @@ namespace Scaffolderlord.Models.Collections
 	{
 		public override string TemplateFileName => "CollectionPatchesTemplate";
 
-		public override string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\Patches\{CollectionName}Patches.cs");
+		public override string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\Patches\{CollectionName}Patches.cs");
 
 		public CollectionPatchesTemplateModel(ServiceTypeInfo serviceInfo, MemberInfo selectedCollection) : base(selectedCollection)
 		{

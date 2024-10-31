@@ -21,7 +21,7 @@ namespace Scaffolderlord.Models
 
 		public virtual string TemplateFileName => "AutoSyncTemplate.cshtml";
 
-		public virtual string GetOutputPath() => GetMainProjectPath(@$"Gameinterface\Services\{TypeName}s\{TypeName}Sync.cs");
+		public virtual string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\{TypeName}Sync.cs");
 
 		public AutoSyncTemplateModel(ServiceTypeInfo serviceInfo)
 		{
