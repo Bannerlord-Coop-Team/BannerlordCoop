@@ -29,13 +29,7 @@ namespace Scaffolderlord.Models.E2E
             TypeName = serviceInfo.Type.Name;
             Namespace = $"E2E.Tests.Services.{serviceInfo.Type.Name}s;";
             Fields = serviceInfo.Fields;
-
-            Usings = Fields
-                .Select(p => p.FieldType.Namespace)
-                .Append(serviceInfo.Type.Namespace)
-                .Concat(GetStaticUsings(Fields))
-                .OfType<string>()
-                .Distinct();
+            Usings = GetUsings(serviceInfo.Type, Fields);
         }
     }
 }

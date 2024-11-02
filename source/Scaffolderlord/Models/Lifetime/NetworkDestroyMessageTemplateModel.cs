@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem.Siege;
@@ -22,10 +23,7 @@ namespace Scaffolderlord.Models.Lifetime
 		{
 			TypeName = serviceInfo.Type.Name;
 			Namespace = $"GameInterface.Services.{TypeName}s.Messages;";
-			Usings = new[]
-			{
-				serviceInfo.Type.Namespace!
-			};
-		}
+            Usings = GetUsings(serviceInfo.Type);
+        }
 	}
 }

@@ -26,15 +26,7 @@ namespace Scaffolderlord.Models.E2E
 			TypeName = serviceInfo.Type.Name;
 			Namespace = $"E2E.Tests.Services.{serviceInfo.Type.Name}s;";
 			Fields = serviceInfo.Fields;
-			Usings = new List<string>
-			{
-				serviceInfo.Type.Namespace!
-			};
-
-			var requiredNamespaces = Fields
-				.Select(x => x.FieldType.Namespace)
-				.Where(x => x != null)
-				.Distinct() ?? Array.Empty<string>();
-		}
+            Usings = GetUsings(serviceInfo.Type);
+        }
 	}
 }

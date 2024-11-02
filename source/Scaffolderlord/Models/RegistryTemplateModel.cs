@@ -8,24 +8,21 @@ using static Scaffolderlord.Extensions;
 
 namespace Scaffolderlord.Models
 {
-	public class RegistryTemplateModel : BaseTemplateModel, ITemplateModel
-	{
-		public string TypeName { get; }
-		public string? Namespace { get; }
-		public IEnumerable<string> Usings { get; }
+    public class RegistryTemplateModel : BaseTemplateModel, ITemplateModel
+    {
+        public string TypeName { get; }
+        public string? Namespace { get; }
+        public IEnumerable<string> Usings { get; }
 
-		public string TemplateFileName => "RegistryTemplate.cshtml";
+        public string TemplateFileName => "RegistryTemplate.cshtml";
 
-		public string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\{TypeName}Registry.cs");
+        public string GetOutputPath() => GetRelativeDirectory(@$"Gameinterface\Services\{TypeName}s\{TypeName}Registry.cs");
 
-		public RegistryTemplateModel(ServiceTypeInfo serviceInfo)
-		{
-			TypeName = serviceInfo.Type.Name;
-			Namespace = $"GameInterface.Services.{serviceInfo.Type.Name}s;";
-			Usings = new[]
-			{
-				serviceInfo.Type.Namespace!
-			};
-		}
-	}
+        public RegistryTemplateModel(ServiceTypeInfo serviceInfo)
+        {
+            TypeName = serviceInfo.Type.Name;
+            Namespace = $"GameInterface.Services.{serviceInfo.Type.Name}s;";
+            Usings = GetUsings(serviceInfo.Type);
+        }
+    }
 }

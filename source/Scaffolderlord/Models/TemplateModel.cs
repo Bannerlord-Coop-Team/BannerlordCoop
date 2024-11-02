@@ -37,10 +37,16 @@ namespace Scaffolderlord.Models
 /// </summary>";
         }
 
-        protected IEnumerable<string> GetStaticUsings(IEnumerable<MemberInfo> members)
+        protected IEnumerable<string> GetUsings(Type mainType, IEnumerable<MemberInfo>? members = null)
         {
+            members = members ?? Enumerable.Empty<MemberInfo>();
+            var usings = new List<string> { mainType.Namespace! };
+
+            // Static usings for nested types
             var nestedTypes = members.Select(x => x.GetUnderlyingType())
-                .Where(x => x.IsNested);
+                .Where(x => x.IsNested).ToList();
+
+            if (mainType.IsNested) nestedTypes.Add(mainType);
 
             return nestedTypes.Select(x => $"static {x.DeclaringType!.Namespace}.{x.DeclaringType.Name}")
                         .Distinct();

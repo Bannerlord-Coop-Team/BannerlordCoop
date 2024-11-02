@@ -20,21 +20,10 @@ namespace Scaffolderlord.Models
         {
             TypeName = serviceInfo.Type.Name;
             Namespace = $"GameInterface.Services.{serviceInfo.Type.Name}s;";
-            Usings = new[]
-            {
-                serviceInfo.Type.Namespace!
-            };
-
             Fields = serviceInfo.Fields;
             Properties = serviceInfo.Properties;
             Collections = serviceInfo.Collections;
-            GetStaticUsings();
-        }
-
-        private void GetStaticUsings()
-        {
-            var members = Fields.Cast<MemberInfo>().Concat(Properties.Cast<MemberInfo>());
-            Usings = Usings.Concat(GetStaticUsings(members));
+            Usings = GetUsings(serviceInfo.Type, Fields.Cast<MemberInfo>().Concat(Properties.Cast<MemberInfo>()));
         }
     }
 }
