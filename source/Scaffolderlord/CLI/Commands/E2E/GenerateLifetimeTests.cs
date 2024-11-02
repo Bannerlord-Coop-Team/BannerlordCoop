@@ -18,7 +18,7 @@ namespace Scaffolderlord.CLI.Commands
         Description = "Generates E2E lifetime tests for the specified type (server side tests)",
         Parent = typeof(RootCliCommand)
         )]
-    public class GenerateLifetimeTests : GenerateCommandBase<E2EFieldTestsTemplateModel>
+    public class GenerateLifetimeTests : GenerateCommandBase<E2ELifetimeTestsTemplateModel>
     {
         public GenerateLifetimeTests(IScaffoldingService scaffoldingService) : base(scaffoldingService)
         {
