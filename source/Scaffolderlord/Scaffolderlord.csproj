@@ -10,8 +10,11 @@
 		<Nullable>enable</Nullable>
 		<PreserveCompilationContext>true</PreserveCompilationContext>
 		<PackageVersion>1.0.2</PackageVersion>
+		<PackageId>BannerlordCoop.CLI.Scaffolding</PackageId>
 		<InformationalVersion>1.0.2-beta</InformationalVersion>
-		<Authors>Bruno Rodrigues</Authors>
+		<Authors>BannerlordCoop Team</Authors>
+		<Description>Scaffolding CLI tool for the BannerlordCoop project (WIP).</Description>
+		<PackageProjectUrl>https://github.com/Bannerlord-Coop-Team/BannerlordCoop/tree/scaffolding</PackageProjectUrl>
 		<Description>Scaffolding CLI Tool for the Bannerlord Coop Project.</Description>
 	</PropertyGroup>
 
@@ -216,6 +219,7 @@
 
 	<ItemGroup>
 		<Folder Include="Models\Commands\" />
+		<Folder Include="nupkg\" />
 		<Folder Include="Templates\Collections\" />
 		<Folder Include="Templates\Commands\" />
 	</ItemGroup>

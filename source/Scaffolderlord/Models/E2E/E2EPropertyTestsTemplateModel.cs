@@ -10,36 +10,33 @@ using static Scaffolderlord.Extensions;
 
 namespace Scaffolderlord.Models.E2E
 {
-	public class E2EPropertyTestsTemplateModel : BaseTemplateModel, ITemplateModel
-	{
-		public string TypeName { get; }
-		public string? Namespace { get; }
-		public IEnumerable<string> Usings { get; }
-		public IEnumerable<PropertyInfo> Properties { get; }
+    public class E2EPropertyTestsTemplateModel : BaseTemplateModel, ITemplateModel
+    {
+        public string TypeName { get; }
+        public string? Namespace { get; }
+        public IEnumerable<string> Usings { get; set; }
+        public IEnumerable<PropertyInfo> Properties { get; }
 
-		public string TemplateFileName => @"E2E\E2EPropertyTestsTemplate.cshtml";
+        public string TemplateFileName => @"E2E\E2EPropertyTestsTemplate.cshtml";
 
-		public string GetOutputPath() => GetRelativeDirectory(@$"E2E.Tests\Services\{TypeName}s\{TypeName}PropertyTests.cs");
+        public string GetOutputPath() => GetRelativeDirectory(@$"E2E.Tests\Services\{TypeName}s\{TypeName}PropertyTests.cs");
 
-		public IEnumerable<PropertyInfo> GetStructProps() => Properties.Where(x => x.PropertyType.IsStruct());
-		public IEnumerable<PropertyInfo> GetClassProps() => Properties.Where(x => !x.PropertyType.IsStruct());
+        public IEnumerable<PropertyInfo> GetStructProps() => Properties.Where(x => x.PropertyType.IsStruct());
+        public IEnumerable<PropertyInfo> GetClassProps() => Properties.Where(x => !x.PropertyType.IsStruct());
 
-		public E2EPropertyTestsTemplateModel(ServiceTypeInfo serviceInfo)
-		{
-			TypeName = serviceInfo.Type.Name;
-			Namespace = $"E2E.Tests.Services.{serviceInfo.Type.Name}s;";
-			Properties = serviceInfo.Properties;
-			Usings = new List<string>
-			{
-				serviceInfo.Type.Namespace!
-			};
+        public E2EPropertyTestsTemplateModel(ServiceTypeInfo serviceInfo)
+        {
+            TypeName = serviceInfo.Type.Name;
+            Namespace = $"E2E.Tests.Services.{serviceInfo.Type.Name}s;";
+            Properties = serviceInfo.Properties;
 
-			var requiredNamespaces = Properties
-				.Select(x => x.PropertyType.Namespace)
-				.Where(x => x != null)
-				.Distinct() ?? Array.Empty<string>();
+            Usings = Properties
+                .Select(p => p.PropertyType.Namespace)
+                .Append(serviceInfo.Type.Namespace)
+                .Concat(GetStaticUsings(Properties))
+                .OfType<string>()
+                .Distinct();
+        }
 
-			Usings = Usings.Concat(requiredNamespaces).Distinct();
-		}
-	}
+    }
 }

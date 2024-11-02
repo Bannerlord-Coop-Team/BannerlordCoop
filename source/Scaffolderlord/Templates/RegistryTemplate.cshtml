@@ -34,6 +34,6 @@ internal class @className : @parentClassName
 
 	protected override string GetNewId(@Model.TypeName obj)
 	{
-		return $"{@(Model.TypeName))IdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+		return $"{@(Model.TypeName)IdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
 	}
 }

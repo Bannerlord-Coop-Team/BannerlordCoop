@@ -1,7 +1,9 @@
-﻿using Scaffolderlord.Exceptions;
+﻿using HarmonyLib;
+using Scaffolderlord.Exceptions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using static Scaffolderlord.Extensions;
@@ -33,6 +35,15 @@ namespace Scaffolderlord.Models
 /// <summary>
 /// {comment}
 /// </summary>";
+        }
+
+        protected IEnumerable<string> GetStaticUsings(IEnumerable<MemberInfo> members)
+        {
+            var nestedTypes = members.Select(x => x.GetUnderlyingType())
+                .Where(x => x.IsNested);
+
+            return nestedTypes.Select(x => $"static {x.DeclaringType!.Namespace}.{x.DeclaringType.Name}")
+                        .Distinct();
         }
     }
 

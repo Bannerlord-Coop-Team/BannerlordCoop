@@ -85,7 +85,7 @@ public class @(Model.TypeName)PropertyTests : IDisposable
     public void ServerChange@(Model.TypeName)@(classProp.Name.PascalCase())_SyncAllClients()
     {
         // Arrange
-        string @(classProp.Name.CamelCase())Id;
+        string? @(classProp.Name.CamelCase())Id=null;
         Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var server@(Model.TypeName)));
         Assert.True(Server.ObjectManager.TryGetObject<@(classProp.PropertyType.Name)>(@(classProp.Name.CamelCase())Id, out var server@(classProp.Name.PascalCase())));
 

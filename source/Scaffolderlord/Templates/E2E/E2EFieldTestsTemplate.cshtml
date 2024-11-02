@@ -28,7 +28,7 @@ public class @(Model.TypeName)FieldTests : IDisposable
 
     private readonly string @(Model.TypeName.CamelCase())Id;
 
-    public @(Model.TypeName)FieldsTests(ITestOutputHelper output)
+    public @(Model.TypeName)FieldTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
 
@@ -70,14 +70,14 @@ public class @(Model.TypeName)FieldTests : IDisposable
         /// Create instances on all clients
         foreach (var client in Clients)
         {
-            var client@(classField.FieldType.Name) = ObjectHelper.SkipConstructor<@(classField.FieldType.Name)>();
+            var client@(fieldNamePascalCase) = ObjectHelper.SkipConstructor<@(classField.FieldType.Name)>();
             Assert.True(client.ObjectManager.AddExisting(@(fieldNameCamelCase)Id, client@(fieldNamePascalCase)));
         }
 
         // Act
         Server.Call(() =>
         {
-            Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var @(Model.TypeName)));
+            Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var @(Model.TypeName)));
             Assert.True(Server.ObjectManager.TryGetObject<@(classField.FieldType.Name)>(@(fieldNameCamelCase)Id, out var server@(fieldNamePascalCase)));
 
             Assert.Null(@(Model.TypeName).@(classField.Name));
@@ -91,7 +91,7 @@ public class @(Model.TypeName)FieldTests : IDisposable
         // Assert
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var @(Model.TypeName)));
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var @(Model.TypeName)));
 
             Assert.True(client.ObjectManager.TryGetObject<@(classField.FieldType.Name)>(@(fieldNameCamelCase)Id, out var client@(fieldNamePascalCase)));
 
@@ -112,7 +112,7 @@ public class @(Model.TypeName)FieldTests : IDisposable
         // Arrange
         var field = AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty));
         var intercept = TestEnvironment.GetIntercept(field);
-        Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var server@(Model.TypeName)));
+        Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var server@(Model.TypeName)));
         var newValue=Random<@structField.FieldType.Name>();
 
         // Act
@@ -127,7 +127,7 @@ public class @(Model.TypeName)FieldTests : IDisposable
         // Assert
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName)Id, out var client@(Model.TypeName)));
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
             Assert.Equal(server@(Model.TypeName).@structField.Name, client@(Model.TypeName).@structField.Name);
         }
     }  
