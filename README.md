@@ -43,7 +43,7 @@ This will generate ALL template files for BesiegerCamp and even prepare autosync
   Generates all lifetime handling files for specified type.
 
 - **`e2e <type-fully-qualified-name> [--members] [--overwrite]`**  
-  Generates end-to-end tests (WIP).
+  Generates end-to-end tests.
 
 - **`commands <type-fully-qualified-name> [--members] [--overwrite]`**  
   Generates command-related classes (WIP).
@@ -54,7 +54,7 @@ This will generate ALL template files for BesiegerCamp and even prepare autosync
 ## Options
 
 - **`--overwrite`**: Specifies if existing files should be overwritten, otherwise a new file is created with a suffix (existing files are NOT altered).
-- **`--members`**: Specifies which members to include on template generation, for autosync, e2e, commands, etc.
+- **`--members`**: Specifies which members to include on template generation, for autosync, e2e, commands, etc (currentyl doesn't do collections).
 - **`--help`**: Gives details about command.
 
 ## All Commands
