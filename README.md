@@ -23,7 +23,7 @@ dotnet tool install --global --add-source ./bin/Release BannerlordCoop
 
 ## Usage
 
-After installing the dotnet tool globally, just call the root command `coop-create` specifying a command with it's argument and options.
+After installing the dotnet tool globally, just call the root command `coop-create` specifying a command with it's argument and options, you can use Visual Studio's own package manager console or any other CLI.
 
 The main argument for all commands is the type's fully qualified name and assembly separated by a comma.
 
