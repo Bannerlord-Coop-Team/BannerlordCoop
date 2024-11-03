@@ -26,8 +26,6 @@ public class @(Model.TypeName)LifetimeTests : IDisposable
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
     private IEnumerable<EnvironmentInstance> AllEnvironmentInstances => Clients.Append(Server);
 
-    private readonly string @(Model.TypeName.CamelCase())Id;
-
     public @(Model.TypeName)LifetimeTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
