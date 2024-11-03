@@ -9,9 +9,9 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<PreserveCompilationContext>true</PreserveCompilationContext>
-		<PackageVersion>1.0.4</PackageVersion>
+		<PackageVersion>1.0.5</PackageVersion>
 		<PackageId>BannerlordCoop.CLI.Scaffolding</PackageId>
-		<InformationalVersion>1.0.4-beta</InformationalVersion>
+		<InformationalVersion>1.0.5-beta</InformationalVersion>
 		<Authors>BannerlordCoop Team</Authors>
 		<Description>Scaffolding CLI tool for the BannerlordCoop project (WIP).</Description>
 		<PackageProjectUrl>https://github.com/Bannerlord-Coop-Team/BannerlordCoop/tree/scaffolding</PackageProjectUrl>
