@@ -38,13 +38,6 @@ public class @(Model.TypeName)FieldTests : IDisposable
 
         // Create @(Model.TypeName) on the server
         @(Model.TypeName.CamelCase())Id = TestEnvironment.CreateRegisteredObject<@(Model.TypeName)>(disabledMethods);
-
-        // Create @(Model.TypeName) on all clients
-        foreach (var client in Clients)
-        {
-            var client@(Model.TypeName) = ObjectHelper.SkipConstructor<@(Model.TypeName)>();
-            Assert.True(client.ObjectManager.AddExisting(@(Model.TypeName.CamelCase())Id, client@(Model.TypeName)));
-        }
     }
 
     public void Dispose()
@@ -110,7 +103,7 @@ public class @(Model.TypeName)FieldTests : IDisposable
     public void ServerChange@($"{Model.TypeName}{fieldNamePascalCase}")_SyncAllClients()
     {
         // Arrange
-        var field = AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._leaderParty));
+        var field = AccessTools.Field(typeof(@Model.TypeName), nameof(@(Model.TypeName).@(structField.Name)));
         var intercept = TestEnvironment.GetIntercept(field);
         Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var server@(Model.TypeName)));
         var newValue=Random<@structField.FieldType.Name>();
@@ -121,7 +114,7 @@ public class @(Model.TypeName)FieldTests : IDisposable
             /// Simulate the field changing
             intercept.Invoke(null, new object[] { server@(Model.TypeName), newValue });
 
-            Assert.Same(newValue, server@(Model.TypeName).@structField.Name);
+            Assert.Equal(newValue, server@(Model.TypeName).@structField.Name);
         });
 
         // Assert

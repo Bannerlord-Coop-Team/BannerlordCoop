@@ -38,13 +38,6 @@ public class @(Model.TypeName)PropertyTests : IDisposable
 
         // Create @(Model.TypeName) on the server
         @(Model.TypeName.CamelCase())Id = TestEnvironment.CreateRegisteredObject<@(Model.TypeName)>(disabledMethods);
-
-        // Create @(Model.TypeName) on all clients
-        foreach (var client in Clients)
-        {
-            var client@(Model.TypeName) = ObjectHelper.SkipConstructor<@(Model.TypeName)>();
-            Assert.True(client.ObjectManager.AddExisting(@(Model.TypeName.CamelCase())Id, client@(Model.TypeName)));
-        }
     }
 
     public void Dispose()
@@ -74,7 +67,33 @@ public class @(Model.TypeName)PropertyTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
             Assert.Equal(server@(Model.TypeName).@structProp.Name, client@(Model.TypeName).@structProp.Name);
         }
-    }  
+    }
+    
+    [Fact]
+    public void ClientChange@($"{Model.TypeName}{structProp.Name}")_DoesNothing()
+    {
+        // Arrange
+        Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var server@(Model.TypeName)));
+        var newValue=Random<@structProp.PropertyType.Name>();
+
+        // Act
+        var firstClient = Clients.First();
+        firstClient.Call(() =>
+        {
+            // Gets instance on client
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
+            // Attempts to change value
+            client@(Model.TypeName).@structProp.Name = newValue;
+
+        });
+
+        // Assert
+        foreach (var client in AllEnvironmentInstances.Where(c => c != firstClient))
+        {
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
+            Assert.NotEqual(server@(Model.TypeName).@structProp.Name, client@(Model.TypeName).@structProp.Name);
+        }
+    }
     </text>
 }
 
@@ -103,6 +122,34 @@ public class @(Model.TypeName)PropertyTests : IDisposable
             Assert.Equal(client@(classProp.Name.PascalCase())Id, @(classProp.Name.CamelCase())Id);
         }
     }
+
+@*     [Fact] // DoesNothing WIP
+    public void ClientChange@(Model.TypeName)@(classProp.Name.PascalCase())_DoesNothing()
+    {
+        // Arrange
+        string? @(classProp.Name.CamelCase())Id=null;
+        Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var server@(Model.TypeName)));
+        Assert.True(Server.ObjectManager.TryGetObject<@(classProp.PropertyType.Name)>(@(classProp.Name.CamelCase())Id, out var server@(classProp.Name.PascalCase())));
+
+        // Act
+        var firstClient = Clients.First();
+        firstClient.Call(() =>
+        {
+            // Gets instance on client
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
+            // Attempts to change value
+            client@(Model.TypeName).@classProp.Name = newValue;
+        });
+
+        // Assert
+        var firstClient = Clients.First();
+        firstClient.Call(() =>
+        {
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
+            client.ObjectManager.TryGetId(client@(Model.TypeName).@(classProp.Name), out string client@(classProp.Name.PascalCase())Id);
+            Assert.NotEqual(client@(classProp.Name.PascalCase())Id, @(classProp.Name.CamelCase())Id);
+        }
+    } *@
     </text>
 }
 }
