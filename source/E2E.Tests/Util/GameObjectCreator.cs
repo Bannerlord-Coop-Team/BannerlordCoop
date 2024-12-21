@@ -47,7 +47,8 @@ internal class GameObjectCreator
         { typeof(EquipmentElement), new EquipmentElementBuilder() },
         { typeof(ItemObject), new ItemObjectBuilder() },
         { typeof(Equipment), new EquipmentBuilder() },
-        { typeof(Crafting), new CraftingBuilder() }
+        { typeof(Crafting), new CraftingBuilder() },
+        { typeof(WeaponDesign), new WeaponDesignBuilder() }
     };
 
     public static T CreateInitializedObject<T>()

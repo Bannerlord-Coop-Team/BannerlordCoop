@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using System;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.BesiegerCamps.Handlers;

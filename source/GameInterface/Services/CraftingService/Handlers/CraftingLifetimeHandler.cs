@@ -1,4 +1,5 @@
-﻿using Common;
+﻿using System.Collections.Generic;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -74,6 +75,8 @@ namespace GameInterface.Services.CraftingService.Handlers
                 using (new AllowedThread())
                 {
                     var crafting = new Crafting(template, cultureObj, new TextObject(payload.Name));
+                    crafting._history = new List<WeaponDesign>();
+                    crafting.UsablePiecesList = new List<WeaponDesignElement>[4];
                     objectManager.AddExisting(payload.CraftingId, crafting);
                 }
             });

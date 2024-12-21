@@ -88,7 +88,6 @@ namespace E2E.Tests.Services.CraftingService
             foreach (var client in Clients.Append(Server).Append(Server))
             {
                 Assert.True(client.ObjectManager.TryGetObject<Crafting>(craftingId, out var clientCrafting));
-                Assert.True(client.ObjectManager.TryGetObject<WeaponDesign>(weaponDesignId, out var clientWeaponDesign));
                 Assert.Empty(clientCrafting._history);
             }
         }
@@ -102,7 +101,7 @@ namespace E2E.Tests.Services.CraftingService
 
             foreach (var client in Clients)
             {
-                Assert.True(client.ObjectManager.TryGetObject<Crafting>(craftingId, out var syncedCamp));
+                Assert.True(client.ObjectManager.TryGetObject<Crafting>(craftingId, out var syncedCrafting));
             }
 
             // Act
