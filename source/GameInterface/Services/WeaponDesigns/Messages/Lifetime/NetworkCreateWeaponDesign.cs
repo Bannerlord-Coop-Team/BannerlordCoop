@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.WeaponDesigns.Messages
+namespace GameInterface.Services.WeaponDesigns.Messages.Lifetime
 {
     [ProtoContract(SkipConstructor = true)]
     internal class NetworkCreateWeaponDesign : ICommand

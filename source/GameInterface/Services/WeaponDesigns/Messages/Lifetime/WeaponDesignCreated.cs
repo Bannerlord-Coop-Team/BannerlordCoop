@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using TaleWorlds.Core;
 
-namespace GameInterface.Services.WeaponDesigns.Messages
+namespace GameInterface.Services.WeaponDesigns.Messages.Lifetime
 {
     internal class WeaponDesignCreated : IEvent
     {

@@ -5,6 +5,7 @@ using Common.Util;
 using GameInterface.Services.ItemObjects.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.WeaponDesigns.Messages;
+using GameInterface.Services.WeaponDesigns.Messages.Lifetime;
 using Serilog;
 using TaleWorlds.Core;
 
