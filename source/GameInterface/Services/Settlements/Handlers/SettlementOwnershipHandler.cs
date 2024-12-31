@@ -1,11 +1,15 @@
-﻿using Common.Logging;
+﻿using Autofac.Features.OwnedInstances;
+using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
+using System;
 using System.Runtime.Serialization;
+using System.Text.RegularExpressions;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
@@ -20,21 +24,38 @@ namespace GameInterface.Services.Settlements.Handlers
     {
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
+        private readonly INetwork network;
         private static readonly ILogger Logger = LogManager.GetLogger<SettlementOwnershipHandler>();
 
-        public SettlementOwnershipHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+        public SettlementOwnershipHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-            messageBroker.Subscribe<ChangeSettlementOwnership>(Handle);
+            this.network = network;
+            messageBroker.Subscribe<SettlementOwnershipChanged>(Handle);
+            messageBroker.Subscribe<NetworkChangeSettlementOwnership>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<ChangeSettlementOwnership>(Handle);
+            messageBroker.Unsubscribe<SettlementOwnershipChanged>(Handle);
+            messageBroker.Unsubscribe<NetworkChangeSettlementOwnership>(Handle);
         }
 
-        private void Handle(MessagePayload<ChangeSettlementOwnership> obj)
+        private void Handle(MessagePayload<SettlementOwnershipChanged> obj)
+        {
+            var payload = obj.What;
+
+            var message = new NetworkChangeSettlementOwnership(
+                payload.SettlementId,
+                payload.OwnerId,
+                payload.CapturerId,
+                payload.Detail);
+
+            network.SendAll(message);
+        }
+
+        private void Handle(MessagePayload<NetworkChangeSettlementOwnership> obj)
         {
             var payload = obj.What;
 
@@ -56,7 +77,7 @@ namespace GameInterface.Services.Settlements.Handlers
                 return;
             }
 
-            ChangeOwnerOfSettlementPatch.RunOriginalApplyInternal(settlement, owner, capturer, 
+            ChangeOwnerOfSettlementPatch.RunOriginalApplyInternal(settlement, owner, capturer,
                 (ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail)payload.Detail);
         }
     }

@@ -51,7 +51,7 @@ namespace GameInterface.Services.Workshops.Handlers
             if (objectManager.TryGetObject(payload.SettlementId, out Settlement settlement) == false) {
                 return;
             }
-
+            
             GameLoopRunner.RunOnMainThread(() =>
             {
                 using (new AllowedThread())
