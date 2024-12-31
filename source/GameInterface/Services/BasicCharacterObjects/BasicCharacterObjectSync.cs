@@ -27,6 +27,12 @@ namespace GameInterface.Services.BasicCharacterObjects
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Level)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Race)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.TattooTags)));
+
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isBasicHero)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isMounted)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isRanged)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._equipmentRoster)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultCharacterSkills)));
         }
     }
 }
