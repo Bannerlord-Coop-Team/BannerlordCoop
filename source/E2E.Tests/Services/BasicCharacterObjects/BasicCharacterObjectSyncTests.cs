@@ -3,6 +3,7 @@ using E2E.Tests.Environment.Instance;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.BasicCharacterObjects
@@ -31,18 +32,21 @@ namespace E2E.Tests.Services.BasicCharacterObjects
             var rangedField = AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isRanged));
             var rosterField = AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._equipmentRoster));
             var skillField = AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultCharacterSkills));
+            var nameField = AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._basicName));
             // Get field intercept to use on the server to simulate the field changing
             var heroIntercept = TestEnvironment.GetIntercept(basicHeroField);
             var mountedIntercept = TestEnvironment.GetIntercept(mountedField);
             var rangedIntercept = TestEnvironment.GetIntercept(rangedField);
             var rosterIntercept = TestEnvironment.GetIntercept(rosterField);
             var skillIntercept = TestEnvironment.GetIntercept(skillField);
+            var nameIntercept = TestEnvironment.GetIntercept(nameField);
 
             // Act
             string? characterId = null;
             string? cultureId = null;
             string? skillId = null;
             string? equipmentRosterId = null;
+            TextObject name = new TextObject("test");   
             server.Call(() =>
             {
                 BasicCharacterObject characterObject = new BasicCharacterObject();
@@ -80,6 +84,7 @@ namespace E2E.Tests.Services.BasicCharacterObjects
                 rangedIntercept.Invoke(null, new object[] { characterObject, true });
                 rosterIntercept.Invoke(null, new object[] { characterObject, equipmentRoster });
                 skillIntercept.Invoke(null, new object[] { characterObject, skills });
+                nameIntercept.Invoke(null, new object[] { characterObject, name });
             });
 
             Assert.True(server.ObjectManager.TryGetObject(skillId, out MBCharacterSkills serverSkills));
@@ -115,6 +120,7 @@ namespace E2E.Tests.Services.BasicCharacterObjects
                 Assert.True(clientCharacter._isRanged);
                 Assert.Equal(serverEquipmentRoster.StringId, clientCharacter._equipmentRoster.StringId); 
                 Assert.Equal(serverSkills.StringId, clientCharacter.DefaultCharacterSkills.StringId);
+                Assert.True(name.Equals(clientCharacter._basicName));
             }
         }
     }

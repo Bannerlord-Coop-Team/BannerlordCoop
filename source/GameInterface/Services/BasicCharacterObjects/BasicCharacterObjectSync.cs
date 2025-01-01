@@ -33,6 +33,7 @@ namespace GameInterface.Services.BasicCharacterObjects
             autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isRanged)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._equipmentRoster)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultCharacterSkills)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._basicName))); 
         }
     }
 }
