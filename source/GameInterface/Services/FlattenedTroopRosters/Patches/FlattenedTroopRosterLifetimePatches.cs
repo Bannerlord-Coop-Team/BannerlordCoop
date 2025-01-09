@@ -2,24 +2,22 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.TroopRosters.Messages;
+using GameInterface.Services.FlattenedTroopRosters.Messages;
+using GameInterface.Services.TroopRosters.Patches;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Roster;
 
-namespace GameInterface.Services.TroopRosters.Patches
+namespace GameInterface.Services.FlattenedTroopRosters.Patches
 {
-    /// <summary>
-    /// Lifetime Patches for TroopRoster
-    /// </summary>
     [HarmonyPatch]
-    internal class TroopRosterLifetimePatches
+    internal class FlattenedTroopRosterLifetimePatches
     {
         private static ILogger Logger = LogManager.GetLogger<TroopRosterLifetimePatches>();
 
-        [HarmonyPatch(typeof(TroopRoster), MethodType.Constructor)]
+        [HarmonyPatch(typeof(FlattenedTroopRoster), MethodType.Constructor, typeof(int))]
         [HarmonyPrefix]
-        private static bool CreateTroopRosterPrefix(ref TroopRoster __instance)
+        private static bool CreateFlattenedTroopRosterPrefix(ref FlattenedTroopRoster __instance, int count)
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -31,7 +29,7 @@ namespace GameInterface.Services.TroopRosters.Patches
                 return false;
             }
 
-            var message = new TroopRosterCreated(__instance);
+            var message = new FlattenedTroopRosterCreated(__instance, count);
 
             MessageBroker.Instance.Publish(__instance, message);
 
