@@ -1,10 +1,9 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
+
 
 namespace E2E.Tests.Services.PartyComponents;
 public class MilitiaPartyComponentTests : IDisposable
@@ -21,53 +20,83 @@ public class MilitiaPartyComponentTests : IDisposable
     }
 
     [Fact]
-    public void ServerCreateParty_SyncAllClients()
+    public void ServerChangeSettlement_SyncAllClients()
     {
         // Arrange
         var server = TestEnvironment.Server;
 
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
         // Act
-        string? partyId = null;
+        string? militiaCompId = null;
+
+        Settlement? settlement1 = null;
 
         server.Call(() =>
         {
-            var newParty = MilitiaPartyComponent.CreateMilitiaParty("TestId", settlement);
-            partyId = newParty.StringId;
+            settlement1 = GameObjectCreator.CreateInitializedObject<Settlement>();
+            var settlement2 = GameObjectCreator.CreateInitializedObject<Settlement>();
+
+            Assert.True(server.ObjectManager.TryGetId(settlement1, out string settlementId));
+            Assert.True(server.ObjectManager.TryGetId(settlement2, out string settlement2Id));
+
+
+            MilitiaPartyComponent militiaPartyComponent = new MilitiaPartyComponent(settlement2);
+            Assert.True(server.ObjectManager.TryGetId(militiaPartyComponent, out militiaCompId));
+            Assert.Equal(settlement2.StringId, militiaPartyComponent.Settlement.StringId);
+
+            militiaPartyComponent.Settlement = settlement1;
         });
 
 
         // Assert
-        Assert.NotNull(partyId);
+        Assert.True(server.ObjectManager.TryGetObject<MilitiaPartyComponent>(militiaCompId, out var militiaParty));
+        Assert.Equal(militiaParty.Settlement, settlement1);
 
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
-            Assert.IsType<MilitiaPartyComponent>(newParty.PartyComponent);
+            Assert.True(client.ObjectManager.TryGetObject<MilitiaPartyComponent>(militiaCompId, out var clientMilitiaParty));
+            Assert.Equal(clientMilitiaParty.Settlement.StringId, settlement1.StringId);
         }
     }
 
+
     [Fact]
-    public void ClientCreateParty_DoesNothing()
+    public void ClientChangeSettlement_DoesNothing()
     {
         // Arrange
         var server = TestEnvironment.Server;
         var client1 = TestEnvironment.Clients.First();
 
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        Settlement? testSettlement = null; 
+        Settlement? settlement = null;
+        string? militiaCompId = null;
 
-        // Act
-        PartyComponent? partyComponent = null;
-        client1.Call(() =>
+        server.Call(() =>
         {
-            partyComponent = new MilitiaPartyComponent(settlement);
+            settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            testSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+
+            MilitiaPartyComponent militiaPartyComponent = new MilitiaPartyComponent(settlement);
+
+            Assert.True(server.ObjectManager.TryGetId(militiaPartyComponent, out militiaCompId));
+
+            Assert.Equal(settlement.StringId, militiaPartyComponent.Settlement.StringId);
         });
 
-        Assert.NotNull(partyComponent);
+        // Act
+
+        client1.Call(() =>
+        {
+            Assert.True(client1.ObjectManager.TryGetObject<MilitiaPartyComponent>(militiaCompId, out var serverMilitiaComponent));
+            serverMilitiaComponent.Settlement = testSettlement;
+        });
 
 
         // Assert
-        Assert.False(client1.ObjectManager.TryGetId(partyComponent, out var _));
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<MilitiaPartyComponent>(militiaCompId, out var clientMilitiaParty));
+            Assert.Equal(clientMilitiaParty.Settlement.StringId, settlement.StringId);
+        }
     }
 }

@@ -1,13 +1,13 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace Coop.Core.Client.Services.Settlements.Messages
+namespace GameInterface.Services.Settlements.Messages
 {
     /// <summary>
-    /// Event for settlement ownership change request sent from client to server
+    /// Network settlement ownership change
     /// </summary>
     [ProtoContract(SkipConstructor = true)]
-    public class SettlementOwnershipChangeRequest : ICommand
+    public record NetworkChangeSettlementOwnership : ICommand
     {
         [ProtoMember(1)]
         public string SettlementId { get; }
@@ -18,7 +18,7 @@ namespace Coop.Core.Client.Services.Settlements.Messages
         [ProtoMember(4)]
         public int Detail { get; }
 
-        public SettlementOwnershipChangeRequest(string settlementId, string ownerId, string capturerId, int detail)
+        public NetworkChangeSettlementOwnership(string settlementId, string ownerId, string capturerId, int detail)
         {
             SettlementId = settlementId;
             OwnerId = ownerId;

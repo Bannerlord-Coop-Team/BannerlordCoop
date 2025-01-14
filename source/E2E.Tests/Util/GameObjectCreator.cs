@@ -46,6 +46,8 @@ internal class GameObjectCreator
         { typeof(TroopRoster), new TroopRosterBuilder() },
         { typeof(EquipmentElement), new EquipmentElementBuilder() },
         { typeof(ItemObject), new ItemObjectBuilder() },
+        { typeof(MapEventParty), new MapEventPartyBuilder() },
+        { typeof(Alley), new AlleyBuilder() },
         { typeof(Equipment), new EquipmentBuilder() }
     };
 
