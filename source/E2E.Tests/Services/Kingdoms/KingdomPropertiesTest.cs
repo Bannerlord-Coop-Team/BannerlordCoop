@@ -104,6 +104,5 @@ namespace E2E.Tests.Services.Kingdoms
                 Assert.Equal(newUint, clientKingdom.SecondaryBannerColor);
             }
         }
-
     }
 }
