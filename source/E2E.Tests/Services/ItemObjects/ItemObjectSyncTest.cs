@@ -10,7 +10,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.CraftingService
+namespace E2E.Tests.Services.ItemObjectService
 {
     public class ItemObjectSyncTest : IDisposable
     {
@@ -60,7 +60,7 @@ namespace E2E.Tests.Services.CraftingService
                 Assert.True(client.ObjectManager.TryGetObject(serverObjectId, out ItemObject clientItemObject));
                 Assert.Equal(itemObject.Type, clientItemObject.Type);
 
-                client.ObjectManager.TryGetId(clientItemObject.Type, out string clientObjectId);
+                client.ObjectManager.TryGetId(clientItemObject, out string clientObjectId);
 
                 Assert.Equal(serverObjectId, clientObjectId);
             }
