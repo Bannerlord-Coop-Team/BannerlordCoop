@@ -15,9 +15,9 @@ internal class MapEventPartyRegistry : RegistryBase<MapEventParty>
 
     public override void RegisterAll()
     {
-        foreach(MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
+        foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            foreach(MapEventParty mep in mapEvent.PartiesOnSide(TaleWorlds.Core.BattleSideEnum.None))
+            foreach (MapEventParty mep in mapEvent.PartiesOnSide(TaleWorlds.Core.BattleSideEnum.None))
             {
                 if (RegisterNewObject(mep, out var newId) == false)
                 {

@@ -56,7 +56,7 @@ namespace GameInterface.Services.MapEventParties.Handlers
             {
                 using (new AllowedThread())
                 {
-                    var newMapEventParty = new MapEventParty(partyBase);
+                    var newMapEventParty = ObjectHelper.SkipConstructor<MapEventParty>();
 
                     if (objectManager.AddExisting(obj.MapEventPartyId, newMapEventParty) == false)
                     {

@@ -7,7 +7,7 @@ internal class MapEventPartyBuilder : IObjectBuilder
     public object Build()
     {
         MobileParty party = GameObjectCreator.CreateInitializedObject<MobileParty>();
-        
+
         return new MapEventParty(party.Party);
     }
 }
