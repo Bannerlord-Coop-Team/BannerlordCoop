@@ -11,10 +11,6 @@ namespace GameInterface.Services.MapEventSides
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventSide), nameof(MapEventSide.CasualtyStrength)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventSide), nameof(MapEventSide.LeaderParty)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventSide), nameof(MapEventSide.MissionSide)));
-
-
-
-
         }
     }
 }
