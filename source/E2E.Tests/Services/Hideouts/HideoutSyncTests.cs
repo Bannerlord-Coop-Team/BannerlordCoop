@@ -41,7 +41,7 @@ namespace E2E.Tests.Services.Hideouts
         }
 
         [Fact]
-        public void Server_Building_Sync()
+        public void Server_Hideout_Sync()
         {
             // Arrange
             var server = TestEnvironment.Server;
