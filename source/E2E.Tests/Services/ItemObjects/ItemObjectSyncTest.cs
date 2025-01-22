@@ -50,7 +50,6 @@ namespace E2E.Tests.Services.CraftingService
 
             server.Call(() =>
             {
-                //NEED TO ADD typeField TEST
                 typeIntercept.Invoke(null, new object[] { itemObject, 69 });
             });
 
@@ -63,7 +62,7 @@ namespace E2E.Tests.Services.CraftingService
 
                 client.ObjectManager.TryGetId(clientItemObject.Type, out string clientObjectId);
 
-                Assert.Equal(serverObjectId, clientObjectId.Type);
+                Assert.Equal(serverObjectId, clientObjectId);
             }
         }
     }
