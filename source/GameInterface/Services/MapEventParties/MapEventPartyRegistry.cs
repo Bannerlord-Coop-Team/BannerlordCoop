@@ -17,11 +17,14 @@ internal class MapEventPartyRegistry : RegistryBase<MapEventParty>
     {
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            foreach (MapEventParty mep in mapEvent.PartiesOnSide(TaleWorlds.Core.BattleSideEnum.None))
+            if(mapEvent._sides.Length > 2)
             {
-                if (RegisterNewObject(mep, out var newId) == false)
+                foreach (MapEventParty mep in mapEvent.PartiesOnSide(TaleWorlds.Core.BattleSideEnum.None))
                 {
-                    Logger.Error("Unable to register MapEventParty {id} in the object manager", mep.ToString());
+                    if (RegisterNewObject(mep, out var newId) == false)
+                    {
+                        Logger.Error("Unable to register MapEventParty {id} in the object manager", mep.ToString());
+                    }
                 }
             }
             foreach (MapEventParty mep in mapEvent.PartiesOnSide(TaleWorlds.Core.BattleSideEnum.Attacker))
