@@ -33,6 +33,9 @@ namespace GameInterface.Services.ItemObjects
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.ItemFlags)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.Appearance)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.WeaponDesign)));
+
+            //Collection
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.ItemHolsters)));
         }
     }
 }

@@ -46,6 +46,7 @@ namespace E2E.Tests.Services.ItemObjectService
             var culture = new BasicCultureObject() { Name = new TextObject("Battania") };
             var weaponDesign = ObjectHelper.SkipConstructor<WeaponDesign>();
             var holsterPositionShift = new Vec3(1, 2, 3, 4);
+            string[] itemHolsters = { "holster1", "holster2", "holster3" };
 
             server.Call(() =>
             {
@@ -69,6 +70,7 @@ namespace E2E.Tests.Services.ItemObjectService
                 itemObject.ItemFlags = ItemFlags.Civilian;
                 itemObject.Appearance = 3.5f;
                 itemObject.WeaponDesign = weaponDesign;
+                itemObject.ItemHolsters = itemHolsters;
             });
 
             // Assert
@@ -82,17 +84,22 @@ namespace E2E.Tests.Services.ItemObjectService
             server.ObjectManager.TryGetId(itemObject, out string serverObjectId);
             server.ObjectManager.TryGetId(itemObject.Culture, out string serverCultureId);
             server.ObjectManager.TryGetId(itemObject.WeaponDesign, out string serverWeaponDesignId);
+            server.ObjectManager.TryGetId(itemObject.ItemHolsters, out string  serverItemHolstersId);
 
             foreach (var client in TestEnvironment.Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject(serverObjectId, out ItemObject clientItemObject));
+                
+                //Field
                 Assert.Equal(itemObject.Type, clientItemObject.Type);
 
                 client.ObjectManager.TryGetId(clientItemObject, out string clientObjectId);
                 client.ObjectManager.TryGetId(clientItemObject.Culture, out string clientCultureId);
                 client.ObjectManager.TryGetId(clientItemObject.WeaponDesign, out string clientWeaponDesignId);
+                client.ObjectManager.TryGetId(clientItemObject.ItemHolsters, out string clientItemHolstersId);
                 Assert.Equal(serverObjectId, clientObjectId);
 
+                //Properties
                 Assert.Equal(3.5f, clientItemObject.Weight);
                 Assert.Equal("Name", clientItemObject.Name.ToString());
                 Assert.Equal("MultiMeshName", clientItemObject.MultiMeshName);
@@ -110,6 +117,11 @@ namespace E2E.Tests.Services.ItemObjectService
                 Assert.Equal(ItemFlags.Civilian, clientItemObject.ItemFlags);
                 Assert.Equal(3.5f, clientItemObject.Appearance);
                 Assert.Equal(clientWeaponDesignId, serverWeaponDesignId);
+
+                //Collection
+                Assert.Equal(itemHolsters, clientItemObject.ItemHolsters);
+                Assert.Equal(itemHolsters[0], clientItemObject.ItemHolsters[0]);
+                Assert.Equal(serverItemHolstersId, clientItemHolstersId);
             }
         }
     }
