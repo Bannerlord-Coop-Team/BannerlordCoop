@@ -17,7 +17,7 @@ internal class MapEventPartyRegistry : RegistryBase<MapEventParty>
     {
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if(mapEvent._sides.Length > 2)
+            if (mapEvent._sides.Length > 2)
             {
                 foreach (MapEventParty mep in mapEvent.PartiesOnSide(TaleWorlds.Core.BattleSideEnum.None))
                 {
