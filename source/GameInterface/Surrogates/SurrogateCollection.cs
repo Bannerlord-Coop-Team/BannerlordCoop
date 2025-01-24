@@ -29,5 +29,8 @@ internal class SurrogateCollection : ISurrogateCollection
             
         if (RuntimeTypeModel.Default.CanSerialize(typeof(Banner)) == false)
             RuntimeTypeModel.Default.SetSurrogate<Banner, BannerSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(Vec3)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
     }
 }
