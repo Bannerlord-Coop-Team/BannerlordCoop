@@ -58,7 +58,7 @@ namespace E2E.Tests.Services.ItemObjectService
                 itemObject.MultiMeshName = "MultiMeshName";
                 itemObject.HolsterMeshName = "HolsterMeshName";
                 itemObject.HolsterWithWeaponMeshName = "WithWeaponMeshName";
-                //itemObject.HolsterPositionShift = holsterPositionShift;
+                itemObject.HolsterPositionShift = holsterPositionShift;
                 itemObject.FlyingMeshName = "FlyingMeshName";
                 itemObject.BodyName = "BodyName";
                 itemObject.HolsterBodyName = "HolsterBodyName";
@@ -105,7 +105,7 @@ namespace E2E.Tests.Services.ItemObjectService
                 Assert.Equal("MultiMeshName", clientItemObject.MultiMeshName);
                 Assert.Equal("HolsterMeshName", clientItemObject.HolsterMeshName);
                 Assert.Equal("WithWeaponMeshName", clientItemObject.HolsterWithWeaponMeshName);
-                //Assert.Equal(holsterPositionShift, clientItemObject.HolsterPositionShift);
+                Assert.Equal(holsterPositionShift, clientItemObject.HolsterPositionShift);
                 Assert.Equal("FlyingMeshName", clientItemObject.FlyingMeshName);
                 Assert.Equal("BodyName", clientItemObject.BodyName);
                 Assert.Equal("HolsterBodyName", clientItemObject.HolsterBodyName);
