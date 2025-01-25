@@ -1,0 +1,20 @@
+using Common.Messaging;
+using ProtoBuf;
+using TaleWorlds.CampaignSystem;
+namespace GameInterface.Services.Kingdoms.Messages;
+
+
+/// <summary>
+/// An event published to clients, commanding them to destroy a <see cref="Kingdom"/>
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
+internal class NetworkDestroyKingdom : ICommand
+{
+	[ProtoMember(1)]
+	public string KingdomId { get; }
+
+	public NetworkDestroyKingdom(string kingdomId)
+	{
+		KingdomId = kingdomId;
+	}
+}
