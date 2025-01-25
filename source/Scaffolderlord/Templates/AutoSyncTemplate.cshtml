@@ -14,7 +14,7 @@ namespace @Model.Namespace
 	string className = $"{Model.TypeName}Sync";
 }
 
-@Model.XmlDoc($"Configures AutoSync for {Model.TypeName}")
+@Model.XmlDoc($"Configures AutoSync for <see cref=\"{Model.TypeName}\"/>")
 internal class @className : IAutoSync
 {
 	public @(className)(IAutoSyncBuilder autoSyncBuilder)

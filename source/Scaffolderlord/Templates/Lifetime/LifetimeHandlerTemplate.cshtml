@@ -42,6 +42,8 @@ internal class @className: IHandler
 	{
 		messageBroker.Unsubscribe<@(Model.TypeName)Created>(HandleCreatedEvent);
 		messageBroker.Unsubscribe<NetworkCreate@(Model.TypeName)>(HandleCreateCommand);
+		messageBroker.Subscribe<@(Model.TypeName)Destroyed>(HandleDestroyedEvent);
+		messageBroker.Subscribe<NetworkDestroy@(Model.TypeName)>(HandleDestroyCommand);
 	}
 
 	private void HandleCreatedEvent(MessagePayload<@(Model.TypeName)Created> payload)
@@ -55,18 +57,20 @@ internal class @className: IHandler
 		network.SendAll(new NetworkCreate@(Model.TypeName)(id));
 	}
 
+	// WARNING: This is a default generated implementation that might not work on all services, be sure to test and implement need logic
 	private void HandleCreateCommand(MessagePayload<NetworkCreate@(Model.TypeName)> payload)
 	{
-		var new@(Model.TypeName) = ObjectHelper.SkipConstructor<@(Model.TypeName)>();
-
-@* 		AccessTools.Field(typeof(@(Model.TypeName)), nameof(@(Model.TypeName)._besiegerParties)).SetValue(new@(Model.TypeName), new MBList<MobileParty>()); *@
-	// TODO:Initialize null lists!
-
-		if (!objectManager.AddExisting(payload.What.@(Model.TypeName)Id, new@(Model.TypeName)))
+		GameLoopRunner.RunOnMainThread(() =>
 		{
-			Logger.Error("Failed to create {ObjectName} on {EventHandler}", nameof(@(Model.TypeName)), nameof(NetworkCreate@(Model.TypeName)));
-			return;
-		}
+			using (new AllowedThread())
+			{
+				var new@(Model.TypeName) = ObjectHelper.SkipConstructor<@(Model.TypeName)>();
+				if (!objectManager.AddExisting(payload.What.@(Model.TypeName)Id, new@(Model.TypeName)))
+				{
+					Logger.Error("Failed to create {ObjectName} on {EventHandler}", nameof(@(Model.TypeName)), nameof(NetworkCreate@(Model.TypeName)));
+				}
+			}
+		});
 	}
 
 	private void HandleDestroyedEvent(MessagePayload<@(Model.TypeName)Destroyed> payload)
@@ -84,6 +88,7 @@ internal class @className: IHandler
 		network.SendAll(new NetworkDestroy@(Model.TypeName)(id));
 	}
 
+	// WARNING: This is a default generated implementation that might not work on all services, be sure to test and implement need logic
 	private void HandleDestroyCommand(MessagePayload<NetworkDestroy@(Model.TypeName)> payload)
 	{
 		var id = payload.What.@(Model.TypeName)Id;

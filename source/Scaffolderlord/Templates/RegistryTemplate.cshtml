@@ -17,7 +17,7 @@ namespace @Model.Namespace
 	string parentClassName = $"RegistryBase<{Model.TypeName}>";
 }
 
-@Model.XmlDoc($"Registry manager for {Model.TypeName}")
+@Model.XmlDoc($"Registry manager for <see cref=\"{Model.TypeName}\"/>")
 internal class @className : @parentClassName
 {
 	private const string @(Model.TypeName)IdPrefix = "Coop@(Model.TypeName)";
