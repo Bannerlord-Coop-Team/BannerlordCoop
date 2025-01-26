@@ -4,7 +4,6 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using Common;
@@ -53,7 +52,7 @@ internal class KingdomLifetimeHandler : IHandler
 		{
 			using (new AllowedThread())
 			{
-				var newKingdom = ObjectHelper.SkipConstructor<Kingdom>();
+				var newKingdom = new Kingdom();
 				if (!objectManager.AddExisting(payload.What.KingdomId, newKingdom))
 				{
 					Logger.Error("Failed to create {ObjectName} on {EventHandler}", nameof(Kingdom), nameof(NetworkCreateKingdom));
