@@ -61,7 +61,7 @@ namespace E2E.Tests.Services.Villages
             // Arrange
             var server = TestEnvironment.Server;
 
-            //var villagerPartyField = AccessTools.Field(typeof(Village), nameof(Village.VillagerPartyComponent));
+            var villagerPartyField = AccessTools.Field(typeof(Village), nameof(Village.VillagerPartyComponent));
             var villageTypeField = AccessTools.Field(typeof(Village), nameof(Village.VillageType));
             var boundField = AccessTools.Field(typeof(Village), nameof(Village._bound));
             var marketDataField = AccessTools.Field(typeof(Village), nameof(Village._marketData));
