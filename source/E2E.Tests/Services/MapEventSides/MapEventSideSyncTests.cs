@@ -38,6 +38,7 @@ public class MapEventSideSyncTests : IDisposable
         var renownField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.RenownValue));
         var strengthField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.StrengthRatio));
         var mapEventField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapEvent));
+        var mapFactionField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapFaction));
         var troopCacheField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._requiresTroopCacheUpdate));
         var selectTroopField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroop));
         var selectedIndexField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroopIndex));
@@ -50,6 +51,7 @@ public class MapEventSideSyncTests : IDisposable
         var renownIntercept = TestEnvironment.GetIntercept(renownField);
         var strengthIntercept = TestEnvironment.GetIntercept(strengthField);
         var mapEventIntercept = TestEnvironment.GetIntercept(mapEventField);
+        var mapFactionIntercept = TestEnvironment.GetIntercept(mapFactionField);
         var troopCacheIntercept = TestEnvironment.GetIntercept(troopCacheField);
         var selectTroopIntercept = TestEnvironment.GetIntercept(selectTroopField);
         var selectedIndexIntercept = TestEnvironment.GetIntercept(selectedIndexField);
@@ -65,11 +67,13 @@ public class MapEventSideSyncTests : IDisposable
             var mapEventSide = GameObjectCreator.CreateInitializedObject<MapEventSide>();
             var mobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
             var mapEvent = GameObjectCreator.CreateInitializedObject<MapEvent>();
+            var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
             var character = GameObjectCreator.CreateInitializedObject<CharacterObject>();
 
             Assert.True(server.ObjectManager.TryGetId(mapEventSide, out mapEventSideId));
             Assert.True(server.ObjectManager.TryGetId(mobileParty, out leaderPartyId));
             Assert.True(server.ObjectManager.TryGetId(mapEvent, out mapEventId));
+            Assert.True(server.ObjectManager.TryGetId(kingdom, out kingdomId));
             Assert.True(server.ObjectManager.TryGetId(character, out characterId));
 
             mapEventSide.LeaderParty = mobileParty.Party;
@@ -84,6 +88,7 @@ public class MapEventSideSyncTests : IDisposable
             renownIntercept.Invoke(null, new object[] { mapEventSide, 5f });
             strengthIntercept.Invoke(null, new object[] { mapEventSide, 5f });
             mapEventIntercept.Invoke(null, new object[] { mapEventSide, mapEvent });
+            mapFactionIntercept.Invoke(null, new object[] { mapEventSide, kingdom });
             troopCacheIntercept.Invoke(null, new object[] { mapEventSide, true });
             selectTroopIntercept.Invoke(null, new object[] { mapEventSide, character });
             selectedIndexIntercept.Invoke(null, new object[] { mapEventSide, 5 });
@@ -98,6 +103,7 @@ public class MapEventSideSyncTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<MapEventSide>(mapEventSideId, out var mapEventSide));
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(leaderPartyId, out var leaderParty));
             Assert.True(client.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
+            Assert.True(client.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var mapFaction));
             Assert.True(client.ObjectManager.TryGetObject<CharacterObject>(characterId, out var characterObject));
             
             Assert.Equal(leaderPartyId, mapEventSide.LeaderParty.MobileParty.StringId);
@@ -112,9 +118,12 @@ public class MapEventSideSyncTests : IDisposable
             Assert.Equal(5f, mapEventSide.RenownValue);
             Assert.Equal(5f, mapEventSide.StrengthRatio);
             Assert.Equal(mapEvent, mapEventSide._mapEvent);
+            Assert.Equal(mapFaction.StringId, mapEventSide._mapFaction.StringId);
             Assert.True(mapEventSide._requiresTroopCacheUpdate);
             Assert.Equal(characterObject, mapEventSide._selectedSimulationTroop);
             Assert.Equal(5, mapEventSide._selectedSimulationTroopIndex);
+
+            //Map faction seperate sync
         }
     }
 }
