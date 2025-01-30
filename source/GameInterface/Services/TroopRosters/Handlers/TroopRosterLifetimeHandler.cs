@@ -2,15 +2,10 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.Buildings.Handlers;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace GameInterface.Services.TroopRosters.Handlers
 {

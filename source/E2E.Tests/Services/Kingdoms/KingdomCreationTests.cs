@@ -5,7 +5,6 @@ using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Armies;
-
 public class ArmyCreationTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }

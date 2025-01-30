@@ -8,7 +8,9 @@ namespace E2E.Tests.Util.ObjectBuilders
         public object Build()
         {
             var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            return new Workshop(settlement, "");
+            var workshop = new Workshop(settlement, "testWorkshop");
+            workshop.SetCustomName(new TaleWorlds.Localization.TextObject("testWorkshop"));
+            return workshop;
         }
     }
 }
