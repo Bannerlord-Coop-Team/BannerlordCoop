@@ -1,14 +1,11 @@
-﻿using Common.Logging;
+﻿using System;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace GameInterface.Services.TroopRosters.Patches
 {

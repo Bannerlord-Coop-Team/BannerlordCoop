@@ -1,54 +1,63 @@
-﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
-using System;
+using Serilog;
 using TaleWorlds.CampaignSystem;
-
+using Common;
 namespace GameInterface.Services.Kingdoms.Handlers;
+
+
+/// <summary>
+/// Lifetime handler for <see cref="Kingdom"/> objects.
+/// </summary>
 internal class KingdomLifetimeHandler : IHandler
 {
-    private readonly IMessageBroker messageBroker;
-    private readonly INetwork network;
-    private readonly IObjectManager objectManager;
+	private static readonly ILogger Logger = LogManager.GetLogger<KingdomLifetimeHandler>();
+	private readonly IMessageBroker messageBroker;
+	private readonly INetwork network;
+	private readonly IObjectManager objectManager;
+	public KingdomLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+	{
+		this.messageBroker = messageBroker;
+		this.network = network;
+		this.objectManager = objectManager;
+		messageBroker.Subscribe<KingdomCreated>(HandleCreatedEvent);
+		messageBroker.Subscribe<NetworkCreateKingdom>(HandleCreateCommand);
+	}
 
-    public KingdomLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
-    {
-        this.messageBroker = messageBroker;
-        this.network = network;
-        this.objectManager = objectManager;
+	public void Dispose()
+	{
+		messageBroker.Unsubscribe<KingdomCreated>(HandleCreatedEvent);
+		messageBroker.Unsubscribe<NetworkCreateKingdom>(HandleCreateCommand);
+	}
 
-        messageBroker.Subscribe<KingdomCreated>(Handle_KingdomCreated);
-        messageBroker.Subscribe<NetworkCreateKingdom>(Handle_CreateKingdom);
-    }
+	private void HandleCreatedEvent(MessagePayload<KingdomCreated> payload)
+	{
+		if (!objectManager.AddNewObject(payload.What.Instance, out var id))
+		{
+			Logger.Error("Failed to AddNewObject on {EventHandler}", nameof(KingdomCreated));
+			return;
+		}
 
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<KingdomCreated>(Handle_KingdomCreated);
-        messageBroker.Unsubscribe<NetworkCreateKingdom>(Handle_CreateKingdom);
-    }
+		network.SendAll(new NetworkCreateKingdom(id));
+	}
 
-
-    private void Handle_KingdomCreated(MessagePayload<KingdomCreated> payload)
-    {
-        objectManager.AddNewObject(payload.What.Kingdom, out var newId);
-
-        var message = new NetworkCreateKingdom(newId);
-        network.SendAll(message);
-    }
-
-    private void Handle_CreateKingdom(MessagePayload<NetworkCreateKingdom> payload)
-    {
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            using (new AllowedThread())
-            {
-                var newKingdom = new Kingdom();
-                objectManager.AddExisting(payload.What.KindgomId, newKingdom);
-            }
-        });
-
-    }
+	// WARNING: This is a default generated implementation that might not work on all services, be sure to test and implement need logic
+	private void HandleCreateCommand(MessagePayload<NetworkCreateKingdom> payload)
+	{
+		GameLoopRunner.RunOnMainThread(() =>
+		{
+			using (new AllowedThread())
+			{
+				var newKingdom = new Kingdom();
+				if (!objectManager.AddExisting(payload.What.KingdomId, newKingdom))
+				{
+					Logger.Error("Failed to create {ObjectName} on {EventHandler}", nameof(Kingdom), nameof(NetworkCreateKingdom));
+				}
+			}
+		});
+	}
 }
