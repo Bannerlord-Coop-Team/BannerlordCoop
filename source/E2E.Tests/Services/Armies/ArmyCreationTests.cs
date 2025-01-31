@@ -2,7 +2,7 @@ using E2E.Tests.Environment;
 using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.Kingdoms;
+namespace E2E.Tests.Services.Armies;
 
 public class KingdomCreationTests : IDisposable
 {
