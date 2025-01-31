@@ -6,14 +6,9 @@ using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.Tests.Bootstrap;
-using Serilog;
-using Serilog.Core;
-using Serilog.Events;
-using Serilog.Sinks.XUnit;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Environment;
@@ -21,35 +16,23 @@ namespace E2E.Tests.Environment;
 /// <summary>
 /// Testing environment for End to End testing
 /// </summary>
-internal class E2ETestEnvironment : IDisposable
+internal class E2ETestEnvironment : IDisposable 
 {
-    public ITestOutputHelper Output { get; }
-
     public IEnumerable<EnvironmentInstance> Clients => IntegrationEnvironment.Clients;
     public EnvironmentInstance Server => IntegrationEnvironment.Server;
 
     private TestEnvironment IntegrationEnvironment { get; }
+    
+    private Action<string> TestOutputCallback { get; }
 
-    private class TestOutputSink : ILogEventSink
-    {
-        private readonly ITestOutputHelper output;
-
-        public TestOutputSink(ITestOutputHelper output)
-        {
-            this.output = output;
-        }
-
-        public void Emit(LogEvent logEvent)
-        {
-            TextWriter textWriter = new StringWriter();
-            logEvent.RenderMessage(textWriter);
-            output.WriteLine(textWriter.ToString());
-        }
-    }
 
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
-        LogManager.Sinks.Add(new TestOutputSink(output));
+        TestOutputCallback = (logMessage) => output.WriteLine(logMessage);
+
+
+        // Setup logging for tests
+        OutputSinkManager.AddLogCallback(TestOutputCallback);
 
         GameLoopRunner.Instance.SetGameLoopThread();
 
@@ -67,9 +50,14 @@ internal class E2ETestEnvironment : IDisposable
             Server.ObjectManager.AddExisting(settlement.StringId, settlement);
         }
 
-        Output = output;
-
         SetupMainHero();
+    }
+
+    public void Dispose()
+    {
+        Server.Resolve<IAutoSyncPatchCollector>().UnpatchAll();
+
+        OutputSinkManager.RemoveLogCallback(TestOutputCallback);
     }
 
     private void SetupAutoSync()
@@ -136,10 +124,5 @@ internal class E2ETestEnvironment : IDisposable
         Assert.True(Server.Resolve<IAutoSyncBuilder>().TryGetIntercept(field, out var intercept));
 
         return intercept;
-    }
-
-    public void Dispose()
-    {
-        Server.Resolve<IAutoSyncPatchCollector>().UnpatchAll();
     }
 }

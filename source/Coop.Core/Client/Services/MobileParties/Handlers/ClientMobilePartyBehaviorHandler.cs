@@ -22,7 +22,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
-        public ClientMobilePartyBehaviorHandler(IMessageBroker messageBroker, INetwork network, ILogger logger)
+        public ClientMobilePartyBehaviorHandler(IMessageBroker messageBroker, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.network = network;

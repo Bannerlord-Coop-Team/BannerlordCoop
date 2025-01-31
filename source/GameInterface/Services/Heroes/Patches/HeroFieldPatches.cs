@@ -518,7 +518,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new CultureChanged(culture.StringId, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new CultureChanged(culture?.StringId, instance.StringId));
 
             instance.Culture = culture;
         }

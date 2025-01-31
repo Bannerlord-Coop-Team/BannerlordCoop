@@ -46,43 +46,6 @@ internal class PartyComponentHandler : IHandler
     {
         messageBroker.Unsubscribe<PartyComponentCreated>(Handle);
         messageBroker.Unsubscribe<NetworkCreatePartyComponent>(Handle);
-
-        messageBroker.Unsubscribe<PartyComponentMobilePartyChanged>(Handle);
-        messageBroker.Unsubscribe<NetworkChangePartyComponentMobileParty>(Handle);
-    }
-
-    private void Handle(MessagePayload<NetworkChangePartyComponentMobileParty> payload)
-    {
-        var componentId = payload.What.ComponentId;
-        var partyId = payload.What.PartyId;
-
-        if (objectManager.TryGetObject<PartyComponent>(componentId, out var component) == false)
-        {
-            Logger.Error("Could not find PartyComponent with id {componentId}", componentId);
-            return;
-        }
-
-        if (objectManager.TryGetObject<MobileParty>(partyId, out var party) == false)
-        {
-            Logger.Error("Could not find MobileParty with id {componentId}", partyId);
-            return;
-        }
-
-        PartyComponentPatches.OverrideSetParty(component, party);
-    }
-
-    private void Handle(MessagePayload<PartyComponentMobilePartyChanged> payload)
-    {
-        var component = payload.What.Component;
-        var party = payload.What.Party;
-
-        if (objectManager.TryGetId(component, out var componentId) == false)
-        {
-            Logger.Error("PartyComponent was not registered with party PartyComponentRegistry");
-            return;
-        }
-        var message = new NetworkChangePartyComponentMobileParty(componentId, party.StringId);
-        network.SendAll(message);
     }
 
     private void Handle(MessagePayload<PartyComponentCreated> payload)
