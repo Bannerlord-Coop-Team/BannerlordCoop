@@ -1,4 +1,5 @@
-﻿using ProtoBuf.Meta;
+﻿using System;
+using ProtoBuf.Meta;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
@@ -32,5 +33,32 @@ internal class SurrogateCollection : ISurrogateCollection
 
         if (RuntimeTypeModel.Default.CanSerialize(typeof(Vec3)) == false)
             RuntimeTypeModel.Default.SetSurrogate<Vec3, Vec3Surrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(ItemObject)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<ItemObject, ItemObjectSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(ItemComponent)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<ItemComponent, ItemComponentSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(ItemCategory)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<ItemCategory, ItemCategorySurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(SkeletonScale)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<SkeletonScale, SkeletonScaleSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(Monster)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<Monster, MonsterSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(WeaponComponent)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<WeaponComponent, WeaponComponentSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(SaddleComponent)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<SaddleComponent, SaddleComponentSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(HorseComponent)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<HorseComponent, HorseComponentSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(ArmorComponent)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<ArmorComponent, ArmorComponentSurrogate>();
     }
 }

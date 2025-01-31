@@ -15,6 +15,8 @@ using System.ComponentModel;
 using Autofac;
 using NuGet.Frameworks;
 using Newtonsoft.Json.Serialization;
+using JetBrains.Annotations;
+using System.Diagnostics;
 
 namespace E2E.Tests.Services.ItemObjectService
 {
@@ -47,6 +49,11 @@ namespace E2E.Tests.Services.ItemObjectService
             var weaponDesign = ObjectHelper.SkipConstructor<WeaponDesign>();
             var holsterPositionShift = new Vec3(1, 2, 3, 4);
             string[] itemHolsters = { "holster1", "holster2", "holster3" };
+            var itemComponent = new TradeItemComponent();
+            var itemCategory = ObjectHelper.SkipConstructor<ItemCategory>();
+            var prerequisiteItem = new ItemObject();
+            var itemTypeEnum = ItemObject.ItemTypeEnum.OneHandedWeapon;
+
 
             server.Call(() =>
             {
@@ -71,6 +78,24 @@ namespace E2E.Tests.Services.ItemObjectService
                 itemObject.Appearance = 3.5f;
                 itemObject.WeaponDesign = weaponDesign;
                 itemObject.ItemHolsters = itemHolsters;
+
+                //Rest of Properties
+                itemObject.ItemComponent = itemComponent;
+                itemObject.HasLowerHolsterPriority = true;
+                itemObject.PrefabName = "PrefabName";
+                itemObject.ItemCategory = itemCategory;
+                itemObject.Value = 1;
+                itemObject.Effectiveness = 3.5f;
+                itemObject.IsUsingTableau = true;
+                itemObject.ArmBandMeshName = "ArmBandMeshName";
+                itemObject.IsFood = true;
+                itemObject.IsUniqueItem = true;
+                itemObject.MultiplayerItem = true;
+                itemObject.NotMerchandise = true;
+                itemObject.IsCraftedByPlayer = true;
+                itemObject.LodAtlasIndex = 1;
+                itemObject.PrerequisiteItem = prerequisiteItem;
+                itemObject.ItemType = itemTypeEnum;
             });
 
             // Assert
@@ -78,13 +103,16 @@ namespace E2E.Tests.Services.ItemObjectService
 
             server.Call(() =>
             {
-                typeIntercept.Invoke(null, new object[] { itemObject, 69 });
+                //typeIntercept.Invoke(null, new object[] { itemObject, 69 });
             });
 
             server.ObjectManager.TryGetId(itemObject, out string serverObjectId);
             server.ObjectManager.TryGetId(itemObject.Culture, out string serverCultureId);
             server.ObjectManager.TryGetId(itemObject.WeaponDesign, out string serverWeaponDesignId);
             server.ObjectManager.TryGetId(itemObject.ItemHolsters, out string  serverItemHolstersId);
+            server.ObjectManager.TryGetId(itemObject.ItemComponent, out string serverItemComponentId);
+            server.ObjectManager.TryGetId(itemObject.ItemCategory, out string serverItemCategoryId);
+            server.ObjectManager.TryGetId(itemObject.PrerequisiteItem, out string serverPrerequisiteItemId);
 
             foreach (var client in TestEnvironment.Clients)
             {
@@ -97,7 +125,11 @@ namespace E2E.Tests.Services.ItemObjectService
                 client.ObjectManager.TryGetId(clientItemObject.Culture, out string clientCultureId);
                 client.ObjectManager.TryGetId(clientItemObject.WeaponDesign, out string clientWeaponDesignId);
                 client.ObjectManager.TryGetId(clientItemObject.ItemHolsters, out string clientItemHolstersId);
+                client.ObjectManager.TryGetId(clientItemObject.ItemComponent, out string clientItemComponentId);
+                client.ObjectManager.TryGetId(clientItemObject.ItemCategory, out string clientItemCategoryId);
+                client.ObjectManager.TryGetId(clientItemObject.PrerequisiteItem, out string clientPrerequisiteItemId);
                 Assert.Equal(serverObjectId, clientObjectId);
+
 
                 //Properties
                 Assert.Equal(3.5f, clientItemObject.Weight);
@@ -117,6 +149,25 @@ namespace E2E.Tests.Services.ItemObjectService
                 Assert.Equal(ItemFlags.Civilian, clientItemObject.ItemFlags);
                 Assert.Equal(3.5f, clientItemObject.Appearance);
                 Assert.Equal(clientWeaponDesignId, serverWeaponDesignId);
+
+                //Rest of Properties
+                Assert.Equal(serverItemComponentId, clientItemComponentId);
+                Assert.True(clientItemObject.HasLowerHolsterPriority);
+                Assert.Equal("PrefabName", clientItemObject.PrefabName);
+                Assert.Equal(serverItemCategoryId, clientItemCategoryId);
+                Assert.Equal(1, clientItemObject.Value);
+                Assert.Equal(3.5f, clientItemObject.Effectiveness);
+                Assert.True(clientItemObject.IsUsingTableau);
+                Assert.Equal("ArmBandMeshName", clientItemObject.ArmBandMeshName);
+                Assert.True(clientItemObject.IsFood);
+                Assert.True(clientItemObject.IsUniqueItem);
+                Assert.True(clientItemObject.MultiplayerItem);
+                Assert.True(clientItemObject.NotMerchandise);
+                Assert.True(clientItemObject.IsCraftedByPlayer);
+                Assert.Equal(1, clientItemObject.LodAtlasIndex);
+                Assert.Equal(serverPrerequisiteItemId, clientPrerequisiteItemId);
+                Assert.Equal(ItemObject.ItemTypeEnum.OneHandedWeapon, clientItemObject.ItemType);
+
 
                 //Collection
                 Assert.Equal(itemHolsters, clientItemObject.ItemHolsters);

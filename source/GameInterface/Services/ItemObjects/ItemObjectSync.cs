@@ -7,9 +7,6 @@ namespace GameInterface.Services.ItemObjects
 {
     public class ItemObjectSync : IAutoSync
     {
-        /**
-        * HolsterPositionShift (Vec3) does not like to be serialized, not sure how to approach this one
-        */
         public ItemObjectSync(IAutoSyncBuilder autoSyncBuilder)
         {
             //Fields
@@ -33,6 +30,22 @@ namespace GameInterface.Services.ItemObjects
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.ItemFlags)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.Appearance)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.WeaponDesign)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.ItemComponent)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.HasLowerHolsterPriority)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.PrefabName)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.ItemCategory)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.Value)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.Effectiveness)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.IsUsingTableau)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.ArmBandMeshName)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.IsFood)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.IsUniqueItem)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.MultiplayerItem)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.NotMerchandise)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.IsCraftedByPlayer)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.LodAtlasIndex)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.PrerequisiteItem)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.ItemType)));
 
             //Collection
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.ItemHolsters)));
