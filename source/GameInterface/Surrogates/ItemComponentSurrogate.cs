@@ -10,7 +10,7 @@ namespace GameInterface.Surrogates;
 internal struct ItemComponentSurrogate
 {
     [ProtoMember(1)]
-    public ItemObjectSurrogate Item { get; set; }
+    public ItemObject Item { get; set; }
     [ProtoMember(2)]
     public ItemModifierGroup ItemModifierGroup { get; set; }
 
