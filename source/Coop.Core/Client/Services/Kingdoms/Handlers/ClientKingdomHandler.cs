@@ -10,7 +10,6 @@ namespace Coop.Core.Client.Services.Kingdoms.Handlers;
 /// </summary>
 public class ClientKingdomHandler : IHandler
 {
-
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
 
