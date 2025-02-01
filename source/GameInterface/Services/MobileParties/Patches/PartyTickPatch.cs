@@ -9,6 +9,11 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(CampaignPeriodicEventManager))]
 internal class PartyTickPatch
 {
+    [HarmonyPatch(nameof(CampaignPeriodicEventManager.TickPeriodicEvents))]
+    [HarmonyPrefix]
+    static bool TickPeriodicEventsPrefix() => ModInformation.IsServer;
+
     [HarmonyPatch(nameof(CampaignPeriodicEventManager.MobilePartyHourlyTick))]
-    static bool Prefix() => ModInformation.IsServer;
+    [HarmonyPrefix]
+    static bool MobilePartyHourlyTickPrefix() => ModInformation.IsServer;
 }

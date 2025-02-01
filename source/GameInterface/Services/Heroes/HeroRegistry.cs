@@ -3,6 +3,7 @@ using Common.Extensions;
 using System;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -14,6 +15,7 @@ namespace GameInterface.Services.Registry;
 internal class HeroRegistry : RegistryBase<Hero>
 {
     public static readonly string HeroStringIdPrefix = "CoopHero";
+    private int InstanceCounter = 0;
 
     public HeroRegistry(IRegistryCollection collection) : base(collection) { }
 
@@ -45,7 +47,7 @@ internal class HeroRegistry : RegistryBase<Hero>
 
     protected override string GetNewId(Hero hero)
     {
-        hero.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
+        hero.StringId = $"{HeroStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
         return hero.StringId;
     }
 

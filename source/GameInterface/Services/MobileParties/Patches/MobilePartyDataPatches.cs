@@ -67,10 +67,6 @@ internal class MobilePartyDataPatches
             return;
         }
 
-        // Remove component from registry once assigned as it should never change (it probably will :/)
-        partyComponentRegistry.Remove(componentId);
-
-
         MessageBroker.Instance.Publish(instance, new PartyComponentChanged(instance.StringId, componentId));
 
         instance._partyComponent = value;

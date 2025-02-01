@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Data;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Messages.Lifetime;
 
@@ -8,10 +8,10 @@ namespace GameInterface.Services.MobileParties.Messages.Lifetime;
 /// </summary>
 public record PartyDestroyed : IEvent
 {
-    public PartyDestructionData Data { get; }
+    public MobileParty Instance { get; }
 
-    public PartyDestroyed(PartyDestructionData data)
+    public PartyDestroyed(MobileParty instance)
     {
-        Data = data;
+        Instance = instance;
     }
 }

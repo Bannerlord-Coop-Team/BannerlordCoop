@@ -31,7 +31,7 @@ internal class ObjectManagerModule : Module
         var assembly = GetType().Assembly;
         var types = assembly.GetTypes()
             .Where(t => t.GetInterface(nameof(IRegistry)) != null &&
-                        t.IsClass && !t.IsAbstract);
+                        t.IsClass && !t.IsAbstract && !t.IsGenericType);
         return types;
     }
 }

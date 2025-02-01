@@ -86,7 +86,7 @@ public class SerializableTypeMapper : ISerializableTypeMapper
 
     public void AddTypes(IEnumerable<Type> types)
     {
-        var sortedTypes = TypeMap.Concat(types).OrderBy(type => type.FullName);
+        var sortedTypes = TypeMap.Concat(types).OrderBy(type => type.FullName).Distinct();
 
         TypeMap = sortedTypes.ToArray();
         AddedKeyData = sortedTypes

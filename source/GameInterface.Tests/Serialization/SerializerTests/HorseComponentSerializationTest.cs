@@ -10,6 +10,9 @@ using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 using Common.Serialization;
+using GameInterface.Services.ObjectManager;
+using System.Runtime.Serialization;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -31,6 +34,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void HorseComponent_Serialize()
         {
             HorseComponent HorseComponent = new HorseComponent();
+            HorseComponent.Monster = new Monster();
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             HorseComponentBinaryPackage package = new HorseComponentBinaryPackage(HorseComponent, factory);
@@ -57,7 +61,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             HorseComponent.Speed = 513;
 
             Monster monster = MBObjectManager.Instance.CreateObject<Monster>();
+            monster.StringId = "testMonster";
+
             HorseComponent.Monster = monster;
+
+            var objectManager = container.Resolve<IObjectManager>();
+            objectManager.AddExisting(monster.StringId, monster);
 
             _monsterMaterialNames.SetValue(HorseComponent, new MBList<HorseComponent.MaterialProperty>
             {

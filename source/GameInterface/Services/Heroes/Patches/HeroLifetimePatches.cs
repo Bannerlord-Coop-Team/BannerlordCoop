@@ -25,14 +25,14 @@ internal class HeroLifetimePatches
     [HarmonyPatch(typeof(Hero), MethodType.Constructor, typeof(string))]
     private static bool Prefix(ref Hero __instance, ref string stringID)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         // Allow method if container is not setup

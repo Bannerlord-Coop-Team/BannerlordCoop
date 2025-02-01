@@ -1,18 +1,9 @@
 ﻿using Autofac;
-using Common;
 using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Registry;
-using GameInterface.Services.Heroes.Messages;
-using System;
 using System.Runtime.Serialization;
-using System.Threading;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using Xunit;
-using GameInterface.Services.Entity;
 
 namespace GameInterface.Tests.Services.Save
 {

@@ -14,8 +14,10 @@ using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using static TaleWorlds.CampaignSystem.Army;
+using static TaleWorlds.CampaignSystem.CampaignTime;
 
 namespace GameInterface.Services.Armies.Patches;
 
@@ -29,9 +31,9 @@ internal class ArmyLifetimePatches
 
     [HarmonyPatch(typeof(Army), MethodType.Constructor, typeof(Kingdom), typeof(MobileParty), typeof(ArmyTypes))]
     [HarmonyPrefix]
-    private static bool CreateArmyPrefix(ref Army __instance, Kingdom kingdom, MobileParty leaderParty, Army.ArmyTypes armyType)
+    private static bool CreateArmyPrefix(ref Army __instance, Kingdom kingdom, MobileParty leaderParty, ArmyTypes armyType)
     {
-        // Skip if we called it
+        // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
@@ -41,98 +43,48 @@ internal class ArmyLifetimePatches
             return true;
         }
 
-        // Allow method if container is not setup
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
-        if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) == false) return true;
-        if (ContainerProvider.TryResolve<INetworkConfiguration>(out var configuration) == false) return true;
+        
+        var message = new ArmyCreated(__instance, kingdom, leaderParty, armyType);
 
-        if (objectManager.AddNewObject(__instance, out var stringID) == false) return true;
-
-        var data = new ArmyCreationData(__instance, kingdom, leaderParty, armyType);
-        var message = new ArmyCreated(data);
-
-        using (new MessageTransaction<NewArmySynced>(messageBroker, configuration.ObjectCreationTimeout))
-        {
-            MessageBroker.Instance.Publish(__instance, message);
-        }
+        MessageBroker.Instance.Publish(__instance, message);
 
         return true;
     }
 
-    private static ConstructorInfo ctor_Army = AccessTools.Constructor(typeof(Army), new Type[] { typeof(Kingdom), typeof(MobileParty), typeof(ArmyTypes) });
-    public static void OverrideCreateArmy(ArmyCreationData creationData)
-    {
-        var armyId = creationData.StringId;
-
-        var army = ObjectHelper.SkipConstructor<Army>();
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return;
-
-
-        if (objectManager.AddExisting(armyId, army) == false) return;
-
-        var message = new ArmyCreated(null);
-        MessageBroker.Instance.Publish(army, message);
-
-        // TODO sync fields instead of calling constructor
-        var kingdomId = creationData.KingdomId;
-        var leaderPartyId = creationData.LeaderPartyId;
-        var armyType = creationData.ArmyType;
-
-        if (objectManager.TryGetObject(kingdomId, out Kingdom kingdom) == false)
-        {
-            Logger.Error("Failed to find {name} with id {id}", nameof(Kingdom), kingdomId);
-            return;
-        }
-             
-        if (objectManager.TryGetObject(leaderPartyId, out MobileParty leaderParty) == false)
-        {
-            Logger.Error("Failed to find {name} with id {id}", nameof(MobileParty), leaderPartyId);
-            return;
-        }
-
-        using (new AllowedThread())
-        {
-            ctor_Army.Invoke(army, new object[] { kingdom, leaderParty, armyType });
-        }
-    }
-
-    [HarmonyPatch(typeof(Army), "DisperseInternal")]
+    [HarmonyPatch(typeof(DisbandArmyAction), "ApplyInternal")]
     [HarmonyPrefix]
-    public static bool DisperseInternal(ref Army __instance, Army.ArmyDispersionReason reason)
+    public static bool DisperseInternal()
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client destroyed unmanaged {name}", typeof(Army));
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(Army), Environment.StackTrace);
             return false;
         }
 
-        var data = new ArmyDestructionData(__instance, reason);
-        var message = new ArmyDestroyed(data);
-
-        MessageBroker.Instance.Publish(__instance, message);
         return true;
     }
 
-    [HarmonyPatch(typeof(DisbandArmyAction), "ApplyInternal")]
+    [HarmonyPatch(typeof(Army), "DisperseInternal")]
     [HarmonyPostfix]
-    public static void DisbandArmyPostfix(ref Army army)
+    public static void DisbandArmyPostfix(Army __instance, Army.ArmyDispersionReason reason)
     {
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return;
+        // Call original if we called it
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
-        if (objectManager.Contains(army) == false)
+        if (ModInformation.IsClient)
         {
-            Logger.Error("{name} did not contain Army {army}", nameof(IObjectManager), army.Name);
+            Logger.Error("Client created unmanaged {name}\n"
+                + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
             return;
         }
 
-        if (objectManager.Remove(army) == false)
-        {
-            Logger.Error("Could not remove Army {army} from {name}", army.Name, nameof(IObjectManager));
-            return;
-        }
+        var data = new ArmyDestructionData(__instance, reason);
+        var message = new ArmyDestroyed(data, __instance);
+
+        MessageBroker.Instance.Publish(__instance, message);
     }
 
     public static void OverrideDestroyArmy(Army army, ArmyDispersionReason reason)

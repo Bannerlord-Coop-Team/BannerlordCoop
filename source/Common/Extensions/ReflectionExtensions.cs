@@ -249,6 +249,4 @@ namespace Common.Extensions
             return values.GetValue(random.Next(values.Length));
         }
     }
-
-    
 }

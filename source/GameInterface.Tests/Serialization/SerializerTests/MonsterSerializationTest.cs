@@ -7,6 +7,7 @@ using System.Runtime.Serialization;
 using TaleWorlds.Core;
 using Xunit;
 using Common.Serialization;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -41,8 +42,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void Monster_Full_Serialization()
         {
             Monster testMonster = (Monster)FormatterServices.GetUninitializedObject(typeof(Monster));
+            testMonster.StringId = "testMonster";
 
             var factory = container.Resolve<IBinaryPackageFactory>();
+            var objectManager = container.Resolve<IObjectManager>();
+
+            objectManager.AddExisting(testMonster.StringId, testMonster);
+
             MonsterBinaryPackage package = new MonsterBinaryPackage(testMonster, factory);
 
             package.Pack();

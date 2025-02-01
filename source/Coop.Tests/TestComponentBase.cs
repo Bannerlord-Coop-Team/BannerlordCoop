@@ -1,10 +1,14 @@
-﻿using Autofac;
+﻿using System.Collections.Generic;
+using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Modules;
+using GameInterface.Services.Modules.Validators;
+using Moq;
 using Xunit.Abstractions;
 
 namespace Coop.Tests;
@@ -45,11 +49,16 @@ internal abstract class TestComponentBase
 
     private ContainerBuilder RegisterCommonTypes(ContainerBuilder builder)
     {
+        var moduleInfoProviderMock = new Mock<IModuleInfoProvider>();
+        moduleInfoProviderMock.Setup(x => x.GetModuleInfos()).Returns(new List<ModuleInfo>());
+        
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().InstancePerLifetimeScope();
         builder.RegisterType<ProtoBufSerializer>().As<ICommonSerializer>().InstancePerLifetimeScope();
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TestNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
+        builder.RegisterInstance(moduleInfoProviderMock.Object).As<IModuleInfoProvider>().SingleInstance();
+        builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
         return builder;
     }
 

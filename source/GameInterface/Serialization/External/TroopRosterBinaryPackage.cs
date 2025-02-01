@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Library;
 
 namespace GameInterface.Serialization.External
 {
@@ -37,6 +38,9 @@ namespace GameInterface.Serialization.External
             {
                 Object.NumberChangedCallback = Object.OwnerParty.MemberRosterNumberChanged;
             }
+
+            Object._troopRosterElements = new MBList<TroopRosterElement>();
+            Object.VersionNo = -1;
         }
     }
 }

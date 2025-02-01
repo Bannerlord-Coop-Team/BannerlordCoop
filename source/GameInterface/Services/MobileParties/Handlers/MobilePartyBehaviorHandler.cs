@@ -86,6 +86,8 @@ internal class MobilePartyBehaviorHandler : IHandler
         if (!objectManager.TryGetObject(data.PartyId, out MobileParty party))
             return;
 
+        if (party.Ai == null) return;
+
         Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
 
         IMapEntity targetMapEntity = null;

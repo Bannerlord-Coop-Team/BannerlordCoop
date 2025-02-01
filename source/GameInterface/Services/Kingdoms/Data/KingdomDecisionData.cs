@@ -18,7 +18,6 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoInclude(106, typeof(SettlementClaimantPreliminaryDecisionData))]
     public abstract class KingdomDecisionData
     {
-
         [ProtoMember(1)]
         public string ProposerClanId { get; }
         [ProtoMember(2)]

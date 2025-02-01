@@ -15,7 +15,6 @@ namespace GameInterface.Services.Kingdoms.Data
     [ProtoContract(SkipConstructor = true)]
     public class KingSelectionKingdomDecisionData : KingdomDecisionData
     {
-
         [ProtoMember(1)]
         public string ClanToExcludeId { get; }
         public KingSelectionKingdomDecisionData(string proposedClanId, string kingdomId, long triggerTime, bool isEnforced, bool notifyPlayer, bool playerExamined, string clanToExcludeId) : base(proposedClanId, kingdomId, triggerTime, isEnforced, notifyPlayer, playerExamined)

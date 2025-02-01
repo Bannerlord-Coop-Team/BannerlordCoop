@@ -18,8 +18,6 @@ namespace GameInterface.Services.MobileParties.Handlers;
 internal class MobilePartyHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
-    private readonly IMobilePartyInterface partyInterface;
-    private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IObjectManager objectManager;
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyHandler>();
 
@@ -30,6 +28,12 @@ internal class MobilePartyHandler : IHandler
         this.objectManager = objectManager;
         messageBroker.Subscribe<ChangeWagePaymentLimit>(HandleWagePaymentLimit); // server
         messageBroker.Subscribe<WagePaymentApprovedOthers>(HandleWagePaymentLimitOtherClients); // all other clients
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<ChangeWagePaymentLimit>(HandleWagePaymentLimit);
+        messageBroker.Unsubscribe<WagePaymentApprovedOthers>(HandleWagePaymentLimitOtherClients);
     }
 
     private void HandleWagePaymentLimitOtherClients(MessagePayload<WagePaymentApprovedOthers> payload)
@@ -68,12 +72,5 @@ internal class MobilePartyHandler : IHandler
                 mobileParty.SetWagePaymentLimit(obj.WageAmount);
             }
         });
-    }
-
-    public void Dispose()
-    {
-        messageBroker.Unsubscribe<ChangeWagePaymentLimit>(HandleWagePaymentLimit);
-        messageBroker.Unsubscribe<WagePaymentApprovedOthers>(HandleWagePaymentLimitOtherClients);
-
     }
 }

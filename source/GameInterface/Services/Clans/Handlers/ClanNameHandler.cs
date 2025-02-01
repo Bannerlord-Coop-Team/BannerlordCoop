@@ -19,21 +19,32 @@ namespace GameInterface.Services.Clans.Handlers
     {
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
+        private readonly INetwork network;
         private readonly ILogger Logger = LogManager.GetLogger<ClanNameHandler>();
 
-        public ClanNameHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+        public ClanNameHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
-            messageBroker.Subscribe<ChangeClanName>(Handle);
+            this.network = network;
+            messageBroker.Subscribe<ClanNameChanged>(Handle);
+            messageBroker.Subscribe<NetworkChangeClanName>(Handle);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<ChangeClanName>(Handle);
+            messageBroker.Unsubscribe<ClanNameChanged>(Handle);
+            messageBroker.Unsubscribe<NetworkChangeClanName>(Handle);
         }
 
-        private void Handle(MessagePayload<ChangeClanName> obj)
+        private void Handle(MessagePayload<ClanNameChanged> obj)
+        {
+            var payload = obj.What;
+            bool isServer = ModInformation.IsServer;
+            network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
+        }
+
+        private void Handle(MessagePayload<NetworkChangeClanName> obj)
         {
             var payload = obj.What;
 

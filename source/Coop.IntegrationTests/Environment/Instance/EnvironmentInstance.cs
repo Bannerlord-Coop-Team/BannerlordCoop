@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -8,9 +9,11 @@ using Coop.Core;
 using Coop.IntegrationTests.Environment.Mock;
 using GameInterface;
 using GameInterface.Services.ObjectManager;
+using HarmonyLib;
 using LiteNetLib;
 using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
 using System.Net.Sockets;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.IntegrationTests.Environment.Instance;
@@ -78,11 +81,19 @@ public abstract class EnvironmentInstance
     /// Calls a given action with correctly setup static variables used by the patches
     /// </summary>
     /// <param name="callFunction">Function to call</param>
-    public void Call(Action callFunction)
+    public void Call(Action callFunction, IEnumerable<MethodBase>? disabledMethods = null)
     {
-        using (new StaticScope(this))
+        if (disabledMethods == null)
         {
-            callFunction();
+            disabledMethods = Array.Empty<MethodBase>();
+        }
+
+        using (new PatchScope(disabledMethods))
+        {
+            using (new StaticScope(this))
+            {
+                callFunction();
+            }
         }
     }
 
@@ -108,6 +119,17 @@ public abstract class EnvironmentInstance
 
         var objectManager = Resolve<IObjectManager>();
         objectManager.AddExisting(stringId, obj);
+
+        return obj;
+    }
+
+    public T GetRegisteredObject<T>(string stringId) where T: class
+    {
+        var objectManager = Resolve<IObjectManager>();
+        if (objectManager.TryGetObject<T>(stringId, out var obj) == false)
+        {
+            throw new Exception($"Unable to resolve {stringId} for type {typeof(T)}");
+        }
 
         return obj;
     }
@@ -141,6 +163,36 @@ public abstract class EnvironmentInstance
             GameInterface.ContainerProvider.SetContainer(previousContainer);
             previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
         }
+    }
+
+    private class PatchScope : IDisposable
+    {
+        private readonly Harmony harmony = new Harmony("patch scope harmony");
+
+        private readonly HarmonyMethod[] patches;
+        private readonly MethodBase[] methods;
+
+        public PatchScope(IEnumerable<MethodBase> disableMethods)
+        {
+            var disableMethod = AccessTools.Method(typeof(PatchScope), nameof(Disable));
+            methods = disableMethods.ToArray();
+            patches = methods.Select(m => new HarmonyMethod(disableMethod)).ToArray();
+
+            for (int i = 0; i < methods.Length; i++)
+            {
+                harmony.Patch(methods[i], prefix: patches[i]);
+            }
+        }
+
+        public void Dispose()
+        {
+            for (int i = 0; i < methods.Length; i++)
+            {
+                harmony.Unpatch(methods[i], patches[i].method);
+            }
+        }
+
+        static bool Disable() => false;
     }
 
     public T EnsureSerializable<T>(T obj)

@@ -26,7 +26,6 @@ namespace GameInterface.Tests.Services.Kingdoms.KingdomDecision
             Assert.Equal(kingSelectionKingdomDecisionData.NotifyPlayer, deserializedObj.NotifyPlayer);
             Assert.Equal(kingSelectionKingdomDecisionData.IsEnforced, deserializedObj.IsEnforced);
             Assert.Equal(kingSelectionKingdomDecisionData.ClanToExcludeId, deserializedObj.ClanToExcludeId);
-
         }
     }
 }

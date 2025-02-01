@@ -23,6 +23,8 @@ using Xunit;
 using Xunit.Abstractions;
 using Common.Serialization;
 using TaleWorlds.CampaignSystem.Actions;
+using Common.Util;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -81,6 +83,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var objectManager = container.Resolve<IObjectManager>();
             HeroFactory.RandomHeroWithData heroData = HeroFactory.CreateRandomHero(objectManager);
             Hero hero = heroData.Hero;
+            
 
             // Setup serialization
             var factory = container.Resolve<IBinaryPackageFactory>();
@@ -347,6 +350,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 HeroParty = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));
                 HeroParty.StringId = "My Party";
                 HeroParty.SetCustomName(new TextObject("My Party"));
+
+                HeroParty.Party = ObjectHelper.SkipConstructor<PartyBase>();
+                HeroParty.Party.MemberRoster = new TroopRoster();
+                HeroParty.Party.PrisonRoster = new TroopRoster();
+
                 objectManager.AddExisting(HeroParty.StringId, HeroParty);
 
                 PartyBelongedToAsPrisoner = (PartyBase)FormatterServices.GetUninitializedObject(typeof(PartyBase));
@@ -357,6 +365,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 CharacterObject = (CharacterObject)FormatterServices.GetUninitializedObject(typeof(CharacterObject));
                 CharacterObject.StringId = "My CharacterObject";
                 CharacterObject._basicName = new TextObject("My CharacterObject");
+                CharacterObject.UpgradeTargets = new CharacterObject[0];
                 objectManager.AddExisting(CharacterObject.StringId, CharacterObject);
             }
 

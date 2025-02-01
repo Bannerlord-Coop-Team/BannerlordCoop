@@ -44,7 +44,7 @@ public class MilitiaSettlementPatch
         {
             using (new AllowedThread())
             {
-                settlement.Militia = militia;
+                settlement._readyMilitia = militia;
             }
         });
     }

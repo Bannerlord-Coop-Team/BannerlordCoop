@@ -84,14 +84,14 @@ internal class MobilePartyControlHandler : IHandler
     {
         if (!controlPartiesByDefault) return;
 
-        var stringId = obj.What.Data.StringId;
+        var stringId = obj.What.Instance.StringId;
 
         controlledEntityRegistry.RegisterAsControlled(ownerId, stringId);
     }
 
     private void Handle_MobilePartyDestroyed(MessagePayload<PartyDestroyed> obj)
     {
-        var stringId = obj.What.Data.StringId;
+        var stringId = obj.What.Instance.StringId;
 
         if (!controlledEntityRegistry.TryGetControlledEntity(stringId, out var controlledEntity))
             return;

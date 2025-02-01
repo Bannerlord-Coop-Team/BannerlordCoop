@@ -13,8 +13,6 @@ internal class CultureBuilder : IObjectBuilder
     {
         var cultureObject = new CultureObject();
 
-        cultureObject.StringId = Guid.NewGuid().ToString();
-
         cultureObject._defaultPolicyList = new MBList<PolicyObject>();
         cultureObject._maleNameList = new MBList<TextObject>();
         cultureObject._femaleNameList = new MBList<TextObject>();

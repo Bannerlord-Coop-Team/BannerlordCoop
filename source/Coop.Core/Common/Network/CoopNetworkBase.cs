@@ -43,6 +43,11 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
         UpdateThread.Start();
     }
 
+    ~CoopNetworkBase()
+    {
+        Dispose();
+    }
+
     public virtual void Dispose()
     {
         CancellationTokenSource?.Cancel();

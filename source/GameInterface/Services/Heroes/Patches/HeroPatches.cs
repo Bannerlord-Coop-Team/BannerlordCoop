@@ -24,6 +24,5 @@ namespace GameInterface.Services.Heroes.Patches
             __result = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties().Any(party => party.LeaderHero == __instance);
             return false;
         }
-
     }
 }

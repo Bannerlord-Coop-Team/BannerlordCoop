@@ -7,7 +7,7 @@ namespace Coop.Core.Client.Services.Save.Handler
     /// <summary>
     /// Handles save data
     /// </summary>
-    /// TODO update to work
+    // TODO update to work
     internal class SaveDataHandler : IHandler
     {
         private readonly IMessageBroker messageBroker;

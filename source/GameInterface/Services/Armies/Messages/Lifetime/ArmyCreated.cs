@@ -1,17 +1,27 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Armies.Data;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Armies.Messages.Lifetime;
 
 /// <summary>
-/// Event that is published when a party is created on the server.
+/// Command to create a new army.
 /// </summary>
-public record ArmyCreated : IEvent
+public record ArmyCreated : ICommand
 {
-    public ArmyCreationData Data { get; }
-
-    public ArmyCreated(ArmyCreationData data)
+    public ArmyCreated(Army army, Kingdom kingdom, MobileParty party, Army.ArmyTypes armyTypes)
     {
-        Data = data;
+        Army = army;
+        Kingdom = kingdom;
+        MobileParty = party;
+        ArmyType = armyTypes;
     }
+
+    public Army Army { get; }
+
+    public Kingdom Kingdom { get; }
+    public MobileParty MobileParty { get; }
+
+    public Army.ArmyTypes ArmyType { get; }
 }

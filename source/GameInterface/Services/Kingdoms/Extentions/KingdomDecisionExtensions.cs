@@ -11,7 +11,6 @@ namespace GameInterface.Services.Kingdoms.Extentions
     /// </summary>
     public static class KingdomDecisionExtensions
     {
-
         private static readonly Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>> SupportedConversions = new Dictionary<Type, Func<KingdomDecision, KingdomDecisionData>>()
         {
             { typeof(DeclareWarDecision), ConvertDeclareWarDecision },

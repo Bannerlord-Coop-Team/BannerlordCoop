@@ -101,7 +101,13 @@ public class ArmyDebugCommand
 
         MessageBroker.Instance.Subscribe<ArmyCreated>((msg) =>
         {
-            tcs.SetResult(msg.What.Data.StringId);
+            if (objectManager.TryGetId(msg.What.Army, out var armyId) == false)
+            {
+                tcs.SetResult(null);
+                return;
+            }
+
+            tcs.SetResult(armyId);
         });
 
         kingdom.CreateArmy(armyLeader, targetSettlment, armyType);
