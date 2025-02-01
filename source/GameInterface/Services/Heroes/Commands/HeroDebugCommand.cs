@@ -44,7 +44,7 @@ public class HeroDebugCommand
             return $"Unable to get {nameof(IObjectManager)}";
         }
 
-        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)  // Crashing here
         {
             return $"Unable to find hero with id: {args[0]}";
         }
