@@ -1,7 +1,5 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using LiteNetLib;
 
 namespace GameInterface.Services.TroopRosters.Messages;
 public record ProccessRequestOnDoneRecruitmentVM : IEvent
@@ -10,9 +8,12 @@ public record ProccessRequestOnDoneRecruitmentVM : IEvent
 
     public (string, string, int)[] TroopsInCart { get; }
 
-    public ProccessRequestOnDoneRecruitmentVM(string mobilePartyId, (string, string, int)[] troopsInCart)
+    public NetPeer ClientWho { get; }
+
+    public ProccessRequestOnDoneRecruitmentVM(string mobilePartyId, (string, string, int)[] troopsInCart, NetPeer clientWho)
     {
         MobilePartyId = mobilePartyId;
         TroopsInCart = troopsInCart;
+        ClientWho = clientWho;
     }
 }

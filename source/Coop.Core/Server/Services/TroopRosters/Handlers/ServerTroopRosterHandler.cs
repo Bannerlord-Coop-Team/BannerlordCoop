@@ -4,8 +4,8 @@ using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
 using Coop.Core.Server.Services.TroopRosters.Messages;
 using GameInterface.Services.TroopRosters.Messages;
+using LiteNetLib;
 using Serilog;
-using System;
 
 namespace Coop.Core.Server.Services.TroopRosters.Handlers;
 internal class ServerTroopRosterHandler : IHandler
@@ -29,7 +29,7 @@ internal class ServerTroopRosterHandler : IHandler
     private void HandleOnRecruitmentDone(MessagePayload<ClientRequestOnDoneRecruitmentVM> payload)
     {
         var obj = payload.What;
-        var message = new ProccessRequestOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart);
+        var message = new ProccessRequestOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, payload.Who as NetPeer);
         messageBroker.Publish(this, message);
     }
 

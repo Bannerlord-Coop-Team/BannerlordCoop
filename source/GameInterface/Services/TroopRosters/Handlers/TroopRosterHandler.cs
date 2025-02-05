@@ -1,8 +1,10 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using GameInterface.Services.TroopRosters.Patches;
+using SandBox.View.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -10,6 +12,12 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Recruitment;
+using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.GauntletUI.Data;
+using TaleWorlds.Library;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
 public class TroopRosterHandler : IHandler
@@ -18,15 +26,30 @@ public class TroopRosterHandler : IHandler
 
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
+    private readonly INetwork network;
 
-    public TroopRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public TroopRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
+        this.network = network;
 
         messageBroker.Subscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
 
         messageBroker.Subscribe<ProccessRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
+
+        messageBroker.Subscribe<ClientCloseRecruitmentVM>(Handle);
+    }
+
+    private void Handle(MessagePayload<ClientCloseRecruitmentVM> payload)
+    {
+        foreach (Tuple<IGauntletMovie, ViewModel> tuple in (ScreenManager.FocusedLayer as GauntletLayer).MoviesAndDataSources)
+        {
+            if (tuple.Item2 is RecruitmentVM)
+            {
+                (tuple.Item2 as RecruitmentVM).Deactivate();
+            }
+        }
     }
 
 
@@ -95,6 +118,7 @@ public class TroopRosterHandler : IHandler
         var message = new ApproveChangeOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, num);
         // TODO: SYNC APPROVE and then SYNC THE OTHER CLIENTS
 
+        network.Send(obj.ClientWho, new ClientCloseRecruitmentVM());
     }
 
     private void HandleAddToCounts(MessagePayload<ChangeTroopRostersAddToCounts> payload)

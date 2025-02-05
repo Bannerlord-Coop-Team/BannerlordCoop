@@ -16,10 +16,6 @@ namespace GameInterface.Services.TroopRosters.Patches;
 [HarmonyPatch(typeof(TroopRoster))]
 public class AddToCountsTroopRosterPatch
 {
-
-    private static readonly FieldInfo TroopRoster_OwnerParty = typeof(Settlement).GetField("_partiesCache", BindingFlags.NonPublic | BindingFlags.Instance);
-
-
     [HarmonyPatch("AddToCounts")]
     [HarmonyPrefix]
     private static bool AddToCountsPrefix(ref TroopRoster __instance, CharacterObject character, int count, bool insertAtFront,
@@ -29,6 +25,8 @@ public class AddToCountsTroopRosterPatch
         if (ModInformation.IsClient) return false;
         // Owner Party
         // TODO: use publicizer later when it comes out
+        if(__instance.OwnerParty == null) return false;
+
         MobileParty mobileParty = __instance.OwnerParty.MobileParty;
 
 
@@ -46,6 +44,7 @@ public class AddToCountsTroopRosterPatch
         {
             using (new AllowedThread())
             {
+                if(party.MemberRoster == null) return;
                 party.MemberRoster.AddToCounts(character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
             }
         });
