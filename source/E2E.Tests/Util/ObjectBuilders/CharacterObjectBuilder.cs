@@ -1,10 +1,4 @@
-﻿using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
+﻿using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -15,11 +9,9 @@ internal class CharacterObjectBuilder : IObjectBuilder
     public object Build()
     {
         var characterObject = new CharacterObject();
-        characterObject.Culture = new CultureObject();
-        characterObject.StringId = "";
 
-        AccessTools.Field(typeof(CharacterObject), "_basicName").SetValue(characterObject, new TextObject("Test Character"));
-        AccessTools.Field(typeof(CharacterObject), "DefaultCharacterSkills").SetValue(characterObject, new MBCharacterSkills());
+        characterObject._basicName = new TextObject("Test Character");
+        characterObject.DefaultCharacterSkills = new MBCharacterSkills();
 
         //List<Equipment> list = characterObject.AllEquipments.Where((Equipment t) => !t.IsEmpty() && !t.IsCivilian).ToList();
         //List<Equipment> list2 = characterObject.AllEquipments.Where((Equipment t) => !t.IsEmpty() && t.IsCivilian).ToList();
@@ -42,10 +34,10 @@ internal class CharacterObjectBuilder : IObjectBuilder
 
         MBEquipmentRoster equipmentRoster = new MBEquipmentRoster();
 
-        AccessTools.Field(typeof(MBEquipmentRoster), "_equipments").SetValue(equipmentRoster, equipment);
+        equipmentRoster._equipments = equipment;
 
-        AccessTools.Field(typeof(BasicCharacterObject), "_equipmentRoster").SetValue(characterObject, equipmentRoster);
-        AccessTools.Property(typeof(BasicCharacterObject), "BodyPropertyRange").SetValue(characterObject, new MBBodyProperty());
+        characterObject._equipmentRoster = equipmentRoster;
+        characterObject.BodyPropertyRange = new MBBodyProperty();
 
         characterObject.Culture = (CultureObject)(new CultureBuilder().Build());
 

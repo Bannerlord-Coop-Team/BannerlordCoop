@@ -3,7 +3,7 @@ using Common.Messaging;
 
 namespace GameInterface.Services.ItemRosters.Messages
 {
-    /// <summary>
+    /// <summary> 
     /// Called when an ItemRoster is updated.
     /// </summary>
     [BatchLogMessage]

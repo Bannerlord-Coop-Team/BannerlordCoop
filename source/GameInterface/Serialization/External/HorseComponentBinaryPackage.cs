@@ -9,18 +9,23 @@ namespace GameInterface.Serialization.External
     [Serializable]
     public class HorseComponentBinaryPackage : BinaryPackageBase<HorseComponent>
     {
+        public string MonsterId;
+
         public HorseComponentBinaryPackage(HorseComponent obj, IBinaryPackageFactory binaryPackageFactory) : base(obj, binaryPackageFactory)
         {
         }
         
         protected override void PackInternal()
         {
+            MonsterId = Object.Monster.StringId;
             base.PackFields();
         }
 
         protected override void UnpackInternal()
         {
             base.UnpackFields();
+
+            Object.Monster = ResolveId<Monster>(MonsterId);
         }
     }
 }

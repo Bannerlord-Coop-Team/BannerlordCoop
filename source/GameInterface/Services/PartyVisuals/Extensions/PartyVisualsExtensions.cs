@@ -9,10 +9,6 @@ namespace GameInterface.Services.PartyVisuals.Extensions;
 
 public static class PartyVisualsExtensions
 {
-    static Action<PartyVisualManager, PartyBase> PartyVisualsManager_AddNewPartyVisualForParty = typeof(PartyVisualManager)
-        .GetMethod("AddNewPartyVisualForParty", BindingFlags.NonPublic | BindingFlags.Instance)
-        .BuildDelegate<Action<PartyVisualManager, PartyBase>>();
-
     public static void CreateNewPartyVisual(this PartyBase partyBase)
     {
         if (partyBase == null) return;
@@ -20,6 +16,6 @@ public static class PartyVisualsExtensions
         if (Campaign.Current == null) return;
         if (PartyVisualManager.Current == null) return;
 
-        PartyVisualsManager_AddNewPartyVisualForParty(PartyVisualManager.Current, partyBase);
+        PartyVisualManager.Current.AddNewPartyVisualForParty(partyBase);
     }
 }

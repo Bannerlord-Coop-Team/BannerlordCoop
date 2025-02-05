@@ -48,7 +48,23 @@
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Autofac" Version="7.0.1" />
+    <Compile Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <Compile Remove="Server\Services\Armies\Messages\**" />
+    <Compile Remove="Server\Services\Kingdoms\Messages\**" />
+    <EmbeddedResource Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <EmbeddedResource Remove="Server\Services\Armies\Messages\**" />
+    <EmbeddedResource Remove="Server\Services\Kingdoms\Messages\**" />
+    <None Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <None Remove="Server\Services\Armies\Messages\**" />
+    <None Remove="Server\Services\Kingdoms\Messages\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Autofac" Version="8.1.0" />
+    <PackageReference Include="Krafs.Publicizer" Version="2.2.1">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.Collections.Immutable" Version="7.0.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
@@ -75,11 +91,15 @@
 	</AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkAddDecision.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkRemoveDecision.cs" />
+  </ItemGroup>
+  <ItemGroup>
 	  <Reference Include="TaleWorlds.Library">
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
 	  </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Server\Services\Kingdoms\Messages\" />
+    <Publicize Include="TaleWorlds.Library" />
   </ItemGroup>
 </Project>

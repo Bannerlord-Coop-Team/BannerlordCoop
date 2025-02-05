@@ -1,17 +1,20 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Armies.Data;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Armies.Messages.Lifetime;
 
 /// <summary>
-/// Event that is published when a party is destroyed on the server.
+/// Command to destroy a army.
 /// </summary>
-public record ArmyDestroyed : IEvent
+public record ArmyDestroyed : ICommand
 {
     public ArmyDestructionData Data { get; }
+    public Army Army { get; }
 
-    public ArmyDestroyed(ArmyDestructionData data)
+    public ArmyDestroyed(ArmyDestructionData data, Army army)
     {
         Data = data;
+        Army = army;
     }
 }

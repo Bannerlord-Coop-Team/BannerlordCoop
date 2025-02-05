@@ -1,10 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using Coop.Core.Client.Services.Clans.Messages;
 using Coop.Core.Server.Services.Towns.Messages;
 using GameInterface.Services.Towns.Messages;
-using System;
-using System.Linq;
 
 namespace Coop.Core.Server.Services.Towns.Handlers
 {

@@ -14,6 +14,8 @@ namespace Common.PacketHandlers
         UpdateMobilePartyMovement,
         RequestUpdatePartyBehavior,
         UpdatePartyBehavior,
+        FieldAutoSync,
+        PropertyAutoSync,
     }
 
     public interface IPacket

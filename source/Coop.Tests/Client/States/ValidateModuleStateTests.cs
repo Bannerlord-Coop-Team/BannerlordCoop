@@ -38,7 +38,23 @@ namespace Coop.Tests.Client.States
             Assert.NotEmpty(clientComponent.TestNetwork.Peers);
 
             var message = Assert.Single(clientComponent.TestNetwork.GetPeerMessages(serverPeer));
-            Assert.IsType<NetworkClientValidate>(message);
+            Assert.IsType<NetworkModuleVersionsValidate>(message);
+        }
+
+        [Fact]
+        public void NetworkModuleVersionsValidated_Transitions_ReceiveResult()
+        {
+            // Arrange
+            var validateState = clientLogic.SetState<ValidateModuleState>();
+
+            var payload = new MessagePayload<NetworkModuleVersionsValidated>(
+                this, new NetworkModuleVersionsValidated(true, null));
+
+            // Act
+            validateState.Handle_NetworkModuleVersionsValidated(payload);
+
+            // Assert
+            Assert.IsType<ValidateModuleState>(clientLogic.State);
         }
 
         [Fact]

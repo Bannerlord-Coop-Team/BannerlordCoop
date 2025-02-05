@@ -1,13 +1,14 @@
 ﻿using Common.Messaging;
 using Common.PacketHandlers;
 using LiteNetLib;
+using System;
 
 namespace Common.Network;
 
 /// <summary>
 /// Manages basic network functionality
 /// </summary>
-public interface INetwork : IUpdateable
+public interface INetwork : IDisposable
 {
     INetworkConfiguration Configuration { get; }
 
@@ -18,5 +19,4 @@ public interface INetwork : IUpdateable
     void SendAll(IMessage message);
     void SendAllBut(NetPeer excludedPeer, IMessage message);
     void Start();
-    void Stop();
 }

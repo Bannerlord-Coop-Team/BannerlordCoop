@@ -1,6 +1,5 @@
 ﻿using Common;
 using Common.Logging;
-using Common.Messaging;
 using Coop.Core;
 using Coop.Lib.NoHarmony;
 using GameInterface.Services.UI;

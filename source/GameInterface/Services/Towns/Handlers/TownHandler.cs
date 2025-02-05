@@ -168,14 +168,14 @@ namespace GameInterface.Services.Towns.Handlers
         private void HandleChangeTownGovernor(MessagePayload<ChangeTownGovernor> payload)
         {
             var obj = payload.What;
-
+            Hero governor = null;
 
             if (objectManager.TryGetObject(obj.TownId, out Town town) == false)
             {
                 Logger.Error("Unable to find Town ({townId})", obj.TownId);
                 return;
             }
-            if (objectManager.TryGetObject(obj.GovernorId, out Hero governor) == false)
+            if (obj.GovernorId != null && objectManager.TryGetObject(obj.GovernorId, out governor) == false)
             {
                 Logger.Error("Unable to find Hero ({governorId})", obj.GovernorId);
                 return;

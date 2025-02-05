@@ -40,8 +40,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        FieldInfo ItemModifier_damage = typeof(ItemModifier).GetField("<Damage>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        FieldInfo ItemModifier_armor = typeof(ItemModifier).GetField("<Armor>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!;
         [Fact]
         public void EquipmentElement_Full_Serialization()
         {
@@ -81,11 +79,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
             EquipmentElement newEquipmentElement = returnedPackage.Unpack<EquipmentElement>(deserializeFactory);
             
-            Assert.Equal(ItemModifier_damage.GetValue(equipmentElement.ItemModifier),
-                         ItemModifier_damage.GetValue(newEquipmentElement.ItemModifier));
+            Assert.Equal(equipmentElement.ItemModifier.Damage,
+                         newEquipmentElement.ItemModifier.Damage);
 
-            Assert.Equal(ItemModifier_armor.GetValue(equipmentElement.ItemModifier),
-                         ItemModifier_armor.GetValue(newEquipmentElement.ItemModifier));
+            Assert.Equal(equipmentElement.ItemModifier.Armor,
+                         newEquipmentElement.ItemModifier.Armor);
 
             Assert.Equal(equipmentElement.Item.StringId, newEquipmentElement.Item.StringId);
             Assert.Equal(equipmentElement.CosmeticItem.StringId, newEquipmentElement.CosmeticItem.StringId);

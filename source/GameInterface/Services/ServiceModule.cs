@@ -55,6 +55,7 @@ internal class ServiceModule : Module
             .Where(t => t.GetInterface(nameof(IHandler)) != null &&
                         t.Namespace.StartsWith(@namespace) &&
                         t.IsClass &&
+                        t.IsGenericType == false &&
                         t.IsAbstract == false);
         return types;
     }

@@ -25,6 +25,11 @@ namespace Coop.IntegrationTests.Environment.Mock
             throw new NotImplementedException();
         }
 
+        public bool IsTypeManaged(Type type)
+        {
+            throw new NotImplementedException();
+        }
+
         public bool Remove(object obj)
         {
             throw new NotImplementedException();

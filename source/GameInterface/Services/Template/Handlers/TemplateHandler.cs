@@ -22,6 +22,8 @@ public class TemplateHandler : IHandler
     // You can pass as many interfaces as you want to the constructor as long as the interface is registered int GameInterfaceModule
     public TemplateHandler(IMessageBroker messageBroker)
     {
+        this.messageBroker = messageBroker;
+
         // TODO remove explanitory comments
         // When TemplateCommandMessage is published to the message broker, Handle_TemplateCommandMessage is called
         messageBroker.Subscribe<TemplateCommandMessage>(Handle_TemplateCommandMessage);

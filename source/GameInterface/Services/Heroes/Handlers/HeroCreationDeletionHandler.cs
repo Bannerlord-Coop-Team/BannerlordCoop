@@ -1,6 +1,5 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using Coop.Mod.Extentions;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Messages.Lifetime;

@@ -31,7 +31,7 @@ namespace GameInterface.Tests.Serialization
             tDict.Add(OAT, 1);
 
             Assert.True(tDict.ContainsKey(OAT2));
-            
+
             Assert.Throws<ArgumentException>(() => tDict.Add(OAT2, 2));
         }
     }

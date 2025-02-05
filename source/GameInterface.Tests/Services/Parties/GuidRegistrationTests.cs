@@ -7,7 +7,6 @@ using Coop.Tests.Mocks;
 using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
-using GameInterface.Tests.Bootstrap.Extensions;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;

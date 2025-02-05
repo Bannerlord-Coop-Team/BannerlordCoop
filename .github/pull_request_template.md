@@ -10,8 +10,8 @@ Please check if your PR fulfills the following requirements:
 What kind of change does this PR introduce?
 <!-- Please check the one that applies to this PR. -->
 
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
 - [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
 - [ ] Refactoring (no functional changes, no api changes)
 - [ ] Build related changes
@@ -20,11 +20,11 @@ What kind of change does this PR introduce?
 - [ ] Other... Please describe:
 
 
-## What is the current behaviour?
-<!-- Please describe the current behaviour that you are modifying, or link to a relevant issue. -->
+## What is the current behavior?
+<!-- Please describe the current behavior that you are modifying, or link to a relevant issue. -->
 
 
-## What is the new behaviour?
+## What is the new behavior?
 <!-- Insert issue id after hashtag. -->
 Resolves #
 <!-- Describe functionality added. Add images or videos to show how it works if applies -->

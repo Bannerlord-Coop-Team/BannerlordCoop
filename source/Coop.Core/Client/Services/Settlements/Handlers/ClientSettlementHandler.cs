@@ -3,6 +3,7 @@ using Common.Network;
 using Coop.Core.Client.Services.Settlements.Messages;
 using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.Settlements;
+using GameInterface.Services.Settlements.Audit;
 using GameInterface.Services.Settlements.Messages;
 using System;
 
@@ -43,8 +44,18 @@ internal class ClientSettlementHandler : IHandler
         // Settlement.CanBeClaimed
         messageBroker.Subscribe<NetworkChangeSettlementClaimantCanBeClaimed>(HandleSettlementClaimaintCanBeClaimed);
 
+        //client auditorNetworkSettlementAuditResults
+
+        messageBroker.Subscribe<NetworkSettlementAuditResults>(HandleAuditor);
 
 
+
+    }
+
+    private void HandleAuditor(MessagePayload<NetworkSettlementAuditResults> payload)
+    {
+        var obj = payload.What;
+        messageBroker.Publish(this, new SettlementAuditResponse(obj.Data, obj.ServerAuditResults));
     }
 
     private void HandleSettlementClaimaintCanBeClaimed(MessagePayload<NetworkChangeSettlementClaimantCanBeClaimed> payload)

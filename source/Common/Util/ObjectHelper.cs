@@ -1,5 +1,8 @@
-﻿using System;
+﻿using Common.Logging;
+using Serilog;
+using System;
 using System.Runtime.Serialization;
+using System.Threading;
 
 namespace Common.Util;
 
@@ -8,6 +11,8 @@ namespace Common.Util;
 /// </summary>
 public class ObjectHelper
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<ObjectHelper>();
+
     /// <summary>
     /// Creates an object skipping the constructor
     /// </summary>
@@ -15,6 +20,8 @@ public class ObjectHelper
     /// <returns>New instance of <typeparamref name="T"/></returns>
     public static T SkipConstructor<T>()
     {
+        Logger.Verbose("{pid}: Creating {type}", Thread.CurrentThread.ManagedThreadId, typeof(T));
+
         return (T)FormatterServices.GetUninitializedObject(typeof(T));
     }
 

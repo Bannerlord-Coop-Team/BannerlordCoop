@@ -9,12 +9,11 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(PartyVisualManager), "AddNewPartyVisualForParty")]
 class DebugFixPatch
 {
-    private static FieldInfo partiesVisuals => typeof(PartyVisualManager).GetField("_partiesAndVisuals", BindingFlags.NonPublic | BindingFlags.Instance);
 
     [HarmonyPrefix]
     static bool Prefix(PartyBase partyBase)
     {
-        Dictionary<PartyBase, PartyVisual> dict = (Dictionary<PartyBase, PartyVisual>)partiesVisuals.GetValue(PartyVisualManager.Current);
+        Dictionary<PartyBase, PartyVisual> dict = PartyVisualManager.Current._partiesAndVisuals;
         if (dict.ContainsKey(partyBase))
         {
             return false;

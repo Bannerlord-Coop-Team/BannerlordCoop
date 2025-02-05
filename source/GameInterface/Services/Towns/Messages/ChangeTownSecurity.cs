@@ -1,10 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging.Attributes;
+using Common.Messaging;
 
 namespace GameInterface.Services.Towns.Messages
 {
     /// <summary>
     /// Used when the Security changes in a Town.
     /// </summary>
+    [BatchLogMessage]
     public record ChangeTownSecurity : ICommand
     {
         public string TownId { get; }

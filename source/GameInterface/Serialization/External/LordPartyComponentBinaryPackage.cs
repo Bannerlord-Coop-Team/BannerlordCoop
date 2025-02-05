@@ -33,11 +33,11 @@ namespace GameInterface.Serialization.External
             Kingdom kingdom = Object.Clan?.Kingdom;
             if (kingdom != null)
             {
-                List<WarPartyComponent> kingdomComponents = (List<WarPartyComponent>)KingdomBinaryPackage.Kingdom_WarPartyComponents.GetValue(kingdom);
+                List<WarPartyComponent> kingdomComponents = kingdom.WarPartyComponents;
                 if(kingdomComponents == null)
                 {
-                    KingdomBinaryPackage.InitializeCachedLists.Invoke(kingdom, Array.Empty<object>());
-                    kingdomComponents = (List<WarPartyComponent>)KingdomBinaryPackage.Kingdom_WarPartyComponents.GetValue(kingdom);
+                    kingdom.InitializeCachedLists();
+                    kingdomComponents = kingdom.WarPartyComponents;
 				}
                 
                 if (kingdomComponents.Contains(Object) == false)

@@ -45,10 +45,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly PropertyInfo Owner = typeof(CaravanPartyComponent).GetProperty(nameof(CaravanPartyComponent.Owner));
-        private static readonly PropertyInfo MobileParty = typeof(PartyComponent).GetProperty(nameof(PartyComponent.MobileParty));
-        private static readonly PropertyInfo Settlement = typeof(CaravanPartyComponent).GetProperty(nameof(CaravanPartyComponent.Settlement));
-        private static readonly FieldInfo _leader = typeof(CaravanPartyComponent).GetField("_leader", BindingFlags.NonPublic | BindingFlags.Instance);
         [Fact]
         public void CaravanPartyComponent_Full_Serialization()
         {
@@ -69,10 +65,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             objectManager.AddExisting(party.StringId, party);
 
             // Set field classes
-            _leader.SetValue(CaravanPartyComponent, hero);
-            Owner.SetValue(CaravanPartyComponent, hero);
-            MobileParty.SetValue(CaravanPartyComponent, party);
-            Settlement.SetValue(CaravanPartyComponent, settlement);
+            CaravanPartyComponent._leader = hero;
+            CaravanPartyComponent.Owner = hero;
+            CaravanPartyComponent.MobileParty = party;
+            CaravanPartyComponent.Settlement = settlement;
 
             // Setup package and dependencies
             var factory = container.Resolve<IBinaryPackageFactory>();

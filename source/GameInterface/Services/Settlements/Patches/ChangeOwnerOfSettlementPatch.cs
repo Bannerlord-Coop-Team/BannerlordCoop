@@ -1,17 +1,15 @@
 ﻿using Common;
-using Common.Extensions;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
+using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library.NewsManager;
 using static TaleWorlds.CampaignSystem.Actions.ChangeOwnerOfSettlementAction;
 
 namespace GameInterface.Services.Settlements.Patches
@@ -22,34 +20,39 @@ namespace GameInterface.Services.Settlements.Patches
     [HarmonyPatch(typeof(ChangeOwnerOfSettlementAction), "ApplyInternal")]
     public class ChangeOwnerOfSettlementPatch
     {
-        private static readonly AllowedInstance<Settlement> AllowedInstance = new AllowedInstance<Settlement>();
+        static readonly ILogger Logger = LogManager.GetLogger<ChangeOwnerOfSettlementPatch>();
 
-        private static readonly Action<Settlement, Hero, Hero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail> ApplyInternal = 
-        typeof(ChangeOwnerOfSettlementAction)
-        .GetMethod("ApplyInternal", BindingFlags.NonPublic | BindingFlags.Static)
-        .BuildDelegate<Action<Settlement, Hero, Hero, ChangeOwnerOfSettlementAction.ChangeOwnerOfSettlementDetail>>();
-    
         public static bool Prefix(Settlement settlement, Hero newOwner, Hero capturerHero, ChangeOwnerOfSettlementDetail detail)
         {
-            if (AllowedInstance.IsAllowed(settlement)) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client called unmanaged {name}\n"
+                    + "Callstack: {callstack}", typeof(ChangeOwnerOfSettlementAction), Environment.StackTrace);
+                return false;
+            }
 
             MessageBroker.Instance.Publish(settlement, 
-                new LocalSettlementOwnershipChange(settlement.StringId, newOwner?.StringId, capturerHero?.StringId, Convert.ToInt32(detail)));
+                new SettlementOwnershipChanged(
+                    settlement.StringId, 
+                    newOwner?.StringId, 
+                    capturerHero?.StringId, 
+                    Convert.ToInt32(detail)));
 
+            RunOriginalApplyInternal(settlement, newOwner, capturerHero,detail);
             return false;
         }
     
         public static void RunOriginalApplyInternal(Settlement settlement, Hero newOwner, Hero capturerHero, ChangeOwnerOfSettlementDetail detail)
         {
-            using (AllowedInstance)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                AllowedInstance.Instance = settlement;
-
-                GameLoopRunner.RunOnMainThread(() =>
+                using (new AllowedThread())
                 {
-                    ApplyInternal.Invoke(settlement, newOwner, capturerHero, detail);
-                }, true);
-            }
+                    ChangeOwnerOfSettlementAction.ApplyInternal(settlement, newOwner, capturerHero, detail);
+                }
+            });
         }
     
     }

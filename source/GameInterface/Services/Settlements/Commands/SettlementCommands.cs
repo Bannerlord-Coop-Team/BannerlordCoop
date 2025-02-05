@@ -1,5 +1,4 @@
 ﻿using Autofac;
-using GameInterface.Extentions;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
@@ -70,13 +69,13 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        try
-        {
-            settlement.NumberOfEnemiesSpottedAround = float.Parse(args[1]);
-        } catch (Exception ex)
+
+        if (float.TryParse(args[1], out var num) == false)
         {
             return $"Error setting the value: {args[1]} to a float.";
         }
+
+        settlement.NumberOfEnemiesSpottedAround = num;
 
         return $"Successfully set the Settlement ({settlementId}) NumberOfEnemiesSpottedAround to '{args[1]}'";
     }
@@ -104,14 +103,10 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        try
-        {
-            settlement.NumberOfAlliesSpottedAround = float.Parse(args[1]);
-        }
-        catch (Exception ex)
-        {
+        if (float.TryParse(args[1], out var num) == false)
             return $"Error setting the value: {args[1]} to a float.";
-        }
+
+        settlement.NumberOfAlliesSpottedAround = num;
 
         return $"Successfully set the Settlement ({settlementId}) NumberOfAlliesSpottedAround to '{args[1]}'";
     }
@@ -139,14 +134,10 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        try
-        {
-            settlement.BribePaid = int.Parse(args[1]);
-        }
-        catch (Exception ex)
-        {
+        if (int.TryParse(args[1], out var num) == false)
             return $"Error setting the value: {args[1]} to a int.";
-        }
+
+        settlement.BribePaid = num;
 
         return $"Successfully set the Settlement ({settlementId}) BribePaid to '{args[1]}'";
     }
@@ -174,14 +165,10 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        try
-        {
-            settlement.SetHitPointsChanged(float.Parse(args[1]));
-        }
-        catch (Exception ex)
-        {
+        if (float.TryParse(args[1], out var num) == false)
             return $"Error setting the value: {args[1]} to a float.";
-        }
+
+        settlement.SettlementHitPoints = num;
 
         return $"Successfully set the Settlement ({settlementId}) SettlementHitPoints to '{args[1]}'";
     }
@@ -261,16 +248,11 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        SiegeState state;
-        try
-        {
-            state =  (SiegeState)Enum.Parse(typeof(SiegeState), siegeState, true);
-        } catch (Exception ex)
-        {
-            return ex.ToString();
-        }
+        if (Enum.TryParse<SiegeState>(siegeState, true, out var state) == false)
+            return $"{siegeState} was not a valid enum in {nameof(SiegeState)}";
 
-        settlement.SetSiegeState(state);
+
+        settlement.CurrentSiegeState = state;
 
 
         return $"Successfully set the Settlement ({settlementId}) SiegeState to '{siegeState}'";
@@ -301,15 +283,9 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        float militia;
-        try
-        {
-            militia = float.Parse(militiaFloat);
-        }
-        catch (Exception ex)
-        {
-            return ex.ToString();
-        }
+
+        if (float.TryParse(militiaFloat, out var militia) == false)
+            return $"Error setting the value: {militiaFloat} to a float.";
 
         settlement.Militia = militia;
 
@@ -341,15 +317,9 @@ internal class SettlementCommands
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"Settlement: {settlementId} was not found.";
 
-        int wageLimit;
-        try
-        {
-            wageLimit = int.Parse(garrisonInt);
-        }
-        catch (Exception ex)
-        {
-            return ex.ToString();
-        }
+
+        if (int.TryParse(garrisonInt, out var wageLimit) == false)
+            return $"Error setting the value: {garrisonInt} to an int.";
 
         settlement.SetGarrisonWagePaymentLimit(wageLimit);
 
@@ -433,5 +403,104 @@ internal class SettlementCommands
         sb.AppendLine($"------------------- SETTLEMENT: {settlement.Name} -------------------");
 
         return sb.ToString();
+    }
+
+    // coop.debug.settlementcomponent.set_owner town_comp_ES3 lord_6_5_party_1
+    // Change Poros component owner
+    /// <summary>
+    /// Changes <see cref="SettlementComponent.Owner"/>
+    /// </summary>
+    /// <param name="args"><see cref="SettlementComponent"/> id, <see cref="MobileParty"/> or <see cref="Settlement"/> id</param>
+    /// <returns>info that is was successful</returns>
+    [CommandLineArgumentFunction("set_owner", "coop.debug.settlementComponent")]
+    public static string SetOwner(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <Mobile party id>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
+        var objectManager = container.Resolve<IObjectManager>();
+        string settlementComponentId = args[0];
+        string partyBaseId = args[1];
+        PartyBase partyBase;
+        if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
+            return $"SettlementComponent: {settlementComponentId} was not found.";
+        if (objectManager.TryGetObject<Settlement>(partyBaseId, out var settlement))
+        {
+            partyBase = settlement.Party;
+        }
+        else if (objectManager.TryGetObject<MobileParty>(partyBaseId, out var mobileParty))
+        {
+            partyBase = mobileParty.Party;
+        }
+        else
+        {
+            return $"PartyBase: {partyBaseId} was not found.";
+        }
+
+        settlementComponent.Owner = partyBase;
+
+        return $"Successfully set the SettlementComponent ({settlementComponentId}) Owner to '{args[1]}'";
+    }
+
+    // coop.debug.settlementcomponent.set_gold town_comp_ES3 401021
+    // Change Poros component gold
+    /// <summary>
+    /// Changes <see cref="SettlementComponent.Gold"/>
+    /// </summary>
+    /// <param name="args"><see cref="SettlementComponent"/> id, amount of gold</param>
+    /// <returns>info that is was successful</returns>
+    [CommandLineArgumentFunction("set_gold", "coop.debug.settlementComponent")]
+    public static string SetGold(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <Gold>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
+        var objectManager = container.Resolve<IObjectManager>();
+        string settlementComponentId = args[0];
+        if (int.TryParse(args[1], out int gold) == false)
+        {
+            return "Unable to parse gold amount";
+        }
+        if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
+            return $"SettlementComponent: {settlementComponentId} was not found.";
+
+        settlementComponent.Gold = gold;
+
+        return $"Successfully set the SettlementComponent ({settlementComponentId}) Gold to '{args[1]}'";
+    }
+
+    // coop.debug.settlementcomponent.set_is_owner_unassigned town_comp_ES3 true
+    // Change Poros component IsOwnerUnassigned
+    /// <summary>
+    /// Changes <see cref="SettlementComponent.IsOwnerUnassigned"/>
+    /// </summary>
+    /// <param name="args"><see cref="SettlementComponent"/> id, new <see cref="SettlementComponent.IsOwnerUnassigned"/> value></param>
+    /// <returns>info that is was successful</returns>
+    [CommandLineArgumentFunction("set_is_owner_unassigned", "coop.debug.settlementComponent")]
+    public static string SetIsOwnerUnassigned(List<string> args)
+    {
+        if (ModInformation.IsClient) return "This function can only be used by the server";
+
+        if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <boolean>\"";
+
+        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get SettlementComponent";
+        var objectManager = container.Resolve<IObjectManager>();
+        string settlementComponentId = args[0];
+        if (bool.TryParse(args[1], out bool value) == false)
+        {
+            return "Unable to parse IsOwnerUnassigned";
+        }
+        if (objectManager.TryGetObject<SettlementComponent>(settlementComponentId, out var settlementComponent) == false)
+            return $"SettlementComponent: {settlementComponentId} was not found.";
+
+
+        settlementComponent.IsOwnerUnassigned = value;
+
+
+        return $"Successfully set the SettlementComponent ({settlementComponentId}) IsOwnerUnassigned to '{args[1]}'";
     }
 }

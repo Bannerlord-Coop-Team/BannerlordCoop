@@ -54,8 +54,6 @@ namespace Common.Tests.Utils
 
     public class TestObject
     {
-        static AllowedInstance<TestObject> allowedInstance = new AllowedInstance<TestObject>();
-
         public int SomeInt { get; private set; }
 
         public TestObject(int startIntValue)
@@ -65,7 +63,7 @@ namespace Common.Tests.Utils
 
         public static void UpdateSomeInt(TestObject obj, int value)
         {
-            if (allowedInstance.IsAllowed(obj))
+            if (AllowedThread.IsThisThreadAllowed())
             {
                 obj.SomeInt = value;
             }
@@ -73,9 +71,8 @@ namespace Common.Tests.Utils
 
         public static void OverrideInt(TestObject obj, int value)
         {
-            using (allowedInstance)
+            using (new AllowedThread())
             {
-                allowedInstance.Instance = obj;
                 UpdateSomeInt(obj, value);
             }
         }

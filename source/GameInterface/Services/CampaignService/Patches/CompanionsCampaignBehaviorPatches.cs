@@ -7,7 +7,7 @@ namespace GameInterface.Services.CampaignService.Patches;
 internal class CompanionsCampaignBehaviorPatches
 {
     [HarmonyPrefix]
-    [HarmonyPatch("CreateCompanionAndAddToSettlement")]
+    [HarmonyPatch(nameof(CompanionsCampaignBehavior.CreateCompanionAndAddToSettlement))]
     private static bool Prefix()
     {
         return false;

@@ -51,7 +51,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-        private static readonly PropertyInfo BannerEffect = typeof(BannerComponent).GetProperty(nameof(BannerComponent.BannerEffect));
         [Fact]
         public void BannerComponent_Full_Serialization()
         {
@@ -70,7 +69,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             BannerEffect effect = new BannerEffect("myEffect");
             Assert.True(objectManager.AddExisting(effect.StringId, effect));
 
-            BannerEffect.SetValue(BannerComponent, effect);
+            BannerComponent.BannerEffect = effect;
 
             // Setup binary package with dependencies 
             var factory = container.Resolve<IBinaryPackageFactory>();
@@ -104,7 +103,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 Assert.Equal(property.GetValue(BannerComponent), property.GetValue(newBannerComponent));
             }
 
-            Assert.Equal(BannerEffect.GetValue(BannerComponent), BannerEffect.GetValue(newBannerComponent));
+            Assert.Equal(BannerComponent.BannerEffect, newBannerComponent.BannerEffect);
         }
     }
 }

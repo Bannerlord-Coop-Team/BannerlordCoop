@@ -37,8 +37,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
             GameLoopRunner.RunOnMainThread(InternalLoadDebugGame, false);
         }
 
-        private static PropertyInfo FileDriver_SavePath => typeof(FileDriver).GetProperty("SavePath", BindingFlags.NonPublic | BindingFlags.Static);
-        private static PlatformDirectoryPath SaveDir => (PlatformDirectoryPath)FileDriver_SavePath?.GetValue(null);
+        private static PlatformDirectoryPath SaveDir => FileDriver.SavePath;
         private static PlatformFilePath SavePath => new PlatformFilePath(SaveDir, $"{LOAD_GAME}.sav");
         private static string FullSavePath => TaleWorlds.Library.Common.PlatformFileHelper?.GetFileFullPath(SavePath);
         private void InternalLoadDebugGame()
@@ -65,11 +64,14 @@ namespace GameInterface.Services.GameDebug.Interfaces
         {
             PartyVisibilityPatch.AllPartiesVisible = true;
 
-            foreach(var party in Campaign.Current.MobileParties)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                party.IsVisible = true;
-                party.Party.SetVisualAsDirty();
-            }
+                foreach (var party in Campaign.Current.MobileParties)
+                {
+                    party.IsVisible = true;
+                    party.Party.SetVisualAsDirty();
+                }
+            });
         }
 
         public void LoadGame(string saveName)

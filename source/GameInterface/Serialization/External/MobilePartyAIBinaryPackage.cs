@@ -33,14 +33,12 @@ namespace GameInterface.Serialization.External
             base.PackFields(excludes);
         }
 
-        private static FieldInfo MobilePartyAi_lastTargetedParties => typeof(MobilePartyAi).GetField("_lastTargetedParties", BindingFlags.NonPublic | BindingFlags.Instance);
-        private static MethodInfo MobilePartyAi_InitCached => typeof(MobilePartyAi).GetMethod("InitCached", BindingFlags.NonPublic | BindingFlags.Instance);
         protected override void UnpackInternal()
         {
             base.UnpackFields();
 
-            MobilePartyAi_lastTargetedParties.SetValue(Object, new List<MobileParty>());
-            MobilePartyAi_InitCached.Invoke(Object, Array.Empty<object>());
+            Object._lastTargetedParties = new List<MobileParty>();
+            Object.InitCached();
         }
     }
 }

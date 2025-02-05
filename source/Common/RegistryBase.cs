@@ -24,7 +24,7 @@ public interface IRegistry : IDisposable
     /// <summary>
     /// Type the registry manages
     /// </summary>
-    Type ManagedType { get; }
+    IEnumerable<Type> ManagedTypes { get; }
 
     /// <summary>
     /// Registers all existing objects

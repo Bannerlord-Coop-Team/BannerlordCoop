@@ -68,10 +68,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 hero2
             };
 
-            ClanBinaryPackage.Clan_supporterNotablesCache.SetValue(testClan, heroes);
-            ClanBinaryPackage.Clan_companionsCache.SetValue(testClan, heroes);
-            ClanBinaryPackage.Clan_lordsCache.SetValue(testClan, heroes);
-            ClanBinaryPackage.Clan_supporterNotablesCache.SetValue(testClan, heroes);
+            testClan._supporterNotablesCache = heroes;
+            testClan._companionsCache = heroes;
+            testClan._lordsCache = heroes;
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             ClanBinaryPackage package = new ClanBinaryPackage(testClan, factory);
@@ -94,10 +93,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(testClan.AutoRecruitmentExpenses, newClan.AutoRecruitmentExpenses);
             Assert.Equal(testClan.LastFactionChangeTime, newClan.LastFactionChangeTime);
 
-            Assert.Equal(heroes, ClanBinaryPackage.Clan_supporterNotablesCache.GetValue(newClan));
-            Assert.Equal(heroes, ClanBinaryPackage.Clan_companionsCache.GetValue(newClan));
-            Assert.Equal(heroes, ClanBinaryPackage.Clan_lordsCache.GetValue(newClan));
-            Assert.Equal(heroes, ClanBinaryPackage.Clan_supporterNotablesCache.GetValue(newClan));
+            Assert.Equal(heroes, newClan._supporterNotablesCache);
+            Assert.Equal(heroes, newClan._companionsCache);
+            Assert.Equal(heroes, newClan._lordsCache);
         }
 
         [Fact]

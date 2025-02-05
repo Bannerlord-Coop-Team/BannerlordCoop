@@ -16,16 +16,18 @@ Also see additional information at the bottom for more information and templates
 
 <!-- Describe why this issue is needed. -->
 **Key**
-Server side only (only allow the running of the function on the server side)
-Client side only (only allow the running of the function on the client side)
-Client side sync (request the server to change the value, server then changes the value and replies to the client allowing the change)
-Server side sync (only server allows running of the function and send to all clients the value changed and clients update the value/call original function)
+| Sync Type | Description |
+|:-----------------|:---------|
+| Server side only | only allow the running of the function on the server side |
+| Client side only | only allow the running of the function on the client side |
+| Client side sync | request the server to change the value, server then changes the value and replies to the client allowing the change |
+| Server side sync | only server allows running of the function and send to all clients the value changed and clients update the value/call original function |
 
 **Synced**
 <!-- Add all method/fields below -->
 | Method/Field Name | Sync Type |
 |:-----------------:|:---------:|
-|                   |           |
+| TODO              | TODO |
 
 **Deferred**
 <!-- Add deffered (covered by a field in the Synced table) --->
@@ -68,4 +70,5 @@ It is recommended to start with an integration test, you can create one using th
 ## Definition of Done
 - [ ] Class level comments exist for all new classes.
 - [ ] XUnit tests exist for every method that does not require the game to be ran.
+- [ ] Commands exist for all new sync items.
 <!-- Create more required items as needed. -->

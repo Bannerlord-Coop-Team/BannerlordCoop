@@ -1,6 +1,5 @@
 ﻿using Common.Extensions;
 using Common.Messaging;
-using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
@@ -102,7 +101,13 @@ public class ArmyDebugCommand
 
         MessageBroker.Instance.Subscribe<ArmyCreated>((msg) =>
         {
-            tcs.SetResult(msg.What.Data.StringId);
+            if (objectManager.TryGetId(msg.What.Army, out var armyId) == false)
+            {
+                tcs.SetResult(null);
+                return;
+            }
+
+            tcs.SetResult(armyId);
         });
 
         kingdom.CreateArmy(armyLeader, targetSettlment, armyType);
@@ -161,7 +166,7 @@ public class ArmyDebugCommand
                 GetArmyDispersionReasonUsage();
         }
 
-        army.DisbandArmy(reason);
+        army.DisperseInternal(reason);
 
         return $"Destroyed army {army.Name} with id {armyId}";
     }
@@ -259,7 +264,7 @@ public class ArmyDebugCommand
             return $"Unable to get {nameof(Army)} with {armyId}";
         }
 
-        army.AddPartyInternal(mobileParty);
+        army.OnAddPartyInternal(mobileParty);
         
         stringBuilder.AppendLine($"Added {mobileParty.Name} to {armyId}");
         
@@ -304,7 +309,7 @@ public class ArmyDebugCommand
             return $"Unable to get {nameof(Army)} with {armyId}";
         }
 
-        army.RemovePartyInternal(mobileParty);
+        army.OnRemovePartyInternal(mobileParty);
         
         stringBuilder.AppendLine($"Removed {mobileParty.Name} from {armyId}");
         

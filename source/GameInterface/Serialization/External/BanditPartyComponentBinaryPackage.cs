@@ -33,7 +33,7 @@ namespace GameInterface.Serialization.External
 
                 if (kingdom != null)
                 {
-                    List<WarPartyComponent> kingdomComponents = (List<WarPartyComponent>)KingdomBinaryPackage.Kingdom_WarPartyComponents.GetValue(kingdom);
+                    List<WarPartyComponent> kingdomComponents = kingdom.WarPartyComponents;
                     if (kingdomComponents.Contains(Object) == false)
                     {
                         kingdomComponents.Add(Object);

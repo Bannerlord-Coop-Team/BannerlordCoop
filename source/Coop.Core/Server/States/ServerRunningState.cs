@@ -34,7 +34,7 @@ public class ServerRunningState : ServerStateBase
     public override void Stop()
     {
         // Stop server
-        network.Stop();
+        network.Dispose();
 
         // Go to main menu
         messageBroker.Publish(this, new EnterMainMenu());

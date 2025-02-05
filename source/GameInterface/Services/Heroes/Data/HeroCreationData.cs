@@ -1,5 +1,4 @@
-﻿using Coop.Mod.Extentions;
-using ProtoBuf;
+﻿using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 

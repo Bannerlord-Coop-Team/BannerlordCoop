@@ -104,7 +104,13 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
-                army.AddPartyInternal(mobileParty);
+                // TODO find why this is not getting set automatically
+                if (mobileParty.Army == null)
+                {
+                    mobileParty._army = army;
+                }
+
+                army.OnAddPartyInternal(mobileParty);
             }
         });
     }
@@ -115,7 +121,13 @@ public class ArmyPatches
         {
             using (new AllowedThread())
             {
-                army.RemovePartyInternal(mobileParty);
+                // TODO find why this is not getting set automatically
+                if (mobileParty.Army == null)
+                {
+                    mobileParty._army = army;
+                }
+
+                army.OnRemovePartyInternal(mobileParty);
             }
         });
     }

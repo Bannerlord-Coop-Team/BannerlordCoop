@@ -5,8 +5,7 @@ using Serilog;
 
 namespace GameInterface.Policies;
 
-// TODO make cleaner
-internal class CallOriginalPolicy
+public class CallOriginalPolicy
 {
     private static readonly ILogger Logger = LogManager.GetLogger<CallOriginalPolicy>();
 

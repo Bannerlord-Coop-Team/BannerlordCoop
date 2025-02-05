@@ -1,11 +1,12 @@
-﻿using Common.Messaging;
-using GameInterface.Extentions;
+﻿using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
+using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
@@ -26,6 +27,8 @@ namespace GameInterface.Services.MobileParties.Handlers;
 /// <seealso cref="AiBehavior"/>
 internal class MobilePartyBehaviorHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
@@ -82,6 +85,8 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         if (!objectManager.TryGetObject(data.PartyId, out MobileParty party))
             return;
+
+        if (party.Ai == null) return;
 
         Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
 

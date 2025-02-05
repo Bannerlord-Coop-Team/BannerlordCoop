@@ -85,7 +85,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Equal(characterTraits.StringId, newCharacterTraits.StringId);
             Assert.Equal(characterTraits.IsReady, newCharacterTraits.IsReady);
 
-            Dictionary<TraitObject, int> newTraits = (Dictionary<TraitObject, int>)_attributes.GetValue(newCharacterTraits);
+            Dictionary<TraitObject, int> newTraits = newCharacterTraits._attributes;
 
             Assert.Equal(traits.ToString(), newTraits.ToString());
         }

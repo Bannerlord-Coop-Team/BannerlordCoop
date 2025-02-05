@@ -38,23 +38,16 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.NotEmpty(bytes);
         }
 
-
-        private static PropertyInfo SkeletonModel = typeof(SkeletonScale).GetProperty(nameof(SkeletonScale.SkeletonModel));
-        private static PropertyInfo MountSitBoneScale = typeof(SkeletonScale).GetProperty(nameof(SkeletonScale.MountSitBoneScale));
-        private static PropertyInfo MountRadiusAdder = typeof(SkeletonScale).GetProperty(nameof(SkeletonScale.MountRadiusAdder));
-        private static PropertyInfo Scales = typeof(SkeletonScale).GetProperty(nameof(SkeletonScale.Scales));
-        private static PropertyInfo BoneNames = typeof(SkeletonScale).GetProperty(nameof(SkeletonScale.BoneNames));
-        private static PropertyInfo BoneIndices = typeof(SkeletonScale).GetProperty(nameof(SkeletonScale.BoneIndices));
         [Fact]
         public void SkeletonScale_Full_Serialization()
         {
             SkeletonScale SkeletonScale = new SkeletonScale();
-            SkeletonModel.SetValue(SkeletonScale, "my model");
-            MountSitBoneScale.SetValue(SkeletonScale, new Vec3(1,2,3));
-            MountRadiusAdder.SetValue(SkeletonScale, 0.4f);
-            Scales.SetValue(SkeletonScale, new[] { new Vec3(3, 2, 3), new Vec3(1, 2, 1) });
-            BoneNames.SetValue(SkeletonScale, new List<string> { "str1", "str2" });
-            BoneIndices.SetValue(SkeletonScale, new sbyte[] { 1, 2, 3 });
+            SkeletonScale.SkeletonModel = "my model";
+            SkeletonScale.MountSitBoneScale = new Vec3(1,2,3);
+            SkeletonScale.MountRadiusAdder = 0.4f;
+            SkeletonScale.Scales = new[] { new Vec3(3, 2, 3), new Vec3(1, 2, 1) };
+            SkeletonScale.BoneNames = new List<string> { "str1", "str2" };
+            SkeletonScale.BoneIndices = new sbyte[] { 1, 2, 3 };
 
             var factory = container.Resolve<IBinaryPackageFactory>();
             SkeletonScaleBinaryPackage package = new SkeletonScaleBinaryPackage(SkeletonScale, factory);
