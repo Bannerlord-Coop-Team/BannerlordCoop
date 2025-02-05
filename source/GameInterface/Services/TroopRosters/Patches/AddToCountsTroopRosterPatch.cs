@@ -29,8 +29,7 @@ public class AddToCountsTroopRosterPatch
         if (ModInformation.IsClient) return false;
         // Owner Party
         // TODO: use publicizer later when it comes out
-        PartyBase partyBase = (PartyBase)TroopRoster_OwnerParty.GetValue(__instance);
-        MobileParty mobileParty = partyBase.MobileParty;
+        MobileParty mobileParty = __instance.OwnerParty.MobileParty;
 
 
         var message = new TroopRosterAddToCountsChanged(mobileParty.StringId, character.StringId, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
