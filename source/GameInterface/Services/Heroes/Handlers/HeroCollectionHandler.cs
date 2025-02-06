@@ -88,7 +88,7 @@ namespace GameInterface.Services.Heroes.Handlers
             var data = payload.What;
 
             if (!TryGetId(data.Instance, out string HeroId)) return;
-            if (!TryGetId(data.Value, out string CharacterObjectId)) return;
+            if (!TryGetId(data.Value, out string CharacterObjectId) && data.Value != null) return;
 
             network.SendAll(new NetworkUpdateArray(HeroId, CharacterObjectId, data.Index));
         }
@@ -98,7 +98,7 @@ namespace GameInterface.Services.Heroes.Handlers
             var data = payload.What;
 
             if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out CharacterObject characterObject)) return;
+            if (!objectManager.TryGetObject(data.ValueId, out CharacterObject characterObject) && data.ValueId != null) return;
 
             hero.VolunteerTypes[data.Index] = characterObject;
         }

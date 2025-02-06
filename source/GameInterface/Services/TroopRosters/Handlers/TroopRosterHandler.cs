@@ -39,6 +39,8 @@ public class TroopRosterHandler : IHandler
         messageBroker.Subscribe<ProccessRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
 
         messageBroker.Subscribe<ClientCloseRecruitmentVM>(Handle);
+
+        messageBroker.Subscribe<ApproveChangeOnDoneRecruitmentVM>(Handle);
     }
 
     private void Handle(MessagePayload<ClientCloseRecruitmentVM> payload)
@@ -54,7 +56,7 @@ public class TroopRosterHandler : IHandler
 
 
     // server process request
-    private void HandleOnRecruitmentDone(MessagePayload<ProccessRequestOnDoneRecruitmentVM> payload)
+    public void HandleOnRecruitmentDone(MessagePayload<ProccessRequestOnDoneRecruitmentVM> payload)
     {
         var obj = payload.What;
         if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
@@ -114,11 +116,62 @@ public class TroopRosterHandler : IHandler
 
         GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, num, true);
 
-        // message to specific client then other clients?
         var message = new ApproveChangeOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, num);
-        // TODO: SYNC APPROVE and then SYNC THE OTHER CLIENTS
 
         network.Send(obj.ClientWho, new ClientCloseRecruitmentVM());
+        network.SendAll(message);
+    }
+
+    //client process approved recruitment
+    private void Handle(MessagePayload<ApproveChangeOnDoneRecruitmentVM> payload)
+    {
+        var obj = payload.What;
+
+        if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
+        {
+            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
+            return;
+        }
+
+        List<(Hero, CharacterObject, int)> herosValidated = new();
+
+        // validate they are all good before recruiting any
+        foreach (var troop in obj.TroopsInCart)
+        {
+            if (objectManager.TryGetObject(troop.Item1, out Hero hero) == false)
+            {
+                Logger.Error("Unable to find Hero ({HeroId})", troop.Item1);
+                // send decline to them at some point...
+                return;
+            }
+
+            if (objectManager.TryGetObject(troop.Item2, out CharacterObject characterObject) == false)
+            {
+                Logger.Error("Unable to find Hero ({CharacterObjectId})", troop.Item2);
+                // send decline to them at some point...
+                return;
+            }
+
+
+            var volunteerTroopAtIndex = hero.VolunteerTypes[troop.Item3];
+
+            if (volunteerTroopAtIndex is null)
+            {
+                // later send decline for specific reason
+                return;
+            }
+
+            herosValidated.Add((hero, characterObject, troop.Item3));
+        }
+
+        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
+        {
+            hero.VolunteerTypes[index] = null;
+            mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
+            CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
+        }
+
+        GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, obj.Gold, true);
     }
 
     private void HandleAddToCounts(MessagePayload<ChangeTroopRostersAddToCounts> payload)
