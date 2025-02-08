@@ -1,24 +1,12 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using HarmonyLib;
-using System.Runtime.ConstrainedExecution;
-using System.Runtime.InteropServices;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
-using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
-using GameInterface.Tests.Bootstrap.Modules;
-using System.ComponentModel;
-using Autofac;
-using NuGet.Frameworks;
-using Newtonsoft.Json.Serialization;
-using JetBrains.Annotations;
-using System.Diagnostics;
 
-namespace E2E.Tests.Services.ItemObjectService
+namespace E2E.Tests.Services.ItemObjects
 {
     public class ItemObjectSyncTest : IDisposable
     {
@@ -48,12 +36,11 @@ namespace E2E.Tests.Services.ItemObjectService
             var culture = new BasicCultureObject() { Name = new TextObject("Battania") };
             var weaponDesign = ObjectHelper.SkipConstructor<WeaponDesign>();
             var holsterPositionShift = new Vec3(1, 2, 3, 4);
-            string[] itemHolsters = { "holster1", "holster2", "holster3" };
+            string[] itemHolsters = { "holster12", "holster23", "holster34" };
             var itemComponent = new TradeItemComponent();
             var itemCategory = ObjectHelper.SkipConstructor<ItemCategory>();
             var prerequisiteItem = new ItemObject();
             var itemTypeEnum = ItemObject.ItemTypeEnum.OneHandedWeapon;
-
 
             server.Call(() =>
             {
@@ -106,13 +93,13 @@ namespace E2E.Tests.Services.ItemObjectService
                 //typeIntercept.Invoke(null, new object[] { itemObject, 69 });
             });
 
-            server.ObjectManager.TryGetId(itemObject, out string serverObjectId);
-            server.ObjectManager.TryGetId(itemObject.Culture, out string serverCultureId);
-            server.ObjectManager.TryGetId(itemObject.WeaponDesign, out string serverWeaponDesignId);
-            server.ObjectManager.TryGetId(itemObject.ItemHolsters, out string  serverItemHolstersId);
-            server.ObjectManager.TryGetId(itemObject.ItemComponent, out string serverItemComponentId);
-            server.ObjectManager.TryGetId(itemObject.ItemCategory, out string serverItemCategoryId);
-            server.ObjectManager.TryGetId(itemObject.PrerequisiteItem, out string serverPrerequisiteItemId);
+            Assert.True(server.ObjectManager.TryGetId(itemObject, out string serverObjectId));
+            Assert.True(server.ObjectManager.TryGetId(itemObject.Culture, out string serverCultureId));
+            Assert.True(server.ObjectManager.TryGetId(itemObject.WeaponDesign, out string serverWeaponDesignId));
+            Assert.True(server.ObjectManager.TryGetId(itemObject.ItemHolsters, out string  serverItemHolstersId));
+            Assert.True(server.ObjectManager.TryGetId(itemObject.ItemComponent, out string serverItemComponentId));
+            Assert.True(server.ObjectManager.TryGetId(itemObject.ItemCategory, out string serverItemCategoryId));
+            Assert.True(server.ObjectManager.TryGetId(itemObject.PrerequisiteItem, out string serverPrerequisiteItemId));
 
             foreach (var client in TestEnvironment.Clients)
             {
@@ -121,13 +108,13 @@ namespace E2E.Tests.Services.ItemObjectService
                 //Field
                 Assert.Equal(itemObject.Type, clientItemObject.Type);
 
-                client.ObjectManager.TryGetId(clientItemObject, out string clientObjectId);
-                client.ObjectManager.TryGetId(clientItemObject.Culture, out string clientCultureId);
-                client.ObjectManager.TryGetId(clientItemObject.WeaponDesign, out string clientWeaponDesignId);
-                client.ObjectManager.TryGetId(clientItemObject.ItemHolsters, out string clientItemHolstersId);
-                client.ObjectManager.TryGetId(clientItemObject.ItemComponent, out string clientItemComponentId);
-                client.ObjectManager.TryGetId(clientItemObject.ItemCategory, out string clientItemCategoryId);
-                client.ObjectManager.TryGetId(clientItemObject.PrerequisiteItem, out string clientPrerequisiteItemId);
+                Assert.True(client.ObjectManager.TryGetId(clientItemObject, out string clientObjectId));
+                Assert.True(client.ObjectManager.TryGetId(clientItemObject.Culture, out string clientCultureId));
+                Assert.True(client.ObjectManager.TryGetId(clientItemObject.WeaponDesign, out string clientWeaponDesignId));
+                Assert.True(client.ObjectManager.TryGetId(clientItemObject.ItemHolsters, out string clientItemHolstersId));
+                Assert.True(client.ObjectManager.TryGetId(clientItemObject.ItemComponent, out string clientItemComponentId));
+                Assert.True(client.ObjectManager.TryGetId(clientItemObject.ItemCategory, out string clientItemCategoryId));
+                Assert.True(client.ObjectManager.TryGetId(clientItemObject.PrerequisiteItem, out string clientPrerequisiteItemId));
                 Assert.Equal(serverObjectId, clientObjectId);
 
 
@@ -167,7 +154,6 @@ namespace E2E.Tests.Services.ItemObjectService
                 Assert.Equal(1, clientItemObject.LodAtlasIndex);
                 Assert.Equal(serverPrerequisiteItemId, clientPrerequisiteItemId);
                 Assert.Equal(ItemObject.ItemTypeEnum.OneHandedWeapon, clientItemObject.ItemType);
-
 
                 //Collection
                 Assert.Equal(itemHolsters, clientItemObject.ItemHolsters);
