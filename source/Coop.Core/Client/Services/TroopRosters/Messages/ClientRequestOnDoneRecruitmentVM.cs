@@ -1,8 +1,5 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Client.Services.TroopRosters.Messages;
 
@@ -13,10 +10,13 @@ public record ClientRequestOnDoneRecruitmentVM : IEvent
     public string MobilePartyId { get; }
     [ProtoMember(2)]
     public (string, string, int)[] TroopsInCart { get; }
+    [ProtoMember(3)]
+    public int TotalCost { get; }
 
-    public ClientRequestOnDoneRecruitmentVM(string mobilePartyId, (string, string, int)[] troopsInCart)
+    public ClientRequestOnDoneRecruitmentVM(string mobilePartyId, (string, string, int)[] troopsInCart, int totalCost)
     {
         MobilePartyId = mobilePartyId;
         TroopsInCart = troopsInCart;
+        TotalCost = totalCost;
     }
 }

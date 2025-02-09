@@ -25,7 +25,7 @@ public class ClientTroopRosterHandler : IHandler
     private void HandleOnRecruitmentDone(MessagePayload<OnDoneRecruitmentVMChanged> payload)
     {
         var obj = payload.What;
-        var message = new ClientRequestOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart);
+        var message = new ClientRequestOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, obj.TotalCost);
 
         network.SendAll(message);
     }

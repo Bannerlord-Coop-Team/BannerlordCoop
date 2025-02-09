@@ -29,7 +29,7 @@ internal class ServerTroopRosterHandler : IHandler
     private void HandleOnRecruitmentDone(MessagePayload<ClientRequestOnDoneRecruitmentVM> payload)
     {
         var obj = payload.What;
-        var message = new ProccessRequestOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, payload.Who as NetPeer);
+        var message = new ProccessRequestOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, payload.Who as NetPeer, obj.TotalCost);
         messageBroker.Publish(this, message);
     }
 

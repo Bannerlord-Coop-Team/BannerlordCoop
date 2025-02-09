@@ -67,10 +67,7 @@ public class TroopRosterHandler : IHandler
 
         var troopsInCartList = obj.TroopsInCart.ToList();
 
-
-        int num = troopsInCartList.Sum(troop => troop.Item3);
-
-        if(num > mobileParty.LeaderHero.Gold)
+        if(obj.TotalCost > mobileParty.LeaderHero.Gold)
         {
             // gold is not good respond to them for future ref reference.
             return;
@@ -114,9 +111,9 @@ public class TroopRosterHandler : IHandler
             CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
         }
 
-        GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, num, true);
+        GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, obj.TotalCost, true);
 
-        var message = new ApproveChangeOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, num);
+        var message = new ApproveChangeOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, obj.TotalCost);
 
         network.Send(obj.ClientWho, new ClientCloseRecruitmentVM());
         network.SendAll(message);

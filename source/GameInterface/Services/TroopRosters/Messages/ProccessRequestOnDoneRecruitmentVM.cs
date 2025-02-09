@@ -10,10 +10,13 @@ public record ProccessRequestOnDoneRecruitmentVM : IEvent
 
     public NetPeer ClientWho { get; }
 
-    public ProccessRequestOnDoneRecruitmentVM(string mobilePartyId, (string, string, int)[] troopsInCart, NetPeer clientWho)
+    public int TotalCost { get; }
+
+    public ProccessRequestOnDoneRecruitmentVM(string mobilePartyId, (string, string, int)[] troopsInCart, NetPeer clientWho, int totalCost)
     {
         MobilePartyId = mobilePartyId;
         TroopsInCart = troopsInCart;
         ClientWho = clientWho;
+        TotalCost = totalCost;
     }
 }
