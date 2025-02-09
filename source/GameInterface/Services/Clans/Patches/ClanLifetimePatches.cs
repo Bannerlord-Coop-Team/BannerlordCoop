@@ -61,8 +61,6 @@ internal class ClanLifetimePatches
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(Clan), Environment.StackTrace);
 
-            __instance.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Clan>("ERROR_PARTY");
-
             return true;
         }
 
@@ -70,31 +68,12 @@ internal class ClanLifetimePatches
         {
             objectManager.AddNewObject(__instance, out var newId);
 
-            var data = new ClanCreatedData(newId);
-            var message = new ClanCreated(data);
+            var message = new ClanCreated(__instance);
 
             MessageBroker.Instance.Publish(null, message);
         }
 
         return true;
-    }
-
-    private static readonly ConstructorInfo Clan_ctor = AccessTools.Constructor(typeof(Clan));
-    public static void OverrideCreateNewClan(string clanId)
-    {
-        Clan newClan = ObjectHelper.SkipConstructor<Clan>();
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return;
-
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            if (objectManager.AddExisting(clanId, newClan) == false) return;
-
-            using (new AllowedThread())
-            {
-                Clan_ctor.Invoke(newClan, Array.Empty<object>());
-            }
-        });
     }
 
     [HarmonyPatch(typeof(DestroyClanAction), "ApplyInternal")]
@@ -110,32 +89,8 @@ internal class ClanLifetimePatches
             return false;
         }
 
-        var data = new ClanDestroyedData(destroyedClan.StringId, details);
-        MessageBroker.Instance.Publish(destroyedClan, new ClanDestroyed(data));
+        MessageBroker.Instance.Publish(destroyedClan, new ClanDestroyed(destroyedClan, details));
 
         return true;
-    }
-
-    [HarmonyPatch(typeof(DestroyClanAction), "ApplyInternal")]
-    [HarmonyPostfix]
-    static void DestroyPrefix(Clan destroyedClan, bool __runOriginal)
-    {
-        if (__runOriginal == false) return;
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-        {
-            objectManager.Remove(destroyedClan);
-        }
-    }
-
-    public static void OverrideDestroyClan(Clan clan, int details)
-    {
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            using (new AllowedThread())
-            {
-                DestroyClanAction.ApplyInternal(clan, (DestroyClanAction.DestroyClanActionDetails)details);
-            }
-        });
     }
 }

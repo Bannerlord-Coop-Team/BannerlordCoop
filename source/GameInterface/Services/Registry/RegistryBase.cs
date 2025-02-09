@@ -4,9 +4,9 @@ using Serilog;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.CompilerServices;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.ObjectSystem;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Registry;
 
@@ -14,9 +14,17 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
 {
     protected readonly ILogger Logger = LogManager.GetLogger<RegistryBase<T>>();
 
-    public IReadOnlyDictionary<string, T> Objects => objIds;
+    public IReadOnlyDictionary<string, T> Objects => objIds
+        .Where(kvp => kvp.Value.TryGetTarget(out _))
+        .ToDictionary(kvp => kvp.Key, kvp => {
+            kvp.Value.TryGetTarget(out var target);
+            return target;
+         }).GetReadOnlyDictionary();
 
-    protected readonly Dictionary<string, T> objIds = new Dictionary<string, T>();
+    /// <inheritdoc cref="IRegistry.Count"/>
+    public int Count => Objects.Count;
+
+    protected readonly Dictionary<string, WeakReference<T>> objIds = new Dictionary<string, WeakReference<T>>();
     protected readonly ConditionalWeakTable<T, string> idObjs = new ConditionalWeakTable<T, string>();
     private readonly IRegistryCollection collection;
 
@@ -41,13 +49,11 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
     /// <returns>New unique id</returns>
     protected abstract string GetNewId(T obj);
 
-    public int Count => objIds.Count;
-
     public virtual IEnumerable<Type> ManagedTypes { get; } = new Type[] { typeof(T) };
 
-    public IEnumerator<KeyValuePair<string, T>> GetEnumerator() => objIds.GetEnumerator();
+    public IEnumerator<KeyValuePair<string, T>> GetEnumerator() => Objects.GetEnumerator();
 
-    IEnumerator IEnumerable.GetEnumerator() => objIds.GetEnumerator();
+    IEnumerator IEnumerable.GetEnumerator() => Objects.GetEnumerator();
 
     /// <inheritdoc cref="IRegistry"/>
     public virtual bool RegisterExistingObject(string id, object obj)
@@ -60,12 +66,7 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
             return false;
         }
 
-        if (obj is MBObjectBase mbObject)
-        {
-            mbObject.StringId = id;
-        }
-
-        objIds.Add(id, castedObj);
+        objIds.Add(id, new WeakReference<T>(castedObj));
         idObjs.Add(castedObj, id);
 
         return true;
@@ -82,14 +83,7 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
         if (objIds.ContainsKey(newId)) return false;
         if (idObjs.TryGetValue(castedObj, out var _)) return false;
 
-        if (obj is MBObjectBase mbObject)
-        {
-            mbObject.StringId = newId;
-
-            MBObjectManager.Instance?.RegisterObject(mbObject);
-        }
-
-        objIds.Add(newId, castedObj);
+        objIds.Add(newId, new WeakReference<T>(castedObj));
         idObjs.Add(castedObj, newId);
 
         id = newId;
@@ -107,7 +101,8 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
 
     public virtual bool Remove(string id)
     {
-        if (objIds.TryGetValue(id, out var obj) == false) return false;
+        if (objIds.TryGetValue(id, out var objRef) == false) return false;
+        if (objRef.TryGetTarget(out var obj) == false) return false;
 
         return objIds.Remove(id) && idObjs.Remove(obj);
     }
@@ -124,7 +119,8 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
     public virtual bool TryGetValue<T1>(string id, out T1 obj) where T1 : class
     {
         obj = null;
-        if (objIds.TryGetValue(id, out var internalobj) == false) return false;
+        if (objIds.TryGetValue(id, out var objRef) == false) return false;
+        if (objRef.TryGetTarget(out var internalobj) == false) return false;
 
         obj = internalobj as T1;
         return obj != null;

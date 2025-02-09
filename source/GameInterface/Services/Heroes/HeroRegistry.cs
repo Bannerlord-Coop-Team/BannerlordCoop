@@ -33,8 +33,6 @@ internal class HeroRegistry : RegistryBase<Hero>
     {
         var result = base.RegisterExistingObject(id, obj);
 
-        AddToCampaignObjectManager(obj);
-
         return result;
     }
 

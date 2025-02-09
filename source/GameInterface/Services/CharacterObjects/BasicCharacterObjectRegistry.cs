@@ -10,7 +10,7 @@ namespace GameInterface.Services.Armies;
 /// <summary>
 /// Registry for <see cref="CharacterObject"/> type
 /// </summary>
-internal class CharacterObjectRegistry : RegistryBase<CharacterObject>
+internal class BasicCharacterObjectRegistry : RegistryBase<BasicCharacterObject>
 {
     public override IEnumerable<Type> ManagedTypes => new Type[]
     {
@@ -21,7 +21,7 @@ internal class CharacterObjectRegistry : RegistryBase<CharacterObject>
     private const string CharacterObjectPrefix = "CoopCharacterObject";
     private int InstanceCounter = 0;
 
-    public CharacterObjectRegistry(IRegistryCollection collection) : base(collection) { }
+    public BasicCharacterObjectRegistry(IRegistryCollection collection) : base(collection) { }
 
     public override void RegisterAll()
     {
@@ -33,7 +33,7 @@ internal class CharacterObjectRegistry : RegistryBase<CharacterObject>
         }
     }
 
-    protected override string GetNewId(CharacterObject obj)
+    protected override string GetNewId(BasicCharacterObject obj)
     {
         return $"{CharacterObjectPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
     }

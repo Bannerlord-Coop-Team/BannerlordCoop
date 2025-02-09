@@ -1,5 +1,4 @@
 ﻿using Common;
-using Common.Logging;
 using GameInterface.Services.Registry;
 using HarmonyLib;
 using Serilog;
@@ -7,7 +6,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ObjectManager;
@@ -94,17 +92,11 @@ internal class ObjectManager : IObjectManager
         if (string.IsNullOrEmpty(id)) return false;
 
         if (obj == null) return false;
-        
-        if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
-        {
-            return LogIfRegistrationError(
-                registry.RegisterExistingObject(id, obj),
-                obj);
-        }
 
-        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
+        if (TryGetRegistry(obj.GetType(), out IRegistry registry) == false) return false;
+
         return LogIfRegistrationError(
-            defaultObjectManager.AddExisting(id, obj),
+            registry.RegisterExistingObject(id, obj),
             obj);
     }
 
@@ -113,16 +105,10 @@ internal class ObjectManager : IObjectManager
         newId = null;
         if (obj == null) return false;
 
-        if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
-        {
-            return LogIfRegistrationError(
-                registry.RegisterNewObject(obj, out newId),
-                obj);
-        }
+        if (TryGetRegistry(obj.GetType(), out IRegistry registry) == false) return false;
 
-        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
         return LogIfRegistrationError(
-            defaultObjectManager.AddNewObject(obj, out newId),
+            registry.RegisterNewObject(obj, out newId),
             obj);
     }
 
@@ -130,13 +116,9 @@ internal class ObjectManager : IObjectManager
     {
         if (obj == null) return false;
 
-        if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
-        {
-            return registry.TryGetId(obj, out _);
-        }
+        if (TryGetRegistry(obj.GetType(), out IRegistry registry) == false) return false;
 
-        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-        return defaultObjectManager.Contains(obj);
+        return registry.TryGetId(obj, out _);
     }
 
     public bool Contains(string id)
@@ -145,8 +127,7 @@ internal class ObjectManager : IObjectManager
 
         if (RegistryMap.Values.Any(registry => registry.TryGetId(id, out _))) return true;
 
-        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-        return defaultObjectManager.Contains(id);
+        return false;
     }
 
     public bool TryGetId(object obj, out string id)
@@ -154,13 +135,9 @@ internal class ObjectManager : IObjectManager
         id = null;
         if (obj == null) return false;
 
-        if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
-        {
-            return registry.TryGetId(obj, out id);
-        }
+        if (TryGetRegistry(obj.GetType(), out IRegistry registry) == false) return false;
 
-        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-        return defaultObjectManager.TryGetId(obj, out id);
+        return registry.TryGetId(obj, out id);
     }
 
     private static readonly MethodInfo GetObject = typeof(MBObjectManager)
@@ -173,31 +150,34 @@ internal class ObjectManager : IObjectManager
 
         if (string.IsNullOrEmpty(id)) return false;
 
-        if (RegistryMap.TryGetValue(typeof(T), out IRegistry registry))
-        {
-            return registry.TryGetValue(id, out obj);
-        }
+        if (TryGetRegistry(typeof(T), out IRegistry registry) == false) return false;
 
-        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-        return defaultObjectManager.TryGetObject(id, out obj);
+        return registry.TryGetValue(id, out obj);
     }
 
     public bool Remove(object obj)
     {
         if (obj == null) return false;
 
-        if (RegistryMap.TryGetValue(obj.GetType(), out IRegistry registry))
-        {
-            return registry.Remove(obj);
-        }
+        if (TryGetRegistry(obj.GetType(), out IRegistry registry) == false) return false;
 
-        /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-        return defaultObjectManager.Remove(obj);
+        return registry.Remove(obj);
     }
 
     public bool IsTypeManaged(Type type)
     {
         return RegistryMap.ContainsKey(type) || defaultObjectManager.IsTypeManaged(type);
+    }
+
+    private bool TryGetRegistry(Type type, out IRegistry registry)
+    {
+        if (RegistryMap.TryGetValue(type, out registry) == false)
+        {
+            logger.Error($"{nameof(ObjectManager)} was unable to find Registry of type {type}");
+            return false;
+        }
+
+        return true;
     }
 
     #region LogHelpers

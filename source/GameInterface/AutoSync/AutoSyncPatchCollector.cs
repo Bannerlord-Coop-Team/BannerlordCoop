@@ -44,7 +44,7 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
     public void PatchAll()
     {
-        if (IsPatched) UnpatchAll();
+        if (IsPatched) return;
 
         IsPatched = true;
 

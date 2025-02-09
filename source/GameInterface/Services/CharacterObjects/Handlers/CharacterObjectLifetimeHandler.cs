@@ -23,21 +23,21 @@ namespace GameInterface.Services.Buildings.Handlers
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
-            messageBroker.Subscribe<CharacterObjectCreated>(Handle_CharacterCreated);
+            messageBroker.Subscribe<BasicCharacterObjectCreated>(Handle_CharacterCreated);
             messageBroker.Subscribe<NetworkCreateCharacterObject>(Handle_CreateCharacter);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<CharacterObjectCreated>(Handle_CharacterCreated);
+            messageBroker.Unsubscribe<BasicCharacterObjectCreated>(Handle_CharacterCreated);
             messageBroker.Unsubscribe<NetworkCreateCharacterObject>(Handle_CreateCharacter);
         }
 
-        private void Handle_CharacterCreated(MessagePayload<CharacterObjectCreated> obj)
+        private void Handle_CharacterCreated(MessagePayload<BasicCharacterObjectCreated> obj)
         {
             var payload = obj.What;
 
-            if (objectManager.AddNewObject(payload.CharacterObject, out string characterObjectId) == false) return;
+            if (objectManager.AddNewObject(payload.BasicCharacterObject, out string characterObjectId) == false) return;
 
             var message = new NetworkCreateCharacterObject(characterObjectId);
             network.SendAll(message);

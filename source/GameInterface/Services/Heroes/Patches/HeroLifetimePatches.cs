@@ -11,6 +11,7 @@ using Serilog;
 using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Patches;
 
@@ -75,9 +76,20 @@ internal class HeroLifetimePatches
 
         if (objectManager.AddExisting(heroId, newHero) == false) return;
 
+        newHero.StringId = heroId;
+
+        RegisterWithGameObjectManagers(newHero);
+
         using (new AllowedThread())
         {
             ctor_Hero.Invoke(newHero, new object[] { heroId });
         }
+    }
+
+    private static void RegisterWithGameObjectManagers(Hero hero)
+    {
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(hero, false, out _);
+
+        Campaign.Current?.CampaignObjectManager?.OnHeroAdded(hero);
     }
 }

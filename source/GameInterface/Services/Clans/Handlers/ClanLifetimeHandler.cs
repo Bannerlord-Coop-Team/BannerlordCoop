@@ -1,11 +1,13 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Clans.Messages.Lifetime;
-using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 
 namespace GameInterface.Services.Clans.Handlers;
 
@@ -39,28 +41,54 @@ internal class ClanLifetimeHandler : IHandler
 
     private void Handle(MessagePayload<ClanCreated> payload)
     {
-        network.SendAll(new NetworkCreateClan(payload.What.Data));
+        if (objectManager.AddNewObject(payload.What.Clan, out string newId) == false)
+        {
+            Logger.Error("Failed to add {type} to manager", typeof(CultureObject));
+            return;
+        }
+
+        network.SendAll(new NetworkCreateClan(newId));
     }
 
-    private void Handle(MessagePayload<NetworkCreateClan> payload)
+    private void Handle(MessagePayload<NetworkCreateClan> obj)
     {
-        ClanLifetimePatches.OverrideCreateNewClan(payload.What.Data.ClanId);
+        var newCultureObject = ObjectHelper.SkipConstructor<Clan>();
+
+        var payload = obj.What;
+
+        if (objectManager.AddExisting(payload.ClanId, newCultureObject) == false)
+        {
+            Logger.Error("Failed to add {type} to manager with id {id}", typeof(CultureObject), payload.ClanId);
+            return;
+        }
     }
 
     private void Handle(MessagePayload<ClanDestroyed> payload)
     {
-        network.SendAll(new NetworkDestroyClan(payload.What.Data));
-    }
-
-    private void Handle(MessagePayload<NetworkDestroyClan> payload)
-    {
-        var data = payload.What.Data;
-        if (objectManager.TryGetObject<Clan>(data.ClanId, out var clan) == false)
+        if (objectManager.TryGetId(payload.What.Clan, out string clanId) == false)
         {
-            Logger.Error("Unable to find clan with string id {stringId}", data.ClanId);
+            Logger.Error("Failed to add {type} to manager", typeof(CultureObject));
             return;
         }
 
-        ClanLifetimePatches.OverrideDestroyClan(clan, data.Details);
+        network.SendAll(new NetworkDestroyClan(clanId, payload.What.Details));
+    }
+
+    private void Handle(MessagePayload<NetworkDestroyClan> obj)
+    {
+        var payload = obj.What;
+        if (objectManager.TryGetObject<Clan>(payload.ClanId, out var clan) == false)
+        {
+            Logger.Error("Unable to find clan with string id {stringId}", payload.ClanId);
+            return;
+        }
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                DestroyClanAction.ApplyInternal(clan, (DestroyClanAction.DestroyClanActionDetails)payload.Details);
+            }
+        });
     }
 }

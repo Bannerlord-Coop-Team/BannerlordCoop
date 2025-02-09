@@ -6,17 +6,19 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.CultureObjects
+namespace GameInterface.Services.BasicCharacterObjects
 {
-    internal class CultureObjectRegistry : RegistryBase<CultureObject>
+    internal class CultureObjectRegistry : RegistryBase<BasicCultureObject>
     {
-        public override IEnumerable<Type> ManagedTypes => new Type[] {
-            typeof(BasicCultureObject),
-            typeof(CultureObject),
-        };
 
         private const string CultureStringIdPrefix = "CoopCulture";
         private int InstanceCounter = 0;
+
+        public override IEnumerable<Type> ManagedTypes => new Type[]
+        {
+            typeof(BasicCultureObject),
+            typeof(CultureObject)
+        };
 
         public CultureObjectRegistry(IRegistryCollection collection) : base(collection) { }
 
@@ -36,7 +38,7 @@ namespace GameInterface.Services.CultureObjects
             }
         }
 
-        protected override string GetNewId(CultureObject culture)
+        protected override string GetNewId(BasicCultureObject culture)
         {
             culture.StringId = $"{CultureStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
             return culture.StringId;

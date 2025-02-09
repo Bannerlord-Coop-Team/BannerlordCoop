@@ -13,15 +13,15 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Heroes.Handlers;
-internal class HeroCreationDeletionHandler : IHandler
+internal class HeroLifetimeHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<HeroCreationDeletionHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<HeroLifetimeHandler>();
 
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
 
-    public HeroCreationDeletionHandler(
+    public HeroLifetimeHandler(
         IHeroInterface heroInterface,
         IMessageBroker messageBroker,
         IObjectManager objectManager)
