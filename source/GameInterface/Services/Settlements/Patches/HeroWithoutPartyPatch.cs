@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
@@ -29,7 +30,7 @@ public class HeroWithoutPartyPatch
 
         var heroCache = __instance._heroesWithoutPartyCache;
 
-        if (!heroCache.Contains(individual))
+        if(!heroCache.Contains(individual))
         {
 
             var message = new SettlementChangedAddHeroWithoutParty(__instance.StringId, individual.StringId);
@@ -49,7 +50,7 @@ public class HeroWithoutPartyPatch
         if (!heroList.Contains(individual))
         {
             heroList.Add(individual);
-        }
+        } 
         else
         {
             Logger.Error("Attempted to add Hero {HeroId} that was already in list", individual.StringId);
@@ -83,7 +84,7 @@ public class HeroWithoutPartyPatch
 
         return true;
     }
-
+    
     internal static void RunRemoveHeroWithoutParty(Settlement settlement, Hero individual)
     {
 
@@ -106,5 +107,5 @@ public class HeroWithoutPartyPatch
             }
         });
     }
-
+  
 }
