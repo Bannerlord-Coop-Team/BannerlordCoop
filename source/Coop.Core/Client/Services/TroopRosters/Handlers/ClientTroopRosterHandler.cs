@@ -36,7 +36,6 @@ public class ClientTroopRosterHandler : IHandler
         var message = new ChangeTroopRostersAddToCounts(obj.MobilePartyId, obj.Character, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.xpChanged, obj.RemoveDepleted, obj.Index);
 
         messageBroker.Publish(this, message);
-
     }
 
     public void Dispose()

@@ -16,7 +16,6 @@ public class OnDoneRecruitmentVMPatch
     [HarmonyPrefix]
     public static bool OnDonePrefix(ref RecruitmentVM __instance)
     {
-
         if (ModInformation.IsServer) return true;
 
         string mobilePartyId = MobileParty.MainParty.StringId;

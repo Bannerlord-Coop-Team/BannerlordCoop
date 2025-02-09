@@ -23,7 +23,6 @@ namespace GameInterface.Services.TroopRosters.Handlers;
 public class TroopRosterHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterHandler>();
-
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
@@ -35,11 +34,8 @@ public class TroopRosterHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
-
         messageBroker.Subscribe<ProccessRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
-
         messageBroker.Subscribe<ClientCloseRecruitmentVM>(Handle);
-
         messageBroker.Subscribe<ApproveChangeOnDoneRecruitmentVM>(Handle);
     }
 
@@ -195,7 +191,7 @@ public class TroopRosterHandler : IHandler
     {
         messageBroker.Unsubscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
         messageBroker.Unsubscribe<ProccessRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
-
-
+        messageBroker.Unsubscribe<ClientCloseRecruitmentVM>(Handle);
+        messageBroker.Unsubscribe<ApproveChangeOnDoneRecruitmentVM>(Handle);
     }
 }
