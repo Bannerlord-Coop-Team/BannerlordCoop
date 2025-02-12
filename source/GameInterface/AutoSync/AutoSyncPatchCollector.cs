@@ -20,6 +20,8 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
     private readonly List<(MethodBase, MethodInfo)> transpilers = new List<(MethodBase, MethodInfo)>();
     private readonly List<(MethodBase, MethodInfo)> prefixes = new List<(MethodBase, MethodInfo)>();
 
+    private readonly List<(MethodBase, MethodInfo)> patches = new List<(MethodBase, MethodInfo)>();
+
     private static bool IsPatched = false;
 
     public AutoSyncPatchCollector(Harmony harmony)
@@ -44,34 +46,29 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
     public void PatchAll()
     {
-        if (IsPatched) return;
-
-        IsPatched = true;
+        if (patches.Count > 0) UnpatchAll();
 
         foreach (var (method, patch) in transpilers)
         {
             harmony.Patch(method, transpiler: new HarmonyMethod(patch));
+            patches.Add((method, patch));
         }
 
         foreach (var (method, patch) in prefixes)
         {
             harmony.Patch(method, prefix: new HarmonyMethod(patch));
+            patches.Add((method, patch));
         }
     }
 
     public void UnpatchAll()
     {
-        IsPatched = false;
-
-        foreach (var (method, patch) in transpilers)
+        foreach (var (method, patch) in patches)
         {
             harmony.Unpatch(method, patch);
         }
 
-        foreach (var (method, patch) in prefixes)
-        {
-            harmony.Unpatch(method, patch);
-        }
+        patches.Clear();
     }
 
     public void Dispose()

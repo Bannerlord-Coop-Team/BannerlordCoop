@@ -12,9 +12,9 @@ using TaleWorlds.CampaignSystem.Siege;
 namespace GameInterface.Services.BesiegerCamps.Patches;
 
 [HarmonyPatch]
-internal class BesiegerCampCreationPatches
+internal class BesiegerCampLifetimePatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<BesiegerCampCreationPatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<BesiegerCampLifetimePatches>();
 
     private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(BesiegerCamp));
 

@@ -32,7 +32,6 @@
   <ItemGroup>
     <ProjectReference Include="..\GameInterface.Tests\GameInterface.Tests.csproj" />
     <ProjectReference Include="..\GameInterface\GameInterface.csproj" />
-    <ProjectReference Include="..\Patches\Patches.csproj" />
   </ItemGroup>
 
   <ItemGroup>

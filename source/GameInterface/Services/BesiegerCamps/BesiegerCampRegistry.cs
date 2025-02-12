@@ -19,10 +19,7 @@ internal class BeseigerCampRegistry : RegistryBase<BesiegerCamp>
     {
         foreach (var camp in Campaign.Current.SiegeEventManager.SiegeEvents.Select(siegeEvent => siegeEvent.BesiegerCamp))
         {
-            if (RegisterNewObject(camp, out _) == false)
-            {
-                Logger.Error($"Unable to register {camp}");
-            }
+            if (RegisterNewObject(camp, out _) == false) Logger.Error($"Unable to register {camp}");
         }
     }
 

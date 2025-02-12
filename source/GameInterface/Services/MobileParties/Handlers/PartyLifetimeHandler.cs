@@ -10,7 +10,9 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
@@ -69,6 +71,18 @@ internal class PartyLifetimeHandler : IHandler
             Logger.Error("Failed to create party with id {stringId}", stringId);
             return;
         }
+
+        // Game related
+        newParty.StringId = stringId;
+
+        RegisterWithGameObjectManagers(newParty);
+    }
+
+    private static void RegisterWithGameObjectManagers(MobileParty party)
+    {
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(party, false, out _);
+
+        Campaign.Current?.CampaignObjectManager?.AddMobileParty(party);
     }
 
     private void Handle_PartyDestroyed(MessagePayload<PartyDestroyed> payload)

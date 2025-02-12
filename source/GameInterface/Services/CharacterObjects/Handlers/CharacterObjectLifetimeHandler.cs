@@ -6,8 +6,10 @@ using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.CharacterObjects.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Buildings.Handlers
 {

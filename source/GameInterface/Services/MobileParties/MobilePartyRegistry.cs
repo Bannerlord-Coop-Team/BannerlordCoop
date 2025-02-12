@@ -26,29 +26,8 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>
     {
         foreach (var party in MobileParty.All)
         {
-            base.RegisterExistingObject(party.StringId, party);
-            Interlocked.Increment(ref InstanceCounter);
+            base.RegisterNewObject(party.StringId, out _);
         }
-    }
-
-    public override bool RegisterExistingObject(string id, object obj)
-    {
-        var result = base.RegisterExistingObject(id, obj);
-
-        AddToCampaignObjectManager(obj);
-
-        return result;
-    }
-
-    private void AddToCampaignObjectManager(object obj)
-    {
-        if (TryCast(obj, out var castedObj) == false) return;
-
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (objectManager == null) return;
-
-        objectManager.AddMobileParty(castedObj);
     }
 
     protected override string GetNewId(MobileParty party)

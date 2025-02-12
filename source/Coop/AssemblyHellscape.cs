@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 
 namespace Coop
 {
@@ -15,6 +16,8 @@ namespace Coop
             "System.Threading.Tasks.Extensions",
             "System.Text.Json",
             "System.Buffers",
+            "Serilog",
+            "System.Diagnostics.DiagnosticSource",
         };
 
         private static readonly Dictionary<string, Assembly> LoadedRedirects = RedirectedAssemblies

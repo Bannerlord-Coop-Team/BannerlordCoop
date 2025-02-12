@@ -29,7 +29,7 @@ internal class BasicCharacterObjectRegistry : RegistryBase<BasicCharacterObject>
         {
             if (TryGetId(character, out _)) continue;
 
-            RegisterExistingObject(character.StringId, character);
+            RegisterExistingObject(GetNewId(character), character);
         }
     }
 

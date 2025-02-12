@@ -5,7 +5,10 @@ using Common.Util;
 using GameInterface.Services.CultureObjects.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.CultureObjects.Handlers;
 
@@ -53,5 +56,14 @@ internal class BasicCultureObjectLifetimeHandler : IHandler
             Logger.Error("Failed to add {type} to manager with id {id}", typeof(BasicCultureObject), payload.CultureObjectId);
             return;
         }
+
+        newCultureObject.StringId = payload.CultureObjectId;
+
+        RegisterWithGameObjectManagers(newCultureObject);
+    }
+
+    private static void RegisterWithGameObjectManagers(BasicCultureObject cultureObject)
+    {
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(cultureObject, false, out _);
     }
 }

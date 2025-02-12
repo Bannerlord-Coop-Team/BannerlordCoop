@@ -46,8 +46,8 @@ internal class BesiegerCampLifetimeHandler : IHandler
     {
         var newBesiegerCamp = ObjectHelper.SkipConstructor<BesiegerCamp>();
 
-        AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._besiegerParties)).SetValue(newBesiegerCamp, new MBList<MobileParty>());
-
         objectManager.AddExisting(payload.What.BesiegerCampId, newBesiegerCamp);
+
+        AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._besiegerParties)).SetValue(newBesiegerCamp, new MBList<MobileParty>());
     }
 }
