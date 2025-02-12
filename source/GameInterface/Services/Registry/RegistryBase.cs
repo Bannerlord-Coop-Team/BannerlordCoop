@@ -81,7 +81,7 @@ internal abstract class RegistryBase<T> : IRegistry<T> where T : class
         var newId = GetNewId(castedObj);
 
         if (objIds.ContainsKey(newId)) return false;
-        if (idObjs.TryGetValue(castedObj, out var _)) return false;
+        if (idObjs.TryGetValue(castedObj, out var outvar)) return false;
 
         objIds.Add(newId, new WeakReference<T>(castedObj));
         idObjs.Add(castedObj, newId);

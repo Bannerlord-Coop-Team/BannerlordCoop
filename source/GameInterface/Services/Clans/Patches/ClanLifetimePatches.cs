@@ -64,14 +64,8 @@ internal class ClanLifetimePatches
             return true;
         }
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
-        {
-            objectManager.AddNewObject(__instance, out var newId);
-
-            var message = new ClanCreated(__instance);
-
-            MessageBroker.Instance.Publish(null, message);
-        }
+        var message = new ClanCreated(__instance);
+        MessageBroker.Instance.Publish(null, message);
 
         return true;
     }

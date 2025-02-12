@@ -1,7 +1,9 @@
 ﻿using Common;
 using GameInterface.Services.Registry;
+using System;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Clans;
 
@@ -27,15 +29,13 @@ internal class ClanRegistry : RegistryBase<Clan>
 
         foreach (var clan in objectManager.Clans)
         {
-            RegisterExistingObject(clan.StringId, clan);
-            Interlocked.Increment(ref InstanceCounter);
+            base.RegisterNewObject(clan, out var _);
         }
     }
 
-    protected override string GetNewId(Clan party)
+    protected override string GetNewId(Clan clan)
     {
-        party.StringId = $"{ClanStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-        return party.StringId;
+        return $"{ClanStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
     }
 
 }

@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Clans.Handlers;
 
@@ -52,15 +53,21 @@ internal class ClanLifetimeHandler : IHandler
 
     private void Handle(MessagePayload<NetworkCreateClan> obj)
     {
-        var newCultureObject = ObjectHelper.SkipConstructor<Clan>();
+        var clan = ObjectHelper.SkipConstructor<Clan>();
 
         var payload = obj.What;
 
-        if (objectManager.AddExisting(payload.ClanId, newCultureObject) == false)
+        if (objectManager.AddExisting(payload.ClanId, clan) == false)
         {
             Logger.Error("Failed to add {type} to manager with id {id}", typeof(CultureObject), payload.ClanId);
             return;
         }
+
+        clan.InitMembers();
+        clan.StringId = payload.ClanId;
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(clan, false, out _);
+
+        Campaign.Current?.CampaignObjectManager?.AddClan(clan);
     }
 
     private void Handle(MessagePayload<ClanDestroyed> payload)
