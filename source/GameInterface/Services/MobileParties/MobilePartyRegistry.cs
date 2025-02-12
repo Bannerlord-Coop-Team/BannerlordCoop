@@ -26,7 +26,7 @@ internal class MobilePartyRegistry : RegistryBase<MobileParty>
     {
         foreach (var party in MobileParty.All)
         {
-            base.RegisterNewObject(party.StringId, out _);
+            base.RegisterNewObject(party, out _);
         }
     }
 
