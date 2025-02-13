@@ -1,27 +1,26 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.PartyBases.Messages;
+using GameInterface.Services.SiegeStrategies.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 
-namespace GameInterface.Services.PartyBases.Patches;
+namespace GameInterface.Services.SiegeStrategies.Patches;
 
 [HarmonyPatch]
-internal class PartyBaseLifetimePatches
+internal class SiegeStrategyLifetimePatches
 {
-    static ILogger Logger = LogManager.GetLogger<PartyBase>();
+    static ILogger Logger = LogManager.GetLogger<SiegeStrategyLifetimePatches>();
 
-    private static MethodBase TargetMethod() => AccessTools.Constructor(typeof(PartyBase), new Type[] { typeof(MobileParty), typeof(Settlement) });
+    private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(SiegeStrategy));
 
     [HarmonyPrefix]
-    static bool Prefix(ref PartyBase __instance)
+    static bool Prefix(ref SiegeStrategy __instance)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -34,7 +33,7 @@ internal class PartyBaseLifetimePatches
             return false;
         }
 
-        var message = new PartyBaseCreated(__instance);
+        var message = new SiegeStrategyCreated(__instance);
         MessageBroker.Instance.Publish(__instance, message);
 
         return true;

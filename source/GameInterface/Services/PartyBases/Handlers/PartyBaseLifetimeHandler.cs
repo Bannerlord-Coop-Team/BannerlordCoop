@@ -16,8 +16,6 @@ internal class PartyBaseLifetimeHandler : IHandler
     private readonly INetwork network;
     private readonly IMessageBroker messageBroker;
     private readonly ILogger logger;
-
-    public static List<PartyBase> Instances = new List<PartyBase>();
     public PartyBaseLifetimeHandler(IObjectManager objectManager, INetwork network, IMessageBroker messageBroker, ILogger logger)
     {
         this.objectManager = objectManager;
@@ -44,9 +42,6 @@ internal class PartyBaseLifetimeHandler : IHandler
     private void Handle_PartyBaseCreated(MessagePayload<PartyBaseCreated> payload)
     {
         var instance = payload.What.Instance;
-
-        Instances.Add(instance); // TODO remove
-
         
 
         if (objectManager.AddNewObject(instance, out var newId) == false)
@@ -54,8 +49,6 @@ internal class PartyBaseLifetimeHandler : IHandler
             logger.Error("Unable to add new {type} to object manager", instance.GetType());
             return;
         }
-
-        DebugMessageLogger.Write($"Created new PartyBase with id: {newId}");
 
         var message = new NetworkCreatePartyBase(newId);
         network.SendAll(message);

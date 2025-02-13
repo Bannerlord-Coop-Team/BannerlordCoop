@@ -16,10 +16,7 @@ internal class PartyBaseRegistry : RegistryBase<PartyBase>
     {
         foreach (var party in MobileParty.All)
         {
-            if(RegisterNewObject(party.Party, out var newId) == false)
-            {
-                Logger.Error("Unable to register PartyBase from Party with id {id} in the object manager", party.StringId);
-            }
+            if(RegisterNewObject(party.Party, out var _) == false) Logger.Error("Unable to register PartyBase from Party with the object manager");
         }
     }
 
