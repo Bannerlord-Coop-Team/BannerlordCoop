@@ -10,19 +10,15 @@ public interface IAutoSyncPatchCollector : IDisposable
     void AddPrefix(MethodBase patchMethod, MethodInfo patch);
     void AddTranspiler(MethodBase patchMethod, MethodInfo patch);
     void PatchAll();
-    void UnpatchAll();
 }
 
 class AutoSyncPatchCollector : IAutoSyncPatchCollector
 {
-    private readonly Harmony harmony;
+    const string HarmonyID = "CoopAutoSyncPatchCollector";
+    private readonly Harmony harmony = new Harmony(HarmonyID);
 
     private readonly List<(MethodBase, MethodInfo)> transpilers = new List<(MethodBase, MethodInfo)>();
     private readonly List<(MethodBase, MethodInfo)> prefixes = new List<(MethodBase, MethodInfo)>();
-
-    private readonly List<(MethodBase, MethodInfo)> patches = new List<(MethodBase, MethodInfo)>();
-
-    private static bool IsPatched = false;
 
     public AutoSyncPatchCollector(Harmony harmony)
     {
@@ -46,35 +42,21 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
     public void PatchAll()
     {
-        if (patches.Count > 0) UnpatchAll();
+        if (Harmony.HasAnyPatches(HarmonyID)) return;
 
         foreach (var (method, patch) in transpilers)
         {
             harmony.Patch(method, transpiler: new HarmonyMethod(patch));
-            patches.Add((method, patch));
         }
 
         foreach (var (method, patch) in prefixes)
         {
             harmony.Patch(method, prefix: new HarmonyMethod(patch));
-            patches.Add((method, patch));
         }
-    }
-
-    public void UnpatchAll()
-    {
-        foreach (var (method, patch) in patches)
-        {
-            harmony.Unpatch(method, patch);
-        }
-
-        patches.Clear();
     }
 
     public void Dispose()
     {
-        UnpatchAll();
-
         transpilers.Clear();
         prefixes.Clear();
     }

@@ -90,7 +90,7 @@ public class PropertyPrefixCreator
         var networkLocal = TryResolve<INetwork>(il);
 
         var objectManagerLocal = TryResolve<IObjectManager>(il);
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
+        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, prop.DeclaringType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -130,8 +130,8 @@ public class PropertyPrefixCreator
         var networkLocal = TryResolve<INetwork>(il);
         var objectManagerLocal = TryResolve<IObjectManager>(il);
 
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
-        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal);
+        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, prop.DeclaringType);
+        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal, prop.PropertyType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -181,7 +181,7 @@ public class PropertyPrefixCreator
         return local;
     }
 
-    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal)
+    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal, Type objType)
     {
         var validLabel = il.DefineLabel();
         var idLocal = il.DeclareLocal(typeof(string));
@@ -198,7 +198,7 @@ public class PropertyPrefixCreator
 
         // Log error
         il.Emit(OpCodes.Ldsfld, loggerField);
-        il.Emit(OpCodes.Ldstr, $"Could not resolve id");
+        il.Emit(OpCodes.Ldstr, $"Could not resolve id for type {objType}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false

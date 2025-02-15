@@ -3,6 +3,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using HarmonyLib;
 using System.Reflection;
+using System.Runtime;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit.Abstractions;

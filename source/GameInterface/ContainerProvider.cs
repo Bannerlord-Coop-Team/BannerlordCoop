@@ -40,6 +40,11 @@ public class ContainerProvider
         return true;
     }
 
+    public static void Clear()
+    {
+        _lifetimeScope = null;
+    }
+
     public static bool TryResolve<T>(out T instance) where T : class
     {
         instance = null;

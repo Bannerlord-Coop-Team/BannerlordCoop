@@ -10,7 +10,7 @@ namespace GameInterface.Services.Registry;
 /// <summary>
 /// Storage for all object registries
 /// </summary>
-internal interface IRegistryCollection : IEnumerable<IRegistry>
+public interface IRegistryCollection : IEnumerable<IRegistry>
 {
     IEnumerable<IRegistry> Registries { get; }
 

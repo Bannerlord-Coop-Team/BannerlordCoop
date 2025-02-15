@@ -5,6 +5,7 @@ using Autofac.Core.Resolving.Pipeline;
 using Common.Logging;
 using Common.PacketHandlers;
 using GameInterface.AutoSync;
+using GameInterface.AutoSync.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Entity;
@@ -29,6 +30,7 @@ public class GameInterfaceModule : Module
         builder.RegisterInstance(new Harmony(HarmonyId)).As<Harmony>().SingleInstance();
 
         builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<AutoRegistryFactory>().As<IAutoRegistryFactory>().InstancePerLifetimeScope().AutoActivate();
 
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();

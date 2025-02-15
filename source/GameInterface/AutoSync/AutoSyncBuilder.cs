@@ -97,6 +97,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         ClearCollections();
 
         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName($"AutoSyncAsm_{AsmCounter++}"), AssemblyBuilderAccess.RunAndCollect);
+
         var moduleBuilder = assemblyBuilder.DefineDynamicModule("AutoSyncAsm");
 
         AllowPrivateAccess(assemblyBuilder);

@@ -5,6 +5,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.AutoSync.Registry;
 using GameInterface.Tests.Bootstrap;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -55,15 +56,22 @@ internal class E2ETestEnvironment : IDisposable
 
     public void Dispose()
     {
-        Server.Resolve<IAutoSyncPatchCollector>().UnpatchAll();
+        Server.Dispose();
+
+        foreach (var client in Clients)
+        {
+            client.Dispose();
+        }
 
         OutputSinkManager.RemoveLogCallback(TestOutputCallback);
+        ContainerProvider.Clear();
     }
 
     private void SetupAutoSync()
     {
         Server.Resolve<IAutoSyncBuilder>().Build();
         Server.Resolve<IAutoSyncPatchCollector>().PatchAll();
+        Server.Resolve<IAutoRegistryFactory>().PatchAll();
 
         foreach (var client in Clients)
         {

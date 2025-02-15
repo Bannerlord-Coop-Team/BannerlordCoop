@@ -471,7 +471,7 @@ public class FieldTranspilerCreator
         var networkLocal = TryResolve<INetwork>(il);
 
         var objectManagerLocal = TryResolve<IObjectManager>(il);
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
+        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, field.DeclaringType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -533,8 +533,8 @@ public class FieldTranspilerCreator
         var networkLocal = TryResolve<INetwork>(il);
         var objectManagerLocal = TryResolve<IObjectManager>(il);
 
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
-        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal);
+        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, field.DeclaringType);
+        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal, field.FieldType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -582,7 +582,7 @@ public class FieldTranspilerCreator
         return local;
     }
 
-    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal)
+    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal, Type objType)
     {
         var validLabel = il.DefineLabel();
         var idLocal = il.DeclareLocal(typeof(string));
@@ -599,7 +599,7 @@ public class FieldTranspilerCreator
 
         // Log error
         il.Emit(OpCodes.Ldsfld, loggerField);
-        il.Emit(OpCodes.Ldstr, $"Could not resolve id");
+        il.Emit(OpCodes.Ldstr, $"Could not resolve id for type {objType}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
 
         // Return
