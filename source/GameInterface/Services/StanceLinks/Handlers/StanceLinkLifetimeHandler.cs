@@ -3,6 +3,7 @@ using System.Runtime.Serialization;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Armies.Data;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
@@ -12,6 +13,7 @@ using GameInterface.Services.Template.Messages;
 using GameInterface.Services.Template.Patches;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Core.ViewModelCollection.CharacterViewModel;
 
@@ -58,7 +60,7 @@ public class StanceLinkLifetimeHandler : IHandler
         if (objectManager.TryGetId(faction2, out var faction2Id) == false) return;
 
         //register object
-        objectManager.AddNewObject(stanceLink, out var stanceLinkId);
+        if (objectManager.AddNewObject(stanceLink, out var stanceLinkId) == false) return;
 
         //send network message to register object on client side
         var data = new StanceLinkCreationData(stanceLinkId, stanceType, faction1Id, faction2Id, isAtConstantWar);
@@ -67,8 +69,52 @@ public class StanceLinkLifetimeHandler : IHandler
     }
 
 
-    private void Handle_CreateStanceLink(MessagePayload<NetworkCreateStanceLink> payload)
+    private void Handle_CreateStanceLink(MessagePayload<NetworkCreateStanceLink> obj)
     {
-        Logger.Error("BIIIIIIIITE", typeof(StanceLink));
+        var payload = obj.What.Data;
+
+        IFaction faction1;
+        IFaction faction2;
+
+        if (objectManager.TryGetObject(payload.Faction1Id, out Kingdom kingdom1) == false)
+        {
+            if(objectManager.TryGetObject(payload.Faction1Id, out Clan clan1) == false)
+            {
+                Logger.Error("Failed to get faction, {id}", payload.Faction1Id);
+                return;
+            }
+            else
+            {
+                faction1 = clan1;
+            }
+        }
+        else
+        {
+            faction1 = kingdom1;
+        }
+
+        if (objectManager.TryGetObject(payload.Faction2Id, out Kingdom kingdom2) == false)
+        {
+            if (objectManager.TryGetObject(payload.Faction2Id, out Clan clan2) == false)
+            {
+                Logger.Error("Failed to get faction, {id}", payload.Faction2Id);
+                return;
+            }
+            else
+            {
+                faction2 = kingdom2;
+            }
+        }
+        else
+        {
+            faction2 = kingdom2;
+        }
+
+        var stanceLink = new StanceLink((StanceType)payload.StanceType, faction1, faction2, payload.IsAtConstantWar);
+        if (objectManager.AddExisting(payload.StringId, stanceLink) == false)
+        {
+            Logger.Error("Failed to add existing StanceLink, {id}", payload.StringId);
+            return;
+        }
     }
 }
