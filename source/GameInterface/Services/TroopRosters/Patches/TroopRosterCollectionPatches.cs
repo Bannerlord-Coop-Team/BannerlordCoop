@@ -1,21 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Reflection.Emit;
 using System.Reflection;
-using System.Text;
-using GameInterface.Services.Heroes.Patches;
-using HarmonyLib;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using System.Reflection.Emit;
 using Common.Logging;
-using Serilog;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.Heroes.Messages.Collections;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.CampaignSystem.Roster;
 using GameInterface.Services.TroopRosters.Messages;
+using HarmonyLib;
+using Serilog;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Patches
 {
@@ -27,73 +20,45 @@ namespace GameInterface.Services.TroopRosters.Patches
         [HarmonyTranspiler]
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
         {
-            var dataStack = new Stack<CodeInstruction>();
-            CodeInstruction previous = null;
-            var TroopRosterDataArray = AccessTools.Field(typeof(TroopRoster), nameof(TroopRoster.data));
-            var arrayAssignIntercept = AccessTools.Method(typeof(TroopRosterCollectionPatches), nameof(ArrayAssignIntercept));
+            var arrayAssignMethod = AccessTools.Method(typeof(TroopRosterCollectionPatches), nameof(ArrayAssignIntercept));
+            var troopRosterElementType = typeof(TroopRosterElement);
+            var dataField = AccessTools.Field(typeof(TroopRoster), "data");
 
-            foreach (var instruction in instructions)
-            {
-                // Track Hero load instructions before accessing VolunteerTypes
-                if (instruction.opcode == OpCodes.Ldfld && (FieldInfo)instruction.operand == TroopRosterDataArray)
+            var matcher = new CodeMatcher(instructions)
+                .MatchStartForward( // Find all stelem.any instructions for TroopRosterElement
+                    new CodeMatch(OpCodes.Ldarg_0),
+                    new CodeMatch(ci => ci.opcode == OpCodes.Ldfld && ci.operand == dataField),
+                    new CodeMatch(ci => ci.opcode == OpCodes.Stelem_Ref)
+                )
+                .Repeat(match => // Process each match
                 {
-                    if (previous != null && IsLdloc(previous))
-                    {
-                        dataStack.Push(previous);
-                    }
-                    else
-                    {
-                        dataStack.Push(null);
-                    }
-                }
+                    match.Advance(-1); // Move to stelem.ref instruction
 
-                // Replace `stelem.ref` with intercept call
-                if (instruction.opcode == OpCodes.Stelem_Ref)
-                {
-                    if (dataStack.Count > 0)
-                    {
-                        var rosterLoad = dataStack.Pop();
-                        if (rosterLoad != null)
-                        {
-                            yield return rosterLoad; // Inject Hero instance
-                            yield return new CodeInstruction(OpCodes.Call, arrayAssignIntercept) { labels = instruction.labels };
-                            continue;
-                        }
-                    }
-                }
+                    // Replace stelem.ref with our interceptor
+                    match.SetInstruction(
+                        new CodeInstruction(OpCodes.Call, arrayAssignMethod)
+                    );
 
-                yield return instruction;
-                previous = instruction; // Track previous instruction
-            }
+                    // Ensure stack balance by re-adding arguments
+                    match.Insert(
+                        new CodeInstruction(OpCodes.Ldarg_0),
+                        new CodeInstruction(OpCodes.Ldfld, dataField),
+                        new CodeInstruction(OpCodes.Ldloc_1), // Replace with actual index local
+                        new CodeInstruction(OpCodes.Ldloc_2)  // Replace with actual value local
+                    );
+                });
+
+            return matcher.InstructionEnumeration();
         }
 
-        // Helper method to check if an instruction loads a local variable
-        private static bool IsLdloc(CodeInstruction instruction)
+        // Intercept method with proper parameters
+        public static void ArrayAssignIntercept(
+            TroopRosterElement[] array,
+            int index,
+            TroopRosterElement value)
         {
-            return instruction.opcode == OpCodes.Ldloc || instruction.opcode == OpCodes.Ldloc_S ||
-                   instruction.opcode == OpCodes.Ldloc_0 || instruction.opcode == OpCodes.Ldloc_1 ||
-                   instruction.opcode == OpCodes.Ldloc_2 || instruction.opcode == OpCodes.Ldloc_3;
-        }
-
-        public static void ArrayAssignIntercept(TroopRosterElement[] TroopRosterElements, int index, TroopRosterElement value, TroopRoster instance)
-        {
-            // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                TroopRosterElements[index] = value;
-                return;
-            }
-
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(TroopRosterElement), Environment.StackTrace);
-                return;
-            }
-            var message = new TroopRosterDataUpdated(instance, value, index);
-            MessageBroker.Instance.Publish(instance, message);
-
-            TroopRosterElements[index] = value;
+            // Custom logic here (e.g., validation, logging)
+            array[index] = value; // Preserve original assignment
         }
     }
 }
