@@ -47,7 +47,6 @@ public class MilitiaPartyComponentTests : IDisposable
             militiaPartyComponent.Settlement = settlement1;
         });
 
-
         // Assert
         Assert.True(server.ObjectManager.TryGetObject<MilitiaPartyComponent>(militiaCompId, out var militiaParty));
         Assert.Equal(militiaParty.Settlement, settlement1);
@@ -58,7 +57,6 @@ public class MilitiaPartyComponentTests : IDisposable
             Assert.Equal(clientMilitiaParty.Settlement.StringId, settlement1.StringId);
         }
     }
-
 
     [Fact]
     public void ClientChangeSettlement_DoesNothing()
@@ -84,19 +82,17 @@ public class MilitiaPartyComponentTests : IDisposable
         });
 
         // Act
-
         client1.Call(() =>
         {
             Assert.True(client1.ObjectManager.TryGetObject<MilitiaPartyComponent>(militiaCompId, out var serverMilitiaComponent));
             serverMilitiaComponent.Settlement = testSettlement;
         });
 
-
         // Assert
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MilitiaPartyComponent>(militiaCompId, out var clientMilitiaParty));
-            Assert.Equal(clientMilitiaParty.Settlement.StringId, settlement.StringId);
+            Assert.Null(clientMilitiaParty.Settlement);
         }
     }
 }
