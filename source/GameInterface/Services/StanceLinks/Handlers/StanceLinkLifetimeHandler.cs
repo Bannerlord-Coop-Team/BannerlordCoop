@@ -110,11 +110,14 @@ public class StanceLinkLifetimeHandler : IHandler
             faction2 = kingdom2;
         }
 
-        var stanceLink = new StanceLink((StanceType)payload.StanceType, faction1, faction2, payload.IsAtConstantWar);
-        if (objectManager.AddExisting(payload.StringId, stanceLink) == false)
+        using(new AllowedThread())
         {
-            Logger.Error("Failed to add existing StanceLink, {id}", payload.StringId);
-            return;
+            var stanceLink = new StanceLink((StanceType)payload.StanceType, faction1, faction2, payload.IsAtConstantWar);
+            if (objectManager.AddExisting(payload.StringId, stanceLink) == false)
+            {
+                Logger.Error("Failed to add existing StanceLink, {id}", payload.StringId);
+                return;
+            }
         }
     }
 }
