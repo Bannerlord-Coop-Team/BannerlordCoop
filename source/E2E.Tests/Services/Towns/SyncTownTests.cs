@@ -1,77 +1,171 @@
-﻿using Common.Util;
-using E2E.Tests.Environment;
+﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using E2E.Tests.Util;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Towns;
 public class SyncTownTests : IDisposable
 {
-    E2ETestEnvironment TestEnvironment { get; }
+	E2ETestEnvironment TestEnvironment { get; }
 
-    EnvironmentInstance Server => TestEnvironment.Server;
+	EnvironmentInstance Server => TestEnvironment.Server;
 
-    IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
+	IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
-    private readonly string TownId;
+	private Dictionary<Type, string> StringIdDict = new();
 
-    public SyncTownTests(ITestOutputHelper output)
+	public SyncTownTests(ITestOutputHelper output)
+	{
+		TestEnvironment = new E2ETestEnvironment(output);
+
+		CreateObject<Town>();
+		CreateObject<Hero>();
+	}
+
+
+    [Fact]
+    public void Server_Town_Fields()
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        AssertField<Town, float>(nameof(Town._prosperity), 500f);
+        AssertField<Town, float>(nameof(Town._security), 50f);
+        AssertField<Town, float>(nameof(Town._loyalty), 60f);
 
-        var town = new Town();
+        AssertField<Town, int>(nameof(Town._tradeTax), 70);
+        AssertField<Town, int>(nameof(Town._wallLevel), 1);
+        AssertField<Town, int>(nameof(Town.BoostBuildingProcess), 200);
 
-        // Create fief on the server
-        Assert.True(Server.ObjectManager.AddNewObject(town, out TownId));
-
-        // Create fief on all clients
-        foreach (var client in Clients)
-        {
-            var client_town = new Town();
-            Assert.True(client.ObjectManager.AddExisting(TownId, client_town));
-        }
-    }
-
-    public void Dispose()
-    {
-        TestEnvironment.Dispose();
+        AssertField<Town, bool>(nameof(Town._isCastle), true);
+        AssertField<Town, bool>(nameof(Town.InRebelliousState), true);
+        AssertReferenceField<Town, Hero>(nameof(Town._governor));
     }
 
     [Fact]
-    public void Server_Town_OwnerClan()
+    public void Server_Town_Properties()
     {
-        // Arrange
-        var server = TestEnvironment.Server;
+        AssertReferenceProperty<Town, Hero>(nameof(Town.Governor));
+    }
 
-        var _hero = ObjectHelper.SkipConstructor<Hero>();
-        server.ObjectManager.AddNewObject(_hero, out var heroId);
+    public void Dispose()
+	{
+		TestEnvironment.Dispose();
+	}
 
-        foreach (var client in Clients)
+	private void CreateObject<T>() where T: class
+	{
+		string instanceId = string.Empty;
+		T serverInstance = null;
+		Server.Call(() =>
+		{
+            serverInstance = GameObjectCreator.CreateInitializedObject<T>();
+            Assert.True(Server.ObjectManager.TryGetId(serverInstance, out instanceId));
+		});
+
+		// Create town on all clients
+		foreach (var client in Clients)
         {
-            var client_hero = ObjectHelper.SkipConstructor<Hero>();
-            client.ObjectManager.AddExisting(heroId, client_hero);
-        }
+            Assert.True(client.ObjectManager.TryGetObject<T>(instanceId, out T clientInstance));
+			Assert.NotSame(serverInstance, clientInstance);
+		}
+
+		StringIdDict.Add(typeof(T), instanceId);
+	}
 
 
-        // Act
-        server.Call(() =>
+	private void AssertField<TInstance, TValue>(string fieldName, TValue value)
+        where TInstance : class
+    {
+        Assert.True(typeof(TValue).IsValueType);
+        var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
+		var intercept = TestEnvironment.GetIntercept(fieldInfo);
+
+        Server.Call(() =>
+		{
+			Assert.True(Server.ObjectManager.TryGetObject<TInstance>(StringIdDict[typeof(TInstance)], out var serverInstance));
+
+            Assert.Equal(fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
+            intercept.Invoke(null, new object[] { serverInstance, value});
+            Assert.Equal(value, fieldInfo.GetValue(serverInstance));
+		});
+
+		// Assert
+		foreach (var client in Clients)
+		{
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(StringIdDict[typeof(TInstance)], out var clientInstance));
+			Assert.Equal(value, fieldInfo.GetValue(clientInstance));
+		}
+	}
+
+    private void AssertReferenceField<TInstance, TValue>(string fieldName) 
+        where TInstance : class
+        where TValue : class
+    {
+        var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
+        Assert.False(fieldInfo.GetUnderlyingType().IsValueType);
+        var intercept = TestEnvironment.GetIntercept(fieldInfo);
+
+        Server.Call(() =>
         {
-            Assert.True(server.ObjectManager.TryGetObject<Town>(TownId, out var fief));
-            Assert.True(server.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
-
-            fief.Governor = hero;
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(StringIdDict[typeof(TInstance)], out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TValue>(StringIdDict[typeof(TValue)], out var serverFieldInstance));
+            Assert.Equal(fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
+            intercept.Invoke(null, new object[] { serverInstance, serverFieldInstance });
+            Assert.Same(serverFieldInstance, fieldInfo.GetValue(serverInstance));
         });
 
         // Assert
         foreach (var client in Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<Town>(TownId, out var fief));
-            Assert.True(client.ObjectManager.TryGetObject<Hero>(heroId, out var client_hero));
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(StringIdDict[typeof(TInstance)], out var clientInstance));
+            Assert.True(client.ObjectManager.TryGetObject<TValue>(StringIdDict[typeof(TValue)], out var clientFieldInstance));
+            Assert.Same(clientFieldInstance, fieldInfo.GetValue(clientInstance));
+        }
+    }
 
-            Assert.Same(client_hero, fief.Governor);
+    private void AssertProperty<TInstance, TValue>(string propertyName, TValue value)
+        where TInstance : class
+    {
+        Assert.True(typeof(TValue).IsValueType);
+        var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
+
+        Server.Call((Action)(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(StringIdDict[typeof(TInstance)], out var serverInstance));
+
+            Assert.Equal(propertyInfo.GetUnderlyingType().GetDefaultValue(), propertyInfo.GetValue((object)serverInstance));
+            propertyInfo.SetValue(serverInstance, value);
+        }));
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(StringIdDict[typeof(TInstance)], out var clientInstance));
+            Assert.Equal(value, propertyInfo.GetValue(clientInstance));
+        }
+    }
+
+    private void AssertReferenceProperty<TInstance, TProperty>(string propertyName)
+        where TInstance : class
+        where TProperty : class
+    {
+        var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(StringIdDict[typeof(TInstance)], out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TProperty>(StringIdDict[typeof(TProperty)], out var serverPropertyInstance));
+            Assert.Equal(propertyInfo.GetUnderlyingType().GetDefaultValue(), propertyInfo.GetValue(serverInstance));
+            propertyInfo.SetValue(serverInstance, serverPropertyInstance);
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(StringIdDict[typeof(TInstance)], out var clientInstance));
+            Assert.True(client.ObjectManager.TryGetObject<TProperty>(StringIdDict[typeof(TProperty)], out var clientPropertyInstance));
+            Assert.Same(clientPropertyInstance, propertyInfo.GetValue(clientInstance));
         }
     }
 }
