@@ -30,21 +30,22 @@ public class SyncTownTests : IDisposable
     public void Server_Town_Fields()
     {
         AssertField<Town, float>(nameof(Town._prosperity), 500f);
-        AssertField<Town, float>(nameof(Town._security), 50f);
-        AssertField<Town, float>(nameof(Town._loyalty), 60f);
 
         AssertField<Town, int>(nameof(Town._tradeTax), 70);
         AssertField<Town, int>(nameof(Town._wallLevel), 1);
         AssertField<Town, int>(nameof(Town.BoostBuildingProcess), 200);
-
         AssertField<Town, bool>(nameof(Town._isCastle), true);
         AssertField<Town, bool>(nameof(Town.InRebelliousState), true);
+
         AssertReferenceField<Town, Hero>(nameof(Town._governor));
     }
 
     [Fact]
     public void Server_Town_Properties()
     {
+        AssertProperty<Town, float>(nameof(Town.Security), 50f);
+        AssertProperty<Town, float>(nameof(Town.Loyalty), 60f);
+
         AssertReferenceProperty<Town, Hero>(nameof(Town.Governor));
     }
 
