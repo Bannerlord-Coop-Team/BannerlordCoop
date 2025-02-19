@@ -70,6 +70,8 @@ namespace GameInterface.Services.TroopRosters.Handlers
             };
 
             troopRoster.data[data.Index] = newElement;
+            troopRoster.UpdateVersion();
+            troopRoster.ValidateTroopListCache();
         }
     }
 }
