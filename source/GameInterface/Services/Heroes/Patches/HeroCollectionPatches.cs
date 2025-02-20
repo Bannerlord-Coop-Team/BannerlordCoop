@@ -17,6 +17,7 @@ using GameInterface.Services.Heroes.Messages.Collections;
 using TaleWorlds.Library;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using GameInterface.Services.TroopRosters.Handlers;
 
 namespace GameInterface.Services.Heroes.Patches;
 
@@ -42,36 +43,58 @@ internal class HeroCollectionPatches
         // Alleys
         yield return AccessTools.Method(typeof(Alley), nameof(Alley.AfterLoad));
         yield return AccessTools.Method(typeof(Alley), nameof(Alley.SetOwner));
+        //yield return AccessTools.Method(typeof(TroopRosterHandler), nameof(TroopRosterHandler.HandleOnRecruitmentDone));
     }
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
     {
-        var stack = new Stack<CodeInstruction>();
-
+        var heroLoadStack = new Stack<CodeInstruction>();
+        CodeInstruction previous = null;
         var VolunteerArrayType = AccessTools.Field(typeof(Hero), nameof(Hero.VolunteerTypes));
         var arrayAssignIntercept = AccessTools.Method(typeof(HeroCollectionPatches), nameof(ArrayAssignIntercept));
+
         foreach (var instruction in instructions)
         {
-            if (stack.Count > 0 && instruction.opcode == OpCodes.Stelem_Ref)
+            // Track Hero load instructions before accessing VolunteerTypes
+            if (instruction.opcode == OpCodes.Ldfld && (FieldInfo)instruction.operand == VolunteerArrayType)
             {
-                stack.Pop();
-
-                var newInstr = new CodeInstruction(OpCodes.Call, arrayAssignIntercept);
-                newInstr.labels = instruction.labels;
-
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
-                yield return newInstr;
-                continue;
+                if (previous != null && IsLdloc(previous))
+                {
+                    heroLoadStack.Push(previous);
+                }
+                else
+                {
+                    heroLoadStack.Push(null);
+                }
             }
 
-            if (instruction.opcode == OpCodes.Ldfld && instruction.operand as FieldInfo == VolunteerArrayType)
+            // Replace `stelem.ref` with intercept call
+            if (instruction.opcode == OpCodes.Stelem_Ref)
             {
-                stack.Push(instruction);
+                if (heroLoadStack.Count > 0)
+                {
+                    var heroLoad = heroLoadStack.Pop();
+                    if (heroLoad != null)
+                    {
+                        yield return heroLoad; // Inject Hero instance
+                        yield return new CodeInstruction(OpCodes.Call, arrayAssignIntercept) { labels = instruction.labels };
+                        continue;
+                    }
+                }
             }
 
             yield return instruction;
+            previous = instruction; // Track previous instruction
         }
+    }
+
+    // Helper method to check if an instruction loads a local variable
+    private static bool IsLdloc(CodeInstruction instruction)
+    {
+        return instruction.opcode == OpCodes.Ldloc || instruction.opcode == OpCodes.Ldloc_S ||
+               instruction.opcode == OpCodes.Ldloc_0 || instruction.opcode == OpCodes.Ldloc_1 ||
+               instruction.opcode == OpCodes.Ldloc_2 || instruction.opcode == OpCodes.Ldloc_3;
     }
 
     public static void ArrayAssignIntercept(CharacterObject[] VolunteerTypes, int index, CharacterObject value, Hero instance)
