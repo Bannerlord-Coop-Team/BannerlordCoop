@@ -55,6 +55,13 @@ public class TroopRosterHandler : IHandler
     public void HandleOnRecruitmentDone(MessagePayload<ProccessRequestOnDoneRecruitmentVM> payload)
     {
         var obj = payload.What;
+
+        if(obj.TroopsInCart == null)
+        {
+            network.Send(obj.ClientWho, new ClientCloseRecruitmentVM());
+            return;
+        }
+
         if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
         {
             Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
@@ -112,6 +119,7 @@ public class TroopRosterHandler : IHandler
         var message = new ApproveChangeOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, obj.TotalCost);
 
         network.Send(obj.ClientWho, new ClientCloseRecruitmentVM());
+
         network.SendAll(message);
     }
 
