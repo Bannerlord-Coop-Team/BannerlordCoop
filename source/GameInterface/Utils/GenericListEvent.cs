@@ -1,13 +1,14 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using TaleWorlds.CampaignSystem.Settlements.Workshops;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Utils
 {
     [ProtoContract(SkipConstructor = true)]
     public record GenericListEvent<TInstance, TValue> : IEvent
     {
+        /// <summary>
+        /// Ctor used by GenericCollectionPatches to create the instance
+        /// </summary>
         public GenericListEvent(TInstance instance, TValue value)
         {
             Instance = instance;
