@@ -171,6 +171,7 @@ namespace GameInterface.Utils
         #endregion
         #region ArrayTranspiler
         public static IEnumerable<CodeInstruction> ArrayTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TMessage : GenericArrayEvent<TInstance, TItem>
         {
             var stack = new Stack<CodeInstruction>();
             var itemSlotArrayType = AccessTools.Field(typeof(TInstance), fieldName);

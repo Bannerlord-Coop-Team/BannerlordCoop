@@ -49,8 +49,8 @@ namespace GameInterface.Services.Equipments.Handlers
             var data = payload.What;
 
             if (!TryGetId(data.Instance, out string EquipmentId)) return;
-            if (!TryGetId(data.Item, out string ItemId)) return;
-            if (!TryGetId(data.ItemModifier, out string ItemModifierId)) return;
+            if (!TryGetId(data.Value.Item, out string ItemId)) return;
+            if (!TryGetId(data.Value.ItemModifier, out string ItemModifierId)) return;
 
             network.SendAll(new NetworkUpdateItemSlots(EquipmentId, ItemId, ItemModifierId, data.Index));
         }

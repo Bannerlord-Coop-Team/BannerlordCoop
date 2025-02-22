@@ -8,12 +8,5 @@ internal record VolunteerTypesArrayUpdated : GenericArrayEvent<Hero, CharacterOb
 {
     public VolunteerTypesArrayUpdated(Hero instance, CharacterObject value, int index) : base(instance, value, index)
     {
-        Instance = instance;
-        Value = value;
-        Index = index;
     }
-
-    public Hero Instance { get; }
-    public CharacterObject Value { get; }
-    public int Index { get; }
 }

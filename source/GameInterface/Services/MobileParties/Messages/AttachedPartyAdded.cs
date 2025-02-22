@@ -12,11 +12,6 @@ public record AttachedPartyAdded : GenericListEvent<MobileParty, MobileParty>
 {
     public AttachedPartyData AttachedPartyData { get; }
 
-    //public AttachedPartyAdded(AttachedPartyData attachedPartyData)
-    //{
-    //    AttachedPartyData = attachedPartyData;
-    //}
-
     public AttachedPartyAdded(MobileParty instance, MobileParty value) : base(instance, value)
     {
         AttachedPartyData = new AttachedPartyData(instance.StringId, value.StringId);
