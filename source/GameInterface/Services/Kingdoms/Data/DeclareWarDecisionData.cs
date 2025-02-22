@@ -49,7 +49,7 @@ namespace GameInterface.Services.Kingdoms.Data
 
             DeclareWarDecision declareWarDecision = (DeclareWarDecision)FormatterServices.GetUninitializedObject(typeof(DeclareWarDecision));
             SetKingdomDecisionProperties(declareWarDecision, proposerClan, kingdom);
-            FactionToDeclareWarOnField.SetValue(declareWarDecision.FactionToDeclareWarOn, faction);
+            FactionToDeclareWarOnField.SetValue(declareWarDecision, faction);
             kingdomDecision = declareWarDecision;
             return true;
         }

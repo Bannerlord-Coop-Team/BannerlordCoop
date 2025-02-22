@@ -13,6 +13,7 @@ using System.Collections;
 using System.Linq;
 using ProtoBuf;
 using ProtoBuf.Meta;
+using Newtonsoft.Json.Linq;
 
 namespace GameInterface.AutoSync.Fields;
 public class FieldTranspilerCreator
@@ -437,6 +438,8 @@ public class FieldTranspilerCreator
 
         IsClientCheck(il, field);
 
+        HasValueChanged(il, field);
+
         var networkLocal = TryResolve<INetwork>(il);
 
         var objectManagerLocal = TryResolve<IObjectManager>(il);
@@ -463,6 +466,8 @@ public class FieldTranspilerCreator
         return methodBuilder;
     }
 
+
+
     private MethodBuilder CreateInterceptByRef(int typeId, int propId, FieldInfo field)
     {
         var methodBuilder = typeBuilder.DefineMethod($"{field.DeclaringType.Name}_{field.Name}_intercept",
@@ -475,6 +480,8 @@ public class FieldTranspilerCreator
         var il = methodBuilder.GetILGenerator();
 
         IsClientCheck(il, field);
+
+        HasValueChanged(il, field);
 
         var networkLocal = TryResolve<INetwork>(il);
         var objectManagerLocal = TryResolve<IObjectManager>(il);
@@ -524,6 +531,31 @@ public class FieldTranspilerCreator
         il.MarkLabel(validLabel);
 
         return local;
+    }
+
+    private void HasValueChanged(ILGenerator il, FieldInfo field)
+    {
+        var fieldType = field.GetUnderlyingType();
+        var valueNotChangedLabel = il.DefineLabel();
+        var method = typeof(object).GetMethod("Equals", new[] { typeof(object), typeof(object) });
+        
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldfld, field);
+        il.Emit(OpCodes.Box, fieldType);
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Box, fieldType);
+        il.Emit(OpCodes.Call, method);        
+        il.Emit(OpCodes.Brfalse_S, valueNotChangedLabel);
+
+        // Log error
+        il.Emit(OpCodes.Ldsfld, loggerField);
+        il.Emit(OpCodes.Ldstr, $"Repeating assignment");
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+
+        // Return
+        il.Emit(OpCodes.Ret);
+
+        il.MarkLabel(valueNotChangedLabel);
     }
 
     private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal)
