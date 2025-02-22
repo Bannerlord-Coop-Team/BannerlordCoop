@@ -1,9 +1,6 @@
 ﻿using E2E.Tests.Environment;
-using HarmonyLib;
 using Xunit.Abstractions;
 using E2E.Tests.Environment.Instance;
-using TaleWorlds.Localization;
-using Newtonsoft.Json.Linq;
 
 namespace E2E.Tests.Util
 {

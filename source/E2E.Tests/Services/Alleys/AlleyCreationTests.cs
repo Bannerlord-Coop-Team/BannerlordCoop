@@ -2,6 +2,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Alleys;
@@ -29,9 +30,7 @@ public class AlleyCreationTests : IDisposable
         // Act
         server.Call(() =>
         {
-            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            var alley = new Alley(settlement, "testAlley", new TaleWorlds.Localization.TextObject("testTextObject"));
-
+            var alley = GameObjectCreator.CreateInitializedObject<Alley>();
             Assert.True(server.ObjectManager.TryGetId(alley, out alleyId));
 
             // _owner field sync test

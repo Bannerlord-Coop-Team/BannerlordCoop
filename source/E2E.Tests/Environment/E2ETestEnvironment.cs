@@ -271,7 +271,6 @@ internal class E2ETestEnvironment : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<TProperty>(referenceId, out var clientPropertyInstance));
             Assert.Same(clientPropertyInstance, propertyInfo.GetValue(clientInstance));
             Assert.NotNull(clientPropertyInstance);
-
         }
     }
 

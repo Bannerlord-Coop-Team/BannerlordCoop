@@ -1,5 +1,4 @@
 ﻿using E2E.Tests.Util;
-using HarmonyLib;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -8,7 +7,6 @@ namespace E2E.Tests.Services.BasicCharacterObjects
 {
     public class BasicCharacterObjectSyncTests : SyncTestBase
     {
-
         public BasicCharacterObjectSyncTests(ITestOutputHelper output) : base(output)
         {
             TestEnvironment.CreateRegisteredObject<BasicCharacterObject>();
@@ -54,6 +52,5 @@ namespace E2E.Tests.Services.BasicCharacterObjects
             TestEnvironment.AssertReferenceField<BasicCharacterObject, MBEquipmentRoster>(nameof(BasicCharacterObject._equipmentRoster));
             TestEnvironment.AssertReferenceField<BasicCharacterObject, MBCharacterSkills>(nameof(BasicCharacterObject.DefaultCharacterSkills));
         }
-
     }
 }
