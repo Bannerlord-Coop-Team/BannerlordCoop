@@ -67,7 +67,6 @@ internal class MapEventHandler : IHandler
         {
             using (new AllowedThread())
             {
-                var t = CampaignEventDispatcher.Instance;
                 mapEvent.FinalizeEvent();
             }
         });
