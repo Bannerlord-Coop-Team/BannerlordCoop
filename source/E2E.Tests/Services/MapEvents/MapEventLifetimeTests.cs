@@ -86,7 +86,6 @@ public class MapEventLifetimeTests : IDisposable
 
             Assert.True(server.ObjectManager.TryGetId(mapEvent, out mapEventId));
 
-            // TODO find better way
             mapEvent.MapEventVisual = Moq.Mock.Of<IMapEventVisual>();
 
             mapEvent.Initialize(attackerParty, defenderParty);

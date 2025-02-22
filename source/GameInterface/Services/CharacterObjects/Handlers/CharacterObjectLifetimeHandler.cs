@@ -41,6 +41,8 @@ namespace GameInterface.Services.Buildings.Handlers
 
             if (objectManager.AddNewObject(payload.BasicCharacterObject, out string characterObjectId) == false) return;
 
+            payload.BasicCharacterObject.StringId = characterObjectId;
+
             var message = new NetworkCreateCharacterObject(characterObjectId);
             network.SendAll(message);
         }
@@ -55,6 +57,8 @@ namespace GameInterface.Services.Buildings.Handlers
                 Logger.Error("Failed to add existing Building, {id}", payload.CharacterObjectId);
                 return;
             }
+
+            characterObject.StringId = payload.CharacterObjectId;
         }
     }
 }

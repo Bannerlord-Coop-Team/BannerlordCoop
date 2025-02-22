@@ -42,7 +42,7 @@ namespace GameInterface.Services.BesiegerCamps
             }
         }
 
-        void OnClientRegister(BesiegerCamp newInstance)
+        void OnClientRegister(string id, BesiegerCamp newInstance)
         {
             AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._besiegerParties)).SetValue(newInstance, new MBList<MobileParty>());
         }

@@ -21,7 +21,7 @@ namespace GameInterface.AutoSync.Registry;
 
 public interface IAutoRegistryFactory : IDisposable
 {
-    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<T> onClientCreated = null) where T : class;
+    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<string, T> onClientCreated = null) where T : class;
     void PatchAll();
 }
 
@@ -62,7 +62,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         Disposables.ForEach(disposable => disposable.Dispose());
     }
 
-    public bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<T> onClientCreated = null) where T : class
+    public bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<string, T> onClientCreated = null) where T : class
     {
         TypeMapper.AddTypes(new Type[] { typeof(NetworkCreateInstance<T>) });
 
@@ -127,9 +127,14 @@ class AutoRegistryHandler<T> : IHandler where T : class
     public IMessageBroker MessageBroker { get; }
     public INetwork Network { get; }
     public IObjectManager ObjectManager { get; }
-    public Action<T> ClientCreatedCallback { get; }
+    public Action<string, T> ClientCreatedCallback { get; }
 
-    public AutoRegistryHandler(AutoRegistry<T> registry, IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, Action<T> clientCreatedCallback = null)
+    public AutoRegistryHandler(
+        AutoRegistry<T> registry,
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager,
+        Action<string, T> clientCreatedCallback = null)
     {
         Registry = registry;
         MessageBroker = messageBroker;
@@ -160,7 +165,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         ObjectManager.AddExisting(payload.What.InstanceId, newInstance);
 
-        if (ClientCreatedCallback != null) ClientCreatedCallback(newInstance);
+        if (ClientCreatedCallback != null) ClientCreatedCallback(payload.What.InstanceId, newInstance);
     }
 }
 

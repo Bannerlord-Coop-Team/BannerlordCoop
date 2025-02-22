@@ -2,11 +2,11 @@
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Clans.Patches
+namespace GameInterface.Services.Clans
 {
     internal class ClanSync : IAutoSync
     {
-        public ClanSync(IAutoSyncBuilder autoSyncBuilder) 
+        public ClanSync(IAutoSyncBuilder autoSyncBuilder)
         {
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Name)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InformalName)));

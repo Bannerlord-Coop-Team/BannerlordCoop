@@ -1,10 +1,12 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -15,7 +17,6 @@ internal class MapEventHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
-
 
     public MapEventHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
@@ -38,17 +39,6 @@ internal class MapEventHandler : IHandler
         messageBroker.Unsubscribe<NetworkDestroyMapEvent>(Handle);
     }
 
-    private void Handle(MessagePayload<NetworkDestroyMapEvent> payload)
-    {
-        if (objectManager.TryGetObject<MapEvent>(payload.What.MapEventId, out var mapEvent) == false)
-        {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), payload.What.MapEventId);
-            return;
-        }
-
-        objectManager.Remove(mapEvent);
-    }
-
     private void Handle(MessagePayload<MapEventDestroyed> payload)
     {
         var mapEvent = payload.What.Instance;
@@ -63,7 +53,26 @@ internal class MapEventHandler : IHandler
         network.SendAll(new NetworkDestroyMapEvent(mapEventId));
     }
 
-    
+    private void Handle(MessagePayload<NetworkDestroyMapEvent> payload)
+    {
+        if (objectManager.TryGetObject<MapEvent>(payload.What.MapEventId, out var mapEvent) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), payload.What.MapEventId);
+            return;
+        }
+
+        objectManager.Remove(mapEvent);
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                var t = CampaignEventDispatcher.Instance;
+                mapEvent.FinalizeEvent();
+            }
+        });
+    }
+
 
     private void Handle(MessagePayload<MapEventCreated> payload)
     {

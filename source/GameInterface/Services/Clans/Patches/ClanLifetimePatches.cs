@@ -26,29 +26,6 @@ internal class ClanLifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroLifetimePatches>();
 
-    /// <summary>
-    /// Disables string id setting in <see cref="Clan.CreateClan(string)"/> so we can manage that in our patches
-    /// </summary>
-    [HarmonyPatch(typeof(Clan), nameof(Clan.CreateClan), new Type[] { typeof(string) })]
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var set_stringId = AccessTools.PropertySetter(typeof(MBObjectBase), nameof(MBObjectBase.StringId));
-
-        foreach (var instr in instructions)
-        {
-            if (instr.opcode == OpCodes.Callvirt && instr.operand as MethodInfo == set_stringId)
-            {
-                yield return new CodeInstruction(OpCodes.Pop);
-                yield return new CodeInstruction(OpCodes.Pop);
-            }
-            else
-            {
-                yield return instr;
-            }
-        }
-    }
-
     [HarmonyPatch(typeof(Clan), MethodType.Constructor)]
     [HarmonyPrefix]
     private static bool ctorPrefix(ref Clan __instance)

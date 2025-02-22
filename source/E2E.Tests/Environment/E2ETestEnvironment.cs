@@ -38,8 +38,11 @@ internal class E2ETestEnvironment : IDisposable
         GameLoopRunner.Instance.SetGameLoopThread();
 
         GameBootStrap.Initialize();
+
+
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
+        SetupMainHero();
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
@@ -51,7 +54,6 @@ internal class E2ETestEnvironment : IDisposable
             Server.ObjectManager.AddExisting(settlement.StringId, settlement);
         }
 
-        SetupMainHero();
     }
 
     public void Dispose()
@@ -89,6 +91,18 @@ internal class E2ETestEnvironment : IDisposable
             characterObject.HeroObject = mainHero;
             Game.Current.PlayerTroop = characterObject;
         });
+
+
+        foreach(var client in Clients)
+        {
+            client.Call(() =>
+            {
+                var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+                var mainHero = HeroCreator.CreateSpecialHero(characterObject);
+                characterObject.HeroObject = mainHero;
+                Game.Current.PlayerTroop = characterObject;
+            });
+        }
     }
 
     /// <summary>

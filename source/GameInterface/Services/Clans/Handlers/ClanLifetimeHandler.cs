@@ -44,7 +44,7 @@ internal class ClanLifetimeHandler : IHandler
     {
         if (objectManager.AddNewObject(payload.What.Clan, out string newId) == false)
         {
-            Logger.Error("Failed to add {type} to manager", typeof(CultureObject));
+            Logger.Error("Failed to add {type} to manager", typeof(Clan));
             return;
         }
 
@@ -59,7 +59,7 @@ internal class ClanLifetimeHandler : IHandler
 
         if (objectManager.AddExisting(payload.ClanId, clan) == false)
         {
-            Logger.Error("Failed to add {type} to manager with id {id}", typeof(CultureObject), payload.ClanId);
+            Logger.Error("Failed to add {type} to manager with id {id}", typeof(Clan), payload.ClanId);
             return;
         }
 
@@ -74,9 +74,15 @@ internal class ClanLifetimeHandler : IHandler
     {
         if (objectManager.TryGetId(payload.What.Clan, out string clanId) == false)
         {
-            Logger.Error("Failed to add {type} to manager", typeof(CultureObject));
+            Logger.Error("Failed to get {type} id", typeof(Clan));
             return;
         }
+
+        if (objectManager.Remove(payload.What.Clan) == false)
+        {
+            Logger.Error("Failed to remove {type} from registry", typeof(Clan));
+            return;
+        }    
 
         network.SendAll(new NetworkDestroyClan(clanId, payload.What.Details));
     }
@@ -87,6 +93,12 @@ internal class ClanLifetimeHandler : IHandler
         if (objectManager.TryGetObject<Clan>(payload.ClanId, out var clan) == false)
         {
             Logger.Error("Unable to find clan with string id {stringId}", payload.ClanId);
+            return;
+        }
+
+        if (objectManager.Remove(clan) == false)
+        {
+            Logger.Error("Failed to remove {type} from registry", typeof(Clan));
             return;
         }
 
