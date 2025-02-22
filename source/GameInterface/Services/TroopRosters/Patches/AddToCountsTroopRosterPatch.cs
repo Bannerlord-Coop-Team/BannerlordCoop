@@ -44,7 +44,7 @@ public class AddToCountsTroopRosterPatch
         {
             using (new AllowedThread())
             {
-                if(party.MemberRoster == null) return;
+                if(party.Party == null || party.MemberRoster == null) return;
                 party.MemberRoster.AddToCounts(character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
             }
         });

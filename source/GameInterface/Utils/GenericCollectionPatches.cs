@@ -7,6 +7,7 @@ using System.Reflection.Emit;
 using System.Reflection;
 using Serilog;
 using Common.Logging;
+using TaleWorlds.Library;
 
 namespace GameInterface.Utils
 {
@@ -20,6 +21,7 @@ namespace GameInterface.Utils
             return AccessTools.GetDeclaredMethods(typeof(TInstance));
         }
 
+        #region ListTranspiler
         public static IEnumerable<CodeInstruction> ListTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions)
             where TAddMessage : GenericListEvent<TInstance, TItem>
             where TRemoveMessage : GenericListEvent<TInstance, TItem>
@@ -92,7 +94,82 @@ namespace GameInterface.Utils
 
             return list.Remove(item);
         }
+        #endregion
+        #region MBListTranspiler
+        public static IEnumerable<CodeInstruction> MBListTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions)
+            where TAddMessage : GenericListEvent<TInstance, TItem>
+            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+        {
+            var addMethod = typeof(MBList<TItem>).GetMethod("Add");
+            var addIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
+            var removeMethod = typeof(MBList<TItem>).GetMethod("Remove");
+            var removeIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
+            foreach (var instruction in instructions)
+            {
+                if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == addMethod)
+                {
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, addIntercept);
+                }
+                else if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == removeMethod)
+                {
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return new CodeInstruction(OpCodes.Call, removeIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+        public static void MBListAddIntercept<TItem, TMessage>(MBList<TItem> list, TItem item, TInstance instance)
+            where TMessage : IEvent
+        {
+            // Allows original method call if this thread is allowed
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                list.Add(item);
+                return;
+            }
+
+            // Skip method if called from client and allow origin
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                list.Add(item);
+                return;
+            }
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item);
+            MessageBroker.Instance.Publish(instance, message);
+
+            list.Add(item);
+        }
+
+        public static bool MBListRemoveIntercept<TItem, TMessage>(MBList<TItem> list, TItem item, TInstance instance)
+            where TMessage : IEvent
+        {
+            // Allows original method call if this thread is allowed
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                return list.Remove(item);
+            }
+
+            // Skip method if called from client and allow origin
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                return list.Remove(item);
+            }
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item);
+            MessageBroker.Instance.Publish(instance, message);
+
+            return list.Remove(item);
+        }
+        #endregion
+        #region ArrayTranspiler
         public static IEnumerable<CodeInstruction> ArrayTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
         {
             var stack = new Stack<CodeInstruction>();
@@ -123,13 +200,13 @@ namespace GameInterface.Utils
             }
         }
 
-        public static void ArrayAssignIntercept<TItem, TMessage>(TItem[] _sides, int index, TItem value, TInstance instance)
+        public static void ArrayAssignIntercept<TItem, TMessage>(TItem[] items, int index, TItem item, TInstance instance)
             where TMessage : GenericArrayEvent<TInstance, TItem>
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
-                _sides[index] = value;
+                items[index] = item;
                 return;
             }
 
@@ -139,10 +216,11 @@ namespace GameInterface.Utils
                     + "Callstack: {callstack}", typeof(TInstance), Environment.StackTrace);
                 return;
             }
-            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, value, index);
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item, index);
             MessageBroker.Instance.Publish(instance, message);
 
-            _sides[index] = value;
+            items[index] = item;
         }
+        #endregion
     }
 }

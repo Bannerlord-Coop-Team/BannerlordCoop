@@ -19,6 +19,7 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using GameInterface.Services.TroopRosters.Handlers;
 using GameInterface.Utils;
+using System.Collections;
 
 namespace GameInterface.Services.Heroes.Patches;
 
@@ -57,6 +58,7 @@ internal class HeroCollectionPatches : GenericCollectionPatches<HeroCollectionPa
 
         foreach (var instruction in instructions)
         {
+            // TODO: Check if this is actually necessary or if the full generic approach is usable
             // Track Hero load instructions before accessing VolunteerTypes
             if (instruction.opcode == OpCodes.Ldfld && (FieldInfo)instruction.operand == VolunteerArrayType)
             {
@@ -99,183 +101,23 @@ internal class HeroCollectionPatches : GenericCollectionPatches<HeroCollectionPa
     }
 
     public static void ArrayAssignIntercept(CharacterObject[] VolunteerTypes, int index, CharacterObject value, Hero instance)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            VolunteerTypes[index] = value;
-            return;
-        }
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
-            return;
-        }
-        var message = new VolunteerTypesArrayUpdated(instance, value, index);
-        MessageBroker.Instance.Publish(instance, message);
-
-        VolunteerTypes[index] = value;
-    }
+        => ArrayAssignIntercept<CharacterObject, VolunteerTypesArrayUpdated>(VolunteerTypes, index, value, instance);
 
     [HarmonyTranspiler]
-    static IEnumerable<CodeInstruction> ChildrenTranspiler(IEnumerable<CodeInstruction> instructions) => ListTranspiler<Hero, ChildrenListUpdated, ChildrenListUpdated>(instructions);
+    static IEnumerable<CodeInstruction> ChildrenTranspiler(IEnumerable<CodeInstruction> instructions) 
+        => MBListTranspiler<Hero, ChildrenListUpdated, ChildrenListRemoved>(instructions);
     
     [HarmonyTranspiler]
-    static IEnumerable<CodeInstruction> CaravanTranspiler(IEnumerable<CodeInstruction> instructions) => ListTranspiler<CaravanPartyComponent, CaravanListUpdated, CaravanListRemoved>(instructions);
+    static IEnumerable<CodeInstruction> CaravanTranspiler(IEnumerable<CodeInstruction> instructions) 
+        => ListTranspiler<CaravanPartyComponent, CaravanListUpdated, CaravanListRemoved>(instructions);
    
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> AlleyTranspiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var addMethod = typeof(List<Alley>).GetMethod("Add");
-        var addIntercept = AccessTools.Method(typeof(HeroCollectionPatches), nameof(AlleyAddIntercept));
-
-        var removeMethod = typeof(List<Alley>).GetMethod("Remove");
-        var removeIntercept = typeof(HeroCollectionPatches).GetMethod(nameof(AlleyRemoveIntercept));
-
-        foreach (var instruction in instructions)
-        {
-            if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == addMethod)
-            {
-                var newInstr = new CodeInstruction(OpCodes.Call, addIntercept);
-                newInstr.labels = instruction.labels;
-
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
-                yield return newInstr;
-            }
-            else if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == removeMethod) 
-            {
-                var newInstr = new CodeInstruction(OpCodes.Call, removeIntercept);
-                newInstr.labels = instruction.labels;
-
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
-                yield return newInstr;
-            }
-            else
-            {
-                yield return instruction;
-            }
-        }
-    }
-
-    public static void AlleyAddIntercept(List<Alley> ownedAlleys, Alley value, Hero instance)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            ownedAlleys.Add(value);
-            return;
-        }
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
-            return;
-        }
-        var message = new AlleyListUpdated(instance, value);
-        MessageBroker.Instance.Publish(instance, message);
-
-        ownedAlleys.Add(value);
-    }
-
-    public static bool AlleyRemoveIntercept(List<Alley> ownedAlleys, Alley value, Hero instance)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            return ownedAlleys.Remove(value);
-        }
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
-            return ownedAlleys.Remove(value);
-        }
-        var message = new AlleyListRemoved(instance, value);
-        MessageBroker.Instance.Publish(instance, message);
-
-        return ownedAlleys.Remove(value);
-    }
+        => ListTranspiler<Alley, AlleyListUpdated, AlleyListRemoved>(instructions);
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> WorkshopTranspiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var stack = new Stack<CodeInstruction>();
-
-        var addMethod = typeof(MBList<Workshop>).GetMethod("Add");
-        var addIntercept = AccessTools.Method(typeof(HeroCollectionPatches), nameof(WorkshopAddIntercept));
-
-        var removeMethod = typeof(MBList<Workshop>).GetMethod("Remove");
-        var removeIntercept = typeof(HeroCollectionPatches).GetMethod(nameof(WorkshopRemoveIntercept));
-
-        foreach (var instruction in instructions)
-        {
-            if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == addMethod)
-            {
-                var newInstr = new CodeInstruction(OpCodes.Call, addIntercept);
-                newInstr.labels = instruction.labels;
-
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
-                yield return newInstr;
-            }
-            else if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == removeMethod)
-            {
-                var newInstr = new CodeInstruction(OpCodes.Call, removeIntercept);
-                newInstr.labels = instruction.labels;
-
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
-                yield return newInstr;
-            }
-            else
-            {
-                yield return instruction;
-            }
-        }
-    }
-
-    public static void WorkshopAddIntercept(MBList<Workshop> ownedWorkshops, Workshop value, Hero instance)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            ownedWorkshops.Add(value);
-            return;
-        }
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
-            return;
-        }
-        var message = new WorkshopListUpdated(instance, value);
-        MessageBroker.Instance.Publish(instance, message);
-
-        ownedWorkshops.Add(value);
-    }
-
-    public static bool WorkshopRemoveIntercept(MBList<Workshop> ownedWorkshops, Workshop value, Hero instance)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            return ownedWorkshops.Remove(value);
-        }
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
-            return ownedWorkshops.Remove(value);
-        }
-        var message = new WorkshopListRemoved(instance, value);
-        MessageBroker.Instance.Publish(instance, message);
-
-        return ownedWorkshops.Remove(value);
-    }
+        => MBListTranspiler<Workshop, WorkshopListUpdated, WorkshopListRemoved>(instructions);
 }
 
 

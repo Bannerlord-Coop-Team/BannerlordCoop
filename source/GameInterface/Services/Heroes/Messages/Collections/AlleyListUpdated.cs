@@ -1,11 +1,16 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Utils;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Heroes.Messages.Collections;
 
-internal record AlleyListUpdated(Hero Instance, Alley Value) : IEvent
+internal record AlleyListUpdated : GenericListEvent<Hero, Alley>
 {
-    public Hero Instance { get; } = Instance;
-    public Alley Value { get; } = Value;
+    public AlleyListUpdated(Hero instance, Alley value) : base(instance, value)
+    {
+        Instance = instance;
+        Value = value;
+    }
+    public Hero Instance { get; }
+    public Alley Value { get; }
 }
