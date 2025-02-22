@@ -48,7 +48,8 @@ internal class GameObjectCreator
         { typeof(ItemObject), new ItemObjectBuilder() },
         { typeof(MapEventParty), new MapEventPartyBuilder() },
         { typeof(Alley), new AlleyBuilder() },
-        { typeof(Equipment), new EquipmentBuilder() }
+        { typeof(Equipment), new EquipmentBuilder() },
+        { typeof(StanceLink), new StanceLinkBuilder() }
     };
 
     public static T CreateInitializedObject<T>()

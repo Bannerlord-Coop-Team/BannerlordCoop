@@ -19,6 +19,8 @@ public class StanceLinkPropertyTests : IDisposable
     private IEnumerable<EnvironmentInstance> AllEnvironmentInstances => Clients.Append(Server);
 
     private readonly string stanceLinkId;
+    private readonly string faction1Id;
+    private readonly string faction2Id;
 
     public StanceLinkPropertyTests(ITestOutputHelper output)
     {
@@ -30,7 +32,10 @@ public class StanceLinkPropertyTests : IDisposable
         };
 
         // Create StanceLink on the server
+        faction1Id = TestEnvironment.CreateRegisteredObject<Kingdom>(disabledMethods);
+        faction2Id = TestEnvironment.CreateRegisteredObject<Kingdom>(disabledMethods);
         stanceLinkId = TestEnvironment.CreateRegisteredObject<StanceLink>(disabledMethods);
+
     }
 
     public void Dispose()
@@ -64,9 +69,8 @@ public class StanceLinkPropertyTests : IDisposable
     public void ServerChangeStanceLinkFaction1_SyncAllClients()
     {
         // Arrange
-        string? faction1Id = null;
         Assert.True(Server.ObjectManager.TryGetObject<StanceLink>(stanceLinkId, out var serverStanceLink));
-        Assert.True(Server.ObjectManager.TryGetObject<IFaction>(faction1Id, out var serverFaction1));
+        Assert.True(Server.ObjectManager.TryGetObject<Kingdom>(faction1Id, out var serverFaction1));
 
         // Act
         Server.Call(() =>
