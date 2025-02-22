@@ -106,7 +106,7 @@ public class TranspilerTests
 
         var packet = Assert.IsType<FieldAutoSyncPacket>(network.SentPackets.First());
 
-        Assert.Equal(typeId, packet.typeId);
+        Assert.Equal(typeId, packet.classId);
         Assert.Equal(0, packet.fieldId);
         Assert.Equal(instanceId, packet.instanceId);
         Assert.Equal(newValue, RawSerializer.Deserialize<int>(packet.value));

@@ -109,14 +109,9 @@ public class MobilePartyPropertyTests : IDisposable
         // Arrange
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
 
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-        Server.ObjectManager.AddNewObject(settlement, out var settlementId);
+        var settlementId = TestEnvironement.CreateRegisteredObject<Settlement>();
 
-        foreach(var client in TestEnvironement.Clients)
-        {
-            var newSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            client.ObjectManager.AddExisting(settlementId, newSettlement);
-        }
+        Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
         
 
         // Act
@@ -130,7 +125,8 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(clientParty.LastVisitedSettlement.StringId, serverParty.LastVisitedSettlement.StringId);
+            Assert.True(client.ObjectManager.TryGetId(clientParty.LastVisitedSettlement, out var clientSettlementId));
+            Assert.Equal(settlementId, clientSettlementId);
         }
     }
 
@@ -604,24 +600,23 @@ public class MobilePartyPropertyTests : IDisposable
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
 
+        var settlementId = TestEnvironement.CreateRegisteredObject<Settlement>();
+
+        Assert.True(Server.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
         // Act
-        string? settlementId = null;
         Server.Call(() =>
         {
-            var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             serverParty.CurrentSettlement = settlement;
-
-            settlementId = settlement.StringId;
         });
-
-        Assert.NotNull(settlementId);
 
 
         // Assert
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(settlementId, clientParty.CurrentSettlement.StringId);
+            Assert.True(client.ObjectManager.TryGetId(clientParty.CurrentSettlement, out var clientSettlementId));
+            Assert.Equal(settlementId, clientSettlementId);
         }
     }
 
@@ -969,14 +964,9 @@ public class MobilePartyPropertyTests : IDisposable
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
 
-        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        Server.ObjectManager.AddNewObject(clan, out string clanId);
+        var clanId = TestEnvironement.CreateRegisteredObject<Clan>();
 
-        foreach (var client in TestEnvironement.Clients)
-        {
-            var newClan = GameObjectCreator.CreateInitializedObject<Clan>();
-            client.ObjectManager.AddExisting(clanId, newClan);
-        }
+        Assert.True(Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
 
         // Act
         Server.Call(() =>
@@ -989,7 +979,8 @@ public class MobilePartyPropertyTests : IDisposable
         foreach (var client in TestEnvironement.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.Equal(serverParty.ActualClan.StringId, clientParty.ActualClan.StringId);
+            client.ObjectManager.TryGetId(clientParty.ActualClan, out var clientClanId);
+            Assert.Equal(clanId, clientClanId);
         }
     }
 

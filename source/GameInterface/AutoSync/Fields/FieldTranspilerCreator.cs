@@ -525,9 +525,11 @@ public class FieldTranspilerCreator
 
         var allowedLabel = il.DefineLabel();
 
+        // Allow this thread to skip patches
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.IsThisThreadAllowed)));
         il.Emit(OpCodes.Brtrue, allowedLabel);
 
+        // Check and log if client attempted to create object without permission
         IsClientCheck(il, field);
 
         var networkLocal = TryResolve<INetwork>(il);
