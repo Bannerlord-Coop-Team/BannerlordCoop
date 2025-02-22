@@ -18,11 +18,12 @@ using TaleWorlds.Library;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using GameInterface.Services.TroopRosters.Handlers;
+using GameInterface.Utils;
 
 namespace GameInterface.Services.Heroes.Patches;
 
 [HarmonyPatch]
-internal class HeroCollectionPatches
+internal class HeroCollectionPatches : GenericCollectionPatches<HeroCollectionPatches, Hero>
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroCollectionPatches>();
 
@@ -47,7 +48,7 @@ internal class HeroCollectionPatches
     }
 
     [HarmonyTranspiler]
-    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+    static IEnumerable<CodeInstruction> VolunteerTranspiler(IEnumerable<CodeInstruction> instructions)
     {
         var heroLoadStack = new Stack<CodeInstruction>();
         CodeInstruction previous = null;
@@ -119,125 +120,11 @@ internal class HeroCollectionPatches
     }
 
     [HarmonyTranspiler]
-    static IEnumerable<CodeInstruction> ChildrenTranspiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var childrenAddMethod = typeof(MBList<Hero>).GetMethod("Add");
-        var childrenAddIntercept = AccessTools.Method(typeof(HeroCollectionPatches), nameof(ChildrenAddIntercept));
-
-        foreach (var instruction in instructions)
-        {
-            if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == childrenAddMethod)
-            {
-                var newInstr = new CodeInstruction(OpCodes.Call, childrenAddIntercept);
-                newInstr.labels = instruction.labels;
-
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
-                yield return newInstr;
-            }
-            else
-            {
-                yield return instruction;
-            }
-        }
-    }
-
-    public static void ChildrenAddIntercept(MBList<Hero> children, Hero value, Hero instance)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            children.Add(value);
-            return;
-        }
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
-            return;
-        }
-        var message = new ChildrenListUpdated(instance, value);
-        MessageBroker.Instance.Publish(instance, message);
-
-        children.Add(value);
-    }
-
+    static IEnumerable<CodeInstruction> ChildrenTranspiler(IEnumerable<CodeInstruction> instructions) => ListTranspiler<Hero, ChildrenListUpdated, ChildrenListUpdated>(instructions);
+    
     [HarmonyTranspiler]
-    static IEnumerable<CodeInstruction> CaravanTranspiler(IEnumerable<CodeInstruction> instructions)
-    {
-        var addMethod = typeof(List<CaravanPartyComponent>).GetMethod("Add");
-        var caravanAddIntercept = AccessTools.Method(typeof(HeroCollectionPatches), nameof(CaravanAddIntercept));
-
-        var removeMethod = typeof(List<CaravanPartyComponent>).GetMethod("Remove");
-        var removeIntercept = typeof(HeroCollectionPatches).GetMethod(nameof(CaravanRemoveIntercept));
-
-        foreach (var instruction in instructions)
-        {
-            if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == addMethod)
-            {
-
-                var newInstr = new CodeInstruction(OpCodes.Call, caravanAddIntercept);
-                newInstr.labels = instruction.labels;
-
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
-                yield return newInstr;
-            }
-            else if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == removeMethod)
-            {
-                var newInstr = new CodeInstruction(OpCodes.Call, removeIntercept);
-                //newInstr.labels = instruction.labels;
-
-                yield return new CodeInstruction(OpCodes.Ldarg_0);
-                yield return newInstr;
-            } 
-            else
-            {
-                yield return instruction;
-            }
-        }
-    }
-
-    public static void CaravanAddIntercept(List<CaravanPartyComponent> ownedCaravans, CaravanPartyComponent value, Hero instance)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            ownedCaravans.Add(value);
-            return;
-        }
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
-            return;
-        }
-        var message = new CaravanListUpdated(instance, value);
-        MessageBroker.Instance.Publish(instance, message);
-
-        ownedCaravans.Add(value);
-    }
-
-    public static bool CaravanRemoveIntercept(List<CaravanPartyComponent> ownedCaravans, CaravanPartyComponent value, Hero instance)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            return ownedCaravans.Remove(value);
-        }
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
-            return ownedCaravans.Remove(value);
-        }
-        var message = new CaravanListRemoved(instance, value);
-        MessageBroker.Instance.Publish(instance, message);
-
-        return ownedCaravans.Remove(value);
-    }
-
+    static IEnumerable<CodeInstruction> CaravanTranspiler(IEnumerable<CodeInstruction> instructions) => ListTranspiler<CaravanPartyComponent, CaravanListUpdated, CaravanListRemoved>(instructions);
+   
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> AlleyTranspiler(IEnumerable<CodeInstruction> instructions)
     {

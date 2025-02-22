@@ -1,10 +1,18 @@
 ﻿using Common.Messaging;
+using GameInterface.Utils;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Messages;
-internal record MapEventSidesArrayUpdated(MapEvent Instance, MapEventSide Value, int Index) : IEvent
+internal record MapEventSidesArrayUpdated : GenericArrayEvent<MapEvent, MapEventSide>
 {
-    public MapEvent Instance { get; } = Instance;
-    public MapEventSide Value { get; } = Value;
-    public int Index { get; } = Index;
+    public MapEventSidesArrayUpdated(MapEvent instance, MapEventSide value, int index) : base(instance, value, index)
+    {
+        Instance = instance;
+        Value = value;
+        Index = index;
+    }
+
+    public MapEvent Instance { get; }
+    public MapEventSide Value { get; }
+    public int Index { get; }
 }
