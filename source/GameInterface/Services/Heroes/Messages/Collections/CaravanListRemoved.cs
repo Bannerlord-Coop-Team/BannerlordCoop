@@ -9,10 +9,5 @@ internal record CaravanListRemoved : GenericListEvent<Hero, CaravanPartyComponen
 {
     public CaravanListRemoved(Hero instance, CaravanPartyComponent value) : base(instance, value)
     {
-        Instance = instance;
-        Value = value;
     }
-
-    public Hero Instance { get; }
-    public CaravanPartyComponent Value { get; }
 }

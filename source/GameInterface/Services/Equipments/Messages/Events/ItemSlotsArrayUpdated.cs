@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using GameInterface.Utils;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Equipments.Messages.Events;
