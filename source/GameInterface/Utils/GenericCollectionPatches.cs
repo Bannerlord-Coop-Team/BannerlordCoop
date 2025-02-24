@@ -8,6 +8,8 @@ using System.Reflection;
 using Serilog;
 using Common.Logging;
 using TaleWorlds.Library;
+using System.Linq;
+using Autofac.Core;
 
 namespace GameInterface.Utils
 {
@@ -33,38 +35,55 @@ namespace GameInterface.Utils
         /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
         /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
+        /// <param name="fieldName">Name of the field to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
         /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
         /// => ListTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
-        public static IEnumerable<CodeInstruction> ListTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions)
+        public static IEnumerable<CodeInstruction> ListFieldTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
             where TAddMessage : GenericListEvent<TInstance, TItem>
             where TRemoveMessage : GenericListEvent<TInstance, TItem>
         {
+            var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var addMethod = typeof(List<TItem>).GetMethod("Add");
             var addIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
             var removeMethod = typeof(List<TItem>).GetMethod("Remove");
             var removeIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
-            foreach (var instruction in instructions)
-            {
-                if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == addMethod)
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, addIntercept);
-                }
-                else if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == removeMethod)
-                {
-                    yield return new CodeInstruction(OpCodes.Ldarg_0);
-                    yield return new CodeInstruction(OpCodes.Call, removeIntercept);
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
+            return PatchFieldInstructions(instructions.ToList(), fieldInfo, addMethod, addIntercept, removeMethod, removeIntercept);
+        }
+
+        /// <summary>
+        /// Used to transpile <see cref="List{TItem}"/>type Collections
+        /// </summary>
+        /// <typeparam name="TItem">Type of the collection items</typeparam>
+        /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
+        /// <param name="propertyName">Name of the property to be patched</param>
+        /// <remarks> Calls should look like:<br /><br />
+        /// [HarmonyTranspiler] <br />
+        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// => ListTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
+        /// </remarks>
+        /// <returns>The CodeInstructions</returns>
+        public static IEnumerable<CodeInstruction> ListPropertyTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
+            where TAddMessage : GenericListEvent<TInstance, TItem>
+            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+        {
+            var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
+            var addMethod = typeof(List<TItem>).GetMethod("Add");
+            var addIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
+            var removeMethod = typeof(List<TItem>).GetMethod("Remove");
+            var removeIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
+
+            var instructionList = instructions.ToList();
+
+            var propertyInstructions = instructionList.Where(inst => inst.opcode == OpCodes.Callvirt && inst.operand as MethodInfo == propertyInfo.GetMethod).ToList();
+
+            return PatchPropertyInstructions(instructionList, propertyInstructions, addMethod, removeMethod, addIntercept, removeIntercept);
         }
 
         /// <summary>
@@ -119,7 +138,7 @@ namespace GameInterface.Utils
         /// public static void RemoveIntercept(List&lt;CharacterObject&gt; VolunteerTypes, CharacterObject value, Hero instance) <br/>
         /// => ListRemoveIntercept&lt;CharacterObject, VolunteerTypesRemoved&gt;(VolunteerTypes, value, instance);
         public static bool ListRemoveIntercept<TItem, TMessage>(List<TItem> list, TItem item, TInstance instance)
-            where TMessage: IEvent
+            where TMessage : IEvent
         {
             // Allows original method call if this thread is allowed
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -149,29 +168,38 @@ namespace GameInterface.Utils
         /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
         /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
+        /// <param name="fieldName">Name of the field to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
         /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
         /// => ListTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
-        public static IEnumerable<CodeInstruction> MBListTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions)
+        public static IEnumerable<CodeInstruction> MBListFieldTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
             where TAddMessage : GenericListEvent<TInstance, TItem>
             where TRemoveMessage : GenericListEvent<TInstance, TItem>
         {
+            var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var addMethod = typeof(MBList<TItem>).GetMethod("Add");
-            var addIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
+            var addIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(MBListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
             var removeMethod = typeof(MBList<TItem>).GetMethod("Remove");
-            var removeIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
+            var removeIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(MBListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
-            foreach (var instruction in instructions)
+            return PatchFieldInstructions(instructions.ToList(), fieldInfo, addMethod, addIntercept, removeMethod, removeIntercept);
+        }
+
+        private static IEnumerable<CodeInstruction> PatchFieldInstructions(List<CodeInstruction> instructionList, FieldInfo fieldInfo, MethodInfo addMethod, MethodInfo addIntercept, MethodInfo removeMethod, MethodInfo removeIntercept)
+        {
+            foreach (var instruction in instructionList)
             {
-                if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == addMethod)
+                if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == addMethod
+                    && IsCorrectField(instructionList[instructionList.IndexOf(instruction) - 1], fieldInfo))
                 {
                     yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, addIntercept);
                 }
-                else if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == removeMethod)
+                else if (instruction.opcode == OpCodes.Callvirt && instruction.operand as MethodInfo == removeMethod
+                    && IsCorrectField(instructionList[instructionList.IndexOf(instruction) - 1], fieldInfo))
                 {
                     yield return new CodeInstruction(OpCodes.Ldarg_0);
                     yield return new CodeInstruction(OpCodes.Call, removeIntercept);
@@ -181,6 +209,37 @@ namespace GameInterface.Utils
                     yield return instruction;
                 }
             }
+        }
+
+        /// <summary>
+        /// Used to transpile <see cref="MBList{TItem}"/>type Collections
+        /// </summary>
+        /// <typeparam name="TItem">Type of the collection items</typeparam>
+        /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
+        /// <param name="propertyName">Name of the property to be patched</param>
+        /// <remarks> Calls should look like:<br /><br />
+        /// [HarmonyTranspiler] <br />
+        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// => ListTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
+        /// </remarks>
+        /// <returns>The CodeInstructions</returns>
+        public static IEnumerable<CodeInstruction> MBListPropertyTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
+            where TAddMessage : GenericListEvent<TInstance, TItem>
+            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+        {
+            var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
+            var addMethod = typeof(List<TItem>).GetMethod("Add");
+            var addIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(MBListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
+            var removeMethod = typeof(List<TItem>).GetMethod("Remove");
+            var removeIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(MBListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
+
+            var instructionList = instructions.ToList();
+
+            var propertyInstructions = instructionList.Where(inst => inst.opcode == OpCodes.Callvirt && inst.operand as MethodInfo == propertyInfo.GetMethod).ToList();
+
+            return PatchPropertyInstructions(instructionList, propertyInstructions, addMethod, removeMethod, addIntercept, removeIntercept);
         }
 
         /// <summary>
@@ -274,16 +333,16 @@ namespace GameInterface.Utils
         public static IEnumerable<CodeInstruction> ArrayTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
             where TMessage : GenericArrayEvent<TInstance, TItem>
         {
-            var stack = new Stack<CodeInstruction>();
+            var loadStack = new Stack<CodeInstruction>();
             var itemSlotArrayType = AccessTools.Field(typeof(TInstance), fieldName);
             var arrayAssignIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
 
 
             foreach (var instruction in instructions)
             {
-                if (stack.Count > 0 && instruction.opcode == OpCodes.Stelem_Ref)
+                if (loadStack.Count > 0 && instruction.opcode == OpCodes.Stelem_Ref)
                 {
-                    stack.Pop();
+                    loadStack.Pop();
 
                     var newInstr = new CodeInstruction(OpCodes.Call, arrayAssignIntercept);
                     newInstr.labels = instruction.labels;
@@ -295,7 +354,7 @@ namespace GameInterface.Utils
 
                 if (instruction.opcode == OpCodes.Ldfld && instruction.operand as FieldInfo == itemSlotArrayType)
                 {
-                    stack.Push(instruction);
+                    loadStack.Push(instruction);
                 }
 
                 yield return instruction;
@@ -339,5 +398,40 @@ namespace GameInterface.Utils
             items[index] = item;
         }
         #endregion
+
+        private static bool IsCorrectField(CodeInstruction codeInstruction, FieldInfo fieldInfo)
+        {
+            return codeInstruction.opcode == OpCodes.Ldfld && (FieldInfo)codeInstruction.operand == fieldInfo;
+        }
+
+        private static IEnumerable<CodeInstruction> PatchPropertyInstructions(List<CodeInstruction> instructionList, List<CodeInstruction> propertyInstructions, MethodInfo addMethod, MethodInfo removeMethod, MethodInfo addIntercept, MethodInfo removeIntercept)
+        {
+            foreach (var propInst in propertyInstructions)
+            {
+                int propIndex = instructionList.IndexOf(propInst);
+                var range = instructionList.GetRange(propIndex + 1, 2);
+
+                var changeInst = range.FirstOrDefault(inst => inst.opcode == OpCodes.Callvirt && (inst.operand as MethodInfo == addMethod || inst.operand as MethodInfo == removeMethod));
+                if (changeInst != null)
+                {
+                    int changeIndex = instructionList.IndexOf(changeInst);
+
+                    var prevPropInst = instructionList[propIndex - 1];
+                    instructionList.RemoveRange(changeIndex - 1, 1);
+
+                    changeIndex = instructionList.IndexOf(changeInst);
+                    instructionList.Insert(changeIndex, new CodeInstruction(OpCodes.Ldarg_0));
+                    changeIndex = instructionList.IndexOf(changeInst);
+                    instructionList.InsertRange(changeIndex, instructionList.GetRange(propIndex - 2, 2));
+                    changeIndex = instructionList.IndexOf(changeInst);
+                    instructionList[changeIndex] = new CodeInstruction(OpCodes.Call,
+                        changeInst.operand as MethodInfo == addMethod ? addIntercept : removeIntercept
+                        );
+                }
+
+
+            }
+            return instructionList;
+        }
     }
 }

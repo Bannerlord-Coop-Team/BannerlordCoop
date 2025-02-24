@@ -15,6 +15,6 @@ namespace GameInterface.Services.BesiegerCamps.Patches
 
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> BesiegerPartiesTranspiler(IEnumerable<CodeInstruction> instructions)
-            => ListTranspiler<MobileParty, BesiegerPartyAdded, BesiegerPartyRemoved>(instructions);
+            => ListFieldTranspiler<MobileParty, BesiegerPartyAdded, BesiegerPartyRemoved>(instructions, nameof(BesiegerCamp._besiegerParties));
     }
 }

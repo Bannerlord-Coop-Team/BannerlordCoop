@@ -93,19 +93,19 @@ internal class HeroCollectionPatches : GenericCollectionPatches<HeroCollectionPa
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> ChildrenTranspiler(IEnumerable<CodeInstruction> instructions) 
-        => MBListTranspiler<Hero, ChildrenListUpdated, ChildrenListRemoved>(instructions);
+        => MBListPropertyTranspiler<Hero, ChildrenListUpdated, ChildrenListRemoved>(instructions, nameof(Hero.Children));
     
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> CaravanTranspiler(IEnumerable<CodeInstruction> instructions) 
-        => ListTranspiler<CaravanPartyComponent, CaravanListUpdated, CaravanListRemoved>(instructions);
-   
+        => ListPropertyTranspiler<CaravanPartyComponent, CaravanListUpdated, CaravanListRemoved>(instructions, nameof(Hero.OwnedCaravans));
+
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> AlleyTranspiler(IEnumerable<CodeInstruction> instructions)
-        => ListTranspiler<Alley, AlleyListUpdated, AlleyListRemoved>(instructions);
+        => ListPropertyTranspiler<Alley, AlleyListUpdated, AlleyListRemoved>(instructions, nameof(Hero.OwnedAlleys));
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> WorkshopTranspiler(IEnumerable<CodeInstruction> instructions)
-        => MBListTranspiler<Workshop, WorkshopListUpdated, WorkshopListRemoved>(instructions);
+        => MBListFieldTranspiler<Workshop, WorkshopListUpdated, WorkshopListRemoved>(instructions, nameof(Hero._ownedWorkshops));
 }
 
 
