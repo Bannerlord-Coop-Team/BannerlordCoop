@@ -1,19 +1,15 @@
-﻿using Common.Logging;
+﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEventSides.Messages;
-using GameInterface.Services.MobileParties.Messages.Fields.Events;
-using GameInterface.Services.MobileParties.Patches;
 using HarmonyLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Reflection.Emit;
-using System.Reflection;
-using TaleWorlds.CampaignSystem.GameComponents;
-using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEventSides.Patches;
 

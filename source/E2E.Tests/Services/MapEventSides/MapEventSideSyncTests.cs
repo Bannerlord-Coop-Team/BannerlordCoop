@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using GameInterface.Services.MapEventSides.Patches;
 using HarmonyLib;
 using System.Runtime.InteropServices;
 using TaleWorlds.CampaignSystem;
@@ -38,7 +39,6 @@ public class MapEventSideSyncTests : IDisposable
         var renownField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.RenownValue));
         var strengthField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.StrengthRatio));
         var mapEventField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapEvent));
-        var mapFactionField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapFaction));
         var troopCacheField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._requiresTroopCacheUpdate));
         var selectTroopField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroop));
         var selectedIndexField = AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroopIndex));
@@ -51,7 +51,6 @@ public class MapEventSideSyncTests : IDisposable
         var renownIntercept = TestEnvironment.GetIntercept(renownField);
         var strengthIntercept = TestEnvironment.GetIntercept(strengthField);
         var mapEventIntercept = TestEnvironment.GetIntercept(mapEventField);
-        var mapFactionIntercept = TestEnvironment.GetIntercept(mapFactionField);
         var troopCacheIntercept = TestEnvironment.GetIntercept(troopCacheField);
         var selectTroopIntercept = TestEnvironment.GetIntercept(selectTroopField);
         var selectedIndexIntercept = TestEnvironment.GetIntercept(selectedIndexField);
@@ -88,7 +87,7 @@ public class MapEventSideSyncTests : IDisposable
             renownIntercept.Invoke(null, new object[] { mapEventSide, 5f });
             strengthIntercept.Invoke(null, new object[] { mapEventSide, 5f });
             mapEventIntercept.Invoke(null, new object[] { mapEventSide, mapEvent });
-            mapFactionIntercept.Invoke(null, new object[] { mapEventSide, kingdom });
+            MapEventSideDataPatches.MapFactionIntercept(mapEventSide, kingdom);
             troopCacheIntercept.Invoke(null, new object[] { mapEventSide, true });
             selectTroopIntercept.Invoke(null, new object[] { mapEventSide, character });
             selectedIndexIntercept.Invoke(null, new object[] { mapEventSide, 5 });
