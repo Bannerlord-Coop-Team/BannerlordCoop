@@ -6,7 +6,7 @@ namespace GameInterface.Services.Stances.Messages.Lifetime
     /// <summary>
     /// Command to create a new StanceLink on client side.
     /// </summary>
-    public record StanceLinkCreated : ICommand
+    public record StanceLinkCreated : IEvent
     {
         public StanceLinkCreated(StanceLink _StanceLink, StanceType _StanceType, IFaction _Faction1, IFaction _Faction2, bool _IsAtConstantWar)
         {

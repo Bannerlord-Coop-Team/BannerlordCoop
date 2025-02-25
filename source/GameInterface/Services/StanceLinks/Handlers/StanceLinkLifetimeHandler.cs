@@ -44,6 +44,7 @@ public class StanceLinkLifetimeHandler : IHandler
     {
         //unsubscribe to internal and network messages
         messageBroker.Unsubscribe<StanceLinkCreated>(Handle_StanceLinkCreated);
+        messageBroker.Unsubscribe<NetworkCreateStanceLink>(Handle_CreateStanceLink);
     }
 
     private void Handle_StanceLinkCreated(MessagePayload<StanceLinkCreated> payload)
