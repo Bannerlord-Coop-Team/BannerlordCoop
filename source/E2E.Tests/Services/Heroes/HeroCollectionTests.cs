@@ -1,19 +1,13 @@
 ﻿using E2E.Tests.Environment;
 using Xunit.Abstractions;
-using TaleWorlds.Core;
-using HarmonyLib;
-using E2E.Tests.Environment.Instance;
-using GameInterface.Services.Equipments.Patches;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Siege;
-using System.Xml.Linq;
-using TaleWorlds.ObjectSystem;
 using TaleWorlds.CampaignSystem;
 using GameInterface.Services.Heroes.Patches;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using E2E.Tests.Util.ObjectBuilders;
+using GameInterface.Services.Heroes.Messages.Collections;
+using GameInterface.Utils;
 
 namespace E2E.Tests.Services.Heroes;
 
@@ -57,7 +51,7 @@ public class HeroCollectionTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<Hero>(HeroId, out var Hero));
             Assert.True(server.ObjectManager.TryGetObject<Hero>(ChildId, out Child));
 
-            HeroCollectionPatches.ChildrenAddIntercept(Hero._children, Child, Hero);
+            HeroCollectionPatches.ListAddIntercept<Hero, ChildrenListUpdated>(Hero._children, Child, Hero);
             Assert.Equal( Child, Hero._children.Last());
 
             CharacterObjectId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
@@ -71,14 +65,14 @@ public class HeroCollectionTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out workshop));
 
             Assert.Empty(Hero.OwnedWorkshops);
-            HeroCollectionPatches.WorkshopAddIntercept(Hero._ownedWorkshops, workshop, Hero);
+            HeroCollectionPatches.MBListAddIntercept<Workshop, WorkshopListUpdated>(Hero._ownedWorkshops, workshop, Hero);
             Assert.Equal(workshop, Hero.OwnedWorkshops.Last());
 
             AlleyId = TestEnvironment.CreateRegisteredObject<Alley>();
             Assert.True(server.ObjectManager.TryGetObject<Alley>(AlleyId, out alley));
 
             Assert.Empty(Hero.OwnedAlleys);
-            HeroCollectionPatches.AlleyAddIntercept(Hero.OwnedAlleys, alley, Hero);
+            HeroCollectionPatches.ListAddIntercept<Alley, AlleyListUpdated>(Hero.OwnedAlleys, alley, Hero);
             Assert.Equal(alley, Hero.OwnedAlleys.Last());
 
             var componentBuilder = new CaravanPartyComponentBuilder();
@@ -86,7 +80,7 @@ public class HeroCollectionTests : IDisposable
             Assert.True(server.ObjectManager.TryGetId(caravan, out CaravanId));
 
             Assert.Empty(Hero.OwnedCaravans);
-            HeroCollectionPatches.CaravanAddIntercept(Hero.OwnedCaravans, caravan, Hero);
+            HeroCollectionPatches.ListAddIntercept<CaravanPartyComponent, CaravanListUpdated>(Hero.OwnedCaravans, caravan, Hero);
             Assert.Equal(caravan, Hero.OwnedCaravans.Last());
         });
 
@@ -106,13 +100,13 @@ public class HeroCollectionTests : IDisposable
         // Remove
         server.Call(() =>
         {
-            HeroCollectionPatches.WorkshopRemoveIntercept(Hero._ownedWorkshops, workshop, Hero);
+            HeroCollectionPatches.MBListRemoveIntercept<Workshop, WorkshopListRemoved>(Hero._ownedWorkshops, workshop, Hero);
             Assert.Empty(Hero.OwnedWorkshops);
 
-            HeroCollectionPatches.AlleyRemoveIntercept(Hero.OwnedAlleys, alley, Hero);
+            HeroCollectionPatches.ListRemoveIntercept<Alley, AlleyListRemoved>(Hero.OwnedAlleys, alley, Hero);
             Assert.Empty(Hero.OwnedAlleys);
 
-            HeroCollectionPatches.CaravanRemoveIntercept(Hero.OwnedCaravans, caravan, Hero);
+            HeroCollectionPatches.ListRemoveIntercept<CaravanPartyComponent, CaravanListRemoved>(Hero.OwnedCaravans, caravan, Hero);
             Assert.Empty(Hero.OwnedCaravans);
         });
 
@@ -150,7 +144,7 @@ public class HeroCollectionTests : IDisposable
         {
             Assert.True(server.ObjectManager.TryGetObject<Hero>(HeroId, out var clientHero));
             Assert.True(server.ObjectManager.TryGetObject<Hero>(ChildId, out var clientChild));
-            HeroCollectionPatches.ChildrenAddIntercept(clientHero._children, clientChild, clientHero);
+            HeroCollectionPatches.ListAddIntercept<Hero, ChildrenListUpdated>(clientHero._children, clientChild, clientHero);
 
             Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(CharacterObjectId, out Character));
             HeroCollectionPatches.ArrayAssignIntercept(clientHero.VolunteerTypes, 0, Character, clientHero);
