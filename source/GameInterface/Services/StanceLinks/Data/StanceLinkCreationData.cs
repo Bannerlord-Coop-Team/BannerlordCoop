@@ -28,5 +28,4 @@ public record StanceLinkCreationData
     public string Faction2Id { get; }
     [ProtoMember(5)]
     public bool IsAtConstantWar { get; }
-
 }
