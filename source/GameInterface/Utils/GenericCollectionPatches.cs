@@ -428,8 +428,6 @@ namespace GameInterface.Utils
                         changeInst.operand as MethodInfo == addMethod ? addIntercept : removeIntercept
                         );
                 }
-
-
             }
             return instructionList;
         }

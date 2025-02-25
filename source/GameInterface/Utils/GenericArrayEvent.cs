@@ -1,10 +1,16 @@
 ﻿using Common.Messaging;
-using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Utils
 {
     public record GenericArrayEvent<TInstance, TValue> : IEvent
     {
+        /// <summary>
+        /// Default ctor used for testing
+        /// </summary>
+        public GenericArrayEvent()
+        {
+        }
+
         /// <summary>
         /// Ctor used by GenericCollectionPatches to create the instance
         /// </summary>

@@ -12,6 +12,13 @@ public record AttachedPartyRemoved : GenericListEvent<MobileParty, MobileParty>
 {
     public AttachedPartyData AttachedPartyData { get; }
 
+    /// <summary>
+    /// Default ctor used for testing
+    /// </summary>
+    public AttachedPartyRemoved()
+    {
+    }
+
     public AttachedPartyRemoved(MobileParty instance, MobileParty value) : base(instance, value)
     {
         AttachedPartyData = new AttachedPartyData(instance.StringId, value.StringId);

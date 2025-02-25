@@ -9,6 +9,11 @@ namespace GameInterface.Utils
         /// <summary>
         /// Ctor used by GenericCollectionPatches to create the instance
         /// </summary>
+        /// 
+        public GenericListEvent()
+        {
+        }
+
         public GenericListEvent(TInstance instance, TValue value)
         {
             Instance = instance;
