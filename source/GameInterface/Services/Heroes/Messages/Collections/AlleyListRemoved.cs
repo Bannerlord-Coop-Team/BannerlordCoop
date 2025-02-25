@@ -1,12 +1,14 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Utils;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Heroes.Messages.Collections;
 
-internal record AlleyListRemoved(Hero Instance, Alley Value) : IEvent
+internal record AlleyListRemoved : GenericListEvent<Hero, Alley>
 {
-    public Hero Instance { get; } = Instance;
-    public Alley Value { get; } = Value;
+    public AlleyListRemoved(Hero instance, Alley value) : base(instance, value)
+    {
+    }
 }
+
 

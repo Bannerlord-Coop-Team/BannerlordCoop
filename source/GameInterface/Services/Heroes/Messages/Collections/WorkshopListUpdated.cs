@@ -1,12 +1,12 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Utils;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 
 namespace GameInterface.Services.Heroes.Messages.Collections;
 
-internal record WorkshopListUpdated(Hero Instance, Workshop Value) : IEvent
+internal record WorkshopListUpdated : GenericListEvent<Hero, Workshop>
 {
-    public Hero Instance { get; } = Instance;
-    public Workshop Value { get; } = Value;
+    public WorkshopListUpdated(Hero instance, Workshop value) : base(instance, value)
+    {
+    }
 }
