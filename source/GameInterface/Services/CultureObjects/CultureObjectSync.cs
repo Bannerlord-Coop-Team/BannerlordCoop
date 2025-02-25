@@ -15,8 +15,8 @@ internal class CultureObjectSync : IAutoSync
         var cultureObjectCtors = AccessTools.GetDeclaredConstructors(typeof(CultureObject));
         registryFactory.TryRegisterType<CultureObject>(cultureObjectCtors, RegisterAll, OnCultureObjectCreated);
 
-        //var basicCultureObjectCtors = AccessTools.GetDeclaredConstructors(typeof(BasicCultureObject));
-        //registryFactory.TryRegisterType<BasicCultureObject>(basicCultureObjectCtors, RegisterAll, OnCultureObjectCreated);
+        var basicCultureObjectCtors = AccessTools.GetDeclaredConstructors(typeof(BasicCultureObject));
+        registryFactory.TryRegisterType<BasicCultureObject>(basicCultureObjectCtors, RegisterAll);
     }
 
     private void OnCultureObjectCreated(string id, CultureObject cultureObject)

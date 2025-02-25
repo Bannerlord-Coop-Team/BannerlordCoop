@@ -28,15 +28,15 @@ public class MobilePartyPropertyTests : IDisposable
     {
         TestEnvironement = new E2ETestEnvironment(output);
 
+        var PartyId = TestEnvironement.CreateRegisteredObject<MobileParty>();
+        var Party2Id = TestEnvironement.CreateRegisteredObject<MobileParty>();
+        var HeroId = TestEnvironement.CreateRegisteredObject<Hero>();
 
         Server.Call(() =>
         {
-            var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var party2 = GameObjectCreator.CreateInitializedObject<MobileParty>();
-            var hero = GameObjectCreator.CreateInitializedObject<Hero>();
-
-            PartyId = party.StringId;
-            HeroId = hero.StringId;
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var party));
+            Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(Party2Id, out var party2));
+            Assert.True(Server.ObjectManager.TryGetObject<Hero>(HeroId, out var hero));
 
             party.CustomName = new TextObject("DefaultName");
             party.Engineer = hero;
@@ -45,13 +45,7 @@ public class MobilePartyPropertyTests : IDisposable
             party.Quartermaster = hero;
             party.AttachedTo = party2;
             party.Ai = new MobilePartyAi(party);
-
-            PartyId2 = party2.StringId;
         });
-
-        Assert.NotNull(PartyId);
-        Assert.NotNull(PartyId2);
-        Assert.NotNull(HeroId);
     }
 
     public void Dispose()
@@ -624,7 +618,7 @@ public class MobilePartyPropertyTests : IDisposable
     public void ClientCurrentSettlement_NoChange()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+        var settlementId = TestEnvironement.CreateRegisteredObject<Settlement>();
 
         // Act
         var firstClient = Clients.First();
@@ -633,6 +627,7 @@ public class MobilePartyPropertyTests : IDisposable
         firstClient.Call(() =>
         {
             Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
+            Assert.True(firstClient.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
             clientParty.CurrentSettlement = settlement;
         });
 

@@ -46,8 +46,7 @@ public class SiegeStrategyLifetimeTests : IDisposable
         {
             var siegeStrategy = GameObjectCreator.CreateInitializedObject<SiegeStrategy>();
             Assert.True(Server.ObjectManager.TryGetId(siegeStrategy, out SiegeStrategyId));
-        }, disabledMethods
-        );
+        });
 
         // Assert
         Assert.NotNull(SiegeStrategyId);

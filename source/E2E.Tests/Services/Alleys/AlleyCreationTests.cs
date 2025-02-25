@@ -56,12 +56,15 @@ public class AlleyCreationTests : IDisposable
     {
         // Arrange
         var client1 = TestEnvironment.Clients.First();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
 
         // Act
         string? clientAlleyId = null;
         client1.Call(() =>
         {
-            var alley = new Alley(GameObjectCreator.CreateInitializedObject<Settlement>(), "testClientAlley", new TaleWorlds.Localization.TextObject("testTextObject"));
+            Assert.True(client1.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            var alley = new Alley(settlement, "testClientAlley", new TaleWorlds.Localization.TextObject("testTextObject"));
             Assert.False(client1.ObjectManager.TryGetId(alley, out clientAlleyId));
         });
 

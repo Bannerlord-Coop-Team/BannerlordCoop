@@ -88,7 +88,7 @@ internal class HeroLifetimePatches
 
     private static void RegisterWithGameObjectManagers(Hero hero)
     {
-        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(hero, false, out _);
+        MBObjectManager.Instance?.RegisterPresumedObject(hero);
 
         Campaign.Current?.CampaignObjectManager?.OnHeroAdded(hero);
     }

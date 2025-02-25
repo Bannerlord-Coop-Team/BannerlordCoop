@@ -1,5 +1,5 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Linq;
+using System.Threading;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Registry;
@@ -10,6 +10,7 @@ namespace GameInterface.Services.Registry;
 internal class HeroRegistry : RegistryBase<Hero>
 {
     public static readonly string HeroStringIdPrefix = "CoopHero";
+    private static int InstanceCounter = 0;
 
     public HeroRegistry(IRegistryCollection collection) : base(collection) { }
 
@@ -26,31 +27,12 @@ internal class HeroRegistry : RegistryBase<Hero>
         var heroes = campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes).ToArray();
         foreach (var hero in heroes)
         {
-            base.RegisterExistingObject(hero.StringId, hero);
+            RegisterNewObject(hero, out var _);
         }
-    }
-
-    public override bool RegisterExistingObject(string id, object obj)
-    {
-        var result = base.RegisterExistingObject(id, obj);
-
-        return result;
     }
 
     protected override string GetNewId(Hero hero)
     {
-        hero.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Hero>(HeroStringIdPrefix);
-        return hero.StringId;
-    }
-
-    private void AddToCampaignObjectManager(object obj)
-    {
-        if (TryCast(obj, out var castedObj) == false) return;
-
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (objectManager == null) return;
-
-        objectManager.OnHeroAdded(castedObj);
+        return $"{HeroStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
     }
 }
