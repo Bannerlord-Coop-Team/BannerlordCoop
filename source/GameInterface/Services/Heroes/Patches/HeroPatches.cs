@@ -24,13 +24,5 @@ namespace GameInterface.Services.Heroes.Patches
             __result = Campaign.Current.CampaignObjectManager.GetPlayerMobileParties().Any(party => party.LeaderHero == __instance);
             return false;
         }
-
-        [HarmonyPrefix]
-        [HarmonyPatch(nameof(Hero.MainHero), MethodType.Getter)]
-        private static bool MainHeroPrefix(ref Hero __result)
-        {
-            __result = CharacterObject.PlayerCharacter?.HeroObject;
-            return false;
-        }
     }
 }

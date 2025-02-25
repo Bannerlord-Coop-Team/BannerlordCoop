@@ -22,7 +22,6 @@ namespace GameInterface.AutoSync.Registry;
 public interface IAutoRegistryFactory : IDisposable
 {
     bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<string, T> onClientCreated = null) where T : class;
-    void PatchAll();
 }
 
 internal class AutoRegistryFactory : IAutoRegistryFactory
@@ -37,7 +36,6 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     IObjectManager ObjectManager { get; }
     ISerializableTypeMapper TypeMapper { get; }
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
-    List<(MethodBase, MethodInfo)> Patches { get; } = new List<(MethodBase, MethodInfo)>();
 
     public AutoRegistryFactory(
         IRegistryCollection collection,
@@ -73,7 +71,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         {
             var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.Prefix)).MakeGenericMethod(typeof(T));
 
-            Patches.Add((ctor, patch));
+            SyncPatchCollector.AddPrefix(ctor, patch);
         }
         
 
@@ -81,18 +79,6 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         Disposables.Add(handler);
 
         return true;
-    }
-
-    public void PatchAll()
-    {
-        if (Harmony.HasAnyPatches(HarmonyID)) return;
-
-        foreach (var (ctor, patch) in Patches)
-        {
-            harmony.Patch(ctor, patch);
-        }
-
-        Patches.Clear();
     }
 }
 

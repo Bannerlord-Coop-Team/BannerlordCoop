@@ -24,10 +24,11 @@ public class GameInterfaceModule : Module
     // TODO move to config
     public const string HarmonyId = "TaleWorlds.MountAndBlade.Bannerlord.Coop";
 
+    private static readonly Harmony harmony = new Harmony(HarmonyId);
+
     protected override void Load(ContainerBuilder builder)
     {
-        
-        builder.RegisterInstance(new Harmony(HarmonyId)).As<Harmony>().SingleInstance();
+        builder.RegisterInstance(harmony).As<Harmony>().SingleInstance();
 
         builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<AutoRegistryFactory>().As<IAutoRegistryFactory>().InstancePerLifetimeScope().AutoActivate();

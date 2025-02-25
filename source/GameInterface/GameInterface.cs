@@ -17,7 +17,7 @@ public class GameInterface : IGameInterface
     private readonly Harmony harmony;
     private readonly IAutoSyncPatchCollector patchCollector;
 
-    public GameInterface(Harmony harmony,IAutoSyncPatchCollector patchCollector)
+    public GameInterface(Harmony harmony, IAutoSyncPatchCollector patchCollector)
     {
         this.harmony = harmony;
         this.patchCollector = patchCollector;
@@ -25,7 +25,8 @@ public class GameInterface : IGameInterface
 
     public void Dispose()
     {
-        UnpatchAll();
+        //UnpatchAll();;
+        ;
     }
 
     public void PatchAll()
@@ -37,6 +38,8 @@ public class GameInterface : IGameInterface
 
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
+
+        patchCollector.PatchAll();
     }
 
     public void UnpatchAll()

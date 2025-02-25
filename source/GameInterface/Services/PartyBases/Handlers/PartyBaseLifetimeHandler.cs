@@ -23,47 +23,14 @@ internal class PartyBaseLifetimeHandler : IHandler
         this.messageBroker = messageBroker;
         this.logger = logger;
 
-        messageBroker.Subscribe<PartyBaseCreated>(Handle_PartyBaseCreated);
-        messageBroker.Subscribe<NetworkCreatePartyBase>(Handle_NetworkCreatePartyBase);
-
         messageBroker.Subscribe<PartyDestroyed>(Handle_PartyDestroyed);
         messageBroker.Subscribe<NetworkDestroyPartyBase>(Handle_NetworkDestroyPartyBase);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<PartyBaseCreated>(Handle_PartyBaseCreated);
-        messageBroker.Unsubscribe<NetworkCreatePartyBase>(Handle_NetworkCreatePartyBase);
-
         messageBroker.Unsubscribe<PartyDestroyed>(Handle_PartyDestroyed);
         messageBroker.Unsubscribe<NetworkDestroyPartyBase>(Handle_NetworkDestroyPartyBase);
-    }
-
-    private void Handle_PartyBaseCreated(MessagePayload<PartyBaseCreated> payload)
-    {
-        var instance = payload.What.Instance;
-        
-
-        if (objectManager.AddNewObject(instance, out var newId) == false)
-        {
-            logger.Error("Unable to add new {type} to object manager", instance.GetType());
-            return;
-        }
-
-        var message = new NetworkCreatePartyBase(newId);
-        network.SendAll(message);
-    }
-
-    private void Handle_NetworkCreatePartyBase(MessagePayload<NetworkCreatePartyBase> payload)
-    {
-        var id = payload.What.Id;
-        var newPartyBase = ObjectHelper.SkipConstructor<PartyBase>();
-
-        if (objectManager.AddExisting(id, newPartyBase) == false)
-        {
-            logger.Error("Unable to create new {type} with id {id}", newPartyBase.GetType(), id);
-            return;
-        }
     }
 
     private void Handle_PartyDestroyed(MessagePayload<PartyDestroyed> payload)

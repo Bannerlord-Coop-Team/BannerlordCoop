@@ -91,8 +91,6 @@ namespace Coop.Core
 
             // Create harmony patches
             container.Resolve<IGameInterface>().PatchAll();
-            container.Resolve<IAutoSyncPatchCollector>().PatchAll();
-            container.Resolve<IAutoRegistryFactory>().PatchAll();
 
             network = container.Resolve<INetwork>();
 

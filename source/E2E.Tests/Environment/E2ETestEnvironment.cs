@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Tests.Utils;
+using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
@@ -42,12 +43,14 @@ internal class E2ETestEnvironment : IDisposable
 
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
+        // Needs to be before patching
+        SetupAutoSync();
+
         SetupMainHero();
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
 
-        SetupAutoSync();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
@@ -72,8 +75,6 @@ internal class E2ETestEnvironment : IDisposable
     private void SetupAutoSync()
     {
         Server.Resolve<IAutoSyncBuilder>().Build();
-        Server.Resolve<IAutoSyncPatchCollector>().PatchAll();
-        Server.Resolve<IAutoRegistryFactory>().PatchAll();
 
         foreach (var client in Clients)
         {
@@ -86,10 +87,13 @@ internal class E2ETestEnvironment : IDisposable
         // Setup main hero
         Server.Call(() =>
         {
-            var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
-            var mainHero = HeroCreator.CreateSpecialHero(characterObject);
-            characterObject.HeroObject = mainHero;
-            Game.Current.PlayerTroop = characterObject;
+            using (new AllowedThread())
+            {
+                var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+                var mainHero = HeroCreator.CreateSpecialHero(characterObject);
+                characterObject.HeroObject = mainHero;
+                Game.Current.PlayerTroop = characterObject;
+            }
         });
 
 
@@ -97,10 +101,13 @@ internal class E2ETestEnvironment : IDisposable
         {
             client.Call(() =>
             {
-                var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
-                var mainHero = HeroCreator.CreateSpecialHero(characterObject);
-                characterObject.HeroObject = mainHero;
-                Game.Current.PlayerTroop = characterObject;
+                using (new AllowedThread())
+                {
+                    var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+                    var mainHero = HeroCreator.CreateSpecialHero(characterObject);
+                    characterObject.HeroObject = mainHero;
+                    Game.Current.PlayerTroop = characterObject;
+                }
             });
         }
     }

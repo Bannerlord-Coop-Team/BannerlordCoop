@@ -81,7 +81,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 client.ObjectManager.TryGetId(clientBesiegerCamp.SiegeEvent, out string clientSiegeEventId);
-                Assert.Equal(clientSiegeEventId, siegeEventId);
+                Assert.Equal(siegeEventId, clientSiegeEventId);
             }
         }
 

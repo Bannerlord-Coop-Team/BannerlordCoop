@@ -14,8 +14,7 @@ public interface IAutoSyncPatchCollector : IDisposable
 
 class AutoSyncPatchCollector : IAutoSyncPatchCollector
 {
-    const string HarmonyID = "CoopAutoSyncPatchCollector";
-    private readonly Harmony harmony = new Harmony(HarmonyID);
+    private readonly Harmony harmony;
 
     private readonly List<(MethodBase, MethodInfo)> transpilers = new List<(MethodBase, MethodInfo)>();
     private readonly List<(MethodBase, MethodInfo)> prefixes = new List<(MethodBase, MethodInfo)>();
@@ -42,8 +41,6 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
     public void PatchAll()
     {
-        if (Harmony.HasAnyPatches(HarmonyID)) return;
-
         foreach (var (method, patch) in transpilers)
         {
             harmony.Patch(method, transpiler: new HarmonyMethod(patch));
