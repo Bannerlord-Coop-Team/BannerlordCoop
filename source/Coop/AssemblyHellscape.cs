@@ -15,6 +15,9 @@ namespace Coop
             "System.Threading.Tasks.Extensions",
             "System.Text.Json",
             "System.Buffers",
+            "Serilog",
+            "System.Diagnostics.DiagnosticSource",
+            "System.Memory"
         };
 
         private static readonly Dictionary<string, Assembly> LoadedRedirects = RedirectedAssemblies

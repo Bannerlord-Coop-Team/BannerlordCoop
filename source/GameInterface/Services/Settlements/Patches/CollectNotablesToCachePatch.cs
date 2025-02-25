@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Extentions;
 using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
@@ -48,14 +49,14 @@ public class CollectNotablesToCachePatch
         return false;
     }
 
-    internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heroes)
+    internal static void RunNotablesCacheChange(Settlement settlement, MBList<Hero> heros)
     {
 
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                settlement._notablesCache = heroes;
+                settlement._notablesCache = heros;
             }
         });
     }
