@@ -178,7 +178,7 @@ internal class E2ETestEnvironment : IDisposable
     /// <param name="value">Value to use for assertions has to be of type <typeparamref name="TField"/></param>
     /// <param name="instanceStringId">The specific stringId of the instance to be tested defaults to the first registered instance <typeparamref name="TField"/></param>
     /// <param name="referenceStringId">The specific stringId of the referenced object to be tested defaults to the first registered instance <typeparamref name="TInstance"/></param>
-    public void AssertReferenceField<TInstance, TField>(string fieldName, string? instanceStringId = null, string? referenceStringId = null)
+    public void AssertReferenceField<TInstance, TField>(string fieldName, string? instanceStringId = null, string? referenceStringId = null, TField? defaultValue = null)
         where TInstance : class
         where TField : class
     {
@@ -191,7 +191,7 @@ internal class E2ETestEnvironment : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
             Assert.True(Server.ObjectManager.TryGetObject<TField>(referenceId, out var serverFieldInstance));
-            Assert.Equal(fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
+            Assert.Equal(defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
             intercept.Invoke(null, new object[] { serverInstance, serverFieldInstance });
             Assert.True(serverFieldInstance.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {serverFieldInstance} Actual: {fieldInfo.GetValue(serverInstance)}");
             Assert.NotNull(serverFieldInstance);
