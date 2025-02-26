@@ -92,7 +92,7 @@ public class TranspilerTests
         var testClass = new SwitchTestClass();
 
         const string instanceId = "MyObj";
-        const int newValue = 1001;
+        int newValue = 1001;
         objManager.AddExisting(instanceId, testClass);
 
         
@@ -100,13 +100,13 @@ public class TranspilerTests
         {
             ModInformation.IsServer = true;
             testClass.SetMyInt(newValue);
+            testClass.SetMyInt(newValue);
 
             Assert.Equal(newValue, testClass.MyInt);
         }
-
         var packet = Assert.IsType<FieldAutoSyncPacket>(network.SentPackets.First());
-
-        Assert.Equal(typeId, packet.classId);
+        Assert.Single(network.SentPackets);
+        Assert.Equal(typeId, packet.typeId);
         Assert.Equal(0, packet.fieldId);
         Assert.Equal(instanceId, packet.instanceId);
         Assert.Equal(newValue, RawSerializer.Deserialize<int>(packet.value));
