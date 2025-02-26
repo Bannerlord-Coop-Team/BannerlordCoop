@@ -234,8 +234,8 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Ldstr, $"Client attempted to change {field.Name}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
-        // Return false
-        il.Emit(OpCodes.Ldc_I4_0);
+        // Return true
+        il.Emit(OpCodes.Ldc_I4_1);
         il.Emit(OpCodes.Ret);
 
         il.MarkLabel(notClientLabel);

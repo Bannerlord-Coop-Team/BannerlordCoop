@@ -536,7 +536,7 @@ public class FieldTranspilerCreator
         // Check and log if client attempted to create object without permission
         IsClientCheck(il, field);
 
-        HasValueChanged(il, field);
+        //HasValueChanged(il, field);
 
         var networkLocal = TryResolve<INetwork>(il);
         var objectManagerLocal = TryResolve<IObjectManager>(il);
@@ -594,7 +594,7 @@ public class FieldTranspilerCreator
     {
         var fieldType = field.GetUnderlyingType();
         var valueNotChangedLabel = il.DefineLabel();
-        var method = typeof(object).GetMethod("Equals", new[] { typeof(object), typeof(object) });
+        var method = AccessTools.Method(typeof(object), nameof(Equals), new[] { typeof(object), typeof(object) });
         
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldfld, field);
@@ -615,7 +615,7 @@ public class FieldTranspilerCreator
         il.MarkLabel(valueNotChangedLabel);
     }
 
-    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal)
+    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal, Type objType)
     {
         var validLabel = il.DefineLabel();
         var idLocal = il.DeclareLocal(typeof(string));
@@ -643,7 +643,7 @@ public class FieldTranspilerCreator
         return idLocal;
     }
 
-    private void IsClientCheck(ILGenerator il, MemberInfo field)
+    private void IsClientCheck(ILGenerator il, FieldInfo field)
     {
         il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(ModInformation), nameof(ModInformation.IsClient)));
         var notClientLabel = il.DefineLabel();
@@ -658,6 +658,11 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(Environment), nameof(Environment.StackTrace)));
 
         il.Emit(OpCodes.Callvirt, logErrorFn.MakeGenericMethod(typeof(string)));
+
+        // Store field to prevent crashing
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Stfld, field);
 
         // Return
         il.Emit(OpCodes.Ret);

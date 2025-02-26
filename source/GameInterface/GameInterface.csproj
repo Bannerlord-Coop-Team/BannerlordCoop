@@ -205,12 +205,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\Common\Common.csproj">
-      <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
-      <Name>Common</Name>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <PackageReference Include="Autofac" Version="8.2.0" />
     <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
       <PrivateAssets>all</PrivateAssets>
@@ -285,5 +279,8 @@
     <Folder Include="Services\BasicCharacterObjects\Handlers\" />
     <Folder Include="Services\BasicCharacterObjects\Messages\" />
     <Folder Include="Services\Kingdoms\Commands\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>
 </Project>

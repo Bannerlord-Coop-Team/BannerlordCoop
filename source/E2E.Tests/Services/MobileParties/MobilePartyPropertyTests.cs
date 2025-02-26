@@ -21,16 +21,16 @@ public class MobilePartyPropertyTests : IDisposable
     IEnumerable<EnvironmentInstance> Clients => TestEnvironement.Clients;
 
     string PartyId { get; set; }
-    string PartyId2 { get; set; }
+    string Party2Id { get; set; }
     string HeroId { get; set; }
 
     public MobilePartyPropertyTests(ITestOutputHelper output)
     {
         TestEnvironement = new E2ETestEnvironment(output);
 
-        var PartyId = TestEnvironement.CreateRegisteredObject<MobileParty>();
-        var Party2Id = TestEnvironement.CreateRegisteredObject<MobileParty>();
-        var HeroId = TestEnvironement.CreateRegisteredObject<Hero>();
+        PartyId = TestEnvironement.CreateRegisteredObject<MobileParty>();
+        Party2Id = TestEnvironement.CreateRegisteredObject<MobileParty>();
+        HeroId = TestEnvironement.CreateRegisteredObject<Hero>();
 
         Server.Call(() =>
         {
@@ -240,7 +240,7 @@ public class MobilePartyPropertyTests : IDisposable
     public void ServerChangeAi_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId2, out var extraParty));
+        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(Party2Id, out var extraParty));
 
         // Act
         Server.Call(() =>
@@ -644,7 +644,7 @@ public class MobilePartyPropertyTests : IDisposable
     public void ServerChangeAttachedTo_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId2, out var extraParty));
+        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(Party2Id, out var extraParty));
 
         // Act
         Server.Call(() =>
