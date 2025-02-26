@@ -45,6 +45,64 @@ public class @(Model.TypeName)FieldTests : IDisposable
         TestEnvironment.Dispose();
     }
 
+@foreach(var structField in Model.GetStructFields())
+{
+    var fieldNamePascalCase=structField.Name.PascalCase(true);
+    var fieldNameCamelCase=structField.Name.CamelCase(true);
+    <text>
+    [Fact]
+    public void ServerChange@($"{Model.TypeName}{fieldNamePascalCase}")_SyncAllClients()
+    {
+        // Arrange
+        var field = AccessTools.Field(typeof(@Model.TypeName), nameof(@(Model.TypeName).@(structField.Name)));
+        var intercept = TestEnvironment.GetIntercept(field);
+        Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var server@(Model.TypeName)));
+        var newValue=Random<@structField.FieldType.Name>();
+
+        // Act
+        Server.Call(() =>
+        {
+            /// Simulate the field changing
+            intercept.Invoke(null, new object[] { server@(Model.TypeName), newValue });
+
+            Assert.Equal(newValue, server@(Model.TypeName).@structField.Name);
+        });
+
+        // Assert
+        foreach (var client in TestEnvironment.Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
+            Assert.Equal(server@(Model.TypeName).@structField.Name, client@(Model.TypeName).@structField.Name);
+        }
+    }  
+@*     [Fact]
+    public void ClientChange@($"{Model.TypeName}{structField.Name}")_DoesNothing()
+    {
+        // Arrange
+        Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var server@(Model.TypeName)));
+        var newValue=Random<@structField.FieldType.Name>();
+
+        // Act
+        var firstClient = Clients.First();
+        firstClient.Call(() =>
+        {
+            // Gets instance on client
+            Assert.True(firstClient.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
+            // Attempts to change value
+            client@(Model.TypeName).@structField.Name = newValue;
+
+        });
+
+        // Assert
+        foreach (var client in AllEnvironmentInstances.Where(c => c != firstClient))
+        {
+            Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
+            Assert.NotEqual(server@(Model.TypeName).@structField.Name, client@(Model.TypeName).@structField.Name);
+        }
+    } *@
+    </text>
+}
+
 @foreach(var classField in Model.GetClassFields())
 {
     var fieldNamePascalCase=classField.Name.PascalCase(true);
@@ -88,44 +146,36 @@ public class @(Model.TypeName)FieldTests : IDisposable
 
             Assert.True(client.ObjectManager.TryGetObject<@(classField.FieldType.Name)>(@(fieldNameCamelCase)Id, out var client@(fieldNamePascalCase)));
 
-            Assert.True(client@(fieldNamePascalCase) == @(Model.TypeName).@(classField.Name));
+            Assert.Same(client@(fieldNamePascalCase), @(Model.TypeName).@(classField.Name));
         }
     }
-    </text>
-}
-
-@foreach(var structField in Model.GetStructFields())
-{
-    var fieldNamePascalCase=structField.Name.PascalCase(true);
-    var fieldNameCamelCase=structField.Name.CamelCase(true);
-    <text>
-    [Fact]
-    public void ServerChange@($"{Model.TypeName}{fieldNamePascalCase}")_SyncAllClients()
+@*     [Fact] 
+    public void ClientChange@(Model.TypeName)@(classField.Name.PascalCase())_DoesNothing()
     {
         // Arrange
-        var field = AccessTools.Field(typeof(@Model.TypeName), nameof(@(Model.TypeName).@(structField.Name)));
-        var intercept = TestEnvironment.GetIntercept(field);
+        string? @(classField.Name.CamelCase())Id=null;
         Assert.True(Server.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var server@(Model.TypeName)));
-        var newValue=Random<@structField.FieldType.Name>();
+        Assert.True(Server.ObjectManager.TryGetObject<@(classField.FieldType.Name)>(@(classField.Name.CamelCase())Id, out var server@(classField.Name.PascalCase())));
 
         // Act
-        Server.Call(() =>
+        var firstClient = Clients.First();
+        firstClient.Call(() =>
         {
-            /// Simulate the field changing
-            intercept.Invoke(null, new object[] { server@(Model.TypeName), newValue });
-
-            Assert.Equal(newValue, server@(Model.TypeName).@structField.Name);
+            // Gets instance on client
+            Assert.True(firstClient.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
+            // Attempts to change value
+            client@(Model.TypeName).@classField.Name = newValue;
         });
 
         // Assert
-        foreach (var client in TestEnvironment.Clients)
+        var firstClient = Clients.First();
+        firstClient.Call(() =>
         {
             Assert.True(client.ObjectManager.TryGetObject<@(Model.TypeName)>(@(Model.TypeName.CamelCase())Id, out var client@(Model.TypeName)));
-            Assert.Equal(server@(Model.TypeName).@structField.Name, client@(Model.TypeName).@structField.Name);
+            client.ObjectManager.TryGetId(client@(Model.TypeName).@(classField.Name), out string client@(classField.Name.PascalCase())Id);
+            Assert.NotEqual(client@(classField.Name.PascalCase())Id, @(classField.Name.CamelCase())Id);
         }
-    }  
+    }  *@
     </text>
 }
 }
-
-    

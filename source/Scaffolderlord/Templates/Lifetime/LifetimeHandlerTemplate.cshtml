@@ -9,6 +9,7 @@ using GameInterface.Services.@(Model.TypeName)s.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
+using Common;
 using TaleWorlds.Library;
 @foreach (var item in Model.Usings)
 {
@@ -57,7 +58,7 @@ internal class @className: IHandler
 		network.SendAll(new NetworkCreate@(Model.TypeName)(id));
 	}
 
-	// WARNING: This is a default generated implementation that might not work on all services, be sure to test and implement need logic
+	// WARNING: This is a default generated implementation that might not work on all services, be sure to test and implement any needed logic
 	private void HandleCreateCommand(MessagePayload<NetworkCreate@(Model.TypeName)> payload)
 	{
 		GameLoopRunner.RunOnMainThread(() =>
@@ -88,7 +89,7 @@ internal class @className: IHandler
 		network.SendAll(new NetworkDestroy@(Model.TypeName)(id));
 	}
 
-	// WARNING: This is a default generated implementation that might not work on all services, be sure to test and implement need logic
+	// WARNING: This is a default generated implementation that might not work on all services, be sure to test and implement any needed logic
 	private void HandleDestroyCommand(MessagePayload<NetworkDestroy@(Model.TypeName)> payload)
 	{
 		var id = payload.What.@(Model.TypeName)Id;
