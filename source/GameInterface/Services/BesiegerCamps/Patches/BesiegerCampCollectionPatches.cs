@@ -9,7 +9,7 @@ using TaleWorlds.CampaignSystem.Siege;
 namespace GameInterface.Services.BesiegerCamps.Patches
 {
     [HarmonyPatch]
-    internal class BesiegerCampCollectionPatches : GenericCollectionPatches<BesiegerCampCollectionPatches, BesiegerCamp>
+    internal class BesiegerCampCollectionPatches : GenericPatches<BesiegerCampCollectionPatches, BesiegerCamp>
     {
         private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(BesiegerCamp));
 

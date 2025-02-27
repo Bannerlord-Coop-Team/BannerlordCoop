@@ -8,7 +8,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties.Patches;
 
 [HarmonyPatch]
-internal class MobilePartyCollectionPatches : GenericCollectionPatches<MobilePartyCollectionPatches, MobileParty>
+internal class MobilePartyCollectionPatches : GenericPatches<MobilePartyCollectionPatches, MobileParty>
 {
     static IEnumerable<MethodBase> TargetMethods()
     {

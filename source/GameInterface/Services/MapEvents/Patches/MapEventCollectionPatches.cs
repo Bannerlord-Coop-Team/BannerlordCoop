@@ -8,7 +8,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 namespace GameInterface.Services.MapEvents.Patches;
 
 [HarmonyPatch]
-internal class MapEventCollectionPatches : GenericCollectionPatches<MapEventCollectionPatches, MapEvent>
+internal class MapEventCollectionPatches : GenericPatches<MapEventCollectionPatches, MapEvent>
 {
     static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(MapEvent));
 

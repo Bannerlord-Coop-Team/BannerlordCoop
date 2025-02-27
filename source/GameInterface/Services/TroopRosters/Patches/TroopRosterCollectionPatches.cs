@@ -10,7 +10,7 @@ using TaleWorlds.CampaignSystem.Roster;
 namespace GameInterface.Services.TroopRosters.Patches
 {
     [HarmonyPatch]
-    internal class TroopRosterCollectionPatches : GenericCollectionPatches<TroopRosterCollectionPatches, TroopRoster>
+    internal class TroopRosterCollectionPatches : GenericPatches<TroopRosterCollectionPatches, TroopRoster>
     {
         static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(TroopRoster));
 

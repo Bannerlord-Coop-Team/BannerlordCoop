@@ -8,7 +8,7 @@ using GameInterface.Utils;
 namespace GameInterface.Services.Equipments.Patches;
 
 [HarmonyPatch]
-internal class EquipmentCollectionPatches : GenericCollectionPatches<EquipmentCollectionPatches, Equipment>
+internal class EquipmentCollectionPatches : GenericPatches<EquipmentCollectionPatches, Equipment>
 {
     static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(Equipment));
     

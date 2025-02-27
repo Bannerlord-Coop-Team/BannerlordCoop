@@ -14,7 +14,7 @@ using GameInterface.Utils;
 namespace GameInterface.Services.Heroes.Patches;
 
 [HarmonyPatch]
-internal class HeroCollectionPatches : GenericCollectionPatches<HeroCollectionPatches, Hero>
+internal class HeroCollectionPatches : GenericPatches<HeroCollectionPatches, Hero>
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {

@@ -10,17 +10,27 @@ using Common.Logging;
 using TaleWorlds.Library;
 using System.Linq;
 using Autofac.Core;
+using System.Xml.Schema;
+using System.Collections;
+using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Patches;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Diamond;
+using JetBrains.Annotations;
 
 namespace GameInterface.Utils
 {
     /// <summary>
     /// Allows for patches of collection types
     /// </summary>
-    /// <typeparam name="TPatch">Class that is extending the <see cref="GenericCollectionPatches{TPatch, TInstance}"/> as its used for the interal Logger</typeparam>
+    /// <typeparam name="TPatch">Class that is extending the <see cref="GenericPatches{TPatch, TInstance}"/> as its used for the interal Logger</typeparam>
     /// <typeparam name="TInstance">Class with the collections that should be patched</typeparam>
-    internal class GenericCollectionPatches<TPatch, TInstance> where TPatch : GenericCollectionPatches<TPatch, TInstance>
+    internal class GenericPatches<TPatch, TInstance> where TPatch : GenericPatches<TPatch, TInstance>
     {
         public static readonly ILogger Logger = LogManager.GetLogger<TPatch>();
+
+        private static Dictionary<Type,Dictionary<string, FieldInfo>> fieldInfoCache = new Dictionary<Type, Dictionary<string, FieldInfo>>();
+        private static Dictionary<Type,Dictionary<string, PropertyInfo>> propertyInfoCache = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
 
         public static IEnumerable<MethodBase> TargetMethods()
         {
@@ -48,10 +58,9 @@ namespace GameInterface.Utils
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var addMethod = typeof(List<TItem>).GetMethod("Add");
-            var addIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
+            var addIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
             var removeMethod = typeof(List<TItem>).GetMethod("Remove");
-            var removeIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
-
+            var removeIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsCorrectField(ci, fieldInfo),
@@ -81,12 +90,12 @@ namespace GameInterface.Utils
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             var addMethod = typeof(List<TItem>).GetMethod("Add");
-            var addIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
+            var addIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
             var removeMethod = typeof(List<TItem>).GetMethod("Remove");
-            var removeIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
+            var removeIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
             return PatchInstructions(instructions.ToList(),
-                (ci) => IsCorrectProperty(ci, propertyInfo),
+                (ci) => IsPropertyGetter(ci, propertyInfo),
                 addMethod,
                 addIntercept,
                 removeMethod,
@@ -188,10 +197,9 @@ namespace GameInterface.Utils
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var addMethod = typeof(MBList<TItem>).GetMethod("Add");
-            var addIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(MBListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
+            var addIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(MBListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
             var removeMethod = typeof(MBList<TItem>).GetMethod("Remove");
-            var removeIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(MBListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
-
+            var removeIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(MBListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsCorrectField(ci, fieldInfo),
@@ -221,12 +229,12 @@ namespace GameInterface.Utils
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             var addMethod = typeof(List<TItem>).GetMethod("Add");
-            var addIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(MBListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
+            var addIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(MBListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
             var removeMethod = typeof(List<TItem>).GetMethod("Remove");
-            var removeIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(MBListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
+            var removeIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(MBListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
             return PatchInstructions(instructions.ToList(),
-                (ci) => IsCorrectProperty(ci, propertyInfo),
+                (ci) => IsPropertyGetter(ci, propertyInfo),
                 addMethod,
                 addIntercept,
                 removeMethod,
@@ -329,9 +337,9 @@ namespace GameInterface.Utils
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var enqueueMethod = typeof(Queue<TItem>).GetMethod("Enqueue");
-            var enqueueIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(QueueEnqueueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TEnqueueMessage));
+            var enqueueIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueEnqueueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TEnqueueMessage));
             var dequeueMethod = typeof(Queue<TItem>).GetMethod("Dequeue");
-            var dequeueIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(QueueDequeueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TDequeueMessage));
+            var dequeueIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueDequeueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TDequeueMessage));
             
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsCorrectField(ci, fieldInfo),
@@ -361,12 +369,12 @@ namespace GameInterface.Utils
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             var enqueueMethod = typeof(Queue<TItem>).GetMethod("Enqueue");
-            var enqueueIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(QueueEnqueueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TEnqueueMessage));
+            var enqueueIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueEnqueueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TEnqueueMessage));
             var dequeueMethod = typeof(Queue<TItem>).GetMethod("Dequeue");
-            var dequeueIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(QueueDequeueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TDequeueMessage));
+            var dequeueIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueDequeueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TDequeueMessage));
 
             return PatchInstructions(instructions.ToList(),
-                (ci) => IsCorrectProperty(ci, propertyInfo),
+                (ci) => IsPropertyGetter(ci, propertyInfo),
                 enqueueMethod,
                 enqueueIntercept,
                 dequeueMethod,
@@ -466,7 +474,7 @@ namespace GameInterface.Utils
         {
             var loadStack = new Stack<CodeInstruction>();
             var itemSlotArrayType = AccessTools.Field(typeof(TInstance), fieldName);
-            var arrayAssignIntercept = typeof(GenericCollectionPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
+            var arrayAssignIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
 
 
             foreach (var instruction in instructions)
@@ -530,14 +538,170 @@ namespace GameInterface.Utils
         }
         #endregion
 
+        #region FieldTranspiler
+        public static IEnumerable<CodeInstruction> FieldTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TMessage : GenericSetEvent<TInstance, TItem>
+        {
+            var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
+            AddToFieldCache(fieldInfo);
+            var fieldIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(FieldIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
+
+            foreach (var instruction in instructions)
+            {
+                if (instruction.StoresField(fieldInfo))
+                {
+                    yield return new CodeInstruction(OpCodes.Ldstr, fieldName);
+                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+
+        public static void FieldIntercept<TItem, TMessage>(TInstance instance, TItem item, string fieldName)
+            where TMessage : GenericSetEvent<TInstance, TItem>
+        {
+            var fieldInfo = fieldInfoCache[typeof(TInstance)][fieldName];
+
+            // Skip if value hasn´t changed
+            if (fieldInfo.GetValue(instance).Equals(item))
+                return;
+
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                fieldInfo.SetValue(instance, item);
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                fieldInfo.SetValue(instance, item);
+                return;
+            }
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item);
+            MessageBroker.Instance.Publish(instance, message);
+
+            fieldInfo.SetValue(instance, item);
+        }
+
+        private static void AddToFieldCache(FieldInfo fieldInfo)
+        {
+            if (!fieldInfoCache.ContainsKey(typeof(TInstance)))
+                fieldInfoCache.Add(typeof(TInstance), new Dictionary<string, FieldInfo>());
+            if (!fieldInfoCache[typeof(TInstance)].ContainsKey(fieldInfo.Name))
+                fieldInfoCache[typeof(TInstance)].Add(fieldInfo.Name, fieldInfo);
+        }
+        #endregion
+
+        #region PropertyTranspiler
+        public static IEnumerable<CodeInstruction> PropertyTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
+            where TMessage : GenericSetEvent<TInstance, TItem>
+        {
+            var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
+            AddToPropertyCache(propertyInfo);
+            var propertyIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(PropertyIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
+
+            foreach (var instruction in instructions)
+            {
+                if (IsPropertySetter(instruction, propertyInfo))
+                {
+                    yield return new CodeInstruction(OpCodes.Ldstr, propertyName);
+                    yield return new CodeInstruction(OpCodes.Call, propertyIntercept);
+                }
+                else
+                {
+                    yield return instruction;
+                }
+            }
+        }
+
+        public static void PropertyIntercept<TItem, TMessage>(TInstance instance, TItem item, string propertyName)
+            where TMessage : GenericSetEvent<TInstance, TItem>
+        {
+            var propertyInfo = propertyInfoCache[typeof(TInstance)][propertyName];
+
+            //// Skip if value hasn´t changed
+            if (propertyInfo.GetValue(instance).Equals(item))
+                return;
+
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                propertyInfo.SetValue(instance, item);
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                propertyInfo.SetValue(instance, item);
+                return;
+            }
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item);
+            MessageBroker.Instance.Publish(instance, message);
+
+            propertyInfo.SetValue(instance, item);
+        }
+
+        private static IEnumerable<CodeInstruction> PatchPropertySetter(List<CodeInstruction> instructionList, PropertyInfo propertyInfo, MethodInfo setIntercept)
+        {
+            var setters = instructionList.Where(pi => IsPropertySetter(pi, propertyInfo));
+            // Method loads property
+            foreach (var setterInst in setters)
+            {
+                var setterIndex = instructionList.IndexOf(setterInst);
+                CodeInstruction getterInst = null;
+                for (int i = setterIndex - 1; i >= 0; i--)
+                {
+                    var currentInst = instructionList[i];
+                    if (IsPropertyGetter(currentInst, propertyInfo))
+                    {
+                        getterInst = currentInst;
+                        break;
+                    }
+                }
+                if (getterInst != null)
+                {
+                    List<CodeInstruction> loadStack = GetLoadStack(instructionList, instructionList.IndexOf(getterInst));
+                    instructionList.InsertRange(setterIndex, loadStack);
+                    setterIndex = instructionList.IndexOf(setterInst);
+                    // Replace the Callvirt with the proper intercept
+                    instructionList[setterIndex] = new CodeInstruction(OpCodes.Call,
+                        setIntercept
+                        );
+                }
+
+            }
+
+            return instructionList;
+
+        }
+
+
+        private static void AddToPropertyCache(PropertyInfo propertyInfo)
+        {
+            if (!propertyInfoCache.ContainsKey(typeof(TInstance)))
+                propertyInfoCache.Add(typeof(TInstance), new Dictionary<string, PropertyInfo>());
+            if (!propertyInfoCache[typeof(TInstance)].ContainsKey(propertyInfo.Name))
+                propertyInfoCache[typeof(TInstance)].Add(propertyInfo.Name, propertyInfo);
+        }
+        #endregion
+
         private static bool IsCorrectField(CodeInstruction codeInstruction, FieldInfo fieldInfo)
         {
             return codeInstruction.opcode == OpCodes.Ldfld && codeInstruction.operand as FieldInfo == fieldInfo;
         }
 
-        private static bool IsCorrectProperty(CodeInstruction codeInstruction, PropertyInfo propertyInfo)
+        private static bool IsPropertyGetter(CodeInstruction codeInstruction, PropertyInfo propertyInfo)
         {
             return (codeInstruction.opcode == OpCodes.Callvirt || codeInstruction.opcode == OpCodes.Call) && codeInstruction.operand as MethodInfo == propertyInfo.GetMethod;
+        }
+
+        private static bool IsPropertySetter(CodeInstruction codeInstruction, PropertyInfo propertyInfo)
+        {
+            return (codeInstruction.opcode == OpCodes.Callvirt || codeInstruction.opcode == OpCodes.Call) && codeInstruction.operand as MethodInfo == propertyInfo.SetMethod;
         }
 
         private static bool IsLdArg(CodeInstruction instruction)
@@ -572,16 +736,7 @@ namespace GameInterface.Utils
                 if (changeInst != null)
                 {
                     int changeIndex = instructionList.IndexOf(changeInst);
-                    // Search beginning of loadStack to be able to retrieve the instance that the collection belongs to
-                    var stack = new List<CodeInstruction>();
-                    for(int i = targetIndex-1; i >=0; i--)
-                    {
-                        var currentInst = instructionList[i];
-                        stack.Add(currentInst);
-                        if (IsLdArg(currentInst))
-                            break;
-                    }
-                    stack.Reverse();
+                    var stack = GetLoadStack(instructionList, targetIndex);
                     //instructionList.InsertRange(changeIndex, instructionList.GetRange(targetIndex - 1, 1));
                     instructionList.InsertRange(changeIndex, stack);
                     changeIndex = instructionList.IndexOf(changeInst);
@@ -592,6 +747,21 @@ namespace GameInterface.Utils
                 }
             }
             return instructionList;
+        }
+
+        private static List<CodeInstruction> GetLoadStack(List<CodeInstruction> instructionList, int targetIndex)
+        {
+            // Search beginning of loadStack to be able to retrieve the instance that the collection belongs to
+            var stack = new List<CodeInstruction>();
+            for (int i = targetIndex - 1; i >= 0; i--)
+            {
+                var currentInst = instructionList[i];
+                stack.Add(currentInst);
+                if (IsLdArg(currentInst))
+                    break;
+            }
+            stack.Reverse();
+            return stack;
         }
     }
 }
