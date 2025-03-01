@@ -14,6 +14,11 @@ namespace Coop
             "Microsoft.Bcl.AsyncInterfaces",
             "System.Threading.Tasks.Extensions",
             "System.Text.Json",
+            "Serilog",
+            "System.Diagnostics.DiagnosticSource",
+            "System.Memory",
+            "System.Buffers",
+            "System.Numerics.Vectors"
         };
 
         private static readonly Dictionary<string, Assembly> LoadedRedirects = RedirectedAssemblies
