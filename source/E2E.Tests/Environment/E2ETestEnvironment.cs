@@ -6,16 +6,12 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
-using GameInterface.AutoSync.Registry;
 using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
-using Newtonsoft.Json.Linq;
-using Serilog;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
-using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Environment;
@@ -310,10 +306,5 @@ internal class E2ETestEnvironment : IDisposable
             Assert.Same(clientPropertyInstance, propertyInfo.GetValue(clientInstance));
             Assert.NotNull(clientPropertyInstance);
         }
-    }
-
-    public void Dispose()
-    {
-        Server.Resolve<IAutoSyncPatchCollector>().UnpatchAll();
     }
 }

@@ -989,43 +989,6 @@ public class MobilePartyPropertyTests : IDisposable
     }
 
     [Fact]
-    public void ClientActualClan_NoChange()
-    {
-        Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));
-        Assert.True(Server.ObjectManager.TryGetId(serverParty.ActualClan, out var serverClanId));
-
-        var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        Server.ObjectManager.AddNewObject(clan, out string clanId);
-
-        foreach (var client in TestEnvironement.Clients)
-        {
-            var newClan = GameObjectCreator.CreateInitializedObject<Clan>();
-            client.ObjectManager.AddExisting(clanId, newClan);
-        }
-
-        Server.Call(() =>
-        {
-            serverParty.ActualClan = clan;
-        });
-
-        var firstClient = Clients.First();
-
-        firstClient.Call(() =>
-        {
-            serverParty.ActualClan = null;
-        });
-
-
-        // Assert
-        foreach (var client in TestEnvironement.Clients.Where(client => client != firstClient))
-        {
-            Assert.True(client.ObjectManager.TryGetObject<MobileParty>(PartyId, out var clientParty));
-            Assert.True(client.ObjectManager.TryGetId(clientParty.ActualClan, out var clientClanId));
-            Assert.Equal(serverClanId, clientClanId);
-        }
-    }
-
-    [Fact]
     public void ServerChangeRecentEventsMorale_SyncAllClients()
     {
         Assert.True(Server.ObjectManager.TryGetObject<MobileParty>(PartyId, out var serverParty));

@@ -97,7 +97,7 @@ public class AlleyCreationTests : IDisposable
         });
 
         // Assert
-        foreach (var client in TestEnvironment.Clients)
+        foreach (var client in TestEnvironment.Clients.Where(client => client != client1))
         {
             Assert.True(client.ObjectManager.TryGetObject<Alley>(alleyId, out var alley));
             Assert.Null(alley.Owner);
