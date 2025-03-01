@@ -8,10 +8,12 @@ namespace GameInterface.Services.StanceLinks
     {
         public StanceLinkSync(IAutoSyncBuilder autoSyncBuilder)
         {
+            //Properties
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(StanceLink), nameof(StanceLink.Faction1)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(StanceLink), nameof(StanceLink.Faction2)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(StanceLink), nameof(StanceLink.StanceType)));
 
+            //Fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(StanceLink), nameof(StanceLink.BehaviorPriority)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(StanceLink), nameof(StanceLink._casualties1)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(StanceLink), nameof(StanceLink._casualties2)));
