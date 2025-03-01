@@ -1,10 +1,12 @@
 ﻿using Common.Messaging;
+using GameInterface.Utils;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Messages.Collections;
 
-internal record ChildrenListUpdated(Hero Instance, Hero Value) : IEvent
+internal record ChildrenListUpdated : GenericListEvent<Hero, Hero>
 {
-    public Hero Instance { get; } = Instance;
-    public Hero Value { get; } = Value;
+    public ChildrenListUpdated(Hero instance, Hero value) : base(instance, value)
+    {
+    }
 }

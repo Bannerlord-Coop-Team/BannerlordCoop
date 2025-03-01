@@ -1,11 +1,13 @@
 ﻿using Common.Messaging;
+using GameInterface.Utils;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.Heroes.Messages.Collections;
 
-internal record CaravanListUpdated(Hero Instance, CaravanPartyComponent Value) : IEvent
+internal record CaravanListUpdated : GenericListEvent<Hero, CaravanPartyComponent>
 {
-    public Hero Instance { get; } = Instance;
-    public CaravanPartyComponent Value { get; } = Value;
+    public CaravanListUpdated(Hero instance, CaravanPartyComponent value) : base(instance, value)
+    {
+    }
 }

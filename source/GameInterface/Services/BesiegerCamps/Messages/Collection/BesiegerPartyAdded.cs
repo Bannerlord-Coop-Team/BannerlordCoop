@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+﻿using GameInterface.Utils;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 
@@ -7,14 +7,9 @@ namespace GameInterface.Services.BesiegerCamps.Messages;
 /// <summary>
 /// Internal event for <see cref="BesiegerCamp._besiegerParties" Add/>
 /// </summary>
-public record BesiegerPartyAdded : IEvent
+public record BesiegerPartyAdded : GenericListEvent<BesiegerCamp, MobileParty>
 {
-    public BesiegerPartyAdded(BesiegerCamp besiegerCamp, MobileParty mobileParty)
+    public BesiegerPartyAdded(BesiegerCamp instance, MobileParty value) : base(instance, value)
     {
-        BesiegerCamp = besiegerCamp;
-        BesiegerParty = mobileParty;
     }
-
-    public BesiegerCamp BesiegerCamp { get; }
-    public MobileParty BesiegerParty { get; }
 }
