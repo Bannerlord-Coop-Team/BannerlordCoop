@@ -1,19 +1,9 @@
 ﻿using Common.Logging;
-using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.MapEvents.Messages;
-using GameInterface.Utils;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Patches;
 

@@ -44,19 +44,7 @@ internal class ServerHeroHandler : IHandler
     {
         var payload = obj.What;
 
-        WaitForAllClientsToCreateHero(payload.Data);
-    }
-
-    private void WaitForAllClientsToCreateHero(HeroCreationData heroCreationData)
-    {
-        //var timeout = configuration.ObjectCreationTimeout;
-        //var responseProtocol = new ResponseProtocol<NetworkHeroCreated>(server, messageBroker, timeout);
-
-        //var triggerMessage = new NetworkCreateHero(heroCreationData);
-        //var notifyMessage = new NewHeroSynced();
-        //responseProtocol.StartResponseProtocol(triggerMessage, notifyMessage);
-
-        var message = new NetworkCreateHero(heroCreationData);
+        var message = new NetworkCreateHero(payload.Data);
 
         server.SendAll(message);
     }

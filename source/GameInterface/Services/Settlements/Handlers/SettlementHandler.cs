@@ -1,11 +1,9 @@
 ﻿using Common.Logging;
 using Common.Messaging;
-using GameInterface.AutoSync.Registry;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;

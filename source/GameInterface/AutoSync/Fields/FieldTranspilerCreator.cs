@@ -536,7 +536,7 @@ public class FieldTranspilerCreator
         // Check and log if client attempted to create object without permission
         IsClientCheck(il, field);
 
-        //HasValueChanged(il, field);
+        HasValueChanged(il, field);
 
         var networkLocal = TryResolve<INetwork>(il);
         var objectManagerLocal = TryResolve<IObjectManager>(il);
