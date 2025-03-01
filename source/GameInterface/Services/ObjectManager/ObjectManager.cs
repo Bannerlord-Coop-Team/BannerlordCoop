@@ -314,7 +314,8 @@ internal class ObjectManager : IObjectManager
             if (objectManager == null) return false;
 
             /// Default object manager <see cref="MBObjectManager"/> requires type to be <see cref="MBObjectBase"/>
-            if (TryCastToMBObject(obj, out var mbObject) == false) return false;
+            if (TryCastToMBObject(obj, out var mbObject) == false) 
+                return false;
 
             id = mbObject.StringId;
 

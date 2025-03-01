@@ -1,8 +1,11 @@
 ﻿using GameInterface.Services.ItemRosters;
 using HarmonyLib;
 using System;
+using System.ComponentModel;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -18,21 +21,5 @@ internal class PartyBasePatch
         if (ModInformation.IsClient) return;
 
         ItemRosterLookup.Set(__instance.ItemRoster, __instance);
-    }
-
-    [HarmonyPatch(typeof(PartyBase), MethodType.Constructor, new Type[] { typeof(MobileParty), typeof(Settlement) } )]
-    [HarmonyPriority(Priority.Low)]
-    [HarmonyPrefix]
-    public static bool CtorPrefix(PartyBase __instance, MobileParty mobileParty, Settlement settlement)
-    {
-        __instance.Index = Campaign.Current.GeneratePartyId(__instance);
-        __instance.MobileParty = mobileParty;
-        __instance.Settlement = settlement;
-        __instance.ItemRoster = new ItemRoster();
-        __instance.MemberRoster = new TroopRoster(__instance);
-        __instance.PrisonRoster = new TroopRoster(__instance);
-        __instance.MemberRoster.NumberChangedCallback = new NumberChangedCallback(__instance.MemberRosterNumberChanged);
-        __instance.PrisonRoster.IsPrisonRoster = true;
-        return false;
     }
 }

@@ -15,6 +15,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.AutoSync.Registry;
 
@@ -141,6 +142,11 @@ class AutoRegistryHandler<T> : IHandler where T : class
     private void Handle_InstanceCreated(MessagePayload<InstanceCreated<T>> payload)
     {
         ObjectManager.AddNewObject(payload.What.Instance, out var id);
+
+        if (payload.What.Instance is MBObjectBase mBObject)
+        {
+            mBObject.StringId = id;
+        }
 
         Network.SendAll(new NetworkCreateInstance<T>(id));
     }

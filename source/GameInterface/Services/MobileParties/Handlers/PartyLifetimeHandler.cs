@@ -72,8 +72,12 @@ internal class PartyLifetimeHandler : IHandler
             return;
         }
 
-        // Game related
-        newParty.StringId = stringId;
+
+        using (new AllowedThread())
+        {
+            newParty.StringId = stringId;
+            newParty.InitMembers();
+        }
 
         RegisterWithGameObjectManagers(newParty);
     }

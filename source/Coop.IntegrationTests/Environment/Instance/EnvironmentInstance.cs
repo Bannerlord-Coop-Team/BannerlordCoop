@@ -168,15 +168,16 @@ public abstract class EnvironmentInstance
     private class PatchScope : IDisposable
     {
         private readonly Harmony harmony = new Harmony("patch scope harmony");
+        private readonly MethodInfo DisablePrefix = AccessTools.Method(typeof(PatchScope), nameof(Disable));
 
         private readonly HarmonyMethod[] patches;
         private readonly MethodBase[] methods;
 
         public PatchScope(IEnumerable<MethodBase> disableMethods)
         {
-            var disableMethod = AccessTools.Method(typeof(PatchScope), nameof(Disable));
+            
             methods = disableMethods.ToArray();
-            patches = methods.Select(m => new HarmonyMethod(disableMethod)).ToArray();
+            patches = methods.Select(m => new HarmonyMethod(DisablePrefix)).ToArray();
 
             for (int i = 0; i < methods.Length; i++)
             {
@@ -188,7 +189,7 @@ public abstract class EnvironmentInstance
         {
             for (int i = 0; i < methods.Length; i++)
             {
-                harmony.Unpatch(methods[i], patches[i].method);
+                harmony.Unpatch(methods[i], patches[i].method, harmony.Id);
             }
         }
 

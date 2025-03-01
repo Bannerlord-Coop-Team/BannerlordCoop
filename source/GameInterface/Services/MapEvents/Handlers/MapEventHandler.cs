@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
@@ -26,17 +27,44 @@ internal class MapEventHandler : IHandler
         messageBroker.Subscribe<MapEventCreated>(Handle);
         messageBroker.Subscribe<NetworkCreateMapEvent>(Handle);
 
+        messageBroker.Subscribe<MapEventSidesArrayUpdated>(Handle);
+        messageBroker.Subscribe<NetworkUpdateMapSidesArray>(Handle);
+        
+
         messageBroker.Subscribe<MapEventDestroyed>(Handle);
         messageBroker.Subscribe<NetworkDestroyMapEvent>(Handle);
     }
+
+
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<MapEventCreated>(Handle);
         messageBroker.Unsubscribe<NetworkCreateMapEvent>(Handle);
 
+        messageBroker.Unsubscribe<MapEventSidesArrayUpdated>(Handle);
+        messageBroker.Unsubscribe<NetworkUpdateMapSidesArray>(Handle);
+
         messageBroker.Unsubscribe<MapEventDestroyed>(Handle);
         messageBroker.Unsubscribe<NetworkDestroyMapEvent>(Handle);
+    }
+
+    private void Handle(MessagePayload<MapEventCreated> payload)
+    {
+        objectManager.AddNewObject(payload.What.Instance, out var id);
+
+        network.SendAll(new NetworkCreateMapEvent(id));
+    }
+
+
+    private void Handle(MessagePayload<NetworkCreateMapEvent> payload)
+    {
+        var newMapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+
+        // TODO find better way of doing this
+        newMapEvent._sides = new MapEventSide[2];
+
+        objectManager.AddExisting(payload.What.MapEventId, newMapEvent);
     }
 
     private void Handle(MessagePayload<MapEventDestroyed> payload)
@@ -44,7 +72,7 @@ internal class MapEventHandler : IHandler
         var mapEvent = payload.What.Instance;
         if (objectManager.TryGetId(mapEvent, out var mapEventId) == false)
         {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEvent);
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEventId);
             return;
         }
 
@@ -72,22 +100,44 @@ internal class MapEventHandler : IHandler
         });
     }
 
-
-    private void Handle(MessagePayload<MapEventCreated> payload)
+    private void Handle(MessagePayload<MapEventSidesArrayUpdated> payload)
     {
-        objectManager.AddNewObject(payload.What.Instance, out var id);
+        var mapEvent = payload.What.Instance;
+        if (objectManager.TryGetId(mapEvent, out var instanceId) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEvent);
+            return;
+        }
 
-        network.SendAll(new NetworkCreateMapEvent(id));
+        var value = payload.What.Value;
+        if (objectManager.TryGetId(value, out var valueId) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEventSide), value);
+            return;
+        }
+
+
+        network.SendAll(new NetworkUpdateMapSidesArray(instanceId, valueId, payload.What.Index));
     }
 
-
-    private void Handle(MessagePayload<NetworkCreateMapEvent> payload)
+    private void Handle(MessagePayload<NetworkUpdateMapSidesArray> payload)
     {
-        var newMapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+        var instanceId = payload.What.InstanceId;
+        var valueId = payload.What.ValueId;
+        var index = payload.What.Index;
 
-        // TODO find better way of doing this
-        newMapEvent._sides = new MapEventSide[2];
+        if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), instanceId);
+            return;
+        }
 
-        objectManager.AddExisting(payload.What.MapEventId, newMapEvent);
+        if (objectManager.TryGetObject<MapEventSide>(valueId, out var mapEventSide) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEventSide), valueId);
+            return;
+        }
+
+        mapEvent._sides[index] = mapEventSide;
     }
 }

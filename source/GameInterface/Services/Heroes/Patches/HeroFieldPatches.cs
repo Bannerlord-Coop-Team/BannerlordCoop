@@ -484,44 +484,6 @@ namespace GameInterface.Services.Heroes.Patches
 
             instance._power = power;
         }
-        [HarmonyTranspiler]
-        private static IEnumerable<CodeInstruction> CultureTranspiler(IEnumerable<CodeInstruction> instructions)
-        {
-            var valueField = AccessTools.Field(typeof(Hero), nameof(Hero.Culture));
-            var fieldIntercept = AccessTools.Method(typeof(HeroFieldPatches), nameof(CultureIntercept));
-
-            foreach (var instruction in instructions)
-            {
-                if (instruction.StoresField(valueField))
-                {
-                    CodeInstruction codeInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
-                    codeInst.labels = instruction.labels;
-                    yield return codeInst;
-                }
-                else
-                {
-                    yield return instruction;
-                }
-            }
-        }
-        public static void CultureIntercept(Hero instance, CultureObject culture)
-        {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.Culture = culture;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.Culture = culture;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new CultureChanged(culture?.StringId, instance.StringId));
-
-            instance.Culture = culture;
-        }
 
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> HomeSettlementTranspiler(IEnumerable<CodeInstruction> instructions)

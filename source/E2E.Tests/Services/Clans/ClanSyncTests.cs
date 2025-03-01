@@ -166,15 +166,15 @@ namespace E2E.Tests.Services.Clans
                 Assert.Equal(serverClan._tier, clientClan._tier);
                 Assert.Equal(serverClan._aggressiveness, clientClan._aggressiveness);
                 Assert.Equal(serverClan._tributeWallet, clientClan._tributeWallet);
-                Assert.Equal(serverClan._home.StringId, clientClan._home.StringId);
                 Assert.Equal(serverClan._clanDebtToKingdom, clientClan._clanDebtToKingdom);
 
-                // Network objects
+                // Network
                 NetworkIdsEqual(Server.ObjectManager, serverClan.Culture, client.ObjectManager, clientClan.Culture);
                 NetworkIdsEqual(Server.ObjectManager, serverClan._kingdom, client.ObjectManager, clientClan._kingdom);
                 NetworkIdsEqual(Server.ObjectManager, serverClan._clanMidSettlement, client.ObjectManager, clientClan._clanMidSettlement);
                 NetworkIdsEqual(Server.ObjectManager, serverClan._basicTroop, client.ObjectManager, clientClan._basicTroop);
                 NetworkIdsEqual(Server.ObjectManager, serverClan._leader, client.ObjectManager, clientClan._leader);
+                NetworkIdsEqual(Server.ObjectManager, serverClan._home, client.ObjectManager, clientClan._home);
             }
         }
 

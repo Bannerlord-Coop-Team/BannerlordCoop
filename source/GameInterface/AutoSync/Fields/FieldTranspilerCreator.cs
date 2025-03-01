@@ -593,7 +593,7 @@ public class FieldTranspilerCreator
     private void HasValueChanged(ILGenerator il, FieldInfo field)
     {
         var fieldType = field.GetUnderlyingType();
-        var valueNotChangedLabel = il.DefineLabel();
+        var valueChangedLabel = il.DefineLabel();
         var method = AccessTools.Method(typeof(object), nameof(Equals), new[] { typeof(object), typeof(object) });
         
         il.Emit(OpCodes.Ldarg_0);
@@ -602,17 +602,12 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Box, fieldType);
         il.Emit(OpCodes.Call, method);        
-        il.Emit(OpCodes.Brfalse_S, valueNotChangedLabel);
+        il.Emit(OpCodes.Brfalse_S, valueChangedLabel);
 
-        // Log error
-        il.Emit(OpCodes.Ldsfld, loggerField);
-        il.Emit(OpCodes.Ldstr, $"Repeating assignment");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
-
-        // Return
+        // Return if value has not changed
         il.Emit(OpCodes.Ret);
 
-        il.MarkLabel(valueNotChangedLabel);
+        il.MarkLabel(valueChangedLabel);
     }
 
     private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal, Type objType)

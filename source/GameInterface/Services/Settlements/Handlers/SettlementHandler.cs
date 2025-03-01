@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.AutoSync.Registry;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;

@@ -1,13 +1,37 @@
 ﻿using GameInterface.AutoSync;
 using HarmonyLib;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Services.Heroes
 {
     internal class HeroSync : IAutoSync
     {
+        private IEnumerable<MethodBase> externalMethods => new MethodBase[]
+        {
+            AccessTools.Method(typeof(HeroDeveloper), "CheckLevel"),
+            AccessTools.Method(typeof(HeroDeveloper), "ClearHeroLevel"),
+            AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal)),
+            AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(Hero) }),
+            AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(PregnancyCampaignBehavior.Pregnancy) }),
+            AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero)),
+            AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring)),
+        };
+
         public HeroSync(IAutoSyncBuilder autoSyncBuilder)
         {
+            foreach (var method in externalMethods)
+            {
+                autoSyncBuilder.AddFieldChangeMethod(method);
+            }
+
+            
+
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.StaticBodyProperties)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Weight)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Build)));
@@ -46,7 +70,10 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Mother)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Spouse)));
 
+
+            // TODO add all fields
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero._health)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(Hero), nameof(Hero.Culture)));
         }
     }
 }

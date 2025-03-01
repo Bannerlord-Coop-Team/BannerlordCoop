@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using SandBox.BoardGames.Pawns;
 using System;
 using System.Collections.Generic;
 using System.Reflection;

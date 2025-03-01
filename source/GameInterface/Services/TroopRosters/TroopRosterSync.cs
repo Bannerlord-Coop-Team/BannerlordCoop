@@ -20,7 +20,7 @@ internal class TroopRosterSync : IAutoSync
         // Call top level first as it sets values
         // If we do not call the top constructor first, those values will not be synced
         var ctors = new MethodBase[] {
-            AccessTools.Constructor(typeof(TroopRoster), new Type[] { typeof(PartyBase) })
+            AccessTools.Constructor(typeof(TroopRoster), Array.Empty<Type>())
         };
         autoRegistryFactory.TryRegisterType<TroopRoster>(ctors, RegisterAll);
 

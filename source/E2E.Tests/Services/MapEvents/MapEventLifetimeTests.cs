@@ -1,8 +1,10 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
@@ -90,7 +92,7 @@ public class MapEventLifetimeTests : IDisposable
 
             mapEvent.Initialize(attackerParty, defenderParty);
             mapEvent.FinalizeEvent();
-        });
+        }, disabledMethods: new MethodBase[] { AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.HandleMapEventEnd)) });
 
         // Assert
         Assert.NotNull(mapEventId);
