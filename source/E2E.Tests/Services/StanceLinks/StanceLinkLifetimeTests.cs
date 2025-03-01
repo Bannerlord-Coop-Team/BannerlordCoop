@@ -1,4 +1,5 @@
 ﻿using E2E.Tests.Environment;
+using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
 
@@ -28,7 +29,8 @@ public class StaceLinkLifetimeTests : IDisposable
         server.Call(() =>
         {
             var kingdom1 = new Kingdom();
-            var stanceLink = new StanceLink(StanceType.War, kingdom1, kingdom1, true);
+            var clan2 = new Clan();
+            var stanceLink = new StanceLink(StanceType.War, kingdom1, clan2, true);
 
             Assert.True(server.ObjectManager.TryGetId(stanceLink, out stanceId));
         });
@@ -38,7 +40,8 @@ public class StaceLinkLifetimeTests : IDisposable
 
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<StanceLink>(stanceId, out var _));
+            Assert.True(client.ObjectManager.TryGetObject<StanceLink>(stanceId, out var _out));
+            Assert.True(_out.IsAtWar);
         }
     }
 
