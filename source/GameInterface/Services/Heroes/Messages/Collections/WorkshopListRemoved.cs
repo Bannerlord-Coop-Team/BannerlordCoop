@@ -1,13 +1,20 @@
-﻿using GameInterface.Utils;
+﻿using Common.Network;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Utils.LocalEvents;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 
 namespace GameInterface.Services.Heroes.Messages.Collections;
 
-internal record WorkshopListRemoved : GenericListEvent<Hero, Workshop>
+internal record WorkshopListRemoved : GenericEvent<Hero, Workshop>
 {
     public WorkshopListRemoved(Hero instance, Workshop value) : base(instance, value)
     {
+    }
+
+    public override void HandleEvent(IObjectManager objectManager, INetwork network)
+    {
+        throw new System.NotImplementedException();
     }
 }
 

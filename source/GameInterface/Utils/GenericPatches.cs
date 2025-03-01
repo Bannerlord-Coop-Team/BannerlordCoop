@@ -17,6 +17,7 @@ using GameInterface.Services.Heroes.Patches;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Diamond;
 using JetBrains.Annotations;
+using GameInterface.Utils.LocalEvents;
 
 namespace GameInterface.Utils
 {
@@ -53,8 +54,8 @@ namespace GameInterface.Utils
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> ListFieldTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
-            where TAddMessage : GenericListEvent<TInstance, TItem>
-            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var addMethod = typeof(List<TItem>).GetMethod("Add");
@@ -85,8 +86,8 @@ namespace GameInterface.Utils
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> ListPropertyTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
-            where TAddMessage : GenericListEvent<TInstance, TItem>
-            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             var addMethod = typeof(List<TItem>).GetMethod("Add");
@@ -192,8 +193,8 @@ namespace GameInterface.Utils
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> MBListFieldTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
-            where TAddMessage : GenericListEvent<TInstance, TItem>
-            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var addMethod = typeof(MBList<TItem>).GetMethod("Add");
@@ -224,8 +225,8 @@ namespace GameInterface.Utils
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> MBListPropertyTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
-            where TAddMessage : GenericListEvent<TInstance, TItem>
-            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             var addMethod = typeof(List<TItem>).GetMethod("Add");
@@ -332,8 +333,8 @@ namespace GameInterface.Utils
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> QueueFieldTranspiler<TItem, TEnqueueMessage, TDequeueMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
-            where TEnqueueMessage : GenericQueueEvent<TInstance, TItem>
-            where TDequeueMessage : GenericQueueEvent<TInstance, TItem>
+            where TEnqueueMessage : GenericEvent<TInstance, TItem>
+            where TDequeueMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var enqueueMethod = typeof(Queue<TItem>).GetMethod("Enqueue");
@@ -364,8 +365,8 @@ namespace GameInterface.Utils
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
         public static IEnumerable<CodeInstruction> QueuePropertyTranspiler<TItem, TEnqueueMessage, TDequeueMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
-            where TEnqueueMessage : GenericQueueEvent<TInstance, TItem>
-            where TDequeueMessage : GenericQueueEvent<TInstance, TItem>
+            where TEnqueueMessage : GenericEvent<TInstance, TItem>
+            where TDequeueMessage : GenericEvent<TInstance, TItem>
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             var enqueueMethod = typeof(Queue<TItem>).GetMethod("Enqueue");
@@ -396,7 +397,7 @@ namespace GameInterface.Utils
         /// => MBListAddIntercept&lt;CharacterObject, VolunteerTypesAdded&gt;(VolunteerTypes, value, instance);
         /// </remarks>
         public static void QueueEnqueueIntercept<TItem, TMessage>(Queue<TItem> queue, TItem item, TInstance instance)
-            where TMessage : GenericQueueEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             // Allows original method call if this thread is allowed
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -434,7 +435,7 @@ namespace GameInterface.Utils
         /// => MBListRemoveIntercept&lt;CharacterObject, VolunteerTypesRemoved&gt;(VolunteerTypes, value, instance);
         /// </remarks>
         public static TItem QueueDequeueIntercept<TItem, TMessage>(Queue<TItem> queue, TInstance instance)
-            where TMessage : GenericQueueEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             // Allows original method call if this thread is allowed
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -540,7 +541,7 @@ namespace GameInterface.Utils
 
         #region FieldTranspiler
         public static IEnumerable<CodeInstruction> FieldTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
-            where TMessage : GenericSetEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             AddToFieldCache(fieldInfo);
@@ -561,7 +562,7 @@ namespace GameInterface.Utils
         }
 
         public static void FieldIntercept<TItem, TMessage>(TInstance instance, TItem item, string fieldName)
-            where TMessage : GenericSetEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = fieldInfoCache[typeof(TInstance)][fieldName];
 
@@ -598,7 +599,7 @@ namespace GameInterface.Utils
 
         #region PropertyTranspiler
         public static IEnumerable<CodeInstruction> PropertyTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
-            where TMessage : GenericSetEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             AddToPropertyCache(propertyInfo);
@@ -619,7 +620,7 @@ namespace GameInterface.Utils
         }
 
         public static void PropertyIntercept<TItem, TMessage>(TInstance instance, TItem item, string propertyName)
-            where TMessage : GenericSetEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             var propertyInfo = propertyInfoCache[typeof(TInstance)][propertyName];
 

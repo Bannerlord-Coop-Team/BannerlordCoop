@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Messages.Collections;
+using GameInterface.Utils;
 using Serilog;
 using System;
 using System.Collections.Immutable;
@@ -15,14 +16,14 @@ namespace GameInterface.Services.Towns.Handlers
     /// <summary>
     /// Handles TownState Changes (e.g. Prosperity, Governor, etc.).
     /// </summary>
-    public class TownCollectionHandler : IHandler
+    public class TownCollectionHandler : GenericMessageHandler<TownCollectionHandler>
     {
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
         private readonly ILogger Logger = LogManager.GetLogger<TownCollectionHandler>();
 
-        public TownCollectionHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+        public TownCollectionHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network) : base(messageBroker, objectManager, network)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
@@ -32,6 +33,15 @@ namespace GameInterface.Services.Towns.Handlers
 
             messageBroker.Subscribe<WorkshopsChanged>(HandleWorkShopsChanged);
             messageBroker.Subscribe<NetworkWorkshopsChanged>(HandleWorkShopsChanged);
+
+            RegisterEvent<BuildingsInProgressSet>();
+            RegisterNetworkEvent<BuildingsInProgressSetNetwork>();
+
+            RegisterEvent<BuildingsInProgressEnqueue>();
+            RegisterNetworkEvent<BuildingsInProgressEnqueueNetwork>();
+
+            RegisterEvent<BuildingsInProgressDequeue>();
+            RegisterNetworkEvent<BuildingsInProgressDequeueNetwork>();
         }
 
         public void Dispose()

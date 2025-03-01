@@ -39,7 +39,7 @@ internal class TownCollectionPatches : GenericPatches<TownCollectionPatches, Tow
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> BuildingsInProgressCollectionTranspiler(IEnumerable<CodeInstruction> instructions)
-        => QueueFieldTranspiler<Building, BuildingsInProgressQueueEnqueue, BuildingsInProgressQueueDequeue>(instructions, nameof(Town.BuildingsInProgress));
+        => QueueFieldTranspiler<Building, BuildingsInProgressEnqueue, BuildingsInProgressDequeue>(instructions, nameof(Town.BuildingsInProgress));
 
     // Reference getting replaced by BuildingHelper
     [HarmonyTranspiler]
