@@ -56,7 +56,7 @@ public class CraftingLifetimeHandler : IHandler
         {
             Logger.Error("Failed to register type {type} with id {id}", typeof(Crafting), obj.What.Id);
             return;
-        };
+        }
     }
 
     private void Handle(MessagePayload<CraftingRemoved> payload)

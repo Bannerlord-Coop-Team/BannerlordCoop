@@ -4,8 +4,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Messages;
 using GameInterface.Services.Towns.Patches;
 using Serilog;
-using System;
-using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;

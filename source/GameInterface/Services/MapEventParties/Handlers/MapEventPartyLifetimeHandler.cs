@@ -67,8 +67,6 @@ namespace GameInterface.Services.MapEventParties.Handlers
                         Logger.Error("Failed to create party with id {stringId}", obj.MapEventPartyId);
                         return;
                     }
-
-
                 }
             });
         }

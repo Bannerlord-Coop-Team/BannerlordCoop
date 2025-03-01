@@ -25,8 +25,6 @@ public class GameInterface : IGameInterface
 
     public void Dispose()
     {
-        //UnpatchAll();;
-        ;
     }
 
     public void PatchAll()

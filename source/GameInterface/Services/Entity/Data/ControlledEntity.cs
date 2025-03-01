@@ -66,8 +66,8 @@ public class ControlledEntity
     public override int GetHashCode()
     {
         int hash = 552523;
-        hash = hash * 31 + OwnerId.GetHashCode();
-        hash = hash * 31 + EntityId.GetHashCode();
+        hash = (hash * 31) + OwnerId.GetHashCode();
+        hash = (hash * 31) + EntityId.GetHashCode();
         return hash;
     }
 }

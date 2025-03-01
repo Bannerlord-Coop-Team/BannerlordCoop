@@ -52,8 +52,8 @@ public class CoopSession : ICoopSession
     public override int GetHashCode()
     {
         int hash = 1236898;
-        hash = hash * 31 + UniqueGameId.GetHashCode();
-        hash = hash * 31 + ControlledEntityMap.GetHashCode();
+        hash = (hash * 31) + UniqueGameId.GetHashCode();
+        hash = (hash * 31) + ControlledEntityMap.GetHashCode();
         return hash;
     }
 }
