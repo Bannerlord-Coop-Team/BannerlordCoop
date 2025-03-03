@@ -275,7 +275,6 @@ namespace GameInterface.Utils
         /// public static void AddIntercept(MBList&lt;CharacterObject&gt; VolunteerTypes, CharacterObject value, Hero instance) <br/>
         /// => MBListAddIntercept&lt;CharacterObject, VolunteerTypesAdded&gt;(VolunteerTypes, value, instance);
         /// </remarks>
-
         public static IEnumerable<CodeInstruction> MBListPropertySetTranspiler<TItem, TSetMessage, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
             where TSetMessage : GenericEvent<TInstance, MBList<TItem>>
             where TAddMessage : GenericEvent<TInstance, TItem>
@@ -736,11 +735,8 @@ namespace GameInterface.Utils
                         setIntercept
                         );
                 }
-
             }
-
             return instructionList;
-
         }
 
 
