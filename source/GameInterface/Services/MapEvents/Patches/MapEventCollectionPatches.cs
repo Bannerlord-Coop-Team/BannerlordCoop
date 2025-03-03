@@ -14,5 +14,5 @@ internal class MapEventCollectionPatches : GenericPatches<MapEventCollectionPatc
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        => ArrayTranspiler<MapEventSide, MapEventSidesArrayUpdated>(instructions, nameof(MapEvent._sides));
+        => ArrayChangeTranspiler<MapEventSide, MapEventSidesArrayUpdated>(instructions, nameof(MapEvent._sides));
 }

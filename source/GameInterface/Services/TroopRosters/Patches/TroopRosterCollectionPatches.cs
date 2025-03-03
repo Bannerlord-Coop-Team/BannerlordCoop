@@ -16,6 +16,6 @@ namespace GameInterface.Services.TroopRosters.Patches
 
         [HarmonyTranspiler]
         static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        => ArrayTranspiler<TroopRosterElement, TroopRosterDataUpdated>(instructions, nameof(TroopRoster.data));
+        => ArrayChangeTranspiler<TroopRosterElement, TroopRosterDataUpdated>(instructions, nameof(TroopRoster.data));
     }
 }

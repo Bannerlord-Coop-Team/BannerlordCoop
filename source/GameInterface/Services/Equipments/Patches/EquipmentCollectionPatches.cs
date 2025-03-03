@@ -14,5 +14,5 @@ internal class EquipmentCollectionPatches : GenericPatches<EquipmentCollectionPa
     
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        => ArrayTranspiler<EquipmentElement, ItemSlotsArrayUpdated>(instructions, nameof(Equipment._itemSlots));
+        => ArrayChangeTranspiler<EquipmentElement, ItemSlotsArrayUpdated>(instructions, nameof(Equipment._itemSlots));
 }

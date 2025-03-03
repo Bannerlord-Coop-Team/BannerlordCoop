@@ -17,5 +17,5 @@ internal class MobilePartyCollectionPatches : GenericPatches<MobilePartyCollecti
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        => ListFieldTranspiler<MobileParty, AttachedPartyAdded, AttachedPartyRemoved>(instructions, nameof(MobileParty._attachedParties));
+        => ListFieldChangeTranspiler<MobileParty, AttachedPartyAdded, AttachedPartyRemoved>(instructions, nameof(MobileParty._attachedParties));
 }

@@ -9,14 +9,7 @@ using Serilog;
 using Common.Logging;
 using TaleWorlds.Library;
 using System.Linq;
-using Autofac.Core;
-using System.Xml.Schema;
-using System.Collections;
-using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.Heroes.Patches;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Diamond;
-using JetBrains.Annotations;
+using GameInterface.Utils.LocalEvents;
 
 namespace GameInterface.Utils
 {
@@ -42,8 +35,8 @@ namespace GameInterface.Utils
         /// Used to transpile <see cref="List{TItem}"/>type Collections
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
-        /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
         /// <param name="fieldName">Name of the field to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
@@ -52,9 +45,9 @@ namespace GameInterface.Utils
         /// => ListFieldTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
-        public static IEnumerable<CodeInstruction> ListFieldTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
-            where TAddMessage : GenericListEvent<TInstance, TItem>
-            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+        public static IEnumerable<CodeInstruction> ListFieldChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var addMethod = typeof(List<TItem>).GetMethod("Add");
@@ -70,12 +63,21 @@ namespace GameInterface.Utils
                 removeIntercept);
         }
 
+        public static IEnumerable<CodeInstruction> ListFieldSetTranspiler<TItem, TSetMessage, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TSetMessage : GenericEvent<TInstance, List<TItem>>
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
+        {
+            var patchedInstructions = ListFieldChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(instructions, fieldName);
+            return FieldTranspiler<List<TItem>, TSetMessage>(patchedInstructions, fieldName);
+        }
+
         /// <summary>
         /// Used to transpile <see cref="List{TItem}"/>type Collections
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
-        /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
         /// <param name="propertyName">Name of the property to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
@@ -84,9 +86,9 @@ namespace GameInterface.Utils
         /// => ListPropertyTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
-        public static IEnumerable<CodeInstruction> ListPropertyTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
-            where TAddMessage : GenericListEvent<TInstance, TItem>
-            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+        public static IEnumerable<CodeInstruction> ListPropertyChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             var addMethod = typeof(List<TItem>).GetMethod("Add");
@@ -102,11 +104,20 @@ namespace GameInterface.Utils
                 removeIntercept);
         }
 
+        public static IEnumerable<CodeInstruction> ListPropertySetTranspiler<TItem, TSetMessage, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TSetMessage : GenericEvent<TInstance, List<TItem>>
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
+        {
+            var patchedInstructions = ListPropertyChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(instructions, fieldName);
+            return PropertyTranspiler<List<TItem>, TSetMessage>(patchedInstructions, fieldName);
+        }
+
         /// <summary>
         /// Intercept that gets called when an item is added from the collection
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="items">The collection that gets changed</param>
         /// <param name="item">The item to be added</param>
         /// <param name="instance">The class that hold the collection</param>
@@ -144,7 +155,7 @@ namespace GameInterface.Utils
         /// Intercept that gets called when an item is removed from the collection
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="items">The collection that gets changed</param>
         /// <param name="item">The item to be removed</param>
         /// <param name="instance">The class that hold the collection</param>
@@ -181,8 +192,8 @@ namespace GameInterface.Utils
         /// Used to transpile <see cref="MBList{TItem}"/>type Collections
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
-        /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
         /// <param name="fieldName">Name of the field to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
@@ -191,9 +202,9 @@ namespace GameInterface.Utils
         /// => MBListFieldTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
-        public static IEnumerable<CodeInstruction> MBListFieldTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
-            where TAddMessage : GenericListEvent<TInstance, TItem>
-            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+        public static IEnumerable<CodeInstruction> MBListFieldChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var addMethod = typeof(MBList<TItem>).GetMethod("Add");
@@ -209,12 +220,21 @@ namespace GameInterface.Utils
                 removeIntercept);
         }
 
+        public static IEnumerable<CodeInstruction> MBListFieldSetTranspiler<TItem, TSetMessage, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TSetMessage : GenericEvent<TInstance, MBList<TItem>>
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
+        {
+            var patchedInstructions = MBListFieldChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(instructions, fieldName);
+            return FieldTranspiler<MBList<TItem>, TSetMessage>(patchedInstructions, fieldName);
+        }
+
         /// <summary>
         /// Used to transpile <see cref="MBList{TItem}"/>type Collections
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
-        /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TAddMessage">Message to be published on Add has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TRemoveMessage">Message to be published on Remove has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
         /// <param name="propertyName">Name of the property to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
@@ -223,9 +243,9 @@ namespace GameInterface.Utils
         /// => MBListPropertyTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
-        public static IEnumerable<CodeInstruction> MBListPropertyTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
-            where TAddMessage : GenericListEvent<TInstance, TItem>
-            where TRemoveMessage : GenericListEvent<TInstance, TItem>
+        public static IEnumerable<CodeInstruction> MBListPropertyChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             var addMethod = typeof(List<TItem>).GetMethod("Add");
@@ -245,7 +265,7 @@ namespace GameInterface.Utils
         /// Intercept that gets called when an item is added from the collection
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="items">The collection that gets changed</param>
         /// <param name="item">The item to be added</param>
         /// <param name="instance">The class that hold the collection</param>
@@ -255,6 +275,16 @@ namespace GameInterface.Utils
         /// public static void AddIntercept(MBList&lt;CharacterObject&gt; VolunteerTypes, CharacterObject value, Hero instance) <br/>
         /// => MBListAddIntercept&lt;CharacterObject, VolunteerTypesAdded&gt;(VolunteerTypes, value, instance);
         /// </remarks>
+
+        public static IEnumerable<CodeInstruction> MBListPropertySetTranspiler<TItem, TSetMessage, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TSetMessage : GenericEvent<TInstance, MBList<TItem>>
+            where TAddMessage : GenericEvent<TInstance, TItem>
+            where TRemoveMessage : GenericEvent<TInstance, TItem>
+        {
+            var patchedInstructions = MBListPropertyChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(instructions, fieldName);
+            return PropertyTranspiler<MBList<TItem>, TSetMessage>(patchedInstructions, fieldName);
+        }
+
         public static void MBListAddIntercept<TItem, TMessage>(MBList<TItem> list, TItem item, TInstance instance)
             where TMessage : IEvent
         {
@@ -283,7 +313,7 @@ namespace GameInterface.Utils
         /// Intercept that gets called when an item is removed from the collection
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="items">The collection that gets changed</param>
         /// <param name="item">The item to be removed</param>
         /// <param name="instance">The class that hold the collection</param>
@@ -321,8 +351,8 @@ namespace GameInterface.Utils
         /// Used to transpile <see cref="Queue{TItem}"/>type Collections
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TEnqueueMessage">Message to be published on Enqueue has to extend <see cref="GenericQueueEvent{TInstance, TValue}"/></typeparam>
-        /// <typeparam name="TDequeueMessage">Message to be published on Dequeue has to extend <see cref="GenericQueueEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TEnqueueMessage">Message to be published on Enqueue has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TDequeueMessage">Message to be published on Dequeue has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
         /// <param name="fieldName">Name of the field to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
@@ -331,9 +361,9 @@ namespace GameInterface.Utils
         /// => QueueFieldTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
-        public static IEnumerable<CodeInstruction> QueueFieldTranspiler<TItem, TEnqueueMessage, TDequeueMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
-            where TEnqueueMessage : GenericQueueEvent<TInstance, TItem>
-            where TDequeueMessage : GenericQueueEvent<TInstance, TItem>
+        public static IEnumerable<CodeInstruction> QueueFieldChangeTranspiler<TItem, TEnqueueMessage, TDequeueMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TEnqueueMessage : GenericEvent<TInstance, TItem>
+            where TDequeueMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var enqueueMethod = typeof(Queue<TItem>).GetMethod("Enqueue");
@@ -349,12 +379,21 @@ namespace GameInterface.Utils
                 dequeueIntercept);
         }
 
+        public static IEnumerable<CodeInstruction> QueueFieldSetTranspiler<TItem, TSetMessage, TEnqueueMessage, TDequeueMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TSetMessage : GenericEvent<TInstance, Queue<TItem>>
+            where TEnqueueMessage : GenericEvent<TInstance, TItem>
+            where TDequeueMessage : GenericEvent<TInstance, TItem>
+        {
+            var patchedInstructions = QueueFieldChangeTranspiler<TItem, TEnqueueMessage, TDequeueMessage>(instructions, fieldName);
+            return FieldTranspiler<Queue<TItem>, TSetMessage>(patchedInstructions, fieldName);
+        }
+
         /// <summary>
         /// Used to transpile <see cref="Queue{TItem}"/>type Collections
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TEnqueueMessage">Message to be published on Enqueue has to extend <see cref="GenericQueueEvent{TInstance, TValue}"/></typeparam>
-        /// <typeparam name="TDequeueMessage">Message to be published on Dequeue has to extend <see cref="GenericQueueEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TEnqueueMessage">Message to be published on Enqueue has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TDequeueMessage">Message to be published on Dequeue has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
         /// <param name="propertyName">Name of the property to be patched</param>
         /// <remarks> Calls should look like:<br /><br />
@@ -363,9 +402,9 @@ namespace GameInterface.Utils
         /// => QueuePropertyTranspiler&lt;Alley, AlleyListUpdated, AlleyListRemoved&gt;(instructions);
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
-        public static IEnumerable<CodeInstruction> QueuePropertyTranspiler<TItem, TEnqueueMessage, TDequeueMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
-            where TEnqueueMessage : GenericQueueEvent<TInstance, TItem>
-            where TDequeueMessage : GenericQueueEvent<TInstance, TItem>
+        public static IEnumerable<CodeInstruction> QueuePropertyChangeTranspiler<TItem, TEnqueueMessage, TDequeueMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
+            where TEnqueueMessage : GenericEvent<TInstance, TItem>
+            where TDequeueMessage : GenericEvent<TInstance, TItem>
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             var enqueueMethod = typeof(Queue<TItem>).GetMethod("Enqueue");
@@ -381,11 +420,20 @@ namespace GameInterface.Utils
                 dequeueIntercept);
         }
 
+        public static IEnumerable<CodeInstruction> QueuePropertySetTranspiler<TItem, TSetMessage, TEnqueueMessage, TDequeueMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
+            where TSetMessage : GenericEvent<TInstance, TItem>
+            where TEnqueueMessage : GenericEvent<TInstance, TItem>
+            where TDequeueMessage : GenericEvent<TInstance, TItem>
+        {
+            var patchedInstructions = QueuePropertyChangeTranspiler<TItem, TEnqueueMessage, TDequeueMessage>(instructions, propertyName);
+            return PropertyTranspiler<TItem, TSetMessage>(patchedInstructions, propertyName);
+        }
+
         /// <summary>
         /// Intercept that gets called when an item is added from the collection
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="items">The collection that gets changed</param>
         /// <param name="item">The item to be added</param>
         /// <param name="instance">The class that hold the collection</param>
@@ -396,7 +444,7 @@ namespace GameInterface.Utils
         /// => MBListAddIntercept&lt;CharacterObject, VolunteerTypesAdded&gt;(VolunteerTypes, value, instance);
         /// </remarks>
         public static void QueueEnqueueIntercept<TItem, TMessage>(Queue<TItem> queue, TItem item, TInstance instance)
-            where TMessage : GenericQueueEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             // Allows original method call if this thread is allowed
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -423,7 +471,7 @@ namespace GameInterface.Utils
         /// Intercept that gets called when an item is removed from the collection
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericListEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericEvent{TInstance, TValue}"/></typeparam>
         /// <param name="queue">The collection that gets changed</param>
         /// <param name="item">The item to be removed</param>
         /// <param name="instance">The class that hold the collection</param>
@@ -434,7 +482,7 @@ namespace GameInterface.Utils
         /// => MBListRemoveIntercept&lt;CharacterObject, VolunteerTypesRemoved&gt;(VolunteerTypes, value, instance);
         /// </remarks>
         public static TItem QueueDequeueIntercept<TItem, TMessage>(Queue<TItem> queue, TInstance instance)
-            where TMessage : GenericQueueEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             // Allows original method call if this thread is allowed
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -461,7 +509,7 @@ namespace GameInterface.Utils
         /// Used to transpile arrays
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericArrayEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericArrayChangedEvent{TInstance, TValue}"/></typeparam>
         /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
@@ -469,8 +517,8 @@ namespace GameInterface.Utils
         /// => ArrayTranspiler&lt;EquipmentElement, ItemSlotsArrayUpdated&gt;(instructions, nameof(Equipment._itemSlots));
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
-        public static IEnumerable<CodeInstruction> ArrayTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
-            where TMessage : GenericArrayEvent<TInstance, TItem>
+        public static IEnumerable<CodeInstruction> ArrayChangeTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TMessage : GenericArrayChangedEvent<TInstance, TItem>
         {
             var loadStack = new Stack<CodeInstruction>();
             var itemSlotArrayType = AccessTools.Field(typeof(TInstance), fieldName);
@@ -500,11 +548,27 @@ namespace GameInterface.Utils
             }
         }
 
+        public static IEnumerable<CodeInstruction> ArrayPropertySetTranspiler<TItem, TSetMessage, TChangeMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
+            where TSetMessage : GenericEvent<TInstance, TItem[]>
+            where TChangeMessage : GenericArrayChangedEvent<TInstance, TItem>
+        {
+            var patchedInstructions = ArrayChangeTranspiler<TItem, TChangeMessage>(instructions, propertyName);
+            return PropertyTranspiler<TItem[], TSetMessage>(patchedInstructions, propertyName);
+        }
+
+        public static IEnumerable<CodeInstruction> ArrayFieldSetTranspiler<TItem, TSetMessage, TChangeMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+            where TSetMessage : GenericEvent<TInstance, TItem[]>
+            where TChangeMessage : GenericArrayChangedEvent<TInstance, TItem>
+        {
+            var patchedInstructions = ArrayChangeTranspiler<TItem, TChangeMessage>(instructions, fieldName);
+            return FieldTranspiler<TItem[], TSetMessage>(patchedInstructions, fieldName);
+        }
+
         /// <summary>
         /// Intercept that gets called on changes for transpiled arrays
         /// </summary>
         /// <typeparam name="TItem">Type of the collection items</typeparam>
-        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericArrayEvent{TInstance, TValue}"/></typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericArrayChangedEvent{TInstance, TValue}"/></typeparam>
         /// <param name="items">The collection that gets changed</param>
         /// <param name="index">Index of the changed item</param>
         /// <param name="item">The item to be assigned</param>
@@ -516,7 +580,7 @@ namespace GameInterface.Utils
         /// => ArrayAssignIntercept&lt;CharacterObject, VolunteerTypesArrayUpdated&gt;(VolunteerTypes, index, value, instance);
         /// </remarks>
         public static void ArrayAssignIntercept<TItem, TMessage>(TItem[] items, int index, TItem item, TInstance instance)
-            where TMessage : GenericArrayEvent<TInstance, TItem>
+            where TMessage : GenericArrayChangedEvent<TInstance, TItem>
         {
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -540,7 +604,7 @@ namespace GameInterface.Utils
 
         #region FieldTranspiler
         public static IEnumerable<CodeInstruction> FieldTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
-            where TMessage : GenericSetEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             AddToFieldCache(fieldInfo);
@@ -561,7 +625,7 @@ namespace GameInterface.Utils
         }
 
         public static void FieldIntercept<TItem, TMessage>(TInstance instance, TItem item, string fieldName)
-            where TMessage : GenericSetEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             var fieldInfo = fieldInfoCache[typeof(TInstance)][fieldName];
 
@@ -598,7 +662,7 @@ namespace GameInterface.Utils
 
         #region PropertyTranspiler
         public static IEnumerable<CodeInstruction> PropertyTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
-            where TMessage : GenericSetEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             AddToPropertyCache(propertyInfo);
@@ -619,7 +683,7 @@ namespace GameInterface.Utils
         }
 
         public static void PropertyIntercept<TItem, TMessage>(TInstance instance, TItem item, string propertyName)
-            where TMessage : GenericSetEvent<TInstance, TItem>
+            where TMessage : GenericEvent<TInstance, TItem>
         {
             var propertyInfo = propertyInfoCache[typeof(TInstance)][propertyName];
 
