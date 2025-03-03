@@ -1,10 +1,9 @@
 ﻿using Autofac;
+using Common.Messaging;
 using GameInterface.Serialization;
-using GameInterface.Services;
-using GameInterface.Services.Heroes;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Tests.Stubs;
+using Moq;
+using Serilog;
 
 namespace GameInterface.Tests.Bootstrap.Modules
 {
@@ -12,9 +11,14 @@ namespace GameInterface.Tests.Bootstrap.Modules
     {
         protected override void Load(ContainerBuilder builder)
         {
+            var logger = new LoggerConfiguration().CreateLogger();
+
             base.Load(builder);
-            builder.RegisterType<ObjectManagerAdapterStub>().As<IObjectManager>().InstancePerLifetimeScope();
             builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>();
+
+            builder.RegisterInstance(logger).As<ILogger>();
+            builder.RegisterInstance(new Mock<IMessageBroker>().Object).As<IMessageBroker>();
+            builder.RegisterModule<ObjectManagerModule>();
         }
     }
 }

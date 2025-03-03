@@ -25,7 +25,7 @@ namespace GameInterface.Serialization.External
         {
             base.UnpackFields();
 
-            Object.Monster = ResolveId<Monster>(MonsterId);
+            Object.Monster = ResolveObject<Monster>(MonsterId);
         }
     }
 }

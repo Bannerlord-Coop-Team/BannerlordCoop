@@ -20,7 +20,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Object = ResolveId<PerkObject>(StringId);
+            Object = ResolveObject<PerkObject>(StringId);
         }
     }
 }

@@ -2,10 +2,9 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using TaleWorlds.Library;
 
-namespace GameInterface.Services.Registry;
+namespace GameInterface.Registry;
 
 /// <summary>
 /// Storage for all object registries

@@ -1,5 +1,5 @@
 ﻿using Common;
-using GameInterface.Services.Registry;
+using GameInterface.Registry;
 using HarmonyLib;
 using Serilog;
 using System;

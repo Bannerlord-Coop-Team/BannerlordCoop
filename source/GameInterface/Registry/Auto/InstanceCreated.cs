@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
 
-namespace GameInterface.AutoSync.Registry;
+namespace GameInterface.Registry.Auto;
 class InstanceCreated<T> : IEvent where T : class
 {
     public T Instance { get; }

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using Common.Extensions;
+using Newtonsoft.Json.Linq;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization
@@ -147,7 +148,7 @@ namespace GameInterface.Serialization
         /// <typeparam name="InT">The type of the objects in the collection.</typeparam>
         /// <param name="values">The collection of objects to be packed.</param>
         /// <returns>An array of string IDs representing the objects in the collection.</returns>
-        protected static string[] PackIds<InT>(IEnumerable<InT> values) where InT : MBObjectBase
+        protected string[] ResolveIds<InT>(IEnumerable<InT> values) where InT : MBObjectBase
         {
             // Return an empty array if the values parameter is null
             if (values == null) return new string[0];
@@ -156,7 +157,14 @@ namespace GameInterface.Serialization
             if (!values.Any()) return new string[0];
 
             // Use the Select and ToArray LINQ methods to convert the values collection to an array of strings
-            return values.Select(value => value.StringId).ToArray();
+            return values.Select(value => ResolveId(value)).ToArray();
+        }
+
+        protected string ResolveId(object obj)
+        {
+            BinaryPackageFactory.ObjectManager.TryGetId(obj, out var id);
+
+            return id;
         }
 
         /// <summary>
@@ -168,7 +176,7 @@ namespace GameInterface.Serialization
         /// The object corresponding to the specified string ID, 
         /// or null if the ID is null or the object cannot be found.
         /// </returns>
-        protected OutT ResolveId<OutT>(string id) where OutT : MBObjectBase
+        protected OutT ResolveObject<OutT>(string id) where OutT : MBObjectBase
         {
             // Return if id is null
             if (id == null) return null;
@@ -188,12 +196,12 @@ namespace GameInterface.Serialization
         /// The collection of objects corresponding to the specified string IDs. 
         /// An exception is thrown if any of the IDs cannot be resolved.
         /// </returns>
-        protected IEnumerable<OutT> ResolveIds<OutT>(string[] ids) where OutT : MBObjectBase
+        protected IEnumerable<OutT> ResolveObjects<OutT>(string[] ids) where OutT : MBObjectBase
         {
             if (ids == null) return Array.Empty<OutT>();
 
             // Convert ids to instances using the MBObjectManager
-            IEnumerable<OutT> values = ids.Select(id => ResolveId<OutT>(id));
+            IEnumerable<OutT> values = ids.Select(id => ResolveObject<OutT>(id));
 
             // Return the resolved instances
             return values.Where(v => v != null);

@@ -5,7 +5,8 @@ using Autofac.Core.Resolving.Pipeline;
 using Common.Logging;
 using Common.PacketHandlers;
 using GameInterface.AutoSync;
-using GameInterface.AutoSync.Registry;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
 using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Entity;
@@ -45,6 +46,7 @@ public class GameInterfaceModule : Module
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
         builder.RegisterModule<AutoSyncModule>();
+        builder.RegisterModule<RegistryModule>();
 
 
         base.Load(builder);

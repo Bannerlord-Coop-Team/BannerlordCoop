@@ -18,7 +18,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = ResolveId<PolicyObject>(StringId);
+            Object = ResolveObject<PolicyObject>(StringId);
         }
     }
 }

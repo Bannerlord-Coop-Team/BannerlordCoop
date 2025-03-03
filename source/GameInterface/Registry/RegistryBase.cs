@@ -7,7 +7,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using TaleWorlds.Library;
 
-namespace GameInterface.Services.Registry;
+namespace GameInterface.Registry;
 
 public abstract class RegistryBase<T> : IRegistry<T> where T : class
 {
@@ -86,7 +86,8 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
         return true;
     }
 
-    public virtual bool Remove(object obj) {
+    public virtual bool Remove(object obj)
+    {
         if (TryCast(obj, out var castedObj) == false) return false;
 
         if (idObjs.TryGetValue(castedObj, out var id) == false) return false;

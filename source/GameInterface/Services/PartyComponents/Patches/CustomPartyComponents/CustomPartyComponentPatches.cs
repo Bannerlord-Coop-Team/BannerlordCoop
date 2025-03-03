@@ -98,7 +98,7 @@ public class CustomPartyComponentPatches
 
         if (ModInformation.IsClient)
         {
-            //Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
             return;
         }
 

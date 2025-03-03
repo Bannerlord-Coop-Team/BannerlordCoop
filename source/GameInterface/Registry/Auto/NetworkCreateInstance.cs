@@ -1,9 +1,9 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.AutoSync.Registry;
+namespace GameInterface.Registry.Auto;
 [ProtoContract(SkipConstructor = true)]
-class NetworkCreateInstance<T> : ICommand where T : class
+class NetworkCreateInstance<T> : ICommand
 {
     [ProtoMember(1)]
     public string InstanceId { get; }

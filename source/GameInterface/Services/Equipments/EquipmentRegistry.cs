@@ -1,11 +1,11 @@
-﻿using GameInterface.Services.Registry;
-using System;
+﻿using System;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
 using TaleWorlds.CampaignSystem.Siege;
 using System.Threading;
+using GameInterface.Registry;
 
 namespace GameInterface.Services.Equipments;
 

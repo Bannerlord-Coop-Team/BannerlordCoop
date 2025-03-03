@@ -1,6 +1,10 @@
-﻿using System.Linq;
+﻿using GameInterface.Registry;
+using GameInterface.Services.ObjectManager.Extensions;
+using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Registry;
 
@@ -24,8 +28,7 @@ internal class HeroRegistry : RegistryBase<Hero>
             return;
         }
 
-        var heroes = campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes).ToArray();
-        foreach (var hero in heroes)
+        foreach (var hero in campaignObjectManager.GetAllHeroes().OrderBy(hero => hero.Id))
         {
             RegisterNewObject(hero, out var _);
         }

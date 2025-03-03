@@ -4,6 +4,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
+using static TaleWorlds.CampaignSystem.CharacterDevelopment.DefaultPerks;
 
 namespace GameInterface.Serialization.External
 {
@@ -64,10 +65,10 @@ namespace GameInterface.Serialization.External
 
             base.PackFields(excludes);
 
-            scoutId = Object.EffectiveScout?.StringId;
-            engineerId = Object.EffectiveEngineer?.StringId;
-            quartermasterId = Object.EffectiveQuartermaster?.StringId;
-            surgeonId = Object.EffectiveSurgeon?.StringId;
+            scoutId = ResolveId(Object.EffectiveScout);
+            engineerId = ResolveId(Object.EffectiveEngineer);
+            quartermasterId = ResolveId(Object.EffectiveQuartermaster);
+            surgeonId = ResolveId(Object.EffectiveSurgeon);
         }
 
         private static ConstructorInfo MobileParty_ctor => typeof(MobileParty).GetConstructor(Array.Empty<Type>());
@@ -75,7 +76,7 @@ namespace GameInterface.Serialization.External
         {
             if(string.IsNullOrEmpty(stringId) == false)
             {
-                Object = ResolveId<MobileParty>(stringId);
+                Object = ResolveObject<MobileParty>(stringId);
                 return;
             }
 
@@ -83,10 +84,10 @@ namespace GameInterface.Serialization.External
 
             base.UnpackFields();
 
-            Object.Scout            = ResolveId<Hero>(scoutId);
-            Object.Engineer         = ResolveId<Hero>(engineerId);
-            Object.Quartermaster    = ResolveId<Hero>(quartermasterId);
-            Object.Surgeon          = ResolveId<Hero>(surgeonId);
+            Object.Scout            = ResolveObject<Hero>(scoutId);
+            Object.Engineer         = ResolveObject<Hero>(engineerId);
+            Object.Quartermaster    = ResolveObject<Hero>(quartermasterId);
+            Object.Surgeon          = ResolveObject<Hero>(surgeonId);
 
 
             Object.OnFinishLoadState();

@@ -24,7 +24,7 @@ namespace GameInterface.Serialization.External
         {
             if(stringId != null)
             {
-                var newObject = ResolveId<ItemObject>(stringId);
+                var newObject = ResolveObject<ItemObject>(stringId);
                 if(newObject != null)
                 {
                     Object = newObject;

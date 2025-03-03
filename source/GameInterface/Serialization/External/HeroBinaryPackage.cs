@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
@@ -40,15 +41,15 @@ namespace GameInterface.Serialization.External
         {
             stringId = Object.StringId;
 
-            base.PackFields(Excludes);
+            PackFields(Excludes);
 
-            fatherId = Object.Father?.StringId;
-            motherId = Object.Mother?.StringId;
-            spouseId = Object.Spouse?.StringId;
+            fatherId = ResolveId(Object.Father);
+            motherId = ResolveId(Object.Mother);
+            spouseId = ResolveId(Object.Spouse);
 
             List<Hero> exSpoueses = Object._exSpouses;
-            exSpousesIds = PackIds(exSpoueses);
-            childrenIds = PackIds(Object.Children);
+            exSpousesIds = ResolveIds(exSpoueses);
+            childrenIds = ResolveIds(Object.Children);
         }
 
         /// <summary>
@@ -62,7 +63,7 @@ namespace GameInterface.Serialization.External
             // Otherwise, create a new object and initialize it
             if (string.IsNullOrEmpty(stringId) == false)
             {
-                var newObject = ResolveId<Hero>(stringId);
+                var newObject = ResolveObject<Hero>(stringId);
                 if (newObject != null)
                 {
                     Object = newObject;
@@ -76,12 +77,12 @@ namespace GameInterface.Serialization.External
             base.UnpackFields();
 
             // Set the values of the object's father, mother, spouse, ex-spouses, and children
-            Object._father = ResolveId<Hero>(fatherId);
-            Object._mother = ResolveId<Hero>(motherId);
-            Object._spouse = ResolveId<Hero>(spouseId);
+            Object._father = ResolveObject<Hero>(fatherId);
+            Object._mother = ResolveObject<Hero>(motherId);
+            Object._spouse = ResolveObject<Hero>(spouseId);
 
-            Hero_ExSpouses.SetValue(Object, new MBList<Hero>(ResolveIds<Hero>(exSpousesIds)));
-            Hero_Children.SetValue(Object, new MBList<Hero>(ResolveIds<Hero>(childrenIds)));
+            Hero_ExSpouses.SetValue(Object, new MBList<Hero>(ResolveObjects<Hero>(exSpousesIds)));
+            Hero_Children.SetValue(Object, new MBList<Hero>(ResolveObjects<Hero>(childrenIds)));
         }
     }
 }

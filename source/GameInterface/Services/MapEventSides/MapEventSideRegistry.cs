@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;

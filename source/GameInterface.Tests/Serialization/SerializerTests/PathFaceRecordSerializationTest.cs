@@ -5,6 +5,7 @@ using GameInterface.Tests.Bootstrap.Modules;
 using TaleWorlds.Library;
 using Xunit;
 using Common.Serialization;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -13,11 +14,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         IContainer container;
         public PathFaceRecordSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = TestModule.Build();
         }
 
         [Fact]

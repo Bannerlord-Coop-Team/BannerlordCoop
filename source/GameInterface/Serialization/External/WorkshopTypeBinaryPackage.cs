@@ -23,7 +23,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Object = ResolveId<WorkshopType>(stringId);
+            Object = ResolveObject<WorkshopType>(stringId);
         }
     }
 }

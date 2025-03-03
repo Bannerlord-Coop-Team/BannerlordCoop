@@ -1,5 +1,4 @@
 ﻿using Common;
-using GameInterface.Services.Registry;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,6 +8,7 @@ using System.Linq;
 using TaleWorlds.Core;
 using System.Collections;
 using System.Threading;
+using GameInterface.Registry;
 
 namespace GameInterface.Services.StanceLinks;
 

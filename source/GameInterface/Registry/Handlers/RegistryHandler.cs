@@ -1,12 +1,7 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.Heroes.Messages;
-using TaleWorlds.CampaignSystem;
-using GameInterface.Services.Clans;
-using GameInterface.Services.Settlements;
-using GameInterface.Services.Armies;
 
-namespace GameInterface.Services.Registry.Handlers;
+namespace GameInterface.Registry.Handlers;
 
 internal class RegistryHandler : IHandler
 {

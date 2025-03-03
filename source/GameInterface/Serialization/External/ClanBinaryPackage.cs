@@ -36,10 +36,10 @@ namespace GameInterface.Serialization.External
 
             base.PackFields();
             
-            supporterNotablesIds = PackIds(Object._supporterNotablesCache);
-            lordsIds = PackIds(Object._lordsCache);
-            heroesIds = PackIds(Object._heroesCache);
-            companionsIds = PackIds(Object._companionsCache);
+            supporterNotablesIds = ResolveIds(Object._supporterNotablesCache);
+            lordsIds = ResolveIds(Object._lordsCache);
+            heroesIds = ResolveIds(Object._heroesCache);
+            companionsIds = ResolveIds(Object._companionsCache);
         }
 
         protected override void UnpackInternal()
@@ -47,7 +47,7 @@ namespace GameInterface.Serialization.External
             // If the stringId already exists in the object manager use that object
             if (stringId != null)
             {
-                var newObject = ResolveId<Clan>(stringId);
+                var newObject = ResolveObject<Clan>(stringId);
                 if (newObject != null)
                 {
                     Object = newObject;
@@ -60,10 +60,10 @@ namespace GameInterface.Serialization.External
             base.UnpackFields();
 
             // Unpack special cases
-            Object._supporterNotablesCache = ResolveIds<Hero>(supporterNotablesIds).ToMBList();
-            Object._lordsCache = ResolveIds<Hero>(lordsIds).ToMBList();
-            Object._heroesCache = ResolveIds<Hero>(heroesIds).ToMBList();
-            Object._companionsCache = ResolveIds<Hero>(companionsIds).ToMBList();
+            Object._supporterNotablesCache = ResolveObjects<Hero>(supporterNotablesIds).ToMBList();
+            Object._lordsCache = ResolveObjects<Hero>(lordsIds).ToMBList();
+            Object._heroesCache = ResolveObjects<Hero>(heroesIds).ToMBList();
+            Object._companionsCache = ResolveObjects<Hero>(companionsIds).ToMBList();
         }
     }
 }

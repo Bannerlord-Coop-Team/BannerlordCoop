@@ -1,5 +1,5 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.AutoSync.Registry;
+using GameInterface.Registry.Auto;
 using HarmonyLib;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -19,7 +19,7 @@ internal class CultureObjectSync : IAutoSync
         registryFactory.TryRegisterType<BasicCultureObject>(basicCultureObjectCtors, RegisterAll);
     }
 
-    private void OnCultureObjectCreated(string id, CultureObject cultureObject)
+    private void OnCultureObjectCreated(CultureObject cultureObject, string id)
     {
         cultureObject.StringId = id;
         MBObjectManager.Instance.RegisterPresumedObject(cultureObject);

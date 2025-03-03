@@ -1,7 +1,9 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.Registry.Auto;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -23,14 +25,12 @@ namespace GameInterface.Services.Heroes
             AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring)),
         };
 
-        public HeroSync(IAutoSyncBuilder autoSyncBuilder)
+        public HeroSync(IAutoSyncBuilder autoSyncBuilder, IAutoRegistryFactory autoRegistryFactory)
         {
             foreach (var method in externalMethods)
             {
                 autoSyncBuilder.AddFieldChangeMethod(method);
             }
-
-            
 
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.StaticBodyProperties)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Weight)));

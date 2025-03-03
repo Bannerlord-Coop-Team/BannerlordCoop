@@ -1,17 +1,20 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
+using GameInterface.AutoSync;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Registry;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
-namespace GameInterface.AutoSync.Registry;
+namespace GameInterface.Registry.Auto;
 public interface IAutoRegistryFactory : IDisposable
 {
     bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<string, T> onClientCreated = null) where T : class;
+
+    void RegisterType<T>(IAutoRegistry<T> autoRegistry);
 }
 
 internal class AutoRegistryFactory : IAutoRegistryFactory
@@ -52,6 +55,8 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
 
     public bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<string, T> onClientCreated = null) where T : class
     {
+        ValidateConstructorTypes(ctrosToPatch, typeof(T));
+
         TypeMapper.AddTypes(new Type[] { typeof(NetworkCreateInstance<T>) });
 
         var registry = new AutoRegistry<T>(registerAll, Collection);
@@ -69,5 +74,18 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         Disposables.Add(handler);
 
         return true;
+    }
+
+    private void ValidateConstructorTypes(IEnumerable<MethodBase> ctros, Type expectedType)
+    {
+        var exceptions = ctros.Where(ctor => ctor.DeclaringType != expectedType).Select(ctor =>
+        {
+            return new InvalidOperationException($"Constructor does not match type {expectedType} instead was {ctor.DeclaringType}");
+        });
+
+        if (exceptions.Any())
+        {
+            throw new AggregateException(exceptions);
+        }
     }
 }

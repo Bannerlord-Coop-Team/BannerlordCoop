@@ -20,7 +20,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Object = ResolveId<BannerEffect>(stringId);
+            Object = ResolveObject<BannerEffect>(stringId);
         }
     }
 }

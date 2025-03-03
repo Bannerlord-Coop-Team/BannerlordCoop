@@ -5,21 +5,21 @@ using GameInterface.Services.ObjectManager;
 using System;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.AutoSync.Registry;
+namespace GameInterface.Registry.Auto;
 class AutoRegistryHandler<T> : IHandler where T : class
 {
     public AutoRegistry<T> Registry { get; }
     public IMessageBroker MessageBroker { get; }
     public INetwork Network { get; }
     public IObjectManager ObjectManager { get; }
-    public Action<string, T> ClientCreatedCallback { get; }
+    public Action<T, string> ClientCreatedCallback { get; }
 
     public AutoRegistryHandler(
         AutoRegistry<T> registry,
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        Action<string, T> clientCreatedCallback = null)
+        Action<T, string> clientCreatedCallback = null)
     {
         Registry = registry;
         MessageBroker = messageBroker;
@@ -55,6 +55,6 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         ObjectManager.AddExisting(payload.What.InstanceId, newInstance);
 
-        if (ClientCreatedCallback != null) ClientCreatedCallback(payload.What.InstanceId, newInstance);
+        if (ClientCreatedCallback != null) ClientCreatedCallback(newInstance, payload.What.InstanceId);
     }
 }

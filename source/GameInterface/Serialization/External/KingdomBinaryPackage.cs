@@ -45,19 +45,19 @@ namespace GameInterface.Serialization.External
 
             base.PackFields(excludes);
 
-            clanIds = PackIds(Object.Clans);
-            fiefIds = PackIds(Object.Fiefs);
-            heroIds = PackIds(Object.Heroes);
-            lordIds = PackIds(Object.Lords);
-            settlementIds = PackIds(Object.Settlements);
-            villageIds = PackIds(Object.Villages);
+            clanIds = ResolveIds(Object.Clans);
+            fiefIds = ResolveIds(Object.Fiefs);
+            heroIds = ResolveIds(Object.Heroes);
+            lordIds = ResolveIds(Object.Lords);
+            settlementIds = ResolveIds(Object.Settlements);
+            villageIds = ResolveIds(Object.Villages);
         }
 
         protected override void UnpackInternal()
         {
             if(stringId != null)
             {
-                Kingdom kingdom = ResolveId<Kingdom>(stringId);
+                Kingdom kingdom = ResolveObject<Kingdom>(stringId);
                 if (kingdom != null)
                 {
                     Object = kingdom;
@@ -74,12 +74,12 @@ namespace GameInterface.Serialization.External
             // Cached WarPartyComponents are handed in the
             // BanditComponentBinaryPackage and LordPartyComponentBinaryPackage
 
-            Object._clans = ResolveIds<Clan>(clanIds).ToMBList();
-            Object._fiefsCache = ResolveIds<Town>(fiefIds).ToMBList();
-            Object._heroesCache = ResolveIds<Hero>(heroIds).ToMBList();
-            Object._lordsCache = ResolveIds<Hero>(lordIds).ToMBList();
-            Object._settlementsCache = ResolveIds<Settlement>(settlementIds).ToMBList();
-            Object._villagesCache = ResolveIds<Village>(villageIds).ToMBList();
+            Object._clans = ResolveObjects<Clan>(clanIds).ToMBList();
+            Object._fiefsCache = ResolveObjects<Town>(fiefIds).ToMBList();
+            Object._heroesCache = ResolveObjects<Hero>(heroIds).ToMBList();
+            Object._lordsCache = ResolveObjects<Hero>(lordIds).ToMBList();
+            Object._settlementsCache = ResolveObjects<Settlement>(settlementIds).ToMBList();
+            Object._villagesCache = ResolveObjects<Village>(villageIds).ToMBList();
         }
     }
 }

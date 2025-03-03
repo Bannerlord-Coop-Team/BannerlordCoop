@@ -19,7 +19,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = ResolveId<CultureObject>(StringId);
+            Object = ResolveObject<CultureObject>(StringId);
         }
     }
 }

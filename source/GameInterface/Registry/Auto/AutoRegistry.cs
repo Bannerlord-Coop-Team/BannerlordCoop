@@ -1,10 +1,10 @@
-﻿using GameInterface.Services.Registry;
-using System;
+﻿using System;
 using System.Threading;
 
-namespace GameInterface.AutoSync.Registry;
+namespace GameInterface.Registry.Auto;
 
-public class AutoRegistry<T> : RegistryBase<T> where T : class
+
+internal class AutoRegistry<T> : RegistryBase<T> where T : class
 {
     readonly static string InstanceId = $"Coop{typeof(T)}";
 

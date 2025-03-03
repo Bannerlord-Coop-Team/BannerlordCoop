@@ -5,7 +5,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Siege;
 
-namespace GameInterface.AutoSync.Registry;
+namespace GameInterface.Registry.Auto;
 internal class LifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LifetimePatches>();

@@ -16,11 +16,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         IContainer container;
         public MonsterSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = TestModule.Build();
         }
 
         [Fact]

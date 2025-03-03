@@ -23,7 +23,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            ResolveId<Monster>(StringId);
+            ResolveObject<Monster>(StringId);
         }
     }
 }

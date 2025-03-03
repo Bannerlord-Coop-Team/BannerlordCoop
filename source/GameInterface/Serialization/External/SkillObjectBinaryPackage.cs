@@ -18,7 +18,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = ResolveId<SkillObject>(StringId);
+            Object = ResolveObject<SkillObject>(StringId);
         }
     }
 }

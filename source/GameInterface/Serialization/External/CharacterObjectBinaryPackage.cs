@@ -52,12 +52,12 @@ namespace GameInterface.Serialization.External
             originCharacterId = originCharacter?.StringId;
 
             // Store the result of calling the PackIds method on the object's UpgradeTargets property in the UpgradeTargetIds variable
-            UpgradeTargetIds = PackIds(Object.UpgradeTargets);
+            UpgradeTargetIds = ResolveIds(Object.UpgradeTargets);
         }
 
         protected override void UnpackInternal()
         {
-            CharacterObject characterObject = ResolveId<CharacterObject>(stringId);
+            CharacterObject characterObject = ResolveObject<CharacterObject>(stringId);
             if (characterObject != null)
             {
                 Object = characterObject;
@@ -67,11 +67,11 @@ namespace GameInterface.Serialization.External
             base.UnpackFields();
 
             // Resolve Ids for StringId resolvable objects
-            Object._battleEquipmentTemplate = ResolveId<CharacterObject>(battleEquipmentTemplateId);
-            Object._civilianEquipmentTemplate = ResolveId<CharacterObject>(civilianEquipmentTemplateId);
-            Object._originCharacter = ResolveId<CharacterObject>(originCharacterId);
+            Object._battleEquipmentTemplate = ResolveObject<CharacterObject>(battleEquipmentTemplateId);
+            Object._civilianEquipmentTemplate = ResolveObject<CharacterObject>(civilianEquipmentTemplateId);
+            Object._originCharacter = ResolveObject<CharacterObject>(originCharacterId);
 
-            Object.UpgradeTargets = ResolveIds<CharacterObject>(UpgradeTargetIds).ToArray();
+            Object.UpgradeTargets = ResolveObjects<CharacterObject>(UpgradeTargetIds).ToArray();
         }
     }
 }

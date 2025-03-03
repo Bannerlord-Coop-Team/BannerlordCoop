@@ -35,8 +35,8 @@ namespace GameInterface.Serialization.External
         protected override void UnpackInternal()
         {
             base.UnpackFields();
-            Object.Faction1 = ResolveId<Clan>(faction1Id);
-            Object.Faction2 = ResolveId<Clan>(faction2Id);
+            Object.Faction1 = ResolveObject<Clan>(faction1Id);
+            Object.Faction2 = ResolveObject<Clan>(faction2Id);
         }
     }
 }

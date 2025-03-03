@@ -6,6 +6,7 @@ using TaleWorlds.CampaignSystem.Party;
 using Autofac;
 using Common.Serialization;
 using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -14,11 +15,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         IContainer container;
         public PartyBaseSerializationTest()
         {
-            ContainerBuilder builder = new ContainerBuilder();
-
-            builder.RegisterModule<SerializationTestModule>();
-
-            container = builder.Build();
+            container = TestModule.Build();
         }
 
         [Fact]

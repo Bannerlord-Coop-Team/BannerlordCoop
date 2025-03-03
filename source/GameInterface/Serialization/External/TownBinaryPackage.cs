@@ -19,7 +19,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void UnpackInternal()
         {
-            Object = ResolveId<Town>(StringId);
+            Object = ResolveObject<Town>(StringId);
         }
     }
 }

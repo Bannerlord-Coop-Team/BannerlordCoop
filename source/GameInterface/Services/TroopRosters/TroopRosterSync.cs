@@ -1,5 +1,5 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.AutoSync.Registry;
+using GameInterface.Registry.Auto;
 using HarmonyLib;
 using Serilog;
 using System;

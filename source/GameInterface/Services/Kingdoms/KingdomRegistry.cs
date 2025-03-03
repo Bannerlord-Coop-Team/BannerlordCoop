@@ -1,5 +1,5 @@
 ﻿using Common;
-using GameInterface.Services.Registry;
+using GameInterface.Registry;
 using System;
 using System.Collections;
 using System.Collections.Generic;

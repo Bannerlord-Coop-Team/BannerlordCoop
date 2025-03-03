@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using SandBox.View.Map;
 using System.Threading;
 using TaleWorlds.CampaignSystem.Settlements;

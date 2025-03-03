@@ -30,14 +30,8 @@ internal class EquipmentLifetimePatches
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
-
-            return true;
-        }
+        // Equiptment is cloned on the client for party icon
+        if (ModInformation.IsClient) return true;
 
         MessageBroker.Instance.Publish(__instance, new EquipmentCreated(__instance));
             

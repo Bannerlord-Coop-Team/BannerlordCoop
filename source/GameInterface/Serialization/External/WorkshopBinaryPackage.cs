@@ -30,7 +30,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Town town = ResolveId<Town>(townId);
+            Town town = ResolveObject<Town>(townId);
 
             Object = town.Workshops[workshopIndex];
         }

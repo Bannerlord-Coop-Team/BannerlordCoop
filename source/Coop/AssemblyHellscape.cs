@@ -18,7 +18,8 @@ namespace Coop
             "System.Diagnostics.DiagnosticSource",
             "System.Memory",
             "System.Buffers",
-            "System.Numerics.Vectors"
+            "System.Numerics.Vectors",
+            "Autofac"
         };
 
         private static readonly Dictionary<string, Assembly> LoadedRedirects = RedirectedAssemblies
