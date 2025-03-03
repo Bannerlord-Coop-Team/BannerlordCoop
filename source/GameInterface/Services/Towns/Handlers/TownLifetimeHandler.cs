@@ -13,6 +13,9 @@ using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Towns.Handlers
 {
@@ -52,7 +55,9 @@ namespace GameInterface.Services.Towns.Handlers
 
         private void Handle(MessagePayload<NetworkCreateTown> payload)
         {
-            var newTown = ObjectHelper.SkipConstructor<Town>();
+            // TODO: Uncertain if this breaks something but if the ctor is skipped
+            // there are unitialized list properties which break later down the line
+            var newTown = new Town();
 
             var data = payload.What;
 

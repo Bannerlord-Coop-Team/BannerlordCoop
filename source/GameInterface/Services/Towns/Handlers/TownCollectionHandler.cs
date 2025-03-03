@@ -1,104 +1,113 @@
-﻿using Common.Logging;
-using Common.Messaging;
+﻿using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Messages.Collections;
-using Serilog;
-using System;
-using System.Collections.Immutable;
+using GameInterface.Utils;
+using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.Towns.Handlers
 {
     /// <summary>
     /// Handles TownState Changes (e.g. Prosperity, Governor, etc.).
     /// </summary>
-    public class TownCollectionHandler : IHandler
+    public class TownCollectionHandler : GenericHandler<Town, TownCollectionHandler>
     {
-        private readonly IMessageBroker messageBroker;
-        private readonly IObjectManager objectManager;
-        private readonly INetwork network;
-        private readonly ILogger Logger = LogManager.GetLogger<TownCollectionHandler>();
-
-        public TownCollectionHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+        public TownCollectionHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network) : base(messageBroker, objectManager, network)
         {
-            this.messageBroker = messageBroker;
-            this.objectManager = objectManager;
-            this.network = network;
-            messageBroker.Subscribe<WorkshopsSet>(HandleWorkShopsSet);
-            messageBroker.Subscribe<NetworkWorkshopsSet>(HandleWorkShopsSet);
+            Subscribe<Workshop[], WorkshopsSet>(WorkshopsSetHandler);
+            SubscribeNetwork<Workshop[], NetworkWorkshopsSet>(NetworkWorkshopsSetHandler);
 
-            messageBroker.Subscribe<WorkshopsChanged>(HandleWorkShopsChanged);
-            messageBroker.Subscribe<NetworkWorkshopsChanged>(HandleWorkShopsChanged);
+            Subscribe<Workshop, WorkshopsChanged>(WorkshopsChangedHandler);
+            SubscribeNetwork<Workshop, NetworkWorkshopsChanged>(NetworkWorkshopsChangedHandler);
+
+            SubscribeGenericReference<Building, BuildingsAdded, NetworkBuildingsAdded>();
+            SubscribeNetworkReference<Building, NetworkBuildingsAdded>((instance,value,_) => { instance.Buildings.Add(value); });
+
+            SubscribeGenericReference<Building, BuildingsRemoved, NetworkBuildingsRemoved>();
+            SubscribeNetworkReference<Building, NetworkBuildingsRemoved>((instance, value, _) => { instance.Buildings.Remove(value); });
+
+            Subscribe<Queue<Building>, BuildingsInProgressSet>(BuildingsInProgressSetHandler);
+            SubscribeNetwork<Queue<Building>, NetworkBuildingsInProgressSet>(NetworkBuildingsInProgressSetHandler);
+
+            SubscribeGenericReference<Building, BuildingsInProgressAdded, NetworkBuildingsInProgressAdded>();
+            SubscribeNetworkReference<Building, NetworkBuildingsInProgressAdded>((instance, value, _) => { instance.BuildingsInProgress.Enqueue(value); });
+
+            SubscribeGenericReference<Building, BuildingsInProgressRemoved, NetworkBuildingsInProgressRemoved>();
+            SubscribeNetworkReference<Building, NetworkBuildingsInProgressRemoved>((instance, _, _) => { instance.BuildingsInProgress.Dequeue(); });
+
+            SubscribeGenericReference<Village, TradeBoundVillagesCacheAdded, NetworkTradeBoundVillagesCacheAdded>();
+            SubscribeNetworkReference<Village, NetworkTradeBoundVillagesCacheAdded>((instance, value, _) => { instance.TradeBoundVillages.Add(value); });
+
+            SubscribeGenericReference<Village, TradeBoundVillagesCacheRemoved, NetworkTradeBoundVillagesCacheRemoved>();
+            SubscribeNetworkReference<Village, NetworkTradeBoundVillagesCacheRemoved>((instance, value, _) => { instance.TradeBoundVillages.Remove(value); });
         }
 
-        public void Dispose()
+        private void WorkshopsSetHandler(string instanceId, WorkshopsSet data)
         {
-            messageBroker.Unsubscribe<WorkshopsSet>(HandleWorkShopsSet);
-            messageBroker.Unsubscribe<NetworkWorkshopsSet>(HandleWorkShopsSet);
-
-            messageBroker.Unsubscribe<WorkshopsChanged>(HandleWorkShopsChanged);
-            messageBroker.Unsubscribe<NetworkWorkshopsChanged>(HandleWorkShopsChanged);
-        }
-
-        private void HandleWorkShopsSet(MessagePayload<WorkshopsSet> payload)
-        {
-            var data = payload.What;
-
-            if (!TryGetId(data.Instance, out string townId)) return;
-            network.SendAll(new NetworkWorkshopsSet(townId, data.Value.Length ));
-
-            foreach (var item in data.Value)
+            var workshopIds = new List<(int index, string id)>();
+            for (int i = 0; i < data.Value.Length; i++)
             {
-                if(item != null)
+                if (!TryGetId(data.Value[i], out string workshopId)) continue;
+                workshopIds.Add((i, workshopId));
+            }
+            network.SendAll(new NetworkWorkshopsSet(instanceId, workshopIds.ToArray(), data.Value.Length));
+        }
+
+        private void NetworkWorkshopsSetHandler(Town town, NetworkWorkshopsSet data)
+        {
+            town.Workshops = new Workshop[data.Length];
+            if(data.WorkshopIds != null)
+            { 
+                for (int i = 0; i < data.WorkshopIds.Length; i++)
                 {
-                    // TODO: Optimize
-                    if (!TryGetId(item, out string workShopId)) return;
-                    network.SendAll(new NetworkWorkshopsChanged(townId, workShopId, data.Value.IndexOf(item)));
+                    var workshopMapping = data.WorkshopIds[i];
+                    if (!objectManager.TryGetObject(workshopMapping.id, out Workshop workshop)) continue;
+                    town.Workshops[workshopMapping.index] = workshop;
                 }
             }
         }
 
-        private void HandleWorkShopsSet(MessagePayload<NetworkWorkshopsSet> payload)
+        private void WorkshopsChangedHandler(string instanceId, WorkshopsChanged data)
         {
-            var data = payload.What;
-
-            if (!objectManager.TryGetObject(data.TownId, out Town town)) return;
-
-            town.Workshops = new Workshop[data.Length];
+            if (!TryGetId(data.Value, out string workshopId)) return;
+            network.SendAll(new NetworkWorkshopsChanged(instanceId, workshopId, data.Index));
         }
 
-        private void HandleWorkShopsChanged(MessagePayload<WorkshopsChanged> payload)
+        private void NetworkWorkshopsChangedHandler(Town town, NetworkWorkshopsChanged data)
         {
-            var data = payload.What;
-
-            if (!TryGetId(data.Instance, out string townId)) return;
-            if (!TryGetId(data.Value, out string workShopId)) return;
-            network.SendAll(new NetworkWorkshopsChanged(townId, workShopId, data.Index));
-        }
-
-        private void HandleWorkShopsChanged(MessagePayload<NetworkWorkshopsChanged> payload)
-        {
-            var data = payload.What;
-
-            if (!objectManager.TryGetObject(data.TownId, out Town town)) return;
-            if (!objectManager.TryGetObject(data.WorkshopId, out Workshop workshop)) return;
+            if (!objectManager.TryGetObject(data.WorkshopId, out Workshop workshop) && !string.IsNullOrWhiteSpace(data.WorkshopId)) return;
             town.Workshops[data.Index] = workshop;
         }
 
-        private bool TryGetId(object value, out string id)
+        private void BuildingsInProgressSetHandler(string instanceId, BuildingsInProgressSet data)
         {
-            id = null;
-            if (value == null) return false;
-
-            if (!objectManager.TryGetId(value, out id))
+            var buildings = data.Value.ToList();
+            var buildingIds = new List<string>();
+            for (int i = 0; i < buildings.Count; i++)
             {
-                Logger.Error("Unable to get ID for instance of type {type}", value.GetType());
-                return false;
+                if (!TryGetId(buildings[i], out string buildingId)) return;
+                buildingIds.Add(buildingId);
             }
-            return true;
+
+            network.SendAll(new NetworkBuildingsInProgressSet(instanceId, buildingIds));
+        }
+
+        private void NetworkBuildingsInProgressSetHandler(Town town, NetworkBuildingsInProgressSet data)
+        {
+            town.BuildingsInProgress = new Queue<Building>();
+            // Empty lists are transmitted as null
+            if(data.BuildingIds != null)
+            { 
+                for(int i = 0; i < data.BuildingIds.Count; i++)
+                {
+                    if (!objectManager.TryGetObject(data.BuildingIds[i], out Building building)) return;
+                    town.BuildingsInProgress.Enqueue(building);
+                }
+            }
         }
     }
 }

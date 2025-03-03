@@ -1,13 +1,12 @@
 ﻿using GameInterface.Utils.LocalEvents;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace GameInterface.Services.Towns.Messages.Collections
 {
-    internal record BuildingsInProgressSet : GenericEvent<Town, Queue<Building>>
+    internal record BuildingsInProgressAdded : GenericEvent<Town, Building>
     {
-        public BuildingsInProgressSet(Town instance, Queue<Building> value) : base(instance, value)
+        public BuildingsInProgressAdded(Town instance, Building value) : base(instance, value)
         {
         }
     }

@@ -104,13 +104,13 @@ namespace GameInterface.Utils
                 removeIntercept);
         }
 
-        public static IEnumerable<CodeInstruction> ListPropertySetTranspiler<TItem, TSetMessage, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+        public static IEnumerable<CodeInstruction> ListPropertySetTranspiler<TItem, TSetMessage, TAddMessage, TRemoveMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
             where TSetMessage : GenericEvent<TInstance, List<TItem>>
             where TAddMessage : GenericEvent<TInstance, TItem>
             where TRemoveMessage : GenericEvent<TInstance, TItem>
         {
-            var patchedInstructions = ListPropertyChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(instructions, fieldName);
-            return PropertyTranspiler<List<TItem>, TSetMessage>(patchedInstructions, fieldName);
+            var patchedInstructions = ListPropertyChangeTranspiler<TItem, TAddMessage, TRemoveMessage>(instructions, propertyName);
+            return PropertyTranspiler<List<TItem>, TSetMessage>(patchedInstructions, propertyName);
         }
 
         /// <summary>

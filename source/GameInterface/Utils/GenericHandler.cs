@@ -7,10 +7,7 @@ using GameInterface.Utils.NetworkEvents;
 using HarmonyLib;
 using Serilog;
 using System;
-using System.CodeDom;
-using System.CodeDom.Compiler;
 using System.Collections.Generic;
-using System.Reflection;
 
 namespace GameInterface.Utils
 {
@@ -32,364 +29,60 @@ namespace GameInterface.Utils
             this.network = network;
         }
 
-        #region Handlers
-        protected Action<MessagePayload<TMessage>> GetSetHandler<TValue, TMessage, TNetworkMessage>()
+        protected void Subscribe<TValue, TMessage>(Action<string, TMessage> messageHandler)
             where TMessage : GenericEvent<TInstance, TValue>
-            where TNetworkMessage : GenericNetworkSetEvent<TInstance, TValue>
         {
-            Action<MessagePayload<TMessage>> handler = (payload) =>
+            Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-
                 if (!TryGetId(data.Instance, out string instanceId)) return;
-
-                var networkMessage = (TNetworkMessage)Activator.CreateInstance(typeof(TNetworkMessage), new object[] { instanceId, data.Value });
-                network.SendAll(networkMessage);
+                messageHandler(instanceId, data);
             };
-
-            return handler;
+            messageBroker.Subscribe(payloadHandler);
+            handlers.Add(payloadHandler);
         }
-
-        protected Action<MessagePayload<TMessage>> GetReferenceSetHandler<TValue, TMessage, TNetworkMessage>()
-            where TValue : class
+        protected void SubscribeGenericReference<TValue, TMessage, TNetworkMessage>()
             where TMessage : GenericEvent<TInstance, TValue>
-            where TNetworkMessage : GenericNetworkReferenceSetEvent<TInstance, TValue>
+            where TNetworkMessage : GenericNetworkReferenceEvent<TInstance, TValue>
         {
-            Action<MessagePayload<TMessage>> handler = (payload) =>
-            {
-                var data = payload.What;
-
-                if (!TryGetId(data.Instance, out string instanceId)) return;
-                if (!TryGetId(data.Value, out string valueId) && data.Value != null) return;
-
-                var networkMessage = (TNetworkMessage)Activator.CreateInstance(typeof(TNetworkMessage), new object[] { instanceId, valueId });
-                network.SendAll(networkMessage);
-            };
-
-            return handler;
-        }
-
-        protected Action<MessagePayload<TMessage>> GetArraySetHandler<TValue, TMessage, TNetworkMessage, TNetworkChangeMessage>()
-            where TMessage : GenericEvent<TInstance, TValue[]>
-            where TNetworkMessage : GenericNetworkArraySetEvent<TInstance, TValue>
-            where TNetworkChangeMessage : GenericNetworkArrayChangedEvent<TInstance, TValue>
-        {
-            Action<MessagePayload<TMessage>> handler = (payload) =>
-            {
-                var data = payload.What;
-
-                if (!TryGetId(data.Instance, out string instanceId)) return;
-
-                network.SendAll((TNetworkMessage)Activator.CreateInstance(typeof(TNetworkMessage), new object[] { instanceId, data.Value.Length }));
-
-                for (int i = 0; i < data.Value.Length; i++)
-                {
-                    network.SendAll((TNetworkChangeMessage)Activator.CreateInstance(typeof(TNetworkChangeMessage), new object[] { instanceId, data.Value[i], i }));
-                }
-            };
-
-            return handler;
-        }
-
-        protected Action<MessagePayload<TMessage>> GetArrayReferenceSetHandler<TValue, TMessage, TNetworkMessage, TNetworkChangeMessage>()
-            where TMessage : GenericEvent<TInstance, TValue[]>
-            where TNetworkMessage : GenericNetworkArraySetEvent<TInstance, TValue>
-            where TNetworkChangeMessage : GenericNetworkReferenceArrayChangedEvent<TInstance, TValue>
-        {
-            Action<MessagePayload<TMessage>> handler = (payload) =>
+            Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
                 if (!TryGetId(data.Instance, out string instanceId)) return;
-
-                network.SendAll((TNetworkMessage)Activator.CreateInstance(typeof(TNetworkMessage), new object[] { instanceId, data.Value.Length }));
-
-                for (int i = 0; i < data.Value.Length; i++)
-                {
-                    if (!TryGetId(data.Value[i], out string valueId)) return;
-                    network.SendAll((TNetworkChangeMessage)Activator.CreateInstance(typeof(TNetworkChangeMessage), new object[] { instanceId, valueId, i }));
-                }
+                if (!TryGetId(data.Value, out string valueId)) return;
+                network.SendAll((TNetworkMessage)Activator.CreateInstance(typeof(TNetworkMessage), new object[] { instanceId, valueId }));
             };
-
-            return handler;
+            messageBroker.Subscribe(payloadHandler);
+            handlers.Add(payloadHandler);
         }
 
-        protected Action<MessagePayload<TMessage>> GetArrayChangedHandler<TValue, TMessage, TNetworkMessage>()
-            where TMessage : GenericArrayChangedEvent<TInstance, TValue>
-            where TNetworkMessage : GenericNetworkArrayChangedEvent<TInstance, TValue>
+        protected void SubscribeNetwork<TValue, TMessage>(Action<TInstance, TMessage> messageHandler)
+            where TMessage : GenericNetworkEvent<TInstance, TValue>
         {
-            Action<MessagePayload<TMessage>> handler = (payload) =>
+            Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-
-                if (!TryGetId(data.Instance, out string instanceId)) return;
-
-                var networkMessage = (TNetworkMessage)Activator.CreateInstance(typeof(TNetworkMessage), new object[] { instanceId, data.Value, data.Index });
-                network.SendAll(networkMessage);
+                if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
+                messageHandler(instance, data);
             };
-
-            return handler;
+            messageBroker.Subscribe(payloadHandler);
+            handlers.Add(payloadHandler);
         }
-
-        protected Action<MessagePayload<TMessage>> GetArrayReferenceChangedHandler<TValue, TMessage, TNetworkMessage>()
-            where TMessage : GenericArrayChangedEvent<TInstance, TValue>
-            where TNetworkMessage : GenericNetworkReferenceArrayChangedEvent<TInstance, TValue>
-        {
-            Action<MessagePayload<TMessage>> handler = (payload) =>
-            {
-                var data = payload.What;
-
-                if (!TryGetId(data.Instance, out string instanceId)) return;
-                if (!TryGetId(data.Value, out string valueId) && data.Value != null) return;
-
-                var networkMessage = (TNetworkMessage)Activator.CreateInstance(typeof(TNetworkMessage), new object[] { instanceId, valueId, data.Index });
-                network.SendAll(networkMessage);
-            };
-
-            return handler;
-        }
-
-        #endregion
-
-        #region Subscriptions
-
-        protected void SubscribeSetHandler<TValue, TMessage, TNetworkMessage>(MemberInfo memberInfo)
+        protected void SubscribeNetworkReference<TValue, TMessage>(Action<TInstance, TValue, TMessage> messageHandler)
             where TValue : class
-            where TMessage : GenericEvent<TInstance, TValue>
-            where TNetworkMessage : GenericNetworkSetEvent<TInstance, TValue>
+            where TMessage : GenericNetworkReferenceEvent<TInstance, TValue>
         {
-            Subscribe(GetSetHandler<TValue, TMessage, TNetworkMessage>());
-            if (memberInfo is PropertyInfo propertyInfo)
+            Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-
-                    propertyInfo.SetValue(instance, data.Value);
-                };
-                Subscribe(networkHandler);
-            }
-            else if (memberInfo is FieldInfo fieldInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-
-                    fieldInfo.SetValue(instance, data.Value);
-                };
-                Subscribe(networkHandler);
-            }
-            else
-                Logger.Error($"Invalid MemberInfo passed for {typeof(TInstance)}; {typeof(TValue)}");
+                var data = payload.What;
+                if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
+                if (!objectManager.TryGetObject(data.ValueId, out TValue value)) return;
+                messageHandler(instance, value, data);
+            };
+            messageBroker.Subscribe(payloadHandler);
+            handlers.Add(payloadHandler);
         }
 
-        protected void SubscribeReferenceSetHandler<TValue, TMessage, TNetworkMessage>(MemberInfo memberInfo)
-            where TValue : class
-            where TMessage : GenericEvent<TInstance, TValue>
-            where TNetworkMessage : GenericNetworkReferenceSetEvent<TInstance, TValue>
-        {
-            Subscribe(GetReferenceSetHandler<TValue, TMessage, TNetworkMessage>());
-            if (memberInfo is PropertyInfo propertyInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-                    if (!objectManager.TryGetObject(data.ValueId, out TValue value) && string.IsNullOrEmpty(data.ValueId)) return;
-
-                    propertyInfo.SetValue(instance, value);
-                };
-                Subscribe(networkHandler);
-            }
-            else if (memberInfo is FieldInfo fieldInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-                    if (!objectManager.TryGetObject(data.ValueId, out TValue value) && string.IsNullOrEmpty(data.ValueId)) return;
-
-                    fieldInfo.SetValue(instance, value);
-                };
-                Subscribe(networkHandler);
-            }
-            else
-                Logger.Error($"Invalid MemberInfo passed for {typeof(TInstance)}; {typeof(TValue)}");
-        }
-
-        protected void SubscribeArraySetHandler<TValue, TMessage, TNetworkMessage, TChangedNetworkMessage>(MemberInfo memberInfo)
-            where TMessage : GenericEvent<TInstance, TValue[]>
-            where TNetworkMessage : GenericNetworkArraySetEvent<TInstance, TValue>
-            where TChangedNetworkMessage : GenericNetworkArrayChangedEvent<TInstance, TValue>
-        {
-            Subscribe(GetArraySetHandler<TValue, TMessage, TNetworkMessage, TChangedNetworkMessage>());
-            if (memberInfo is PropertyInfo propertyInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-
-                    propertyInfo.SetValue(instance, new TValue[data.Length]);
-                };
-                Subscribe(networkHandler);
-            }
-            else if (memberInfo is FieldInfo fieldInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-
-                    fieldInfo.SetValue(instance, new TValue[data.Length]);
-                };
-                Subscribe(networkHandler);
-            }
-            else
-                Logger.Error($"Invalid MemberInfo passed for {typeof(TInstance)}; {typeof(TValue)}");
-        }
-
-        protected void SubscribeArrayReferenceSetHandler<TValue, TMessage, TNetworkMessage, TChangedNetworkMessage>(MemberInfo memberInfo)
-            where TMessage : GenericEvent<TInstance, TValue[]>
-            where TNetworkMessage : GenericNetworkArraySetEvent<TInstance, TValue>
-            where TChangedNetworkMessage : GenericNetworkReferenceArrayChangedEvent<TInstance, TValue>
-        {
-            Subscribe(GetArrayReferenceSetHandler<TValue, TMessage, TNetworkMessage, TChangedNetworkMessage>());
-            if (memberInfo is PropertyInfo propertyInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-
-                    propertyInfo.SetValue(instance, new TValue[data.Length]);
-                };
-                Subscribe(networkHandler);
-            }
-            else if (memberInfo is FieldInfo fieldInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-
-                    fieldInfo.SetValue(instance, new TValue[data.Length]);
-                };
-                Subscribe(networkHandler);
-            }
-            else
-                Logger.Error($"Invalid MemberInfo passed for {typeof(TInstance)}; {typeof(TValue)}");
-        }
-
-        protected void SubscribeArrayChangedHandler<TValue, TMessage, TNetworkMessage>(MemberInfo memberInfo)
-            where TMessage : GenericArrayChangedEvent<TInstance, TValue>
-            where TNetworkMessage : GenericNetworkArrayChangedEvent<TInstance, TValue>
-        {
-            Subscribe(GetArrayChangedHandler<TValue, TMessage, TNetworkMessage>());
-            if (memberInfo is PropertyInfo propertyInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-
-                    (propertyInfo.GetValue(instance) as TValue[])[data.Index] = data.Value;
-                };
-                Subscribe(networkHandler);
-            }
-            else if (memberInfo is FieldInfo fieldInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-
-                    (fieldInfo.GetValue(instance) as TValue[])[data.Index] = data.Value;
-                };
-                Subscribe(networkHandler);
-            }
-            else
-                Logger.Error($"Invalid MemberInfo passed for {typeof(TInstance)}; {typeof(TValue)}");
-        }
-
-        protected void SubscribeArrayReferenceChangedHandler<TValue, TMessage, TNetworkMessage>(MemberInfo memberInfo)
-            where TValue : class
-            where TMessage : GenericArrayChangedEvent<TInstance, TValue>
-            where TNetworkMessage : GenericNetworkReferenceArrayChangedEvent<TInstance, TValue>
-        {
-            Subscribe(GetArrayReferenceChangedHandler<TValue, TMessage, TNetworkMessage>());
-            if (memberInfo is PropertyInfo propertyInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-                    if (!objectManager.TryGetObject(data.ValueId, out TValue value) && string.IsNullOrEmpty(data.ValueId)) return;
-
-                    (propertyInfo.GetValue(instance) as TValue[])[data.Index] = value;
-                };
-                Subscribe(networkHandler);
-            }
-            else if (memberInfo is FieldInfo fieldInfo)
-            {
-                Action<MessagePayload<TNetworkMessage>> networkHandler = (payload) =>
-                {
-                    var data = payload.What;
-
-                    if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-                    if (!objectManager.TryGetObject(data.ValueId, out TValue value) && string.IsNullOrEmpty(data.ValueId)) return;
-
-                    (fieldInfo.GetValue(instance) as TValue[])[data.Index] = value;
-                };
-                Subscribe(networkHandler);
-            }
-            else
-                Logger.Error($"Invalid MemberInfo passed for {typeof(TInstance)}; {typeof(TValue)}");
-        }
-
-        protected void SubsribeArrayHandler<TValue, TSetMessage, TSetNetworkMessage, TChangedMessage, TChangedNetworkMessage>(MemberInfo memberInfo)
-            where TSetMessage : GenericEvent<TInstance, TValue[]>
-            where TSetNetworkMessage : GenericNetworkArraySetEvent<TInstance, TValue>
-            where TChangedMessage : GenericArrayChangedEvent<TInstance, TValue>
-            where TChangedNetworkMessage : GenericNetworkArrayChangedEvent<TInstance, TValue>
-        {
-            SubscribeArraySetHandler<TValue, TSetMessage, TSetNetworkMessage, TChangedNetworkMessage>(memberInfo);
-            SubscribeArrayChangedHandler<TValue, TChangedMessage, TChangedNetworkMessage>(memberInfo);
-        }
-
-        protected void SubsribeArrayReferenceHandler<TValue, TSetMessage, TSetNetworkMessage, TChangedMessage, TChangedNetworkMessage>(MemberInfo memberInfo)
-            where TValue : class
-            where TSetMessage : GenericEvent<TInstance, TValue[]>
-            where TSetNetworkMessage : GenericNetworkArraySetEvent<TInstance, TValue>
-            where TChangedMessage : GenericArrayChangedEvent<TInstance, TValue>
-            where TChangedNetworkMessage : GenericNetworkReferenceArrayChangedEvent<TInstance, TValue>
-        {
-            SubscribeArrayReferenceSetHandler<TValue, TSetMessage, TSetNetworkMessage, TChangedNetworkMessage>(memberInfo);
-            SubscribeArrayReferenceChangedHandler<TValue, TChangedMessage, TChangedNetworkMessage>(memberInfo);
-        }
-
-        #endregion
-
-        #region Helpers
-
-        protected void Subscribe<TMessage>(Action<MessagePayload<TMessage>> handler)
-            where TMessage : IMessage
-        {
-            messageBroker.Subscribe(handler);
-            handlers.Add(handler);
-        }
 
         protected bool TryGetId(object value, out string id)
         {
@@ -410,6 +103,5 @@ namespace GameInterface.Utils
             foreach (var handler in handlers)
                 method.Invoke(messageBroker, new object[] { handler });
         }
-        #endregion
     }
 }

@@ -1,12 +1,12 @@
-﻿using GameInterface.Utils;
+﻿using GameInterface.Utils.LocalEvents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace GameInterface.Services.Towns.Messages.Collections
 {
-    internal record BuildingsListRemoved : GenericListEvent<Town, Building>
+    internal record BuildingsAdded : GenericEvent<Town, Building>
     {
-        public BuildingsListRemoved(Town instance, Building value) : base(instance, value)
+        public BuildingsAdded(Town instance, Building value) : base(instance, value)
         {
         }
     }
