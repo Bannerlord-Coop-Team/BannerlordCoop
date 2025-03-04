@@ -28,7 +28,7 @@ public class StanceLinkFieldsTests : SyncTestBase
     }
 
     [Fact]
-    public void ServerBasicCharacterObject_SyncAll_Fields()
+    public void ServerStanceLink_SyncAll_Fields()
     {
         // Arrange
         TestEnvironment.AssertField<StanceLink, StanceType>(nameof(StanceLink._stanceType), StanceType.Alliance);
