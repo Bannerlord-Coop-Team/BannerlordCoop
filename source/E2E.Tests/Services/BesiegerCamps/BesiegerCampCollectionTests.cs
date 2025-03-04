@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
+using GameInterface.Services.BesiegerCamps.Messages;
 using GameInterface.Services.BesiegerCamps.Patches;
 using HarmonyLib;
 using System.Reflection;
@@ -49,7 +50,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             //Act
             Server.Call(() =>
             {
-                BesiegerCampCollectionPatches.ListAddOverride(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
+                BesiegerCampCollectionPatches.ListAddIntercept<MobileParty, BesiegerPartyAdded>(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
                 Assert.Contains<MobileParty>(serverBesiegerParty, serverBesiegerCamp._besiegerParties);
             });
 
@@ -71,7 +72,7 @@ namespace E2E.Tests.Services.BesiegerCamps
 
             Server.Call(() =>
             {
-                BesiegerCampCollectionPatches.ListAddOverride(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
+                BesiegerCampCollectionPatches.ListAddIntercept<MobileParty, BesiegerPartyAdded>(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
                 Assert.Contains<MobileParty>(serverBesiegerParty, serverBesiegerCamp._besiegerParties);
             });
 
@@ -85,7 +86,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             // Act
             Server.Call(() =>
             {
-                BesiegerCampCollectionPatches.ListRemoveOverride(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
+                BesiegerCampCollectionPatches.ListRemoveIntercept<MobileParty, BesiegerPartyRemoved>(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
             });
 
             // Assert
@@ -115,7 +116,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             {
                 Assert.True(firstClient.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var clientBesiegerParty));
-                BesiegerCampCollectionPatches.ListAddOverride(clientBesiegerCamp._besiegerParties, clientBesiegerParty, clientBesiegerCamp);
+                BesiegerCampCollectionPatches.ListAddIntercept<MobileParty, BesiegerPartyAdded>(clientBesiegerCamp._besiegerParties, clientBesiegerParty, clientBesiegerCamp);
             });
 
             // Assert
@@ -137,7 +138,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             Server.Call(() =>
             {
                 /// Server adds besiegerParty to besiegerCamp
-                BesiegerCampCollectionPatches.ListAddOverride(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
+                BesiegerCampCollectionPatches.ListAddIntercept<MobileParty, BesiegerPartyAdded>(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
                 Assert.Contains<MobileParty>(serverBesiegerParty, serverBesiegerCamp._besiegerParties);
             });
 
@@ -156,7 +157,7 @@ namespace E2E.Tests.Services.BesiegerCamps
                 /// A client removes besiegerParty from besiegerCamp
                 Assert.True(firstClient.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var clientBesiegerParty));
-                BesiegerCampCollectionPatches.ListRemoveOverride(clientBesiegerCamp._besiegerParties, clientBesiegerParty, clientBesiegerCamp);
+                BesiegerCampCollectionPatches.ListRemoveIntercept<MobileParty, BesiegerPartyRemoved>(clientBesiegerCamp._besiegerParties, clientBesiegerParty, clientBesiegerCamp);
             });
 
             // Assert

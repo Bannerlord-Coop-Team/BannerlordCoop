@@ -49,10 +49,13 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <Compile Remove="Server\Services\Armies\Messages\**" />
     <Compile Remove="Server\Services\Kingdoms\Messages\**" />
     <EmbeddedResource Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <EmbeddedResource Remove="Server\Services\Armies\Messages\**" />
     <EmbeddedResource Remove="Server\Services\Kingdoms\Messages\**" />
     <None Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <None Remove="Server\Services\Armies\Messages\**" />
     <None Remove="Server\Services\Kingdoms\Messages\**" />
   </ItemGroup>
   <ItemGroup>
@@ -86,6 +89,10 @@
 	<AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
 		<_Parameter1>E2E.Tests</_Parameter1>
 	</AssemblyAttribute>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkAddDecision.cs" />
+    <Compile Include="Server\Services\Kingdoms\Messages\NetworkRemoveDecision.cs" />
   </ItemGroup>
   <ItemGroup>
 	  <Reference Include="TaleWorlds.Library">

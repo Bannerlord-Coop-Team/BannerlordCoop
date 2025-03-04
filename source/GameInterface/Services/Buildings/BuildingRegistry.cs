@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
-namespace GameInterface.Services.Armies;
+namespace GameInterface.Services.Buildings;
 
 /// <summary>
 /// Registry for <see cref="Army"/> type

@@ -8,6 +8,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using System.Xml.Linq;
 using TaleWorlds.ObjectSystem;
+using GameInterface.Services.Equipments.Messages.Events;
 
 namespace E2E.Tests.Services.Equipments;
 
@@ -42,7 +43,7 @@ public class EquipmentCollectionTests : IDisposable
             Assert.True(server.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var Equipment));
             Assert.True(server.ObjectManager.TryGetObject<ItemObject>(ItemObjectId, out var serverItemObject));
             EquipmentElement element = new EquipmentElement(serverItemObject);
-            EquipmentCollectionPatches.ArrayAssignIntercept(Equipment._itemSlots, 0, element, Equipment);
+            EquipmentCollectionPatches.ArrayAssignIntercept<EquipmentElement, ItemSlotsArrayUpdated>(Equipment._itemSlots, 0, element, Equipment);
             Assert.Equal(element.Item, Equipment._itemSlots[0].Item);
         });
 
@@ -84,7 +85,7 @@ public class EquipmentCollectionTests : IDisposable
         {
             Assert.True(server.ObjectManager.TryGetObject<Equipment>(EquipmentId, out var clientEquipment));
             Assert.True(server.ObjectManager.TryGetObject<ItemObject>(ItemObjectId, out var clientItemObject));
-            EquipmentCollectionPatches.ArrayAssignIntercept(clientEquipment._itemSlots, 0, element, clientEquipment);
+            EquipmentCollectionPatches.ArrayAssignIntercept<EquipmentElement, ItemSlotsArrayUpdated>(clientEquipment._itemSlots, 0, element, clientEquipment);
         });
 
         // Assert

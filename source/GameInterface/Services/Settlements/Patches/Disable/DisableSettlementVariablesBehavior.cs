@@ -9,5 +9,5 @@ namespace GameInterface.Services.Settlements.Patches.Disable;
 internal class DisableSettlementVariablesBehavior
 {
     [HarmonyPatch(nameof(SettlementVariablesBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }
