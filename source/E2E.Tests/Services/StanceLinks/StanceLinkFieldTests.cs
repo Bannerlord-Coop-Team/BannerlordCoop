@@ -14,54 +14,40 @@ using Xunit.Abstractions;
 using System.Reflection;
 using Common.Util;
 using HarmonyLib;
+using GameInterface.AutoSync;
 
 namespace E2E.Tests.Services.StanceLinks;
 public class StanceLinkFieldsTests : SyncTestBase
 {
-    private readonly List<MethodBase> disabledMethods;
-    E2ETestEnvironment TestEnvironment { get; }
     private EnvironmentInstance Server => TestEnvironment.Server;
     private IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
     public StanceLinkFieldsTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        TestEnvironment.CreateRegisteredObject<StanceLink>();
     }
 
     [Fact]
-    public void ServerChangeStanceLink_SyncAllClients()
+    public void ServerBasicCharacterObject_SyncAll_Fields()
     {
         // Arrange
-        var field = AccessTools.Field(typeof(StanceLink), nameof(StanceLink._stanceType));
-        var intercept = TestEnvironment.GetIntercept(field);
-        var newValue = StanceType.Alliance;
-        var oldValue = StanceType.War;
-        string? StanceLinkId = null;
-
-    // Act
-    Server.Call(() =>
-        {
-            var kingdom = new Kingdom();
-            var clan = new Clan();
-            var serverStanceLink = new StanceLink(oldValue, kingdom, clan, false);
-
-            Assert.True(Server.ObjectManager.TryGetId(serverStanceLink, out StanceLinkId));
-
-            /// Simulate the field changing
-            intercept.Invoke(null, new object[] { serverStanceLink, newValue });
-            Assert.Equal(newValue, serverStanceLink._stanceType);
-        });
-
-        // Assert
-        Assert.NotNull(StanceLinkId);
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<StanceLink>(StanceLinkId, out var clientStanceLink));
-            Assert.Equal(newValue, clientStanceLink._stanceType);
-        }
+        TestEnvironment.AssertField<StanceLink, StanceType>(nameof(StanceLink._stanceType), StanceType.Alliance);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink.BehaviorPriority), 3);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._casualties1), 69);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._casualties2), 42);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._dailyTributeFrom1To2), 666);
+        TestEnvironment.AssertField<StanceLink, bool>(nameof(StanceLink._isAtConstantWar), true);
+        TestEnvironment.AssertField<StanceLink, CampaignTime>(nameof(StanceLink._peaceDeclarationDate), new CampaignTime(999L));
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._successfulRaids1), 123);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._successfulRaids2), 456);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._successfulSieges1), 789);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._successfulSieges2), 12);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._totalTributePaidby1), 421);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._totalTributePaidby2), 1);
+        TestEnvironment.AssertField<StanceLink, CampaignTime>(nameof(StanceLink._warStartDate), new CampaignTime(456789L));
     }
 
-    
+
 
 
 }

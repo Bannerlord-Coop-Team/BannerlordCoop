@@ -49,6 +49,7 @@ internal class GameObjectCreator
         { typeof(MapEventParty), new MapEventPartyBuilder() },
         { typeof(Alley), new AlleyBuilder() },
         { typeof(Equipment), new EquipmentBuilder() },
+        { typeof(StanceLink), new StanceLinkBuilder() },
         { typeof(BasicCharacterObject), new DefaultBuilder<BasicCharacterObject>() },
         { typeof(BasicCultureObject), new DefaultBuilder<BasicCultureObject>() },
         { typeof(MBCharacterSkills), new DefaultBuilder<MBCharacterSkills>() },
