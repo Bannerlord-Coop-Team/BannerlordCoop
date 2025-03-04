@@ -10,7 +10,7 @@ internal class LifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LifetimePatches>();
 
-    internal static bool Prefix<T>(ref T __instance) where T : class
+    internal static bool Prefix(ref object __instance)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
@@ -22,7 +22,8 @@ internal class LifetimePatches
             return true;
         }
 
-        var message = new InstanceCreated<T>(__instance);
+        Type genericType = typeof(InstanceCreated<>).MakeGenericType(__instance.GetType());
+        var message = (IEvent)Activator.CreateInstance(genericType, __instance);
 
         MessageBroker.Instance.Publish(__instance, message);
 

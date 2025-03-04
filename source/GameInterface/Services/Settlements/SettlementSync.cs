@@ -1,35 +1,17 @@
-﻿using Common;
-using Common.Util;
-using GameInterface.AutoSync;
+﻿using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
 using HarmonyLib;
-using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Locations;
-using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Localization;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Settlements;
 internal class SettlementSync : IAutoSync
 {
-    public SettlementSync(IAutoSyncBuilder autoSyncBuilder, IAutoRegistryFactory registryFactory)
+    public SettlementSync(IAutoSyncBuilder autoSyncBuilder)
     {
-        var ctors = new MethodBase[] {
-            AccessTools.Constructor(typeof(Settlement), new Type[] {
-                typeof(TextObject),
-                typeof(LocationComplex),
-                typeof(PartyTemplateObject)}),
-        };
-        registryFactory.TryRegisterType<Settlement>(ctors, RegisterAll, OnClientCreated);
-
-
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.CanBeClaimed)));
         autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(SettlementClaimantCampaignBehavior), nameof(SettlementClaimantCampaignBehavior.OnSettlementOwnerChanged)));
 
@@ -64,24 +46,5 @@ internal class SettlementSync : IAutoSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._numberOfLordPartiesAt)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._position)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._readyMilitia)));
-    }
-
-    private void RegisterAll(AutoRegistry<Settlement> registry)
-    {
-        foreach (var settlement in MBObjectManager.Instance.GetObjectTypeList<Settlement>())
-        {
-            registry.RegisterNewObject(settlement, out _);
-        }
-    }
-
-    private void OnClientCreated(string id, Settlement settlement)
-    {
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            using (new AllowedThread())
-            {
-                settlement.InitSettlement();
-            }
-        });
     }
 }

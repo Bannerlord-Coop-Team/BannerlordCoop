@@ -6,13 +6,14 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.CultureObjects;
-internal class CultureObjectRegistry : IAutoRegistry<CultureObject>
+namespace GameInterface.Services.BasicCultureObjects;
+internal class BasicCultureObjectRegistry : IAutoRegistry<BasicCultureObject>
 {
     ILogger Logger { get; }
-    public CultureObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public BasicCultureObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
         Logger = logger;
 
@@ -20,12 +21,12 @@ internal class CultureObjectRegistry : IAutoRegistry<CultureObject>
     }
 
     public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(CultureObject))
+        AccessTools.Constructor(typeof(BasicCultureObject))
     };
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<CultureObject> registry)
+    public void RegisterAllObjects(IRegistry<BasicCultureObject> registry)
     {
         foreach (var culture in MBObjectManager.Instance.GetObjectTypeList<CultureObject>())
         {
@@ -33,19 +34,19 @@ internal class CultureObjectRegistry : IAutoRegistry<CultureObject>
         }
     }
 
-    public void OnClientCreated(CultureObject obj, string id)
+    public void OnClientCreated(BasicCultureObject obj, string id)
     {
     }
 
-    public void OnClientDestroyed(CultureObject obj, string id)
+    public void OnClientDestroyed(BasicCultureObject obj, string id)
     {
     }
 
-    public void OnServerCreated(CultureObject obj, string id)
+    public void OnServerCreated(BasicCultureObject obj, string id)
     {
     }
 
-    public void OnServerDestroyed(CultureObject obj, string id)
+    public void OnServerDestroyed(BasicCultureObject obj, string id)
     {
     }
 }

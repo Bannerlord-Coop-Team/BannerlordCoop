@@ -1,5 +1,9 @@
 ﻿using Autofac;
 using Common.Messaging;
+using Common.Network;
+using Common.Serialization;
+using GameInterface.AutoSync;
+using GameInterface.Registry;
 using GameInterface.Serialization;
 using GameInterface.Services.ObjectManager;
 using Moq;
@@ -19,6 +23,11 @@ namespace GameInterface.Tests.Bootstrap.Modules
             builder.RegisterInstance(logger).As<ILogger>();
             builder.RegisterInstance(new Mock<IMessageBroker>().Object).As<IMessageBroker>();
             builder.RegisterModule<ObjectManagerModule>();
+
+            builder.RegisterInstance(new Mock<INetwork>().Object).As<INetwork>();
+            builder.RegisterInstance(new Mock<IAutoSyncPatchCollector>().Object).As<IAutoSyncPatchCollector>();
+            builder.RegisterInstance(new Mock<ISerializableTypeMapper>().Object).As<ISerializableTypeMapper>();
+            builder.RegisterModule<RegistryModule>();
         }
     }
 }

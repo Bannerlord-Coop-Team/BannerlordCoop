@@ -25,7 +25,7 @@ namespace GameInterface.Services.Heroes
             AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring)),
         };
 
-        public HeroSync(IAutoSyncBuilder autoSyncBuilder, IAutoRegistryFactory autoRegistryFactory)
+        public HeroSync(IAutoSyncBuilder autoSyncBuilder)
         {
             foreach (var method in externalMethods)
             {

@@ -15,7 +15,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         IContainer container;
         public PartyBaseSerializationTest()
         {
-            container = TestModule.Build();
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]

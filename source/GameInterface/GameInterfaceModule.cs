@@ -32,7 +32,6 @@ public class GameInterfaceModule : Module
         builder.RegisterInstance(harmony).As<Harmony>().SingleInstance();
 
         builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
-        builder.RegisterType<AutoRegistryFactory>().As<IAutoRegistryFactory>().InstancePerLifetimeScope().AutoActivate();
 
         builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
@@ -45,8 +44,8 @@ public class GameInterfaceModule : Module
 
         builder.RegisterModule<ServiceModule>();
         builder.RegisterModule<ObjectManagerModule>();
-        builder.RegisterModule<AutoSyncModule>();
         builder.RegisterModule<RegistryModule>();
+        builder.RegisterModule<AutoSyncModule>();
 
 
         base.Load(builder);

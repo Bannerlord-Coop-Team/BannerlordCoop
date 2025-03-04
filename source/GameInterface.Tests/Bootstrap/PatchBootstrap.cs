@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Serialization;
 using Coop.Core.Common.Configuration;
 using Coop.Tests.Mocks;
+using GameInterface.Registry;
 using GameInterface.Surrogates;
 using System;
 using System.Threading;

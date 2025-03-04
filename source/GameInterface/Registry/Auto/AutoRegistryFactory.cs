@@ -12,9 +12,9 @@ using System.Reflection;
 namespace GameInterface.Registry.Auto;
 public interface IAutoRegistryFactory : IDisposable
 {
-    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<string, T> onClientCreated = null) where T : class;
+    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null) where T : class;
 
-    void RegisterType<T>(IAutoRegistry<T> autoRegistry);
+    void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class;
 }
 
 internal class AutoRegistryFactory : IAutoRegistryFactory
@@ -53,7 +53,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         Disposables.ForEach(disposable => disposable.Dispose());
     }
 
-    public bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<string, T> onClientCreated = null) where T : class
+    public bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null) where T : class
     {
         ValidateConstructorTypes(ctrosToPatch, typeof(T));
 
@@ -64,7 +64,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
 
         foreach (var ctor in ctrosToPatch)
         {
-            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.Prefix)).MakeGenericMethod(typeof(T));
+            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.Prefix));
 
             SyncPatchCollector.AddPrefix(ctor, patch);
         }
@@ -78,7 +78,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
 
     private void ValidateConstructorTypes(IEnumerable<MethodBase> ctros, Type expectedType)
     {
-        var exceptions = ctros.Where(ctor => ctor.DeclaringType != expectedType).Select(ctor =>
+        var exceptions = ctros.Where(ctor => ctor?.DeclaringType != expectedType).Select(ctor =>
         {
             return new InvalidOperationException($"Constructor does not match type {expectedType} instead was {ctor.DeclaringType}");
         });
@@ -87,5 +87,10 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         {
             throw new AggregateException(exceptions);
         }
+    }
+
+    public void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class
+    {
+        TryRegisterType<T>(autoRegistry.Constructors, autoRegistry.RegisterAllObjects, autoRegistry.OnClientCreated);
     }
 }

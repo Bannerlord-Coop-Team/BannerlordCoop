@@ -8,9 +8,9 @@ using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.AutoSync;
-using GameInterface.AutoSync.Registry;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
+using HarmonyLib;
 using System;
 
 namespace Coop.Core
@@ -91,6 +91,7 @@ namespace Coop.Core
 
             // Create harmony patches
             container.Resolve<IGameInterface>().PatchAll();
+            container.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
             network = container.Resolve<INetwork>();
 
@@ -120,8 +121,8 @@ namespace Coop.Core
             GameInterface.ContainerProvider.SetContainer(container);
 
             // Create harmony patches
-            var gameInterface = container.Resolve<IGameInterface>();
-            gameInterface.PatchAll();
+            container.Resolve<IGameInterface>().PatchAll();
+            container.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
             network = container.Resolve<INetwork>();
 
@@ -131,6 +132,7 @@ namespace Coop.Core
 
         private void DestroyContainer()
         {
+            container?.Resolve<Harmony>().UnpatchAll();
             container?.Dispose();
             container = null;
         }

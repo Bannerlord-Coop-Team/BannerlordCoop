@@ -1,10 +1,25 @@
-﻿using System;
+﻿using Common;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 
 namespace GameInterface.Registry.Auto;
 
 
-internal class AutoRegistry<T> : RegistryBase<T> where T : class
+public interface IAutoRegistry<T> where T : class
+{
+    IEnumerable<MethodBase> Constructors { get; }
+    IEnumerable<MethodBase> DestroyMethods { get; }
+    void RegisterAllObjects(IRegistry<T> registry);
+    void OnClientCreated(T obj, string id);
+    void OnClientDestroyed(T obj, string id);
+
+    void OnServerCreated(T obj, string id);
+    void OnServerDestroyed(T obj, string id);
+}
+
+public class AutoRegistry<T> : RegistryBase<T> where T : class
 {
     readonly static string InstanceId = $"Coop{typeof(T)}";
 

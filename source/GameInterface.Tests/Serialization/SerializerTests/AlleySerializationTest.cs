@@ -37,7 +37,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Alley alley = (Alley)FormatterServices.GetUninitializedObject(typeof(Alley));
             Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             settlement.StringId = "My Settlement";
-            MBObjectManager.Instance.RegisterObject(settlement);
+
+            container.Resolve<IObjectManager>().AddNewObject(settlement, out var _);
+            container.Resolve<IObjectManager>().AddNewObject(alley, out var _);
 
             alley._settlement = settlement;
 

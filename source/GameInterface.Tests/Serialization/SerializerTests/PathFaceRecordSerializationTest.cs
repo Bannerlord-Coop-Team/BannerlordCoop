@@ -14,7 +14,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         IContainer container;
         public PathFaceRecordSerializationTest()
         {
-            container = TestModule.Build();
+            ContainerBuilder builder = new ContainerBuilder();
+
+            builder.RegisterModule<SerializationTestModule>();
+
+            container = builder.Build();
         }
 
         [Fact]
