@@ -4,10 +4,11 @@ using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.LocalEvents;
 using GameInterface.Utils.NetworkEvents;
-using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
+using System.Linq.Expressions;
 
 namespace GameInterface.Utils
 {
@@ -20,7 +21,7 @@ namespace GameInterface.Utils
         protected readonly INetwork network;
         protected readonly ILogger Logger = LogManager.GetLogger<THandler>();
 
-        private readonly List<object> handlers = new List<object>();
+        private readonly List<Action> disposeFunctions = new List<Action>();
 
         public GenericHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
         {
@@ -39,21 +40,24 @@ namespace GameInterface.Utils
                 messageHandler(instanceId, data);
             };
             messageBroker.Subscribe(payloadHandler);
-            handlers.Add(payloadHandler);
+            disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
         }
         protected void SubscribeGenericReference<TValue, TMessage, TNetworkMessage>()
             where TMessage : GenericEvent<TInstance, TValue>
             where TNetworkMessage : GenericNetworkReferenceEvent<TInstance, TValue>
         {
+            // Get ctor with most parameters to invoke
+            var ctor = typeof(TNetworkMessage).GetConstructors().OrderByDescending(c => c.GetParameters().Length).First();
+
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
                 if (!TryGetId(data.Instance, out string instanceId)) return;
                 if (!TryGetId(data.Value, out string valueId)) return;
-                network.SendAll((TNetworkMessage)Activator.CreateInstance(typeof(TNetworkMessage), new object[] { instanceId, valueId }));
+                network.SendAll((TNetworkMessage)ctor.Invoke(new object[] { instanceId, valueId }));
             };
             messageBroker.Subscribe(payloadHandler);
-            handlers.Add(payloadHandler);
+            disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
         }
 
         protected void SubscribeNetwork<TValue, TMessage>(Action<TInstance, TMessage> messageHandler)
@@ -66,7 +70,7 @@ namespace GameInterface.Utils
                 messageHandler(instance, data);
             };
             messageBroker.Subscribe(payloadHandler);
-            handlers.Add(payloadHandler);
+            disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
         }
         protected void SubscribeNetworkReference<TValue, TMessage>(Action<TInstance, TValue, TMessage> messageHandler)
             where TValue : class
@@ -80,7 +84,7 @@ namespace GameInterface.Utils
                 messageHandler(instance, value, data);
             };
             messageBroker.Subscribe(payloadHandler);
-            handlers.Add(payloadHandler);
+            disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
         }
 
 
@@ -99,9 +103,8 @@ namespace GameInterface.Utils
 
         public void Dispose()
         {
-            var method = AccessTools.Method(messageBroker.GetType(), "Unsubscribe");
-            foreach (var handler in handlers)
-                method.Invoke(messageBroker, new object[] { handler });
+            foreach (var disposeFn in disposeFunctions)
+                disposeFn();
         }
     }
 }
