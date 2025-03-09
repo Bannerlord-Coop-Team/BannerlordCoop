@@ -27,8 +27,6 @@ internal class ClanLifetimeHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        messageBroker.Subscribe<ClanCreated>(Handle);
-        messageBroker.Subscribe<NetworkCreateClan>(Handle);
 
         messageBroker.Subscribe<ClanDestroyed>(Handle);
         messageBroker.Subscribe<NetworkDestroyClan>(Handle);
@@ -36,38 +34,8 @@ internal class ClanLifetimeHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<ClanCreated>(Handle);
-        messageBroker.Unsubscribe<NetworkCreateClan>(Handle);
-    }
-
-    private void Handle(MessagePayload<ClanCreated> payload)
-    {
-        if (objectManager.AddNewObject(payload.What.Clan, out string newId) == false)
-        {
-            Logger.Error("Failed to add {type} to manager", typeof(Clan));
-            return;
-        }
-
-        network.SendAll(new NetworkCreateClan(newId));
-    }
-
-    private void Handle(MessagePayload<NetworkCreateClan> obj)
-    {
-        var clan = ObjectHelper.SkipConstructor<Clan>();
-
-        var payload = obj.What;
-
-        if (objectManager.AddExisting(payload.ClanId, clan) == false)
-        {
-            Logger.Error("Failed to add {type} to manager with id {id}", typeof(Clan), payload.ClanId);
-            return;
-        }
-
-        clan.InitMembers();
-        clan.StringId = payload.ClanId;
-        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(clan, false, out _);
-
-        Campaign.Current?.CampaignObjectManager?.AddClan(clan);
+        messageBroker.Unsubscribe<ClanDestroyed>(Handle);
+        messageBroker.Unsubscribe<NetworkDestroyClan>(Handle);
     }
 
     private void Handle(MessagePayload<ClanDestroyed> payload)

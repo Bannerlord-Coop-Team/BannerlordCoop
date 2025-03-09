@@ -1,4 +1,5 @@
 ﻿using GameInterface.Registry;
+using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
@@ -18,9 +19,9 @@ namespace GameInterface.Services.ItemObjects
 
         public override void RegisterAll()
         {
-            foreach (ItemObject item in Campaign.Current.AllItems)
+            foreach (ItemObject item in Campaign.Current.AllItems.OrderBy(i => i.Id))
             {
-                if (RegisterExistingObject(item.StringId, item) == false)
+                if (RegisterNewObject(item, out _) == false)
                 {
                     Logger.Error($"Unable to register {item}");
                 }

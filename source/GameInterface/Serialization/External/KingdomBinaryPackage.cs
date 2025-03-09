@@ -41,7 +41,7 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            stringId = Object.StringId;
+            stringId = ResolveId(Object);
 
             base.PackFields(excludes);
 
@@ -55,14 +55,11 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            if(stringId != null)
+            var resolvedObj = ResolveObject<Kingdom>(stringId);
+            if (resolvedObj != null)
             {
-                Kingdom kingdom = ResolveObject<Kingdom>(stringId);
-                if (kingdom != null)
-                {
-                    Object = kingdom;
-                    return;
-                }
+                Object = resolvedObj;
+                return;
             }
 
             base.UnpackFields();

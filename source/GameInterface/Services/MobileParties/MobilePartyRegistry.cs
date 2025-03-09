@@ -1,35 +1,66 @@
-﻿using Common.Messaging;
-using GameInterface.Registry;
-using System.Threading;
+﻿using Common;
+using Common.Util;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties;
 
 /// <summary>
 /// Registry for <see cref="MobileParty"/> objects
 /// </summary>
-internal class MobilePartyRegistry : RegistryBase<MobileParty>
+internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
 {
-    private const string PartyStringIdPrefix = "CoopParty";
-    private int InstanceCounter = 0;
-    private readonly IMessageBroker messageBroker;
-
-    public MobilePartyRegistry(IRegistryCollection collection, IMessageBroker messageBroker) : base(collection)
+    ILogger Logger { get; }
+    public MobilePartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        this.messageBroker = messageBroker;
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
     }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(MobileParty))
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<MobileParty> registry)
     {
-        foreach (var party in MobileParty.All)
+        foreach (var party in MobileParty.All.OrderBy(p => p.Id))
         {
-            base.RegisterNewObject(party, out _);
+            registry.RegisterNewObject(party, out _);
         }
     }
 
-    protected override string GetNewId(MobileParty party)
+    public void OnClientCreated(MobileParty obj, string id)
     {
-        party.StringId = $"{PartyStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-        return party.StringId;
+        using (new AllowedThread())
+        {
+            obj.InitMembers();
+        }
+
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
+
+        Campaign.Current?.CampaignObjectManager?.AddMobileParty(obj);
+    }
+
+    public void OnClientDestroyed(MobileParty obj, string id)
+    {
+    }
+
+    public void OnServerCreated(MobileParty obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(MobileParty obj, string id)
+    {
     }
 }

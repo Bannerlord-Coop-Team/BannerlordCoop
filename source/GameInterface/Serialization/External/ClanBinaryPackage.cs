@@ -32,7 +32,7 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            stringId = Object.StringId;
+            stringId = ResolveId(Object);
 
             base.PackFields();
             
@@ -44,15 +44,11 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            // If the stringId already exists in the object manager use that object
-            if (stringId != null)
+            var resolvedObj = ResolveObject<Clan>(stringId);
+            if (resolvedObj != null)
             {
-                var newObject = ResolveObject<Clan>(stringId);
-                if (newObject != null)
-                {
-                    Object = newObject;
-                    return;
-                }
+                Object = resolvedObj;
+                return;
             }
 
             Object.InitMembers();

@@ -1,4 +1,5 @@
 ﻿using System;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.ObjectSystem;
 
@@ -18,7 +19,7 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            stringId = Object.StringId;
+            stringId = ResolveId(Object);
         }
 
         protected override void UnpackInternal()

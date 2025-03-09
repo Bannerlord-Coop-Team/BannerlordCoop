@@ -24,28 +24,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch]
 internal class ClanLifetimePatches
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<HeroLifetimePatches>();
-
-    [HarmonyPatch(typeof(Clan), MethodType.Constructor)]
-    [HarmonyPrefix]
-    private static bool ctorPrefix(ref Clan __instance)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Clan), Environment.StackTrace);
-
-            return true;
-        }
-
-        var message = new ClanCreated(__instance);
-        MessageBroker.Instance.Publish(null, message);
-
-        return true;
-    }
+    private static readonly ILogger Logger = LogManager.GetLogger<ClanLifetimePatches>();
 
     [HarmonyPatch(typeof(DestroyClanAction), "ApplyInternal")]
     [HarmonyPrefix]

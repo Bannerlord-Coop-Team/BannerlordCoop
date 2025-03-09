@@ -61,7 +61,7 @@ namespace GameInterface.Serialization.External
             if (Object.Army != null) throw new Exception($"{nameof(Army)} is not handled in {nameof(MobilePartyBinaryPackage)}");
             if (Object.BesiegerCamp != null) throw new Exception($"{nameof(BesiegerCamp)} is not handled in {nameof(MobilePartyBinaryPackage)}");
 
-            stringId = Object.StringId ?? string.Empty;
+            stringId = ResolveId(Object);
 
             base.PackFields(excludes);
 
@@ -74,9 +74,10 @@ namespace GameInterface.Serialization.External
         private static ConstructorInfo MobileParty_ctor => typeof(MobileParty).GetConstructor(Array.Empty<Type>());
         protected override void UnpackInternal()
         {
-            if(string.IsNullOrEmpty(stringId) == false)
+            var resolvedObj = ResolveObject<MobileParty>(stringId);
+            if (resolvedObj != null)
             {
-                Object = ResolveObject<MobileParty>(stringId);
+                Object = resolvedObj;
                 return;
             }
 

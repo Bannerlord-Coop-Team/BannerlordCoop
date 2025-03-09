@@ -28,8 +28,8 @@ namespace GameInterface.Serialization.External
         {
             base.PackFields(excludes);
 
-            faction1Id = Object.Faction1?.StringId;
-            faction2Id = Object.Faction2?.StringId;
+            faction1Id = ResolveId(Object.Faction1);
+            faction2Id = ResolveId(Object.Faction2);
         }
 
         protected override void UnpackInternal()

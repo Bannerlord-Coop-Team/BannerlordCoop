@@ -1,5 +1,6 @@
 ﻿using GameInterface.Registry;
 using System;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -22,9 +23,9 @@ namespace GameInterface.Services.CraftingTemplates
                 return;
             }
 
-            foreach (var template in objectManager.GetObjectTypeList<CraftingTemplate>())
+            foreach (var template in objectManager.GetObjectTypeList<CraftingTemplate>().OrderBy(c => c.Id))
             {
-                RegisterExistingObject(template.StringId, template);
+                RegisterNewObject(template, out _);
             }
         }
 

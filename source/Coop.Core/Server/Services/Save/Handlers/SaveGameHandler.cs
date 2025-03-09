@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Services.Save.Data;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
@@ -32,7 +33,6 @@ internal class SaveGameHandler : IHandler
         this.controlledEntityRegistry = controlledEntityRegistry;
         messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
         messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
-        messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
@@ -41,7 +41,6 @@ internal class SaveGameHandler : IHandler
     {
         messageBroker.Unsubscribe<GameSaved>(Handle_GameSaved);
         messageBroker.Unsubscribe<GameLoaded>(Handle_GameLoaded);
-        messageBroker.Unsubscribe<CampaignReady>(Handle_CampaignLoaded);
 
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
@@ -62,12 +61,6 @@ internal class SaveGameHandler : IHandler
     private void Handle_GameLoaded(MessagePayload<GameLoaded> obj)
     {
         savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
-    }
-
-    private void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
-    {
-        // Register all game objects with our object manager
-        messageBroker.Publish(this, new RegisterAllGameObjects());
     }
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)

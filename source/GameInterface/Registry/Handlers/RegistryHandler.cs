@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Registry.Messages;
 
 namespace GameInterface.Registry.Handlers;
 
@@ -14,7 +14,9 @@ internal class RegistryHandler : IHandler
     {
         this.messageBroker = messageBroker;
         this.registryCollection = registryCollection;
+
         messageBroker.Subscribe<RegisterAllGameObjects>(Handle);
+        messageBroker.Subscribe<ClearAllRegistries>(Handle);
     }
 
     public void Dispose()
@@ -30,5 +32,12 @@ internal class RegistryHandler : IHandler
         }
 
         messageBroker.Publish(this, new AllGameObjectsRegistered());
+    }
+
+    private void Handle(MessagePayload<ClearAllRegistries> payload)
+    {
+        registryCollection.ClearRegistries();
+
+        messageBroker.Publish(this, new AllRegistriesCleared());
     }
 }

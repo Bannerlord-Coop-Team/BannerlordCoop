@@ -15,7 +15,7 @@ namespace GameInterface.Serialization.External
         }
         protected override void PackInternal()
         {
-            templateId = Object.StringId;
+            templateId = ResolveId(Object);
         }
         protected override void UnpackInternal()
         {

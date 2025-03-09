@@ -1,9 +1,13 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager.Extensions;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Registry;
@@ -11,14 +15,23 @@ namespace GameInterface.Services.Registry;
 /// <summary>
 /// Registry for identifying ownership of <see cref="Hero"/> objects
 /// </summary>
-internal class HeroRegistry : RegistryBase<Hero>
+internal class HeroRegistry : IAutoRegistry<Hero>
 {
-    public static readonly string HeroStringIdPrefix = "CoopHero";
-    private static int InstanceCounter = 0;
+    ILogger Logger { get; }
+    public HeroRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    {
+        Logger = logger;
 
-    public HeroRegistry(IRegistryCollection collection) : base(collection) { }
+        autoRegistryFactory.RegisterType(this);
+    }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(Hero), new Type[] { typeof(string) })
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<Hero> registry)
     {
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -30,12 +43,26 @@ internal class HeroRegistry : RegistryBase<Hero>
 
         foreach (var hero in campaignObjectManager.GetAllHeroes().OrderBy(hero => hero.Id))
         {
-            RegisterNewObject(hero, out var _);
+            registry.RegisterNewObject(hero, out var _);
         }
     }
 
-    protected override string GetNewId(Hero hero)
+    public void OnClientCreated(Hero obj, string id)
     {
-        return $"{HeroStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+        MBObjectManager.Instance?.RegisterPresumedObject(obj);
+
+        Campaign.Current?.CampaignObjectManager?.OnHeroAdded(obj);
+    }
+
+    public void OnClientDestroyed(Hero obj, string id)
+    {
+    }
+
+    public void OnServerCreated(Hero obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(Hero obj, string id)
+    {
     }
 }

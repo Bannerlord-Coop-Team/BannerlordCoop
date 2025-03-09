@@ -4,6 +4,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -27,7 +28,7 @@ internal class BasicCharacterObjectRegistry : IAutoRegistry<BasicCharacterObject
 
     public void RegisterAllObjects(IRegistry<BasicCharacterObject> registry)
     {
-        foreach (CharacterObject character in CharacterObject.All)
+        foreach (CharacterObject character in CharacterObject.All.OrderBy(c => c.Id))
         {
             registry.RegisterNewObject(character, out _);
         }

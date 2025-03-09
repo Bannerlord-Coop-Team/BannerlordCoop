@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using System;
 
-namespace GameInterface.Services.Heroes.Messages;
+namespace GameInterface.Registry.Messages;
 
 public record RegisterAllGameObjects : ICommand
 {

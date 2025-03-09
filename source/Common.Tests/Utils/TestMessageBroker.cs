@@ -126,9 +126,8 @@ public class TestMessageBroker : MessageBroker
         return totalSubscribers;
     }
 
-    public int GetMessageCountFromType<T>() where T : IMessage => Messages.Count(m => m.GetType() == typeof(T));
 
-    public IEnumerable<T> GetMessagesFromType<T>() where T : IMessage => Messages.Where(m => m.GetType() == typeof(T)).Select(m => (T)m);
+    public IEnumerable<T> GetMessagesFromType<T>() where T : IMessage => Messages.Where(m => m is T).Cast<T>();
 
     public void Clear() => Messages.Clear();
 

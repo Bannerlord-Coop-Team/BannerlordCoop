@@ -63,7 +63,7 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterMainMenu();
 
             // Assert
-            Assert.Equal(1, clientComponent.TestMessageBroker.GetMessageCountFromType<EnterMainMenu>());
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EnterMainMenu>());
         }
 
         [Fact]
@@ -92,7 +92,7 @@ namespace Coop.Tests.Client.States
             clientLogic.Disconnect();
 
             // Assert
-            Assert.Equal(1, clientComponent.TestMessageBroker.GetMessageCountFromType<EnterMainMenu>());
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EnterMainMenu>());
         }
 
         [Fact]

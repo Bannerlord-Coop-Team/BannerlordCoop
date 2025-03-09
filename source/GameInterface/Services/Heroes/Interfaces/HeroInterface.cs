@@ -37,8 +37,6 @@ internal class HeroInterface : IHeroInterface
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IControlledEntityRegistry entityRegistry;
 
-
-
     public HeroInterface(
         IBinaryPackageFactory binaryPackageFactory,
         IControlledEntityRegistry entityRegistry,
@@ -81,7 +79,7 @@ internal class HeroInterface : IHeroInterface
 
         entityRegistry.RegisterAsControlled(controllerId, heroId);
 
-        var playerData = new Player()
+        return new Player()
         {
             HeroData = bytes,
             HeroStringId = heroId,
@@ -89,8 +87,6 @@ internal class HeroInterface : IHeroInterface
             CharacterObjectStringId = characterObjectId,
             ClanStringId = clanId
         };
-
-        return playerData;
     }
 
     private Hero UnpackMainHeroInternal(byte[] bytes)
@@ -113,7 +109,8 @@ internal class HeroInterface : IHeroInterface
             return false;
         }
 
-        var resolvedEntity = entities.SingleOrDefault(entity => entity.EntityId.StartsWith(HeroRegistry.HeroStringIdPrefix));
+        // TODO ensure works
+        var resolvedEntity = entities.SingleOrDefault(entity => entity.EntityId.StartsWith("hero"));
 
         if (resolvedEntity == null)
         {

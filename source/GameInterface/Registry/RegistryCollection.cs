@@ -17,6 +17,7 @@ public interface IRegistryCollection : IEnumerable<IRegistry>
 
     void AddRegistry(IRegistry registry);
     void RemoveRegistry(IRegistry registry);
+    void ClearRegistries();
 }
 
 /// <inheritdoc cref="IRegistryCollection"/>
@@ -45,6 +46,14 @@ internal class RegistryCollection : IRegistryCollection
         foreach (var type in registry.ManagedTypes)
         {
             registryMap.Remove(type);
+        }
+    }
+
+    public void ClearRegistries()
+    {
+        foreach (var registry in registries)
+        {
+            registry.Clear();
         }
     }
 

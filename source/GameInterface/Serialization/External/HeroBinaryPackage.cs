@@ -39,7 +39,8 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            stringId = Object.StringId;
+            // TODO this might give the new player hero an id and the server will try to resolve it
+            stringId = ResolveId(Object);
 
             PackFields(Excludes);
 
@@ -59,16 +60,11 @@ namespace GameInterface.Serialization.External
         /// </summary>
         protected override void UnpackInternal()
         {
-            // If the stringId already exists in the object manager use that object
-            // Otherwise, create a new object and initialize it
-            if (string.IsNullOrEmpty(stringId) == false)
+            var resolvedObj = ResolveObject<Hero>(stringId);
+            if (resolvedObj != null)
             {
-                var newObject = ResolveObject<Hero>(stringId);
-                if (newObject != null)
-                {
-                    Object = newObject;
-                    return;
-                }
+                Object = resolvedObj;
+                return;
             }
 
             Object.Init();

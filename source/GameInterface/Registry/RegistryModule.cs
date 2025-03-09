@@ -1,6 +1,7 @@
 ﻿using Autofac;
+using Common.Extensions;
+using Common.Util;
 using GameInterface.Registry.Auto;
-using GameInterface.Services.Alleys;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,14 +23,8 @@ internal class RegistryModule : Module
 
     private IEnumerable<Type> GetRegistries()
     {
-        var assembly = GetType().Assembly;
-        var @namespace = GetType().Namespace;
-
-        var types = assembly.GetTypes()
-            .Where(t => 
-                t.IsClass &&
-                !t.IsAbstract &&
-                t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IAutoRegistry<>)));
-        return types;
+        return AppDomain.CurrentDomain.GetDomainTypes()
+            .Where(t => t.IsConcrete() &&
+                        t.GetInterfaces().Any(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IAutoRegistry<>)));
     }
 }

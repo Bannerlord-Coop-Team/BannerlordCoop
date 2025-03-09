@@ -1,4 +1,5 @@
 ﻿using GameInterface.Registry;
+using System.Linq;
 using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -24,9 +25,9 @@ namespace GameInterface.Services.CharacterSkills
                 return;
             }
 
-            foreach (var skill in objectManager.GetObjectTypeList<MBCharacterSkills>())
+            foreach (var skill in objectManager.GetObjectTypeList<MBCharacterSkills>().OrderBy(s => s.Id))
             {
-                RegisterExistingObject(skill.StringId, skill);
+                RegisterNewObject(skill, out _);
             }
         }
 

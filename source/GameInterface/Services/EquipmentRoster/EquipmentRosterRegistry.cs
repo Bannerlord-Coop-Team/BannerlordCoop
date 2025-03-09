@@ -1,4 +1,5 @@
 ﻿using GameInterface.Registry;
+using System.Linq;
 using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
@@ -24,9 +25,9 @@ namespace GameInterface.Services.EquipmentRoster
                 return;
             }
 
-            foreach (var equipRoster in objectManager.GetObjectTypeList<MBEquipmentRoster>())
+            foreach (var equipRoster in objectManager.GetObjectTypeList<MBEquipmentRoster>().OrderBy(e => e.Id))
             {
-                RegisterExistingObject(equipRoster.StringId, equipRoster);
+                RegisterNewObject(equipRoster, out _);
             }
         }
 

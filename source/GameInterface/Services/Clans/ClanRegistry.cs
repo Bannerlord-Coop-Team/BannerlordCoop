@@ -1,23 +1,41 @@
 ﻿using Common;
+using Common.Util;
 using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Clans;
 
 /// <summary>
 /// Registry class that assosiates <see cref="Clan"/> and a <see cref="string"/> id
 /// </summary>
-internal class ClanRegistry : RegistryBase<Clan>
+internal class ClanRegistry : IAutoRegistry<Clan>
 {
-    private const string ClanStringIdPrefix = "CoopClan";
-    private int InstanceCounter = 0;
+    ILogger Logger { get; }
+    public ClanRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    {
+        Logger = logger;
 
-    public ClanRegistry(IRegistryCollection collection) : base(collection) { }
+        autoRegistryFactory.RegisterType(this);
+    }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(Clan))
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<Clan> registry)
     {
         var objectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -27,15 +45,33 @@ internal class ClanRegistry : RegistryBase<Clan>
             return;
         }
 
-        foreach (var clan in objectManager.Clans)
+        foreach (var clan in objectManager.Clans.OrderBy(clan => clan.Id))
         {
-            base.RegisterNewObject(clan, out var _);
+            registry.RegisterNewObject(clan, out var _);
         }
     }
 
-    protected override string GetNewId(Clan clan)
+    public void OnClientCreated(Clan obj, string id)
     {
-        return $"{ClanStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+        using (new AllowedThread())
+        {
+            obj.InitMembers();
+        }
+
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
+
+        Campaign.Current?.CampaignObjectManager?.AddClan(obj);
     }
 
+    public void OnClientDestroyed(Clan obj, string id)
+    {
+    }
+
+    public void OnServerCreated(Clan obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(Clan obj, string id)
+    {
+    }
 }

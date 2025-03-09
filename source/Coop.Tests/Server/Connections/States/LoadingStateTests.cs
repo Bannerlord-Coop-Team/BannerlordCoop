@@ -75,7 +75,7 @@ namespace Coop.Tests.Server.Connections.States
 
 
             // Assert
-            Assert.Equal(1, serverComponent.TestMessageBroker.GetMessageCountFromType<PlayerCampaignEntered>());
+            Assert.Single(serverComponent.TestMessageBroker.GetMessagesFromType<PlayerCampaignEntered>());
 
             Assert.IsType<CampaignState>(connectionLogic.State);
         }

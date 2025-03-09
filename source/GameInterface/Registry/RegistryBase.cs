@@ -20,7 +20,7 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 
     //protected readonly Dictionary<string, WeakReference<T>> objIds = new Dictionary<string, WeakReference<T>>();
     protected readonly Dictionary<string, T> objIds = new Dictionary<string, T>();
-    protected readonly ConditionalWeakTable<T, string> idObjs = new ConditionalWeakTable<T, string>();
+    protected ConditionalWeakTable<T, string> idObjs = new ConditionalWeakTable<T, string>();
     private readonly IRegistryCollection collection;
 
     protected RegistryBase(IRegistryCollection collection)
@@ -130,5 +130,12 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
         }
 
         return castedObj != null;
+    }
+
+    /// <inheritdoc />
+    public void Clear()
+    {
+        objIds.Clear();
+        idObjs = new ConditionalWeakTable<T, string>();
     }
 }

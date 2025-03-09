@@ -4,7 +4,9 @@ using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using Common.Extensions;
+using Common.Logging;
 using Newtonsoft.Json.Linq;
+using Serilog;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Serialization
@@ -30,6 +32,9 @@ namespace GameInterface.Serialization
 
         [NonSerialized]
         protected T Object;
+
+        [NonSerialized]
+        protected ILogger Logger = LogManager.GetLogger<BinaryPackageBase<T>>();
 
         [field: NonSerialized]
         public IBinaryPackageFactory BinaryPackageFactory
@@ -162,7 +167,12 @@ namespace GameInterface.Serialization
 
         protected string ResolveId(object obj)
         {
-            BinaryPackageFactory.ObjectManager.TryGetId(obj, out var id);
+            if (obj == null) return string.Empty;
+
+            if (BinaryPackageFactory.ObjectManager.TryGetId(obj, out var id) == false)
+            {
+                Logger.Error("Failed to retrieve ID for object {type}", obj.GetType());
+            }
 
             return id;
         }
