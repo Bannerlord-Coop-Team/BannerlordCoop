@@ -12,14 +12,9 @@ using System.Reflection;
 namespace GameInterface.Registry.Auto;
 public interface IAutoRegistryFactory : IDisposable
 {
-    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null) where T : class;
+    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null, Action<T, string> onClientDestroyed = null) where T : class;
 
     void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class;
-
-    bool TryDestroyType<T>(IEnumerable<MethodBase> destroyMethods, Action<T, string> onClientDestroyed = null) where T : class;
-
-    void DestroyType<T>(IAutoRegistry<T> autoRegistry) where T : class;
-
 }
 
 internal class AutoRegistryFactory : IAutoRegistryFactory
@@ -54,6 +49,11 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     public void Dispose()
     {
         Disposables.ForEach(disposable => disposable.Dispose());
+    }
+
+    public void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class
+    {
+        TryRegisterType<T>(autoRegistry.Constructors, autoRegistry.DestroyMethods, autoRegistry.RegisterAllObjects, autoRegistry.OnClientCreated, autoRegistry.OnClientDestroyed);
     }
 
     public bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null, Action<T, string> onClientDestroyed = null) where T : class
