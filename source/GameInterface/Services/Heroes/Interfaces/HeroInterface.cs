@@ -50,10 +50,10 @@ internal class HeroInterface : IHeroInterface
 
     public byte[] PackageMainHero()
     {
-        Hero.MainHero.StringId = string.Empty;
-        Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
-        Hero.MainHero.Clan.StringId = string.Empty;
-        Hero.MainHero.CharacterObject.StringId = string.Empty;
+        objectManager.Remove(Hero.MainHero);
+        objectManager.Remove(Hero.MainHero.PartyBelongedTo);
+        objectManager.Remove(Hero.MainHero.Clan);
+        objectManager.Remove(Hero.MainHero.CharacterObject);
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 

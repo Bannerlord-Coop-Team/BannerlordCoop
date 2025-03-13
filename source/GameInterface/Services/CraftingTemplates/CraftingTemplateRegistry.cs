@@ -1,38 +1,50 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using System;
-using System.Linq;
-using TaleWorlds.CampaignSystem;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.CraftingTemplates
+namespace GameInterface.Services.CraftingTemplates;
+
+internal class CraftingTemplateRegistry : IAutoRegistry<CraftingTemplate>
 {
-    internal class CraftingTemplateRegistry : RegistryBase<CraftingTemplate>
+    ILogger Logger { get; }
+    public CraftingTemplateRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        private const string TemplateStringIdPrefix = "CoopCraftingTemplate";
+        Logger = logger;
 
-        public CraftingTemplateRegistry(IRegistryCollection collection) : base(collection) { }
+        autoRegistryFactory.RegisterType(this);
+    }
 
-        public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<CraftingTemplate> registry)
+    {
+        foreach (CraftingTemplate skill in MBObjectManager.Instance.GetObjectTypeList<CraftingTemplate>())
         {
-            var objectManager = MBObjectManager.Instance;
-
-            if (objectManager == null)
-            {
-                Logger.Error("Unable to register objects when CampaignObjectManager is null");
-                return;
-            }
-
-            foreach (var template in objectManager.GetObjectTypeList<CraftingTemplate>().OrderBy(c => c.Id))
-            {
-                RegisterNewObject(template, out _);
-            }
+            registry.RegisterNewObject(skill, out _);
         }
+    }
 
-        protected override string GetNewId(CraftingTemplate template)
-        {
-            template.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<CraftingTemplate>(TemplateStringIdPrefix);
-            return template.StringId;
-        }
+    public void OnClientCreated(CraftingTemplate obj, string id)
+    {
+    }
+
+    public void OnClientDestroyed(CraftingTemplate obj, string id)
+    {
+    }
+
+    public void OnServerCreated(CraftingTemplate obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(CraftingTemplate obj, string id)
+    {
     }
 }

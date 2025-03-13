@@ -16,7 +16,7 @@ namespace GameInterface.Serialization.External
         protected override void PackInternal()
         {
             stringId = ResolveId(Object);
-            
+
             base.PackFields();
         }
 

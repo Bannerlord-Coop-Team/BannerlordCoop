@@ -34,7 +34,7 @@ internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
 
     public void RegisterAllObjects(IRegistry<MobileParty> registry)
     {
-        foreach (var party in MobileParty.All.OrderBy(p => p.Id))
+        foreach (var party in MobileParty.All.OrderBy(p => p.StringId))
         {
             registry.RegisterNewObject(party, out _);
         }

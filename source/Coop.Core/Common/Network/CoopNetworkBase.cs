@@ -54,8 +54,8 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
         if (CancellationTokenSource.IsCancellationRequested) return;
 
-        CancellationTokenSource?.Cancel();
-        CancellationTokenSource?.Dispose();
+        CancellationTokenSource.Cancel();
+        CancellationTokenSource.Dispose();
         UpdateThread?.Join(Configuration.ObjectCreationTimeout);
     }
 

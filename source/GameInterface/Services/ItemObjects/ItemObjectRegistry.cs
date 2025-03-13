@@ -1,36 +1,56 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System.Collections.Generic;
+using System;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.ItemObjects
+namespace GameInterface.Services.ItemObjects;
+
+public class ItemObjectRegistry : IAutoRegistry<ItemObject>
 {
-    //This crashes
-
-
-    internal class ItemObjectRegistry : RegistryBase<ItemObject>
+    ILogger Logger { get; }
+    public ItemObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        private const string ItemObjectIdPrefix = "CoopItemObject";
-        private int InstanceCounter = 0;
+        Logger = logger;
 
-        public ItemObjectRegistry(IRegistryCollection collection) : base(collection) { }
+        autoRegistryFactory.RegisterType(this);
+    }
 
-        public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(ItemObject));
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<ItemObject> registry)
+    {
+        // Must order by string id as this is not deterministic on load
+        foreach (ItemObject Item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>().OrderBy(i => i.StringId))
         {
-            foreach (ItemObject item in Campaign.Current.AllItems.OrderBy(i => i.Id))
-            {
-                if (RegisterNewObject(item, out _) == false)
-                {
-                    Logger.Error($"Unable to register {item}");
-                }
-            }
+            registry.RegisterNewObject(Item, out _);
         }
+    }
 
-        protected override string GetNewId(ItemObject obj)
-        {
-            return $"{ItemObjectIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-        }
+    public void OnClientCreated(ItemObject obj, string id)
+    {
+    }
+
+    public void OnClientDestroyed(ItemObject obj, string id)
+    {
+    }
+
+    public void OnServerCreated(ItemObject obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(ItemObject obj, string id)
+    {
     }
 }

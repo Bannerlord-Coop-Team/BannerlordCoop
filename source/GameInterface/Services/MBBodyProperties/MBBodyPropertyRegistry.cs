@@ -4,6 +4,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -27,7 +28,7 @@ internal class MBBodyPropertyRegistry : IAutoRegistry<MBBodyProperty>
 
     public void RegisterAllObjects(IRegistry<MBBodyProperty> registry)
     {
-        foreach (CharacterObject character in Campaign.Current.Characters)
+        foreach (CharacterObject character in CharacterObject.All.OrderBy(c => c.Id))
         {
             registry.RegisterNewObject(character.BodyPropertyRange, out _);
         }

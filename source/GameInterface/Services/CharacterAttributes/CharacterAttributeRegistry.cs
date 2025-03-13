@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.CharacterAttributes;
 internal class CharacterAttributeRegistry : IAutoRegistry<CharacterAttribute>
@@ -28,6 +29,10 @@ internal class CharacterAttributeRegistry : IAutoRegistry<CharacterAttribute>
 
     public void RegisterAllObjects(IRegistry<CharacterAttribute> registry)
     {
+        foreach (var obj in MBObjectManager.Instance.GetObjectTypeList<CharacterAttribute>())
+        {
+            registry.RegisterNewObject(obj, out _);
+        }
     }
 
     public void OnClientCreated(CharacterAttribute obj, string id)
