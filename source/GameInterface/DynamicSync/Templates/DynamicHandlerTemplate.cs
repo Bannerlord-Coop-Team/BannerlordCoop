@@ -4,6 +4,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Utils;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 @UsingDeclarations@
 
 namespace DynamicSync

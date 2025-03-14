@@ -2,7 +2,9 @@
 using GameInterface.DynamicSync;
 using GameInterface.Services.Towns.Messages.Collections;
 using HarmonyLib;
+using Helpers;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -39,5 +41,12 @@ internal class TownDynamicSync : IDynamicSync
         dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeBoundVillagesCache)));
 
         dynamicSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Workshops)));
+
+
+        dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeCurrentBuildingQueue)));
+        dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeCurrentBuilding)));
+        dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(WorkshopsCampaignBehavior), nameof(WorkshopsCampaignBehavior.BuildArtisanWorkshop)));
+        dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(WorkshopsCampaignBehavior), nameof(WorkshopsCampaignBehavior.BuildWorkshopForHeroAtGameStart)));
+        dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(WorkshopsCampaignBehavior), nameof(WorkshopsCampaignBehavior.BuildWorkshopsAtGameStart)));
     }
 }

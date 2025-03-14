@@ -71,6 +71,7 @@ namespace GameInterface.DynamicSync
                 Assembly.Load("System.Runtime"),
                 Assembly.Load("System.Private.CoreLib"),
                 Assembly.Load("System.Collections"),
+                Assembly.Load("System.Linq"),
                 typeof(Console).Assembly
             };
             foreach (var assemblyName in Assembly.GetExecutingAssembly().GetReferencedAssemblies())
@@ -298,9 +299,9 @@ namespace GameInterface.DynamicSync
                                             .Replace("@Operation@", 
                                             $@"{{ 
                                                 var valueIds = new List<string>();
-                                                for (int i = 0; i < data.Value.Count(); i++)
+                                                for (int i = 0; i < data.Value.Count; i++)
                                                 {{
-                                                    if (!TryGetId(data.Value.ElementAt(i), out string valueId)) return;
+                                                    if (!TryGetId(data.Value[i], out string valueId)) return;
                                                     valueIds.Add(valueId);
                                                 }}
                                                 network.SendAll(new {"Network_" + message.MessageName}(instanceId, valueIds));
@@ -308,9 +309,9 @@ namespace GameInterface.DynamicSync
                                             .Replace("@NetworkOperation@", 
                                             $@"{{
                                                 instance.{message.MemberName} = new {GetMemberType(message.MemberType)}();
-                                                for (int i = 0; i < data.Value.Count(); i++)
+                                                for (int i = 0; i < data.Value.Count; i++)
                                                 {{
-                                                    if (!objectManager.TryGetObject(data.Value.ElementAt(i), out {GetGenericType(message.MemberType)} value)) return;
+                                                    if (!objectManager.TryGetObject(data.Value[i], out {GetGenericType(message.MemberType)} value)) return;
                                                     instance.{message.MemberName}.Add(value);
                                                 }}
                                             }}");
@@ -326,7 +327,7 @@ namespace GameInterface.DynamicSync
                                             .Replace("@NetworkOperation@",
                                             $@"{{
                                                 instance.{message.MemberName} = new {GetMemberType(message.MemberType)}();
-                                                for (int i = 0; i < data.Value.Count(); i++)
+                                                for (int i = 0; i < data.Value.Count; i++)
                                                 {{
                                                     instance.{message.MemberName}.Add(value);
                                                 }}
@@ -352,7 +353,7 @@ namespace GameInterface.DynamicSync
                                                 .Replace("@Operation@",
                                                 $@"{{ 
                                                 var valueIds = new List<string>();
-                                                for (int i = 0; i < data.Value.Count(); i++)
+                                                for (int i = 0; i < data.Value.Count; i++)
                                                 {{
                                                     if (!TryGetId(data.Value.ElementAt(i), out string valueId)) return;
                                                     valueIds.Add(valueId);
@@ -362,9 +363,9 @@ namespace GameInterface.DynamicSync
                                                 .Replace("@NetworkOperation@",
                                                 $@"{{
                                                 instance.{message.MemberName} = new {GetMemberType(message.MemberType)}();
-                                                for (int i = 0; i < data.Value.Count(); i++)
+                                                for (int i = 0; i < data.Value.Count; i++)
                                                 {{
-                                                    if (!objectManager.TryGetObject(data.Value.ElementAt(i), out {GetGenericType(message.MemberType)} value)) return;
+                                                    if (!objectManager.TryGetObject(data.Value[i], out {GetGenericType(message.MemberType)} value)) return;
                                                     instance.{message.MemberName}.Enqueue(value);
                                                 }}
                                             }}");
@@ -380,7 +381,7 @@ namespace GameInterface.DynamicSync
                                                 .Replace("@NetworkOperation@",
                                                 $@"{{
                                                 instance.{message.MemberName} = new {GetMemberType(message.MemberType)}();
-                                                for (int i = 0; i < data.Value.Count(); i++)
+                                                for (int i = 0; i < data.Value.Count; i++)
                                                 {{
                                                     instance.{message.MemberName}.Add(value);
                                                 }}
@@ -454,7 +455,7 @@ namespace GameInterface.DynamicSync
                                                 .Replace("@Operation@",
                                                 $@"{{ 
                                                 var valueIds = new List<(int Index, string Id)>();
-                                                for (int i = 0; i < data.Value.Count(); i++)
+                                                for (int i = 0; i < data.Value.Length; i++)
                                                 {{
                                                     if(data.Value[i] == null) continue;
                                                     if (!TryGetId(data.Value[i], out string valueId)) return;
@@ -465,7 +466,7 @@ namespace GameInterface.DynamicSync
                                                 .Replace("@NetworkOperation@",
                                                 $@"{{
                                                 instance.{message.MemberName} = new {message.MemberType.GetElementType().Name}[data.Length];
-                                                for (int i = 0; i < data.Value.Count(); i++)
+                                                for (int i = 0; i < data.Value.Count; i++)
                                                 {{
                                                     if (!objectManager.TryGetObject(data.Value[i].Id, out {message.MemberType.GetElementType().Name} value)) return;
                                                     instance.{message.MemberName}[data.Value[i].Index] = value;
@@ -479,7 +480,7 @@ namespace GameInterface.DynamicSync
                                                 .Replace("@Operation@",
                                                 $@"{{ 
                                                 var valueIds = new List<(int Index, string Id)>();
-                                                for (int i = 0; i < data.Value.Count(); i++)
+                                                for (int i = 0; i < data.Value.Length; i++)
                                                 {{
                                                     if(data.Value[i] == null) continue;
                                                     valueIds.Add(new (i, data.Value[i]));
