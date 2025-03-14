@@ -1,0 +1,2 @@
+﻿        [HarmonyTranspiler]
+        static IEnumerable<CodeInstruction> @MemberName@Transpiler(IEnumerable<CodeInstruction> instructions) => ArrayPropertySetTranspiler<@MemberType@, @MessageTypes@>(instructions, "@MemberName@");

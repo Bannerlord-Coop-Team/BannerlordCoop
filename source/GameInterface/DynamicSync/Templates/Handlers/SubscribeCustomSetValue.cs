@@ -1,0 +1,2 @@
+﻿        Subscribe<@MemberType@, @MessageType@>((instanceId, data) => @Operation@);
+        SubscribeNetwork<@NetworkMemberType@, @NetworkMessageType@>((instance, data) => @NetworkOperation@);

@@ -35,6 +35,33 @@
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="DynamicSync\Templates\DynamicAssemblyInfo.cs" />
+    <Compile Remove="DynamicSync\Templates\DynamicHandlerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\DynamicPatchTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetReference.cs" />
+    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetValue.cs" />
+    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeCustomSetValue.cs" />
+    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeGenericSetReference.cs" />
+    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeGenericSetValue.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericMessageTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkEvent.cs" />
+    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkReferenceEvent.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\FieldArrayTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\FieldListTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\FieldMbListTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\FieldQueueTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\FieldTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyArrayTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyListTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyMBListTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyQueueTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyTranspilerTemplate.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
@@ -218,12 +245,49 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="Lib.Harmony" Version="2.3.3" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
     <ItemGroup>
 	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
 		    <_Parameter1>E2E.Tests</_Parameter1>
 	    </AssemblyAttribute>
+    </ItemGroup>
+    <ItemGroup>
+      <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfo.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\DynamicPatchTemplate.cs">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetReference.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomSetValue.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetValue.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetValue.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetReference.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkEvent.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkReferenceEvent.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyQueueTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyMBListTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyListTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyArrayTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldArrayTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldQueueTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldMBListTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldListTranspilerTemplate.cs" />
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldTranspilerTemplate.cs">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </EmbeddedResource>
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyTranspilerTemplate.cs">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </EmbeddedResource>
+    </ItemGroup>
+    <ItemGroup>
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericMessageTemplate.cs">
+        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </EmbeddedResource>
     </ItemGroup>
   <ItemGroup>
     <Publicize Include="SandBox" />
@@ -283,6 +347,10 @@
     <!--<Publicize Include="TaleWorlds.TwoDimension.Standalone"/>                                                             -->
   </ItemGroup>
   <ItemGroup>
+    <Folder Include="DynamicSync\Dummy\" />
     <Folder Include="Services\Kingdoms\Commands\" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="DynamicSync\Templates\DynamicHandlerTemplate.cs" />
   </ItemGroup>
 </Project>

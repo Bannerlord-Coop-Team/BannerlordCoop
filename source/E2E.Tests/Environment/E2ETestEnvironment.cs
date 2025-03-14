@@ -5,6 +5,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
@@ -44,7 +45,7 @@ internal class E2ETestEnvironment : IDisposable
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
-
+        SetupDynamicSync();
         SetupAutoSync();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
@@ -65,6 +66,15 @@ internal class E2ETestEnvironment : IDisposable
         foreach (var client in Clients)
         {
             client.Resolve<IAutoSyncBuilder>().Build();
+        }
+    }
+    private void SetupDynamicSync()
+    {
+        Server.Resolve<DynamicSyncPatcher>().PatchAll();
+
+        foreach (var client in Clients)
+        {
+            client.Resolve<DynamicSyncPatcher>().PatchAll();
         }
     }
 

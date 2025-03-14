@@ -18,7 +18,7 @@ namespace GameInterface.Utils
     /// </summary>
     /// <typeparam name="TPatch">Class that is extending the <see cref="GenericPatches{TPatch, TInstance}"/> as its used for the interal Logger</typeparam>
     /// <typeparam name="TInstance">Class with the collections that should be patched</typeparam>
-    internal class GenericPatches<TPatch, TInstance> where TPatch : GenericPatches<TPatch, TInstance>
+    public class GenericPatches<TPatch, TInstance> where TPatch : GenericPatches<TPatch, TInstance>
     {
         public static readonly ILogger Logger = LogManager.GetLogger<TPatch>();
 

@@ -1,0 +1,2 @@
+﻿        SubscribeGenericReference<@MemberType@, @MessageType@, @NetworkMessageType@>();
+        SubscribeNetworkReference<@MemberType@, @NetworkMessageType@ >((instance, value, _) => @Operation@);

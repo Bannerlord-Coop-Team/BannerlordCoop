@@ -53,7 +53,7 @@ namespace GameInterface.Utils
             {
                 var data = payload.What;
                 if (!TryGetId(data.Instance, out string instanceId)) return;
-                if (!TryGetId(data.Value, out string valueId)) return;
+                if (!TryGetId(data.Value, out string valueId) && data.Value != null) return;
                 network.SendAll((TNetworkMessage)ctor.Invoke(new object[] { instanceId, valueId }));
             };
             messageBroker.Subscribe(payloadHandler);
@@ -80,7 +80,7 @@ namespace GameInterface.Utils
             {
                 var data = payload.What;
                 if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-                if (!objectManager.TryGetObject(data.ValueId, out TValue value)) return;
+                if (!objectManager.TryGetObject(data.ValueId, out TValue value) && data.ValueId != null) return;
                 messageHandler(instance, value, data);
             };
             messageBroker.Subscribe(payloadHandler);
