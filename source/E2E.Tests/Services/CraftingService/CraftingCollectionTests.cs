@@ -88,7 +88,8 @@ namespace E2E.Tests.Services.CraftingService
             foreach (var client in Clients.Append(Server).Append(Server))
             {
                 Assert.True(client.ObjectManager.TryGetObject<Crafting>(craftingId, out var clientCrafting));
-                Assert.Empty(clientCrafting._history);
+                Assert.True(client.ObjectManager.TryGetObject<WeaponDesign>(weaponDesignId, out var clientWeaponDesign));
+                Assert.Single(clientCrafting._history);
             }
         }
 
