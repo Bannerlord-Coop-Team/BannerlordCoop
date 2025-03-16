@@ -105,7 +105,7 @@ public class PropertySwitchCreator
 
         il.Emit(OpCodes.Ldsfld, loggerField);
 
-        var errorString = $"Unable to find instance of type {instanceType.Name} with id ";
+        var errorString = $"AutoSync: Unable to find instance of type {instanceType.Name} with id ";
         il.Emit(OpCodes.Ldstr, errorString);
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(PropertyAutoSyncPacket), nameof(PropertyAutoSyncPacket.instanceId)));
@@ -163,7 +163,7 @@ public class PropertySwitchCreator
 
     private void CreateByRef(ILGenerator il, PropertyInfo property, LocalBuilder instanceLocal)
     {
-        var errorString = $"Unable to find instance of type {instanceType.Name} with id ";
+        var errorString = $"AutoSync: Unable to find instance of type {instanceType.Name} with id ";
         var stringConcatMethod = AccessTools.Method(typeof(PropertySwitchCreator), nameof(Concat));
 
         var valueId = il.DeclareLocal(typeof(string));

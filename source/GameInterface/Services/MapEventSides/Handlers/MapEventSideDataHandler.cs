@@ -41,8 +41,11 @@ internal class MapEventSideDataHandler : IHandler
         var payloadData = payload.What;
         bool isKingdom = false;
 
+        string factionId;
+
         if (objectManager.TryGetId(payloadData.Side, out var mapEventSideId) == false) return;
-        if (objectManager.TryGetId(payloadData.Faction, out var factionId) == false) return;
+        if (objectManager.TryGetId(payloadData.Faction as Kingdom, out factionId) == false &&
+            objectManager.TryGetId(payloadData.Faction as Clan, out factionId) == false) return;
 
         if(payloadData.Faction.GetType().Equals(typeof(Kingdom)))
         {

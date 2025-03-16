@@ -77,6 +77,15 @@ internal class HeroInterface : IHeroInterface
         objectManager.TryGetId(hero.CharacterObject, out var characterObjectId);
         objectManager.TryGetId(hero.Clan, out var clanId);
 
+        using (new AllowedThread())
+        {
+            hero.StringId = heroId;
+            hero.PartyBelongedTo.StringId = partyId;
+            hero.CharacterObject.StringId = characterObjectId;
+            hero.Clan.StringId = clanId;
+        }
+        
+
         entityRegistry.RegisterAsControlled(controllerId, heroId);
 
         return new Player()

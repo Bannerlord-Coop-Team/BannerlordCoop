@@ -6,6 +6,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Data;
 using GameInterface.Services.PartyComponents.Messages;
 using GameInterface.Services.PartyComponents.Patches;
+using HarmonyLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Party;
@@ -74,6 +75,6 @@ internal class PartyComponentHandler : IHandler
 
         var obj = ObjectHelper.SkipConstructor(partyTypes[typeIdx]);
 
-        objectManager.AddExisting(data.Id, obj);
+        objectManager.AddExisting(data.Id, (PartyComponent)obj);
     }
 }

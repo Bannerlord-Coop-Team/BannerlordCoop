@@ -61,8 +61,8 @@ public class VillagerPartyComponentTests : IDisposable
         const string partyId = "TestId";
         client1.Call(() =>
         {
-            Assert.True(client1.ObjectManager.TryGetObject<Village>(villageId, out var village));
-            VillagerPartyComponent.CreateVillagerParty(partyId, village, 5);
+            var village = GameObjectCreator.CreateInitializedObject<Village>();
+            new VillagerPartyComponent(village);
         }, new[] { AccessTools.Method(typeof(MobileParty), nameof(MobileParty.ResetCached)) });
 
         // Assert

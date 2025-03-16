@@ -318,34 +318,3 @@ public enum CustomPartyComponentType
     HarnessId,
     AvoidHostileActions
 }
-
-[HarmonyPatch(typeof(CaravanPartyComponent))]
-internal class DeleteMe
-{
-    [HarmonyPatch(nameof(CaravanPartyComponent.CreateCaravanParty))]
-    [HarmonyPrefix]
-    static bool CreateCaravanParty(Hero caravanOwner, Settlement spawnSettlement, bool isInitialSpawn, Hero caravanLeader, ItemRoster caravanItems, int troopToBeGiven, bool isElite, ref MobileParty __result)
-    {
-        MobileParty mobileParty2 = MobileParty.CreateParty("caravan_template_" + spawnSettlement.Culture.StringId.ToLower() + "_1", new CaravanPartyComponent(spawnSettlement, caravanOwner, caravanLeader), delegate (MobileParty mobileParty)
-        {
-            (mobileParty.PartyComponent as CaravanPartyComponent).InitializeCaravanOnCreation(mobileParty, caravanLeader, caravanItems, troopToBeGiven, isElite);
-        });
-        if (spawnSettlement.Party.MapEvent == null && spawnSettlement.SiegeEvent == null)
-        {
-            mobileParty2.Ai.SetMoveGoToSettlement(spawnSettlement);
-            mobileParty2.Ai.RecalculateShortTermAi();
-            EnterSettlementAction.ApplyForParty(mobileParty2, spawnSettlement);
-        }
-        else
-        {
-            mobileParty2.Ai.SetMoveModeHold();
-        }
-        if (mobileParty2.LeaderHero != null)
-        {
-            CampaignEventDispatcher.Instance.OnHeroGetsBusy(mobileParty2.LeaderHero, HeroGetsBusyReasons.BecomeCaravanLeader);
-        }
-        __result = mobileParty2;
-
-        return false;
-    }
-}

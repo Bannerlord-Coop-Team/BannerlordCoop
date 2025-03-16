@@ -103,7 +103,7 @@ public class FieldSwitchCreator
 
         il.Emit(OpCodes.Ldsfld, loggerField);
 
-        var errorString = $"Unable to find instance of type {instanceType.Name} with id ";
+        var errorString = $"AutoSync: Unable to find instance of type {instanceType.Name} with id ";
         il.Emit(OpCodes.Ldstr, errorString);
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(FieldAutoSyncPacket), nameof(FieldAutoSyncPacket.instanceId)));
@@ -157,7 +157,7 @@ public class FieldSwitchCreator
 
     private void CreateByRef(ILGenerator il, FieldInfo field, LocalBuilder instanceLocal)
     {
-        var errorString = $"Unable to find instance of type {field.Name} with id ";
+        var errorString = $"AutoSync: Unable to find instance of type {field.Name} with id ";
         var stringConcatMethod = AccessTools.Method(typeof(FieldSwitchCreator), nameof(Concat));
 
         var valueId = il.DeclareLocal(typeof(string));

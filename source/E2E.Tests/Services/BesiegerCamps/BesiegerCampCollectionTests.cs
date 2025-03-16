@@ -51,7 +51,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             Server.Call(() =>
             {
                 BesiegerCampCollectionPatches.ListAddIntercept<MobileParty, BesiegerPartyAdded>(serverBesiegerCamp._besiegerParties, serverBesiegerParty, serverBesiegerCamp);
-                Assert.Contains<MobileParty>(serverBesiegerParty, serverBesiegerCamp._besiegerParties);
+                Assert.Contains(serverBesiegerParty, serverBesiegerCamp._besiegerParties);
             });
 
             //Assert
@@ -59,7 +59,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 Assert.True(client.ObjectManager.TryGetObject<MobileParty>(besiegerPartyId, out var clientBesiegerParty));
-                Assert.Contains<MobileParty>(clientBesiegerParty, clientBesiegerCamp._besiegerParties);
+                Assert.Contains(clientBesiegerParty, clientBesiegerCamp._besiegerParties);
             }
         }
 

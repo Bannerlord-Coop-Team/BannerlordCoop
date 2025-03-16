@@ -178,7 +178,7 @@ namespace E2E.Tests.Services.Clans
             }
         }
 
-        void NetworkIdsEqual(IObjectManager objManager1, object obj1, IObjectManager objManager2, object obj2)
+        void NetworkIdsEqual<T>(IObjectManager objManager1, T obj1, IObjectManager objManager2, T obj2)
         {
             Assert.True(objManager1.TryGetId(obj1, out var obj1Id));
             Assert.True(objManager2.TryGetId(obj2, out var obj2Id));

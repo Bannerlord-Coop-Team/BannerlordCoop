@@ -9,6 +9,7 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties;
@@ -45,6 +46,7 @@ internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
         using (new AllowedThread())
         {
             obj.InitMembers();
+            obj.Initialize();
         }
 
         MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);

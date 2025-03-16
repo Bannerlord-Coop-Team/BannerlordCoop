@@ -114,7 +114,7 @@ internal class BesiegerCampBesiegerPartyHandler : IHandler
         return new BesiegerPartyData(campId, partyId);
     }
 
-    private bool TryGetId(object value, out string id)
+    private bool TryGetId<T>(T value, out string id)
     {
         id = null;
         if (value == null) return false;

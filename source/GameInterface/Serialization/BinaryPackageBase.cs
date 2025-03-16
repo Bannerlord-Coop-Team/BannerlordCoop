@@ -165,7 +165,7 @@ namespace GameInterface.Serialization
             return values.Select(value => ResolveId(value)).ToArray();
         }
 
-        protected string ResolveId(object obj)
+        protected string ResolveId<InT>(InT obj)
         {
             if (obj == null) return string.Empty;
 
