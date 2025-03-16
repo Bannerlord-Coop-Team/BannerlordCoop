@@ -27,7 +27,7 @@ namespace GameInterface.DynamicSync
             this.serializableTypeMapper = serializableTypeMapper;
         }
 
-        public Assembly PatchAll()
+        public Assembly BuildAssembly()
         {
             var assembly = dynamicSyncRegistry.Build(objectManager);
 
@@ -48,9 +48,6 @@ namespace GameInterface.DynamicSync
                 }
             }));
             
-            harmony.PatchCategory(assembly, GameInterface.HARMONY_STATIC_FIXES_CATEGORY);
-            harmony.PatchAllUncategorized(assembly);
-
             return assembly;
         }
 

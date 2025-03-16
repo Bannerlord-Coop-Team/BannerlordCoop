@@ -87,11 +87,11 @@ internal class E2ETestEnvironment : IDisposable
     }
     private void SetupDynamicSync()
     {
-        Server.Resolve<DynamicSyncPatcher>().PatchAll();
+        Server.Resolve<DynamicSyncPatcher>().BuildAssembly();
 
         foreach (var client in Clients)
         {
-            client.Resolve<DynamicSyncPatcher>().PatchAll();
+            client.Resolve<DynamicSyncPatcher>().BuildAssembly();
         }
     }
 

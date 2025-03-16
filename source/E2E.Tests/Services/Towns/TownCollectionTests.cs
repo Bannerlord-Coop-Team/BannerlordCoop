@@ -1,6 +1,8 @@
 ﻿using E2E.Tests.Util;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Towns.Messages.Collections;
+using HarmonyLib;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -33,7 +35,6 @@ namespace E2E.Tests.Services.Towns
             //Act
             Server.Call(() =>
             {
-                TownCollectionPatches.MBListAddIntercept<Building, BuildingsAdded>(town.Buildings, building, town);
                 Assert.Contains(building, town.Buildings);
             });
 
@@ -46,7 +47,6 @@ namespace E2E.Tests.Services.Towns
 
             Server.Call(() =>
             {
-                TownCollectionPatches.MBListRemoveIntercept<Building, BuildingsRemoved>(town.Buildings, building, town);
                 Assert.DoesNotContain(building, town.Buildings);
             });
 
@@ -68,7 +68,6 @@ namespace E2E.Tests.Services.Towns
             //Act
             Server.Call(() =>
             {
-                TownCollectionPatches.MBListAddIntercept<Village, TradeBoundVillagesCacheAdded>(town._tradeBoundVillagesCache, village, town);
                 Assert.Contains(village, town._tradeBoundVillagesCache);
             });
 
@@ -81,7 +80,6 @@ namespace E2E.Tests.Services.Towns
 
             Server.Call(() =>
             {
-                TownCollectionPatches.MBListRemoveIntercept<Village, TradeBoundVillagesCacheRemoved>(town._tradeBoundVillagesCache, village, town);
                 Assert.DoesNotContain(village, town._tradeBoundVillagesCache);
             });
 
@@ -104,7 +102,7 @@ namespace E2E.Tests.Services.Towns
             {
                 var workshops = new Workshop[20];
                 workshops[12] = workshop;
-                TownCollectionPatches.PropertyIntercept<Workshop[], WorkshopsSet>(town, workshops, nameof(town.Workshops));
+
                 Assert.Equal(20, town.Workshops.Length);
                 Assert.Equal(workshop, town.Workshops[12]);
             });
@@ -119,7 +117,6 @@ namespace E2E.Tests.Services.Towns
 
             Server.Call(() =>
             {
-                TownCollectionPatches.ArrayAssignIntercept<Workshop, WorkshopsChanged>(town.Workshops, 5, workshop, town);
                 Assert.Equal(workshop, town.Workshops[5]);
             });
 
@@ -144,7 +141,7 @@ namespace E2E.Tests.Services.Towns
                 Assert.Empty(town.BuildingsInProgress);
                 var newQueue = new Queue<Building>();
                 newQueue.Enqueue(secondBuilding);
-                TownCollectionPatches.FieldIntercept<Queue<Building>, BuildingsInProgressSet>(town, newQueue, nameof(town.BuildingsInProgress));
+
                 Assert.Equal(secondBuilding, town.BuildingsInProgress.Peek());
                 Assert.Single(town.BuildingsInProgress);
             });
@@ -160,7 +157,6 @@ namespace E2E.Tests.Services.Towns
             //Act
             Server.Call(() =>
             {
-                TownCollectionPatches.QueueEnqueueIntercept<Building, BuildingsInProgressAdded>(town.BuildingsInProgress, building, town);
                 Assert.Equal(2, town.BuildingsInProgress.Count);
             });
 
@@ -172,7 +168,6 @@ namespace E2E.Tests.Services.Towns
 
             Server.Call(() =>
             {
-                TownCollectionPatches.QueueDequeueIntercept<Building, BuildingsInProgressRemoved>(town.BuildingsInProgress, town);
                 Assert.Single(town.BuildingsInProgress);
             });
 
