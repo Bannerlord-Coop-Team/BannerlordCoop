@@ -9,7 +9,6 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.TroopRosters;
 internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
@@ -30,10 +29,13 @@ internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
 
     public void RegisterAllObjects(IRegistry<TroopRoster> registry)
     {
-        foreach (MobileParty party in Campaign.Current.MobileParties.OrderBy(obj => obj.Id))
+        foreach (MobileParty party in Campaign.Current.MobileParties)
         {
-            if (registry.RegisterNewObject(party.MemberRoster, out var _) == false) Logger.Error($"Unable to register {nameof(MobileParty.MemberRoster)}");
-            if (registry.RegisterNewObject(party.PrisonRoster, out var _) == false) Logger.Error($"Unable to register {nameof(MobileParty.PrisonRoster)}");
+
+            if (registry.RegisterExistingObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster) == false)
+                Logger.Error($"Unable to register {nameof(MobileParty.MemberRoster)}");
+            if (registry.RegisterExistingObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster) == false)
+                Logger.Error($"Unable to register {nameof(MobileParty.PrisonRoster)}");
         }
     }
 

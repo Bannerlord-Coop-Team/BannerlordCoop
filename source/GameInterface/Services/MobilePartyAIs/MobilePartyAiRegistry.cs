@@ -34,9 +34,8 @@ internal class MobilePartyAiRegistry : RegistryBase<MobilePartyAi>
                 continue;
             }
 
-            var newId = GetNewId(partyAi);
-
-            base.RegisterExistingObject(newId, partyAi);
+            var networkId = nameof(MobilePartyAi) + "_" + party.StringId;
+            base.RegisterExistingObject(networkId, partyAi);
         }
     }
 

@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.Issues;
 
-namespace GameInterface.Services.IssuesService.Patches.Disable;
+namespace GameInterface.Services.Issues.Patches;
 
 [HarmonyPatch(typeof(IssueManager))]
 internal class IssueManagerDisablePatches

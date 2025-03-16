@@ -1,4 +1,5 @@
 ﻿using GameInterface.Registry;
+using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -27,14 +28,18 @@ namespace GameInterface.Services.ItemRosters
             {
                 if (party.ItemRoster == null) continue;
 
-                RegisterNewObject(party.ItemRoster, out var _);
+                var networkId = nameof(ItemRoster) + "_" + party.StringId;
+
+                RegisterExistingObject(networkId, party.ItemRoster);
             }
 
             foreach(Settlement settlement in objectManager.Settlements)
             {
                 if (settlement.ItemRoster == null) continue;
 
-                RegisterNewObject(settlement.ItemRoster, out var _);
+                var networkId = nameof(ItemRoster) + "_" + settlement.StringId;
+
+                RegisterExistingObject(networkId, settlement.ItemRoster);
             }
         }
 

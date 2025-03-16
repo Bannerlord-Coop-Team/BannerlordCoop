@@ -1,6 +1,8 @@
 ﻿using GameInterface.Registry;
+using GameInterface.Services.PartyBases.Extensions;
 using SandBox.View.Map;
 using System.Threading;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.ObjectSystem;
@@ -22,6 +24,16 @@ namespace GameInterface.Services.PartyVisuals
             {
                 Logger.Error("Unable to register party visuals when PartyVisualManager is null");
                 return;
+            }
+
+            foreach (var party in MobileParty.All)
+            {
+                var partyVisual = party.Party.GetPartyVisual();
+
+                if (partyVisual == null) continue;
+
+                var networkId = $"{nameof(PartyVisual)}_{party.StringId}";
+                RegisterExistingObject(networkId, partyVisual);
             }
 
             foreach (PartyVisual visual in visualManager._visualsFlattened)

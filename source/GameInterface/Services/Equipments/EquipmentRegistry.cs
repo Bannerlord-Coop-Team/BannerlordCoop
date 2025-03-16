@@ -14,7 +14,7 @@ namespace GameInterface.Services.Equipments;
 /// </summary>
 internal class EquipmentRegistry : RegistryBase<Equipment> {
 
-    private const string EquipmentPrefix = $"Coop{nameof(Equipment)}";
+    private const string EquipmentPrefix = $"Coop{nameof(Equipment)}_";
     private int InstanceCounter = 0;
 
     public EquipmentRegistry(IRegistryCollection collection) : base(collection) { }

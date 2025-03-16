@@ -45,9 +45,9 @@ internal class ClanRegistry : IAutoRegistry<Clan>
             return;
         }
 
-        foreach (var clan in objectManager.Clans.OrderBy(clan => clan.Id))
+        foreach (var clan in objectManager.Clans)
         {
-            registry.RegisterNewObject(clan, out var _);
+            registry.RegisterExistingObject(clan.StringId, clan);
         }
     }
 

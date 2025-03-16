@@ -28,9 +28,10 @@ internal class BasicCharacterObjectRegistry : IAutoRegistry<BasicCharacterObject
 
     public void RegisterAllObjects(IRegistry<BasicCharacterObject> registry)
     {
-        foreach (CharacterObject character in CharacterObject.All.OrderBy(c => c.Id))
+        foreach (CharacterObject character in CharacterObject.All)
         {
-            registry.RegisterNewObject(character, out _);
+            var networkId = nameof(BasicCharacterObject) + "_" + character.StringId;
+            registry.RegisterExistingObject(networkId, character);
         }
     }
 

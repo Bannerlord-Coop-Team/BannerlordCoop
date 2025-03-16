@@ -34,7 +34,7 @@ public class ItemObjectRegistry : IAutoRegistry<ItemObject>
         // Must order by string id as this is not deterministic on load
         foreach (ItemObject Item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>().OrderBy(i => i.StringId))
         {
-            registry.RegisterNewObject(Item, out _);
+            registry.RegisterExistingObject(Item.StringId, Item);
         }
     }
 

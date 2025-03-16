@@ -15,7 +15,7 @@ namespace GameInterface.Services.ItemComponents;
 /// </summary>
 internal class ItemComponentRegistry : RegistryBase<ItemComponent>
 {
-    private const string CoopItemComponentPrefix = "CoopItemComponent";
+    private const string CoopItemComponentPrefix = $"Coop_{nameof(ItemComponent)}";
     private static int InstanceCounter = 0;
 
     public ItemComponentRegistry(IRegistryCollection collection) : base(collection) { }
@@ -34,11 +34,16 @@ internal class ItemComponentRegistry : RegistryBase<ItemComponent>
     {
         foreach (var component in Campaign.Current.AllItems.Select(p => p.ItemComponent).Where(c => c != null))
         {
-            RegisterNewObject(component, out var _);
+            if (component.StringId == null)
+            {
+                component.StringId = GetNewId(component);
+            }
+
+            RegisterExistingObject(component.StringId, component);
         }
     }
 
-    protected override string GetNewId(ItemComponent party)
+    protected override string GetNewId(ItemComponent obj)
     {
         return $"{CoopItemComponentPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
     }

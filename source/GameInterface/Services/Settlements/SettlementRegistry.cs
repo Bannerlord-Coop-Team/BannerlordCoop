@@ -33,7 +33,7 @@ internal class SettlementRegistry : IAutoRegistry<Settlement>
     {
         foreach (var settlement in Settlement.All.OrderBy(obj => obj.Id))
         {
-            registry.RegisterNewObject(settlement, out _);
+            registry.RegisterExistingObject(settlement.StringId, settlement);
         }
     }
 

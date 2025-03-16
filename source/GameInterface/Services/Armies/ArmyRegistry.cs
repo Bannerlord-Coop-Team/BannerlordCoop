@@ -4,6 +4,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -36,16 +37,15 @@ internal class ArmyRegistry : IAutoRegistry<Army>
     {
         IEnumerable<Kingdom> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
 
-        List<Army> armies = new List<Army>();
+        int counter = 0;
 
-        foreach (var kingdom in kingdoms.OrderBy(obj => obj.Id))
+        foreach (var kingdom in kingdoms)
         {
-            armies.AddRange(kingdom.Armies);
-        }
-
-        foreach (var army in armies)
-        {
-            registry.RegisterNewObject(army, out var _);
+            foreach (var army in kingdom.Armies)
+            {
+                var networkId = "Army_" + kingdom.StringId + counter++;
+                registry.RegisterExistingObject(networkId, army);
+            }
         }
     }
 

@@ -26,9 +26,9 @@ internal class CraftingTemplateRegistry : IAutoRegistry<CraftingTemplate>
 
     public void RegisterAllObjects(IRegistry<CraftingTemplate> registry)
     {
-        foreach (CraftingTemplate skill in MBObjectManager.Instance.GetObjectTypeList<CraftingTemplate>())
+        foreach (var obj in MBObjectManager.Instance.GetObjectTypeList<CraftingTemplate>())
         {
-            registry.RegisterNewObject(skill, out _);
+            registry.RegisterExistingObject(obj.StringId, obj);
         }
     }
 

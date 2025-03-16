@@ -29,7 +29,7 @@ internal class CultureObjectRegistry : IAutoRegistry<CultureObject>
     {
         foreach (var culture in MBObjectManager.Instance.GetObjectTypeList<CultureObject>())
         {
-            registry.RegisterNewObject(culture, out _);
+            registry.RegisterExistingObject(culture.StringId, culture);
         }
     }
 

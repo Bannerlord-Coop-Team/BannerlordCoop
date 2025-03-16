@@ -30,7 +30,7 @@ internal class SkillObjectRegistry : IAutoRegistry<SkillObject>
     {
         foreach (SkillObject skill in MBObjectManager.Instance.GetObjectTypeList<SkillObject>())
         {
-            registry.RegisterNewObject(skill, out _);
+            registry.RegisterExistingObject(skill.StringId, skill);
         }
     }
 

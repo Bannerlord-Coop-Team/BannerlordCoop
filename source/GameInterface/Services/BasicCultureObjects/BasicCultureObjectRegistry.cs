@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -30,7 +31,8 @@ internal class BasicCultureObjectRegistry : IAutoRegistry<BasicCultureObject>
     {
         foreach (var culture in MBObjectManager.Instance.GetObjectTypeList<CultureObject>())
         {
-            registry.RegisterNewObject(culture, out _);
+            var networkId = nameof(BasicCultureObject) + "_" + culture.StringId;
+            registry.RegisterExistingObject(networkId, culture);
         }
     }
 

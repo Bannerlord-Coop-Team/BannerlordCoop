@@ -31,9 +31,10 @@ internal class HideoutLifetimeHandler : IHandler
 
     private void Handle_HideoutCreated(MessagePayload<HideoutCreated> payload)
     {
-        objectManager.AddNewObject(payload.What.Hideout, out var newId);
+        var hideout = payload.What.Hideout;
+        objectManager.AddExisting(hideout.StringId, hideout);
 
-        var message = new NetworkCreateHideout(newId);
+        var message = new NetworkCreateHideout(hideout.StringId);
         network.SendAll(message);
     }
 

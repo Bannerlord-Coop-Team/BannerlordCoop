@@ -34,7 +34,7 @@ internal class SiegeStrategyRegistry : IAutoRegistry<SiegeStrategy>
     {
         foreach (var siegeStrategy in MBObjectManager.Instance.GetObjectTypeList<SiegeStrategy>())
         {
-            if (registry.RegisterNewObject(siegeStrategy, out var _) == false) Logger.Error($"Unable to register {nameof(SiegeStrategy)}");
+            if (registry.RegisterExistingObject(siegeStrategy.StringId, siegeStrategy) == false) Logger.Error($"Unable to register {nameof(SiegeStrategy)}");
         }
     }
 

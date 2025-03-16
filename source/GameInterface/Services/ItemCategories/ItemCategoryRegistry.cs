@@ -30,7 +30,7 @@ internal class ItemCategoryRegistry : IAutoRegistry<ItemCategory>
     {
         foreach (ItemCategory item in MBObjectManager.Instance.GetObjectTypeList<ItemCategory>())
         {
-            registry.RegisterNewObject(item, out _);
+            registry.RegisterExistingObject(item.StringId, item);
         }
     }
 

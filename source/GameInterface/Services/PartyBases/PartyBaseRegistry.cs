@@ -29,7 +29,10 @@ internal class PartyBaseRegistry : IAutoRegistry<PartyBase>
     {
         foreach (var party in MobileParty.All)
         {
-            if (registry.RegisterNewObject(party.Party, out var _) == false) Logger.Error("Unable to register PartyBase from Party with the object manager");
+            var networkId = $"{nameof(PartyBase)}_{party.StringId}";
+
+            if (registry.RegisterExistingObject(networkId, party.Party) == false)
+                Logger.Error("Unable to register PartyBase from Party with the object manager");
         }
     }
 

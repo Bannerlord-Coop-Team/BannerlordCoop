@@ -25,9 +25,9 @@ namespace GameInterface.Services.CharacterSkills
                 return;
             }
 
-            foreach (var skill in objectManager.GetObjectTypeList<MBCharacterSkills>().OrderBy(s => s.Id))
+            foreach (var skill in objectManager.GetObjectTypeList<MBCharacterSkills>())
             {
-                RegisterNewObject(skill, out _);
+                RegisterExistingObject(skill.StringId, skill);
             }
         }
 

@@ -41,9 +41,9 @@ internal class HeroRegistry : IAutoRegistry<Hero>
             return;
         }
 
-        foreach (var hero in campaignObjectManager.GetAllHeroes().OrderBy(hero => hero.Id))
+        foreach (var hero in campaignObjectManager.GetAllHeroes())
         {
-            registry.RegisterNewObject(hero, out var _);
+            registry.RegisterExistingObject(hero.StringId, hero);
         }
     }
 

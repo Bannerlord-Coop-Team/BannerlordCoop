@@ -24,23 +24,24 @@ internal class StanceLinkRegistry : RegistryBase<StanceLink>
 
     public override void RegisterAll()
     {
-        IEnumerable<Kingdom> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
+        IEnumerable<IFaction> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
+        IEnumerable<IFaction> clans = Campaign.Current?.Clans ?? Enumerable.Empty<Clan>();
 
-        foreach (var kingdom in kingdoms)
+        var factions = kingdoms.Concat(clans);
+
+        HashSet<StanceLink> visitedStances = new();
+
+        foreach (var faction in factions)
         {
-            foreach(StanceLink stance in kingdom._stances)
+            int counter = 1;
+            foreach(var stance in faction.Stances)
             {
-                RegisterNewObject(stance, out var _);
-            }
-        }
+                if (visitedStances.Contains(stance)) continue;
 
-        IEnumerable<Clan> clans = Campaign.Current?.Clans ?? Enumerable.Empty<Clan>();
+                var networkId = $"{nameof(StanceLink)}_{faction.StringId}_{counter++}";
+                RegisterExistingObject(networkId, stance);
 
-        foreach (var clan in clans)
-        {
-            foreach (StanceLink stance in clan._stances)
-            {
-                RegisterNewObject(stance, out var _);
+                visitedStances.Add(stance);
             }
         }
     }

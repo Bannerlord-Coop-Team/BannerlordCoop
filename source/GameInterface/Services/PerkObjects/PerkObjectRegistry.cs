@@ -28,7 +28,7 @@ internal class ItemCategoryRegistry : IAutoRegistry<PerkObject>
     {
         foreach (PerkObject trait in PerkObject.All)
         {
-            registry.RegisterNewObject(trait, out _);
+            registry.RegisterExistingObject(trait.StringId, trait);
         }
     }
 

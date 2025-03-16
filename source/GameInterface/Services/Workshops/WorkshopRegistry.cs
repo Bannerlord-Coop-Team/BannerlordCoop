@@ -25,9 +25,12 @@ namespace GameInterface.Services.Workshops
 
             foreach (Town town in Town.AllTowns)
             {
+                int counter = 1;
+
                 foreach (Workshop workshop in town.Workshops)
                 {
-                    RegisterNewObject(workshop, out var _);
+                    var networkId = $"{nameof(Workshop)}_{town.StringId}_{counter++}";
+                    RegisterExistingObject(networkId, workshop);
                 }
             }
         }

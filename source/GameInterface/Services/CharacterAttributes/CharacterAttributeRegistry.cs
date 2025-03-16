@@ -31,7 +31,7 @@ internal class CharacterAttributeRegistry : IAutoRegistry<CharacterAttribute>
     {
         foreach (var obj in MBObjectManager.Instance.GetObjectTypeList<CharacterAttribute>())
         {
-            registry.RegisterNewObject(obj, out _);
+            registry.RegisterExistingObject(obj.StringId, obj);
         }
     }
 

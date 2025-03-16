@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Policies;
 using Serilog;
 using System;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Registry.Auto;
@@ -22,8 +23,7 @@ internal class LifetimePatches
             return true;
         }
 
-        Type genericType = typeof(InstanceCreated<>).MakeGenericType(__instance.GetType());
-        var message = (IEvent)Activator.CreateInstance(genericType, __instance);
+        var message = CreateInstanceCreatedEventFast(__instance);
 
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -42,11 +42,40 @@ internal class LifetimePatches
             return true;
         }
 
-        Type genericType = typeof(InstanceDestroyed<>).MakeGenericType(__instance.GetType());
-        var message = (IEvent)Activator.CreateInstance(genericType, __instance);
+        var message = CreateInstanceDestroyedEventFast(__instance);
 
         MessageBroker.Instance.Publish(__instance, message);
 
         return true;
+    }
+
+    private static ConditionalWeakTable<object, Type> TypeWeakDictionary = new ConditionalWeakTable<object, Type>();
+    public static IEvent CreateInstanceCreatedEventFast(object obj)
+    {
+        var type = obj.GetType();
+        Type genericTypeDefinition;
+        if (TypeWeakDictionary.TryGetValue(type, out genericTypeDefinition) == false)
+        {
+            genericTypeDefinition = typeof(InstanceCreated<>).MakeGenericType(type);
+            TypeWeakDictionary.Add(type, genericTypeDefinition);
+
+        }
+
+        return (IEvent)Activator.CreateInstance(genericTypeDefinition, obj);
+    }
+
+
+    public static IEvent CreateInstanceDestroyedEventFast(object obj)
+    {
+        var type = obj.GetType();
+        Type genericTypeDefinition;
+        if (TypeWeakDictionary.TryGetValue(type, out genericTypeDefinition) == false)
+        {
+            genericTypeDefinition = typeof(InstanceDestroyed<>).MakeGenericType(type);
+            TypeWeakDictionary.Add(type, genericTypeDefinition);
+
+        }
+
+        return (IEvent)Activator.CreateInstance(genericTypeDefinition, obj);
     }
 }

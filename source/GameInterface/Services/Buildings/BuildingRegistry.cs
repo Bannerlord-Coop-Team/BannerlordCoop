@@ -23,12 +23,13 @@ internal class BuildingRegistry : RegistryBase<Building>
         {
             if(settlement.Town == null) continue;
 
+            int counter = 0;
+
             foreach(Building building in settlement.Town.Buildings)
             {
-                if (RegisterNewObject(building, out var _) == false)
-                {
+                var networkId = nameof(Building) + "_" + settlement.StringId + counter++;
+                if (RegisterExistingObject(networkId, building) == false)
                     Logger.Error($"Unable to register {building}");
-                }
             }
         }
     }

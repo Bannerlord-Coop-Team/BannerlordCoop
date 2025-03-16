@@ -28,7 +28,7 @@ internal class TraitObjectRegistry : IAutoRegistry<TraitObject>
     {
         foreach (TraitObject trait in TraitObject.All)
         {
-            registry.RegisterNewObject(trait, out _);
+            registry.RegisterExistingObject(trait.StringId, trait);
         }
     }
 

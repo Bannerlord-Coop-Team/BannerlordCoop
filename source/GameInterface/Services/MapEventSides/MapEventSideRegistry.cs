@@ -18,13 +18,18 @@ internal class MapEventSideRegistry : RegistryBase<MapEventSide>
 
     public override void RegisterAll()
     {
-        foreach (var side in Campaign.Current.MapEventManager.MapEvents.SelectMany(mapEvent => mapEvent._sides))
+        foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (side == null) continue;
+            int counter = 1;
 
-            if (RegisterNewObject(side, out var _) == false)
+            foreach (var side in mapEvent._sides)
             {
-                Logger.Error($"Unable to register {side}");
+                if (side == null) continue;
+
+                var networkId = nameof(MapEventSide) + "_" + mapEvent.StringId + "_" + counter++;
+
+                if (RegisterExistingObject(networkId, side) == false)
+                    Logger.Error("Unable to register MapEventSide {id} in the object manager", side.ToString());
             }
         }
     }

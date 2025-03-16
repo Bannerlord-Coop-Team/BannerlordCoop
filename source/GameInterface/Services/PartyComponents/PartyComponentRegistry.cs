@@ -33,9 +33,10 @@ internal class PartyComponentRegistry : RegistryBase<PartyComponent>
 
     public override void RegisterAll()
     {
-        foreach (var component in MobileParty.All.Select(p => p.PartyComponent).Where(c => c != null))
+        foreach (var party in MobileParty.All)
         {
-            RegisterNewObject(component, out var _);
+            var networkId = $"{party.PartyComponent.GetType().Name}_{party.StringId}";
+            RegisterExistingObject(networkId, party.PartyComponent);
         }
     }
 

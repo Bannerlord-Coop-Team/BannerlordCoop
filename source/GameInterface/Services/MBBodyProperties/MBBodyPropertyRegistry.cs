@@ -28,9 +28,10 @@ internal class MBBodyPropertyRegistry : IAutoRegistry<MBBodyProperty>
 
     public void RegisterAllObjects(IRegistry<MBBodyProperty> registry)
     {
-        foreach (CharacterObject character in CharacterObject.All.OrderBy(c => c.Id))
+        foreach (CharacterObject character in CharacterObject.All.DistinctBy(c => c.BodyPropertyRange))
         {
-            registry.RegisterNewObject(character.BodyPropertyRange, out _);
+            var networkId = nameof(MBBodyProperty) + "_" + character.StringId;
+            registry.RegisterExistingObject(networkId, character.BodyPropertyRange);
         }
     }
 

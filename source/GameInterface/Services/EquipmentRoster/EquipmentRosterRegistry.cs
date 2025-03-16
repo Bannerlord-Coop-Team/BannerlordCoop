@@ -25,9 +25,9 @@ namespace GameInterface.Services.EquipmentRoster
                 return;
             }
 
-            foreach (var equipRoster in objectManager.GetObjectTypeList<MBEquipmentRoster>().OrderBy(e => e.Id))
+            foreach (var equipRoster in objectManager.GetObjectTypeList<MBEquipmentRoster>())
             {
-                RegisterNewObject(equipRoster, out _);
+                RegisterExistingObject(equipRoster.StringId, equipRoster);
             }
         }
 

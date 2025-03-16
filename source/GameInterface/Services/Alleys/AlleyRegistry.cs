@@ -28,13 +28,18 @@ internal class AlleyRegistry : IAutoRegistry<Alley>
 
     public void RegisterAllObjects(IRegistry<Alley> registry)
     {
+        
         foreach (Settlement settlement in Campaign.Current.Settlements)
         {
             if (settlement.Town == null) continue;
 
+            int counter = 0;
+
             foreach (Alley alley in settlement.Alleys)
             {
-                if (registry.RegisterNewObject(alley, out var _) == false) Logger.Error($"Unable to register {alley}");
+                var networkId = "Alley_" + settlement.StringId + counter++;
+                if (registry.RegisterExistingObject(networkId, alley) == false) 
+                    Logger.Error($"Unable to register {alley}");
             }
         }
     }

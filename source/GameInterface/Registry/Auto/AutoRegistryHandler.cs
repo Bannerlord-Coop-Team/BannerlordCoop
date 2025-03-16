@@ -2,6 +2,7 @@
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using ProtoBuf.Meta;
 using System;
 using TaleWorlds.ObjectSystem;
 
@@ -12,23 +13,20 @@ class AutoRegistryHandler<T> : IHandler where T : class
     public IMessageBroker MessageBroker { get; }
     public INetwork Network { get; }
     public IObjectManager ObjectManager { get; }
-    public Action<T, string> ClientCreatedCallback { get; }
-    public Action<T, string> ClientDestroyedCallback { get; }
+    AutoRegistryCallbacks<T> Callbacks { get; }
 
     public AutoRegistryHandler(
         AutoRegistry<T> registry,
         IMessageBroker messageBroker,
         INetwork network,
         IObjectManager objectManager,
-        Action<T, string> clientCreatedCallback = null,
-        Action<T, string> clientDestroyedCallback = null)
+        AutoRegistryCallbacks<T> callbacks)
     {
         Registry = registry;
         MessageBroker = messageBroker;
         Network = network;
         ObjectManager = objectManager;
-        ClientCreatedCallback = clientCreatedCallback;
-        ClientDestroyedCallback = clientDestroyedCallback;
+        Callbacks = callbacks;
 
         MessageBroker.Subscribe<InstanceCreated<T>>(Handle_InstanceCreated);
         MessageBroker.Subscribe<NetworkCreateInstance<T>>(Handle_NetworkCreateInstance);
@@ -53,6 +51,9 @@ class AutoRegistryHandler<T> : IHandler where T : class
             mBObject.StringId = id;
         }
 
+        // Callback before sent on network
+        Callbacks.ServerCreatedCallback?.Invoke(payload.What.Instance, id);
+
         Network.SendAll(new NetworkCreateInstance<T>(id));
     }
 
@@ -62,12 +63,15 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         ObjectManager.AddExisting(payload.What.InstanceId, newInstance);
 
-        if (ClientCreatedCallback != null) ClientCreatedCallback(newInstance, payload.What.InstanceId);
+        Callbacks.ClientCreatedCallback?.Invoke(newInstance, payload.What.InstanceId);
     }
 
     private void Handle_InstanceDestroyed(MessagePayload<InstanceDestroyed<T>> payload)
     {
         if (ObjectManager.TryGetId(payload.What.Instance, out string id) == false) return;
+
+        // Callback before object is removed from registry
+        Callbacks.ServerDestroyedCallback?.Invoke(payload.What.Instance, id);
 
         ObjectManager.Remove(payload.What.Instance);
 
@@ -78,8 +82,9 @@ class AutoRegistryHandler<T> : IHandler where T : class
     {
         if (ObjectManager.TryGetObject(payload.What.InstanceId, out T obj) == false) return;
 
-        ObjectManager.Remove(obj);
+        // Callback before object is removed from registry
+        Callbacks.ClientDestroyedCallback?.Invoke(obj, payload.What.InstanceId);
 
-        if (ClientDestroyedCallback != null) ClientDestroyedCallback(obj, payload.What.InstanceId);
+        ObjectManager.Remove(obj);
     }
 }

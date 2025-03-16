@@ -1,8 +1,10 @@
 ﻿using Common;
+using Common.Util;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Registry.Auto;
 
@@ -40,6 +42,19 @@ public class AutoRegistry<T> : RegistryBase<T> where T : class
 
     protected override string GetNewId(T obj)
     {
-        return $"{InstanceId}_{Interlocked.Increment(ref InstanceCounter)}";
+        var newId = $"{InstanceId}_{Interlocked.Increment(ref InstanceCounter)}";
+
+        // Set object string id if it is a MBObjectBase
+        // This is to keep the current network id in the save system so
+        // save tranfers have enough data to resolve network ids
+        if (obj is MBObjectBase mbObject)
+        {
+            using(new AllowedThread())
+            {
+                mbObject.StringId = newId;
+            }
+        }
+
+        return newId;
     }
 }

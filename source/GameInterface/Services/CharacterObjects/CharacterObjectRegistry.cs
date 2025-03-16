@@ -27,9 +27,9 @@ internal class CharacterObjectRegistry : IAutoRegistry<CharacterObject>
 
     public void RegisterAllObjects(IRegistry<CharacterObject> registry)
     {
-        foreach (CharacterObject character in CharacterObject.All.OrderBy(c => c.Id))
+        foreach (CharacterObject character in CharacterObject.All)
         {
-            registry.RegisterNewObject(character, out _);
+            registry.RegisterExistingObject(character.StringId, character);
         }
     }
 

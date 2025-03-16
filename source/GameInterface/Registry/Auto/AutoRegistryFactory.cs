@@ -12,7 +12,7 @@ using System.Reflection;
 namespace GameInterface.Registry.Auto;
 public interface IAutoRegistryFactory : IDisposable
 {
-    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null, Action<T, string> onClientDestroyed = null) where T : class;
+    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<AutoRegistry<T>> registerAll, AutoRegistryCallbacks<T> callbacks) where T : class;
 
     void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class;
 }
@@ -53,10 +53,17 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
 
     public void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class
     {
-        TryRegisterType<T>(autoRegistry.Constructors, autoRegistry.DestroyMethods, autoRegistry.RegisterAllObjects, autoRegistry.OnClientCreated, autoRegistry.OnClientDestroyed);
+        var callbacks = new AutoRegistryCallbacks<T>(autoRegistry);
+
+        TryRegisterType(autoRegistry.Constructors, autoRegistry.DestroyMethods, autoRegistry.RegisterAllObjects, callbacks);
     }
 
-    public bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null, Action<T, string> onClientDestroyed = null) where T : class
+    public bool TryRegisterType<T>(
+        IEnumerable<MethodBase> ctrosToPatch,
+        IEnumerable<MethodBase> destroyMethods,
+        Action<AutoRegistry<T>> registerAll,
+        AutoRegistryCallbacks<T> callbacks
+    ) where T : class
     {
         ValidateConstructorTypes(ctrosToPatch, typeof(T));
         ValidateConstructorTypes(destroyMethods, typeof(T));
@@ -64,7 +71,13 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         TypeMapper.AddTypes(new Type[] { typeof(NetworkCreateInstance<T>) });
 
         var registry = new AutoRegistry<T>(registerAll, Collection);
-        var handler = new AutoRegistryHandler<T>(registry, MessageBroker, Network, ObjectManager, onClientCreated, onClientDestroyed);
+        var handler = new AutoRegistryHandler<T>(
+            registry,
+            MessageBroker,
+            Network,
+            ObjectManager,
+            callbacks
+        );
 
         foreach (var ctor in ctrosToPatch)
         {
