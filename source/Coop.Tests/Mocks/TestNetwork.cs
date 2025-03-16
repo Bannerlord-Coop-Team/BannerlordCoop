@@ -39,26 +39,14 @@ public class TestNetwork : INetwork
 
     public IEnumerable<T> GetPeerMessagesFromType<T>(NetPeer peer) where T : IMessage
     {
-        return SentNetworkMessages[peer.Id]
-            .Where(msg => msg.GetType() == typeof(T))
-            .Select(msg => (T)msg);
-    }
-
-    public int GetPeerMessageCountFromType<T>(NetPeer peer) where T : IMessage
-    {
-        return SentNetworkMessages[peer.Id].Count(msg => msg.GetType() == typeof(T));
+        return SentNetworkMessages[peer.Id].Where(msg => msg is T).Cast<T>();
     }
 
     public IEnumerable<IPacket> GetPeerPackets(NetPeer peer) => SentPackets[peer.Id];
 
     public IEnumerable<T> GetPeerPacketsFromType<T>(NetPeer peer) where T : IPacket 
     {
-        return SentPackets[peer.Id].Where(pkt => pkt.GetType() == typeof(T)).Select(msg => (T)msg);
-    }
-
-    public int GetPeerPacketCountFromType<T>(NetPeer peer) where T : IPacket 
-    { 
-        return SentPackets[peer.Id].Count(pkt => pkt.GetType() == typeof(T)); 
+        return SentPackets[peer.Id].Where(pkt => pkt is T).Cast<T>();
     }
 
     public void Send(NetPeer netPeer, IPacket packet)

@@ -7,11 +7,11 @@ namespace GameInterface.Services.CraftingService.Messages
     internal record NetworkCreateCrafting : ICommand
     {
         [ProtoMember(1)]
-        public CraftingCreatedData Data { get; }
+        public string Id { get; }
 
-        public NetworkCreateCrafting(CraftingCreatedData data)
+        public NetworkCreateCrafting(string id)
         {
-            Data = data;
+            Id = id;
         }
     }
 }

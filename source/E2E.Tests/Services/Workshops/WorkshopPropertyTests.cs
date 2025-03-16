@@ -268,7 +268,7 @@ namespace E2E.Tests.Services.Workshops
                 Assert.True(server.ObjectManager.TryGetObject<Workshop>(WorkshopId, out var workshop));
                 Assert.True(server.ObjectManager.TryGetObject<Settlement>(newSettlementId, out var settlement));
 
-                Assert.Null(workshop.Settlement);  // Before changing, verify the workshop has no settlement
+                Assert.NotSame(settlement, workshop.Settlement);  // Before changing, verify the workshop is different
 
                 // Simulate the field changing
                 intercept.Invoke(null, new object[] { workshop, settlement });

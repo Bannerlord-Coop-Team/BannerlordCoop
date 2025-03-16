@@ -15,21 +15,18 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            stringId = Object.StringId;
-            
+            stringId = ResolveId(Object);
+
             base.PackFields();
         }
 
         protected override void UnpackInternal()
         {
-            if(stringId != null)
+            var resolvedObj = ResolveObject<ItemObject>(stringId);
+            if (resolvedObj != null)
             {
-                var newObject = ResolveId<ItemObject>(stringId);
-                if(newObject != null)
-                {
-                    Object = newObject;
-                    return;
-                }
+                Object = resolvedObj;
+                return;
             }
 
             base.UnpackFields();

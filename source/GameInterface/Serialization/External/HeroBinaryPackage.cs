@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Library;
 
@@ -38,17 +39,18 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            stringId = Object.StringId;
+            // TODO this might give the new player hero an id and the server will try to resolve it
+            stringId = ResolveId(Object);
 
-            base.PackFields(Excludes);
+            PackFields(Excludes);
 
-            fatherId = Object.Father?.StringId;
-            motherId = Object.Mother?.StringId;
-            spouseId = Object.Spouse?.StringId;
+            fatherId = ResolveId(Object.Father);
+            motherId = ResolveId(Object.Mother);
+            spouseId = ResolveId(Object.Spouse);
 
             List<Hero> exSpoueses = Object._exSpouses;
-            exSpousesIds = PackIds(exSpoueses);
-            childrenIds = PackIds(Object.Children);
+            exSpousesIds = ResolveIds(exSpoueses);
+            childrenIds = ResolveIds(Object.Children);
         }
 
         /// <summary>
@@ -58,16 +60,11 @@ namespace GameInterface.Serialization.External
         /// </summary>
         protected override void UnpackInternal()
         {
-            // If the stringId already exists in the object manager use that object
-            // Otherwise, create a new object and initialize it
-            if (string.IsNullOrEmpty(stringId) == false)
+            var resolvedObj = ResolveObject<Hero>(stringId);
+            if (resolvedObj != null)
             {
-                var newObject = ResolveId<Hero>(stringId);
-                if (newObject != null)
-                {
-                    Object = newObject;
-                    return;
-                }
+                Object = resolvedObj;
+                return;
             }
 
             Object.Init();
@@ -76,12 +73,12 @@ namespace GameInterface.Serialization.External
             base.UnpackFields();
 
             // Set the values of the object's father, mother, spouse, ex-spouses, and children
-            Object._father = ResolveId<Hero>(fatherId);
-            Object._mother = ResolveId<Hero>(motherId);
-            Object._spouse = ResolveId<Hero>(spouseId);
+            Object._father = ResolveObject<Hero>(fatherId);
+            Object._mother = ResolveObject<Hero>(motherId);
+            Object._spouse = ResolveObject<Hero>(spouseId);
 
-            Hero_ExSpouses.SetValue(Object, new MBList<Hero>(ResolveIds<Hero>(exSpousesIds)));
-            Hero_Children.SetValue(Object, new MBList<Hero>(ResolveIds<Hero>(childrenIds)));
+            Hero_ExSpouses.SetValue(Object, new MBList<Hero>(ResolveObjects<Hero>(exSpousesIds)));
+            Hero_Children.SetValue(Object, new MBList<Hero>(ResolveObjects<Hero>(childrenIds)));
         }
     }
 }

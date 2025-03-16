@@ -69,6 +69,8 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
     public void AddField(FieldInfo field)
     {
         if (field == null) throw new ArgumentNullException(nameof(field));
+        if (field.FieldType.IsInterface) throw new NotSupportedException($"{field.Name} cannot be autosynced as interfaces types are not supported");
+        if (field.FieldType.IsAbstract) throw new NotSupportedException($"{field.Name} cannot be autosynced as abstract types are not supported");
 
         if (fields.Contains(field)) throw new ArgumentException($"{field.Name} has already been registered as a synced field");
         fields.Add(field);
@@ -78,6 +80,8 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
     {
         if (property == null) throw new ArgumentNullException(nameof(property));
         if (property.CanWrite == false) throw new ArgumentException($"{property.Name} does not have a set method");
+        if (property.PropertyType.IsInterface) throw new NotSupportedException($"{property.Name} cannot be autosynced as interfaces types are not supported");
+        if (property.PropertyType.IsAbstract) throw new NotSupportedException($"{property.Name} cannot be autosynced as abstract types are not supported");
 
         if (properties.Contains(property)) throw new ArgumentException($"{property.Name} has already been registered as a synced property");
         properties.Add(property);
@@ -97,6 +101,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         ClearCollections();
 
         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName($"AutoSyncAsm_{AsmCounter++}"), AssemblyBuilderAccess.RunAndCollect);
+
         var moduleBuilder = assemblyBuilder.DefineDynamicModule("AutoSyncAsm");
 
         AllowPrivateAccess(assemblyBuilder);
@@ -199,7 +204,9 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
         {
             var method = kvp.Value;
 
-            if (compiledType.Name.StartsWith(kvp.Key.DeclaringType.Name) == false) return kvp.Value;
+            // Returns transpiler if name matches
+            var nameFromCompiledType = compiledType.Name.Split('_').First();
+            if (nameFromCompiledType.Equals(kvp.Key.DeclaringType.Name) == false) return kvp.Value;
 
             var genericParams = method.IsGenericMethod ? method.GetGenericArguments() : null;
             var actualMethod = AccessTools.Method(compiledType, method.Name, method.GetParameters().Select(p => p.ParameterType).ToArray(), genericParams);

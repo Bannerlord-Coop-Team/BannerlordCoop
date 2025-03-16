@@ -22,12 +22,8 @@ namespace GameInterface.Services.PartyVisuals.Patches
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(PartyVisual), Environment.StackTrace);
-                return true;
-            }
+            // TODO Maybe make this client side
+            if (ModInformation.IsClient) return true;
 
             var message = new PartyVisualCreated(__instance, partyBase);
 

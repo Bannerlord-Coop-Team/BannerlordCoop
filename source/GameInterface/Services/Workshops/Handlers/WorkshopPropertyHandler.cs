@@ -15,7 +15,7 @@ namespace GameInterface.Services.Workshops.Handlers
 {
     public class WorkshopPropertyHandler : IHandler
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyFieldsHandler>();
+        private static readonly ILogger Logger = LogManager.GetLogger<WorkshopPropertyHandler>();
 
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;

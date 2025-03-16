@@ -1,5 +1,6 @@
 ﻿using Common.Extensions;
 using Common.Messaging;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
@@ -32,7 +33,7 @@ public class ArmyDebugCommand
     {
         StringBuilder stringBuilder = new StringBuilder();
 
-        if (ContainerProvider.TryResolve<ArmyRegistry>(out var armyRegistry) == false)
+        if (ContainerProvider.TryResolve<AutoRegistry<Army>>(out var armyRegistry) == false)
         {
             return $"Unable to resolve {nameof(ArmyRegistry)}";
         }

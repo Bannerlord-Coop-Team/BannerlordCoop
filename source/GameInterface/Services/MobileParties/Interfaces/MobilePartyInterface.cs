@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Util;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -35,16 +36,13 @@ internal class MobilePartyInterface : IMobilePartyInterface
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyInterface>();
     private static readonly MethodInfo PartyBase_OnFinishLoadState = typeof(PartyBase).GetMethod("OnFinishLoadState", BindingFlags.NonPublic | BindingFlags.Instance);
 
-    private readonly MobilePartyRegistry partyRegistry;
     private readonly IObjectManager objectManager;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
 
     public MobilePartyInterface(
-        MobilePartyRegistry partyRegistry,
         IObjectManager objectManager,
         IControlledEntityRegistry controlledEntityRegistry)
     {
-        this.partyRegistry = partyRegistry;
         this.objectManager = objectManager;
         this.controlledEntityRegistry = controlledEntityRegistry;
     }
@@ -58,9 +56,15 @@ internal class MobilePartyInterface : IMobilePartyInterface
 
     public void RegisterAllPartiesAsControlled(string ownerId)
     {
-        foreach(var party in partyRegistry)
+        foreach(var party in MobileParty.All)
         {
-            controlledEntityRegistry.RegisterAsControlled(ownerId, party.Key);
+            if (objectManager.TryGetId(party.Id, out var id) == false)
+            {
+                Logger.Error($"Failed to retrieve object id for MobileParty with identifier {party.Id}. Registration skipped.");
+                continue;
+            }
+
+            controlledEntityRegistry.RegisterAsControlled(ownerId, id);
         }
     }
 }

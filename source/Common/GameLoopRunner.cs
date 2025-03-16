@@ -38,7 +38,7 @@ public class GameLoopRunner : IUpdateable
 
         List<(Action, EventWaitHandle)> toBeRun = new List<(Action, EventWaitHandle)>();
 
-        lock (m_Queue)
+        lock (Instance.m_QueueLock)
         {
             while (m_Queue.Count > 0)
             {

@@ -11,7 +11,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.CharacterObjects
 {
-    public class CharacterObjectLifetimeTests
+    public class CharacterObjectLifetimeTests : IDisposable
     {
         E2ETestEnvironment TestEnvironment { get; }
 

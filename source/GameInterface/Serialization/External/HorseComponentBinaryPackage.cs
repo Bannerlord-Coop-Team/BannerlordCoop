@@ -17,7 +17,7 @@ namespace GameInterface.Serialization.External
         
         protected override void PackInternal()
         {
-            MonsterId = Object.Monster.StringId;
+            MonsterId = ResolveId(Object.Monster);
             base.PackFields();
         }
 
@@ -25,7 +25,7 @@ namespace GameInterface.Serialization.External
         {
             base.UnpackFields();
 
-            Object.Monster = ResolveId<Monster>(MonsterId);
+            Object.Monster = ResolveObject<Monster>(MonsterId);
         }
     }
 }

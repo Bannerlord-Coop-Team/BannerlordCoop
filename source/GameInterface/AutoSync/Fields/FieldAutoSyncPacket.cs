@@ -7,10 +7,10 @@ namespace GameInterface.AutoSync.Fields;
 [ProtoContract(SkipConstructor = true)]
 public readonly struct FieldAutoSyncPacket : IPacket
 {
-    public FieldAutoSyncPacket(string instanceId, int typeId, int fieldId, byte[] value)
+    public FieldAutoSyncPacket(string instanceId, int classId, int fieldId, byte[] value)
     {
         this.instanceId = instanceId;
-        this.typeId = typeId;
+        this.classId = classId;
         this.fieldId = fieldId;
         this.value = value;
     }
@@ -18,7 +18,7 @@ public readonly struct FieldAutoSyncPacket : IPacket
     [ProtoMember(1)]
     public readonly string instanceId;
     [ProtoMember(2)]
-    public readonly int typeId;
+    public readonly int classId;
     [ProtoMember(3)]
     public readonly int fieldId;
     [ProtoMember(4)]

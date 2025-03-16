@@ -7,14 +7,14 @@ namespace GameInterface.Services.Heroes.Audit;
 internal record HeroAuditData
 {
     [ProtoMember(1)]
-    public string StringId { get; }
+    public string Id { get; }
 
     [ProtoMember(2)]
     public string Name { get; }
 
-    public HeroAuditData(Hero h)
+    public HeroAuditData(string id, Hero h)
     {
-        StringId = h.StringId;
+        Id = id;
         Name = h.Name?.ToString();
     }
 }

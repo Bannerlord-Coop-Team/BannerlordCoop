@@ -55,7 +55,7 @@ internal class FieldTypeSwitchCreator
         var labels = types.Select(i => il.DefineLabel()).ToArray();
 
         il.Emit(OpCodes.Ldarg_1);
-        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(FieldAutoSyncPacket), nameof(FieldAutoSyncPacket.typeId)));
+        il.Emit(OpCodes.Ldfld, AccessTools.Field(typeof(FieldAutoSyncPacket), nameof(FieldAutoSyncPacket.classId)));
         il.Emit(OpCodes.Switch, labels);
 
         // Add property switching

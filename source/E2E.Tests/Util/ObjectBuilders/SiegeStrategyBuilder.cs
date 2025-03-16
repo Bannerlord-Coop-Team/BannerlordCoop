@@ -4,11 +4,11 @@ namespace E2E.Tests.Util.ObjectBuilders
 {
     internal class SiegeStrategyBuilder : IObjectBuilder
     {
+        static int InstanceCounter = 0;
+
         public object Build()
         {
-            var strategies = SiegeStrategy.All;
-            int rndIndex = new Random().Next(strategies.Count);
-            return strategies[rndIndex];
+            return new SiegeStrategy($"{nameof(SiegeStrategy)}_{Interlocked.Increment(ref InstanceCounter)}");
         }
     }
 }

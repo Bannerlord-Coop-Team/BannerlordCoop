@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using ProtoBuf;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans.Messages.Lifetime;
 
@@ -6,7 +8,9 @@ namespace GameInterface.Services.Clans.Messages.Lifetime;
 /// Local event when a clan is created
 /// </summary>
 /// <param name="Data">Data for clan creation</param>
-internal record ClanCreated(ClanCreatedData Data) : IEvent
+[ProtoContract]
+internal record ClanCreated(Clan Clan) : IEvent
 {
-    public ClanCreatedData Data { get; } = Data;
+    [ProtoMember(1)]
+    public Clan Clan { get; } = Clan;
 }

@@ -40,7 +40,7 @@ namespace GameInterface.Services.GameDebug.Commands
 
             clans.ForEach((clan) =>
             {
-                stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", clan.StringId, clan.Name));
+                stringBuilder.AppendLine(string.Format("ID: '{0}' Name: '{1}'", clan.StringId, clan.Name));
             });
 
             return stringBuilder.ToString();

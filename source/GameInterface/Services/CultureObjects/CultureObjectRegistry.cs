@@ -1,37 +1,69 @@
-﻿using GameInterface.Services.Registry;
-using System.Threading;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.CultureObjects
+namespace GameInterface.Services.CultureObjects;
+internal class CultureObjectRegistry : IAutoRegistry<CultureObject>
 {
-    internal class CultureObjectRegistry : RegistryBase<CultureObject>
+    ILogger Logger { get; }
+    IObjectManager ObjectManager { get; }
+
+    public CultureObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
     {
-        private const string CultureStringIdPrefix = "CoopCulture";
-        private static int InstanceCounter = 0;
+        Logger = logger;
+        ObjectManager = objectManager;
+        autoRegistryFactory.RegisterType(this);
+    }
 
-        public CultureObjectRegistry(IRegistryCollection collection) : base(collection) { }
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(CultureObject))
+    };
 
-        public override void RegisterAll()
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<CultureObject> registry)
+    {
+        foreach (var culture in MBObjectManager.Instance.GetObjectTypeList<CultureObject>())
         {
-            var objectManager = MBObjectManager.Instance;
-
-            if (objectManager == null)
-            {
-                Logger.Error("Unable to register objects when CampaignObjectManager is null");
-                return;
-            }
-
-            foreach (var culture in objectManager.GetObjectTypeList<CultureObject>())
-            {
-                RegisterExistingObject(culture.StringId, culture);
-            }
+            registry.RegisterExistingObject(culture.StringId, culture);
         }
+    }
 
-        protected override string GetNewId(CultureObject culture)
-        {
-            culture.StringId = $"{CultureStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-            return culture.StringId;
-        }
+    public void OnClientCreated(CultureObject obj, string id)
+    {
+        var networkId = $"{nameof(BasicCultureObject)}_{id}";
+        ObjectManager.AddExisting<BasicCultureObject>(networkId, obj);
+    }
+
+    public void OnClientDestroyed(CultureObject obj, string id)
+    {
+        var networkId = $"{nameof(BasicCultureObject)}_{id}";
+
+        if (ObjectManager.TryGetObject<BasicCultureObject>(networkId, out var resolvedObj) == false) return;
+
+        ObjectManager.Remove(resolvedObj);
+    }
+
+    public void OnServerCreated(CultureObject obj, string id)
+    {
+        var networkId = $"{nameof(BasicCultureObject)}_{id}";
+        ObjectManager.AddExisting<BasicCultureObject>(networkId, obj);
+    }
+
+    public void OnServerDestroyed(CultureObject obj, string id)
+    {
+        var networkId = $"{nameof(BasicCultureObject)}_{id}";
+
+        if (ObjectManager.TryGetObject<BasicCultureObject>(networkId, out var resolvedObj) == false) return;
+
+        ObjectManager.Remove(resolvedObj);
     }
 }

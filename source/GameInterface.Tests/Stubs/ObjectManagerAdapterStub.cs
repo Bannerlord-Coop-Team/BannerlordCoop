@@ -13,7 +13,7 @@ namespace GameInterface.Tests.Stubs
 
         private long objectCounter = 0;
 
-        public bool AddExisting(string id, object obj)
+        public bool AddExisting<T>(string id, T obj)
         {
             if(registry.ContainsKey(id)) return false;
 
@@ -22,7 +22,7 @@ namespace GameInterface.Tests.Stubs
             return true;
         }
 
-        public bool AddNewObject(object obj, out string newId)
+        public bool AddNewObject<T>(T obj, out string newId)
         {
             newId = string.Empty;
 
@@ -41,7 +41,7 @@ namespace GameInterface.Tests.Stubs
             return true;
         }
 
-        public bool Contains(object obj)
+        public bool Contains<T>(T obj)
         {
             return registry.Values.Contains(obj);
         }
@@ -66,17 +66,15 @@ namespace GameInterface.Tests.Stubs
             throw new NotImplementedException();
         }
 
-        public bool Remove(object obj)
+        public bool Remove<T>(T obj)
         {
             throw new NotImplementedException();
         }
 
-        public bool TryGetId(object obj, out string id)
+        public bool TryGetId<T>(T obj, out string id)
         {
             throw new NotImplementedException();
         }
-
-        public bool TryGetObject(string id, out object obj) => registry.TryGetValue(id, out obj);
 
         public bool TryGetObject<T>(string id, out T obj) where T : class
         {
