@@ -12,7 +12,7 @@ using System.Reflection;
 namespace GameInterface.Registry.Auto;
 public interface IAutoRegistryFactory : IDisposable
 {
-    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null) where T : class;
+    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null, Action<T, string> onClientDestroyed = null) where T : class;
 
     void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class;
 }
@@ -46,29 +46,39 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         TypeMapper = typeMapper;
     }
 
-
-
     public void Dispose()
     {
         Disposables.ForEach(disposable => disposable.Dispose());
     }
 
-    public bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null) where T : class
+    public void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class
+    {
+        TryRegisterType<T>(autoRegistry.Constructors, autoRegistry.DestroyMethods, autoRegistry.RegisterAllObjects, autoRegistry.OnClientCreated, autoRegistry.OnClientDestroyed);
+    }
+
+    public bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<AutoRegistry<T>> registerAll, Action<T, string> onClientCreated = null, Action<T, string> onClientDestroyed = null) where T : class
     {
         ValidateConstructorTypes(ctrosToPatch, typeof(T));
+        ValidateConstructorTypes(destroyMethods, typeof(T));
 
         TypeMapper.AddTypes(new Type[] { typeof(NetworkCreateInstance<T>) });
 
         var registry = new AutoRegistry<T>(registerAll, Collection);
-        var handler = new AutoRegistryHandler<T>(registry, MessageBroker, Network, ObjectManager, onClientCreated);
+        var handler = new AutoRegistryHandler<T>(registry, MessageBroker, Network, ObjectManager, onClientCreated, onClientDestroyed);
 
         foreach (var ctor in ctrosToPatch)
         {
-            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.Prefix));
+            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.CreatePrefix));
 
             SyncPatchCollector.AddPrefix(ctor, patch);
         }
 
+        foreach (var destroy in destroyMethods)
+        {
+            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.DestroyPrefix));
+
+            SyncPatchCollector.AddPrefix(destroy, patch);
+        }
 
         Disposables.Add(registry);
         Disposables.Add(handler);
@@ -87,10 +97,5 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         {
             throw new AggregateException(exceptions);
         }
-    }
-
-    public void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class
-    {
-        TryRegisterType<T>(autoRegistry.Constructors, autoRegistry.RegisterAllObjects, autoRegistry.OnClientCreated);
     }
 }
