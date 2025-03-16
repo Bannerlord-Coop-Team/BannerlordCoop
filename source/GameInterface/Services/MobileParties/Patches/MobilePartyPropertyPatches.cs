@@ -98,25 +98,25 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.LastVisitedSettlement), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetLastVisitedSettlementPrefix(MobileParty __instance, Settlement value)
-    {
-        if (value == __instance.LastVisitedSettlement) return false;
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //[HarmonyPatch(nameof(MobileParty.LastVisitedSettlement), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetLastVisitedSettlementPrefix(MobileParty __instance, Settlement value)
+    //{
+    //    if (value == __instance.LastVisitedSettlement) return false;
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", nameof(MobileParty.LastVisitedSettlement), Environment.StackTrace);
-            return false;
-        }
+    //    if (ModInformation.IsClient)
+    //    {
+    //        Logger.Error("Client tried to set {name}\n"
+    //            + "Callstack: {callstack}", nameof(MobileParty.LastVisitedSettlement), Environment.StackTrace);
+    //        return false;
+    //    }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.LastVisitedSettlement, __instance.StringId, value?.StringId);
-        MessageBroker.Instance.Publish(__instance, message);
+    //    var message = new MobilePartyPropertyChanged(PropertyType.LastVisitedSettlement, __instance.StringId, value?.StringId);
+    //    MessageBroker.Instance.Publish(__instance, message);
 
-        return ModInformation.IsServer;
-    }
+    //    return ModInformation.IsServer;
+    //}
 
     [HarmonyPatch(nameof(MobileParty.Aggressiveness), MethodType.Setter)]
     [HarmonyPrefix]
@@ -329,25 +329,25 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.CurrentSettlement), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetCurrentSettlementPrefix(MobileParty __instance, Settlement value)
-    {
-        if (value == __instance._currentSettlement) return false;
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //[HarmonyPatch(nameof(MobileParty.CurrentSettlement), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetCurrentSettlementPrefix(MobileParty __instance, Settlement value)
+    //{
+    //    if (value == __instance._currentSettlement) return false;
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", nameof(MobileParty.CurrentSettlement), Environment.StackTrace);
-            return false;
-        }
+    //    if (ModInformation.IsClient)
+    //    {
+    //        Logger.Error("Client tried to set {name}\n"
+    //            + "Callstack: {callstack}", nameof(MobileParty.CurrentSettlement), Environment.StackTrace);
+    //        return false;
+    //    }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.CurrentSettlement, __instance.StringId, value?.StringId);
-        MessageBroker.Instance.Publish(__instance, message);
+    //    var message = new MobilePartyPropertyChanged(PropertyType.CurrentSettlement, __instance.StringId, value?.StringId);
+    //    MessageBroker.Instance.Publish(__instance, message);
 
-        return ModInformation.IsServer;
-    }
+    //    return ModInformation.IsServer;
+    //}
 
     [HarmonyPatch(nameof(MobileParty.AttachedTo), MethodType.Setter)]
     [HarmonyPrefix]
@@ -466,24 +466,24 @@ public class MobilePartyPropertyPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPatch(nameof(MobileParty.ActualClan), MethodType.Setter)]
-    [HarmonyPrefix]
-    private static bool SetActualClanPrefix(MobileParty __instance, Clan value)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //[HarmonyPatch(nameof(MobileParty.ActualClan), MethodType.Setter)]
+    //[HarmonyPrefix]
+    //private static bool SetActualClanPrefix(MobileParty __instance, Clan value)
+    //{
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to set {name}\n"
-                + "Callstack: {callstack}", nameof(MobileParty.ActualClan), Environment.StackTrace);
-            return false;
-        }
+    //    if (ModInformation.IsClient)
+    //    {
+    //        Logger.Error("Client tried to set {name}\n"
+    //            + "Callstack: {callstack}", nameof(MobileParty.ActualClan), Environment.StackTrace);
+    //        return false;
+    //    }
 
-        var message = new MobilePartyPropertyChanged(PropertyType.ActualClan, __instance.StringId, value?.StringId);
-        MessageBroker.Instance.Publish(__instance, message);
+    //    var message = new MobilePartyPropertyChanged(PropertyType.ActualClan, __instance.StringId, value?.StringId);
+    //    MessageBroker.Instance.Publish(__instance, message);
 
-        return ModInformation.IsServer;
-    }
+    //    return ModInformation.IsServer;
+    //}
 
     [HarmonyPatch(nameof(MobileParty.RecentEventsMorale), MethodType.Setter)]
     [HarmonyPrefix]

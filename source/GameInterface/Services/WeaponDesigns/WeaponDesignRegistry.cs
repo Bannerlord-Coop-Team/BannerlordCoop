@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System.Collections.Generic;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -11,7 +11,7 @@ namespace GameInterface.Services.ItemObjects
     internal class WeaponDesignRegistry : RegistryBase<WeaponDesign>
     {
         private const string ItemObjectIdPrefix = "CoopWeaponDesign";
-        private static int InstanceCounter = 0;
+        private int InstanceCounter = 0;
 
         public WeaponDesignRegistry(IRegistryCollection collection) : base(collection) { }
 
@@ -20,6 +20,7 @@ namespace GameInterface.Services.ItemObjects
             var dict = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftedItemDictionary;
             foreach (KeyValuePair<ItemObject, CraftedItemInitializationData> craft in dict)
             {
+                var networkId = $"{nameof(WeaponDesign)}_{craft.Key.StringId}";
                 if (RegisterNewObject(craft.Value.CraftedData, out var _) == false)
                 {
                     Logger.Error($"Unable to register {craft.Value.CraftedData}");

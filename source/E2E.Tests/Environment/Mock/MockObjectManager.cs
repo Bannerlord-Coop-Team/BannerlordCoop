@@ -4,17 +4,27 @@ namespace E2E.Tests.Environment.Mock
 {
     internal class MockObjectManager : IObjectManager
     {
-        public bool AddExisting(string id, object obj)
+        public bool AddExisting<T>(string id, object obj)
         {
             throw new NotImplementedException();
         }
 
-        public bool AddNewObject(object obj, out string newId)
+        public bool AddExisting<T>(string id, T obj)
         {
             throw new NotImplementedException();
         }
 
-        public bool Contains(object obj)
+        public bool AddNewObject<T>(object obj, out string newId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool AddNewObject<T>(T obj, out string newId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool Contains<T>(object obj)
         {
             throw new NotImplementedException();
         }
@@ -24,20 +34,35 @@ namespace E2E.Tests.Environment.Mock
             throw new NotImplementedException();
         }
 
+        public bool Contains<T>(T obj)
+        {
+            throw new NotImplementedException();
+        }
+
         public bool IsTypeManaged(Type type)
         {
             throw new NotImplementedException();
         }
 
-        public bool Remove(object obj)
+        public bool Remove<T>(object obj)
         {
             throw new NotImplementedException();
         }
 
-        public bool TryGetId(object obj, out string id)
+        public bool Remove<T>(T obj)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryGetId<T>(object obj, out string id)
         {
             id = default;
             return false;
+        }
+
+        public bool TryGetId<T>(T obj, out string id)
+        {
+            throw new NotImplementedException();
         }
 
         public bool TryGetObject<T>(string id, out T obj) where T : class

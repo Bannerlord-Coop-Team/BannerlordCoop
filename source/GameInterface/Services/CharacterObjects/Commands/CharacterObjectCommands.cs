@@ -1,9 +1,9 @@
-﻿using System;
+﻿using GameInterface.Services.ObjectManager;
 using System.Collections.Generic;
 using System.Text;
-using static TaleWorlds.Library.CommandLineFunctionality;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.ObjectSystem;
+using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.CharacterObjects.Commands;
 internal class CharacterObjectCommands
@@ -14,10 +14,21 @@ internal class CharacterObjectCommands
     {
         var characters = MBObjectManager.Instance.GetObjectTypeList<CharacterObject>();
 
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return "Unable to resolve object manager";
+        }
+
         var stringBuilder = new StringBuilder();
         foreach (var character in characters)
         {
-            stringBuilder.AppendLine(character.StringId);
+            if (objectManager.TryGetId(character, out var id) == false)
+            {
+                stringBuilder.Append($"Unable to get id for {character.StringId}");
+                continue;
+            }
+
+            stringBuilder.AppendLine(id);
         }
 
         return stringBuilder.ToString();

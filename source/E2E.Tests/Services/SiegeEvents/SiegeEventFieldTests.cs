@@ -30,9 +30,9 @@ public class SiegeEventFieldTests : IDisposable
         disabledMethods = new List<MethodBase>
         {
             AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+            AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
         };
-
-        disabledMethods.AddRange(AccessTools.GetDeclaredConstructors(typeof(SiegeEvent)));
 
         // Create SiegeEvent on the server
         siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
@@ -67,7 +67,7 @@ public class SiegeEventFieldTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var SiegeEvent));
             Assert.True(Server.ObjectManager.TryGetObject<Settlement>(besiegedSettlementId, out var serverBesiegedSettlement));
 
-            Assert.Null(SiegeEvent.BesiegedSettlement);
+            Assert.NotEqual(serverBesiegedSettlement, SiegeEvent.BesiegedSettlement);
 
             /// Simulate the field changing
             intercept.Invoke(null, new object[] { SiegeEvent, serverBesiegedSettlement });
@@ -109,7 +109,7 @@ public class SiegeEventFieldTests : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<SiegeEvent>(siegeEventId, out var SiegeEvent));
             Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
 
-            Assert.Null(SiegeEvent.BesiegerCamp);
+            Assert.NotEqual(serverBesiegerCamp, SiegeEvent.BesiegerCamp);
 
             /// Simulate the field changing
             intercept.Invoke(null, new object[] { SiegeEvent, serverBesiegerCamp });

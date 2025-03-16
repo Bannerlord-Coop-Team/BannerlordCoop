@@ -1,6 +1,5 @@
 using E2E.Tests.Environment;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Clans;
@@ -28,8 +27,8 @@ public class ClanCreationTests : IDisposable
         string? clanId = null;
         server.Call(() =>
         {
-            var clan = Clan.CreateClan("");
-            clanId = clan.StringId;
+            var clan = new Clan();
+            Assert.True(server.ObjectManager.TryGetId(clan, out clanId));
         });
 
         // Assert
@@ -48,19 +47,17 @@ public class ClanCreationTests : IDisposable
         var server = TestEnvironment.Server;
 
         // Act
-        string? clanId = null;
-        TestEnvironment.Clients.First().Call(() =>
+        var client = TestEnvironment.Clients.First();
+
+        Clan? clan = null;
+        client.Call(() =>
         {
-            var clan = Clan.CreateClan("");
-            clanId = clan.StringId;
+            clan = new Clan();
         });
 
         // Assert
-        Assert.False(server.ObjectManager.TryGetObject<Clan>(clanId, out var _));
-
-        foreach (var client in TestEnvironment.Clients)
-        {
-            Assert.False(client.ObjectManager.TryGetObject<Clan>(clanId, out var _));
-        }
+        Assert.NotNull(clan);
+        Assert.False(server.ObjectManager.TryGetId(clan, out var _));
+        Assert.False(client.ObjectManager.TryGetId(clan, out var _));
     }
 }

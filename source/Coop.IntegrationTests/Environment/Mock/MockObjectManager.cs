@@ -5,22 +5,23 @@ namespace Coop.IntegrationTests.Environment.Mock
 {
     internal class MockObjectManager : IObjectManager
     {
-        public bool AddExisting(string id, object obj)
+
+        public bool AddExisting<T>(string id, T obj)
         {
             throw new NotImplementedException();
         }
 
-        public bool AddNewObject(object obj, out string newId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool Contains(object obj)
+        public bool AddNewObject<T>(T obj, out string newId)
         {
             throw new NotImplementedException();
         }
 
         public bool Contains(string id)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool Contains<T>(T obj)
         {
             throw new NotImplementedException();
         }
@@ -35,7 +36,12 @@ namespace Coop.IntegrationTests.Environment.Mock
             throw new NotImplementedException();
         }
 
-        public bool TryGetId(object obj, out string id)
+        public bool Remove<T>(T obj)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryGetId<T>(T obj, out string id)
         {
             id = default;
             return false;

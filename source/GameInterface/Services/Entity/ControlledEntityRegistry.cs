@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Entity;
 
@@ -22,7 +23,15 @@ public interface IControlledEntityRegistry
     /// Packages an immutable dictionary of controlled entities
     /// </summary>
     /// <returns>Immutable dictionary of controlled entities</returns>
-    IReadOnlyDictionary<string, IReadOnlySet<ControlledEntity>> PackageControlledEntities();
+    Dictionary<string, HashSet<ControlledEntity>> PackageControlledEntities();
+
+    /// <summary>
+    /// Attempts to register all provided entities.
+    /// 
+    /// Is meant to be used to load from save file
+    /// </summary>
+    /// <param name="controlledEntityMap">Entities to load</param>
+    void LoadControlledEntities(Dictionary<string, HashSet<ControlledEntity>> controlledEntityMap);
 
     /// <summary>
     /// Registers an Enumerable of entities with the registry
@@ -89,12 +98,30 @@ internal class ControlledEntityRegistry : IControlledEntityRegistry
     [ProtoMember(2)]
     private readonly ConcurrentDictionary<string, ControlledEntity> controllerIdLookup = new ConcurrentDictionary<string, ControlledEntity>();
 
-    public IReadOnlyDictionary<string, IReadOnlySet<ControlledEntity>> PackageControlledEntities()
-    {
-        // Make dictionary immutable
-        var readonlyListDict = controlledEntities.ToDictionary(k => k.Key, k => k.Value.AsReadOnly() as IReadOnlySet<ControlledEntity>);
+    public Dictionary<string, HashSet<ControlledEntity>> PackageControlledEntities() => controlledEntities.ToDictionary(k => k.Key, v => v.Value);
 
-        return new ReadOnlyDictionary<string, IReadOnlySet<ControlledEntity>>(readonlyListDict);
+    public void LoadControlledEntities(Dictionary<string, HashSet<ControlledEntity>> controlledEntityMap)
+    {
+        if (controlledEntities.Count != 0)
+        {
+            Logger.Error($"Attempted to over-write existing controlled entity collection: ${nameof(controlledEntities)}");
+            return;
+        }
+
+        if (controllerIdLookup.Count != 0)
+        {
+            Logger.Error($"Attempted to over-write existing controlled entity collection: ${nameof(controllerIdLookup)}");
+            return;
+        }
+
+        foreach(var entitySet in controlledEntityMap)
+        {
+            var controllerId = entitySet.Key;
+            foreach (var entity in entitySet.Value)
+            {
+                RegisterAsControlled(controllerId, entity.EntityId);
+            }
+        }
     }
 
     public void RegisterExistingEntities(IEnumerable<ControlledEntity> entityIds)

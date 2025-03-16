@@ -143,17 +143,17 @@ public class AutoSyncTests
     {
         private readonly Dictionary<string, object> idMap = new Dictionary<string, object>();
 
-        public bool AddExisting(string id, object obj)
+        public bool AddExisting<T>(string id, T obj)
         {
             return idMap.TryAdd(id, obj);
         }
 
-        public bool AddNewObject(object obj, out string newId)
+        public bool AddNewObject<T>(T obj, out string newId)
         {
             throw new NotImplementedException();
         }
 
-        public bool Contains(object obj)
+        public bool Contains<T>(T obj)
         {
             throw new NotImplementedException();
         }
@@ -174,18 +174,18 @@ public class AutoSyncTests
             return managedTypes.Contains(type);
         }
 
-        public bool Remove(object obj)
+        public bool Remove<T>(T obj)
         {
             throw new NotImplementedException();
         }
 
-        public bool TryGetId(object obj, out string? id)
+        public bool TryGetId<T>(T obj, out string? id)
         {
             id = null;
 
             foreach (var kvp in idMap)
             {
-                if (kvp.Value == obj)
+                if (kvp.Value is T)
                 {
                     id = kvp.Key;
                     return true;

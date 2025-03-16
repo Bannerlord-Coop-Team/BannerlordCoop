@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
@@ -52,6 +53,8 @@ static class PartyBehaviorPatch
     {
         if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref targetPartyFigure, ref bestTargetPoint)) return false;
 
+        if (__instance._mobileParty.IsPartyControlled() == false) return false;
+
         MobileParty party = __instance._mobileParty;
 
         bool hasTargetEntity = false;
@@ -83,7 +86,7 @@ static class PartyBehaviorPatch
 
         if (targetPartyFigure != null)
         {
-            targetEntity = targetPartyFigure.IsSettlement ? targetPartyFigure.MobileParty : targetPartyFigure.Settlement;
+            targetEntity = targetPartyFigure.IsSettlement ? targetPartyFigure.Settlement : targetPartyFigure.MobileParty;
         }
 
         return __instance.AiBehaviorMapEntity == targetEntity &&

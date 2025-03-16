@@ -46,6 +46,7 @@ public class ArmyPatches
             return false;
         }
 
+        // TODO use objectmanager id
         var partyId = mobileParty.StringId;
 
         var data = new ArmyAddPartyData(armyId, partyId);
@@ -85,6 +86,7 @@ public class ArmyPatches
             return true;
         }
 
+        // TODO use objectmanager id
         var partyId = mobileParty.StringId;
 
 

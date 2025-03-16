@@ -1,25 +1,40 @@
 ﻿using Common;
-using Common.Extensions;
+using Common.Util;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager.Extensions;
+using HarmonyLib;
+using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Registry;
 
 /// <summary>
 /// Registry for identifying ownership of <see cref="Hero"/> objects
 /// </summary>
-internal class HeroRegistry : RegistryBase<Hero>
+internal class HeroRegistry : IAutoRegistry<Hero>
 {
-    public static readonly string HeroStringIdPrefix = "CoopHero";
-    private int InstanceCounter = 0;
+    ILogger Logger { get; }
+    public HeroRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    {
+        Logger = logger;
 
-    public HeroRegistry(IRegistryCollection collection) : base(collection) { }
+        autoRegistryFactory.RegisterType(this);
+    }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(Hero), new Type[] { typeof(string) })
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<Hero> registry)
     {
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -29,36 +44,35 @@ internal class HeroRegistry : RegistryBase<Hero>
             return;
         }
 
-        var heroes = campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes).ToArray();
-        foreach (var hero in heroes)
+        foreach (var hero in campaignObjectManager.GetAllHeroes())
         {
-            base.RegisterExistingObject(hero.StringId, hero);
+            registry.RegisterExistingObject(hero.StringId, hero);
         }
     }
 
-    public override bool RegisterExistingObject(string id, object obj)
+    public void OnClientCreated(Hero obj, string id)
     {
-        var result = base.RegisterExistingObject(id, obj);
+        using(new AllowedThread())
+        {
+            obj.Init();
+            AccessTools.Field(typeof(Hero), nameof(Hero._children)).SetValue(obj, new MBList<Hero>());
+            AccessTools.Field(typeof(Hero), nameof(Hero._ownedWorkshops)).SetValue(obj, new MBList<Workshop>());
+        }
 
-        AddToCampaignObjectManager(obj);
+        MBObjectManager.Instance?.RegisterPresumedObject(obj);
 
-        return result;
+        Campaign.Current?.CampaignObjectManager?.OnHeroAdded(obj);
     }
 
-    protected override string GetNewId(Hero hero)
+    public void OnClientDestroyed(Hero obj, string id)
     {
-        hero.StringId = $"{HeroStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-        return hero.StringId;
     }
 
-    private void AddToCampaignObjectManager(object obj)
+    public void OnServerCreated(Hero obj, string id)
     {
-        if (TryCast(obj, out var castedObj) == false) return;
+    }
 
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (objectManager == null) return;
-
-        objectManager.OnHeroAdded(castedObj);
+    public void OnServerDestroyed(Hero obj, string id)
+    {
     }
 }

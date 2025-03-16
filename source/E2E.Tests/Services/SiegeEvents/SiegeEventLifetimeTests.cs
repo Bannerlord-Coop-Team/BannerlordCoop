@@ -8,6 +8,7 @@ using System.Reflection;
 using Xunit.Abstractions;
 using static Common.Extensions.ReflectionExtensions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace E2E.Tests.Services.SiegeEvents;
 
@@ -26,9 +27,9 @@ public class SiegeEventLifetimeTests : IDisposable
         disabledMethods = new List<MethodBase>
         {
             AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+            AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
         };
-
-        disabledMethods.AddRange(AccessTools.GetDeclaredConstructors(typeof(SiegeEvent)));
     }
 
     public void Dispose()

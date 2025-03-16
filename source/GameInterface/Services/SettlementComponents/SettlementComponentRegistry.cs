@@ -1,24 +1,16 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.SettlementComponents;
 internal class SettlementComponentRegistry : RegistryBase<SettlementComponent>
 {
     private const string SettlementComponentIdPrefix = "CoopSettlementComponent";
-    private static int InstanceCounter = 0;
-
-    public override IEnumerable<Type> ManagedTypes { get; } = new Type[]
-    {
-        typeof(SettlementComponent),
-        typeof(Fief),
-        typeof(Town),
-        typeof(Village),
-        typeof(Hideout),
-        typeof(RetirementSettlementComponent),
-    };
+    private int InstanceCounter = 0;
 
     public SettlementComponentRegistry(IRegistryCollection collection) : base(collection)
     {
@@ -32,9 +24,10 @@ internal class SettlementComponentRegistry : RegistryBase<SettlementComponent>
         settlementComponents.AddRange(Village.All);
         settlementComponents.AddRange(Hideout.All);
 
-        foreach (var settlement in settlementComponents)
+        foreach (var settlementComponent in settlementComponents.DistinctBy(comp => comp.StringId))
         {
-            RegisterExistingObject(settlement.StringId, settlement);
+            var networkId = $"{nameof(SettlementComponent)}_{settlementComponent.StringId}";
+            RegisterExistingObject(networkId, settlementComponent);
         }
     }
 

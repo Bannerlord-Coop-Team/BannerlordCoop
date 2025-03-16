@@ -55,7 +55,9 @@ public class VillagerPartyComponentTests : IDisposable
             Assert.IsType<VillagerPartyComponent>(newParty.PartyComponent);
             VillagerPartyComponent villagers = (VillagerPartyComponent)newParty.PartyComponent;
 
-            Assert.Equal(villageId, villagers.Village.StringId);
+            client.ObjectManager.TryGetId(villagers.Village, out string clientVillageId);
+
+            Assert.Equal(villageId, clientVillageId);
         }
     }
 

@@ -2,6 +2,8 @@
 using Common.LogicStates;
 using Coop.Core.Client.States;
 using Serilog;
+using System;
+using System.Collections.Generic;
 
 namespace Coop.Core.Client;
 
@@ -27,6 +29,11 @@ public class ClientLogic : IClientLogic
     public IStateFactory StateFactory { get; }
     public string ControlledHeroId { get; set; }
     private IClientState InitialState => StateFactory.CreateClientState<MainMenuState>(this);
+    private readonly HashSet<Type> RunningStates = new HashSet<Type>
+    {
+        typeof(MissionState),
+        typeof(CampaignState),
+    };
     public IClientState State 
     {
         get 
@@ -42,6 +49,8 @@ public class ClientLogic : IClientLogic
             _state = value;
         } 
     }
+
+    public bool RunningState => RunningStates.Contains(_state.GetType());
 
     private IClientState _state;
 

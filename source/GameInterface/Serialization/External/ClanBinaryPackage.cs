@@ -32,27 +32,23 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            stringId = Object.StringId;
+            stringId = ResolveId(Object);
 
             base.PackFields();
             
-            supporterNotablesIds = PackIds(Object._supporterNotablesCache);
-            lordsIds = PackIds(Object._lordsCache);
-            heroesIds = PackIds(Object._heroesCache);
-            companionsIds = PackIds(Object._companionsCache);
+            supporterNotablesIds = ResolveIds(Object._supporterNotablesCache);
+            lordsIds = ResolveIds(Object._lordsCache);
+            heroesIds = ResolveIds(Object._heroesCache);
+            companionsIds = ResolveIds(Object._companionsCache);
         }
 
         protected override void UnpackInternal()
         {
-            // If the stringId already exists in the object manager use that object
-            if (stringId != null)
+            var resolvedObj = ResolveObject<Clan>(stringId);
+            if (resolvedObj != null)
             {
-                var newObject = ResolveId<Clan>(stringId);
-                if (newObject != null)
-                {
-                    Object = newObject;
-                    return;
-                }
+                Object = resolvedObj;
+                return;
             }
 
             Object.InitMembers();
@@ -60,10 +56,10 @@ namespace GameInterface.Serialization.External
             base.UnpackFields();
 
             // Unpack special cases
-            Object._supporterNotablesCache = ResolveIds<Hero>(supporterNotablesIds).ToMBList();
-            Object._lordsCache = ResolveIds<Hero>(lordsIds).ToMBList();
-            Object._heroesCache = ResolveIds<Hero>(heroesIds).ToMBList();
-            Object._companionsCache = ResolveIds<Hero>(companionsIds).ToMBList();
+            Object._supporterNotablesCache = ResolveObjects<Hero>(supporterNotablesIds).ToMBList();
+            Object._lordsCache = ResolveObjects<Hero>(lordsIds).ToMBList();
+            Object._heroesCache = ResolveObjects<Hero>(heroesIds).ToMBList();
+            Object._companionsCache = ResolveObjects<Hero>(companionsIds).ToMBList();
         }
     }
 }

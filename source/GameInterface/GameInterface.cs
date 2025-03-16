@@ -28,7 +28,6 @@ public class GameInterface : IGameInterface
 
     public void Dispose()
     {
-        UnpatchAll();
     }
 
     public void PatchAll()
@@ -46,11 +45,6 @@ public class GameInterface : IGameInterface
 
     public void UnpatchAll()
     {
-        if (Harmony.HasAnyPatches(GameInterfaceModule.HarmonyId) == false) return;
-
-        foreach (var patch in harmony.GetPatchedMethods())
-        {
-            harmony.Unpatch(patch, HarmonyPatchType.All, harmony.Id);
-        }
+        harmony.UnpatchAll();
     }
 }
