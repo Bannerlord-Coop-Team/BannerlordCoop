@@ -68,10 +68,10 @@ namespace GameInterface.DynamicSync
             List<Assembly> assemblies = new List<Assembly>
             {
                 Assembly.GetExecutingAssembly(),
-                Assembly.Load("System.Runtime"),
-                Assembly.Load("System.Private.CoreLib"),
-                Assembly.Load("System.Collections"),
-                Assembly.Load("System.Linq"),
+                typeof(System.Collections.ArrayList).Assembly,
+                typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly,
+                typeof(System.Linq.Enumerable).Assembly,
+                typeof(Queue<>).Assembly,
                 typeof(Console).Assembly
             };
             foreach (var assemblyName in Assembly.GetExecutingAssembly().GetReferencedAssemblies())
@@ -139,6 +139,7 @@ namespace GameInterface.DynamicSync
                 }
                 else
                 {
+                    // Register all Messages with the SerializationTypeMapper
                     return Assembly.Load(assemblyStream.GetBuffer());
                 }
             }

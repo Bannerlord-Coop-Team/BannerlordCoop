@@ -21,32 +21,32 @@ namespace GameInterface.Services.Towns.Handlers
     {
         public TownCollectionHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network) : base(messageBroker, objectManager, network)
         {
-            Subscribe<Workshop[], WorkshopsSet>(WorkshopsSetHandler);
-            SubscribeNetwork<Workshop[], NetworkWorkshopsSet>(NetworkWorkshopsSetHandler);
+            //Subscribe<Workshop[], WorkshopsSet>(WorkshopsSetHandler);
+            //SubscribeNetwork<Workshop[], NetworkWorkshopsSet>(NetworkWorkshopsSetHandler);
 
-            Subscribe<Workshop, WorkshopsChanged>(WorkshopsChangedHandler);
-            SubscribeNetwork<Workshop, NetworkWorkshopsChanged>(NetworkWorkshopsChangedHandler);
+            //Subscribe<Workshop, WorkshopsChanged>(WorkshopsChangedHandler);
+            //SubscribeNetwork<Workshop, NetworkWorkshopsChanged>(NetworkWorkshopsChangedHandler);
 
-            SubscribeGenericReference<Building, BuildingsAdded, NetworkBuildingsAdded>();
-            SubscribeNetworkReference<Building, NetworkBuildingsAdded>((instance,value,_) => { instance.Buildings.Add(value); });
+            //SubscribeGenericReference<Building, BuildingsAdded, NetworkBuildingsAdded>();
+            //SubscribeNetworkReference<Building, NetworkBuildingsAdded>((instance,value,_) => { instance.Buildings.Add(value); });
 
-            SubscribeGenericReference<Building, BuildingsRemoved, NetworkBuildingsRemoved>();
-            SubscribeNetworkReference<Building, NetworkBuildingsRemoved>((instance, value, _) => { instance.Buildings.Remove(value); });
+            //SubscribeGenericReference<Building, BuildingsRemoved, NetworkBuildingsRemoved>();
+            //SubscribeNetworkReference<Building, NetworkBuildingsRemoved>((instance, value, _) => { instance.Buildings.Remove(value); });
 
-            Subscribe<Queue<Building>, BuildingsInProgressSet>(BuildingsInProgressSetHandler);
-            SubscribeNetwork<Queue<Building>, NetworkBuildingsInProgressSet>(NetworkBuildingsInProgressSetHandler);
+            //Subscribe<Queue<Building>, BuildingsInProgressSet>(BuildingsInProgressSetHandler);
+            //SubscribeNetwork<Queue<Building>, NetworkBuildingsInProgressSet>(NetworkBuildingsInProgressSetHandler);
 
-            SubscribeGenericReference<Building, BuildingsInProgressAdded, NetworkBuildingsInProgressAdded>();
-            SubscribeNetworkReference<Building, NetworkBuildingsInProgressAdded>((instance, value, _) => { instance.BuildingsInProgress.Enqueue(value); });
+            //SubscribeGenericReference<Building, BuildingsInProgressAdded, NetworkBuildingsInProgressAdded>();
+            //SubscribeNetworkReference<Building, NetworkBuildingsInProgressAdded>((instance, value, _) => { instance.BuildingsInProgress.Enqueue(value); });
 
-            SubscribeGenericReference<Building, BuildingsInProgressRemoved, NetworkBuildingsInProgressRemoved>();
-            SubscribeNetworkReference<Building, NetworkBuildingsInProgressRemoved>((instance, _, _) => { instance.BuildingsInProgress.Dequeue(); });
+            //SubscribeGenericReference<Building, BuildingsInProgressRemoved, NetworkBuildingsInProgressRemoved>();
+            //SubscribeNetworkReference<Building, NetworkBuildingsInProgressRemoved>((instance, _, _) => { instance.BuildingsInProgress.Dequeue(); });
 
-            SubscribeGenericReference<Village, TradeBoundVillagesCacheAdded, NetworkTradeBoundVillagesCacheAdded>();
-            SubscribeNetworkReference<Village, NetworkTradeBoundVillagesCacheAdded>((instance, value, _) => { instance.TradeBoundVillages.Add(value); });
+            //SubscribeGenericReference<Village, TradeBoundVillagesCacheAdded, NetworkTradeBoundVillagesCacheAdded>();
+            //SubscribeNetworkReference<Village, NetworkTradeBoundVillagesCacheAdded>((instance, value, _) => { instance.TradeBoundVillages.Add(value); });
 
-            SubscribeGenericReference<Village, TradeBoundVillagesCacheRemoved, NetworkTradeBoundVillagesCacheRemoved>();
-            SubscribeNetworkReference<Village, NetworkTradeBoundVillagesCacheRemoved>((instance, value, _) => { instance.TradeBoundVillages.Remove(value); });
+            //SubscribeGenericReference<Village, TradeBoundVillagesCacheRemoved, NetworkTradeBoundVillagesCacheRemoved>();
+            //SubscribeNetworkReference<Village, NetworkTradeBoundVillagesCacheRemoved>((instance, value, _) => { instance.TradeBoundVillages.Remove(value); });
         }
 
         private void WorkshopsSetHandler(string instanceId, WorkshopsSet data)

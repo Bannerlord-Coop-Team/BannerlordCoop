@@ -628,8 +628,9 @@ namespace GameInterface.Utils
         {
             var fieldInfo = fieldInfoCache[typeof(TInstance)][fieldName];
 
+            var fieldValue = (TItem)fieldInfo.GetValue(instance);
             // Skip if value hasn´t changed
-            if (fieldInfo.GetValue(instance).Equals(item))
+            if ((fieldValue == null && item == null) || item.Equals(fieldValue))
                 return;
 
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -686,8 +687,9 @@ namespace GameInterface.Utils
         {
             var propertyInfo = propertyInfoCache[typeof(TInstance)][propertyName];
 
+            var propertyValue = (TItem)propertyInfo.GetValue(instance);
             //// Skip if value hasn´t changed
-            if (propertyInfo.GetValue(instance).Equals(item))
+            if ((propertyValue == null && item == null) || item.Equals(propertyValue))
                 return;
 
             if (CallOriginalPolicy.IsOriginalAllowed())

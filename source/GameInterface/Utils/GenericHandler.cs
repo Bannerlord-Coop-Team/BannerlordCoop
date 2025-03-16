@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.LocalEvents;
 using GameInterface.Utils.NetworkEvents;
@@ -67,7 +68,9 @@ namespace GameInterface.Utils
             {
                 var data = payload.What;
                 if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
+                AllowedThread.AllowThisThread();
                 messageHandler(instance, data);
+                AllowedThread.RevokeThisThread();
             };
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
@@ -81,7 +84,9 @@ namespace GameInterface.Utils
                 var data = payload.What;
                 if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
                 if (!objectManager.TryGetObject(data.ValueId, out TValue value) && data.ValueId != null) return;
+                AllowedThread.AllowThisThread();
                 messageHandler(instance, value, data);
+                AllowedThread.RevokeThisThread();
             };
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
