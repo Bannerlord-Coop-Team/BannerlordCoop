@@ -37,13 +37,12 @@ internal class ArmyRegistry : IAutoRegistry<Army>
     {
         IEnumerable<Kingdom> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
 
-        int counter = 0;
-
         foreach (var kingdom in kingdoms)
         {
+            int counter = 1;
             foreach (var army in kingdom.Armies)
             {
-                var networkId = "Army_" + kingdom.StringId + counter++;
+                var networkId = $"{nameof(Army)}_{kingdom.StringId}_{counter++}";
                 registry.RegisterExistingObject(networkId, army);
             }
         }

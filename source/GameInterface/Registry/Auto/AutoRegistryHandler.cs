@@ -1,8 +1,11 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf.Meta;
+using Serilog;
+using Serilog.Core;
 using System;
 using TaleWorlds.ObjectSystem;
 
@@ -14,6 +17,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
     public INetwork Network { get; }
     public IObjectManager ObjectManager { get; }
     AutoRegistryCallbacks<T> Callbacks { get; }
+    ILogger Logger { get; } = LogManager.GetLogger<AutoRegistryHandler<T>>();
 
     public AutoRegistryHandler(
         AutoRegistry<T> registry,
@@ -44,11 +48,18 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
     private void Handle_InstanceCreated(MessagePayload<InstanceCreated<T>> payload)
     {
-        ObjectManager.AddNewObject(payload.What.Instance, out var id);
+        if (ObjectManager.AddNewObject(payload.What.Instance, out var id) == false)
+        {
+            Logger.Error("Unable to create new id for {type}", typeof(T).Name);
+            return;
+        }
 
         if (payload.What.Instance is MBObjectBase mBObject)
         {
-            mBObject.StringId = id;
+            using(new AllowedThread())
+            {
+                mBObject.StringId = id;
+            }
         }
 
         // Callback before sent on network
@@ -61,7 +72,19 @@ class AutoRegistryHandler<T> : IHandler where T : class
     {
         var newInstance = ObjectHelper.SkipConstructor<T>();
 
-        ObjectManager.AddExisting(payload.What.InstanceId, newInstance);
+        if (newInstance is MBObjectBase mBObject)
+        {
+            using (new AllowedThread())
+            {
+                mBObject.StringId = payload.What.InstanceId;
+            }
+        }
+
+        if (ObjectManager.AddExisting(payload.What.InstanceId, newInstance) == false)
+        {
+            Logger.Error("Unable to create new id for {type} with id {id}", typeof(T).Name, payload.What.InstanceId);
+            return;
+        }
 
         Callbacks.ClientCreatedCallback?.Invoke(newInstance, payload.What.InstanceId);
     }

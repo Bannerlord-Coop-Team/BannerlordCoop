@@ -1,24 +1,38 @@
 ﻿using Common;
-using GameInterface.Registry;
+using Common.Util;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Text;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Kingdoms;
 
 /// <summary>
 /// Registry for <see cref="Kingdom"/> type
 /// </summary>
-internal class KingdomRegistry : RegistryBase<Kingdom>
+internal class KingdomRegistry : IAutoRegistry<Kingdom>
 {
-    private const string PartyStringIdPrefix = "CoopKingdom";
+    ILogger Logger { get; }
+    public KingdomRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    {
+        Logger = logger;
 
-    public KingdomRegistry(IRegistryCollection collection) : base(collection) { }
+        autoRegistryFactory.RegisterType(this);
+    }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(Kingdom))
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<Kingdom> registry)
     {
         var objectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -30,13 +44,41 @@ internal class KingdomRegistry : RegistryBase<Kingdom>
 
         foreach (var kingdom in objectManager.Kingdoms)
         {
-            RegisterExistingObject(kingdom.StringId, kingdom);
+            registry.RegisterExistingObject(kingdom.StringId, kingdom);
         }
     }
 
-    protected override string GetNewId(Kingdom kingdom)
+    public void OnClientCreated(Kingdom obj, string id)
     {
-        kingdom.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<Kingdom>(PartyStringIdPrefix);
-        return kingdom.StringId;
+        using(new AllowedThread())
+        {
+            obj._activePolicies = new MBList<PolicyObject>();
+            obj._armies = new MBList<Army>();
+            obj.InitializeCachedLists();
+            obj.EncyclopediaText = TextObject.Empty;
+            obj.EncyclopediaTitle = TextObject.Empty;
+            obj.EncyclopediaRulerTitle = TextObject.Empty;
+            obj._midPointCalculated = false;
+            obj._distanceToClosestNonAllyFortificationCacheDirty = true;
+            obj._isEliminated = false;
+            obj.NotAttackableByPlayerUntilTime = CampaignTime.Zero;
+            obj.LastArmyCreationDay = (int)CampaignTime.Now.ToDays;
+        }
+
+        MBObjectManager.Instance?.RegisterPresumedObject(obj);
+
+        Campaign.Current?.CampaignObjectManager?.AddKingdom(obj);
+    }
+
+    public void OnClientDestroyed(Kingdom obj, string id)
+    {
+    }
+
+    public void OnServerCreated(Kingdom obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(Kingdom obj, string id)
+    {
     }
 }

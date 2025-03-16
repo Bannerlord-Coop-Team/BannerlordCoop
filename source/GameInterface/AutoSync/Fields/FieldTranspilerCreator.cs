@@ -622,7 +622,7 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Ldloca, idLocal);
 
         // Try resolve instance id
-        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetId)));
+        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetId)).MakeGenericMethod(objType));
         il.Emit(OpCodes.Brtrue, validLabel);
 
         // Log error

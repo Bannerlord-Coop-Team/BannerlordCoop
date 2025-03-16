@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager.Extensions;
 using HarmonyLib;
@@ -8,6 +9,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
+using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Registry;
@@ -49,6 +52,13 @@ internal class HeroRegistry : IAutoRegistry<Hero>
 
     public void OnClientCreated(Hero obj, string id)
     {
+        using(new AllowedThread())
+        {
+            obj.Init();
+            AccessTools.Field(typeof(Hero), nameof(Hero._children)).SetValue(obj, new MBList<Hero>());
+            AccessTools.Field(typeof(Hero), nameof(Hero._ownedWorkshops)).SetValue(obj, new MBList<Workshop>());
+        }
+
         MBObjectManager.Instance?.RegisterPresumedObject(obj);
 
         Campaign.Current?.CampaignObjectManager?.OnHeroAdded(obj);

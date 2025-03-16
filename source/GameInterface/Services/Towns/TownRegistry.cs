@@ -1,24 +1,23 @@
 ﻿using Common;
-using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Towns;
 internal class TownRegistry : IAutoRegistry<Town>
 {
     ILogger Logger { get; }
-    public TownRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    IObjectManager ObjectManager { get; }
+
+    public TownRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
     {
         Logger = logger;
-
+        ObjectManager = objectManager;
         autoRegistryFactory.RegisterType(this);
     }
 
@@ -39,6 +38,8 @@ internal class TownRegistry : IAutoRegistry<Town>
 
     public void OnClientCreated(Town obj, string id)
     {
+        var networkId = $"{nameof(Fief)}_{id}";
+        ObjectManager.AddExisting<Fief>(networkId, obj);
     }
 
     public void OnClientDestroyed(Town obj, string id)
@@ -47,6 +48,9 @@ internal class TownRegistry : IAutoRegistry<Town>
 
     public void OnServerCreated(Town obj, string id)
     {
+
+        var networkId = $"{nameof(Fief)}_{id}";
+        ObjectManager.AddExisting<Fief>(networkId, obj);
     }
 
     public void OnServerDestroyed(Town obj, string id)

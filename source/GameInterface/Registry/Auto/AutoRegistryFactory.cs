@@ -101,7 +101,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
 
     private void ValidateConstructorTypes(IEnumerable<MethodBase> ctros, Type expectedType)
     {
-        var exceptions = ctros.Where(ctor => ctor?.DeclaringType != expectedType).Select(ctor =>
+        var exceptions = ctros.Where(ctor => expectedType.IsAssignableFrom(ctor?.DeclaringType) == false).Select(ctor =>
         {
             return new InvalidOperationException($"Constructor does not match type {expectedType} instead was {ctor.DeclaringType}");
         });

@@ -23,9 +23,9 @@ public interface IAutoRegistry<T> where T : class
 
 public class AutoRegistry<T> : RegistryBase<T> where T : class
 {
-    readonly static string InstanceId = $"Coop{typeof(T)}";
+    private static readonly string InstanceId = $"Coop_{typeof(T)}";
 
-    static int InstanceCounter = 0;
+    private static int InstanceCounter = 0;
 
     public Action<AutoRegistry<T>> RegisterAllCallback { get; }
 
@@ -42,19 +42,6 @@ public class AutoRegistry<T> : RegistryBase<T> where T : class
 
     protected override string GetNewId(T obj)
     {
-        var newId = $"{InstanceId}_{Interlocked.Increment(ref InstanceCounter)}";
-
-        // Set object string id if it is a MBObjectBase
-        // This is to keep the current network id in the save system so
-        // save tranfers have enough data to resolve network ids
-        if (obj is MBObjectBase mbObject)
-        {
-            using(new AllowedThread())
-            {
-                mbObject.StringId = newId;
-            }
-        }
-
-        return newId;
+        return $"{InstanceId}_{Interlocked.Increment(ref InstanceCounter)}";
     }
 }

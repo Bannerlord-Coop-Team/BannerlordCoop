@@ -27,7 +27,7 @@ public class ClanCreationTests : IDisposable
         string? clanId = null;
         server.Call(() =>
         {
-            var clan = Clan.CreateClan("TestClan");
+            var clan = new Clan();
             Assert.True(server.ObjectManager.TryGetId(clan, out clanId));
         });
 
@@ -52,7 +52,7 @@ public class ClanCreationTests : IDisposable
         Clan? clan = null;
         client.Call(() =>
         {
-            clan = Clan.CreateClan("TestClan");
+            clan = new Clan();
         });
 
         // Assert

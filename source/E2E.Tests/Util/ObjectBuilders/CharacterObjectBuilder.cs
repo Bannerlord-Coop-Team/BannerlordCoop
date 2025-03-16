@@ -41,6 +41,8 @@ internal class CharacterObjectBuilder : IObjectBuilder
 
         characterObject.Culture = (CultureObject)(new CultureBuilder().Build());
 
+        characterObject.DefaultCharacterSkills = new MBCharacterSkills();
+
         return characterObject;
     }
 }
