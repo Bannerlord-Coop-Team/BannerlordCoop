@@ -265,7 +265,7 @@
     </ItemGroup>
     <ItemGroup>
       <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </EmbeddedResource>
     </ItemGroup>
     <ItemGroup>

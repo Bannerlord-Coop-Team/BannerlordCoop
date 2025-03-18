@@ -1,24 +1,12 @@
-﻿using Microsoft.CodeAnalysis.CSharp;
+﻿using GameInterface.Services.ObjectManager;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using System.IO;
 using System.Linq;
-using GameInterface.Services.ObjectManager;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
+using System.Reflection;
 using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade.GauntletUI.Widgets.Tutorial;
-using Serilog.Events;
-using TaleWorlds.SaveSystem.Definition;
-using TaleWorlds.Diamond;
-using System.Reflection.Metadata.Ecma335;
-using TaleWorlds.Network;
-using GameInterface.Services.Towns.Messages.Collections;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
-using HarmonyLib;
-using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
 
 namespace GameInterface.DynamicSync
 {
@@ -87,7 +75,6 @@ namespace GameInterface.DynamicSync
             }
 
 
-
             List<SyntaxTree> syntaxTrees = new List<SyntaxTree>();
 
             if (Directory.Exists($@"{DebugPath}"))
@@ -147,14 +134,14 @@ namespace GameInterface.DynamicSync
 
         private IEnumerable<string> AllowPrivateAccess(List<DynamicPatchInfo> dynamicPatchInfos)
         {
-            var assemblies = new List<Assembly>();
-            assemblies.AddRange(dynamicPatchInfos.SelectMany(mi => mi.MemberInfos.Select(m =>
-            m.MemberInfo is FieldInfo ?
-                ((FieldInfo)m.MemberInfo).FieldType.Assembly :
-                ((PropertyInfo)m.MemberInfo).PropertyType.Assembly
-            )));
+            var assemblies = dynamicPatchInfos.SelectMany(mi => mi.MemberInfos.Select(memberInfo =>
+            {
+                if (memberInfo.MemberInfo is FieldInfo fieldInfo) return fieldInfo.FieldType.Assembly;
+                if (memberInfo.MemberInfo is PropertyInfo propertyInfo) return propertyInfo.PropertyType.Assembly;
 
-            assemblies.AddRange(dynamicPatchInfos.Select(dp => dp.DeclaringType.Assembly));
+                throw new NotSupportedException($"{memberInfo.GetType()} is not supported by {nameof(DynamicSyncRegistry)}");
+            }))
+            .Concat(dynamicPatchInfos.Select(patchInfo => patchInfo.DeclaringType.Assembly));
 
             // Allow access from dynamic assembly to private types
             foreach (var assembly in assemblies.Distinct())

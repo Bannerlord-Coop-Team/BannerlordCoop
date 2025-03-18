@@ -1,0 +1,34 @@
+﻿using GameInterface.Services.MobileParties.Patches;
+using HarmonyLib;
+using System;
+using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using System.Text;
+{{~ for lib in Libraries ~}}
+using {{ lib }};
+{{~ end ~}}
+
+namespace GameInterface.DynamicSync.{{ Namespace }};
+
+[HarmonyPatch(typeof({{ PropertyDeclaringType }}))]
+internal class PropertySetPrefixTemplate
+{{ "{" }}
+    [HarmonyPatch(nameof({{ PropertyDeclaringType }}.{{ PropertyName }}), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static void {{ PropertyName }}Prefix({{ PropertyDeclaringType }} __instance, {{ PropertyType }} value)
+    {{ "{" }}
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        if (ModInformation.IsClient)
+        {{ "{" }}
+            Logger.Error("Client tried to set {{ PropertyDeclaringType }}.{{ PropertyName }}\n"
+                + "Callstack: {callstack}", Environment.StackTrace);
+            return;
+        {{ "}" }}
+
+        var message = new {{ MessageName }}(__instance, value);
+        MessageBroker.Instance.Publish(__instance, message);
+
+        return;
+    {{ "}" }}
+{{ "}" }}
