@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.Library;
+using TaleWorlds.SaveSystem.Save;
 
 namespace GameInterface.DynamicSync
 {
@@ -56,12 +57,30 @@ namespace GameInterface.DynamicSync
             List<Assembly> assemblies = new List<Assembly>
             {
                 Assembly.GetExecutingAssembly(),
-                typeof(System.Collections.ArrayList).Assembly,
-                typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly,
-                typeof(System.Linq.Enumerable).Assembly,
-                typeof(Queue<>).Assembly,
-                typeof(Console).Assembly
             };
+
+            // We need to load different dlls based on the runtime
+            // currently the games runs .netframework 4.7.2
+            // but tests uses .net 6.0
+            if(System.Environment.Version.Major <= 4)
+            {
+                assemblies.Add(typeof(System.Collections.ArrayList).Assembly);
+                assemblies.Add(typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly);
+                assemblies.Add(typeof(System.Linq.Enumerable).Assembly);
+                assemblies.Add(typeof(Queue<>).Assembly);
+                assemblies.Add(typeof(Console).Assembly);
+            }
+            else
+            {
+                assemblies.Add(typeof(System.Linq.Enumerable).Assembly);
+                assemblies.Add(typeof(Queue<>).Assembly);
+                assemblies.Add(Assembly.GetExecutingAssembly());
+                assemblies.Add(Assembly.Load("System.Runtime"));
+                assemblies.Add(Assembly.Load("System.Private.CoreLib"));
+                assemblies.Add(Assembly.Load("System.Collections"));
+                assemblies.Add(typeof(Console).Assembly);
+
+            }
             foreach (var assemblyName in Assembly.GetExecutingAssembly().GetReferencedAssemblies())
             {
                 assemblies.Add(Assembly.Load(assemblyName));
