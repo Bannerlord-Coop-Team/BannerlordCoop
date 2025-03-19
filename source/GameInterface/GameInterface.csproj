@@ -64,6 +64,7 @@
     <Compile Remove="DynamicSync\Templates\Transpilers\PropertyListTranspilerTemplate.cs" />
     <Compile Remove="DynamicSync\Templates\Transpilers\PropertyMBListTranspilerTemplate.cs" />
     <Compile Remove="DynamicSync\Templates\Transpilers\PropertyQueueTranspilerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyTranspilerTemplate.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
@@ -300,6 +301,7 @@
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericMessageTemplate.cs">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </EmbeddedResource>
+      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyTranspilerTemplate.cs" />
     </ItemGroup>
   <ItemGroup>
     <Publicize Include="SandBox" />
