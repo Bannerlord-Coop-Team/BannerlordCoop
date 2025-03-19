@@ -121,8 +121,7 @@ namespace GameInterface.DynamicSync
 
                 if (!result.Success)
                 {
-                    Console.WriteLine("Do Error handling here");
-                    return null;
+                    throw new InvalidOperationException();
                 }
                 else
                 {
