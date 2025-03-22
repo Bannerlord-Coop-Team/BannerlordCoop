@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -12,19 +12,24 @@ namespace GameInterface.Services.MapEvents;
 internal class MapEventSideRegistry : RegistryBase<MapEventSide>
 {
     private const string MapEventSideIdPrefix = "CoopMapEventSide";
-    private static int InstanceCounter = 0;
+    private int InstanceCounter = 0;
 
     public MapEventSideRegistry(IRegistryCollection collection) : base(collection) { }
 
     public override void RegisterAll()
     {
-        foreach (var side in Campaign.Current.MapEventManager.MapEvents.SelectMany(mapEvent => mapEvent._sides))
+        foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (side == null) continue;
+            int counter = 1;
 
-            if (RegisterNewObject(side, out var _) == false)
+            foreach (var side in mapEvent._sides)
             {
-                Logger.Error($"Unable to register {side}");
+                if (side == null) continue;
+
+                var networkId = nameof(MapEventSide) + "_" + mapEvent.StringId + "_" + counter++;
+
+                if (RegisterExistingObject(networkId, side) == false)
+                    Logger.Error("Unable to register MapEventSide {id} in the object manager", side.ToString());
             }
         }
     }

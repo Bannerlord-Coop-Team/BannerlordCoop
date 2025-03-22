@@ -30,7 +30,7 @@ internal class GameStateInterface : IGameStateInterface
 
     public void LoadSaveGame(byte[] saveData)
     {
-        GameLoopRunner.RunOnMainThread(() => InteralLoadSaveGame(saveData));
+        GameLoopRunner.RunOnMainThread(() => InteralLoadSaveGame(saveData), blocking: true);
     }
 
     private void InteralLoadSaveGame(byte[] saveData)

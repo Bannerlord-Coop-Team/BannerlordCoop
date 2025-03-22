@@ -18,12 +18,12 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            StringId = Object.StringId;
+            StringId = ResolveId(Object);
         }
 
         protected override void UnpackInternal()
         {
-            Object = ResolveId<CharacterAttribute>(StringId);
+            Object = ResolveObject<CharacterAttribute>(StringId);
         }
     }
 }

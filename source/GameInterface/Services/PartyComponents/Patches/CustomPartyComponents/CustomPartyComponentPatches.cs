@@ -10,7 +10,10 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Localization;
 
@@ -88,11 +91,14 @@ public class CustomPartyComponentPatches
 
     public static void HomeSettlementIntercept(CustomPartyComponent instance, Settlement newSettlement)
     {
+        if (instance._homeSettlement == newSettlement) return;
+
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             instance._homeSettlement = newSettlement;
             return;
         }
+
         if (ModInformation.IsClient)
         {
             Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);

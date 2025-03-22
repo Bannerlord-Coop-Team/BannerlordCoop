@@ -1,31 +1,68 @@
-﻿using GameInterface.Services.Registry;
-using System.Threading;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 
-namespace GameInterface.Services.Armies;
-
-/// <summary>
-/// Registry for <see cref="CharacterObject"/> type
-/// </summary>
-internal class CharacterObjectRegistry : RegistryBase<CharacterObject>
+namespace GameInterface.Services.CharacterObjects;
+internal class CharacterObjectRegistry : IAutoRegistry<CharacterObject>
 {
-    private const string CharacterObjectPrefix = "CoopCharacterObject";
-    private static int InstanceCounter = 0;
+    ILogger Logger { get; }
+    IObjectManager ObjectManager { get; }
 
-    public CharacterObjectRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override void RegisterAll()
+    public CharacterObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
     {
-        foreach (CharacterObject character in Campaign.Current.Characters)
-        {
-            if (TryGetId(character, out _)) continue;
+        Logger = logger;
+        ObjectManager = objectManager;
+        autoRegistryFactory.RegisterType(this);
+    }
 
-            RegisterExistingObject(character.StringId, character);
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] { 
+        AccessTools.Constructor(typeof(CharacterObject))
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<CharacterObject> registry)
+    {
+        foreach (CharacterObject character in CharacterObject.All)
+        {
+            registry.RegisterExistingObject(character.StringId, character);
         }
     }
 
-    protected override string GetNewId(CharacterObject obj)
+    public void OnClientCreated(CharacterObject obj, string id)
     {
-        return $"{CharacterObjectPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+        var networkId = $"{nameof(BasicCharacterObject)}_{id}";
+        ObjectManager.AddExisting<BasicCharacterObject>(networkId, obj);
+    }
+
+    public void OnClientDestroyed(CharacterObject obj, string id)
+    {
+        var networkId = $"{nameof(BasicCharacterObject)}_{id}";
+
+        if (ObjectManager.TryGetObject<BasicCharacterObject>(networkId, out var resolvedObj) == false) return;
+
+        ObjectManager.Remove(resolvedObj);
+    }
+
+    public void OnServerCreated(CharacterObject obj, string id)
+    {
+        var networkId = $"{nameof(BasicCharacterObject)}_{id}";
+        ObjectManager.AddExisting<BasicCharacterObject>(networkId, obj);
+    }
+
+    public void OnServerDestroyed(CharacterObject obj, string id)
+    {
+        var networkId = $"{nameof(BasicCharacterObject)}_{id}";
+
+        if (ObjectManager.TryGetObject<BasicCharacterObject>(networkId, out var resolvedObj) == false) return;
+
+        ObjectManager.Remove(resolvedObj);
     }
 }

@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System.Threading;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
@@ -9,7 +9,7 @@ namespace GameInterface.Services.Workshops
     internal class WorkshopRegistry : RegistryBase<Workshop>
     {
         private const string WorkshopIdPrefix = $"Coop{nameof(Workshop)}";
-        private static int InstanceCounter = 0;
+        private int InstanceCounter = 0;
 
         public WorkshopRegistry(IRegistryCollection collection) : base(collection) { }
 
@@ -25,9 +25,12 @@ namespace GameInterface.Services.Workshops
 
             foreach (Town town in Town.AllTowns)
             {
+                int counter = 1;
+
                 foreach (Workshop workshop in town.Workshops)
                 {
-                    RegisterNewObject(workshop, out var _);
+                    var networkId = $"{nameof(Workshop)}_{town.StringId}_{counter++}";
+                    RegisterExistingObject(networkId, workshop);
                 }
             }
         }

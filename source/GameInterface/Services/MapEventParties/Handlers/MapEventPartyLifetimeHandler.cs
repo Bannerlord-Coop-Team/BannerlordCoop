@@ -8,6 +8,7 @@ using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.MapEventParties.Handlers
 {
@@ -57,6 +58,9 @@ namespace GameInterface.Services.MapEventParties.Handlers
                 using (new AllowedThread())
                 {
                     var newMapEventParty = ObjectHelper.SkipConstructor<MapEventParty>();
+
+                    newMapEventParty._woundedInBattle = new TroopRoster();
+                    newMapEventParty._diedInBattle = new TroopRoster();
 
                     if (objectManager.AddExisting(obj.MapEventPartyId, newMapEventParty) == false)
                     {

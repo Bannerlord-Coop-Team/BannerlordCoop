@@ -1,40 +1,62 @@
-﻿using GameInterface.Services.Registry;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using System;
-using System.Threading;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Alleys;
-
-/// <summary>
-/// Registry for <see cref="Alley"/> type
-/// </summary>
-internal class AlleyRegistry : RegistryBase<Alley>
+internal class AlleyRegistry : IAutoRegistry<Alley>
 {
-    private const string AlleyIdPrefix = "CoopAlley";
-    private static int InstanceCounter = 0;
-
-    public AlleyRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override void RegisterAll()
+    ILogger Logger { get; }
+    public AlleyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        foreach(Settlement settlement in Campaign.Current.Settlements)
-        {
-            if(settlement.Town == null) continue;
+        Logger = logger;
 
-            foreach(Alley alley in settlement.Alleys)
+        autoRegistryFactory.RegisterType(this);
+    }
+
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(Alley), new Type[] { typeof(Settlement), typeof(string), typeof(TextObject) })
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<Alley> registry)
+    {
+        
+        foreach (Settlement settlement in Campaign.Current.Settlements)
+        {
+            if (settlement.Town == null) continue;
+
+            int counter = 0;
+
+            foreach (Alley alley in settlement.Alleys)
             {
-                if (RegisterNewObject(alley, out var _) == false)
-                {
+                var networkId = "Alley_" + settlement.StringId + counter++;
+                if (registry.RegisterExistingObject(networkId, alley) == false) 
                     Logger.Error($"Unable to register {alley}");
-                }
             }
         }
     }
 
-    protected override string GetNewId(Alley obj)
+    public void OnClientCreated(Alley obj, string id)
     {
-        return $"{AlleyIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+    }
+
+    public void OnClientDestroyed(Alley obj, string id)
+    {
+    }
+
+    public void OnServerCreated(Alley obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(Alley obj, string id)
+    {
     }
 }

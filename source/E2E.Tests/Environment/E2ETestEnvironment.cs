@@ -1,19 +1,17 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Tests.Utils;
+using Common.Util;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
-using Newtonsoft.Json.Linq;
-using Serilog;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
-using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Environment;
@@ -21,46 +19,65 @@ namespace E2E.Tests.Environment;
 /// <summary>
 /// Testing environment for End to End testing
 /// </summary>
-internal class E2ETestEnvironment : IDisposable
+internal class E2ETestEnvironment : IDisposable 
 {
-    public ITestOutputHelper Output { get; }
-
     public IEnumerable<EnvironmentInstance> Clients => IntegrationEnvironment.Clients;
     public EnvironmentInstance Server => IntegrationEnvironment.Server;
 
     private TestEnvironment IntegrationEnvironment { get; }
+    
+    private Action<string> TestOutputCallback { get; }
+
 
     private Dictionary<Type, List<string>> StringIdListMappings = new();
 
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
-        LogManager.Configuration = new LoggerConfiguration().WriteTo.TestOutput(output);
+        TestOutputCallback = (logMessage) => output.WriteLine(logMessage);
+
+
+        // Setup logging for tests
+        OutputSinkManager.AddLogCallback(TestOutputCallback);
 
         GameLoopRunner.Instance.SetGameLoopThread();
 
         GameBootStrap.Initialize();
+
+
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
+        // Needs to be before patching
+        SetupAutoSync();
+
+        SetupMainHero();
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
 
-        SetupAutoSync();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
             Server.ObjectManager.AddExisting(settlement.StringId, settlement);
         }
 
-        Output = output;
+    }
 
-        SetupMainHero();
+    public void Dispose()
+    {
+        Server.Dispose();
+
+        foreach (var client in Clients)
+        {
+            client.Dispose();
+        }
+
+        OutputSinkManager.RemoveLogCallback(TestOutputCallback);
+        ContainerProvider.Clear();
     }
 
     private void SetupAutoSync()
     {
         Server.Resolve<IAutoSyncBuilder>().Build();
-        Server.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
         foreach (var client in Clients)
         {
@@ -73,12 +90,29 @@ internal class E2ETestEnvironment : IDisposable
         // Setup main hero
         Server.Call(() =>
         {
-            var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
-            MBObjectManager.Instance.RegisterObject(characterObject);
-            var mainHero = HeroCreator.CreateSpecialHero(characterObject);
-            characterObject.HeroObject = mainHero;
-            Game.Current.PlayerTroop = characterObject;
+            using (new AllowedThread())
+            {
+                var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+                var mainHero = HeroCreator.CreateSpecialHero(characterObject);
+                characterObject.HeroObject = mainHero;
+                Game.Current.PlayerTroop = characterObject;
+            }
         });
+
+
+        foreach(var client in Clients)
+        {
+            client.Call(() =>
+            {
+                using (new AllowedThread())
+                {
+                    var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+                    var mainHero = HeroCreator.CreateSpecialHero(characterObject);
+                    characterObject.HeroObject = mainHero;
+                    Game.Current.PlayerTroop = characterObject;
+                }
+            });
+        }
     }
 
     private void AddToStringIdLists<T>(string instanceId) where T : class
@@ -178,7 +212,7 @@ internal class E2ETestEnvironment : IDisposable
     /// <param name="value">Value to use for assertions has to be of type <typeparamref name="TField"/></param>
     /// <param name="instanceStringId">The specific stringId of the instance to be tested defaults to the first registered instance <typeparamref name="TField"/></param>
     /// <param name="referenceStringId">The specific stringId of the referenced object to be tested defaults to the first registered instance <typeparamref name="TInstance"/></param>
-    public void AssertReferenceField<TInstance, TField>(string fieldName, string? instanceStringId = null, string? referenceStringId = null)
+    public void AssertReferenceField<TInstance, TField>(string fieldName, string? instanceStringId = null, string? referenceStringId = null, TField? defaultValue = null)
         where TInstance : class
         where TField : class
     {
@@ -191,7 +225,7 @@ internal class E2ETestEnvironment : IDisposable
         {
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
             Assert.True(Server.ObjectManager.TryGetObject<TField>(referenceId, out var serverFieldInstance));
-            Assert.Equal(fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
+            Assert.Equal(defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
             intercept.Invoke(null, new object[] { serverInstance, serverFieldInstance });
             Assert.True(serverFieldInstance.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {serverFieldInstance} Actual: {fieldInfo.GetValue(serverInstance)}");
             Assert.NotNull(serverFieldInstance);
@@ -272,10 +306,5 @@ internal class E2ETestEnvironment : IDisposable
             Assert.Same(clientPropertyInstance, propertyInfo.GetValue(clientInstance));
             Assert.NotNull(clientPropertyInstance);
         }
-    }
-
-    public void Dispose()
-    {
-        Server.Resolve<IAutoSyncPatchCollector>().UnpatchAll();
     }
 }

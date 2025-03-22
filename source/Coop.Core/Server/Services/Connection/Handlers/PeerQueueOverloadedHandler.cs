@@ -123,7 +123,7 @@ internal class PeerQueueOverloadedHandler : IHandler
         var numPacketsInQueue = peer.GetPacketsCountInReliableQueue(0, true)
                               + peer.GetPacketsCountInReliableQueue(0, false);
 
-        Logger.Information($"Peer {peer.EndPoint} is catching up with {numPacketsInQueue} packets remaining");
+        Logger.Information($"Peer {peer.Address} is catching up with {numPacketsInQueue} packets remaining");
 
         return numPacketsInQueue == 0;
     }

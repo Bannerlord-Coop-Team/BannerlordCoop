@@ -3,8 +3,8 @@ using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.Core.Client;
 using Coop.Core.Client.States;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Heroes.Messages;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -49,7 +49,7 @@ namespace Coop.Tests.Client.States
             clientLogic.Disconnect();
 
             // Assert
-            Assert.Equal(1, clientComponent.TestMessageBroker.GetMessageCountFromType<EnterMainMenu>());
+            Assert.Single(clientComponent.TestMessageBroker.GetMessagesFromType<EnterMainMenu>());
         }
 
         [Fact]

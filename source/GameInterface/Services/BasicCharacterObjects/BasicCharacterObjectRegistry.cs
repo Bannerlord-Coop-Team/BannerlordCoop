@@ -1,33 +1,53 @@
-﻿using GameInterface.Services.Registry;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using System;
-using System.Threading;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
-namespace GameInterface.Services.BasicCharacterObjects
+namespace GameInterface.Services.BasicCharacterObjects;
+internal class BasicCharacterObjectRegistry : IAutoRegistry<BasicCharacterObject>
 {
-    internal class BasicCharacterObjectRegistry : RegistryBase<BasicCharacterObject>
+    ILogger Logger { get; }
+    public BasicCharacterObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        private const string IdPrefix = "CoopBasicCharacter";
-        private static int InstanceCounter = 0;
+        Logger = logger;
 
-        public BasicCharacterObjectRegistry(IRegistryCollection collection) : base(collection)
+        autoRegistryFactory.RegisterType(this);
+    }
+
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(BasicCharacterObject))
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<BasicCharacterObject> registry)
+    {
+        foreach (CharacterObject character in CharacterObject.All)
         {
+            var networkId = nameof(BasicCharacterObject) + "_" + character.StringId;
+            registry.RegisterExistingObject(networkId, character);
         }
+    }
 
-        public override void RegisterAll()
-        {
-            foreach (BasicCharacterObject character in Campaign.Current.Characters)
-            {
-                if (TryGetId(character, out _)) continue;
+    public void OnClientCreated(BasicCharacterObject obj, string id)
+    {
+    }
 
-                RegisterExistingObject(character.StringId, character);
-            }
-        }
+    public void OnClientDestroyed(BasicCharacterObject obj, string id)
+    {
+    }
 
-        protected override string GetNewId(BasicCharacterObject obj)
-        {
-            return $"{IdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-        }
+    public void OnServerCreated(BasicCharacterObject obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(BasicCharacterObject obj, string id)
+    {
     }
 }

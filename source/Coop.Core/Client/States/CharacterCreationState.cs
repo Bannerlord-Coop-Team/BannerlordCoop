@@ -5,6 +5,7 @@ using Common.Network;
 using Coop.Core.Common;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Messages;
@@ -37,6 +38,7 @@ public class CharacterCreationState : ClientStateBase
         this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
+        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectRegistered);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
     }
@@ -45,11 +47,17 @@ public class CharacterCreationState : ClientStateBase
     {
         messageBroker.Unsubscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Unsubscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
+        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectRegistered);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
     }
 
     internal void Handle_CharacterCreationFinished(MessagePayload<CharacterCreationFinished> obj)
+    {
+        messageBroker.Publish(this, new RegisterAllGameObjects());
+    }
+
+    internal void Handle_AllGameObjectRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
         messageBroker.Publish(this, new PackageMainHero());
     }
@@ -58,6 +66,9 @@ public class CharacterCreationState : ClientStateBase
     {
         var playerId = controllerIdProvider.ControllerId;
         var data = obj.What.Package;
+
+        // Clear all registries so next time the game is loaded, it re-registers loaded save objects
+        messageBroker.Publish(this, new ClearAllRegistries());
 
         network.SendAll(new NetworkTransferedHero(playerId, data));
     }

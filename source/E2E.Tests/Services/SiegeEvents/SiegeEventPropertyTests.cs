@@ -9,6 +9,7 @@ using Xunit.Abstractions;
 using Common.Util;
 using static Common.Extensions.ReflectionExtensions;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace E2E.Tests.Services.SiegeEvents;
 
@@ -29,9 +30,9 @@ public class SiegeEventPropertyTests : IDisposable
         disabledMethods = new List<MethodBase>
         {
             AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+            AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+            AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
         };
-
-        disabledMethods.AddRange(AccessTools.GetDeclaredConstructors(typeof(SiegeEvent)));
 
         // Create SiegeEvent on the server
         siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);

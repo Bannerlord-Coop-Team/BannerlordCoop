@@ -18,7 +18,7 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            settlementStringId = Object.Settlement.StringId;
+            settlementStringId = ResolveId(Object.Settlement);
 
             // CommonArea is generated once per campaign so we can resolve it by
             // Using the index of that common area in it's settlement
@@ -27,7 +27,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Settlement settlement = ResolveId<Settlement>(settlementStringId);
+            Settlement settlement = ResolveObject<Settlement>(settlementStringId);
 
             // CommonArea is generated once per campaign so we can resolve it by
             // Using the index of that common area in it's settlement

@@ -31,9 +31,7 @@ namespace E2E.Tests.Services.CultureObjects
             {
                 CultureObject cultureObject = new CultureObject();
 
-                cultureId = cultureObject.StringId;
-
-                Assert.True(server.ObjectManager.TryGetObject(cultureId, out CultureObject culture));
+                Assert.True(server.ObjectManager.TryGetId(cultureObject, out cultureId));
             });
 
             foreach (var client in TestEnvironment.Clients)

@@ -1,15 +1,12 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.MapEventParties.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace GameInterface.Services.MapEventParties.Patches
 {

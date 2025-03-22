@@ -7,12 +7,15 @@ using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using GameInterface;
+using GameInterface.AutoSync;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
+using HarmonyLib;
+using System;
 
 namespace Coop.Core
 {
-    public class CoopartiveMultiplayerExperience
+    public class CoopartiveMultiplayerExperience : IDisposable
     {
         private readonly IMessageBroker messageBroker;
         private INetworkConfiguration configuration;
@@ -29,6 +32,18 @@ namespace Coop.Core
             messageBroker.Subscribe<HostSaveGame>(Handle);
             messageBroker.Subscribe<EndCoopMode>(Handle);
         }
+
+        public bool Running { get
+            {
+                if (container == null) return false;
+
+                var logic = container.Resolve<ILogic>();
+
+                return logic.RunningState;
+            }
+        }
+
+        public void Dispose() => DestroyContainer();
 
         private void Handle(MessagePayload<AttemptJoin> obj)
         {
@@ -75,8 +90,8 @@ namespace Coop.Core
             GameInterface.ContainerProvider.SetContainer(container);
 
             // Create harmony patches
-            var gameInterface = container.Resolve<IGameInterface>();
-            gameInterface.PatchAll();
+            container.Resolve<IGameInterface>().PatchAll();
+            container.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
             network = container.Resolve<INetwork>();
 
@@ -106,8 +121,8 @@ namespace Coop.Core
             GameInterface.ContainerProvider.SetContainer(container);
 
             // Create harmony patches
-            var gameInterface = container.Resolve<IGameInterface>();
-            gameInterface.PatchAll();
+            container.Resolve<IGameInterface>().PatchAll();
+            container.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
             network = container.Resolve<INetwork>();
 
@@ -117,6 +132,7 @@ namespace Coop.Core
 
         private void DestroyContainer()
         {
+            container?.Resolve<Harmony>().UnpatchAll();
             container?.Dispose();
             container = null;
         }

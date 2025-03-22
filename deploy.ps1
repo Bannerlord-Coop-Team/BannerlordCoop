@@ -42,7 +42,8 @@ if(Test-Path (${BaseDir} + $config.modsDir))
     New-Item -Force -ItemType Directory -Path "${ModDir}\bin" | Out-Null
     New-Item -Force -ItemType Directory -Path "${ModDir}\bin\Win64_Shipping_Client" | Out-Null
     $ModSourceDir = ${SolutionDir} + "\" + $config.name
-    Get-ChildItem -Path "${ModSourceDir}" -Filter "*.dll" -Recurse -ErrorAction Ignore | Where { $_.PSIsContainer -eq $false } | Copy-Item -Destination "${ModDir}\bin\Win64_Shipping_Client"
+    Get-ChildItem -Path "${ModSourceDir}\bin\Debug" -Filter "*.dll" -Recurse -ErrorAction Ignore | Where { $_.PSIsContainer -eq $false } | Copy-Item -Destination "${ModDir}\bin\Win64_Shipping_Client"
+    Get-ChildItem -Path "${ModSourceDir}\bin\Release" -Filter "*.dll" -Recurse -ErrorAction Ignore | Where { $_.PSIsContainer -eq $false } | Copy-Item -Destination "${ModDir}\bin\Win64_Shipping_Client"
     Copy-Item -Force "${DeployDir}\SubModule.xml" -Destination "${ModDir}\"
 }
 

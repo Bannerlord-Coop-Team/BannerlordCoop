@@ -1,10 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Packets;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using Serilog;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers
 {
@@ -15,6 +17,8 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
     /// <seealso cref="GameInterface.Services.MobileParties.Handlers.MobilePartyBehaviorHandler">Game Interface's Handler</seealso>
     public class ClientMobilePartyBehaviorHandler : IHandler
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<ClientMobilePartyBehaviorHandler>();
+
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
 
@@ -42,6 +46,8 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
 
         internal void Handle(MessagePayload<ControlledPartyBehaviorUpdated> obj)
         {
+            Logger.Debug($"Attempting to update party movement X:{obj.What.BehaviorUpdateData.TargetPointX} Y:{obj.What.BehaviorUpdateData.TargetPointY}");
+
             network.SendAll(new RequestMobilePartyBehaviorPacket(obj.What.BehaviorUpdateData));
         }
 

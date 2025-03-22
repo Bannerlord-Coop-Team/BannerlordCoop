@@ -53,7 +53,8 @@ internal class GameObjectCreator
         { typeof(BasicCharacterObject), new DefaultBuilder<BasicCharacterObject>() },
         { typeof(BasicCultureObject), new DefaultBuilder<BasicCultureObject>() },
         { typeof(MBCharacterSkills), new DefaultBuilder<MBCharacterSkills>() },
-        { typeof(MBEquipmentRoster), new DefaultBuilder<MBEquipmentRoster>() }
+        { typeof(MBEquipmentRoster), new DefaultBuilder<MBEquipmentRoster>() },
+        { typeof(MobilePartyAi), new MobilePartyAiBuilder() }
     };
 
     public static T CreateInitializedObject<T>()
