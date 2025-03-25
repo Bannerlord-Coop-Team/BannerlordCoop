@@ -32,6 +32,8 @@ internal class E2ETestEnvironment : IDisposable
 
     private Dictionary<Type, List<string>> StringIdListMappings = new();
 
+    private DynamicSyncRegistry dynamicSyncRegistry;
+
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
         TestOutputCallback = (logMessage) => output.WriteLine(logMessage);
@@ -87,11 +89,10 @@ internal class E2ETestEnvironment : IDisposable
     }
     private void SetupDynamicSync()
     {
-        var registry = Server.Resolve<DynamicSyncRegistry>();
-
+        Server.Resolve<DynamicSyncPatcher>().BindHandlers();
         foreach (var client in Clients)
         {
-            client.Resolve<DynamicSyncPatcher>().BindHandlers(registry);
+            client.Resolve<DynamicSyncPatcher>().BindHandlers();
         }
     }
 
@@ -170,11 +171,9 @@ internal class E2ETestEnvironment : IDisposable
     /// </summary>
     /// <param name="field">Field to get intercept from</param>
     /// <returns>Field intercept as <see cref="MethodInfo"/></returns>
-    public MethodInfo GetIntercept(FieldInfo field)
+    public MethodInfo GetIntercept(FieldInfo field, DynamicMessageAction dynamicMessageAction = DynamicMessageAction.Set)
     {
-        Assert.True(Server.Resolve<IAutoSyncBuilder>().TryGetIntercept(field, out var intercept));
-        // TODO: Add dynamic sync
-        //Assert.True(Server.Resolve<DynamicSyncRegistry>().TryGetIntercept(field, out var intercept));
+        Assert.True(Server.Resolve<DynamicSyncRegistry>().TryGetIntercept(field, out var intercept, dynamicMessageAction));
         return intercept;
     }
 
@@ -199,7 +198,7 @@ internal class E2ETestEnvironment : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
 
             Assert.Equal(fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
-            intercept.Invoke(null, new object[] { serverInstance, value });
+            intercept.Invoke(null, new object[] { serverInstance, value, fieldName });
             Assert.True(value.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {value} Actual: {fieldInfo.GetValue(serverInstance)}");
         });
 
@@ -237,7 +236,7 @@ internal class E2ETestEnvironment : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
             Assert.True(Server.ObjectManager.TryGetObject<TField>(referenceId, out var serverFieldInstance));
             Assert.Equal(defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
-            intercept.Invoke(null, new object[] { serverInstance, serverFieldInstance });
+            intercept.Invoke(null, new object[] { serverInstance, serverFieldInstance, fieldName });
             Assert.True(serverFieldInstance.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {serverFieldInstance} Actual: {fieldInfo.GetValue(serverInstance)}");
             Assert.NotNull(serverFieldInstance);
         });

@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.DynamicSync.Templates;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
@@ -8,13 +9,14 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using TaleWorlds.Diamond;
 using TaleWorlds.Library;
 
 namespace GameInterface.DynamicSync
 {
     public class DynamicSyncRegistry
     {
-
+        private readonly IObjectManager objectManager;
         private readonly DynamicSyncPatchProcessor dynamicSyncPatchProcessor;
 
         private readonly Dictionary<Type, DynamicSyncRegistryItem> registrations = new Dictionary<Type, DynamicSyncRegistryItem>();
@@ -56,16 +58,18 @@ namespace GameInterface.DynamicSync
             return true;
         }
 
-        public Assembly Assembly { get; set; }
+        // TODO: Find a cleaner way of keeping the assembly and handlers for testing purposes
+        public static Assembly Assembly { get; set; }
 
-        public IEnumerable<Type> DynamicHandlers  { get; set; }
+        public static IEnumerable<Type> DynamicHandlers  { get; set; }
 
-        public DynamicSyncRegistry(DynamicSyncPatchProcessor dynamicSyncPatchProcessor)
+        public DynamicSyncRegistry(IObjectManager objectManager, DynamicSyncPatchProcessor dynamicSyncPatchProcessor)
         {
+            this.objectManager = objectManager;
             this.dynamicSyncPatchProcessor = dynamicSyncPatchProcessor;
         }
 
-        public void Build(IObjectManager objectManager)
+        public void Build()
         {
             List<Assembly> assemblies = new List<Assembly>
             {
@@ -155,6 +159,42 @@ namespace GameInterface.DynamicSync
                 }
             }
         }
+
+
+        public bool TryGetIntercept(FieldInfo fieldInfo, out MethodInfo intercept, DynamicMessageAction dynamicMessageAction = DynamicMessageAction.Set)
+        {
+            intercept = null;
+            if (dynamicMessageAction == DynamicMessageAction.None)
+                throw new InvalidOperationException("Not allowed Intercept Access");
+            
+            if (!registrations.TryGetValue(fieldInfo.DeclaringType, out var registryItem))
+                return false;
+            
+            var member = registryItem.Members.FirstOrDefault(m => m == fieldInfo);
+            if (member == null)
+                return false;
+
+            var dynamicPatch = Assembly.GetType($"DynamicSync.{fieldInfo.DeclaringType.Name}DynamicPatches");
+            if (dynamicPatch == null)
+                return false;
+
+            var genericPatch = dynamicPatch.BaseType;
+
+            if(dynamicMessageAction == DynamicMessageAction.Set)
+            {
+                var messageType = Assembly.GetType($"DynamicSync.{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetMessage");
+                var fieldIntercept = genericPatch.GetMethod("FieldIntercept").MakeGenericMethod(fieldInfo.FieldType, messageType);
+                intercept = fieldIntercept;
+            }
+
+            // TODO: Add Intercept for other actions like adding elements to collection
+
+            return true;
+        }
+
+
+        // TODO: Add TryGetIntercept for properties as above without the set part
+
         private IEnumerable<Type> GetDynamicHandlerClasses(Assembly assembly)
         {
             var types = assembly.GetTypes()

@@ -29,16 +29,16 @@ namespace GameInterface.DynamicSync
 
         public Assembly BuildAssembly()
         {
-            dynamicSyncRegistry.Build(objectManager);
+            dynamicSyncRegistry.Build();
 
-            BindHandlers(dynamicSyncRegistry);
+            BindHandlers();
             
-            return dynamicSyncRegistry.Assembly;
+            return DynamicSyncRegistry.Assembly;
         }
 
-        public void BindHandlers(DynamicSyncRegistry registry)
+        public void BindHandlers()
         {
-            serializableTypeMapper.AddTypes(registry.Assembly.GetTypes()
+            serializableTypeMapper.AddTypes(DynamicSyncRegistry.Assembly.GetTypes()
             .Where(type => {
                 try
                 {
@@ -51,7 +51,7 @@ namespace GameInterface.DynamicSync
                 }
             }));
 
-            foreach (var handler in registry.DynamicHandlers)
+            foreach (var handler in DynamicSyncRegistry.DynamicHandlers)
             {
                 dynamicHandler.RegisterHandler(handler);
             }

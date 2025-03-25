@@ -1,6 +1,5 @@
 ﻿using E2E.Tests.Util;
 using GameInterface.Services.Heroes.Patches;
-using GameInterface.Services.Towns.Messages.Collections;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Settlements;

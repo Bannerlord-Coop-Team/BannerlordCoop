@@ -815,7 +815,6 @@ namespace GameInterface.Utils
             }
 
             // TODO: Add some way to verify value has changed to prevent unecessary message flood
-
             var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, value);
             MessageBroker.Instance.Publish(instance, message);
         }

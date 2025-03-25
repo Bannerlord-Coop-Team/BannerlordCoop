@@ -104,8 +104,8 @@ namespace GameInterface.DynamicSync
                 {
                     usings.Add(item);
                 }
-                var template = GetMemberPatches(memberPatchInfo);
 
+                var template = GetMemberPatches(memberPatchInfo);
                 transpilers.AddRange(template.transpilers);
                 prefixes.AddRange(template.prefixes);
             }

@@ -1,13 +1,9 @@
 ﻿using GameInterface.AutoSync;
 using GameInterface.DynamicSync;
-using GameInterface.Services.Towns.Messages.Collections;
 using HarmonyLib;
 using Helpers;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
-using TaleWorlds.CampaignSystem.Settlements.Workshops;
 
 namespace GameInterface.Services.Towns;
 internal class TownDynamicSync : IDynamicSync
@@ -17,8 +13,10 @@ internal class TownDynamicSync : IDynamicSync
         dynamicSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Governor)));
         dynamicSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Security)));
         dynamicSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
+        dynamicSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.LastCapturedBy)));
 
         dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._prosperity)));
+        // TODO: Find out why these 2 values Break Harmony
         //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._wallLevel)));
         //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._isCastle)));
         dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._ownerClan)));
@@ -46,5 +44,11 @@ internal class TownDynamicSync : IDynamicSync
         dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(WorkshopsCampaignBehavior), nameof(WorkshopsCampaignBehavior.BuildArtisanWorkshop)));
         dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(WorkshopsCampaignBehavior), nameof(WorkshopsCampaignBehavior.BuildWorkshopForHeroAtGameStart)));
         dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(WorkshopsCampaignBehavior), nameof(WorkshopsCampaignBehavior.BuildWorkshopsAtGameStart)));
+        dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.DecideProject)));
+        dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.ApplyRebellionConsequencesToSettlement)));
+        dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.CheckAndSetTownRebelliousState)));
+
+        // TODO: Find out why patching this breaks Harmony
+        //dynamicSyncBuilder.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.BuildDevelopmentsAtGameStart)));
     }
 }
