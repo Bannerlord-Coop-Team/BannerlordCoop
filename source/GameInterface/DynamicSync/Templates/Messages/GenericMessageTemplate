@@ -1,0 +1,18 @@
+﻿using GameInterface.Utils.LocalEvents;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace DynamicSync
+{
+    public record {{ MessageType }} : GenericEvent<{{ MemberDeclaringType }}, {{ MemberType }}>
+    {
+        public {{ MessageType }}()
+        {
+        }
+
+        public {{ MessageType }}({{ MemberDeclaringType }} instance, {{ MemberType }} value) : base(instance, value)
+        {
+        }
+    }
+}

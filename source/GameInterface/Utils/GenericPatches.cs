@@ -10,6 +10,9 @@ using Common.Logging;
 using TaleWorlds.Library;
 using System.Linq;
 using GameInterface.Utils.LocalEvents;
+using GameInterface;
+using Newtonsoft.Json.Linq;
+using TaleWorlds.Diamond;
 
 namespace GameInterface.Utils
 {
@@ -22,8 +25,8 @@ namespace GameInterface.Utils
     {
         public static readonly ILogger Logger = LogManager.GetLogger<TPatch>();
 
-        private static Dictionary<Type,Dictionary<string, FieldInfo>> fieldInfoCache = new Dictionary<Type, Dictionary<string, FieldInfo>>();
-        private static Dictionary<Type,Dictionary<string, PropertyInfo>> propertyInfoCache = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
+        private static Dictionary<Type, Dictionary<string, FieldInfo>> fieldInfoCache = new Dictionary<Type, Dictionary<string, FieldInfo>>();
+        private static Dictionary<Type, Dictionary<string, PropertyInfo>> propertyInfoCache = new Dictionary<Type, Dictionary<string, PropertyInfo>>();
 
         public static IEnumerable<MethodBase> TargetMethods()
         {
@@ -369,7 +372,7 @@ namespace GameInterface.Utils
             var enqueueIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueEnqueueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TEnqueueMessage));
             var dequeueMethod = typeof(Queue<TItem>).GetMethod("Dequeue");
             var dequeueIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueDequeueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TDequeueMessage));
-            
+
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsCorrectField(ci, fieldInfo),
                 enqueueMethod,
@@ -513,16 +516,17 @@ namespace GameInterface.Utils
         /// <remarks> Calls should look like:<br /><br />
         /// [HarmonyTranspiler] <br />
         /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
-        /// => ArrayTranspiler&lt;EquipmentElement, ItemSlotsArrayUpdated&gt;(instructions, nameof(Equipment._itemSlots));
+        /// => ArrayFieldChangeTranspiler&lt;EquipmentElement, ItemSlotsArrayUpdated&gt;(instructions, nameof(Equipment._itemSlots));
         /// </remarks>
         /// <returns>The CodeInstructions</returns>
-        public static IEnumerable<CodeInstruction> ArrayChangeTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
+        public static IEnumerable<CodeInstruction> ArrayFieldChangeTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string fieldName)
             where TMessage : GenericArrayChangedEvent<TInstance, TItem>
         {
             var loadStack = new Stack<CodeInstruction>();
-            var itemSlotArrayType = AccessTools.Field(typeof(TInstance), fieldName);
+            var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var arrayAssignIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
 
+            // TODO: Implement properly with loading the correct instance onto the stack before call the method
 
             foreach (var instruction in instructions)
             {
@@ -538,7 +542,52 @@ namespace GameInterface.Utils
                     continue;
                 }
 
-                if (instruction.opcode == OpCodes.Ldfld && instruction.operand as FieldInfo == itemSlotArrayType)
+                if (instruction.opcode == OpCodes.Ldfld && instruction.operand as FieldInfo == fieldInfo)
+                {
+                    loadStack.Push(instruction);
+                }
+
+                yield return instruction;
+            }
+
+        }
+
+        /// <summary>
+        /// Used to transpile arrays
+        /// </summary>
+        /// <typeparam name="TItem">Type of the collection items</typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change has to extend <see cref="GenericArrayChangedEvent{TInstance, TValue}"/></typeparam>
+        /// <param name="instructions">CodeInstructions provided by the calling HarmonyTranspiler</param>
+        /// <remarks> Calls should look like:<br /><br />
+        /// [HarmonyTranspiler] <br />
+        /// static IEnumerable&lt;CodeInstruction&gt; AlleyTranspiler(IEnumerable&lt;CodeInstruction&gt; instructions) <br />
+        /// => ArrayPropertyChangeTranspiler&lt;EquipmentElement, ItemSlotsArrayUpdated&gt;(instructions, nameof(Equipment._itemSlots));
+        /// </remarks>
+        /// <returns>The CodeInstructions</returns>
+        public static IEnumerable<CodeInstruction> ArrayPropertyChangeTranspiler<TItem, TMessage>(IEnumerable<CodeInstruction> instructions, string propertyName)
+            where TMessage : GenericArrayChangedEvent<TInstance, TItem>
+        {
+            var loadStack = new Stack<CodeInstruction>();
+            var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
+            var arrayAssignIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
+
+            // TODO: Implement properly with loading the correct instance onto the stack before call the method
+
+            foreach (var instruction in instructions)
+            {
+                if (loadStack.Count > 0 && instruction.opcode == OpCodes.Stelem_Ref)
+                {
+                    loadStack.Pop();
+
+                    var newInstr = new CodeInstruction(OpCodes.Call, arrayAssignIntercept);
+                    newInstr.labels = instruction.labels;
+
+                    yield return new CodeInstruction(OpCodes.Ldarg_0);
+                    yield return newInstr;
+                    continue;
+                }
+
+                if (instruction.opcode == OpCodes.Ldfld && instruction.operand as PropertyInfo == propertyInfo)
                 {
                     loadStack.Push(instruction);
                 }
@@ -551,7 +600,7 @@ namespace GameInterface.Utils
             where TSetMessage : GenericEvent<TInstance, TItem[]>
             where TChangeMessage : GenericArrayChangedEvent<TInstance, TItem>
         {
-            var patchedInstructions = ArrayChangeTranspiler<TItem, TChangeMessage>(instructions, propertyName);
+            var patchedInstructions = ArrayPropertyChangeTranspiler<TItem, TChangeMessage>(instructions, propertyName);
             return PropertyTranspiler<TItem[], TSetMessage>(patchedInstructions, propertyName);
         }
 
@@ -559,7 +608,7 @@ namespace GameInterface.Utils
             where TSetMessage : GenericEvent<TInstance, TItem[]>
             where TChangeMessage : GenericArrayChangedEvent<TInstance, TItem>
         {
-            var patchedInstructions = ArrayChangeTranspiler<TItem, TChangeMessage>(instructions, fieldName);
+            var patchedInstructions = ArrayFieldChangeTranspiler<TItem, TChangeMessage>(instructions, fieldName);
             return FieldTranspiler<TItem[], TSetMessage>(patchedInstructions, fieldName);
         }
 
@@ -751,6 +800,27 @@ namespace GameInterface.Utils
         }
         #endregion
 
+        #region PropertyPrefix
+        public static void PropertyPrefix<TItem, TMessage>(TInstance instance, TItem value)
+            where TMessage : GenericEvent<TInstance, TItem>
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                return;
+            }
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                return;
+            }
+
+            // TODO: Add some way to verify value has changed to prevent unecessary message flood
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, value);
+            MessageBroker.Instance.Publish(instance, message);
+        }
+        #endregion
+
         private static bool IsCorrectField(CodeInstruction codeInstruction, FieldInfo fieldInfo)
         {
             return codeInstruction.opcode == OpCodes.Ldfld && codeInstruction.operand as FieldInfo == fieldInfo;
@@ -771,11 +841,11 @@ namespace GameInterface.Utils
             return instruction.opcode.Name.StartsWith(OpCodes.Ldarg.Name);
         }
 
-        private static IEnumerable<CodeInstruction> PatchInstructions(List<CodeInstruction> instructionList, 
+        private static IEnumerable<CodeInstruction> PatchInstructions(List<CodeInstruction> instructionList,
             Func<CodeInstruction, bool> targetLocator,
-            MethodInfo addMethod, 
-            MethodInfo addIntercept, 
-            MethodInfo removeMethod, 
+            MethodInfo addMethod,
+            MethodInfo addIntercept,
+            MethodInfo removeMethod,
             MethodInfo removeIntercept
             )
         {

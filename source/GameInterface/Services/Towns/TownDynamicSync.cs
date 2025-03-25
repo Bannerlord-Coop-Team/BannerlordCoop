@@ -14,25 +14,23 @@ internal class TownDynamicSync : IDynamicSync
 {
     public TownDynamicSync(IDynamicSyncBuilder dynamicSyncBuilder)
     {
-        //// Already synced manually
         dynamicSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Governor)));
-        //dynamicSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Security)));
-        //dynamicSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
-
-        //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._wallLevel)));
-        //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._isCastle)));
-        //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._ownerClan)));
-        //// Not synced fields
-        //// autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._security)));
-        //// autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._loyalty)));
-        //// Remove Prop or auto sync
-        //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town.BoostBuildingProcess)));
-        //// Remove Prop or auto sync
-        //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeTax)));
-        //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town.InRebelliousState)));
-        //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._governor)));
+        dynamicSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Security)));
+        dynamicSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
 
         dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._prosperity)));
+        //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._wallLevel)));
+        //dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._isCastle)));
+        dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._ownerClan)));
+        // Not synced fields
+        // autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._security)));
+        // autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._loyalty)));
+        // Remove Prop or auto sync
+        dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town.BoostBuildingProcess)));
+        // Remove Prop or auto sync
+        dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeTax)));
+        dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town.InRebelliousState)));
+        dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._governor)));
 
         dynamicSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town.Buildings)));
 

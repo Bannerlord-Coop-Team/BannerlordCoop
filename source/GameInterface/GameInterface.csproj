@@ -40,31 +40,7 @@
     <None Remove="DynamicSync\Dummy\**" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Remove="DynamicSync\Templates\DynamicAssemblyInfo.cs" />
     <Compile Remove="DynamicSync\Templates\DynamicHandlerTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\DynamicPatchTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetReference.cs" />
-    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetValue.cs" />
-    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeCustomSetValue.cs" />
-    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeGenericSetReference.cs" />
-    <Compile Remove="DynamicSync\Templates\Handlers\SubscribeGenericSetValue.cs" />
-    <Compile Remove="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Messages\GenericMessageTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent.cs" />
-    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent.cs" />
-    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent.cs" />
-    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkEvent.cs" />
-    <Compile Remove="DynamicSync\Templates\Messages\GenericNetworkReferenceEvent.cs" />
-    <Compile Remove="DynamicSync\Templates\Transpilers\FieldArrayTranspilerTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Transpilers\FieldListTranspilerTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Transpilers\FieldMbListTranspilerTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Transpilers\FieldQueueTranspilerTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Transpilers\FieldTranspilerTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyArrayTranspilerTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyListTranspilerTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyMBListTranspilerTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyQueueTranspilerTemplate.cs" />
-    <Compile Remove="DynamicSync\Templates\Transpilers\PropertyTranspilerTemplate.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
@@ -265,43 +241,36 @@
 	    </AssemblyAttribute>
     </ItemGroup>
     <ItemGroup>
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate">
+      <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfoTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\DynamicPatchTemplate">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </EmbeddedResource>
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetReference" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomSetValue" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetValue" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetValue" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetReference" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkEvent" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkReferenceEvent" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldListChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldMBListChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldQueueChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyArrayChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldArrayChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyListChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldSetTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyMBListChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyQueueChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
     </ItemGroup>
     <ItemGroup>
-      <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfo.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\DynamicPatchTemplate.cs">
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericMessageTemplate">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </EmbeddedResource>
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetReference.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomSetValue.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetValue.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetValue.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetReference.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkEvent.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkReferenceEvent.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyQueueTranspilerTemplate.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyMBListTranspilerTemplate.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyListTranspilerTemplate.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyArrayTranspilerTemplate.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldArrayTranspilerTemplate.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldQueueTranspilerTemplate.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldMBListTranspilerTemplate.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldListTranspilerTemplate.cs" />
-      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\FieldTranspilerTemplate.cs">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </EmbeddedResource>
-    </ItemGroup>
-    <ItemGroup>
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericMessageTemplate.cs">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </EmbeddedResource>
-      <EmbeddedResource Include="DynamicSync\Templates\Transpilers\PropertyTranspilerTemplate.cs" />
     </ItemGroup>
   <ItemGroup>
     <Publicize Include="SandBox" />
@@ -364,6 +333,6 @@
     <Folder Include="Services\Kingdoms\Commands\" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="DynamicSync\Templates\DynamicHandlerTemplate.cs" />
+    <EmbeddedResource Include="DynamicSync\Templates\Handlers\DynamicHandlerTemplate" />
   </ItemGroup>
 </Project>

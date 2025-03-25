@@ -1,0 +1,2 @@
+        [HarmonyTranspiler]
+        static IEnumerable<CodeInstruction> TestFieldListChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ListFieldChangeTranspiler<float, AddListFieldMessage, RemoveListFieldMessage>(instructions, "TestFieldList");

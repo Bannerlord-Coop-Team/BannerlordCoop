@@ -49,12 +49,12 @@ internal class E2ETestEnvironment : IDisposable
 
         // Needs to be before patching
         SetupAutoSync();
-        SetupDynamicSync();
 
         SetupMainHero();
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
+        SetupDynamicSync();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {
@@ -87,11 +87,11 @@ internal class E2ETestEnvironment : IDisposable
     }
     private void SetupDynamicSync()
     {
-        Server.Resolve<DynamicSyncPatcher>().BuildAssembly();
+        var registry = Server.Resolve<DynamicSyncRegistry>();
 
         foreach (var client in Clients)
         {
-            client.Resolve<DynamicSyncPatcher>().BuildAssembly();
+            client.Resolve<DynamicSyncPatcher>().BindHandlers(registry);
         }
     }
 
@@ -173,7 +173,8 @@ internal class E2ETestEnvironment : IDisposable
     public MethodInfo GetIntercept(FieldInfo field)
     {
         Assert.True(Server.Resolve<IAutoSyncBuilder>().TryGetIntercept(field, out var intercept));
-
+        // TODO: Add dynamic sync
+        //Assert.True(Server.Resolve<DynamicSyncRegistry>().TryGetIntercept(field, out var intercept));
         return intercept;
     }
 
@@ -271,7 +272,8 @@ internal class E2ETestEnvironment : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
 
             Assert.Equal(defaultValue, propertyInfo.GetValue((object)serverInstance));
-            propertyInfo.SetValue(serverInstance, value);
+            var set = propertyInfo.GetSetMethod();
+            set.Invoke(serverInstance, new object[] { value });
         }));
 
         // Assert

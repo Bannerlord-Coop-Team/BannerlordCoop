@@ -1,0 +1,2 @@
+﻿        [HarmonyTranspiler]
+        static IEnumerable<CodeInstruction> {{MemberName}}Transpiler(IEnumerable<CodeInstruction> instructions) => FieldTranspiler<{{MemberType}}, {{MessageType}}>(instructions, "{{MemberName}}");

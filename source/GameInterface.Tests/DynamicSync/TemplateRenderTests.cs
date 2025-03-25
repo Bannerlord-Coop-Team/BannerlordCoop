@@ -1,5 +1,5 @@
-﻿using Scriban;
-using System.IO;
+﻿using GameInterface.DynamicSync.Templates;
+using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -12,35 +12,147 @@ public class TemplateRenderTests
     {
         this.output = output;
     }
+
     [Fact]
-    public void PrefixClassGenerationTest()
+    public void PropertySetPrefixTest()
     {
-        const string resourceName = "GameInterface.DynamicSync.Templates.Patches.PropertySetPrefixTemplate";
-        string fileText = "";
-
-        using (Stream stream = typeof(GameInterface).Assembly.GetManifestResourceStream(resourceName) ?? throw new FileNotFoundException())
-        using (StreamReader reader = new StreamReader(stream))
-        {
-            fileText = reader.ReadToEnd();
-        }
-
-        var template = Template.Parse(fileText);
-
-        var result = template.Render(new
-        {
-            Libraries = new string[] { "SomeTest.Library" },
-            PropertyDeclaringType = "TestType",
-            PropertyName = "TestProperty",
-            PropertyType = "int",
-            Namespace = "Test",
-            MessageName = "TestPropertyUpdated"
-        }, member => member.Name);
-
-        Assert.Contains("using SomeTest.Library;", result);
-        Assert.Contains($"[HarmonyPatch(typeof(TestType))]", result);
-        Assert.Contains($"TestPropertyPrefix", result);
-        Assert.Contains($"int value", result);
-        Assert.Contains($"namespace GameInterface.DynamicSync.Test", result);
-        Assert.Contains($"new TestPropertyUpdated(__instance, value)", result);
+        var result = TemplateParser.Parse("Patches.PropertySetPrefixTemplate",
+            new
+            {
+                MemberDeclaringType = "TestType",
+                MemberName = "TestProperty",
+                MemberType = "int",
+                MessageType = "TestPropertySet"
+            });
+        SnapshotAssert.Equals(result);
     }
+
+    [Fact]
+    public void FieldSetTranspilerTest()
+    {
+        var result = TemplateParser.Parse("Patches.FieldSetTranspilerTemplate", new
+        {
+            MemberName = "TestField",
+            MemberType = "int",
+            MessageType = "TestFieldSet"
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void FieldListChangeTranspilerTest()
+    {
+        var result = TemplateParser.Parse("Patches.FieldListChangeTranspilerTemplate", new
+        {
+            MemberName = "TestFieldList",
+            MemberType = "float",
+            AddMessageType = "AddListFieldMessage",
+            RemoveMessageType = "RemoveListFieldMessage"
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void PropertyListChangeTranspilerTest()
+    {
+        var result = TemplateParser.Parse("Patches.PropertyListChangeTranspilerTemplate", new
+        {
+            MemberName = "TestPropertyList",
+            MemberType = "float",
+            AddMessageType = "AddListPropertyMessage",
+            RemoveMessageType = "RemoveListPropertyMessage"
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void FieldMBListChangeTranspilerTest()
+    {
+        var result = TemplateParser.Parse("Patches.FieldListChangeTranspilerTemplate", new
+        {
+            MemberName = "TestFieldMBList",
+            MemberType = "double",
+            AddMessageType = "AddMBListFieldMessage",
+            RemoveMessageType = "RemoveMBListFieldMessage"
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void PropertyMBListChangeTranspilerTest()
+    {
+        var result = TemplateParser.Parse("Patches.PropertyListChangeTranspilerTemplate", new
+        {
+            MemberName = "TestPropertyMBList",
+            MemberType = "double",
+            AddMessageType = "AddMBListPropertyMessage",
+            RemoveMessageType = "RemoveMBListPropertyMessage"
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void FieldQueueChangeTranspilerTest()
+    {
+        var result = TemplateParser.Parse("Patches.FieldListChangeTranspilerTemplate", new
+        {
+            MemberName = "TestFieldQueue",
+            MemberType = "long",
+            AddMessageType = "AddQueueFieldMessage",
+            RemoveMessageType = "RemoveQueueFieldMessage"
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void PropertyQueueChangeTranspilerTest()
+    {
+        var result = TemplateParser.Parse("Patches.PropertyListChangeTranspilerTemplate", new
+        {
+            MemberName = "TestPropertyQueue",
+            MemberType = "long",
+            AddMessageType = "AddQueuePropertyMessage",
+            RemoveMessageType = "RemoveQueuePropertyMessage"
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void FieldArrayChangeTranspilerTest()
+    {
+        var result = TemplateParser.Parse("Patches.FieldListChangeTranspilerTemplate", new
+        {
+            MemberName = "TestFieldArray",
+            MemberType = "string",
+            ChangeMessageType = "ChangeArrayFieldMessage"
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void PropertyArrayChangeTranspilerTest()
+    {
+        var result = TemplateParser.Parse("Patches.PropertyListChangeTranspilerTemplate", new
+        {
+            MemberName = "TestPropertyArray",
+            MemberType = "string",
+            ChangeMessageType = "ChangeArrayFieldMessage"
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void AssemblyInfoTest()
+    {
+        var result = TemplateParser.Parse("DynamicAssemblyInfoTemplate", new
+        {
+            Assemblies = new List<string>
+            {
+                "Assembly1",
+                "Assembly2"
+            }
+        });
+        SnapshotAssert.Equals(result);
+    }
+
 }

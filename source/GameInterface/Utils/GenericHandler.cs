@@ -37,7 +37,7 @@ namespace GameInterface.Utils
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-                if (!TryGetId(data.Instance, out string instanceId)) return;
+                if (!TryGetId<TInstance>(data.Instance, out string instanceId)) return;
                 messageHandler(instanceId, data);
             };
             messageBroker.Subscribe(payloadHandler);
@@ -53,8 +53,8 @@ namespace GameInterface.Utils
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-                if (!TryGetId(data.Instance, out string instanceId)) return;
-                if (!TryGetId(data.Value, out string valueId) && data.Value != null) return;
+                if (!TryGetId<TInstance>(data.Instance, out string instanceId)) return;
+                if (!TryGetId<TValue>(data.Value, out string valueId) && data.Value != null) return;
                 network.SendAll((TNetworkMessage)ctor.Invoke(new object[] { instanceId, valueId }));
             };
             messageBroker.Subscribe(payloadHandler);
@@ -93,7 +93,7 @@ namespace GameInterface.Utils
         }
 
 
-        protected bool TryGetId(object value, out string id)
+        protected bool TryGetId<T>(T value, out string id)
         {
             id = null;
             if (value == null) return false;

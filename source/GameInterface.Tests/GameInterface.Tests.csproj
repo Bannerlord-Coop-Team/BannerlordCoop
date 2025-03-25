@@ -109,4 +109,7 @@
     <Publicize Include="TaleWorlds.ObjectSystem" />
     <Publicize Include="TaleWorlds.SaveSystem" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="DynamicSync\Snapshots\" />
+  </ItemGroup>
 </Project>

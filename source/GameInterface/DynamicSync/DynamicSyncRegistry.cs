@@ -1,4 +1,6 @@
-﻿using GameInterface.Services.ObjectManager;
+﻿using Common.Messaging;
+using GameInterface.DynamicSync.Templates;
+using GameInterface.Services.ObjectManager;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
@@ -7,30 +9,33 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.Library;
-using TaleWorlds.SaveSystem.Save;
 
 namespace GameInterface.DynamicSync
 {
     public class DynamicSyncRegistry
     {
-        Dictionary<Type, DynamicSyncRegistryItem> Registrations = new Dictionary<Type, DynamicSyncRegistryItem>();
+
+        private readonly DynamicSyncPatchProcessor dynamicSyncPatchProcessor;
+
+        private readonly Dictionary<Type, DynamicSyncRegistryItem> registrations = new Dictionary<Type, DynamicSyncRegistryItem>();
+        
 
         string DebugPath => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + @"\DynamicSyncDebug";
 
-        public bool Add(Type type, MemberInfo memberInfo)
+        public bool AddMember(Type type, MemberInfo memberInfo)
         {
             if (memberInfo is not FieldInfo && memberInfo is not PropertyInfo)
                 return false;
 
-            if (!Registrations.ContainsKey(type))
+            if (!registrations.ContainsKey(type))
             {
-                Registrations.Add(type, new DynamicSyncRegistryItem());
+                registrations.Add(type, new DynamicSyncRegistryItem());
             }
 
-            if (Registrations[type].Members.Contains(memberInfo))
+            if (registrations[type].Members.Contains(memberInfo))
                 return false;
 
-            Registrations[type].Members.Add(memberInfo);
+            registrations[type].Members.Add(memberInfo);
 
             return true;
         }
@@ -38,21 +43,29 @@ namespace GameInterface.DynamicSync
         public bool AddTargetMethod(Type type, MethodInfo methodInfo)
         {
 
-            if (!Registrations.ContainsKey(type))
+            if (!registrations.ContainsKey(type))
             {
-                Registrations.Add(type, new DynamicSyncRegistryItem());
+                registrations.Add(type, new DynamicSyncRegistryItem());
             }
 
-            if (Registrations[type].TargetMethods.Contains(methodInfo))
+            if (registrations[type].TargetMethods.Contains(methodInfo))
                 return false;
 
-            Registrations[type].TargetMethods.Add(methodInfo);
+            registrations[type].TargetMethods.Add(methodInfo);
 
             return true;
         }
 
+        public Assembly Assembly { get; set; }
 
-        public Assembly Build(IObjectManager objectManager)
+        public IEnumerable<Type> DynamicHandlers  { get; set; }
+
+        public DynamicSyncRegistry(DynamicSyncPatchProcessor dynamicSyncPatchProcessor)
+        {
+            this.dynamicSyncPatchProcessor = dynamicSyncPatchProcessor;
+        }
+
+        public void Build(IObjectManager objectManager)
         {
             List<Assembly> assemblies = new List<Assembly>
             {
@@ -88,7 +101,7 @@ namespace GameInterface.DynamicSync
 
             List<DynamicPatchInfo> dynamicPatches = new List<DynamicPatchInfo>();
 
-            foreach (var registration in Registrations)
+            foreach (var registration in registrations)
             {
                 dynamicPatches.Add(GetPatchInfo(registration.Key, registration.Value, objectManager));
             }
@@ -99,24 +112,16 @@ namespace GameInterface.DynamicSync
             if (Directory.Exists($@"{DebugPath}"))
                 Directory.Delete($@"{DebugPath}", true);
 
-
-            string assemblyInfoTemplate = ReadTemplate("DynamicAssemblyInfo.cs");
-
-            List<string> attributes = new List<string>
+            var assemblyInfoTemplate = TemplateParser.Parse("DynamicAssemblyInfoTemplate", new
             {
-                $"[assembly: AssemblyVersion(\"1.0.0.0\")]",
-                $"[assembly: AssemblyFileVersion(\"1.0.0.0\")]",
-            };
-
-            attributes.AddRange(AllowPrivateAccess(dynamicPatches));
-
-            assemblyInfoTemplate = assemblyInfoTemplate.Replace("@Attributes@", string.Join(Environment.NewLine, attributes));
+                Assemblies = GetIgnoresAccessChecksToAssemblies(dynamicPatches)
+            });
 
             foreach (var dynamicPatch in dynamicPatches)
             {
                 if (!Directory.Exists($@"{DebugPath}\{dynamicPatch.DeclaringType.Name}"))
                     Directory.CreateDirectory($@"{DebugPath}\{dynamicPatch.DeclaringType.Name}");
-                syntaxTrees.AddRange(BuildSyntaxTrees(dynamicPatch));
+                syntaxTrees.AddRange(dynamicSyncPatchProcessor.ProcessPatch(dynamicPatch));
             }
             File.WriteAllText($@"{DebugPath}\AssemblyInfo.cs", assemblyInfoTemplate);
             syntaxTrees.Add(CSharpSyntaxTree.ParseText(assemblyInfoTemplate));
@@ -145,12 +150,22 @@ namespace GameInterface.DynamicSync
                 else
                 {
                     // Register all Messages with the SerializationTypeMapper
-                    return Assembly.Load(assemblyStream.GetBuffer());
+                    Assembly = Assembly.Load(assemblyStream.GetBuffer());
+                    DynamicHandlers = GetDynamicHandlerClasses(Assembly);
                 }
             }
         }
+        private IEnumerable<Type> GetDynamicHandlerClasses(Assembly assembly)
+        {
+            var types = assembly.GetTypes()
+                .Where(t => t.GetInterface(nameof(IHandler)) != null &&
+                            t.IsClass &&
+                            t.IsGenericType == false &&
+                            t.IsAbstract == false);
+            return types;
+        }
 
-        private IEnumerable<string> AllowPrivateAccess(List<DynamicPatchInfo> dynamicPatchInfos)
+        private IEnumerable<string> GetIgnoresAccessChecksToAssemblies(List<DynamicPatchInfo> dynamicPatchInfos)
         {
             var assemblies = dynamicPatchInfos.SelectMany(mi => mi.MemberInfos.Select(memberInfo =>
             {
@@ -164,533 +179,8 @@ namespace GameInterface.DynamicSync
             // Allow access from dynamic assembly to private types
             foreach (var assembly in assemblies.Distinct())
             {
-                yield return $"[assembly: IgnoresAccessChecksTo(\"{assembly.GetName().Name}\")]";
+                yield return assembly.GetName().Name;
             }
-        }
-
-        private IEnumerable<SyntaxTree> BuildSyntaxTrees(DynamicPatchInfo dynamicPatch)
-        {
-
-            List<SyntaxTree> syntaxTrees = new List<SyntaxTree>();
-            HashSet<string> usings = new HashSet<string>
-            {
-                dynamicPatch.DeclaringType.Namespace
-            };
-
-            string patchTemplate = ReadTemplate("DynamicPatchTemplate.cs");
-
-            patchTemplate = patchTemplate
-                .Replace("@DynamicPatchClassName@", $"{dynamicPatch.DeclaringType.Name}DynamicPatches")
-                .Replace("@TargetType@", $"{dynamicPatch.DeclaringType.Name}");
-
-            List<string> transpilers = new List<string>();
-            foreach (var memberPatchInfo in dynamicPatch.MemberInfos)
-            {
-                foreach (var item in memberPatchInfo.UsingDeclarations)
-                {
-                    usings.Add(item);
-                }
-
-                foreach( var message in memberPatchInfo.MessageInfos)
-                {
-                    syntaxTrees.Add(GetLocalMessage(message, memberPatchInfo.MemberInfo));
-                    syntaxTrees.Add(GetNetworkMessage(message, memberPatchInfo.MemberInfo));
-                }
-
-                string transpilerTemplate = GetTranspiler(memberPatchInfo);
-
-                transpilers.Add(transpilerTemplate);
-            }
-
-            patchTemplate = patchTemplate
-                .Replace("@UsingDeclarations@", string.Join(Environment.NewLine, usings.Select(name => $"using {name};").Distinct()))
-                .Replace("@TargetMethods@", "")
-                .Replace("@Transpilers@", string.Join(Environment.NewLine + Environment.NewLine, transpilers));
-
-            File.WriteAllText($@"{DebugPath}\{dynamicPatch.DeclaringType.Name}\{dynamicPatch.DeclaringType.Name}Patches.cs", patchTemplate);
-            syntaxTrees.Add(CSharpSyntaxTree.ParseText(patchTemplate));
-
-            string handlerTemplate = ReadTemplate("DynamicHandlerTemplate.cs");
-            List<string> handlerSubscriptions = new List<string>();
-            HashSet<string> handlerUsings = new HashSet<string>
-            {
-                dynamicPatch.DeclaringType.Namespace
-            };
-            foreach (var message in dynamicPatch.MemberInfos.SelectMany(mi => mi.MessageInfos))
-            {
-                message.UsingDeclarations.ForEach(u => handlerUsings.Add(u));
-                if ((message.Type & DynamicMessageType.Direct) == DynamicMessageType.Direct)
-                {
-                    if ((message.Type & DynamicMessageType.ObjectManagerType) == DynamicMessageType.ObjectManagerType)
-                    {
-                        string subscriptionTemplate = ReadTemplate("Handlers.SubscribeGenericSetReference.cs");
-                        subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@MemberType@", message.MemberType.Name)
-                                                .Replace("@MemberName@", message.MemberName)
-                                                .Replace("@MessageType@", message.MessageName)
-                                                .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                        handlerSubscriptions.Add(subscriptionTemplate);
-                    }
-                    else
-                    {
-                        string subscriptionTemplate = ReadTemplate("Handlers.SubscribeGenericSetValue.cs");
-                        subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@MemberType@", message.MemberType.Name)
-                                                .Replace("@MemberName@", message.MemberName)
-                                                .Replace("@MessageType@", message.MessageName)
-                                                .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                        handlerSubscriptions.Add(subscriptionTemplate);
-                    }
-                }
-                else if(message.Action == DynamicMessageAction.CollectionAdd && (message.Type & DynamicMessageType.Queue) != DynamicMessageType.Queue)
-                {
-                    if ((message.Type & DynamicMessageType.ObjectManagerType) == DynamicMessageType.ObjectManagerType)
-                    {
-                        string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomNetworkSetReference.cs");
-                        subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@MemberType@", message.MemberType.Name)
-                                                .Replace("@Operation@", $"instance.{message.MemberName}.Add(value)")
-                                                .Replace("@MessageType@", message.MessageName)
-                                                .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                        handlerSubscriptions.Add(subscriptionTemplate);
-                    }
-                    else
-                    {
-                        string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomNetworkSetValue.cs");
-                        subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@MemberType@", message.MemberType.Name)
-                                                .Replace("@Operation@", $"instance.{message.MemberName}.Add(data.Value)")
-                                                .Replace("@MessageType@", message.MessageName)
-                                                .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                        handlerSubscriptions.Add(subscriptionTemplate);
-                    }
-                }
-                else if (message.Action == DynamicMessageAction.CollectionRemove && (message.Type & DynamicMessageType.Queue) != DynamicMessageType.Queue)
-                {
-                    if ((message.Type & DynamicMessageType.ObjectManagerType) == DynamicMessageType.ObjectManagerType)
-                    {
-                        string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomNetworkSetReference.cs");
-                        subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@MemberType@", message.MemberType.Name)
-                                                .Replace("@Operation@", $"instance.{message.MemberName}.Remove(value)")
-                                                .Replace("@MessageType@", message.MessageName)
-                                                .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                        handlerSubscriptions.Add(subscriptionTemplate);
-                    }
-                    else
-                    {
-                        string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomNetworkSetValue.cs");
-                        subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@MemberType@", message.MemberType.Name)
-                                                .Replace("@Operation@", $"instance.{message.MemberName}.Remove(data.Value)")
-                                                .Replace("@MessageType@", message.MessageName)
-                                                .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                        handlerSubscriptions.Add(subscriptionTemplate);
-                    }
-
-                }
-                else if (((message.Type & DynamicMessageType.MBList) == DynamicMessageType.MBList || (message.Type & DynamicMessageType.List) == DynamicMessageType.List) 
-                    && message.Action == DynamicMessageAction.Set)
-                {
-                    string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomSetValue.cs");
-                    subscriptionTemplate = subscriptionTemplate
-                                            .Replace("@MemberType@", GetMemberType(message.MemberType))
-                                            .Replace("@MessageType@", message.MessageName)
-                                            .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-
-                    if ((message.Type & DynamicMessageType.ObjectManagerType) == DynamicMessageType.ObjectManagerType)
-                    {
-                        subscriptionTemplate = subscriptionTemplate
-                                            .Replace("@NetworkMemberType@", "List<string>")
-                                            .Replace("@Operation@", 
-                                            $@"{{ 
-                                                var valueIds = new List<string>();
-                                                for (int i = 0; i < data.Value.Count; i++)
-                                                {{
-                                                    if (!TryGetId(data.Value[i], out string valueId)) return;
-                                                    valueIds.Add(valueId);
-                                                }}
-                                                network.SendAll(new {"Network_" + message.MessageName}(instanceId, valueIds));
-                                            }}")
-                                            .Replace("@NetworkOperation@", 
-                                            $@"{{
-                                                instance.{message.MemberName} = new {GetMemberType(message.MemberType)}();
-                                                for (int i = 0; i < data.Value.Count; i++)
-                                                {{
-                                                    if (!objectManager.TryGetObject(data.Value[i], out {GetGenericType(message.MemberType)} value)) return;
-                                                    instance.{message.MemberName}.Add(value);
-                                                }}
-                                            }}");
-                    }
-                    else
-                    {
-                        subscriptionTemplate = subscriptionTemplate
-                                            .Replace("@NetworkMemberType@", $"List<{GetGenericType(message.MemberType)}>")
-                                            .Replace("@Operation@",
-                                            $@"{{
-                                                network.SendAll(new {"Network_" + message.MessageName}(instanceId, data.Value.ToList()));
-                                            }}")
-                                            .Replace("@NetworkOperation@",
-                                            $@"{{
-                                                instance.{message.MemberName} = new {GetMemberType(message.MemberType)}();
-                                                for (int i = 0; i < data.Value.Count; i++)
-                                                {{
-                                                    instance.{message.MemberName}.Add(value);
-                                                }}
-                                            }}");
-                    }
-
-                    handlerSubscriptions.Add(subscriptionTemplate);
-                }
-                else if ((message.Type & DynamicMessageType.Queue) == DynamicMessageType.Queue)
-                {
-                    if (message.Action == DynamicMessageAction.Set)
-                    {
-                        string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomSetValue.cs");
-                        subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@MemberType@", GetMemberType(message.MemberType))
-                                                .Replace("@MessageType@", message.MessageName)
-                                                .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-
-                        if ((message.Type & DynamicMessageType.ObjectManagerType) == DynamicMessageType.ObjectManagerType)
-                        {
-                            subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@NetworkMemberType@", "List<string>")
-                                                .Replace("@Operation@",
-                                                $@"{{ 
-                                                var valueIds = new List<string>();
-                                                for (int i = 0; i < data.Value.Count; i++)
-                                                {{
-                                                    if (!TryGetId(data.Value.ElementAt(i), out string valueId)) return;
-                                                    valueIds.Add(valueId);
-                                                }}
-                                                network.SendAll(new {"Network_" + message.MessageName}(instanceId, valueIds));
-                                            }}")
-                                                .Replace("@NetworkOperation@",
-                                                $@"{{
-                                                instance.{message.MemberName} = new {GetMemberType(message.MemberType)}();
-                                                for (int i = 0; i < data.Value.Count; i++)
-                                                {{
-                                                    if (!objectManager.TryGetObject(data.Value[i], out {GetGenericType(message.MemberType)} value)) return;
-                                                    instance.{message.MemberName}.Enqueue(value);
-                                                }}
-                                            }}");
-                        }
-                        else
-                        {
-                            subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@NetworkMemberType@", $"List<{GetGenericType(message.MemberType)}>")
-                                                .Replace("@Operation@",
-                                                $@"{{
-                                                network.SendAll(new {"Network_" + message.MessageName}(instanceId, data.Value.ToList()));
-                                            }}")
-                                                .Replace("@NetworkOperation@",
-                                                $@"{{
-                                                instance.{message.MemberName} = new {GetMemberType(message.MemberType)}();
-                                                for (int i = 0; i < data.Value.Count; i++)
-                                                {{
-                                                    instance.{message.MemberName}.Add(value);
-                                                }}
-                                            }}");
-                        }
-
-                        handlerSubscriptions.Add(subscriptionTemplate);
-                    }
-                    else if (message.Action == DynamicMessageAction.CollectionAdd)
-                    {
-                        if ((message.Type & DynamicMessageType.ObjectManagerType) == DynamicMessageType.ObjectManagerType)
-                        {
-                            string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomNetworkSetReference.cs");
-                            subscriptionTemplate = subscriptionTemplate
-                                                    .Replace("@MemberType@", message.MemberType.Name)
-                                                    .Replace("@Operation@", $"instance.{message.MemberName}.Enqueue(value)")
-                                                    .Replace("@MessageType@", message.MessageName)
-                                                    .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                            handlerSubscriptions.Add(subscriptionTemplate);
-                        }
-                        else
-                        {
-                            string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomNetworkSetValue.cs");
-                            subscriptionTemplate = subscriptionTemplate
-                                                    .Replace("@MemberType@", message.MemberType.Name)
-                                                    .Replace("@Operation@", $"instance.{message.MemberName}.Enqueue(data.Value)")
-                                                    .Replace("@MessageType@", message.MessageName)
-                                                    .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                            handlerSubscriptions.Add(subscriptionTemplate);
-                        }
-                    }
-                    else if (message.Action == DynamicMessageAction.CollectionRemove)
-                    {
-                        if ((message.Type & DynamicMessageType.ObjectManagerType) == DynamicMessageType.ObjectManagerType)
-                        {
-                            string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomNetworkSetReference.cs");
-                            subscriptionTemplate = subscriptionTemplate
-                                                    .Replace("@MemberType@", message.MemberType.Name)
-                                                    .Replace("@Operation@", $"instance.{message.MemberName}.Dequeue()")
-                                                    .Replace("@MessageType@", message.MessageName)
-                                                    .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                            handlerSubscriptions.Add(subscriptionTemplate);
-                        }
-                        else
-                        {
-                            string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomNetworkSetValue.cs");
-                            subscriptionTemplate = subscriptionTemplate
-                                                    .Replace("@MemberType@", message.MemberType.Name)
-                                                    .Replace("@Operation@", $"instance.{message.MemberName}.Dequeue()")
-                                                    .Replace("@MessageType@", message.MessageName)
-                                                    .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                            handlerSubscriptions.Add(subscriptionTemplate);
-                        }
-                    }
-                }
-
-                else if ((message.Type & DynamicMessageType.Array) == DynamicMessageType.Array)
-                {
-                    if (message.Action == DynamicMessageAction.ArraySet)
-                    {
-                        string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomSetValue.cs");
-                        subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@MemberType@", message.MemberType.Name)
-                                                .Replace("@MessageType@", message.MessageName)
-                                                .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-
-                        if ((message.Type & DynamicMessageType.ObjectManagerType) == DynamicMessageType.ObjectManagerType)
-                        {
-                            subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@NetworkMemberType@", "List<(int Index, string Id)>")
-                                                .Replace("@Operation@",
-                                                $@"{{ 
-                                                var valueIds = new List<(int Index, string Id)>();
-                                                for (int i = 0; i < data.Value.Length; i++)
-                                                {{
-                                                    if(data.Value[i] == null) continue;
-                                                    if (!TryGetId(data.Value[i], out string valueId)) return;
-                                                    valueIds.Add(new (i,valueId));
-                                                }}
-                                                network.SendAll(new {"Network_" + message.MessageName}(instanceId, valueIds, data.Value.Length));
-                                            }}")
-                                                .Replace("@NetworkOperation@",
-                                                $@"{{
-                                                instance.{message.MemberName} = new {message.MemberType.GetElementType().Name}[data.Length];
-                                                for (int i = 0; i < data.Value.Count; i++)
-                                                {{
-                                                    if (!objectManager.TryGetObject(data.Value[i].Id, out {message.MemberType.GetElementType().Name} value)) return;
-                                                    instance.{message.MemberName}[data.Value[i].Index] = value;
-                                                }}
-                                            }}");
-                        }
-                        else
-                        {
-                            subscriptionTemplate = subscriptionTemplate
-                                                .Replace("@NetworkMemberType@", "List<(int Index, string Id)>")
-                                                .Replace("@Operation@",
-                                                $@"{{ 
-                                                var valueIds = new List<(int Index, string Id)>();
-                                                for (int i = 0; i < data.Value.Length; i++)
-                                                {{
-                                                    if(data.Value[i] == null) continue;
-                                                    valueIds.Add(new (i, data.Value[i]));
-                                                }}
-                                                network.SendAll(new {"Network_" + message.MessageName}(instanceId, valueIds, data.Value.Length));
-                                            }}")
-                                                .Replace("@NetworkOperation@",
-                                                $@"{{
-                                                instance.{message.MemberName} = new {message.MemberType.GetElementType().Name}[data.Length];
-                                                for (int i = 0; i < data.Value.Count; i++)
-                                                {{
-                                                    instance.{message.MemberName}[data.Value[i].Index] = data.Value[i];
-                                                }}
-                                            }}");
-                        }
-                        handlerSubscriptions.Add(subscriptionTemplate);
-                    }
-
-                    else if (message.Action == DynamicMessageAction.ArrayChange)
-                    {
-                        if ((message.Type & DynamicMessageType.ObjectManagerType) == DynamicMessageType.ObjectManagerType)
-                        {
-                            string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomSetValue.cs");
-                            subscriptionTemplate = subscriptionTemplate
-                                                    .Replace("@MemberType@", message.MemberType.Name)
-                                                    .Replace("@NetworkMemberType@", message.MemberType.Name)
-                                                    .Replace("@Operation@", $"{{if (!TryGetId(data.Value, out string valueId) && data.Value != null) return;network.SendAll(new {"Network_" + message.MessageName}(instanceId, valueId, data.Index));}}")
-                                                    .Replace("@NetworkOperation@", $"{{if (!objectManager.TryGetObject(data.ValueId, out {message.MemberType.Name} value) && data.ValueId != null) return; instance.{message.MemberName}[data.Index] = value;}}")
-                                                    .Replace("@MessageType@", message.MessageName)
-                                                    .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                            handlerSubscriptions.Add(subscriptionTemplate);
-                        }
-                        else
-                        {
-                            string subscriptionTemplate = ReadTemplate("Handlers.SubscribeCustomSetValue.cs");
-                            subscriptionTemplate = subscriptionTemplate
-                                                    .Replace("@MemberType@", message.MemberType.Name)
-                                                    .Replace("@NetworkMemberType@", message.MemberType.Name)
-                                                    .Replace("@Operation@", $"network.SendAll(new {"Network_" + message.MessageName}(instanceId, data.Value, data.Index));")
-                                                    .Replace("@NetworkOperation@", $"instance.{message.MemberName}[data.Index] = data.Value")
-                                                    .Replace("@MessageType@", message.MessageName)
-                                                    .Replace("@NetworkMessageType@", "Network_" + message.MessageName);
-                            handlerSubscriptions.Add(subscriptionTemplate);
-                        }
-                    }
-                }
-            }
-
-            handlerTemplate = handlerTemplate
-                .Replace("@UsingDeclarations@", string.Join(Environment.NewLine, usings.Select(name => $"using {name};").Distinct()))
-                .Replace("@Subscriptions@", string.Join(Environment.NewLine, handlerSubscriptions))
-                .Replace("@HandlerType@", $"Dynamic{dynamicPatch.DeclaringType.Name}Handler")
-                .Replace("@ClassType@", dynamicPatch.DeclaringType.Name);
-
-            File.WriteAllText($@"{DebugPath}\{dynamicPatch.DeclaringType.Name}\Dynamic{dynamicPatch.DeclaringType.Name}Handler.cs", handlerTemplate);
-            syntaxTrees.Add(CSharpSyntaxTree.ParseText(handlerTemplate));
-            return syntaxTrees;
-        }
-
-        private SyntaxTree GetNetworkMessage(DynamicMessageInfo message, MemberInfo memberInfo)
-        {
-            string messageTemplate = string.Empty;
-            if((message.Type & DynamicMessageType.Direct) == DynamicMessageType.Direct)
-            {
-                if ((message.Type & DynamicMessageType.ValueType) == DynamicMessageType.ValueType)
-                {
-                    messageTemplate = ReadTemplate($"Messages.GenericNetworkEvent.cs");
-                }
-                else
-                {
-                    messageTemplate = ReadTemplate($"Messages.GenericNetworkReferenceEvent.cs");
-                }
-            }
-            else if((message.Type & DynamicMessageType.List) == DynamicMessageType.List ||
-                (message.Type & DynamicMessageType.MBList) == DynamicMessageType.MBList ||
-                (message.Type & DynamicMessageType.Queue) == DynamicMessageType.Queue)
-            {
-                if(message.Action == DynamicMessageAction.CollectionAdd || message.Action == DynamicMessageAction.CollectionRemove)
-                {
-                    if((message.Type & DynamicMessageType.ValueType) == DynamicMessageType.ValueType)
-                    {
-                        messageTemplate = ReadTemplate($"Messages.GenericNetworkEvent.cs");
-                    }
-                    else
-                    {
-                        messageTemplate = ReadTemplate($"Messages.GenericNetworkReferenceEvent.cs");
-                    }
-                }
-                else if(message.Action == DynamicMessageAction.Set)
-                {
-
-
-                    if ((message.Type & DynamicMessageType.ValueType) == DynamicMessageType.ValueType)
-                    {
-                        // Use member for initial size
-                        messageTemplate = ReadTemplate($"Messages.GenericNetworkEvent.cs")
-                                            .Replace("@MemberType@", $"List<{GetGenericType(message.MemberType)}>");
-                    }
-                    else
-                    {
-                        // Use member for initial size
-                        messageTemplate = ReadTemplate($"Messages.GenericNetworkEvent.cs")
-                                            .Replace("@MemberType@", $"List<string>");
-                    }
-                }
-            }
-            else if ((message.Type & DynamicMessageType.Array) == DynamicMessageType.Array)
-            {
-                if(message.Action == DynamicMessageAction.ArrayChange)
-                {
-                    if ((message.Type & DynamicMessageType.ValueType) == DynamicMessageType.ValueType)
-                    {
-                        messageTemplate = ReadTemplate($"Messages.GenericNetworkArrayChangedEvent.cs");
-                    }
-                    else
-                    {
-                        messageTemplate = ReadTemplate($"Messages.GenericNetworkArrayChangedReferenceEvent.cs");
-                    }
-                }
-                else if(message.Action == DynamicMessageAction.ArraySet)
-                {
-                    messageTemplate = ReadTemplate($"Messages.GenericNetworkArraySetEvent.cs");
-                    if ((message.Type & DynamicMessageType.ValueType) == DynamicMessageType.ValueType)
-                    {
-                        // Use member for initial size
-                        messageTemplate = messageTemplate
-                                            .Replace("@MemberType@", $"List<{message.MemberType.GetElementType()}>");
-                    }
-                    else
-                    {
-                        // Use member for initial size
-                        messageTemplate = messageTemplate
-                                            .Replace("@MemberType@", $"List<(int Index, string Id)>");
-                    }
-                }
-            }
-
-            messageTemplate = messageTemplate.Replace("@ClassType@", message.ClassType.Name)
-                .Replace("@MemberType@", $"{GetMemberType(message.MemberType)}")
-                .Replace("@MessageType@", $"Network_{message.MessageName}")
-                .Replace("@UsingDeclarations@", string.Join(Environment.NewLine, message.UsingDeclarations.Select(name => $"using {name};").Distinct()));
-
-            File.WriteAllText($@"{DebugPath}\{memberInfo.DeclaringType.Name}\Network_{message.MessageName}.cs", messageTemplate);
-            return CSharpSyntaxTree.ParseText(messageTemplate);
-        }
-
-        private SyntaxTree GetLocalMessage(DynamicMessageInfo message, MemberInfo memberInfo)
-        {
-            string messageTemplate;
-            if(message.Action != DynamicMessageAction.ArrayChange)
-                messageTemplate = ReadTemplate($"Messages.GenericMessageTemplate.cs");
-            else
-                messageTemplate = ReadTemplate($"Messages.GenericArrayChangedMessageTemplate.cs");
-
-            messageTemplate = messageTemplate
-                .Replace("@ClassType@", $"{message.ClassType.Name}")
-                .Replace("@MemberType@", $"{GetMemberType(message.MemberType)}")
-                .Replace("@MessageType@", message.MessageName)
-                .Replace("@UsingDeclarations@", string.Join(Environment.NewLine, message.UsingDeclarations.Select(name => $"using {name};").Distinct()));
-
-            // Debug
-            File.WriteAllText($@"{DebugPath}\{memberInfo.DeclaringType.Name}\{message.MessageName}.cs", messageTemplate);
-            return CSharpSyntaxTree.ParseText(messageTemplate);
-        }
-
-        private string GetTranspiler(DynamicPatchMemberInfo memberPatchInfo)
-        {
-            Type targetType;
-            if (memberPatchInfo.MemberInfo is FieldInfo fieldInfo)
-            {
-                targetType = fieldInfo.FieldType;
-            }
-            else
-            {
-                var propertyInfo = (PropertyInfo)memberPatchInfo.MemberInfo;
-                targetType = propertyInfo.PropertyType;
-            }
-            if (targetType.IsGenericType)
-            {
-                targetType = targetType.GenericTypeArguments[0];
-            }
-            else if (targetType.IsArray)
-                targetType = targetType.GetElementType();
-
-            string transpilerTemplate = ReadTemplate($"Transpilers.{memberPatchInfo.TranspilerType.ToString()}TranspilerTemplate.cs");
-            transpilerTemplate = transpilerTemplate
-                .Replace("@MemberName@", $"{memberPatchInfo.MemberInfo.Name}")
-                .Replace("@MemberType@", $"{GetMemberType(targetType)}")
-                .Replace("@MessageTypes@", $"{string.Join(",", memberPatchInfo.MessageInfos.Select(m => m.MessageName))}");
-            return transpilerTemplate;
-        }
-        private string GetMemberType(Type targetType)
-        {
-            string memberType = targetType.Name;
-            if (targetType.IsGenericType)
-            {
-                memberType = targetType.Name.Trim('`', '1') + "<" + targetType.GenericTypeArguments[0].Name + ">";
-            }
-            return memberType;
-        }
-
-        private string GetGenericType(Type targetType)
-        {
-            return targetType.GenericTypeArguments[0].Name;
         }
 
         private DynamicPatchInfo GetPatchInfo(Type type, DynamicSyncRegistryItem registryItem, IObjectManager objectManager)
@@ -790,7 +280,7 @@ namespace GameInterface.DynamicSync
                     patchMemberInfo.MessageInfos.Add(setMessage);
                     patchMemberInfo.MessageInfos.Add(addMessage);
                     patchMemberInfo.MessageInfos.Add(removeMessage);
-                    patchMemberInfo.TranspilerType = isField ? DynamicTranspilerType.FieldMBList : DynamicTranspilerType.PropertyMBList;
+                    patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldMBList : DynamicMemberPatchType.PropertyMBList;
                 }
                 else if(typeof(List<>).IsAssignableFrom(memberType.GetGenericTypeDefinition()))
                 {
@@ -834,7 +324,7 @@ namespace GameInterface.DynamicSync
                     patchMemberInfo.MessageInfos.Add(setMessage);
                     patchMemberInfo.MessageInfos.Add(addMessage);
                     patchMemberInfo.MessageInfos.Add(removeMessage);
-                    patchMemberInfo.TranspilerType = isField ? DynamicTranspilerType.FieldList : DynamicTranspilerType.PropertyList;
+                    patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldList : DynamicMemberPatchType.PropertyList;
 
                 }
                 else if (typeof(Queue<>).IsAssignableFrom(memberType.GetGenericTypeDefinition()))
@@ -878,7 +368,7 @@ namespace GameInterface.DynamicSync
                     patchMemberInfo.MessageInfos.Add(setMessage);
                     patchMemberInfo.MessageInfos.Add(addMessage);
                     patchMemberInfo.MessageInfos.Add(removeMessage);
-                    patchMemberInfo.TranspilerType = isField ? DynamicTranspilerType.FieldQueue : DynamicTranspilerType.PropertyQueue;
+                    patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldQueue : DynamicMemberPatchType.PropertyQueue;
                 }
             }
             else if (memberType.IsArray)
@@ -913,7 +403,7 @@ namespace GameInterface.DynamicSync
                 };
                 patchMemberInfo.MessageInfos.Add(setMessage);
                 patchMemberInfo.MessageInfos.Add(changeMessage);
-                patchMemberInfo.TranspilerType = isField ? DynamicTranspilerType.FieldArray : DynamicTranspilerType.PropertyArray;
+                patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldArray : DynamicMemberPatchType.PropertyArray;
             }
             else
             {
@@ -934,23 +424,10 @@ namespace GameInterface.DynamicSync
                     MemberName = member.Name
                 };
                 patchMemberInfo.MessageInfos.Add(setMessage);
-                patchMemberInfo.TranspilerType = isField ? DynamicTranspilerType.Field : DynamicTranspilerType.Property;
+                patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.Field : DynamicMemberPatchType.Property;
             }
 
             return patchMemberInfo;
         }
-
-        public string ReadTemplate(string templateName)
-        {
-            // Determine path
-            var assembly = Assembly.GetExecutingAssembly();
-            string resourcePath = $"GameInterface.DynamicSync.Templates.{templateName}";
-            using (Stream stream = assembly.GetManifestResourceStream(resourcePath))
-            using (StreamReader reader = new StreamReader(stream))
-            {
-                return reader.ReadToEnd();
-            }
-        }
-
     }
 }

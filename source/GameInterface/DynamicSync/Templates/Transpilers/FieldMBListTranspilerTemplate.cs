@@ -1,2 +1,0 @@
-﻿        [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> @MemberName@Transpiler(IEnumerable<CodeInstruction> instructions) => MBListFieldSetTranspiler<@MemberType@, @MessageTypes@>(instructions, "@MemberName@");

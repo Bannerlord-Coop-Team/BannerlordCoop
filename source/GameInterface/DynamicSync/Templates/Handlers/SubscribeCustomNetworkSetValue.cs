@@ -1,2 +1,0 @@
-﻿        Subscribe<@MemberType@, @MessageType@>((instanceId, data) => network.SendAll(new @NetworkMessageType@(instanceId, data.Value)));
-        SubscribeNetwork<@MemberType@, @NetworkMessageType@>((instance, data) => @Operation@);

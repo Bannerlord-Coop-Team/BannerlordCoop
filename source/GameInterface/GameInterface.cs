@@ -37,9 +37,11 @@ public class GameInterface : IGameInterface
 
         var assembly = typeof(GameInterface).Assembly;
 
-        dynamicSyncPatcher.BuildAssembly();
+        var dynamicAssembly = dynamicSyncPatcher.BuildAssembly();
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
+        harmony.PatchCategory(dynamicAssembly, HARMONY_STATIC_FIXES_CATEGORY);
+        harmony.PatchAllUncategorized(dynamicAssembly);
         patchCollector.PatchAll();
     }
 

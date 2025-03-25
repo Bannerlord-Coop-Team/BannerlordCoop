@@ -1,0 +1,2 @@
+﻿        [HarmonyTranspiler]
+        static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => MBListPropertyChangeTranspiler<{{MemberType}}, {{AddMessageType}}, {{RemoveMessageType}}>(instructions, "{{MemberName}}");

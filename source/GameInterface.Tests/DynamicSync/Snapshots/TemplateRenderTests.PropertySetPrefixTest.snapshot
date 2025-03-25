@@ -1,0 +1,7 @@
+[HarmonyPatch(typeof(TestType))]
+public class TestType_TestProperty_PropertySetPrefix : GenericPatches<TestType_TestProperty_PropertySetPrefix, TestType>
+{
+    [HarmonyPatch(nameof(TestType.TestProperty), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static void TestPropertyPrefix(TestType __instance, int value) => PropertyPrefix<int, TestPropertySet>(__instance, value);
+}

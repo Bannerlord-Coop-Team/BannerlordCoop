@@ -40,15 +40,17 @@ internal class DynamicSyncBuilder : IDynamicSyncBuilder
     {
         if (field == null) throw new ArgumentNullException(nameof(field));
 
-        if (!dynamicSyncRegistry.Add(field.DeclaringType, field)) throw new ArgumentException($"{field.Name} has already been registered as a synced field");
+        if (!dynamicSyncRegistry.AddMember(field.DeclaringType, field)) throw new ArgumentException($"{field.Name} has already been registered as a synced field");
     }
 
     public void AddProperty(PropertyInfo property)
     {
         if (property == null) throw new ArgumentNullException(nameof(property));
-        if (property.CanWrite == false) throw new ArgumentException($"{property.Name} does not have a set method");
+        
+        // only prevent properties from being added if they are no collection like type
+        if (property.CanWrite == false && !property.PropertyType.IsGenericType && !property.PropertyType.IsArray) throw new ArgumentException($"{property.Name} does not have a set method");
 
-        if (!dynamicSyncRegistry.Add(property.DeclaringType, property)) throw new ArgumentException($"{property.Name} has already been registered as a synced property");
+        if (!dynamicSyncRegistry.AddMember(property.DeclaringType, property)) throw new ArgumentException($"{property.Name} has already been registered as a synced property");
     }
 
     public void AddTargetMethod(Type type, MethodInfo methodInfo)

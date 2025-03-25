@@ -10,6 +10,10 @@ namespace GameInterface.Services.Template.Messages;
 /// </summary>
 public record TemplateEventMessage : IEvent
 {
+    public TemplateEventMessage()
+    {
+        
+    }
     // This data can be anything you need
     public TemplateEventMessage(Campaign instance, float value)
     {

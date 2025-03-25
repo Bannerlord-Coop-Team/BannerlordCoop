@@ -8,7 +8,7 @@ namespace GameInterface.DynamicSync
     {
         public MemberInfo MemberInfo { get; set; }
 
-        public DynamicTranspilerType TranspilerType { get; set; }
+        public DynamicMemberPatchType PatchType { get; set; }
 
         public List<DynamicMessageInfo> MessageInfos { get; set; } = new List<DynamicMessageInfo>();
 
