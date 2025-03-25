@@ -1,21 +1,14 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using GameInterface.Services.MapEvents.Handlers;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Runtime.Serialization;
-using System.Text;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MapEventSides.Handlers;
 internal class MapEventSideLifetimeHandler : IHandler

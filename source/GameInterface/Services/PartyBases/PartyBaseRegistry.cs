@@ -1,30 +1,54 @@
-﻿using GameInterface.Services.Registry;
-using System.Threading;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.PartyBases;
-internal class PartyBaseRegistry : RegistryBase<PartyBase>
+internal class PartyBaseRegistry : IAutoRegistry<PartyBase>
 {
-    private const string PartyBaseIdPrefix = "CoopPartyBase";
-    private static int InstanceCounter = 0;
-
-    public PartyBaseRegistry(IRegistryCollection collection) : base(collection)
+    ILogger Logger { get; }
+    public PartyBaseRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
     }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(PartyBase), new Type[] { typeof(MobileParty), typeof(Settlement) })
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<PartyBase> registry)
     {
         foreach (var party in MobileParty.All)
         {
-            if(RegisterNewObject(party.Party, out var newId) == false)
-            {
-                Logger.Error("Unable to register PartyBase from Party with id {id} in the object manager", party.StringId);
-            }
+            var networkId = $"{nameof(PartyBase)}_{party.StringId}";
+
+            if (registry.RegisterExistingObject(networkId, party.Party) == false)
+                Logger.Error("Unable to register PartyBase from Party with the object manager");
         }
     }
 
-    protected override string GetNewId(PartyBase obj)
+    public void OnClientCreated(PartyBase obj, string id)
     {
-        return $"{PartyBaseIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+    }
+
+    public void OnClientDestroyed(PartyBase obj, string id)
+    {
+    }
+
+    public void OnServerCreated(PartyBase obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(PartyBase obj, string id)
+    {
     }
 }

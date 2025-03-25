@@ -25,7 +25,7 @@ public class AlleyCreationTests : IDisposable
     {
         // Arrange
         var server = TestEnvironment.Server;
-        string alleyId = null;
+        string? alleyId = null;
 
         // Act
         server.Call(() =>
@@ -55,12 +55,15 @@ public class AlleyCreationTests : IDisposable
     {
         // Arrange
         var client1 = TestEnvironment.Clients.First();
+        var settlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
 
         // Act
         string? clientAlleyId = null;
         client1.Call(() =>
         {
-            var alley = new Alley(GameObjectCreator.CreateInitializedObject<Settlement>(), "testClientAlley", new TaleWorlds.Localization.TextObject("testTextObject"));
+            Assert.True(client1.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
+
+            var alley = new Alley(settlement, "testClientAlley", new TaleWorlds.Localization.TextObject("testTextObject"));
             Assert.False(client1.ObjectManager.TryGetId(alley, out clientAlleyId));
         });
 
@@ -74,15 +77,19 @@ public class AlleyCreationTests : IDisposable
         // Arrange
         var client1 = TestEnvironment.Clients.First();
         var server = TestEnvironment.Server;
-        string alleyId = null;
-        string heroId = null;
+        string? alleyId = null;
+        string? heroId = null;
         server.Call(() =>
         {
             alleyId = TestEnvironment.CreateRegisteredObject<Alley>();
             heroId = TestEnvironment.CreateRegisteredObject<Hero>();
         });
-            // Act
-            client1.Call(() =>
+
+        Assert.NotNull(alleyId);
+        Assert.NotNull(heroId);
+
+        // Act
+        client1.Call(() =>
         {
             Assert.True(client1.ObjectManager.TryGetObject<Alley>(alleyId, out var alley));
             Assert.True(client1.ObjectManager.TryGetObject<Hero>(heroId, out var hero));
@@ -90,7 +97,7 @@ public class AlleyCreationTests : IDisposable
         });
 
         // Assert
-        foreach (var client in TestEnvironment.Clients)
+        foreach (var client in TestEnvironment.Clients.Where(client => client != client1))
         {
             Assert.True(client.ObjectManager.TryGetObject<Alley>(alleyId, out var alley));
             Assert.Null(alley.Owner);

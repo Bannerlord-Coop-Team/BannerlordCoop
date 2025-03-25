@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -23,12 +23,12 @@ internal class MonsterRegistry : RegistryBase<Monster>
     {
         foreach (Monster monster in MBObjectManager.Instance.GetObjectTypeList<Monster>())
         {
-            RegisterNewObject(monster, out _);
+            RegisterExistingObject(monster.StringId, monster);
         }
     }
 
     protected override string GetNewId(Monster obj)
     {
-        return obj.StringId;
+        return $"{MonsterIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
     }
 }

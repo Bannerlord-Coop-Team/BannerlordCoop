@@ -12,7 +12,6 @@ using System;
 using GameInterface.Services.Equipments.Data;
 using HarmonyLib;
 using System.Reflection;
-using GameInterface.Services.Alleys.Messages;
 
 
 namespace GameInterface.Services.Equipments.Handlers

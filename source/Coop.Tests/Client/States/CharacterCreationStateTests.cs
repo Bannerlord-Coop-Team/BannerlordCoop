@@ -5,6 +5,7 @@ using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Tests.Mocks;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
@@ -50,7 +51,7 @@ namespace Coop.Tests.Client.States
         }
 
         [Fact]
-        public void CharacterCreationFinished_Publishes_PackageMainHero()
+        public void CharacterCreationFinished_Publishes_RegisterAllGameObjects()
         {
             // Arrange
             var characterCreationState = clientLogic.SetState<CharacterCreationState>();
@@ -62,7 +63,23 @@ namespace Coop.Tests.Client.States
             characterCreationState.Handle_CharacterCreationFinished(payload);
 
             // Assert
-            Assert.Equal(1, TestMessageBroker.GetMessageCountFromType<PackageMainHero>());
+            Assert.Single(TestMessageBroker.GetMessagesFromType<RegisterAllGameObjects>());
+        }
+
+        [Fact]
+        public void AllGameObjects_Publishes_PackageMainHero()
+        {
+            // Arrange
+            var characterCreationState = clientLogic.SetState<CharacterCreationState>();
+
+            var payload = new MessagePayload<AllGameObjectsRegistered>(
+                this, new AllGameObjectsRegistered());
+
+            // Act
+            characterCreationState.Handle_AllGameObjectRegistered(payload);
+
+            // Assert
+            Assert.Single(TestMessageBroker.GetMessagesFromType<PackageMainHero>());
         }
 
         [Fact]
@@ -75,7 +92,7 @@ namespace Coop.Tests.Client.States
             clientLogic.EnterMainMenu();
 
             // Assert
-            Assert.Equal(1, TestMessageBroker.GetMessageCountFromType<EnterMainMenu>());
+            Assert.Single(TestMessageBroker.GetMessagesFromType<EnterMainMenu>());
         }
 
         [Fact]

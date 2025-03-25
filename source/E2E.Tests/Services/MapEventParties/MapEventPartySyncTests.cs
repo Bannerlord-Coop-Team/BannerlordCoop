@@ -36,6 +36,12 @@ namespace E2E.Tests.Services.MapEventParties
         [Fact]
         public void Server_MapEventParty_Sync()
         {
+            var contributionField = AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._contributionToBattle));
+            var contributionIntercept = TestEnvironment.GetIntercept(contributionField);
+
+            var healthyField = AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._healthyManCountAtStart));
+            var healthyIntercept = TestEnvironment.GetIntercept(healthyField);
+
             // Arrange
             var server = TestEnvironment.Server;
 
@@ -57,12 +63,17 @@ namespace E2E.Tests.Services.MapEventParties
                 mapEventParty.Party = party;
                 mapEventParty.PlunderedGold = newInt;
 
+                contributionIntercept.Invoke(null, new object[] { mapEventParty, newInt });
+                healthyIntercept.Invoke(null, new object[] { mapEventParty, newInt });
+
                 Assert.Equal(newFloat, mapEventParty.GainedInfluence);
                 Assert.Equal(newFloat, mapEventParty.GainedRenown);
                 Assert.Equal(newInt, mapEventParty.GoldLost);
                 Assert.Equal(newFloat, mapEventParty.MoraleChange);
                 Assert.Equal(party, mapEventParty.Party);
                 Assert.Equal(newInt, mapEventParty.PlunderedGold);
+                Assert.Equal(newInt, mapEventParty._contributionToBattle);
+                Assert.Equal(newInt, mapEventParty._healthyManCountAtStart);
             });
 
             // Assert
@@ -77,7 +88,8 @@ namespace E2E.Tests.Services.MapEventParties
                 Assert.Equal(newFloat, clientMapEventParty.MoraleChange);
                 Assert.Equal(clientParty, clientMapEventParty.Party);
                 Assert.Equal(newInt, clientMapEventParty.PlunderedGold);
-
+                Assert.Equal(newInt, clientMapEventParty._contributionToBattle);
+                Assert.Equal(newInt, clientMapEventParty._healthyManCountAtStart);
             }
         }
     }

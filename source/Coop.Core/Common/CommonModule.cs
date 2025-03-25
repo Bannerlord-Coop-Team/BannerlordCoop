@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Common.Serialization;
+using Common.Util;
 using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Common.Configuration;
 using Coop.Core.Server;
@@ -56,7 +57,8 @@ public abstract class CommonModule : Module
     /// <param name="autoInstantiate">Flag to auto instantiate type when container is built</param>
     protected void RegisterAllTypesWithInterface<TModule, TInterface>(ContainerBuilder builder, bool autoInstantiate = false)
     {
-        foreach (var handlerType in TypeCollector.Collect<TModule, TInterface>())
+        // Namespace is needed to separate client and server handlers being registered with DI
+        foreach (var handlerType in InterfaceCollector.GetInterfaces<TInterface>(typeof(TModule).Namespace))
         {
             var handlerBuilder = builder.RegisterType(handlerType).AsSelf().InstancePerLifetimeScope();
 

@@ -13,7 +13,7 @@ namespace GameInterface.Services.FlattenedTroopRosters.Patches
     [HarmonyPatch]
     internal class FlattenedTroopRosterLifetimePatches
     {
-        private static ILogger Logger = LogManager.GetLogger<TroopRosterLifetimePatches>();
+        private static ILogger Logger = LogManager.GetLogger<FlattenedTroopRosterLifetimePatches>();
 
         [HarmonyPatch(typeof(FlattenedTroopRoster), MethodType.Constructor, typeof(int))]
         [HarmonyPrefix]

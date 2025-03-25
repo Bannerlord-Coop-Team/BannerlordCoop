@@ -40,8 +40,8 @@ public class PeerQueueOverloadedTests
 
         // Assert
         /// 1 of each pause message is sent
-        Assert.Equal(1, TestMessageBroker.GetMessageCountFromType<SetTimeControlMode>());
-        Assert.Equal(1, TestNetwork.GetPeerMessageCountFromType<NetworkChangeTimeControlMode>(netPeer));
+        Assert.Single(TestMessageBroker.GetMessagesFromType<SetTimeControlMode>());
+        Assert.Single(TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer));
 
         /// Gets the last internal and network message of their respected types for asserting below
         var internalMsg = TestMessageBroker.GetMessagesFromType<SetTimeControlMode>().Last();
@@ -76,8 +76,8 @@ public class PeerQueueOverloadedTests
         // Assert
         /// When the game resumes, a resume message is sent internally and over the network
         /// 2 messages exist because the server forces a pause before resuming
-        Assert.Equal(2, TestMessageBroker.GetMessageCountFromType<SetTimeControlMode>());
-        Assert.Equal(2, TestNetwork.GetPeerMessageCountFromType<NetworkChangeTimeControlMode>(netPeer));
+        Assert.Equal(2, TestMessageBroker.GetMessagesFromType<SetTimeControlMode>().Count());
+        Assert.Equal(2, TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer).Count());
 
         var internalMsg = TestMessageBroker.GetMessagesFromType<SetTimeControlMode>().Last();
         var networkMsg = TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer).Last();

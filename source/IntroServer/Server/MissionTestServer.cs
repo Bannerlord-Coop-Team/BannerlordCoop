@@ -82,19 +82,19 @@ namespace IntroServer.Server
 
         public void OnPeerConnected(NetPeer peer)
         {
-            _logger.LogInformation("Received connection from {Peer}", peer.EndPoint);
+            _logger.LogInformation("Received connection from {Peer}", peer.Address);
         }
 
         public void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
         {
-            _logger.LogInformation("{Peer} disconnected. Reason: {DisconnectionReason}", peer.EndPoint, disconnectInfo.Reason);
+            _logger.LogInformation("{Peer} disconnected. Reason: {DisconnectionReason}", peer.Address, disconnectInfo.Reason);
             _peerRegistry.RemovePeer(peer);
         }
 
         public void OnNetworkLatencyUpdate(NetPeer peer, int latency)
         {
             if (latency > 0)
-				_logger.LogDebug("Network latency update of {Latency} for {Peer}", latency, peer.EndPoint);
+				_logger.LogDebug("Network latency update of {Latency} for {Peer}", latency, peer.Address);
         }
 
         public void OnNetworkReceive(
@@ -160,7 +160,7 @@ namespace IntroServer.Server
                 if (peer == null) return;
                 var p2PPeer = new P2PPeer(peer, localEndPoint, remoteEndPoint);
                 _peerRegistry.RegisterPeer(instance, p2PPeer);
-                _logger.LogDebug("Peer {Peer} Registered", p2PPeer.NetPeer.EndPoint);
+                _logger.LogDebug("Peer {Peer} Registered", p2PPeer.NetPeer.Address);
             }
             catch (Exception ex)
             {

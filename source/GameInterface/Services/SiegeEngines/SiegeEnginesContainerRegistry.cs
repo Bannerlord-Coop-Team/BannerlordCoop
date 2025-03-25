@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -9,7 +9,7 @@ namespace GameInterface.Services.SiegeEngines
     internal class SiegeEnginesContainerRegistry : RegistryBase<SiegeEnginesContainer>
     {
         private const string SiegeEnginesContainerIdPrefix = "CoopSiegeEnginesContainer";
-        private static int InstanceCounter = 0;
+        private int InstanceCounter = 0;
 
         public SiegeEnginesContainerRegistry(IRegistryCollection collection) : base(collection)
         {

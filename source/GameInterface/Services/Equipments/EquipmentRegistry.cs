@@ -1,11 +1,11 @@
-﻿using GameInterface.Services.Registry;
-using System;
+﻿using System;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
 using TaleWorlds.CampaignSystem.Siege;
 using System.Threading;
+using GameInterface.Registry;
 
 namespace GameInterface.Services.Equipments;
 
@@ -14,8 +14,8 @@ namespace GameInterface.Services.Equipments;
 /// </summary>
 internal class EquipmentRegistry : RegistryBase<Equipment> {
 
-    private const string EquipmentPrefix = $"Coop{nameof(Equipment)}";
-    private static int InstanceCounter = 0;
+    private const string EquipmentPrefix = $"Coop{nameof(Equipment)}_";
+    private int InstanceCounter = 0;
 
     public EquipmentRegistry(IRegistryCollection collection) : base(collection) { }
 

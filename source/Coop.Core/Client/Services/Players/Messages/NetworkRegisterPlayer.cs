@@ -15,6 +15,6 @@ internal class NetworkRegisterPlayer : ICommand
 
     public NetworkRegisterPlayer(Player player)
     {
-        this.Player = player;
+        Player = player;
     }
 }

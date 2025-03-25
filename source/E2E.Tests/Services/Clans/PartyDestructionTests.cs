@@ -1,4 +1,5 @@
 using E2E.Tests.Environment;
+using System.Security.Claims;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using Xunit.Abstractions;
@@ -9,7 +10,7 @@ public class ClanDestructionTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
 
-    Clan clan;
+    string? clanId;
     public ClanDestructionTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
@@ -17,13 +18,16 @@ public class ClanDestructionTests : IDisposable
         // Create a clan on the server and all clients
         TestEnvironment.Server.Call(() =>
         {
-            clan = Clan.CreateClan("TestClan");
+            var clan = Clan.CreateClan("TestClan");
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetId(clan, out clanId));
         });
+
+        Assert.NotNull(clanId);
 
         // Ensure clan was created on all clients
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<Clan>(clan!.StringId, out var _));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(clanId, out var _));
         }
     }
 
@@ -41,15 +45,16 @@ public class ClanDestructionTests : IDisposable
         // Act
         server.Call(() =>
         {
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
             DestroyClanAction.Apply(clan);
         });
 
         // Assert
-        Assert.False(server.ObjectManager.TryGetObject<Clan>(clan.StringId, out var _));
+        Assert.False(server.ObjectManager.TryGetObject<Clan>(clanId, out var _));
 
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.False(client.ObjectManager.TryGetObject<Clan>(clan.StringId, out var _));
+            Assert.False(client.ObjectManager.TryGetObject<Clan>(clanId, out var _));
         }
     }
 
@@ -62,15 +67,16 @@ public class ClanDestructionTests : IDisposable
         // Act
         TestEnvironment.Clients.First().Call(() =>
         {
+            Assert.True(TestEnvironment.Server.ObjectManager.TryGetObject<Clan>(clanId, out var clan));
             DestroyClanAction.Apply(clan);
         });
 
         // Assert
-        Assert.True(server.ObjectManager.TryGetObject<Clan>(clan.StringId, out var _));
+        Assert.True(server.ObjectManager.TryGetObject<Clan>(clanId, out var _));
 
         foreach (var client in TestEnvironment.Clients)
         {
-            Assert.True(client.ObjectManager.TryGetObject<Clan>(clan.StringId, out var _));
+            Assert.True(client.ObjectManager.TryGetObject<Clan>(clanId, out var _));
         }
     }
 }

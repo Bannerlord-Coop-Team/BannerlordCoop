@@ -10,6 +10,7 @@ using Coop.IntegrationTests.Environment.Instance;
 using Coop.IntegrationTests.Environment.Mock;
 using GameInterface;
 using GameInterface.Policies;
+using GameInterface.Services.Entity;
 
 namespace Coop.IntegrationTests.Environment;
 
@@ -87,6 +88,7 @@ public class TestEnvironment
 
         builder.RegisterModule<ServerModule>();
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
+        builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
         builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
 

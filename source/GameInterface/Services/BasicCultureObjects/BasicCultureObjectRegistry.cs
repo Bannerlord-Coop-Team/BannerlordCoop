@@ -1,39 +1,54 @@
-﻿using GameInterface.Services.Registry;
-using System.Threading;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.BasicCultureObjects
+namespace GameInterface.Services.BasicCultureObjects;
+internal class BasicCultureObjectRegistry : IAutoRegistry<BasicCultureObject>
 {
-    internal class BasicCultureObjectRegistry : RegistryBase<BasicCultureObject>
+    ILogger Logger { get; }
+    public BasicCultureObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        private const string IdPrefix = "CoopBasicCulture";
-        private static int InstanceCounter = 0;
+        Logger = logger;
 
-        public BasicCultureObjectRegistry(IRegistryCollection collection) : base(collection)
+        autoRegistryFactory.RegisterType(this);
+    }
+
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(BasicCultureObject))
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<BasicCultureObject> registry)
+    {
+        foreach (var culture in MBObjectManager.Instance.GetObjectTypeList<CultureObject>())
         {
+            var networkId = nameof(BasicCultureObject) + "_" + culture.StringId;
+            registry.RegisterExistingObject(networkId, culture);
         }
+    }
 
-        public override void RegisterAll()
-        {
-            var objectManager = MBObjectManager.Instance;
+    public void OnClientCreated(BasicCultureObject obj, string id)
+    {
+    }
 
-            if (objectManager == null)
-            {
-                Logger.Error("Unable to register objects when CampaignObjectManager is null");
-                return;
-            }
+    public void OnClientDestroyed(BasicCultureObject obj, string id)
+    {
+    }
 
-            foreach (var culture in objectManager.GetObjectTypeList<BasicCultureObject>())
-            {
-                RegisterExistingObject(culture.StringId, culture);
-            }
-        }
+    public void OnServerCreated(BasicCultureObject obj, string id)
+    {
+    }
 
-        protected override string GetNewId(BasicCultureObject obj)
-        {
-            return $"{IdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-        }
+    public void OnServerDestroyed(BasicCultureObject obj, string id)
+    {
     }
 }

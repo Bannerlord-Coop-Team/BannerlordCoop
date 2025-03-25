@@ -99,6 +99,7 @@ internal class ParallelRobustnessPatches
             MobileParty mobileParty = tickCachePerParty.MobileParty;
 
             if (mobileParty.Party == null) continue;
+            if (mobileParty.AttachedTo == null) continue;
 
             MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
             mobileParty.TickForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);

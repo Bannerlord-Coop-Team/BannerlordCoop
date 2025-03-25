@@ -90,7 +90,7 @@ public class PropertyPrefixCreator
         var networkLocal = TryResolve<INetwork>(il);
 
         var objectManagerLocal = TryResolve<IObjectManager>(il);
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
+        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, prop.DeclaringType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -130,8 +130,8 @@ public class PropertyPrefixCreator
         var networkLocal = TryResolve<INetwork>(il);
         var objectManagerLocal = TryResolve<IObjectManager>(il);
 
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
-        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal);
+        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, prop.DeclaringType);
+        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal, prop.PropertyType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -181,7 +181,7 @@ public class PropertyPrefixCreator
         return local;
     }
 
-    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal)
+    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal, Type objType)
     {
         var validLabel = il.DefineLabel();
         var idLocal = il.DeclareLocal(typeof(string));
@@ -193,12 +193,12 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Ldloca, idLocal);
 
         // Try resolve instance id
-        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetId)));
+        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetId)).MakeGenericMethod(objType));
         il.Emit(OpCodes.Brtrue, validLabel);
 
         // Log error
         il.Emit(OpCodes.Ldsfld, loggerField);
-        il.Emit(OpCodes.Ldstr, $"Could not resolve id");
+        il.Emit(OpCodes.Ldstr, $"Could not resolve id for type {objType}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
@@ -234,8 +234,8 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Ldstr, $"Client attempted to change {field.Name}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
-        // Return false
-        il.Emit(OpCodes.Ldc_I4_0);
+        // Return true
+        il.Emit(OpCodes.Ldc_I4_1);
         il.Emit(OpCodes.Ret);
 
         il.MarkLabel(notClientLabel);

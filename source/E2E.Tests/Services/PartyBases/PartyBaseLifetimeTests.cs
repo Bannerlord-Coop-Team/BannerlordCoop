@@ -34,7 +34,9 @@ public class PartyBaseLifetimeTests : IDisposable
         {
             var party = GameObjectCreator.CreateInitializedObject<MobileParty>();
 
-            partyId = party.StringId;
+            party.Party = party.Party;
+
+            Assert.True(server.ObjectManager.TryGetId(party, out partyId));
             Assert.True(server.ObjectManager.TryGetId(party.Party, out partyBaseId));
         });
 
@@ -46,7 +48,7 @@ public class PartyBaseLifetimeTests : IDisposable
         {
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var clientParty));
             Assert.True(client.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var clientPartyBase));
-            Assert.Equal(clientPartyBase.MobileParty, clientParty);
+            Assert.Equal(clientParty, clientPartyBase.MobileParty);
         }
     }
 

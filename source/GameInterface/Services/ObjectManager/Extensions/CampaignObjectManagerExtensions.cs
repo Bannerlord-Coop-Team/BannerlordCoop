@@ -16,22 +16,6 @@ internal static class CampaignObjectManagerExtensions
 {
     public static IEnumerable<Hero> GetAllHeroes(this CampaignObjectManager campaignObjectManager)
     {
-        return campaignObjectManager.AliveHeroes.Concat(campaignObjectManager.DeadOrDisabledHeroes);
-    }
-
-    public static void OnHeroAdded(this CampaignObjectManager campaignObjectManager, Hero hero)
-    {
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            campaignObjectManager.OnHeroAdded(hero);
-        });
-    }
-
-    public static void AddMobileParty(this CampaignObjectManager campaignObjectManager, MobileParty party)
-    {
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            campaignObjectManager.AddMobileParty(party);
-        });
+        return campaignObjectManager.DeadOrDisabledHeroes.Concat(campaignObjectManager.AliveHeroes);
     }
 }
