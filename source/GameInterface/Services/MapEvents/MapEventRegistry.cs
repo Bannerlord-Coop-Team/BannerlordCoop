@@ -1,7 +1,10 @@
 ﻿using GameInterface.Registry;
+using System.Diagnostics.Metrics;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MapEvents;
 
@@ -19,7 +22,9 @@ internal class MapEventRegistry : RegistryBase<MapEvent>
     {
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (RegisterExistingObject(mapEvent.StringId, mapEvent) == false)
+            int counter = 0;
+            var networkId = nameof(Building) + "_" + "Coop" + counter++;
+            if (RegisterExistingObject(networkId, mapEvent) == false)
             {
                 Logger.Error($"Unable to register {mapEvent}");
             }
