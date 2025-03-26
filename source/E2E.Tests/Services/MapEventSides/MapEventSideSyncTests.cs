@@ -2,11 +2,9 @@
 using E2E.Tests.Util;
 using GameInterface.Services.MapEventSides.Patches;
 using HarmonyLib;
-using System.Runtime.InteropServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 

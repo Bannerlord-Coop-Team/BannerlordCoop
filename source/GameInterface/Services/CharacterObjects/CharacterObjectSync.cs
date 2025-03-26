@@ -14,7 +14,7 @@ namespace GameInterface.Services.CharacterObjects
             autoSyncBuilder.AddField(AccessTools.Field(typeof(CharacterObject), nameof(CharacterObject._characterRestrictionFlags)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(CharacterObject), nameof(CharacterObject._originCharacter)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(CharacterObject), nameof(CharacterObject._persona)));
-            //autoSyncBuilder.AddField(AccessTools.Field(typeof(CharacterObject), nameof(CharacterObject._characterTraits)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(CharacterObject), nameof(CharacterObject._characterTraits)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(CharacterObject), nameof(CharacterObject._civilianEquipmentTemplate)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(CharacterObject), nameof(CharacterObject._battleEquipmentTemplate)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(CharacterObject), nameof(CharacterObject._occupation)));

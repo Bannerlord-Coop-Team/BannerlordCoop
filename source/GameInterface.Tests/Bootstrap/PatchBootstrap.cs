@@ -1,13 +1,11 @@
-﻿using Autofac;
+﻿using System;
+using System.Threading;
+using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Coop.Core.Common.Configuration;
 using Coop.Tests.Mocks;
-using GameInterface.Registry;
-using GameInterface.Surrogates;
-using System;
-using System.Threading;
 
 namespace GameInterface.Tests.Bootstrap;
 

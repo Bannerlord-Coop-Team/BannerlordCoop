@@ -1,8 +1,7 @@
-﻿using GameInterface.Services.Registry;
-using System.Threading;
+﻿using System.Threading;
+using GameInterface.Registry;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.CharacterTrait
 {

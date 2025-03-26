@@ -1,4 +1,9 @@
-﻿using Common.Logging;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
@@ -11,11 +16,6 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
 using LiteNetLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 
 namespace Coop.Core.Server;
 
