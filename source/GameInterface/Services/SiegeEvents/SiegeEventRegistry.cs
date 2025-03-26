@@ -31,7 +31,8 @@ internal class SiegeEventRegistry : IAutoRegistry<SiegeEvent>
     {
         foreach (var instance in Campaign.Current.SiegeEventManager.SiegeEvents)
         {
-            if (registry.RegisterNewObject(instance, out var _) == false) Logger.Error($"Unable to register {nameof(SiegeEvent)}");
+            if (registry.RegisterNewObject(instance, out var _) == false)
+                Logger.Error($"Unable to register {nameof(SiegeEvent)}");
         }
     }
 

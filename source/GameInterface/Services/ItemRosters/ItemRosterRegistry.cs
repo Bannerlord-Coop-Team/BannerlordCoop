@@ -1,5 +1,12 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
@@ -8,13 +15,21 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.ItemRosters
 {
-    internal class ItemRosterRegistry : RegistryBase<ItemRoster>
+    internal class ItemRosterRegistry : IAutoRegistry<ItemRoster>
     {
-        private const string ItemRosterIdPrefix = "CoopItemRoster";
-        private static int ItemRosterCounter = 0;
-        public ItemRosterRegistry(IRegistryCollection collection) : base(collection) { }
+        ILogger Logger { get; }
+        public ItemRosterRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+        {
+            Logger = logger;
 
-        public override void RegisterAll()
+            autoRegistryFactory.RegisterType(this);
+        }
+
+        public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(ItemRoster));
+
+        public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+        public void RegisterAllObjects(IRegistry<ItemRoster> registry)
         {
             var objectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -28,24 +43,35 @@ namespace GameInterface.Services.ItemRosters
             {
                 if (party.ItemRoster == null) continue;
 
-                var networkId = nameof(ItemRoster) + "_" + party.StringId;
+                var networkId = $"{nameof(ItemRoster)}_{party.StringId}";
 
-                RegisterExistingObject(networkId, party.ItemRoster);
+                registry.RegisterExistingObject(networkId, party.ItemRoster);
             }
 
-            foreach(Settlement settlement in objectManager.Settlements)
+            foreach (Settlement settlement in objectManager.Settlements)
             {
                 if (settlement.ItemRoster == null) continue;
 
-                var networkId = nameof(ItemRoster) + "_" + settlement.StringId;
+                var networkId = $"{nameof(ItemRoster)}_{settlement.StringId}";
 
-                RegisterExistingObject(networkId, settlement.ItemRoster);
+                registry.RegisterExistingObject(networkId, settlement.ItemRoster);
             }
         }
 
-        protected override string GetNewId(ItemRoster itemRoster)
+        public void OnClientCreated(ItemRoster obj, string id)
         {
-            return $"{ItemRosterIdPrefix}_{Interlocked.Increment(ref ItemRosterCounter)}";
+        }
+
+        public void OnClientDestroyed(ItemRoster obj, string id)
+        {
+        }
+
+        public void OnServerCreated(ItemRoster obj, string id)
+        {
+        }
+
+        public void OnServerDestroyed(ItemRoster obj, string id)
+        {
         }
     }
 }

@@ -103,7 +103,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     {
         var exceptions = ctros.Where(ctor => expectedType.IsAssignableFrom(ctor?.DeclaringType) == false).Select(ctor =>
         {
-            return new InvalidOperationException($"Constructor does not match type {expectedType} instead was {ctor.DeclaringType}");
+            return new InvalidOperationException($"{ctor.DeclaringType} is not assignable to {expectedType}");
         });
 
         if (exceptions.Any())

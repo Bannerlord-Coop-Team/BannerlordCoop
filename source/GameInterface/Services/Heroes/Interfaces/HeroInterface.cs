@@ -14,6 +14,7 @@ using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -72,30 +73,39 @@ internal class HeroInterface : IHeroInterface
         },
         blocking: true);
 
-        objectManager.TryGetId(hero, out var heroId);
-        objectManager.TryGetId(hero.PartyBelongedTo, out var partyId);
-        objectManager.TryGetId(hero.CharacterObject, out var characterObjectId);
-        objectManager.TryGetId(hero.Clan, out var clanId);
-
-        using (new AllowedThread())
-        {
-            hero.StringId = heroId;
-            hero.PartyBelongedTo.StringId = partyId;
-            hero.CharacterObject.StringId = characterObjectId;
-            hero.Clan.StringId = clanId;
-        }
+        var heroId = RegisterObject(hero);
         
-
         entityRegistry.RegisterAsControlled(controllerId, heroId);
 
         return new Player()
         {
             HeroData = bytes,
             HeroStringId = heroId,
-            PartyStringId = partyId,
-            CharacterObjectStringId = characterObjectId,
-            ClanStringId = clanId
+            PartyStringId = RegisterObject(hero.PartyBelongedTo),
+            CharacterObjectStringId = RegisterObject(hero.CharacterObject),
+            ClanStringId = RegisterObject(hero.Clan)
         };
+    }
+
+    private string RegisterObject<T>(T obj) where T : MBObjectBase
+    {
+        
+        
+
+        if (objectManager.AddNewObject(obj, out var newId) == false)
+        {
+            throw new InvalidOperationException($"Unable to register {obj.StringId} {typeof(T)}");
+        }
+
+        using (new AllowedThread())
+        {
+            obj.StringId = newId;
+            MBObjectManager.Instance.RegisterObject(obj);
+        }
+
+        if (obj.StringId != newId) throw new Exception();
+
+        return newId;
     }
 
     private Hero UnpackMainHeroInternal(byte[] bytes)

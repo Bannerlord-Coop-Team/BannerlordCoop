@@ -30,7 +30,7 @@ class FiefRegistry : IAutoRegistry<Fief>
         foreach (var fief in Town.AllTowns)
         {
             var networkId = $"{nameof(Fief)}_{fief.StringId}";
-            registry.RegisterExistingObject(networkId, fief.StringId);
+            registry.RegisterExistingObject(networkId, fief);
         }
     }
 

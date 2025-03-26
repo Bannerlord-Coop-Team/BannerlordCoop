@@ -30,7 +30,7 @@ internal class BasicCharacterObjectRegistry : IAutoRegistry<BasicCharacterObject
     {
         foreach (CharacterObject character in CharacterObject.All)
         {
-            var networkId = nameof(BasicCharacterObject) + "_" + character.StringId;
+            var networkId = $"{nameof(BasicCharacterObject)}_{character.StringId}";
             registry.RegisterExistingObject(networkId, character);
         }
     }

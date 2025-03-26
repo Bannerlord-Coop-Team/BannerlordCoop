@@ -62,8 +62,8 @@ namespace Coop.Core.Server.Services.Connection.Handlers
             if (AnyLoaders())
             {
                 int loadingPeers = clientRegistry.LoadingPeers.Count;
-
-                string loadingMessage = "Pausing disabled, " + loadingPeers + " player(s) are currently joining the game";
+                string plural = loadingPeers > 1 ? "s" : "";
+                string loadingMessage = $"Unpausing disabled, {loadingPeers} player{plural} are currently joining the game";
 
                 messageBroker.Publish(this, new SendInformationMessage(loadingMessage));
                 network.SendAll(new SendInformationMessage(loadingMessage));

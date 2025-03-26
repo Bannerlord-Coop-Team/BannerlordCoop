@@ -32,7 +32,7 @@ internal class TownRegistry : IAutoRegistry<Town>
         foreach (var town in Town.AllTowns)
         {
             var networkId = $"{nameof(Town)}_{town.StringId}";
-            registry.RegisterExistingObject(networkId, town.StringId);
+            registry.RegisterExistingObject(networkId, town);
         }
     }
 

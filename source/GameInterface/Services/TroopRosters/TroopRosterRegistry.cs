@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Util;
 using GameInterface.Registry.Auto;
 using HarmonyLib;
 using Serilog;
@@ -9,6 +10,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.TroopRosters;
 internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
@@ -22,7 +24,7 @@ internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
     }
 
     public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(TroopRoster))
+        AccessTools.Constructor(typeof(TroopRoster), new Type[0])
     };
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
@@ -41,6 +43,13 @@ internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
 
     public void OnClientCreated(TroopRoster obj, string id)
     {
+        using(new AllowedThread())
+        {
+            obj.data = new TroopRosterElement[4];
+            obj._count = 0;
+            obj._troopRosterElements = new MBList<TroopRosterElement>();
+            obj.InitializeCachedData();
+        }
     }
 
     public void OnClientDestroyed(TroopRoster obj, string id)

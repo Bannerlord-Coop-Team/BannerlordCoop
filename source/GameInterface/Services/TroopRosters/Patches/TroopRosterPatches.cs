@@ -1,11 +1,8 @@
 ﻿using Common.Logging;
-using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Patches

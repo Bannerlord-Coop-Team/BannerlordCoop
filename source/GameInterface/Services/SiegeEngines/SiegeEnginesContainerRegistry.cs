@@ -1,31 +1,57 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEngines
 {
-    internal class SiegeEnginesContainerRegistry : RegistryBase<SiegeEnginesContainer>
+    internal class SiegeEnginesContainerRegistry : IAutoRegistry<SiegeEnginesContainer>
     {
-        private const string SiegeEnginesContainerIdPrefix = "CoopSiegeEnginesContainer";
-        private int InstanceCounter = 0;
+        ILogger Logger { get; }
 
-        public SiegeEnginesContainerRegistry(IRegistryCollection collection) : base(collection)
+        public IEnumerable<MethodBase> Constructors => new MethodBase[]
         {
+            AccessTools.Constructor(typeof(SiegeEnginesContainer), new Type[] { typeof(BattleSideEnum), typeof(SiegeEngineConstructionProgress) })
+        };
+
+        public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+        public SiegeEnginesContainerRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+        {
+            Logger = logger;
+
+            autoRegistryFactory.RegisterType(this);
         }
 
-        public override void RegisterAll()
+        public void RegisterAllObjects(IRegistry<SiegeEnginesContainer> registry)
         {
             foreach (var siegeEnginesContainer in Campaign.Current.SiegeEventManager.SiegeEvents.Select(siegeEvent => siegeEvent.BesiegerCamp.SiegeEngines))
             {
-                RegisterNewObject(siegeEnginesContainer, out _);
+                registry.RegisterNewObject(siegeEnginesContainer, out _);
             }
         }
 
-        protected override string GetNewId(SiegeEnginesContainer obj)
+        public void OnClientCreated(SiegeEnginesContainer obj, string id)
         {
-            return $"{SiegeEnginesContainerIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+        }
+
+        public void OnClientDestroyed(SiegeEnginesContainer obj, string id)
+        {
+        }
+
+        public void OnServerCreated(SiegeEnginesContainer obj, string id)
+        {
+        }
+
+        public void OnServerDestroyed(SiegeEnginesContainer obj, string id)
+        {
         }
     }
 }

@@ -26,7 +26,7 @@ internal class MapEventSideRegistry : RegistryBase<MapEventSide>
             {
                 if (side == null) continue;
 
-                var networkId = nameof(MapEventSide) + "_" + mapEvent.StringId + "_" + counter++;
+                var networkId = $"{nameof(MapEventSide)}_{mapEvent.StringId}_{counter++}";
 
                 if (RegisterExistingObject(networkId, side) == false)
                     Logger.Error("Unable to register MapEventSide {id} in the object manager", side.ToString());

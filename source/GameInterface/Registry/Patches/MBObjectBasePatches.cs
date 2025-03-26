@@ -1,4 +1,5 @@
-﻿using GameInterface.Policies;
+﻿using Common.Util;
+using GameInterface.Policies;
 using HarmonyLib;
 using TaleWorlds.ObjectSystem;
 
@@ -13,6 +14,14 @@ internal class MBObjectBasePatches
     {
         // Call original if we allow this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (__instance.StringId == null)
+        {
+            using(new AllowedThread())
+            {
+                __instance.StringId = value;
+            }
+        }
 
         return false;
     }

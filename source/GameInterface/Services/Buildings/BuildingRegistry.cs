@@ -27,7 +27,7 @@ internal class BuildingRegistry : RegistryBase<Building>
 
             foreach(Building building in settlement.Town.Buildings)
             {
-                var networkId = nameof(Building) + "_" + settlement.StringId + counter++;
+                var networkId = $"{nameof(Building)}_{settlement.StringId}_{counter++}";
                 if (RegisterExistingObject(networkId, building) == false)
                     Logger.Error($"Unable to register {building}");
             }

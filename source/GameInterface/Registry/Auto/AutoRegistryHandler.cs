@@ -48,7 +48,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
     private void Handle_InstanceCreated(MessagePayload<InstanceCreated<T>> payload)
     {
-        if (ObjectManager.AddNewObject(payload.What.Instance, out var id) == false)
+        if (ObjectManager.AddNewObject<T>(payload.What.Instance, out var id) == false)
         {
             Logger.Error("Unable to create new id for {type}", typeof(T).Name);
             return;

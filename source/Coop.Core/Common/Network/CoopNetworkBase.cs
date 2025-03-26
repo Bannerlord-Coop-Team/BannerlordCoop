@@ -52,8 +52,12 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
     {
         netManager.Stop();
 
-        CancellationTokenSource.Cancel();
-        CancellationTokenSource.Dispose();
+        if (CancellationTokenSource.IsCancellationRequested == false)
+        {
+            CancellationTokenSource.Cancel();
+            CancellationTokenSource.Dispose();
+        }
+
         UpdateThread?.Join(Configuration.ObjectCreationTimeout);
     }
 

@@ -1,24 +1,40 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.SettlementComponents;
-internal class SettlementComponentRegistry : RegistryBase<SettlementComponent>
+internal class SettlementComponentRegistry : IAutoRegistry<SettlementComponent>
 {
-    private const string SettlementComponentIdPrefix = "CoopSettlementComponent";
-    private int InstanceCounter = 0;
+    ILogger Logger { get; }
 
-    public SettlementComponentRegistry(IRegistryCollection collection) : base(collection)
+    public SettlementComponentRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
     }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => new MethodBase[]
     {
-        List<SettlementComponent> settlementComponents = new List<SettlementComponent>();
+        AccessTools.Constructor(typeof(Town)),
+        AccessTools.Constructor(typeof(Village)),
+        AccessTools.Constructor(typeof(Hideout)),
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<SettlementComponent> registry)
+    {
+        var settlementComponents = new List<SettlementComponent>();
 
         settlementComponents.AddRange(Town.AllFiefs);
         settlementComponents.AddRange(Village.All);
@@ -27,12 +43,23 @@ internal class SettlementComponentRegistry : RegistryBase<SettlementComponent>
         foreach (var settlementComponent in settlementComponents.DistinctBy(comp => comp.StringId))
         {
             var networkId = $"{nameof(SettlementComponent)}_{settlementComponent.StringId}";
-            RegisterExistingObject(networkId, settlementComponent);
+            registry.RegisterExistingObject(networkId, settlementComponent);
         }
     }
 
-    protected override string GetNewId(SettlementComponent obj)
+    public void OnClientCreated(SettlementComponent obj, string id)
     {
-        return $"{SettlementComponentIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+    }
+
+    public void OnClientDestroyed(SettlementComponent obj, string id)
+    {
+    }
+
+    public void OnServerCreated(SettlementComponent obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(SettlementComponent obj, string id)
+    {
     }
 }

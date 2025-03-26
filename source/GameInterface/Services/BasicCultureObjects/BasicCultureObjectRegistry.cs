@@ -31,7 +31,7 @@ internal class BasicCultureObjectRegistry : IAutoRegistry<BasicCultureObject>
     {
         foreach (var culture in MBObjectManager.Instance.GetObjectTypeList<CultureObject>())
         {
-            var networkId = nameof(BasicCultureObject) + "_" + culture.StringId;
+            var networkId = $"{nameof(BasicCultureObject)}_{culture.StringId}";
             registry.RegisterExistingObject(networkId, culture);
         }
     }
