@@ -1,7 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.SiegeEvents.Messages;
 using GameInterface.Services.VillageMarketDatas.Messages;
 using HarmonyLib;
 using Serilog;
@@ -9,7 +8,6 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.VillageMarketDatas.Patches;
 

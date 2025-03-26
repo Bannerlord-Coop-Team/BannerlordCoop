@@ -10,10 +10,10 @@ namespace GameInterface.Services.Clans.Messages.Lifetime;
 internal class NetworkCreateClan : ICommand
 {
     [ProtoMember(1)]
-    public ClanCreatedData Data { get; }
+    public string ClanId { get; }
 
-    public NetworkCreateClan(ClanCreatedData data)
+    public NetworkCreateClan(string clanId)
     {
-        Data = data;
+        ClanId = clanId;
     }
 }

@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -13,7 +13,7 @@ namespace GameInterface.Services.Buildings;
 internal class BuildingRegistry : RegistryBase<Building>
 {
     private const string BuildingIdPrefix = "CoopBuilding";
-    private static int InstanceCounter = 0;
+    private int InstanceCounter = 0;
 
     public BuildingRegistry(IRegistryCollection collection) : base(collection) { }
 
@@ -23,12 +23,13 @@ internal class BuildingRegistry : RegistryBase<Building>
         {
             if(settlement.Town == null) continue;
 
+            int counter = 0;
+
             foreach(Building building in settlement.Town.Buildings)
             {
-                if (RegisterNewObject(building, out var _) == false)
-                {
+                var networkId = nameof(Building) + "_" + settlement.StringId + counter++;
+                if (RegisterExistingObject(networkId, building) == false)
                     Logger.Error($"Unable to register {building}");
-                }
             }
         }
     }

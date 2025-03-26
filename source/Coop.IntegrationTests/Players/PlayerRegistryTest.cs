@@ -2,6 +2,7 @@
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
+using ProtoBuf;
 
 namespace Coop.IntegrationTests.Players
 {
@@ -22,7 +23,14 @@ namespace Coop.IntegrationTests.Players
         [Fact]
         public void ServerNewPlayerRegistered_ClientPublishes_RegisterPlayer()
         {
-            Player player = new Player(Array.Empty<Byte>(),"Hero-CoopParty", "CoopParty", "characterObjectID", "ClanStringID");
+            Player player = new Player()
+            {
+                HeroData = Array.Empty<byte>(),
+                HeroStringId = "Hero-CoopParty",
+                PartyStringId = "CoopParty",
+                CharacterObjectStringId = "characterObjectID",
+                ClanStringId = "ClanStringID"
+            };
             
      
             var message = new PlayerRegistered(player);

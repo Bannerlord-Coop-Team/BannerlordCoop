@@ -1,5 +1,4 @@
 ﻿using Common;
-using GameInterface.Services.Registry;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -9,44 +8,70 @@ using System.Linq;
 using TaleWorlds.Core;
 using System.Collections;
 using System.Threading;
+using GameInterface.Registry;
+using Common.Util;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System.Reflection;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.StanceLinks;
 
 /// <summary>
 /// Registry for <see cref="StanceLink"/> type
 /// </summary>
-internal class StanceLinkRegistry : RegistryBase<StanceLink>
+internal class StanceLinkRegistry : IAutoRegistry<StanceLink>
 {
-    private const string StanceLinkStringIdPrefix = "CoopStanceLink";
-    private static int InstaceCounter = 0;
-
-    public StanceLinkRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override void RegisterAll()
+    ILogger Logger { get; }
+    public StanceLinkRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        IEnumerable<Kingdom> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
+        Logger = logger;
 
-        foreach (var kingdom in kingdoms)
+        autoRegistryFactory.RegisterType(this);
+    }
+
+    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(StanceLink));
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<StanceLink> registry)
+    {
+        IEnumerable<IFaction> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
+        IEnumerable<IFaction> clans = Campaign.Current?.Clans ?? Enumerable.Empty<Clan>();
+
+        var factions = kingdoms.Concat(clans);
+
+        HashSet<StanceLink> visitedStances = new();
+
+        foreach (var faction in factions)
         {
-            foreach(StanceLink stance in kingdom._stances)
+            int counter = 1;
+            foreach (var stance in faction.Stances)
             {
-                RegisterNewObject(stance, out var _);
-            }
-        }
+                if (visitedStances.Contains(stance)) continue;
 
-        IEnumerable<Clan> clans = Campaign.Current?.Clans ?? Enumerable.Empty<Clan>();
+                var networkId = $"{nameof(StanceLink)}_{faction.StringId}_{counter++}";
+                registry.RegisterExistingObject(networkId, stance);
 
-        foreach (var clan in clans)
-        {
-            foreach (StanceLink stance in clan._stances)
-            {
-                RegisterNewObject(stance, out var _);
+                visitedStances.Add(stance);
             }
         }
     }
 
-    protected override string GetNewId(StanceLink obj)
+    public void OnClientCreated(StanceLink obj, string id)
     {
-        return $"{StanceLinkStringIdPrefix}_{Interlocked.Increment(ref InstaceCounter)}";
+    }
+
+    public void OnClientDestroyed(StanceLink obj, string id)
+    {
+    }
+
+    public void OnServerCreated(StanceLink obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(StanceLink obj, string id)
+    {
     }
 }

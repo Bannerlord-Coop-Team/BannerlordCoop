@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -137,7 +138,7 @@ namespace E2E.Tests.Services.Clans
                 Assert.True(client.ObjectManager.TryGetObject(ClanId, out Clan clientClan));
                 Assert.Equal(serverClan.Name.Value, clientClan.Name.Value);
                 Assert.Equal(serverClan.InformalName.Value, clientClan.InformalName.Value);
-                Assert.Equal(serverClan.Culture.StringId, clientClan.Culture.StringId);
+
                 Assert.Equal(serverClan.LastFactionChangeTime, clientClan.LastFactionChangeTime);
                 Assert.Equal(serverClan.AutoRecruitmentExpenses, clientClan.AutoRecruitmentExpenses);
                 Assert.Equal(serverClan.IsNoble, clientClan.IsNoble);
@@ -157,19 +158,32 @@ namespace E2E.Tests.Services.Clans
                 Assert.Equal(serverClan.NotAttackableByPlayerUntilTime, clientClan.NotAttackableByPlayerUntilTime);
 
                 Assert.Equal(serverClan._isEliminated, clientClan._isEliminated);
-                Assert.Equal(serverClan._kingdom.StringId, clientClan._kingdom.StringId);
+                
                 Assert.Equal(serverClan._influence, clientClan._influence);
-                Assert.Equal(serverClan._clanMidSettlement.StringId, clientClan._clanMidSettlement.StringId);
-                Assert.Equal(serverClan._basicTroop.StringId, clientClan._basicTroop.StringId);
-                Assert.Equal(serverClan._leader.StringId, clientClan._leader.StringId);
+                
                 Assert.Equal(serverClan._banner._bannerVisual, clientClan._banner._bannerVisual);
                 Assert.Equal(serverClan._banner._bannerDataList, clientClan._banner._bannerDataList);
                 Assert.Equal(serverClan._tier, clientClan._tier);
                 Assert.Equal(serverClan._aggressiveness, clientClan._aggressiveness);
                 Assert.Equal(serverClan._tributeWallet, clientClan._tributeWallet);
-                Assert.Equal(serverClan._home.StringId, clientClan._home.StringId);
                 Assert.Equal(serverClan._clanDebtToKingdom, clientClan._clanDebtToKingdom);
+
+                // Network
+                NetworkIdsEqual(Server.ObjectManager, serverClan.Culture, client.ObjectManager, clientClan.Culture);
+                NetworkIdsEqual(Server.ObjectManager, serverClan._kingdom, client.ObjectManager, clientClan._kingdom);
+                NetworkIdsEqual(Server.ObjectManager, serverClan._clanMidSettlement, client.ObjectManager, clientClan._clanMidSettlement);
+                NetworkIdsEqual(Server.ObjectManager, serverClan._basicTroop, client.ObjectManager, clientClan._basicTroop);
+                NetworkIdsEqual(Server.ObjectManager, serverClan._leader, client.ObjectManager, clientClan._leader);
+                NetworkIdsEqual(Server.ObjectManager, serverClan._home, client.ObjectManager, clientClan._home);
             }
+        }
+
+        void NetworkIdsEqual<T>(IObjectManager objManager1, T obj1, IObjectManager objManager2, T obj2)
+        {
+            Assert.True(objManager1.TryGetId(obj1, out var obj1Id));
+            Assert.True(objManager2.TryGetId(obj2, out var obj2Id));
+
+            Assert.Equal(obj2Id, obj1Id);
         }
     }
 }

@@ -82,6 +82,13 @@ namespace GameInterface.Services.Heroes.Handlers
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
                 return;
             }
+
+            if (data.SettlementStringId == null)
+            {
+                instance._homeSettlement = null;
+                return;
+            }
+
             if (objectManager.TryGetObject<Settlement>(data.SettlementStringId, out var settlement) == false)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.SettlementStringId);

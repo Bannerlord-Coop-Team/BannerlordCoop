@@ -37,7 +37,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Alley alley = (Alley)FormatterServices.GetUninitializedObject(typeof(Alley));
             Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             settlement.StringId = "My Settlement";
-            MBObjectManager.Instance.RegisterObject(settlement);
+
+            container.Resolve<IObjectManager>().AddNewObject(settlement, out var _);
+            container.Resolve<IObjectManager>().AddNewObject(alley, out var _);
 
             alley._settlement = settlement;
 
@@ -70,12 +72,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var objectManager = container.Resolve<IObjectManager>();
 
             // Register owner with MBObjectManager
-            owner.StringId = "My Hero";
-            objectManager.AddExisting(owner.StringId, owner);
+            var ownerId = "My Hero";
+            objectManager.AddExisting(ownerId, owner);
 
             // Register settlement with MBObjectManager
-            settlement.StringId = "My Settlement";
-            objectManager.AddExisting(settlement.StringId, settlement);
+            var settlmentId = "My Settlement";
+            objectManager.AddExisting(settlmentId, settlement);
 
             // Attach settlement and commonArea
             alley._settlement = settlement;

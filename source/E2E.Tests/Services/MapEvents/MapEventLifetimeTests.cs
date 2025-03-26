@@ -2,7 +2,6 @@
 using E2E.Tests.Util;
 using HarmonyLib;
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -11,7 +10,6 @@ using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Siege;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEvents;
@@ -19,20 +17,9 @@ public class MapEventLifetimeTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }
 
-    private readonly List<MethodBase> disabledMethods;
-
     public MapEventLifetimeTests(ITestOutputHelper output)
     {
         TestEnvironment = new E2ETestEnvironment(output);
-
-        disabledMethods = new List<MethodBase>
-        {
-            typeof(PartyBase).GetProperty(nameof(PartyBase.MapEventSide)).GetSetMethod(),
-            AccessTools.Method(typeof(MapEvent), nameof(MapEvent.CacheSimulationData)),
-            AccessTools.Method(typeof(MapEvent), nameof(MapEvent.GetBattleSizeValue)),
-            AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.UpdatePartiesMoveState)),
-            AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.HandleMapEventEnd)),
-        };
     }
 
     public void Dispose()
@@ -101,13 +88,11 @@ public class MapEventLifetimeTests : IDisposable
 
             Assert.True(server.ObjectManager.TryGetId(mapEvent, out mapEventId));
 
-            // TODO find better way
             mapEvent.MapEventVisual = Moq.Mock.Of<IMapEventVisual>();
-            mapEvent._sides = new MapEventSide[2];
 
             mapEvent.Initialize(attackerParty, defenderParty);
             mapEvent.FinalizeEvent();
-        }, disabledMethods );
+        }, disabledMethods: new MethodBase[] { AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.HandleMapEventEnd)) });
 
         // Assert
         Assert.NotNull(mapEventId);

@@ -20,7 +20,7 @@ namespace GameInterface.Services.MobileParties.Handlers
 {
     public class MobilePartyPropertyHandler : IHandler
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyFieldsHandler>();
+        private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyPropertyHandler>();
 
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
