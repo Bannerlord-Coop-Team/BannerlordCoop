@@ -88,7 +88,7 @@ namespace Coop
         
         public override void NoHarmonyLoad()
         {
-            Coop  = new CoopartiveMultiplayerExperience();
+            Coop = new CoopartiveMultiplayerExperience();
 
             Updateables.Add(GameLoopRunner.Instance);
 
@@ -162,6 +162,11 @@ namespace Coop
         public override void OnGameEnd(Game game)
         {
             base.OnGameEnd(game);
+
+            if (Coop.Running)
+            {
+                Coop.Dispose();
+            }
         }
 
         private bool m_IsFirstTick = true;

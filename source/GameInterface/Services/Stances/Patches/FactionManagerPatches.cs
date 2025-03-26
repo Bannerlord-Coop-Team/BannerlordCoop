@@ -13,7 +13,7 @@ namespace GameInterface.Services.Stances.Patches
         [HarmonyPrefix]
         private static bool AddStancePrefix()
         {
-            return false;
+            return true;
         }
 
         [HarmonyPatch("RemoveStance")]

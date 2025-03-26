@@ -5,11 +5,11 @@ namespace GameInterface.Services.CraftingService.Messages
 {
     internal record CraftingRemoved : IEvent
     {
-        public Crafting crafting;
+        public Crafting Crafting { get; }
 
         public CraftingRemoved(Crafting crafting)
         {
-            this.crafting = crafting;
+            Crafting = crafting;
         }
     }
 }

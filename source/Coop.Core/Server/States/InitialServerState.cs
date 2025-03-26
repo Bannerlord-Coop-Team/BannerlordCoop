@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
@@ -33,6 +34,9 @@ public class InitialServerState : ServerStateBase
 
         // Remove server party
         messageBroker.Publish(this, new RemoveMainParty());
+
+        // Register all objects after main party is removed to keep order
+        messageBroker.Publish(this, new RegisterAllGameObjects());
 
         // Change to server running state
         Logic.SetState<ServerRunningState>();

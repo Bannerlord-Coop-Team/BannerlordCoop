@@ -13,7 +13,8 @@ using System.Collections;
 using System.Linq;
 using ProtoBuf;
 using ProtoBuf.Meta;
-using Newtonsoft.Json.Linq;
+using System.Diagnostics;
+using Common.Util;
 
 namespace GameInterface.AutoSync.Fields;
 public class FieldTranspilerCreator
@@ -21,6 +22,7 @@ public class FieldTranspilerCreator
     private readonly TypeBuilder typeBuilder;
 
     private readonly FieldBuilder loggerField;
+    private readonly MethodInfo logErrorFn;
     private readonly IObjectManager objectManager;
     private readonly Dictionary<FieldInfo, MethodInfo> interceptMap;
 
@@ -42,6 +44,14 @@ public class FieldTranspilerCreator
 
 
         loggerField = typeBuilder.DefineField("logger", typeof(ILogger), FieldAttributes.Private | FieldAttributes.InitOnly | FieldAttributes.Static);
+        const int parameterCount = 2;
+
+        logErrorFn = typeof(ILogger).GetMethods(BindingFlags.Instance | BindingFlags.Public)
+            .Where(
+                m => m.Name == nameof(ILogger.Error) &&
+                m.IsGenericMethodDefinition &&
+                m.GetParameters().Count() == parameterCount)
+            .Single();
 
         CreateStaticCtor();
 
@@ -60,6 +70,17 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Call, AccessTools.Constructor(typeof(object)));
 
         il.Emit(OpCodes.Ret);
+    }
+
+    public static string GetStackTrace()
+    {
+        var stackTrace = new StackTrace();
+
+        var frames = stackTrace.GetFrames();
+
+        var result = string.Join("\n", frames.Take(frames.Count() - 1).Select(frame => frame.ToString()));
+
+        return result;
     }
 
     private void CreateStaticCtor()
@@ -436,6 +457,15 @@ public class FieldTranspilerCreator
 
         var il = methodBuilder.GetILGenerator();
 
+        var neqLabel = il.DefineLabel();
+
+        var allowedLabel = il.DefineLabel();
+
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.IsThisThreadAllowed)));
+        il.Emit(OpCodes.Brtrue, allowedLabel);
+
+        // TODO add same value checking, has to be more complex than just ==, needs .Equals function to properly work with surrogates
+
         IsClientCheck(il, field);
 
         HasValueChanged(il, field);
@@ -443,7 +473,7 @@ public class FieldTranspilerCreator
         var networkLocal = TryResolve<INetwork>(il);
 
         var objectManagerLocal = TryResolve<IObjectManager>(il);
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
+        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, field.DeclaringType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -457,6 +487,8 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(FieldAutoSyncPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
         il.Emit(OpCodes.Box, typeof(FieldAutoSyncPacket));
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
+
+        il.MarkLabel(allowedLabel);
 
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldarg_1);
@@ -479,6 +511,29 @@ public class FieldTranspilerCreator
 
         var il = methodBuilder.GetILGenerator();
 
+        var neqLabel = il.DefineLabel();
+
+        // if (this.currentValue == newValue) return;
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldfld, field);
+        il.Emit(OpCodes.Ldarg_1);
+
+
+        il.Emit(OpCodes.Ceq);
+        il.Emit(OpCodes.Brfalse, neqLabel);
+
+        il.Emit(OpCodes.Ret);
+
+
+        il.MarkLabel(neqLabel);
+
+        var allowedLabel = il.DefineLabel();
+
+        // Allow this thread to skip patches
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.IsThisThreadAllowed)));
+        il.Emit(OpCodes.Brtrue, allowedLabel);
+
+        // Check and log if client attempted to create object without permission
         IsClientCheck(il, field);
 
         HasValueChanged(il, field);
@@ -486,8 +541,8 @@ public class FieldTranspilerCreator
         var networkLocal = TryResolve<INetwork>(il);
         var objectManagerLocal = TryResolve<IObjectManager>(il);
 
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal);
-        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal);
+        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, field.DeclaringType);
+        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal, field.FieldType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -501,6 +556,8 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Newobj, AccessTools.Constructor(typeof(FieldAutoSyncPacket), new Type[] { typeof(string), typeof(int), typeof(int), typeof(byte[]) }));
         il.Emit(OpCodes.Box, typeof(FieldAutoSyncPacket));
         il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(INetwork), nameof(INetwork.SendAll), new Type[] { typeof(IPacket) }));
+
+        il.MarkLabel(allowedLabel);
 
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldarg_1);
@@ -536,8 +593,8 @@ public class FieldTranspilerCreator
     private void HasValueChanged(ILGenerator il, FieldInfo field)
     {
         var fieldType = field.GetUnderlyingType();
-        var valueNotChangedLabel = il.DefineLabel();
-        var method = typeof(object).GetMethod("Equals", new[] { typeof(object), typeof(object) });
+        var valueChangedLabel = il.DefineLabel();
+        var method = AccessTools.Method(typeof(object), nameof(Equals), new[] { typeof(object), typeof(object) });
         
         il.Emit(OpCodes.Ldarg_0);
         il.Emit(OpCodes.Ldfld, field);
@@ -545,20 +602,15 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Ldarg_1);
         il.Emit(OpCodes.Box, fieldType);
         il.Emit(OpCodes.Call, method);        
-        il.Emit(OpCodes.Brfalse_S, valueNotChangedLabel);
+        il.Emit(OpCodes.Brfalse_S, valueChangedLabel);
 
-        // Log error
-        il.Emit(OpCodes.Ldsfld, loggerField);
-        il.Emit(OpCodes.Ldstr, $"Repeating assignment");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
-
-        // Return
+        // Return if value has not changed
         il.Emit(OpCodes.Ret);
 
-        il.MarkLabel(valueNotChangedLabel);
+        il.MarkLabel(valueChangedLabel);
     }
 
-    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal)
+    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal, Type objType)
     {
         var validLabel = il.DefineLabel();
         var idLocal = il.DeclareLocal(typeof(string));
@@ -570,12 +622,12 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Ldloca, idLocal);
 
         // Try resolve instance id
-        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetId)));
+        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetId)).MakeGenericMethod(objType));
         il.Emit(OpCodes.Brtrue, validLabel);
 
         // Log error
         il.Emit(OpCodes.Ldsfld, loggerField);
-        il.Emit(OpCodes.Ldstr, $"Could not resolve id");
+        il.Emit(OpCodes.Ldstr, $"Could not resolve id for type {objType}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
 
         // Return
@@ -586,7 +638,7 @@ public class FieldTranspilerCreator
         return idLocal;
     }
 
-    private void IsClientCheck(ILGenerator il, MemberInfo field)
+    private void IsClientCheck(ILGenerator il, FieldInfo field)
     {
         il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(ModInformation), nameof(ModInformation.IsClient)));
         var notClientLabel = il.DefineLabel();
@@ -595,8 +647,17 @@ public class FieldTranspilerCreator
 
         // Log error
         il.Emit(OpCodes.Ldsfld, loggerField);
-        il.Emit(OpCodes.Ldstr, $"Client attempted to change {field.Name}");
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
+
+        il.Emit(OpCodes.Ldstr, $"Client attempted to change {field.Name} {{trace}}");
+
+        il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(Environment), nameof(Environment.StackTrace)));
+
+        il.Emit(OpCodes.Callvirt, logErrorFn.MakeGenericMethod(typeof(string)));
+
+        // Store field to prevent crashing
+        il.Emit(OpCodes.Ldarg_0);
+        il.Emit(OpCodes.Ldarg_1);
+        il.Emit(OpCodes.Stfld, field);
 
         // Return
         il.Emit(OpCodes.Ret);

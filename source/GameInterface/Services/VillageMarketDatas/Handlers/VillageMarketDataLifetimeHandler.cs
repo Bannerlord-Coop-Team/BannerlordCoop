@@ -3,7 +3,6 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.SiegeEvents.Messages;
 using GameInterface.Services.VillageMarketDatas.Messages;
 using Serilog;
 using TaleWorlds.CampaignSystem.Settlements;

@@ -14,6 +14,7 @@ namespace GameInterface.Services.Clans.Patches
     {
         private static ILogger Logger = LogManager.GetLogger<ClanNameChangePatch>();
 
+        // TODO fix
         static bool Prefix(ref Clan __instance, TextObject name, TextObject informalName)
         {
             if(AllowedThread.IsThisThreadAllowed()) return true;

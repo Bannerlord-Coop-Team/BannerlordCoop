@@ -1,66 +1,68 @@
-﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages.Lifetime;
-using GameInterface.Services.Registry;
+﻿using Common;
+using Common.Util;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using System;
-using System.Threading;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties;
 
 /// <summary>
 /// Registry for <see cref="MobileParty"/> objects
 /// </summary>
-internal class MobilePartyRegistry : RegistryBase<MobileParty>
+internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
 {
-    private const string PartyStringIdPrefix = "CoopParty";
-    private int InstanceCounter = 0;
-    private readonly IMessageBroker messageBroker;
-
-    public MobilePartyRegistry(IRegistryCollection collection, IMessageBroker messageBroker) : base(collection)
+    ILogger Logger { get; }
+    public MobilePartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        this.messageBroker = messageBroker;
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
     }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(MobileParty))
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<MobileParty> registry)
     {
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (objectManager == null)
+        foreach (var party in MobileParty.All)
         {
-            Logger.Error("Unable to register objects when CampaignObjectManager is null");
-            return;
-        }
-
-        foreach (var party in objectManager.MobileParties)
-        {
-            base.RegisterExistingObject(party.StringId, party);
+            registry.RegisterExistingObject(party.StringId, party);
         }
     }
 
-    public override bool RegisterExistingObject(string id, object obj)
+    public void OnClientCreated(MobileParty obj, string id)
     {
-        var result = base.RegisterExistingObject(id, obj);
+        using (new AllowedThread())
+        {
+            obj.InitMembers();
+            obj.Initialize();
+        }
 
-        AddToCampaignObjectManager(obj);
+        MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
 
-        return result;
+        Campaign.Current?.CampaignObjectManager?.AddMobileParty(obj);
     }
 
-    private void AddToCampaignObjectManager(object obj)
+    public void OnClientDestroyed(MobileParty obj, string id)
     {
-        if (TryCast(obj, out var castedObj) == false) return;
-
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (objectManager == null) return;
-
-        objectManager.AddMobileParty(castedObj);
     }
 
-    protected override string GetNewId(MobileParty party)
+    public void OnServerCreated(MobileParty obj, string id)
     {
-        party.StringId = $"{PartyStringIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-        return party.StringId;
+    }
+
+    public void OnServerDestroyed(MobileParty obj, string id)
+    {
     }
 }

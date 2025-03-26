@@ -1,16 +1,8 @@
 ﻿using Coop.Core.Client.Services.MobileParties.Messages;
-using Coop.Core.Client.Services.MobileParties.Messages.Fields;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.MobileParties.Messages;
-using GameInterface.Services.MobileParties.Messages.Fields.Commands;
-using GameInterface.Services.MobileParties.Messages.Fields.Events;
 using GameInterface.Services.MobileParties.Patches;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Coop.IntegrationTests.MobileParties
 {

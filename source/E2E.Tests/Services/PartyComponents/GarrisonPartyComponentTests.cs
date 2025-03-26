@@ -43,7 +43,7 @@ public class GarrisonPartyComponentTests : IDisposable
 
             Assert.True(server.ObjectManager.TryGetId(newSettlement, out settlementId));
 
-            partyId = newParty.StringId;
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
         });
 
 
@@ -55,8 +55,9 @@ public class GarrisonPartyComponentTests : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
             Assert.IsType<GarrisonPartyComponent>(newParty.PartyComponent);
             GarrisonPartyComponent garrison = (GarrisonPartyComponent)newParty.PartyComponent;
+            Assert.True(client.ObjectManager.TryGetId(garrison.Settlement, out string clientGarrisonSettlementId));
 
-            Assert.Equal(settlementId, garrison.Settlement.StringId);
+            Assert.Equal(settlementId, clientGarrisonSettlementId);
         }
     }
 

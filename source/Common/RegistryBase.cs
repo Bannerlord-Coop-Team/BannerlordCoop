@@ -79,4 +79,10 @@ public interface IRegistry : IDisposable
     /// <param name="obj">Stored obj, will be default if no id/obj exists</param>
     /// <returns>True if retrieval was successful, otherwise false</returns>
     bool TryGetValue<T>(string id, out T obj) where T : class;
+
+    /// <summary>
+    /// Clears all registered objects and their associated identifiers from the registry.
+    /// After calling this method, the registry will be empty.
+    /// </summary>
+    void Clear();
 }

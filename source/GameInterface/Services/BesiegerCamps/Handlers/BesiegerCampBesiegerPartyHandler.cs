@@ -48,7 +48,7 @@ internal class BesiegerCampBesiegerPartyHandler : IHandler
     {
         var data = payload.What;
 
-        var networkData = CreateNetworkMessageData(data.BesiegerCamp, data.BesiegerParty);
+        var networkData = CreateNetworkMessageData(data.Instance, data.Value);
         if (networkData == null) return;
 
         network.SendAll(new NetworkAddBesiegerParty(networkData));
@@ -58,7 +58,7 @@ internal class BesiegerCampBesiegerPartyHandler : IHandler
     {
         var data = payload.What;
 
-        var networkData = CreateNetworkMessageData(data.BesiegerCamp, data.BesiegerParty);
+        var networkData = CreateNetworkMessageData(data.Instance, data.Value);
         if (networkData == null) return;
 
         network.SendAll(new NetworkRemoveBesiegerParty(networkData));
@@ -114,7 +114,7 @@ internal class BesiegerCampBesiegerPartyHandler : IHandler
         return new BesiegerPartyData(campId, partyId);
     }
 
-    private bool TryGetId(object value, out string id)
+    private bool TryGetId<T>(T value, out string id)
     {
         id = null;
         if (value == null) return false;

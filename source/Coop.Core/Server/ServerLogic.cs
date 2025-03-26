@@ -2,6 +2,7 @@
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
+using Coop.Core.Client.States;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.States;
 using Serilog;
@@ -37,6 +38,9 @@ public class ServerLogic : IServerLogic
             _state = value;
         }
     }
+
+    public bool RunningState => _state is not InitialServerState;
+
     private IServerState _state;
 
     public ServerLogic(IStateFactory stateFactory)

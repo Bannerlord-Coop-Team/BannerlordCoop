@@ -13,7 +13,7 @@ namespace GameInterface.Services.FlattenedTroopRosters.Handlers
 {
     internal class FlattenedTroopRosterLifetimeHandler : IHandler
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterLifetimeHandler>();
+        private static readonly ILogger Logger = LogManager.GetLogger<FlattenedTroopRosterLifetimeHandler>();
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;

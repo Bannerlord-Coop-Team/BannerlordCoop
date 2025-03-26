@@ -20,7 +20,7 @@ public class ObjectHelper
     /// <returns>New instance of <typeparamref name="T"/></returns>
     public static T SkipConstructor<T>()
     {
-        Logger.Verbose("{pid}: Creating {type}", Thread.CurrentThread.ManagedThreadId, typeof(T));
+        //Logger.Verbose("{pid}: Creating {type}", Thread.CurrentThread.ManagedThreadId, typeof(T));
 
         return (T)FormatterServices.GetUninitializedObject(typeof(T));
     }

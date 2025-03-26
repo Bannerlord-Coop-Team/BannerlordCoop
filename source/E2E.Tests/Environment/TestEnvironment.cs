@@ -10,6 +10,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Environment.Mock;
 using GameInterface;
 using GameInterface.Policies;
+using GameInterface.Surrogates;
 using Xunit.Abstractions;
 using ContainerProvider = Coop.Core.ContainerProvider;
 
@@ -117,6 +118,7 @@ public class TestEnvironment
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
         builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
+        builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
 
         return builder;
     }

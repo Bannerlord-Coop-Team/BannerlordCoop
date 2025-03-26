@@ -1,26 +1,19 @@
 ﻿using Common;
-using Common.Extensions;
 using Common.Logging;
 using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
-using GameInterface.Services.Clans;
 using GameInterface.Services.Entity;
-using GameInterface.Services.MobileParties;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
-using GameInterface.Services.PartyVisuals.Extensions;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Registry;
 using Serilog;
 using System;
-using System.Diagnostics;
 using System.Linq;
-using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -44,8 +37,6 @@ internal class HeroInterface : IHeroInterface
     private readonly IBinaryPackageFactory binaryPackageFactory;
     private readonly IControlledEntityRegistry entityRegistry;
 
-
-
     public HeroInterface(
         IBinaryPackageFactory binaryPackageFactory,
         IControlledEntityRegistry entityRegistry,
@@ -59,10 +50,10 @@ internal class HeroInterface : IHeroInterface
 
     public byte[] PackageMainHero()
     {
-        Hero.MainHero.StringId = string.Empty;
-        Hero.MainHero.PartyBelongedTo.StringId = string.Empty;
-        Hero.MainHero.Clan.StringId = string.Empty;
-        Hero.MainHero.CharacterObject.StringId = string.Empty;
+        objectManager.Remove(Hero.MainHero);
+        objectManager.Remove(Hero.MainHero.PartyBelongedTo);
+        objectManager.Remove(Hero.MainHero.Clan);
+        objectManager.Remove(Hero.MainHero.CharacterObject);
 
         HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
 
@@ -81,17 +72,30 @@ internal class HeroInterface : IHeroInterface
         },
         blocking: true);
 
-        entityRegistry.RegisterAsControlled(controllerId, hero.StringId);
+        objectManager.TryGetId(hero, out var heroId);
+        objectManager.TryGetId(hero.PartyBelongedTo, out var partyId);
+        objectManager.TryGetId(hero.CharacterObject, out var characterObjectId);
+        objectManager.TryGetId(hero.Clan, out var clanId);
 
-        var playerData = new Player(
-            bytes,
-            hero.StringId,
-            hero.PartyBelongedTo.StringId,
-            hero.CharacterObject.StringId,
-            hero.Clan.StringId
-        );
+        using (new AllowedThread())
+        {
+            hero.StringId = heroId;
+            hero.PartyBelongedTo.StringId = partyId;
+            hero.CharacterObject.StringId = characterObjectId;
+            hero.Clan.StringId = clanId;
+        }
+        
 
-        return playerData;
+        entityRegistry.RegisterAsControlled(controllerId, heroId);
+
+        return new Player()
+        {
+            HeroData = bytes,
+            HeroStringId = heroId,
+            PartyStringId = partyId,
+            CharacterObjectStringId = characterObjectId,
+            ClanStringId = clanId
+        };
     }
 
     private Hero UnpackMainHeroInternal(byte[] bytes)
@@ -114,7 +118,8 @@ internal class HeroInterface : IHeroInterface
             return false;
         }
 
-        var resolvedEntity = entities.SingleOrDefault(entity => entity.EntityId.StartsWith(HeroRegistry.HeroStringIdPrefix));
+        // TODO ensure works
+        var resolvedEntity = entities.SingleOrDefault(entity => entity.EntityId.StartsWith("hero"));
 
         if (resolvedEntity == null)
         {

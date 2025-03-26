@@ -66,7 +66,7 @@ public class TranspilerTests
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
         var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
 
-        const int typeId = 0;
+        const int classId = 0;
 
         var syncedFields = new FieldInfo[]
         {
@@ -74,7 +74,7 @@ public class TranspilerTests
             AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.RefClass)),
         };
 
-        var builder = new FieldTranspilerCreator(objManager, moduleBuilder, typeof(SwitchTestClass), typeId, syncedFields, new Dictionary<FieldInfo, MethodInfo>());
+        var builder = new FieldTranspilerCreator(objManager, moduleBuilder, typeof(SwitchTestClass), classId, syncedFields, new Dictionary<FieldInfo, MethodInfo>());
 
         var transpilerType = builder.Build();
 
@@ -106,7 +106,7 @@ public class TranspilerTests
         }
         var packet = Assert.IsType<FieldAutoSyncPacket>(network.SentPackets.First());
         Assert.Single(network.SentPackets);
-        Assert.Equal(typeId, packet.typeId);
+        Assert.Equal(classId, packet.classId);
         Assert.Equal(0, packet.fieldId);
         Assert.Equal(instanceId, packet.instanceId);
         Assert.Equal(newValue, RawSerializer.Deserialize<int>(packet.value));

@@ -33,7 +33,7 @@ public class CampaignStateTests
         clientLogic.EnterMissionState();
 
         // Assert
-        Assert.Equal(1, TestMessageBroker.GetMessageCountFromType<EnterMissionState>());
+        Assert.Single(TestMessageBroker.GetMessagesFromType<EnterMissionState>());
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public class CampaignStateTests
         clientLogic.EnterMainMenu();
 
         // Assert
-        Assert.Equal(1, TestMessageBroker.GetMessageCountFromType<EnterMainMenu>());
+        Assert.Single(TestMessageBroker.GetMessagesFromType<EnterMainMenu>());
     }
 
     [Fact]
@@ -75,7 +75,7 @@ public class CampaignStateTests
         clientLogic.Disconnect();
 
         // Assert
-        Assert.Equal(1, TestMessageBroker.GetMessageCountFromType<EnterMainMenu>());
+        Assert.Single(TestMessageBroker.GetMessagesFromType<EnterMainMenu>());
     }
 
     [Fact]
