@@ -39,6 +39,8 @@ public abstract class EnvironmentInstance : IDisposable
     private readonly MockNetworkBase mockNetwork;
     private readonly IContainerProvider containerProvider;
 
+    private readonly static object _lock = new object();
+
     public EnvironmentInstance(
         TestMessageBroker messageBroker,
         MockNetworkBase mockNetwork,
@@ -87,11 +89,14 @@ public abstract class EnvironmentInstance : IDisposable
             disabledMethods = Array.Empty<MethodBase>();
         }
 
-        using (new PatchScope(disabledMethods))
+        lock (_lock)
         {
-            using (new StaticScope(this))
+            using (new PatchScope(disabledMethods))
             {
-                callFunction();
+                using (new StaticScope(this))
+                {
+                    callFunction();
+                }
             }
         }
     }
@@ -192,7 +197,7 @@ public abstract class EnvironmentInstance : IDisposable
         {
             for (int i = 0; i < methods.Length; i++)
             {
-                harmony.Unpatch(methods[i], patches[i].method);
+                harmony.Unpatch(methods[i], HarmonyPatchType.Prefix, harmony.Id);
             }
         }
 

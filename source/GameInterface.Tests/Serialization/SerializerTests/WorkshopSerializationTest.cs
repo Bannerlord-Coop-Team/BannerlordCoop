@@ -31,13 +31,13 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         [Fact]
         public void Workshop_Serialize()
         {
+            var objectManager = container.Resolve<IObjectManager>();
+
             Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             Town town = (Town)FormatterServices.GetUninitializedObject(typeof(Town));
 
-            // Setup town to be referencable by StringId
-            town.StringId = "myTown";
-
-            MBObjectManager.Instance.RegisterObject(town);
+            // Setup town to be referencable by id
+            objectManager.AddNewObject(town, out var townId);
 
             // Set town of workshop settlement
             settlement.Town = town;
@@ -61,13 +61,12 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void Workshop_Full_Serialization()
         {
             var objectManager = container.Resolve<IObjectManager>();
+
             Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
             Town town = (Town)FormatterServices.GetUninitializedObject(typeof(Town));
 
-            // Setup town to be referencable by StringId
-            town.StringId = "myTown";
-
-            objectManager.AddExisting(town.StringId, town);
+            // Setup town to be referencable by id
+            objectManager.AddNewObject(town, out var townId);
 
             // Set town of workshop settlement
             settlement.Town = town;

@@ -5,6 +5,7 @@ using GameInterface.Tests.Bootstrap.Modules;
 using TaleWorlds.Core;
 using Xunit;
 using Common.Serialization;
+using GameInterface.Tests.Bootstrap;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {

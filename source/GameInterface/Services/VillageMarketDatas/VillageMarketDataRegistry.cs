@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System.Linq;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -24,7 +24,8 @@ internal class VillageMarketRegistry : RegistryBase<VillageMarketData>
     {
         foreach (var village in Campaign.Current._villages)
         {
-            RegisterNewObject(village._marketData, out _);
+            var networkId = $"{nameof(VillageMarketData)}_{village.StringId}";
+            RegisterExistingObject(networkId, village._marketData);
         }
     }
 

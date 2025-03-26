@@ -2,6 +2,7 @@
 using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using HarmonyLib;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
@@ -21,17 +22,7 @@ public class SyncFiefTests : IDisposable
     {
         TestEnvironment = new E2ETestEnvironment(output);
 
-        var fief = new Town();
-
-        // Create fief on the server
-        Assert.True(Server.ObjectManager.AddNewObject(fief, out FiefId));
-
-        // Create fief on all clients
-        foreach (var client in Clients)
-        {
-            var client_fief = new Town();
-            Assert.True(client.ObjectManager.AddExisting(FiefId, client_fief));
-        }
+        FiefId = TestEnvironment.CreateRegisteredObject<Town>();
     }
 
     public void Dispose()

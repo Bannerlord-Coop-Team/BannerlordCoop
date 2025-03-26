@@ -22,7 +22,7 @@ namespace GameInterface.Serialization.External
         protected override void PackInternal()
         {
             Town town = Object.Settlement.Town;
-            townId = town.StringId;
+            townId = ResolveId(town);
             if (townId == null) throw new Exception("Town does not have required StringId");
 
             workshopIndex = town.Workshops.FindIndex(w => w == Object);
@@ -30,7 +30,7 @@ namespace GameInterface.Serialization.External
 
         protected override void UnpackInternal()
         {
-            Town town = ResolveId<Town>(townId);
+            Town town = ResolveObject<Town>(townId);
 
             Object = town.Workshops[workshopIndex];
         }

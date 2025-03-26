@@ -43,7 +43,9 @@ internal class WorkshopLifetimePatches
         {
             objectManager.AddNewObject(__instance, out var newWorkshopId);
 
-            var data = new WorkshopCreatedData(newWorkshopId, settlement.StringId, tag);
+            objectManager.TryGetId(settlement, out string settlementId);
+
+            var data = new WorkshopCreatedData(newWorkshopId, settlementId, tag);
             var message = new WorkshopCreated(data);
 
             MessageBroker.Instance.Publish(null, message);

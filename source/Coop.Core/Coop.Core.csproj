@@ -59,12 +59,12 @@
     <None Remove="Server\Services\Kingdoms\Messages\**" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Autofac" Version="8.1.0" />
-    <PackageReference Include="Krafs.Publicizer" Version="2.2.1">
+    <PackageReference Include="Autofac" Version="8.2.0" />
+    <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="System.Collections.Immutable" Version="7.0.0" />
+    <PackageReference Include="System.Collections.Immutable" Version="9.0.2" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">

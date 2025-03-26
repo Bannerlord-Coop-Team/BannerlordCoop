@@ -3,13 +3,10 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.GameDebug.Handlers;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
-using HarmonyLib;
 using Serilog;
 using System;
-using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
@@ -30,45 +27,14 @@ internal class PartyLifetimeHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        messageBroker.Subscribe<PartyCreated>(Handle_PartyCreated);
-        messageBroker.Subscribe<NetworkCreateParty>(Handle_CreateParty);
         messageBroker.Subscribe<PartyDestroyed>(Handle_PartyDestroyed);
         messageBroker.Subscribe<NetworkDestroyParty>(Handle_DestroyParty);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<PartyCreated>(Handle_PartyCreated);
-        messageBroker.Unsubscribe<NetworkCreateParty>(Handle_CreateParty);
         messageBroker.Unsubscribe<PartyDestroyed>(Handle_PartyDestroyed);
         messageBroker.Unsubscribe<NetworkDestroyParty>(Handle_DestroyParty);
-    }
-
-    private void Handle_PartyCreated(MessagePayload<PartyCreated> payload)
-    {
-        var party = payload.What.Instance;
-
-        if (objectManager.AddNewObject(party, out var newId) == false) return;
-
-        network.SendAll(new NetworkCreateParty(newId));
-    }
-
-    private readonly ConstructorInfo MobileParty_ctor = AccessTools.Constructor(typeof(MobileParty));
-    private void Handle_CreateParty(MessagePayload<NetworkCreateParty> payload)
-    {
-        var stringId = payload.What.StringId;
-
-        var isClient = ModInformation.IsClient ? "Client" : "Server";
-
-        Logger.Debug("Creating party {partyId} for {instance}", stringId, isClient);
-
-        var newParty = ObjectHelper.SkipConstructor<MobileParty>();
-
-        if (objectManager.AddExisting(stringId, newParty) == false)
-        {
-            Logger.Error("Failed to create party with id {stringId}", stringId);
-            return;
-        }
     }
 
     private void Handle_PartyDestroyed(MessagePayload<PartyDestroyed> payload)

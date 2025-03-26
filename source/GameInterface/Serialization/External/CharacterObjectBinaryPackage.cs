@@ -35,43 +35,40 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            stringId = Object.StringId ?? string.Empty;
+            stringId = ResolveId(Object) ?? string.Empty;
 
             base.PackFields(Excludes);
 
             // Get the value of the CharacterObject_battleEquipmentTemplate field in the object
-            CharacterObject battleEquipmentTemplate = Object._battleEquipmentTemplate;
-            battleEquipmentTemplateId = battleEquipmentTemplate?.StringId;
+            battleEquipmentTemplateId = ResolveId(Object._battleEquipmentTemplate);
 
             // Get the value of the CharacterObject_civilianEquipmentTemplate field in the object
-            CharacterObject civilianEquipmentTemplate = Object._civilianEquipmentTemplate;
-            civilianEquipmentTemplateId = civilianEquipmentTemplate?.StringId;
+            civilianEquipmentTemplateId = ResolveId(Object._civilianEquipmentTemplate);
 
             // Get the value of the CharacterObject_originCharacter field in the object
-            CharacterObject originCharacter = Object._originCharacter;
-            originCharacterId = originCharacter?.StringId;
+            originCharacterId = ResolveId(Object._originCharacter);
 
             // Store the result of calling the PackIds method on the object's UpgradeTargets property in the UpgradeTargetIds variable
-            UpgradeTargetIds = PackIds(Object.UpgradeTargets);
+            UpgradeTargetIds = ResolveIds(Object.UpgradeTargets);
         }
 
         protected override void UnpackInternal()
         {
-            CharacterObject characterObject = ResolveId<CharacterObject>(stringId);
-            if (characterObject != null)
+            var resolvedObj = ResolveObject<CharacterObject>(stringId);
+            if (resolvedObj != null)
             {
-                Object = characterObject;
+                Object = resolvedObj;
                 return;
             }
 
             base.UnpackFields();
 
             // Resolve Ids for StringId resolvable objects
-            Object._battleEquipmentTemplate = ResolveId<CharacterObject>(battleEquipmentTemplateId);
-            Object._civilianEquipmentTemplate = ResolveId<CharacterObject>(civilianEquipmentTemplateId);
-            Object._originCharacter = ResolveId<CharacterObject>(originCharacterId);
+            Object._battleEquipmentTemplate = ResolveObject<CharacterObject>(battleEquipmentTemplateId);
+            Object._civilianEquipmentTemplate = ResolveObject<CharacterObject>(civilianEquipmentTemplateId);
+            Object._originCharacter = ResolveObject<CharacterObject>(originCharacterId);
 
-            Object.UpgradeTargets = ResolveIds<CharacterObject>(UpgradeTargetIds).ToArray();
+            Object.UpgradeTargets = ResolveObjects<CharacterObject>(UpgradeTargetIds).ToArray();
         }
     }
 }

@@ -67,7 +67,7 @@ namespace GameInterface.Serialization.Native
 
                 if(k == null)
                 {
-                    Logger.Warning("Key was null while unpacking dictionary");
+                    Logger.Warning($"Key was null while unpacking dictionary {type}");
                     continue;
                 }
 

@@ -34,7 +34,6 @@ public class HeroCreationTests : IDisposable
         server.Call(() =>
         {
             var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
-            MBObjectManager.Instance.RegisterObject(characterObject);
 
             var hero = HeroCreator.CreateSpecialHero(characterObject);
 

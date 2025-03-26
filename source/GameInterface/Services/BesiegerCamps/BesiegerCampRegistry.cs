@@ -1,33 +1,55 @@
-﻿using GameInterface.Services.Registry;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
+using System.Reflection;
+using System.Text.RegularExpressions;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.BesiegerCamps;
-
-internal class BeseigerCampRegistry : RegistryBase<BesiegerCamp>
+internal class BesiegerCampRegistry : IAutoRegistry<BesiegerCamp>
 {
-    private const string BeseigerCampIdPrefix = "CoopBeseigerCamp";
-    private static int InstanceCounter = 0;
-
-    public BeseigerCampRegistry(IRegistryCollection collection) : base(collection)
+    ILogger Logger { get; }
+    public BesiegerCampRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
     }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(BesiegerCamp));
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<BesiegerCamp> registry)
     {
         foreach (var camp in Campaign.Current.SiegeEventManager.SiegeEvents.Select(siegeEvent => siegeEvent.BesiegerCamp))
         {
-            if (RegisterNewObject(camp, out _) == false)
-            {
-                Logger.Error($"Unable to register {camp}");
-            }
+            if (registry.RegisterNewObject(camp, out _) == false) Logger.Error($"Unable to register {camp}");
         }
     }
 
-    protected override string GetNewId(BesiegerCamp obj)
+    public void OnClientCreated(BesiegerCamp obj, string id)
     {
-        return $"{BeseigerCampIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+        AccessTools.Field(typeof(BesiegerCamp), nameof(BesiegerCamp._besiegerParties)).SetValue(obj, new MBList<MobileParty>());
+    }
+
+    public void OnClientDestroyed(BesiegerCamp obj, string id)
+    {
+    }
+
+    public void OnServerCreated(BesiegerCamp obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(BesiegerCamp obj, string id)
+    {
     }
 }

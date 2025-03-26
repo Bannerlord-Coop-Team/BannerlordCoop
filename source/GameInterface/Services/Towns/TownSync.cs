@@ -7,10 +7,9 @@ internal class TownSync : IAutoSync
 {
     public TownSync(IAutoSyncBuilder autoSyncBuilder)
     {
-        // Already synced manually
-        //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Governor)));
-        //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Security)));
-        //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Governor)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Security)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._prosperity)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._wallLevel)));

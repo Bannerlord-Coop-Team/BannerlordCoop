@@ -27,10 +27,7 @@ namespace Common.Messaging
         public static MessageBroker Instance { 
             get
             {
-                if( instance == null)
-                {
-                    instance = new MessageBroker();
-                }
+                instance ??= new MessageBroker();
                 return instance;
             } 
         }
@@ -69,8 +66,6 @@ namespace Common.Messaging
                 }
 
                 // Making synchronous to maintain sequencing of packets
-                //Task.Factory.StartNew(() => weakDelegate.Invoke(new object[] { payload }));
-
                 weakDelegate.Invoke(new object[] { payload });
             }
         }

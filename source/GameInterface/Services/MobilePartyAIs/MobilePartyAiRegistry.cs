@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
@@ -8,7 +8,7 @@ namespace GameInterface.Services.MobilePartyAIs;
 internal class MobilePartyAiRegistry : RegistryBase<MobilePartyAi>
 {
     private const string MobilePartyAiIdPrefix = "CoopMobilePartyAi";
-    private static int InstanceCounter = 0;
+    private int InstanceCounter = 0;
 
     public MobilePartyAiRegistry(IRegistryCollection collection) : base(collection)
     {
@@ -34,9 +34,8 @@ internal class MobilePartyAiRegistry : RegistryBase<MobilePartyAi>
                 continue;
             }
 
-            var newId = GetNewId(partyAi);
-
-            base.RegisterExistingObject(newId, partyAi);
+            var networkId = nameof(MobilePartyAi) + "_" + party.StringId;
+            base.RegisterExistingObject(networkId, partyAi);
         }
     }
 
