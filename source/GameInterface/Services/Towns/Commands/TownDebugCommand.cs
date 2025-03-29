@@ -1,19 +1,12 @@
 ﻿using Autofac;
-using Common.Extensions;
-using GameInterface.Services.GameDebug.Commands;
-using GameInterface.Services.Heroes.Commands;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Towns.Patches;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Runtime.Serialization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -442,7 +435,11 @@ public class TownDebugCommand
             return $"Argument2: {rebellionStateValue} is not a boolean.";
         }
 
-        RebellionsCampaignBehaviorPatches.PublishTownInRebelliousStateChanged(town, inRebelliousState);
+        using(new AllowedThread())
+        {
+            town.InRebelliousState = inRebelliousState;
+        }
+
         return $"Town InRebelliousState has changed to: {town.InRebelliousState}.";
     }
 
@@ -478,7 +475,11 @@ public class TownDebugCommand
             return $"Argument2: {garrisonRecruitmentValue} is not a boolean.";
         }
 
-        UpdateClanSettlementAutoRecruitmentPatches.PublishTownGarrisonAutoRecruitmentIsEnabledChanged(town, garrisonAutoRecruitmentIsEnabled);
+        using (new AllowedThread())
+        {
+            town.GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
+        }
+
         return $"Town GarrisonAutoRecruitmentIsEnabled has changed to: {town.GarrisonAutoRecruitmentIsEnabled}.";
     }
 

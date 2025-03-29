@@ -89,9 +89,6 @@ internal class HeroInterface : IHeroInterface
 
     private string RegisterObject<T>(T obj) where T : MBObjectBase
     {
-        
-        
-
         if (objectManager.AddNewObject(obj, out var newId) == false)
         {
             throw new InvalidOperationException($"Unable to register {obj.StringId} {typeof(T)}");
@@ -102,8 +99,6 @@ internal class HeroInterface : IHeroInterface
             obj.StringId = newId;
             MBObjectManager.Instance.RegisterObject(obj);
         }
-
-        if (obj.StringId != newId) throw new Exception();
 
         return newId;
     }

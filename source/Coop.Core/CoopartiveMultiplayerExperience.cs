@@ -132,7 +132,7 @@ namespace Coop.Core
 
         private void DestroyContainer()
         {
-            container?.Resolve<Harmony>().UnpatchAll();
+            //container?.Resolve<Harmony>().UnpatchAll();
             container?.Dispose();
             container = null;
         }

@@ -3,10 +3,8 @@ using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Client.Services.MobileParties.Packets;
 using Coop.Core.Server.Services.MobileParties.Messages;
-using Coop.Core.Server.Services.Settlements.Messages;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
-using GameInterface.Services.Settlements.Messages;
 using LiteNetLib;
 
 namespace Coop.Core.Server.Services.MobileParties.Handlers;
