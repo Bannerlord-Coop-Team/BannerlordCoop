@@ -20,9 +20,10 @@ internal class MapEventRegistry : RegistryBase<MapEvent>
 
     public override void RegisterAll()
     {
+        int counter = 0;
+
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            int counter = 0;
             var networkId = nameof(Building) + "_" + "Coop" + counter++;
             if (RegisterExistingObject(networkId, mapEvent) == false)
             {
