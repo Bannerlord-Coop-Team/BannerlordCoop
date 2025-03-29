@@ -1,12 +1,11 @@
-﻿using Common.Messaging;
-using GameInterface.Services.Armies.Messages.Lifetime;
+﻿using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Data;
 using GameInterface.Services.MobileParties.Interfaces;
-using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Control;
-using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
+using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
@@ -16,6 +15,8 @@ namespace GameInterface.Services.MobileParties.Handlers;
 /// </summary>
 internal class MobilePartyControlHandler : IHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyControlHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly IMobilePartyInterface partyInterface;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
@@ -39,15 +40,11 @@ internal class MobilePartyControlHandler : IHandler
         this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Subscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
-        messageBroker.Subscribe<PartyCreated>(Handle_MobilePartyCreated);
-        messageBroker.Subscribe<PartyDestroyed>(Handle_MobilePartyDestroyed);
     }
     public void Dispose()
     {
         messageBroker.Unsubscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Unsubscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
-        messageBroker.Unsubscribe<PartyCreated>(Handle_MobilePartyCreated);
-        messageBroker.Unsubscribe<PartyDestroyed>(Handle_MobilePartyDestroyed);
     }
 
     private void Handle_RegisterAllPartiesAsControlled(MessagePayload<RegisterAllPartiesAsControlled> obj)
@@ -78,24 +75,5 @@ internal class MobilePartyControlHandler : IHandler
             bool aiDisabled = obj.What.IsRevocation ? false : true;
             party.Ai.SetDoNotMakeNewDecisions(aiDisabled);
         }
-    }
-
-    private void Handle_MobilePartyCreated(MessagePayload<PartyCreated> obj)
-    {
-        if (!controlPartiesByDefault) return;
-
-        var stringId = obj.What.Instance.StringId;
-
-        controlledEntityRegistry.RegisterAsControlled(ownerId, stringId);
-    }
-
-    private void Handle_MobilePartyDestroyed(MessagePayload<PartyDestroyed> obj)
-    {
-        var stringId = obj.What.Instance.StringId;
-
-        if (!controlledEntityRegistry.TryGetControlledEntity(stringId, out var controlledEntity))
-            return;
-
-        controlledEntityRegistry.RemoveAsControlled(controlledEntity);
     }
 }

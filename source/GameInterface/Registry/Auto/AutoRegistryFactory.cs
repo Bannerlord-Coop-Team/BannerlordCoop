@@ -88,9 +88,9 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
 
         foreach (var destroy in destroyMethods)
         {
-            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.DestroyPrefix));
+            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.DestroyPostfix));
 
-            SyncPatchCollector.AddPrefix(destroy, patch);
+            SyncPatchCollector.AddPostfix(destroy, patch);
         }
 
         Disposables.Add(registry);

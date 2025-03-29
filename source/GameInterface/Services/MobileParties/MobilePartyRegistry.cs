@@ -1,6 +1,9 @@
-﻿using Common;
+﻿using Autofac.Features.OwnedInstances;
+using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Entity;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -19,11 +22,24 @@ namespace GameInterface.Services.MobileParties;
 /// </summary>
 internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
 {
+    private readonly IObjectManager objectManager;
+    private readonly IControlledEntityRegistry entityRegistry;
+    private readonly IControllerIdProvider controllerIdProvider;
+
+    private string ownerId => controllerIdProvider.ControllerId;
+
     ILogger Logger { get; }
-    public MobilePartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public MobilePartyRegistry(
+        ILogger logger, 
+        IAutoRegistryFactory autoRegistryFactory, 
+        IObjectManager objectManager,
+        IControlledEntityRegistry entityRegistry,
+        IControllerIdProvider controllerIdProvider)
     {
         Logger = logger;
-
+        this.objectManager = objectManager;
+        this.entityRegistry = entityRegistry;
+        this.controllerIdProvider = controllerIdProvider;
         autoRegistryFactory.RegisterType(this);
     }
 
@@ -60,9 +76,14 @@ internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
 
     public void OnServerCreated(MobileParty obj, string id)
     {
+        entityRegistry.RegisterAsControlled(ownerId, id);
     }
 
     public void OnServerDestroyed(MobileParty obj, string id)
     {
+        if (!entityRegistry.TryGetControlledEntity(id, out var controlledEntity))
+            return;
+
+        entityRegistry.RemoveAsControlled(controlledEntity);
     }
 }

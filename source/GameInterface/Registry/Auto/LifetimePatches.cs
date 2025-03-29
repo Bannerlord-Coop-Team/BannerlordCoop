@@ -1,14 +1,11 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
-using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Diamond;
 
 namespace GameInterface.Registry.Auto;
 internal class LifetimePatches
@@ -34,23 +31,21 @@ internal class LifetimePatches
         return true;
     }
 
-    internal static bool DestroyPrefix(ref object __instance, MethodBase __originalMethod)
+    internal static void DestroyPostfix(ref object __instance, MethodBase __originalMethod)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client destroyed unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(BesiegerCamp), Environment.StackTrace);
-            return true;
+            return;
         }
 
         var destroyMessage = CreateInstanceDestroyedEventFast(__instance, __originalMethod.DeclaringType);
 
         MessageBroker.Instance.Publish(__instance, destroyMessage);
-
-        return true;
     }
 
     private static Dictionary<Type, IEvent> CreateEventsCache = new Dictionary<Type, IEvent>();

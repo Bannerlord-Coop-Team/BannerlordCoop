@@ -1,20 +1,36 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs;
-internal class MobilePartyAiRegistry : RegistryBase<MobilePartyAi>
+internal class MobilePartyAiRegistry : IAutoRegistry<MobilePartyAi>
 {
-    private const string MobilePartyAiIdPrefix = "CoopMobilePartyAi";
-    private int InstanceCounter = 0;
-
-    public MobilePartyAiRegistry(IRegistryCollection collection) : base(collection)
+    ILogger Logger { get; }
+    public MobilePartyAiRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
     }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(MobilePartyAi), new Type[] { typeof(MobileParty) })
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
+    {
+        //AccessTools.Method(typeof(MobileParty), nameof(MobileParty.RemoveParty)),
+    };
+
+    public void RegisterAllObjects(IRegistry<MobilePartyAi> registry)
     {
         var objectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -35,12 +51,23 @@ internal class MobilePartyAiRegistry : RegistryBase<MobilePartyAi>
             }
 
             var networkId = $"{nameof(MobilePartyAi)}_{party.StringId}";
-            base.RegisterExistingObject(networkId, partyAi);
+            registry.RegisterExistingObject(networkId, partyAi);
         }
     }
 
-    protected override string GetNewId(MobilePartyAi obj)
+    public void OnClientCreated(MobilePartyAi obj, string id)
     {
-        return $"{MobilePartyAiIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+    }
+
+    public void OnClientDestroyed(MobilePartyAi obj, string id)
+    {
+    }
+
+    public void OnServerCreated(MobilePartyAi obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(MobilePartyAi obj, string id)
+    {
     }
 }

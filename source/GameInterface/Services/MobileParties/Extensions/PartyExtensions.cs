@@ -32,7 +32,19 @@ internal static class PartyExtensions
             return false;
         };
 
-        return entityRegistry.IsControlledBy(idProvider.ControllerId, party.StringId);
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            Logger.Error("Unable to resolve {name}", nameof(IObjectManager));
+            return false;
+        };
+
+        if (objectManager.TryGetId(party, out var id) == false)
+        {
+            Logger.Error("Unable to get id for {class}", party);
+            return false;
+        }
+
+        return entityRegistry.IsControlledBy(idProvider.ControllerId, id);
     }
 
     /// <summary>

@@ -9,6 +9,7 @@ namespace GameInterface.AutoSync;
 public interface IAutoSyncPatchCollector : IDisposable
 {
     void AddPrefix(MethodBase patchMethod, MethodInfo patch);
+    void AddPostfix(MethodBase patchMethod, MethodInfo patch);
     void AddTranspiler(MethodBase patchMethod, MethodInfo patch);
     void PatchAll();
 }
@@ -17,8 +18,10 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 {
     private readonly Harmony harmony;
 
-    private readonly List<(MethodBase, MethodInfo)> transpilers = new List<(MethodBase, MethodInfo)>();
     private readonly List<(MethodBase, MethodInfo)> prefixes = new List<(MethodBase, MethodInfo)>();
+    private readonly List<(MethodBase, MethodInfo)> postfixes = new List<(MethodBase, MethodInfo)>();
+    private readonly List<(MethodBase, MethodInfo)> transpilers = new List<(MethodBase, MethodInfo)>();
+    
 
     public AutoSyncPatchCollector(Harmony harmony)
     {
@@ -32,6 +35,15 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
         prefixes.Add((patchMethod, patch));
     }
+
+    public void AddPostfix(MethodBase patchMethod, MethodInfo patch)
+    {
+        if (patchMethod == null) throw new ArgumentNullException(nameof(patchMethod));
+        if (patch == null) throw new ArgumentNullException(nameof(patch));
+
+        postfixes.Add((patchMethod, patch));
+    }
+
     public void AddTranspiler(MethodBase patchMethod, MethodInfo patch)
     {
         if (patchMethod == null) throw new ArgumentNullException(nameof(patchMethod));
@@ -42,14 +54,19 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 
     public void PatchAll()
     {
-        foreach (var (method, patch) in transpilers)
-        {
-            harmony.Patch(method, transpiler: new HarmonyMethod(patch));
-        }
-
         foreach (var (method, patch) in prefixes)
         {
             harmony.Patch(method, prefix: new HarmonyMethod(patch));
+        }
+
+        foreach (var (method, patch) in postfixes)
+        {
+            harmony.Patch(method, postfix: new HarmonyMethod(patch));
+        }
+
+        foreach (var (method, patch) in transpilers)
+        {
+            harmony.Patch(method, transpiler: new HarmonyMethod(patch));
         }
     }
 

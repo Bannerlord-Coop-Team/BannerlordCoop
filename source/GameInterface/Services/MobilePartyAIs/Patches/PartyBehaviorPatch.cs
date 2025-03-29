@@ -138,7 +138,7 @@ static class PartyBehaviorPatch
 [HarmonyPatch(typeof(MapCameraView))]
 public static class MapCameraViewPatches
 {
-    private static readonly FieldInfo LabelNumberField = typeof(Label).GetField("m_label", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static FieldInfo LabelNumberField => typeof(Label).GetField("m_label", BindingFlags.NonPublic | BindingFlags.Instance);
 
     /// <summary>
     /// Replaces the instructions in the else if (mainParty.Ai.ForceAiNoPathMode) block with Nop instructions.
