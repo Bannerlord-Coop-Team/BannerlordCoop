@@ -1,19 +1,33 @@
-﻿using GameInterface.Registry;
-using System.Threading;
+﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
+using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Workshops
 {
-    internal class WorkshopRegistry : RegistryBase<Workshop>
+    internal class WorkshopRegistry : IAutoRegistry<Workshop>
     {
-        private const string WorkshopIdPrefix = $"Coop{nameof(Workshop)}";
-        private int InstanceCounter = 0;
+        ILogger Logger { get; }
+        public WorkshopRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+        {
+            Logger = logger;
 
-        public WorkshopRegistry(IRegistryCollection collection) : base(collection) { }
+            autoRegistryFactory.RegisterType(this);
+        }
 
-        public override void RegisterAll()
+        public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(Workshop), new Type[] { typeof(Settlement), typeof(string) })
+    };
+
+        public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+        public void RegisterAllObjects(IRegistry<Workshop> registry)
         {
             var objectManager = MBObjectManager.Instance;
 
@@ -30,14 +44,30 @@ namespace GameInterface.Services.Workshops
                 foreach (Workshop workshop in town.Workshops)
                 {
                     var networkId = $"{nameof(Workshop)}_{town.StringId}_{counter++}";
-                    RegisterExistingObject(networkId, workshop);
+                    if (registry.RegisterExistingObject(networkId, workshop) == false)
+                        Logger.Error($"Unable to register {workshop}");
                 }
             }
         }
 
-        protected override string GetNewId(Workshop shop)
+        public void OnClientCreated(Workshop obj, string id)
         {
-            return $"{WorkshopIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+            
+        }
+
+        public void OnClientDestroyed(Workshop obj, string id)
+        {
+            
+        }
+
+        public void OnServerCreated(Workshop obj, string id)
+        {
+            
+        }
+
+        public void OnServerDestroyed(Workshop obj, string id)
+        {
+            
         }
     }
 }
