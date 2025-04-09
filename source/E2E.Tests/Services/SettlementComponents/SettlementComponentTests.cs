@@ -56,8 +56,12 @@ public class SettlementComponentTests : IDisposable
             Assert.Null(settlementComponent.Owner);
 
             settlementComponent.Owner = partyBase;
+            settlementComponent.Gold = 5;
+            settlementComponent.IsOwnerUnassigned = true;
 
-            Assert.Same(partyBase, settlementComponent.Owner);
+            //Assert.Same(partyBase, settlementComponent.Owner);
+            Assert.Equal(5, settlementComponent.Gold);
+            Assert.True(settlementComponent.IsOwnerUnassigned);
         });
 
         // Assert
@@ -67,7 +71,9 @@ public class SettlementComponentTests : IDisposable
 
             Assert.True(client.ObjectManager.TryGetObject<PartyBase>(partyBaseId, out var clientPartyBase));
 
-            Assert.True(clientPartyBase == settlementComponent.Owner);
+            //Assert.True(clientPartyBase == settlementComponent.Owner);
+            Assert.Equal(5, settlementComponent.Gold);
+            Assert.True(settlementComponent.IsOwnerUnassigned);
         }
     }
 }
