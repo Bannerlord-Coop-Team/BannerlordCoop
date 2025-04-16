@@ -663,7 +663,11 @@ namespace GameInterface.Utils
                 if (instruction.StoresField(fieldInfo))
                 {
                     yield return new CodeInstruction(OpCodes.Ldstr, fieldName);
-                    yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+                    var inst = new CodeInstruction(OpCodes.Call, fieldIntercept);
+                    //if (instruction.labels.Any())
+                        //inst.labels = instruction.labels.ToList();
+                    yield return inst;
+                    
                 }
                 else
                 {

@@ -1,7 +1,23 @@
 ﻿[HarmonyPatch(typeof({{ MemberDeclaringType }}))]
-public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : GenericPatches<{{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix, {{ MemberDeclaringType }}>
+public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : GenericPatches<{{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix, Town>
 {
     [HarmonyPatch(nameof({{ MemberDeclaringType }}.{{ MemberName }}), MethodType.Setter)]
     [HarmonyPrefix]
-    private static void {{ MemberName }}Prefix({{ MemberDeclaringType }} __instance, {{ MemberType }} value) => PropertyPrefix<{{ MemberType }}, {{ MessageType }}>(__instance, value);
+    private static void {{ MemberName }}Prefix({{ MemberDeclaringType }} __instance, {{ MemberType }} value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+            return;
+        
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            return;
+        }
+        
+        if(__instance.{{MemberName}} == value)
+            return;
+
+        var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(__instance, value);
+        MessageBroker.Instance.Publish(__instance, message);
+    }
 }

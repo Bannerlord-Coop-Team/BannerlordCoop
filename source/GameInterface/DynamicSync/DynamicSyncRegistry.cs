@@ -1,4 +1,5 @@
 ﻿using Common.Messaging;
+using GameInterface.DynamicSync.Builders;
 using GameInterface.DynamicSync.Templates;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils;
@@ -11,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.Diamond;
 using TaleWorlds.Library;
+using TaleWorlds.LinQuick;
 
 namespace GameInterface.DynamicSync
 {
@@ -19,41 +21,80 @@ namespace GameInterface.DynamicSync
         private readonly IObjectManager objectManager;
         private readonly DynamicSyncPatchProcessor dynamicSyncPatchProcessor;
 
-        private readonly Dictionary<Type, DynamicSyncRegistryItem> registrations = new Dictionary<Type, DynamicSyncRegistryItem>();
+        public readonly Dictionary<Type, DynamicSyncRegistryItem> Registrations = new Dictionary<Type, DynamicSyncRegistryItem>();
         
-
         string DebugPath => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + @"\DynamicSyncDebug";
 
-        public bool AddMember(Type type, MemberInfo memberInfo)
+        public void AddField(FieldInfo field)
         {
-            if (memberInfo is not FieldInfo && memberInfo is not PropertyInfo)
-                return false;
+            if (field == null) throw new ArgumentNullException(nameof(field));
 
-            if (!registrations.ContainsKey(type))
-            {
-                registrations.Add(type, new DynamicSyncRegistryItem());
-            }
+            // TODO: Add back collection support
+            if (field.FieldType.IsGenericType || field.FieldType.IsArray) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Field: Collection types are currently not supported");
 
-            if (registrations[type].Members.Contains(memberInfo))
-                return false;
+            // TODO: verify interface support
+            if (field.FieldType.IsInterface) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Field: Interfaces are currently not supported");
 
-            registrations[type].Members.Add(memberInfo);
+            if (!AddMember(field.DeclaringType, field)) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Field: {field.Name} has already been registered as a synced field");
+        }
 
-            return true;
+        public void AddProperty(PropertyInfo property)
+        {
+            if (property == null) throw new ArgumentNullException(nameof(property));
+
+            // only prevent properties from being added if they are no collection like type
+            if (property.CanWrite == false) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Property: {property.Name} does not have a set method");
+
+            // TODO: Add back collection support
+            if (property.PropertyType.IsGenericType || property.PropertyType.IsArray) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Property: Collection types are currently not supported");
+
+            // TODO: verify interface support
+            if (property.PropertyType.IsInterface) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Property: Interfaces are currently not supported");
+
+            if (!AddMember(property.DeclaringType, property)) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Property: {property.Name} has already been registered as a synced property");
         }
 
         public bool AddTargetMethod(Type type, MethodInfo methodInfo)
         {
 
-            if (!registrations.ContainsKey(type))
+            if (!Registrations.ContainsKey(type))
             {
-                registrations.Add(type, new DynamicSyncRegistryItem());
+                Registrations.Add(type, new DynamicSyncRegistryItem());
             }
 
-            if (registrations[type].TargetMethods.Contains(methodInfo))
+            if (Registrations[type].TargetMethods.Contains(methodInfo))
                 return false;
 
-            registrations[type].TargetMethods.Add(methodInfo);
+            Registrations[type].TargetMethods.Add(methodInfo);
+
+            return true;
+        }
+
+        private bool AddMember(Type type, MemberInfo memberInfo)
+        {
+            if (memberInfo is not FieldInfo && memberInfo is not PropertyInfo)
+                return false;
+
+            if (!Registrations.ContainsKey(type))
+            {
+                Registrations.Add(type, new DynamicSyncRegistryItem());
+            }
+            if(memberInfo is FieldInfo fieldInfo)
+            { 
+                if (Registrations[type].Fields.Contains(fieldInfo))
+                    return false;
+
+                Registrations[type].Fields.Add(fieldInfo);
+            }
+            else if (memberInfo is PropertyInfo propertyInfo)
+            {
+                if (Registrations[type].Properties.Contains(propertyInfo))
+                    return false;
+
+                Registrations[type].Properties.Add(propertyInfo);
+            }
+            else
+                throw new NotSupportedException($"Unsupported MemberInfo Type: {memberInfo.MemberType}");
 
             return true;
         }
@@ -98,17 +139,18 @@ namespace GameInterface.DynamicSync
                 assemblies.Add(typeof(Console).Assembly);
 
             }
-            foreach (var assemblyName in Assembly.GetExecutingAssembly().GetReferencedAssemblies())
+
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
             {
-                assemblies.Add(Assembly.Load(assemblyName));
+                assemblies.Add(Assembly.Load(asm.FullName));
             }
 
             List<DynamicPatchInfo> dynamicPatches = new List<DynamicPatchInfo>();
 
-            foreach (var registration in registrations)
-            {
-                dynamicPatches.Add(GetPatchInfo(registration.Key, registration.Value, objectManager));
-            }
+            //foreach (var registration in Registrations)
+            //{
+            //    dynamicPatches.Add(GetPatchInfo(registration.Key, registration.Value, objectManager));
+            //}
 
 
             List<SyntaxTree> syntaxTrees = new List<SyntaxTree>();
@@ -167,10 +209,10 @@ namespace GameInterface.DynamicSync
             if (dynamicMessageAction == DynamicMessageAction.None)
                 throw new InvalidOperationException("Not allowed Intercept Access");
             
-            if (!registrations.TryGetValue(fieldInfo.DeclaringType, out var registryItem))
+            if (!Registrations.TryGetValue(fieldInfo.DeclaringType, out var registryItem))
                 return false;
             
-            var member = registryItem.Members.FirstOrDefault(m => m == fieldInfo);
+            var member = registryItem.Fields.FirstOrDefault(m => m == fieldInfo);
             if (member == null)
                 return false;
 
@@ -223,251 +265,251 @@ namespace GameInterface.DynamicSync
             }
         }
 
-        private DynamicPatchInfo GetPatchInfo(Type type, DynamicSyncRegistryItem registryItem, IObjectManager objectManager)
-        {
-            var dynamicPatchInfo = new DynamicPatchInfo
-            {
-                DeclaringType = type,
-                TargetMethods = registryItem.TargetMethods
-            };
-            List<SyntaxTree> syntaxTrees = new List<SyntaxTree>();
+        //private DynamicPatchInfo GetPatchInfo(Type type, DynamicSyncRegistryItem registryItem, IObjectManager objectManager)
+        //{
+        //    var dynamicPatchInfo = new DynamicPatchInfo
+        //    {
+        //        DeclaringType = type,
+        //        TargetMethods = registryItem.TargetMethods
+        //    };
+        //    List<SyntaxTree> syntaxTrees = new List<SyntaxTree>();
 
-            foreach (var member in registryItem.Members)
-            {
-                dynamicPatchInfo.MemberInfos.Add(GetDynamicPatchMemberInfo(member, objectManager));
-            }
+        //    foreach (var member in registryItem.Members)
+        //    {
+        //        dynamicPatchInfo.MemberInfos.Add(GetDynamicPatchMemberInfo(member, objectManager));
+        //    }
 
-            List<string> transpilers = new List<string>();
-            HashSet<string> usings = new HashSet<string>
-            {
-                type.Namespace
-            };
+        //    List<string> transpilers = new List<string>();
+        //    HashSet<string> usings = new HashSet<string>
+        //    {
+        //        type.Namespace
+        //    };
 
-            return dynamicPatchInfo;
-        }
+        //    return dynamicPatchInfo;
+        //}
 
-        private DynamicPatchMemberInfo GetDynamicPatchMemberInfo(MemberInfo member, IObjectManager objectManager)
-        {
-            var patchMemberInfo = new DynamicPatchMemberInfo
-            {
-                MemberInfo = member,
-            };
+        //private DynamicPatchMemberInfo GetDynamicPatchMemberInfo(MemberInfo member, IObjectManager objectManager)
+        //{
+        //    var patchMemberInfo = new DynamicPatchMemberInfo
+        //    {
+        //        MemberInfo = member,
+        //    };
 
-            Type memberType;
-            bool isField = false;
-            if(member is FieldInfo fieldInfo)
-            {
-                memberType = fieldInfo.FieldType;
-                isField = true;
-                patchMemberInfo.UsingDeclarations.Add(fieldInfo.FieldType.Namespace);
-            }
-            else
-            {
-                var propertyInfo = (PropertyInfo)member;
-                memberType = propertyInfo.PropertyType;
-                patchMemberInfo.UsingDeclarations.Add(propertyInfo.PropertyType.Namespace);
-            }
+        //    Type memberType;
+        //    bool isField = false;
+        //    if(member is FieldInfo fieldInfo)
+        //    {
+        //        memberType = fieldInfo.FieldType;
+        //        isField = true;
+        //        patchMemberInfo.UsingDeclarations.Add(fieldInfo.FieldType.Namespace);
+        //    }
+        //    else
+        //    {
+        //        var propertyInfo = (PropertyInfo)member;
+        //        memberType = propertyInfo.PropertyType;
+        //        patchMemberInfo.UsingDeclarations.Add(propertyInfo.PropertyType.Namespace);
+        //    }
 
-            // Is collection
-            bool isObjectMangerType = false;
-            var messageUsings = patchMemberInfo.UsingDeclarations.ToList();
-            messageUsings.Add(member.DeclaringType.Namespace);
-            if (memberType.IsGenericType)
-            {
-                var genericType = memberType.GenericTypeArguments[0];
-                messageUsings.Add(genericType.Namespace);
-                patchMemberInfo.UsingDeclarations.Add(genericType.Namespace);
-                isObjectMangerType = objectManager.IsTypeManaged(genericType);
-                if(typeof(MBList<>).IsAssignableFrom(memberType.GetGenericTypeDefinition()))
-                {
-                    DynamicMessageType messageType = isObjectMangerType ? DynamicMessageType.ObjectManagerType : DynamicMessageType.ValueType;
-                    messageType |= isField ? DynamicMessageType.Field: DynamicMessageType.Property;
+        //    // Is collection
+        //    bool isObjectMangerType = false;
+        //    var messageUsings = patchMemberInfo.UsingDeclarations.ToList();
+        //    messageUsings.Add(member.DeclaringType.Namespace);
+        //    if (memberType.IsGenericType)
+        //    {
+        //        var genericType = memberType.GenericTypeArguments[0];
+        //        messageUsings.Add(genericType.Namespace);
+        //        patchMemberInfo.UsingDeclarations.Add(genericType.Namespace);
+        //        isObjectMangerType = objectManager.IsTypeManaged(genericType);
+        //        if(typeof(MBList<>).IsAssignableFrom(memberType.GetGenericTypeDefinition()))
+        //        {
+        //            DynamicMessageType messageType = isObjectMangerType ? DynamicMessageType.ObjectManagerType : DynamicMessageType.ValueType;
+        //            messageType |= isField ? DynamicMessageType.Field: DynamicMessageType.Property;
 
-                    messageType |= DynamicMessageType.MBList;
+        //            messageType |= DynamicMessageType.MBList;
 
-                    var setMessage = new DynamicMessageInfo
-                    {
-                        Action = DynamicMessageAction.Set,
-                        Type = messageType,
-                        MessageName = $"{member.DeclaringType.Name}_{member.Name}_SetMessage",
-                        UsingDeclarations = messageUsings,
-                        ClassType = member.DeclaringType,
-                        MemberType = memberType,
-                        MemberName = member.Name
-                    };
+        //            var setMessage = new DynamicMessageInfo
+        //            {
+        //                Action = DynamicMessageAction.Set,
+        //                Type = messageType,
+        //                MessageName = $"{member.DeclaringType.Name}_{member.Name}_SetMessage",
+        //                UsingDeclarations = messageUsings,
+        //                ClassType = member.DeclaringType,
+        //                MemberType = memberType,
+        //                MemberName = member.Name
+        //            };
                     
-                    var addMessage = new DynamicMessageInfo
-                    {
-                        Action = DynamicMessageAction.CollectionAdd,
-                        Type = messageType,
-                        MessageName = $"{member.DeclaringType.Name}_{member.Name}_AddMessage",
-                        UsingDeclarations = messageUsings,
-                        ClassType = member.DeclaringType,
-                        MemberType = genericType,
-                        MemberName = member.Name
-                    };
+        //            var addMessage = new DynamicMessageInfo
+        //            {
+        //                Action = DynamicMessageAction.CollectionAdd,
+        //                Type = messageType,
+        //                MessageName = $"{member.DeclaringType.Name}_{member.Name}_AddMessage",
+        //                UsingDeclarations = messageUsings,
+        //                ClassType = member.DeclaringType,
+        //                MemberType = genericType,
+        //                MemberName = member.Name
+        //            };
                     
-                    var removeMessage = new DynamicMessageInfo
-                    {
-                        Action = DynamicMessageAction.CollectionRemove,
-                        Type = messageType,
-                        MessageName = $"{member.DeclaringType.Name}_{member.Name}_RemoveMessage",
-                        UsingDeclarations = messageUsings,
-                        ClassType = member.DeclaringType,
-                        MemberType = genericType,
-                        MemberName = member.Name
-                    };
-                    patchMemberInfo.MessageInfos.Add(setMessage);
-                    patchMemberInfo.MessageInfos.Add(addMessage);
-                    patchMemberInfo.MessageInfos.Add(removeMessage);
-                    patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldMBList : DynamicMemberPatchType.PropertyMBList;
-                }
-                else if(typeof(List<>).IsAssignableFrom(memberType.GetGenericTypeDefinition()))
-                {
-                    DynamicMessageType messageType = isObjectMangerType ? DynamicMessageType.ObjectManagerType : DynamicMessageType.ValueType;
-                    messageType |= isField ? DynamicMessageType.Field : DynamicMessageType.Property;
+        //            var removeMessage = new DynamicMessageInfo
+        //            {
+        //                Action = DynamicMessageAction.CollectionRemove,
+        //                Type = messageType,
+        //                MessageName = $"{member.DeclaringType.Name}_{member.Name}_RemoveMessage",
+        //                UsingDeclarations = messageUsings,
+        //                ClassType = member.DeclaringType,
+        //                MemberType = genericType,
+        //                MemberName = member.Name
+        //            };
+        //            patchMemberInfo.MessageInfos.Add(setMessage);
+        //            patchMemberInfo.MessageInfos.Add(addMessage);
+        //            patchMemberInfo.MessageInfos.Add(removeMessage);
+        //            patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldMBList : DynamicMemberPatchType.PropertyMBList;
+        //        }
+        //        else if(typeof(List<>).IsAssignableFrom(memberType.GetGenericTypeDefinition()))
+        //        {
+        //            DynamicMessageType messageType = isObjectMangerType ? DynamicMessageType.ObjectManagerType : DynamicMessageType.ValueType;
+        //            messageType |= isField ? DynamicMessageType.Field : DynamicMessageType.Property;
 
-                    messageType |= DynamicMessageType.List;
+        //            messageType |= DynamicMessageType.List;
 
-                    var setMessage = new DynamicMessageInfo
-                    {
-                        Action = DynamicMessageAction.Set,
-                        Type = messageType,
-                        MessageName = $"{member.DeclaringType.Name}_{member.Name}_SetMessage",
-                        UsingDeclarations = messageUsings,
-                        ClassType = member.DeclaringType,
-                        MemberType = memberType,
-                        MemberName = member.Name
-                    };
+        //            var setMessage = new DynamicMessageInfo
+        //            {
+        //                Action = DynamicMessageAction.Set,
+        //                Type = messageType,
+        //                MessageName = $"{member.DeclaringType.Name}_{member.Name}_SetMessage",
+        //                UsingDeclarations = messageUsings,
+        //                ClassType = member.DeclaringType,
+        //                MemberType = memberType,
+        //                MemberName = member.Name
+        //            };
 
-                    var addMessage = new DynamicMessageInfo
-                    {
-                        Action = DynamicMessageAction.CollectionAdd,
-                        Type = messageType,
-                        MessageName = $"{member.DeclaringType.Name}_{member.Name}_AddMessage",
-                        UsingDeclarations = messageUsings,
-                        ClassType = member.DeclaringType,
-                        MemberType = genericType,
-                        MemberName = member.Name
-                    };
+        //            var addMessage = new DynamicMessageInfo
+        //            {
+        //                Action = DynamicMessageAction.CollectionAdd,
+        //                Type = messageType,
+        //                MessageName = $"{member.DeclaringType.Name}_{member.Name}_AddMessage",
+        //                UsingDeclarations = messageUsings,
+        //                ClassType = member.DeclaringType,
+        //                MemberType = genericType,
+        //                MemberName = member.Name
+        //            };
 
-                    var removeMessage = new DynamicMessageInfo
-                    {
-                        Action = DynamicMessageAction.CollectionRemove,
-                        Type = messageType,
-                        MessageName = $"{member.DeclaringType.Name}_{member.Name}_RemoveMessage",
-                        UsingDeclarations = messageUsings,
-                        ClassType = member.DeclaringType,
-                        MemberType = genericType,
-                        MemberName = member.Name
-                    };
-                    patchMemberInfo.MessageInfos.Add(setMessage);
-                    patchMemberInfo.MessageInfos.Add(addMessage);
-                    patchMemberInfo.MessageInfos.Add(removeMessage);
-                    patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldList : DynamicMemberPatchType.PropertyList;
+        //            var removeMessage = new DynamicMessageInfo
+        //            {
+        //                Action = DynamicMessageAction.CollectionRemove,
+        //                Type = messageType,
+        //                MessageName = $"{member.DeclaringType.Name}_{member.Name}_RemoveMessage",
+        //                UsingDeclarations = messageUsings,
+        //                ClassType = member.DeclaringType,
+        //                MemberType = genericType,
+        //                MemberName = member.Name
+        //            };
+        //            patchMemberInfo.MessageInfos.Add(setMessage);
+        //            patchMemberInfo.MessageInfos.Add(addMessage);
+        //            patchMemberInfo.MessageInfos.Add(removeMessage);
+        //            patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldList : DynamicMemberPatchType.PropertyList;
 
-                }
-                else if (typeof(Queue<>).IsAssignableFrom(memberType.GetGenericTypeDefinition()))
-                {
-                    DynamicMessageType messageType = isObjectMangerType ? DynamicMessageType.ObjectManagerType : DynamicMessageType.ValueType;
-                    messageType |= isField ? DynamicMessageType.Field : DynamicMessageType.Property;
-                    messageType |= DynamicMessageType.Queue;
+        //        }
+        //        else if (typeof(Queue<>).IsAssignableFrom(memberType.GetGenericTypeDefinition()))
+        //        {
+        //            DynamicMessageType messageType = isObjectMangerType ? DynamicMessageType.ObjectManagerType : DynamicMessageType.ValueType;
+        //            messageType |= isField ? DynamicMessageType.Field : DynamicMessageType.Property;
+        //            messageType |= DynamicMessageType.Queue;
 
-                    var setMessage = new DynamicMessageInfo
-                    {
-                        Action = DynamicMessageAction.Set,
-                        Type = messageType,
-                        MessageName = $"{member.DeclaringType.Name}_{member.Name}_SetMessage",
-                        UsingDeclarations = messageUsings,
-                        ClassType = member.DeclaringType,
-                        MemberType = memberType,
-                        MemberName = member.Name
-                    };
+        //            var setMessage = new DynamicMessageInfo
+        //            {
+        //                Action = DynamicMessageAction.Set,
+        //                Type = messageType,
+        //                MessageName = $"{member.DeclaringType.Name}_{member.Name}_SetMessage",
+        //                UsingDeclarations = messageUsings,
+        //                ClassType = member.DeclaringType,
+        //                MemberType = memberType,
+        //                MemberName = member.Name
+        //            };
 
-                    var addMessage = new DynamicMessageInfo
-                    {
-                        Action = DynamicMessageAction.CollectionAdd,
-                        Type = messageType,
-                        MessageName = $"{member.DeclaringType.Name}_{member.Name}_AddMessage",
-                        UsingDeclarations = messageUsings,
-                        ClassType = member.DeclaringType,
-                        MemberType = genericType,
-                        MemberName = member.Name
-                    };
+        //            var addMessage = new DynamicMessageInfo
+        //            {
+        //                Action = DynamicMessageAction.CollectionAdd,
+        //                Type = messageType,
+        //                MessageName = $"{member.DeclaringType.Name}_{member.Name}_AddMessage",
+        //                UsingDeclarations = messageUsings,
+        //                ClassType = member.DeclaringType,
+        //                MemberType = genericType,
+        //                MemberName = member.Name
+        //            };
 
-                    var removeMessage = new DynamicMessageInfo
-                    {
-                        Action = DynamicMessageAction.CollectionRemove,
-                        Type = messageType,
-                        MessageName = $"{member.DeclaringType.Name}_{member.Name}_RemoveMessage",
-                        UsingDeclarations = messageUsings,
-                        ClassType = member.DeclaringType,
-                        MemberType = genericType,
-                        MemberName = member.Name
-                    };
-                    patchMemberInfo.MessageInfos.Add(setMessage);
-                    patchMemberInfo.MessageInfos.Add(addMessage);
-                    patchMemberInfo.MessageInfos.Add(removeMessage);
-                    patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldQueue : DynamicMemberPatchType.PropertyQueue;
-                }
-            }
-            else if (memberType.IsArray)
-            {
-                isObjectMangerType = objectManager.IsTypeManaged(memberType.GetElementType());
-                messageUsings.Add(memberType.GetElementType().Namespace);
-                patchMemberInfo.UsingDeclarations.Add(memberType.GetElementType().Namespace);
-                DynamicMessageType messageType = isObjectMangerType ? DynamicMessageType.ObjectManagerType : DynamicMessageType.ValueType;
-                messageType |= isField ? DynamicMessageType.Field : DynamicMessageType.Property;
-                messageType |= DynamicMessageType.Array;
+        //            var removeMessage = new DynamicMessageInfo
+        //            {
+        //                Action = DynamicMessageAction.CollectionRemove,
+        //                Type = messageType,
+        //                MessageName = $"{member.DeclaringType.Name}_{member.Name}_RemoveMessage",
+        //                UsingDeclarations = messageUsings,
+        //                ClassType = member.DeclaringType,
+        //                MemberType = genericType,
+        //                MemberName = member.Name
+        //            };
+        //            patchMemberInfo.MessageInfos.Add(setMessage);
+        //            patchMemberInfo.MessageInfos.Add(addMessage);
+        //            patchMemberInfo.MessageInfos.Add(removeMessage);
+        //            patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldQueue : DynamicMemberPatchType.PropertyQueue;
+        //        }
+        //    }
+        //    else if (memberType.IsArray)
+        //    {
+        //        isObjectMangerType = objectManager.IsTypeManaged(memberType.GetElementType());
+        //        messageUsings.Add(memberType.GetElementType().Namespace);
+        //        patchMemberInfo.UsingDeclarations.Add(memberType.GetElementType().Namespace);
+        //        DynamicMessageType messageType = isObjectMangerType ? DynamicMessageType.ObjectManagerType : DynamicMessageType.ValueType;
+        //        messageType |= isField ? DynamicMessageType.Field : DynamicMessageType.Property;
+        //        messageType |= DynamicMessageType.Array;
 
-                var setMessage = new DynamicMessageInfo
-                {
-                    Action = DynamicMessageAction.ArraySet,
-                    Type = messageType,
-                    MessageName = $"{member.DeclaringType.Name}_{member.Name}_SetMessage",
-                    UsingDeclarations = messageUsings,
-                    ClassType = member.DeclaringType,
-                    MemberType = memberType,
-                    MemberName = member.Name
-                };
+        //        var setMessage = new DynamicMessageInfo
+        //        {
+        //            Action = DynamicMessageAction.ArraySet,
+        //            Type = messageType,
+        //            MessageName = $"{member.DeclaringType.Name}_{member.Name}_SetMessage",
+        //            UsingDeclarations = messageUsings,
+        //            ClassType = member.DeclaringType,
+        //            MemberType = memberType,
+        //            MemberName = member.Name
+        //        };
 
-                var changeMessage = new DynamicMessageInfo
-                {
-                    Action = DynamicMessageAction.ArrayChange,
-                    Type = messageType,
-                    MessageName = $"{member.DeclaringType.Name}_{member.Name}_ChangeMessage",
-                    UsingDeclarations = messageUsings,
-                    ClassType = member.DeclaringType,
-                    MemberType = memberType.GetElementType(),
-                    MemberName = member.Name
-                };
-                patchMemberInfo.MessageInfos.Add(setMessage);
-                patchMemberInfo.MessageInfos.Add(changeMessage);
-                patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldArray : DynamicMemberPatchType.PropertyArray;
-            }
-            else
-            {
-                isObjectMangerType = objectManager.IsTypeManaged(memberType);
-                DynamicMessageType messageType = isObjectMangerType ? DynamicMessageType.ObjectManagerType : DynamicMessageType.ValueType;
-                messageType |= isField ? DynamicMessageType.Field : DynamicMessageType.Property;
+        //        var changeMessage = new DynamicMessageInfo
+        //        {
+        //            Action = DynamicMessageAction.ArrayChange,
+        //            Type = messageType,
+        //            MessageName = $"{member.DeclaringType.Name}_{member.Name}_ChangeMessage",
+        //            UsingDeclarations = messageUsings,
+        //            ClassType = member.DeclaringType,
+        //            MemberType = memberType.GetElementType(),
+        //            MemberName = member.Name
+        //        };
+        //        patchMemberInfo.MessageInfos.Add(setMessage);
+        //        patchMemberInfo.MessageInfos.Add(changeMessage);
+        //        patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.FieldArray : DynamicMemberPatchType.PropertyArray;
+        //    }
+        //    else
+        //    {
+        //        isObjectMangerType = objectManager.IsTypeManaged(memberType);
+        //        DynamicMessageType messageType = isObjectMangerType ? DynamicMessageType.ObjectManagerType : DynamicMessageType.ValueType;
+        //        messageType |= isField ? DynamicMessageType.Field : DynamicMessageType.Property;
 
-                messageType |= DynamicMessageType.Direct;
+        //        messageType |= DynamicMessageType.Direct;
 
-                var setMessage = new DynamicMessageInfo
-                {
-                    Action = DynamicMessageAction.Set,
-                    Type = messageType,
-                    MessageName = $"{member.DeclaringType.Name}_{member.Name}_SetMessage",
-                    UsingDeclarations = messageUsings,
-                    ClassType = member.DeclaringType,
-                    MemberType = memberType,
-                    MemberName = member.Name
-                };
-                patchMemberInfo.MessageInfos.Add(setMessage);
-                patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.Field : DynamicMemberPatchType.Property;
-            }
+        //        var setMessage = new DynamicMessageInfo
+        //        {
+        //            Action = DynamicMessageAction.Set,
+        //            Type = messageType,
+        //            MessageName = $"{member.DeclaringType.Name}_{member.Name}_SetMessage",
+        //            UsingDeclarations = messageUsings,
+        //            ClassType = member.DeclaringType,
+        //            MemberType = memberType,
+        //            MemberName = member.Name
+        //        };
+        //        patchMemberInfo.MessageInfos.Add(setMessage);
+        //        patchMemberInfo.PatchType = isField ? DynamicMemberPatchType.Field : DynamicMemberPatchType.Property;
+        //    }
 
-            return patchMemberInfo;
-        }
+        //    return patchMemberInfo;
+        //}
     }
 }

@@ -89,10 +89,10 @@ internal class E2ETestEnvironment : IDisposable
     }
     private void SetupDynamicSync()
     {
-        Server.Resolve<DynamicSyncPatcher>().BindHandlers();
+        var serverPatcher = Server.Resolve<DynamicSyncPatcher>();
         foreach (var client in Clients)
         {
-            client.Resolve<DynamicSyncPatcher>().BindHandlers();
+            client.Resolve<DynamicSyncPatcher>().BindHandlers(serverPatcher.Assembly);
         }
     }
 

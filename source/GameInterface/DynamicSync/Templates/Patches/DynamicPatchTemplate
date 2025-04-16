@@ -16,11 +16,11 @@ using {{ library }};
 namespace DynamicSync
 {
     [HarmonyPatch()]
-    public class {{DynamicPatchName}} : GenericPatches<{{DynamicPatchName}}, {{TargetType}}>
+    public class {{DeclaringType}}_DynamicPatch : GenericPatches<{{DeclaringType}}_DynamicPatch, {{DeclaringType}}>
     {
         private static IEnumerable<MethodBase> TargetMethods()
         {
-            foreach (var method in AccessTools.GetDeclaredMethods(typeof({{TargetType}})))
+            foreach (var method in AccessTools.GetDeclaredMethods(typeof({{DeclaringType}})))
             {
                 yield return method;
             }

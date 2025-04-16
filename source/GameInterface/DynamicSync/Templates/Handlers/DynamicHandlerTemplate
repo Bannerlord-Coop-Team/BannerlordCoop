@@ -11,10 +11,10 @@ using {{ library }};
 
 namespace DynamicSync
 {
-    public class {{HandlerType}} : GenericHandler<{{DeclaringType}}, {{HandlerType}}>
+    public class {{DeclaringType}}_Handler : GenericHandler<{{DeclaringType}}_Handler, {{DeclaringType}}>
     {
 
-        public {{HandlerType}}(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network) : base(messageBroker, objectManager, network)
+        public {{DeclaringType}}_Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network) : base(messageBroker, objectManager, network)
         {
             {{~ for subscription in Subscriptions ~}}
             {{ subscription }}

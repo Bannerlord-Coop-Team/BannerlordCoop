@@ -1,2 +1,2 @@
-﻿        [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> {{MemberName}}Transpiler(IEnumerable<CodeInstruction> instructions) => FieldTranspiler<{{MemberType}}, {{MessageType}}>(instructions, "{{MemberName}}");
+﻿[HarmonyTranspiler]
+static IEnumerable<CodeInstruction> {{MemberName}}_SetTranspiler(IEnumerable<CodeInstruction> instructions) => FieldTranspiler<{{MemberType}}, {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage>(instructions, "{{MemberName}}");

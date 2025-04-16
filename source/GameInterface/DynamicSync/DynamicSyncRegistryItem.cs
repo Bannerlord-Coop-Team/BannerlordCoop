@@ -5,7 +5,8 @@ namespace GameInterface.DynamicSync
 {
     public class DynamicSyncRegistryItem
     {
-        public HashSet<MemberInfo> Members = new HashSet<MemberInfo>();
+        public HashSet<FieldInfo> Fields = new HashSet<FieldInfo>();
+        public HashSet<PropertyInfo> Properties = new HashSet<PropertyInfo>();
 
         public List<MethodInfo> TargetMethods = new List<MethodInfo>();
 

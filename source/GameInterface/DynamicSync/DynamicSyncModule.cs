@@ -1,5 +1,6 @@
 ﻿using Autofac;
 using GameInterface.DynamicSync;
+using GameInterface.DynamicSync.Builders;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,7 +17,11 @@ internal class DynamicSyncModule : Module
         builder.RegisterType<DynamicSyncRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncPatcher>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncPatchProcessor>().InstancePerLifetimeScope();
-        builder.RegisterType<DynamicSyncBuilder>().As<IDynamicSyncBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<DynamicSyncBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<DynamicSyncAssemblyInfoBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<DynamicSyncPatchBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<DynamicSyncPropertyBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<DynamicSyncFieldBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicHandler>().InstancePerLifetimeScope();
 
         foreach (var type in GetDynamicSyncClasses())

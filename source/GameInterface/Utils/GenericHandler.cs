@@ -13,7 +13,7 @@ using System.Linq.Expressions;
 
 namespace GameInterface.Utils
 {
-    public class GenericHandler<TInstance, THandler> : IHandler
+    public class GenericHandler<THandler, TInstance> : IHandler
         where TInstance : class
         where THandler : IHandler
     {

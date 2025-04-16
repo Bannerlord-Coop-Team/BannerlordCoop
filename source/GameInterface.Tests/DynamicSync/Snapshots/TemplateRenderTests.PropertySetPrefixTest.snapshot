@@ -1,7 +1,26 @@
 [HarmonyPatch(typeof(TestType))]
-public class TestType_TestProperty_PropertySetPrefix : GenericPatches<TestType_TestProperty_PropertySetPrefix, TestType>
+public class TestType_TestProperty_PropertySetPrefix
 {
+    
+    public static readonly ILogger Logger = LogManager.GetLogger<TestType_TestProperty_PropertySetPrefix>();
+
     [HarmonyPatch(nameof(TestType.TestProperty), MethodType.Setter)]
     [HarmonyPrefix]
-    private static void TestPropertyPrefix(TestType __instance, int value) => PropertyPrefix<int, TestPropertySet>(__instance, value);
+    private static void TestPropertyPrefix(TestType __instance, int value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+            return;
+        
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            return;
+        }
+        
+        if(__instance.TestProperty == value)
+            return;
+
+        var message = new TestType_TestProperty_SetMessage(instance, value);
+        MessageBroker.Instance.Publish(instance, message);
+    }
 }

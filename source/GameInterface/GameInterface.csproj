@@ -248,14 +248,14 @@
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetReference" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomSetValue" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetValue" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetValue" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetReference" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetValueTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetReferenceTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkEvent" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetValueMessageTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkReferenceEvent" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetReferenceMessageTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldListChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldMBListChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldQueueChangeTranspilerTemplate" />
@@ -268,7 +268,7 @@
       <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
     </ItemGroup>
     <ItemGroup>
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericMessageTemplate">
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalSetMessageTemplate">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </EmbeddedResource>
     </ItemGroup>

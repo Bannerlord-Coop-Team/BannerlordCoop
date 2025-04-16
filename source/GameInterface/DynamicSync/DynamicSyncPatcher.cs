@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Common.Serialization;
+using GameInterface.DynamicSync.Builders;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using ProtoBuf;
@@ -12,31 +13,26 @@ namespace GameInterface.DynamicSync
 {
     public class DynamicSyncPatcher
     {
+        public Assembly Assembly;
+
         private readonly Harmony harmony;
-        private readonly DynamicSyncRegistry dynamicSyncRegistry;
-        private readonly IObjectManager objectManager;
+        private readonly DynamicSyncBuilder dynamicSyncBuilder;
         private readonly DynamicHandler dynamicHandler;
         private readonly ISerializableTypeMapper serializableTypeMapper;
 
-        public DynamicSyncPatcher(Harmony harmony, DynamicSyncRegistry dynamicSyncRegistry, IObjectManager objectManager, DynamicHandler dynamicHandler, ISerializableTypeMapper serializableTypeMapper)
+        public DynamicSyncPatcher(Harmony harmony, DynamicSyncBuilder dynamicSyncBuilder, DynamicHandler dynamicHandler, ISerializableTypeMapper serializableTypeMapper)
         {
             this.harmony = harmony;
-            this.dynamicSyncRegistry = dynamicSyncRegistry;
-            this.objectManager = objectManager;
+            this.dynamicSyncBuilder = dynamicSyncBuilder;
             this.dynamicHandler = dynamicHandler;
             this.serializableTypeMapper = serializableTypeMapper;
         }
 
-        public Assembly BuildAssembly()
-        {
-            dynamicSyncRegistry.Build();
-
-            BindHandlers();
-            
-            return DynamicSyncRegistry.Assembly;
-        }
-
-        public void BindHandlers()
+        /// <summary>
+        /// Only required for testing to be able to rebind the handlers on client side
+        /// </summary>
+        /// <param name="assembly"></param>
+        public void BindHandlers(Assembly assembly)
         {
             serializableTypeMapper.AddTypes(DynamicSyncRegistry.Assembly.GetTypes()
             .Where(type => {
@@ -55,7 +51,17 @@ namespace GameInterface.DynamicSync
             {
                 dynamicHandler.RegisterHandler(handler);
             }
+        }
 
+        public void PatchAll()
+        {
+            if (!DynamicSyncConfiguration.Enabled)
+                return;
+
+            Assembly = dynamicSyncBuilder.Build();
+            harmony.PatchAllUncategorized();
+
+            BindHandlers(Assembly);
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using GameInterface.DynamicSync.Templates;
+﻿using GameInterface.DynamicSync.Builders;
+using GameInterface.DynamicSync.Templates;
 using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;
@@ -17,13 +18,27 @@ public class TemplateRenderTests
     public void PropertySetPrefixTest()
     {
         var result = TemplateParser.Parse("Patches.PropertySetPrefixTemplate",
-            new
+            new 
             {
                 MemberDeclaringType = "TestType",
                 MemberName = "TestProperty",
-                MemberType = "int",
-                MessageType = "TestPropertySet"
+                MemberType = "int"
             });
+        SnapshotAssert.Equals(result);
+    }
+
+
+    [Fact]
+    public void AssemblyInfoTest()
+    {
+        var result = TemplateParser.Parse("DynamicAssemblyInfoTemplate", new
+        {
+            Assemblies = new List<string>
+            {
+                "Assembly1",
+                "Assembly2"
+            }
+        });
         SnapshotAssert.Equals(result);
     }
 
@@ -137,20 +152,6 @@ public class TemplateRenderTests
             MemberName = "TestPropertyArray",
             MemberType = "string",
             ChangeMessageType = "ChangeArrayFieldMessage"
-        });
-        SnapshotAssert.Equals(result);
-    }
-
-    [Fact]
-    public void AssemblyInfoTest()
-    {
-        var result = TemplateParser.Parse("DynamicAssemblyInfoTemplate", new
-        {
-            Assemblies = new List<string>
-            {
-                "Assembly1",
-                "Assembly2"
-            }
         });
         SnapshotAssert.Equals(result);
     }

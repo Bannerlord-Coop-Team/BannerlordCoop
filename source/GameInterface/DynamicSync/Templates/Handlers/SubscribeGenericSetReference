@@ -1,2 +1,0 @@
-﻿SubscribeGenericReference<{{MemberType}}, {{MessageType}}, {{NetworkMessageType}}>();
-SubscribeNetworkReference<{{MemberType}}, {{NetworkMessageType}} >((instance, value, _) => { instance.{{MemberName}} = value; });
