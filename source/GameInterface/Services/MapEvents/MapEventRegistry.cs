@@ -19,6 +19,8 @@ internal class MapEventRegistry : RegistryBase<MapEvent>
     {
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
+            if (mapEvent.StringId == null) return;
+
             if (RegisterExistingObject(mapEvent.StringId, mapEvent) == false)
             {
                 Logger.Error($"Unable to register {mapEvent}");
