@@ -1,5 +1,10 @@
-﻿using GameInterface.Registry;
-using System.Threading;
+﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
+using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
@@ -8,27 +13,50 @@ namespace GameInterface.Services.MapEvents;
 /// <summary>
 /// Registry for <see cref="MapEvent"/> objects
 /// </summary>
-internal class MapEventRegistry : RegistryBase<MapEvent>
+internal class MapEventRegistry : IAutoRegistry<MapEvent>
 {
-    private const string MapEventIdPrefix = "CoopMapEvent";
-    private int InstanceCounter = 0;
+    ILogger Logger { get; }
 
-    public MapEventRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override void RegisterAll()
+    public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
+    }
+
+    public IEnumerable<MethodBase> Constructors => new MethodBase[]
+    {
+        AccessTools.Constructor(typeof(MapEvent))
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<MapEvent> registry)
+    {
+        foreach(var instance in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (RegisterExistingObject(mapEvent.StringId, mapEvent) == false)
-            {
-                Logger.Error($"Unable to register {mapEvent}");
-            }
+            if (registry.RegisterNewObject(instance, out var _) == false) Logger.Error($"Unable to register {nameof(MapEvent)}");
         }
     }
 
-    protected override string GetNewId(MapEvent party)
+    public void OnClientCreated(MapEvent obj, string id)
     {
-        return $"{MapEventIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+        
+    }
+
+    public void OnClientDestroyed(MapEvent obj, string id)
+    {
+        
+    }
+
+    public void OnServerCreated(MapEvent obj, string id)
+    {
+        
+    }
+
+    public void OnServerDestroyed(MapEvent obj, string id)
+    {
+        
     }
 }
 

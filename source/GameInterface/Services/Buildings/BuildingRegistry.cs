@@ -1,6 +1,10 @@
-﻿using GameInterface.Registry;
-using System;
-using System.Threading;
+﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
+using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
@@ -8,34 +12,58 @@ using TaleWorlds.CampaignSystem.Settlements.Buildings;
 namespace GameInterface.Services.Buildings;
 
 /// <summary>
-/// Registry for <see cref="Army"/> type
+/// Registry for <see cref="Building"/> objects
 /// </summary>
-internal class BuildingRegistry : RegistryBase<Building>
+internal class BuildingRegistry : IAutoRegistry<Building>
 {
-    private const string BuildingIdPrefix = "CoopBuilding";
-    private int InstanceCounter = 0;
+    ILogger Logger { get; }
 
-    public BuildingRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override void RegisterAll()
+    public BuildingRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        foreach(Settlement settlement in Campaign.Current.Settlements)
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
+    }
+
+    public IEnumerable<MethodBase> Constructors => new MethodBase[]
+    {
+        AccessTools.Constructor(typeof(Building), new Type[] { typeof(BuildingType), typeof(Town), typeof(float), typeof(int)} )
+    };
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IRegistry<Building> registry)
+    {
+        foreach (Settlement settlement in Campaign.Current.Settlements)
         {
-            if(settlement.Town == null) continue;
+            if (settlement.Town == null) continue;
 
-            int counter = 0;
-
-            foreach(Building building in settlement.Town.Buildings)
+            foreach (Building building in settlement.Town.Buildings)
             {
-                var networkId = nameof(Building) + "_" + settlement.StringId + counter++;
-                if (RegisterExistingObject(networkId, building) == false)
-                    Logger.Error($"Unable to register {building}");
+                if (registry.RegisterNewObject(building, out var _) == false) Logger.Error($"Unable to register {nameof(Building)}");
             }
         }
     }
 
-    protected override string GetNewId(Building obj)
+    public void OnClientCreated(Building obj, string id)
     {
-        return $"{BuildingIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+
+    }
+
+    public void OnClientDestroyed(Building obj, string id)
+    {
+
+    }
+
+    public void OnServerCreated(Building obj, string id)
+    {
+
+    }
+
+    public void OnServerDestroyed(Building obj, string id)
+    {
+
     }
 }
+
+
