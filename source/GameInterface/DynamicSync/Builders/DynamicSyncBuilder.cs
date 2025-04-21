@@ -60,9 +60,14 @@ public class DynamicSyncBuilder
 
         }
 
+        foreach (var asm in Assembly.GetExecutingAssembly().GetReferencedAssemblies())
+        {
+            assemblies.Add(Assembly.Load(asm.FullName));
+        }
+
         foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
         {
-            if(!asm.IsDynamic)
+            if(!asm.IsDynamic && !asm.FullName.Contains("Anonymously Hosted DynamicMethods Assembly") && asm.FullName.Contains("AutoSyncAsm"))
                 assemblies.Add(Assembly.Load(asm.FullName));
         }
 
@@ -74,11 +79,6 @@ public class DynamicSyncBuilder
         }
 
         syntaxTrees.Add(dynamicSyncAssemblyInfoBuilder.Build());
-
-        //foreach (var dynamicPatch in dynamicPatches)
-        //{
-        //    syntaxTrees.AddRange(dynamicSyncPatchProcessor.ProcessPatch(dynamicPatch));
-        //}
 
         // https://www.strathweb.com/2018/10/no-internalvisibleto-no-problem-bypassing-c-visibility-rules-with-roslyn/
         // Allow IgnoresAccessChecksTo for dynamic compilation
@@ -98,16 +98,9 @@ public class DynamicSyncBuilder
             var result = dynamicAssembly.Emit(assemblyStream, pdbStream);
 
             if (!result.Success)
-            {
                 throw new InvalidOperationException();
-            }
             else
-            {
-                // Register all Messages with the SerializationTypeMapper
                 assembly = Assembly.Load(assemblyStream.GetBuffer());
-                // TODO: Bind dynamic handlers again
-                //DynamicHandlers = GetDynamicHandlerClasses(Assembly);
-            }
         }
 
         return assembly;

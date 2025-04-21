@@ -24,7 +24,7 @@ namespace GameInterface.DynamicSync.Builders
                     MemberName = fieldInfo.Name,
                     MemberType = fieldInfo.FieldType.Name
                 });
-
+            // TODO: Register Intercept for test usages
             return template;
         }
 

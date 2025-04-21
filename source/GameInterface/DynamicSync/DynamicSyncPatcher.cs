@@ -2,6 +2,7 @@
 using Common.Serialization;
 using GameInterface.DynamicSync.Builders;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Utils;
 using HarmonyLib;
 using ProtoBuf;
 using System;
@@ -34,7 +35,7 @@ namespace GameInterface.DynamicSync
         /// <param name="assembly"></param>
         public void BindHandlers(Assembly assembly)
         {
-            serializableTypeMapper.AddTypes(DynamicSyncRegistry.Assembly.GetTypes()
+            serializableTypeMapper.AddTypes(assembly.GetTypes()
             .Where(type => {
                 try
                 {
@@ -46,8 +47,11 @@ namespace GameInterface.DynamicSync
                     return false;
                 }
             }));
-
-            foreach (var handler in DynamicSyncRegistry.DynamicHandlers)
+            var handlers = assembly.GetTypes()
+            .Where(type => {
+                return type.Name.EndsWith("_Handler");
+            }).ToList();
+            foreach (var handler in handlers)
             {
                 dynamicHandler.RegisterHandler(handler);
             }
@@ -59,7 +63,7 @@ namespace GameInterface.DynamicSync
                 return;
 
             Assembly = dynamicSyncBuilder.Build();
-            harmony.PatchAllUncategorized();
+            harmony.PatchAllUncategorized(Assembly);
 
             BindHandlers(Assembly);
         }

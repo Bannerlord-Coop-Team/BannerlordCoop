@@ -1,5 +1,6 @@
 ﻿using GameInterface.DynamicSync.Templates;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -23,6 +24,7 @@ namespace GameInterface.DynamicSync.Builders
             List<string> transpilers = new List<string>();
             List<string> messages = new List<string>();
             List<string> messageHandlers = new List<string>();
+            List<SyntaxTree> syntaxTrees = new List<SyntaxTree>();
 
             List<string> usings = new List<string>
             {
@@ -64,7 +66,11 @@ namespace GameInterface.DynamicSync.Builders
             });
 
             DynamicSyncConfiguration.ExportFile($"{declaringType.Name}/{declaringType.Name}_Handler.cs", handlerTemplate);
-            return new List<SyntaxTree>();
+
+            syntaxTrees.Add(CSharpSyntaxTree.ParseText(patchTemplate));
+            syntaxTrees.AddRange(messages.Select(m => CSharpSyntaxTree.ParseText(m)));
+            syntaxTrees.Add(CSharpSyntaxTree.ParseText(handlerTemplate));
+            return syntaxTrees;
         }
     }
 }
