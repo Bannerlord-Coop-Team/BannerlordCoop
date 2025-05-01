@@ -1,26 +1,25 @@
-﻿using TaleWorlds.Core;
+﻿using Common.Messaging;
+using GameInterface;
+using GameInterface.Services.UI.Messages;
 using SandBox.View;
 using SandBox.ViewModelCollection.SaveLoad;
-using TaleWorlds.Engine.Screens;
-using TaleWorlds.Engine.GauntletUI;
-using TaleWorlds.Library;
 using System;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.SaveSystem.Load;
-using TaleWorlds.Engine;
-using TaleWorlds.Localization;
 using System.Linq;
+using TaleWorlds.Core;
+using TaleWorlds.Engine;
+using TaleWorlds.Engine.GauntletUI;
+using TaleWorlds.InputSystem;
+using TaleWorlds.Library;
+using TaleWorlds.Localization;
+using TaleWorlds.MountAndBlade;
+using TaleWorlds.MountAndBlade.View;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.ScreenSystem;
-using TaleWorlds.MountAndBlade.View;
-using TaleWorlds.InputSystem;
 using TaleWorlds.TwoDimension;
-using Common.Messaging;
-using GameInterface.Services.UI.Messages;
 
 namespace Coop.UI.LoadGameUI
 {
-	class SelectedGameVM : SavedGameVM
+    class SelectedGameVM : SavedGameVM
 	{
 		private readonly Action<SavedGameVM> _onDelete;
 		private readonly Action<SavedGameVM> _onSelection;
@@ -50,7 +49,8 @@ namespace Coop.UI.LoadGameUI
                 GameStateManager.Current = Module.CurrentModule.GlobalGameStateManager;
             }
 
-            MessageBroker.Instance.Publish(this, new HostSaveGame(Save.Name));
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(this, new HostSaveGame(Save.Name));
         }
 	}
 

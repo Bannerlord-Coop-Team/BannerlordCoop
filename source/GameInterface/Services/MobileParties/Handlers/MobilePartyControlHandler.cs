@@ -6,6 +6,7 @@ using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Control;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
@@ -70,7 +71,13 @@ internal class MobilePartyControlHandler : IHandler
             messageBroker.Publish(this, new RemovePartyController(controllerId, partyId));
         }
 
-        if (ModInformation.IsServer && objectManager.TryGetObject(partyId, out MobileParty party))
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            Logger.Error($"Unable to resolve {typeof(IGameInterfaceConfig)}\n" +
+                $"Callstack: {Environment.StackTrace}");
+        }
+
+        if (config.IsServer && objectManager.TryGetObject(partyId, out MobileParty party))
         {
             bool aiDisabled = obj.What.IsRevocation ? false : true;
             party.Ai.SetDoNotMakeNewDecisions(aiDisabled);

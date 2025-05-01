@@ -9,6 +9,13 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Registry;
 
+class ReferenceComparer<T> : IEqualityComparer<T> where T : class
+{
+    public bool Equals(T x, T y) => ReferenceEquals(x, y);
+
+    public int GetHashCode(T obj) => RuntimeHelpers.GetHashCode(obj);
+}
+
 public abstract class RegistryBase<T> : IRegistry<T> where T : class
 {
     protected readonly ILogger Logger = LogManager.GetLogger<RegistryBase<T>>();
@@ -20,7 +27,7 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 
     //protected readonly Dictionary<string, WeakReference<T>> objIds = new Dictionary<string, WeakReference<T>>();
     protected readonly Dictionary<string, T> objIds = new Dictionary<string, T>();
-    protected readonly Dictionary<T, string> idObjs = new Dictionary<T, string>();
+    protected readonly Dictionary<T, string> idObjs = new Dictionary<T, string>(new ReferenceComparer<T>());
     private readonly IRegistryCollection collection;
 
     protected RegistryBase(IRegistryCollection collection)
@@ -75,8 +82,19 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 
         var newId = GetNewId(castedObj);
 
-        if (objIds.ContainsKey(newId)) return false;
-        if (idObjs.ContainsKey(castedObj)) return false;
+        foreach (var key in idObjs.Keys)
+        {
+            if (ReferenceEquals(key, obj))
+            {
+                ;
+            }
+        }
+
+        if (objIds.ContainsKey(newId) || idObjs.ContainsKey(castedObj))
+        {
+            Logger.Warning("{type} instance already exists in registry, current registered object count {objCount}", typeof(T), objIds.Count);
+            return false;
+        }
 
         objIds.Add(newId, castedObj);
         idObjs.Add(castedObj, newId);

@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Util;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -35,8 +36,7 @@ namespace E2E.Tests.Services.TroopRosters
             server.Call(() =>
             {
                 TroopRoster troopRoster = GameObjectCreator.CreateInitializedObject<TroopRoster>();
-                var TroopRoster = new TroopRoster();
-                Assert.True(server.ObjectManager.TryGetId(TroopRoster, out RosterId));
+                Assert.True(server.ObjectManager.TryGetId(troopRoster, out RosterId));
             });
 
             // Assert
@@ -53,14 +53,13 @@ namespace E2E.Tests.Services.TroopRosters
         {
             // Arrange
             var server = TestEnvironment.Server;
-            var client1 = TestEnvironment.Clients.First();
+            var firstClient = TestEnvironment.Clients.First();
             // Act
             string? TroopRosterId = null;
-            client1.Call(() =>
+            firstClient.Call(() =>
             {
-                TroopRoster settlement = GameObjectCreator.CreateInitializedObject<TroopRoster>();
-                var Roster = new TroopRoster();
-                Assert.False(client1.ObjectManager.TryGetId(Roster, out TroopRosterId));
+                var roster = GameObjectCreator.CreateInitializedObject<TroopRoster>();
+                Assert.False(firstClient.ObjectManager.TryGetId(roster, out TroopRosterId));
             });
 
             // Assert

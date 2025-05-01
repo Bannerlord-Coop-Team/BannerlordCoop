@@ -28,52 +28,39 @@ namespace GameInterface.Services.Workshops.Patches
         [HarmonyPrefix]
         private static bool SetCapitalPrefix(Workshop __instance, int value)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client tried to set {name}\n"
-                    + "Callstack: {callstack}", nameof(Workshop.Capital), Environment.StackTrace);
-                return false;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new WorkshopPropertyChanged(PropertyType.Capital, __instance, value.ToString());
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(__instance, message);
 
-            return ModInformation.IsServer;
+            return true;
         }
 
         [HarmonyPatch(nameof(Workshop.LastRunCampaignTime), MethodType.Setter)]
         [HarmonyPrefix]
         private static bool SetLastRunCampaignTimePrefix(Workshop __instance, CampaignTime value)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client tried to set {name}\n"
-                    + "Callstack: {callstack}", nameof(Workshop.LastRunCampaignTime), Environment.StackTrace);
-                return false;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new WorkshopPropertyChanged(PropertyType.LastRunCampaignTime, __instance, value.NumTicks.ToString());
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(__instance, message);
 
-            return ModInformation.IsServer;
+            return true;
         }
 
         [HarmonyPatch(nameof(Workshop.WorkshopType), MethodType.Setter)]
         [HarmonyPrefix]
         private static bool SetWorkshopTypePrefix(Workshop __instance, WorkshopType value)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client tried to set {name}\n"
-                    + "Callstack: {callstack}", nameof(Workshop.WorkshopType), Environment.StackTrace);
-                return false;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
             {
@@ -84,23 +71,19 @@ namespace GameInterface.Services.Workshops.Patches
             objectManager.TryGetId(value, out string typeId);
 
             var message = new WorkshopPropertyChanged(PropertyType.WorkshopType, __instance, typeId);
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(__instance, message);
 
-            return ModInformation.IsServer;
+            return true;
         }
 
         [HarmonyPatch(nameof(Workshop.InitialCapital), MethodType.Setter)]
         [HarmonyPrefix]
         private static bool SetInitialCapitalPrefix(Workshop __instance, int value)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client tried to set {name}\n"
-                    + "Callstack: {callstack}", nameof(Workshop.InitialCapital), Environment.StackTrace);
-                return false;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
             {
@@ -109,9 +92,10 @@ namespace GameInterface.Services.Workshops.Patches
             }
 
             var message = new WorkshopPropertyChanged(PropertyType.InitialCapital, __instance, value.ToString());
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(__instance, message);
 
-            return ModInformation.IsServer;
+            return true;
         }
     }
 }

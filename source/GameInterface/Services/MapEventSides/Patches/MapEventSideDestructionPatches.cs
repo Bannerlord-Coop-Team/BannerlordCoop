@@ -18,17 +18,13 @@ internal class MapEventSideDestructionPatches
     static void Postfix(MapEventSide __instance)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallPolicy.IsOriginalAllowed()) return;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MapEventSide), Environment.StackTrace);
-            return;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
 
         var message = new MapEventSideDestroyed(__instance);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
     }
 }

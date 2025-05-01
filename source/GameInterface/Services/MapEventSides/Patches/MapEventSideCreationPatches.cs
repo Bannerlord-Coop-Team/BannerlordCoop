@@ -23,18 +23,14 @@ internal class MapEventSideCreationPatches
     static bool Prefix(MapEventSide __instance, MapEvent mapEvent, BattleSideEnum missionSide, PartyBase leaderParty)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MapEventSide), Environment.StackTrace);
-            return true;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
         var message = new MapEventSideCreated(__instance, mapEvent, missionSide, leaderParty);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
 
         return true;
     }

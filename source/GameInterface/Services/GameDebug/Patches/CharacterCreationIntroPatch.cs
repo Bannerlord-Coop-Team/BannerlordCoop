@@ -20,7 +20,8 @@ internal class CharacterCreationIntroPatch
     {
         Logger.Information("Game State is changing to {state}", __instance.GetType().Name);
         
-        MessageBroker.Instance.Publish(__instance, new CharacterCreationStarted());
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, new CharacterCreationStarted());
 
 #if DEBUG
         if (DebugCharacterCreationInterface.InCharacterCreationIntro())

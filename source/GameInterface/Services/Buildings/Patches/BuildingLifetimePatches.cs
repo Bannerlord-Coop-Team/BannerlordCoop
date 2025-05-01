@@ -23,18 +23,15 @@ namespace GameInterface.Services.Buildings.Patches
         private static bool CreateBuildingPrefix(ref Building __instance, BuildingType buildingType, Town town, float buildingProgress, int currentLevel)
         {
             // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(Building), Environment.StackTrace);
-                return true;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new BuildingCreated(__instance);
 
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+
+            messageBroker?.Publish(__instance, message);
 
             return true;
         }

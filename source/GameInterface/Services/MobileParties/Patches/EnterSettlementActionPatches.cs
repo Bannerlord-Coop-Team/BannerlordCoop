@@ -19,10 +19,11 @@ namespace GameInterface.Services.MobileParties.Patches
         {
             if (mobileParty.CurrentSettlement == settlement) return false;
 
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
             var message = new PartyEnterSettlementAttempted(settlement.StringId, mobileParty.StringId);
-            MessageBroker.Instance.Publish(mobileParty, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(mobileParty, message);
 
             return false;
         }

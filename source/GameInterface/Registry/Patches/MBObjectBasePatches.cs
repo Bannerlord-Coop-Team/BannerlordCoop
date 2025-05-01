@@ -13,7 +13,7 @@ internal class MBObjectBasePatches
     private static bool StringIdPrefix(MBObjectBase __instance, string value)
     {
         // Call original if we allow this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
         if (__instance.StringId == null)
         {

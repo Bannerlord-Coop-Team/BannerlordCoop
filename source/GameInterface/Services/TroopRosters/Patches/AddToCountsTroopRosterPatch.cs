@@ -1,14 +1,14 @@
-﻿using HarmonyLib;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
-using System.Reflection;
+using Common.Util;
+using GameInterface.Policies;
+using GameInterface.Services.TroopRosters.Messages;
+using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Roster;
-using GameInterface.Services.TroopRosters.Messages;
-using GameInterface.Policies;
-using Common;
-using Common.Util;
 
 namespace GameInterface.Services.TroopRosters.Patches;
 
@@ -16,23 +16,26 @@ namespace GameInterface.Services.TroopRosters.Patches;
 [HarmonyPatch(typeof(TroopRoster))]
 public class AddToCountsTroopRosterPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AddToCountsTroopRosterPatch>();
+
     [HarmonyPatch("AddToCounts")]
     [HarmonyPrefix]
     private static bool AddToCountsPrefix(ref TroopRoster __instance, CharacterObject character, int count, bool insertAtFront,
         int woundedCount, int xpChange, bool removeDepleted, int index)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-        if (ModInformation.IsClient) return false;
+        if (CallPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
         // Owner Party
         // TODO: use publicizer later when it comes out
-        if(__instance.OwnerParty == null) return false;
+        if (__instance.OwnerParty == null) return false;
 
         MobileParty mobileParty = __instance.OwnerParty.MobileParty;
 
 
         var message = new TroopRosterAddToCountsChanged(mobileParty.StringId, character.StringId, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, message);
 
 
         return true;

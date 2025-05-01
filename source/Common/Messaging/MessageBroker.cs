@@ -21,16 +21,10 @@ namespace Common.Messaging
     public class MessageBroker : IMessageBroker
     {
         private static readonly ILogger Logger = LogManager.GetLogger<MessageBroker>();
-        protected static MessageBroker instance;
+
         protected readonly Dictionary<Type, List<WeakDelegate>> subscribers;
+
         private readonly MessageLogger messageLogger = new MessageLogger(Logger);
-        public static MessageBroker Instance { 
-            get
-            {
-                instance ??= new MessageBroker();
-                return instance;
-            } 
-        }
 
         public MessageBroker()
         {

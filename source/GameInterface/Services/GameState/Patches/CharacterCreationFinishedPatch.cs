@@ -12,6 +12,7 @@ internal class CharacterCreationFinishedPatch
     [HarmonyPatch("FinalizeCharacterCreation")]
     private static void FinalizeCharacterCreation_Patch(ref CharacterCreationState __instance)
     {
-        MessageBroker.Instance.Publish(__instance, new CharacterCreationFinished());
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, new CharacterCreationFinished());
     }
 }

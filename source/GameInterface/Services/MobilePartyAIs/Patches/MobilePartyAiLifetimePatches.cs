@@ -20,9 +20,9 @@ class MobilePartyAiLifetimePatches
     static void CtorPrefix(MobilePartyAi __instance, MobileParty mobileParty)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallPolicy.IsOriginalAllowed()) return;
 
-        if (ModInformation.IsClient)
+        if (GameInterfaceConfig.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
@@ -30,7 +30,8 @@ class MobilePartyAiLifetimePatches
             return;
         }
 
-        MessageBroker.Instance.Publish(__instance, new MobilePartyAiCreated(__instance, mobileParty));
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, new MobilePartyAiCreated(__instance, mobileParty));
 
         return;
     }
@@ -40,9 +41,9 @@ class MobilePartyAiLifetimePatches
     private static void RemoveParty_Postfix(ref MobileParty __instance)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallPolicy.IsOriginalAllowed()) return;
 
-        if (ModInformation.IsClient)
+        if (GameInterfaceConfig.IsClient)
         {
             Logger.Error("Client destroyed unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
@@ -51,6 +52,7 @@ class MobilePartyAiLifetimePatches
 
         var ai = __instance.Ai;
 
-        MessageBroker.Instance.Publish(ai, new MobilePartyAiDestroyed(ai));
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(ai, new MobilePartyAiDestroyed(ai));
     }
 }

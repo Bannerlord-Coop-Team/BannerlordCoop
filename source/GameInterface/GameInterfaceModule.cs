@@ -17,6 +17,7 @@ using GameInterface.Surrogates;
 using HarmonyLib;
 using Serilog;
 using System.Linq;
+using System.Net.NetworkInformation;
 
 namespace GameInterface;
 

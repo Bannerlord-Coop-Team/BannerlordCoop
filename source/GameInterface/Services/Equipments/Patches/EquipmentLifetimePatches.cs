@@ -28,12 +28,20 @@ internal class EquipmentLifetimePatches
     {
 
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
+
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            Logger.Error("Unable to resolve {type}\n"
+                    + "Callstack: {callstack}", typeof(IGameInterfaceConfig), Environment.StackTrace);
+            return true;
+        }
 
         // Equiptment is cloned on the client for party icon
-        if (ModInformation.IsClient) return true;
+        if (config.IsClient) return true;
 
-        MessageBroker.Instance.Publish(__instance, new EquipmentCreated(__instance));
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, new EquipmentCreated(__instance));
             
         return true;
     }
@@ -43,18 +51,12 @@ internal class EquipmentLifetimePatches
     private static bool CreateEquipmentParamPrefix(Equipment __instance, Equipment equipment)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
-
-            return true;
-        }
-
-            MessageBroker.Instance.Publish(__instance, new EquipmentCreated(__instance));
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, new EquipmentCreated(__instance));
 
         return true;
     }
@@ -63,18 +65,14 @@ internal class EquipmentLifetimePatches
     [HarmonyPrefix]
     private static void OnDeathPrefix(ref Hero __instance)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallPolicy.IsOriginalAllowed()) return;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
-            return;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
 
         var message = new EquipmentRemoved(__instance.BattleEquipment, __instance.CivilianEquipment);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, message);
     }
 
 
@@ -82,18 +80,14 @@ internal class EquipmentLifetimePatches
     [HarmonyPrefix]
     private static void ResetEquipmentPrefix(ref Hero __instance)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallPolicy.IsOriginalAllowed()) return;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Hero), Environment.StackTrace);
-            return;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var _)) return;
 
         var message = new EquipmentRemoved(__instance.BattleEquipment, __instance.CivilianEquipment);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, message);
 
     }
 

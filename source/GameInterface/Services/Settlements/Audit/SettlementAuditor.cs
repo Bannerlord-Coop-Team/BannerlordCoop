@@ -71,7 +71,14 @@ internal class SettlementAuditor : IAuditor
 
     public string Audit()
     {
-        if(ModInformation.IsServer)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            Logger.Error("Unable to resolve {type}\n"
+                    + "Callstack: {callstack}", typeof(IGameInterfaceConfig), Environment.StackTrace);
+            return true;
+        }
+
+        if (GameInterfaceConfig.IsServer)
         {
             var errorMsg = "Audit is only client side";
             Logger.Error(errorMsg);

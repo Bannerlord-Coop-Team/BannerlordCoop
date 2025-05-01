@@ -20,36 +20,38 @@ namespace E2E.Tests.Environment.Instance;
 /// </summary>
 public abstract class EnvironmentInstance : IDisposable
 {
-    public NetPeer NetPeer => mockNetwork.NetPeer;
+    public NetPeer NetPeer => MockNetwork.NetPeer;
     /// <summary>
     /// Messages sent internally or received over the network via the message broker
     /// </summary>
-    public MessageCollection InternalMessages => messageBroker.Messages;
+    public MessageCollection InternalMessages => MessageBroker.Messages;
     /// <summary>
     /// Messages sent over the network
     /// </summary>
-    public MessageCollection NetworkSentMessages => mockNetwork.NetworkSentMessages;
+    public MessageCollection NetworkSentMessages => MockNetwork.NetworkSentMessages;
 
-    public IContainer Container => containerProvider.GetContainer();
-    public IObjectManager ObjectManager => Container.Resolve<IObjectManager>();
+    public abstract ILifetimeScope Container { get; }
+
+    protected abstract TestMessageBroker MessageBroker { get; }
+    protected abstract MockNetworkBase MockNetwork { get; }
+
+
+    public IObjectManager ObjectManager
+    {
+        get
+        {
+            if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            {
+                throw new Exception($"Unable to resolve {typeof(IObjectManager)}");
+            }
+
+            return objectManager;
+        }
+    }
 
     public GameInstance GameInstance = new GameInstance();
 
-    private readonly TestMessageBroker messageBroker;
-    private readonly MockNetworkBase mockNetwork;
-    private readonly IContainerProvider containerProvider;
-
     private readonly static object _lock = new object();
-
-    public EnvironmentInstance(
-        TestMessageBroker messageBroker,
-        MockNetworkBase mockNetwork,
-        IContainerProvider containerProvider)
-    {
-        this.messageBroker = messageBroker;
-        this.mockNetwork = mockNetwork;
-        this.containerProvider = containerProvider;
-    }
 
     /// <summary>
     /// Simulate receiving a message from the message broker
@@ -60,7 +62,7 @@ public abstract class EnvironmentInstance : IDisposable
     {
         using (new StaticScope(this))
         {
-            messageBroker.Publish(source, message);
+            MessageBroker.Publish(source, message);
         }
     }
 
@@ -74,7 +76,7 @@ public abstract class EnvironmentInstance : IDisposable
         using (new StaticScope(this))
         {
             EnsureSerializable(packet);
-            mockNetwork.ReceiveFromNetwork(source, packet);
+            MockNetwork.ReceiveFromNetwork(source, packet);
         }
     }
 
@@ -101,14 +103,14 @@ public abstract class EnvironmentInstance : IDisposable
         }
     }
 
-    /// <summary>
-    /// Resolves an object created by this instance
-    /// </summary>
-    /// <typeparam name="T">Type to resolve</typeparam>
-    /// <returns>Object of type <typeparamref name="T"/></returns>
-    public T Resolve<T>() where T : notnull
+    public T Resolve<T>() where T : class
     {
-        return Container.Resolve<T>();
+        if (Container.TryResolve(out T? resolvedObj) == false)
+        {
+            throw new Exception($"Unable to resolve {typeof(T)}");
+        }
+
+        return resolvedObj;
     }
 
     /// <summary>
@@ -121,16 +123,14 @@ public abstract class EnvironmentInstance : IDisposable
     {
         var obj = ObjectHelper.SkipConstructor<T>();
 
-        var objectManager = Resolve<IObjectManager>();
-        objectManager.AddExisting(stringId, obj);
+        ObjectManager.AddExisting(stringId, obj);
 
         return obj;
     }
 
     public T GetRegisteredObject<T>(string stringId) where T : class
     {
-        var objectManager = Resolve<IObjectManager>();
-        if (objectManager.TryGetObject<T>(stringId, out var obj) == false)
+        if (ObjectManager.TryGetObject<T>(stringId, out var obj) == false)
         {
             throw new Exception($"Unable to resolve {stringId} for type {typeof(T)}");
         }
@@ -147,9 +147,7 @@ public abstract class EnvironmentInstance : IDisposable
         {
             Monitor.Enter(GameInstance.@lock);
             
-            // Save previous static values
-            wasServer = ModInformation.IsServer;
-            if (GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
+            if (ContainerProvider.TryGetContainer(out previousContainer) == false)
             {
                 // If no previous container is set, set it to the current container
                 previousContainer = instance.Container;
@@ -158,17 +156,13 @@ public abstract class EnvironmentInstance : IDisposable
             // Set new static values
             instance.GameInstance.SetStatics();
 
-            ModInformation.IsServer = instance is ServerInstance;
-            instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
-            GameInterface.ContainerProvider.SetContainer(instance.Container);
+            ContainerProvider.SetContainer(instance.Container);
         }
 
         public void Dispose()
         {
             // Restore previous static values
-            ModInformation.IsServer = wasServer;
-            GameInterface.ContainerProvider.SetContainer(previousContainer);
-            previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
+            ContainerProvider.SetContainer(previousContainer);
 
             Monitor.Exit(GameInstance.@lock);
         }
@@ -211,7 +205,10 @@ public abstract class EnvironmentInstance : IDisposable
             Assert.Fail($"ProtoBuf is unable to serialize type {obj?.GetType().Name}");
         }
 
-        var serializer = Container.Resolve<ICommonSerializer>();
+        if (ContainerProvider.TryResolve<ICommonSerializer>(out var serializer) == false)
+        {
+            throw new Exception($"Unable to resolve {typeof(ICommonSerializer)}");
+        }
 
         byte[] bytes = serializer.Serialize(obj);
 

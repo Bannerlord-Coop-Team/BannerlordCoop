@@ -464,8 +464,6 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(AllowedThread), nameof(AllowedThread.IsThisThreadAllowed)));
         il.Emit(OpCodes.Brtrue, allowedLabel);
 
-        // TODO add same value checking, has to be more complex than just ==, needs .Equals function to properly work with surrogates
-
         IsClientCheck(il, field);
 
         HasValueChanged(il, field);
@@ -473,7 +471,7 @@ public class FieldTranspilerCreator
         var networkLocal = TryResolve<INetwork>(il);
 
         var objectManagerLocal = TryResolve<IObjectManager>(il);
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, field.DeclaringType);
+        var idLocal = TryGetId(il, field, OpCodes.Ldarg_0, objectManagerLocal, field.DeclaringType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -541,8 +539,8 @@ public class FieldTranspilerCreator
         var networkLocal = TryResolve<INetwork>(il);
         var objectManagerLocal = TryResolve<IObjectManager>(il);
 
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, field.DeclaringType);
-        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal, field.FieldType);
+        var idLocal = TryGetId(il, field, OpCodes.Ldarg_0, objectManagerLocal, field.DeclaringType);
+        var valueIdLocal = TryGetId(il, field, OpCodes.Ldarg_1, objectManagerLocal, field.FieldType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -610,7 +608,7 @@ public class FieldTranspilerCreator
         il.MarkLabel(valueChangedLabel);
     }
 
-    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal, Type objType)
+    private LocalBuilder TryGetId(ILGenerator il, FieldInfo field, OpCode argOpcode, LocalBuilder objectManagerLocal, Type objType)
     {
         var validLabel = il.DefineLabel();
         var idLocal = il.DeclareLocal(typeof(string));
@@ -627,7 +625,7 @@ public class FieldTranspilerCreator
 
         // Log error
         il.Emit(OpCodes.Ldsfld, loggerField);
-        il.Emit(OpCodes.Ldstr, $"Could not resolve id for type {objType}");
+        il.Emit(OpCodes.Ldstr, $"Could not resolve id for type {objType} attempting to sync for field {field.Name}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(ILogger), nameof(ILogger.Error), new Type[] { typeof(string) }));
 
         // Return
@@ -640,7 +638,7 @@ public class FieldTranspilerCreator
 
     private void IsClientCheck(ILGenerator il, FieldInfo field)
     {
-        il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(ModInformation), nameof(ModInformation.IsClient)));
+        il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(GameInterfaceConfig), nameof(GameInterfaceConfig.IsClient)));
         var notClientLabel = il.DefineLabel();
 
         il.Emit(OpCodes.Brfalse, notClientLabel);

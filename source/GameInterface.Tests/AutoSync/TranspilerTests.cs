@@ -98,7 +98,7 @@ public class TranspilerTests
         
         using (ContainerProvider.UseContainerThreadSafe(container))
         {
-            ModInformation.IsServer = true;
+            GameInterfaceConfig.IsServer = true;
             testClass.SetMyInt(newValue);
             testClass.SetMyInt(newValue);
 

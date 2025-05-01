@@ -10,23 +10,21 @@ using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
-using HarmonyLib;
 using System;
 
 namespace Coop.Core
 {
     public class CoopartiveMultiplayerExperience : IDisposable
     {
-        private readonly IMessageBroker messageBroker;
+        private IMessageBroker messageBroker;
         private INetworkConfiguration configuration;
         private IContainer container;
         private INetwork network;
 
         public CoopartiveMultiplayerExperience()
         {
-            // TODO use DI maybe?
-            messageBroker = MessageBroker.Instance;
             configuration = new NetworkConfiguration();
+            messageBroker = new MessageBroker();
 
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
@@ -76,18 +74,19 @@ namespace Coop.Core
 
         public void StartAsServer()
         {
-            DestroyContainer();
-
-            var containerProvider = new ContainerProvider();
+            var config = new GameInterfaceConfig()
+            {
+                IsServer = true,
+            };
 
             ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterInstance(messageBroker).InstancePerLifetimeScope().ExternallyOwned();
+            builder.RegisterInstance(config).As<IGameInterfaceConfig>().InstancePerLifetimeScope();
             builder.RegisterModule<ServerModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
             builder.RegisterModule<GameInterfaceModule>();
             container = builder.Build();
 
-            containerProvider.SetProvider(container);
-            GameInterface.ContainerProvider.SetContainer(container);
+            ContainerProvider.SetContainer(container);
 
             // Create harmony patches
             container.Resolve<IGameInterface>().PatchAll();
@@ -99,26 +98,24 @@ namespace Coop.Core
             logic.Start();
         }
 
-        public void StartAsClient(INetworkConfiguration configuration = null)
+        public void StartAsClient(INetworkConfiguration networkConfig)
         {
-            DestroyContainer();
-
-            var containerProvider = new ContainerProvider();
+            var config = new GameInterfaceConfig()
+            {
+                IsServer = false,
+            };
 
             ContainerBuilder builder = new ContainerBuilder();
+            builder.RegisterInstance(messageBroker).InstancePerLifetimeScope().ExternallyOwned();
+            builder.RegisterInstance(config).As<IGameInterfaceConfig>().InstancePerLifetimeScope();
             builder.RegisterModule<ClientModule>();
-            builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
             builder.RegisterModule<GameInterfaceModule>();
 
-            if (configuration != null)
-            {
-                builder.RegisterInstance(configuration).As<INetworkConfiguration>().SingleInstance();
-            }
+            builder.RegisterInstance(networkConfig).As<INetworkConfiguration>().SingleInstance();
 
             container = builder.Build();
 
-            containerProvider.SetProvider(container);
-            GameInterface.ContainerProvider.SetContainer(container);
+            ContainerProvider.SetContainer(container);
 
             // Create harmony patches
             container.Resolve<IGameInterface>().PatchAll();

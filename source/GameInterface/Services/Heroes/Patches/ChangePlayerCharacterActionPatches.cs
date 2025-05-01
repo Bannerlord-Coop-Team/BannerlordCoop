@@ -12,6 +12,7 @@ internal class ChangePlayerCharacterActionPatches
     [HarmonyPatch("Apply")]
     private static void Prefix(Hero hero)
     {
-        MessageBroker.Instance.Publish(null, new PlayerHeroChanged(Hero.MainHero, hero));
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(null, new PlayerHeroChanged(Hero.MainHero, hero));
     }
 }

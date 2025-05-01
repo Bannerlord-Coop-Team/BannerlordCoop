@@ -37,7 +37,12 @@ static class PartyBehaviorPatch
     [HarmonyPatch("Tick")]
     private static bool TickPrefix(ref MobilePartyAi __instance)
     {
-        if (ModInformation.DISABLE_AI == false) return true;
+        // allow ai ticking if container is not setup properly
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+            return true;
+
+
+        if (config.DisableAI == false) return true;
 
         // This disables AI
         return __instance.DefaultBehaviorNeedsUpdate;
@@ -70,7 +75,8 @@ static class PartyBehaviorPatch
 
         var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint, party.Position2D);
         var message = new PartyBehaviorChangeAttempted(party, data);
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
 
         return false;
     }

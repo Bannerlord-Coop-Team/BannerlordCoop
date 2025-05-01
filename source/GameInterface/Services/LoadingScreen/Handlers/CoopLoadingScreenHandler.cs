@@ -11,9 +11,9 @@ namespace GameInterface.Services.LoadingScreen.Handlers;
 /// </summary>
 /// <remarks>
 /// To show the loading screen, just use 
-/// MessageBroker.Instance.Publish(this, new ShowLoadingScreen()); 
+/// messageBroker.Publish(this, new ShowLoadingScreen()); 
 /// To hide it, use
-/// MessageBroker.Instance.Publish(this, new HideLoadingScreen());
+/// messageBroker.Publish(this, new HideLoadingScreen());
 /// </remarks>
 public class CoopLoadingScreenHandler : IHandler
 {
@@ -52,14 +52,16 @@ public class CoopLoadingScreenHandler : IHandler
     [CommandLineFunctionality.CommandLineArgumentFunction("ShowLoadingScreen", "Coop.Debug")]
     public static string testShow(List<string> strings)
     {
-        MessageBroker.Instance.Publish(null, new ShowLoadingScreen());
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(null, new ShowLoadingScreen());
         return "Command Executed!";
     }
 
     [CommandLineFunctionality.CommandLineArgumentFunction("HideLoadingScreen", "Coop.Debug")]
     public static string testHide(List<string> strings)
     {
-        MessageBroker.Instance.Publish(null, new HideLoadingScreen());
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(null, new HideLoadingScreen());
         return "Command Executed!";
     }
 }

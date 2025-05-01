@@ -23,18 +23,14 @@ namespace GameInterface.Services.MapEventParties.Patches
         private static bool CreateMapEventPartyPrefix(ref MapEventParty __instance, PartyBase party)
         {
             // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(MapEventParty), Environment.StackTrace);
-                return false;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new MapEventPartyCreated(__instance, party);
 
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
 
             return true;
         }

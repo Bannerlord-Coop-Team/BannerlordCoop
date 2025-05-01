@@ -27,11 +27,11 @@ public class ArmyPatches
     [HarmonyPrefix]
     static bool OnAddPartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
-        
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false) return true;
+
+        if (config.IsClient) return false;
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
@@ -51,7 +51,10 @@ public class ArmyPatches
 
         var data = new ArmyAddPartyData(armyId, partyId);
         var message = new MobilePartyInArmyAdded(data);
-        MessageBroker.Instance.Publish(mobileParty, message);
+
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+
+        messageBroker?.Publish(mobileParty, message);
 
         return true;
     }
@@ -61,15 +64,9 @@ public class ArmyPatches
     [HarmonyPrefix]
     static bool OnRemovePartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
-            return true;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
@@ -93,7 +90,8 @@ public class ArmyPatches
         var data = new ArmyRemovePartyData(armyId, partyId);
         var message = new ArmyPartyRemoved(data);
 
-        MessageBroker.Instance.Publish(mobileParty, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(mobileParty, message);
 
 
         return true;

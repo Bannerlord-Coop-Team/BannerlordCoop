@@ -28,14 +28,16 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.StartSettlementEncounter))]
     private static bool Prefix(MobileParty attackerParty, Settlement settlement)
     {
-        if (ModInformation.IsServer) return true;
+
+        if (GameInterfaceConfig.IsServer) return true;
 
         if (attackerParty.IsPartyControlled() == false) return false;
 
         var message = new StartSettlementEncounterAttempted(
             attackerParty.StringId,
             settlement.StringId);
-        MessageBroker.Instance.Publish(attackerParty, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(attackerParty, message);
 
         return false;
     }

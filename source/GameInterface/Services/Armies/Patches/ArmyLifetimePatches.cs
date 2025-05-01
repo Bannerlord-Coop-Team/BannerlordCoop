@@ -31,33 +31,37 @@ internal class ArmyLifetimePatches
 
     [HarmonyPatch(typeof(Army), MethodType.Constructor, typeof(Kingdom), typeof(MobileParty), typeof(ArmyTypes))]
     [HarmonyPrefix]
-    private static bool CreateArmyPrefix(ref Army __instance, Kingdom kingdom, MobileParty leaderParty, ArmyTypes armyType)
+    private static void CreateArmyPrefix(ref Army __instance, Kingdom kingdom, MobileParty leaderParty, ArmyTypes armyType)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return;
 
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false) return;
+
+        if (config.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(Army), Environment.StackTrace);
-            return true;
+            return;
         }
 
         
         var message = new ArmyCreated(__instance, kingdom, leaderParty, armyType);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
 
-        return true;
+        messageBroker?.Publish(__instance, message);
     }
 
     [HarmonyPatch(typeof(DisbandArmyAction), "ApplyInternal")]
     [HarmonyPrefix]
     public static bool DisperseInternal()
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false) return true;
+
+        if (config.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(Army), Environment.StackTrace);
@@ -72,9 +76,11 @@ internal class ArmyLifetimePatches
     public static void DisbandArmyPostfix(Army __instance, Army.ArmyDispersionReason reason)
     {
         // Call original if we called it
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallPolicy.IsOriginalAllowed()) return;
 
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false) return;
+
+        if (config.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
@@ -84,7 +90,8 @@ internal class ArmyLifetimePatches
         var data = new ArmyDestructionData(__instance, reason);
         var message = new ArmyDestroyed(data, __instance);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, message);
     }
 
     public static void OverrideDestroyArmy(Army army, ArmyDispersionReason reason)

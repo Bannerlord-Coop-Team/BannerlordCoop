@@ -23,18 +23,14 @@ namespace GameInterface.Services.Monsters.Patches
         private static bool CreateMonsterPrefix(ref Monster __instance)
         {
             // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(Monster), Environment.StackTrace);
-                return false;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new MonsterCreated(__instance);
 
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
 
             return true;
         }

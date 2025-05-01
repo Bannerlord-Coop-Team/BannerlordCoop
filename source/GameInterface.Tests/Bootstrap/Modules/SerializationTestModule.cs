@@ -5,6 +5,7 @@ using Common.Serialization;
 using GameInterface.AutoSync;
 using GameInterface.Registry;
 using GameInterface.Serialization;
+using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using Moq;
 using Serilog;
@@ -27,6 +28,8 @@ namespace GameInterface.Tests.Bootstrap.Modules
             builder.RegisterInstance(new Mock<INetwork>().Object).As<INetwork>();
             builder.RegisterInstance(new Mock<IAutoSyncPatchCollector>().Object).As<IAutoSyncPatchCollector>();
             builder.RegisterInstance(new Mock<ISerializableTypeMapper>().Object).As<ISerializableTypeMapper>();
+            builder.RegisterInstance(new Mock<IControlledEntityRegistry>().Object).As<IControlledEntityRegistry>();
+            builder.RegisterInstance(new Mock<IControllerIdProvider>().Object).As<IControllerIdProvider>();
             builder.RegisterModule<RegistryModule>();
         }
     }

@@ -15,7 +15,8 @@ internal class LoadPatches
     {
         if (__result.Successful)
         {
-            MessageBroker.Instance.Publish(__instance, new GameLoaded(saveName));
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, new GameLoaded(saveName));
         }
     }
 }

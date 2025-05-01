@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;
@@ -71,7 +72,14 @@ internal class MobilePartyAuditor : IAuditor
 
     public string Audit()
     {
-        if (ModInformation.IsServer)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            var errorMsg = $"Unable to resolve {typeof(IGameInterfaceConfig)}\nCallstack: {Environment.StackTrace}";
+            Logger.Error(errorMsg);
+            return errorMsg;
+        }
+
+        if (config.IsServer)
         {
             var errorMsg = "Audit is only available client side";
             Logger.Error(errorMsg);

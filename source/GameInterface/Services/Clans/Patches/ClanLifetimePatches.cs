@@ -30,16 +30,12 @@ internal class ClanLifetimePatches
     [HarmonyPrefix]
     static bool DestroyPrefix(Clan destroyedClan, int details)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Clan), Environment.StackTrace);
-            return false;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
-        MessageBroker.Instance.Publish(destroyedClan, new ClanDestroyed(destroyedClan, details));
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(destroyedClan, new ClanDestroyed(destroyedClan, details));
 
         return true;
     }

@@ -1,9 +1,12 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
+using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -17,17 +20,20 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(LeaveSettlementAction))]
 public class LeaveSettlementActionPatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<LeaveSettlementActionPatches>();
+
     [HarmonyPrefix]
     [HarmonyPatch(nameof(LeaveSettlementAction.ApplyForParty))]
     private static bool Prefix(MobileParty mobileParty)
     {
         if (mobileParty.CurrentSettlement == null) return false;
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
         var message = new PartyLeaveSettlementAttempted(mobileParty.StringId);
-        MessageBroker.Instance.Publish(mobileParty, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(mobileParty, message);
 
         return false;
     }

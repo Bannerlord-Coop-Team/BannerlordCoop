@@ -1,8 +1,11 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Template.Messages;
+using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Template.Patches;
@@ -13,6 +16,8 @@ namespace GameInterface.Services.Template.Patches;
 //[HarmonyPatch(typeof(Campaign))]
 class TemplatePatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<TemplatePatch>();
+
     // See https://harmony.pardeike.net/articles/intro.html on how to use harmony patches
     //[HarmonyPatch("TimeControlMode")]
     //[HarmonyPatch(MethodType.Setter)]
@@ -20,15 +25,18 @@ class TemplatePatch
     private static bool Prefix(ref Campaign __instance)
     {
         // Allows original method call when called by OverrideTemplateFn 
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        // Skip method if called from server and allow origin
-        if (ModInformation.IsServer) return false;
+        // Allow method but log callstack and client attempted to call
+        // The patch design intends to disable all server functionality for the clients
+        // such that clients will not call server functions
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
         // Publishing a message to all internal software is done using the message broker
         // This type of message should be IEvent since it is a reaction to something
         // Normally sent to a handler in Coop.Core
-        MessageBroker.Instance.Publish(__instance, new TemplateEventMessage());
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, new TemplateEventMessage());
 
         // Returning false in a prefix will skip the original
         // In this case we want to request the change from the server

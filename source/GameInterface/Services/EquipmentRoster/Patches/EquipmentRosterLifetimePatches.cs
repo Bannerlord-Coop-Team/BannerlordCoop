@@ -22,18 +22,14 @@ namespace GameInterface.Services.EquipmentRoster.Patches
         private static bool CreateEquipmentRosterPrefix(ref MBEquipmentRoster __instance)
         {
             // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(MBEquipmentRoster), Environment.StackTrace);
-                return false;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new EquipmentRosterCreated(__instance);
 
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(__instance, message);
 
             return true;
         }

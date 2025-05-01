@@ -1,20 +1,15 @@
 ﻿using Autofac;
-using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;
 using Common.Tests.Utils;
 using Common.Util;
-using Coop.Core;
 using Coop.IntegrationTests.Environment.Mock;
 using GameInterface;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using LiteNetLib;
-using Microsoft.VisualStudio.TestPlatform.CommunicationUtilities;
-using System.Net.Sockets;
 using System.Reflection;
-using TaleWorlds.CampaignSystem;
 
 namespace Coop.IntegrationTests.Environment.Instance;
 
@@ -23,32 +18,20 @@ namespace Coop.IntegrationTests.Environment.Instance;
 /// </summary>
 public abstract class EnvironmentInstance
 {
-    public NetPeer NetPeer => mockNetwork.NetPeer;
+    public NetPeer NetPeer => MockNetwork.NetPeer;
     /// <summary>
     /// Messages sent internally or received over the network via the message broker
     /// </summary>
-    public MessageCollection InternalMessages => messageBroker.Messages;
+    public MessageCollection InternalMessages => MessageBroker.Messages;
     /// <summary>
     /// Messages sent over the network
     /// </summary>
-    public MessageCollection NetworkSentMessages => mockNetwork.NetworkSentMessages;
+    public MessageCollection NetworkSentMessages => MockNetwork.NetworkSentMessages;
 
-    public IContainer Container => containerProvider.GetContainer();
-    public IObjectManager ObjectManager => Container.Resolve<IObjectManager>();
+    public abstract IContainer Container { get; }
 
-    private readonly TestMessageBroker messageBroker;
-    private readonly MockNetworkBase mockNetwork;
-    private readonly IContainerProvider containerProvider;
-
-    public EnvironmentInstance(
-        TestMessageBroker messageBroker,
-        MockNetworkBase mockNetwork,
-        IContainerProvider containerProvider)
-    {
-        this.messageBroker = messageBroker;
-        this.mockNetwork = mockNetwork;
-        this.containerProvider = containerProvider;
-    }
+    protected abstract TestMessageBroker MessageBroker { get; }
+    protected abstract MockNetworkBase MockNetwork { get; }
 
     /// <summary>
     /// Simulate receiving a message from the message broker
@@ -59,7 +42,7 @@ public abstract class EnvironmentInstance
     {
         using (new StaticScope(this))
         {
-            messageBroker.Publish(source, message);
+            MessageBroker.Publish(source, message);
         }
     }
 
@@ -73,7 +56,7 @@ public abstract class EnvironmentInstance
         using(new StaticScope(this))
         {
             EnsureSerializable(packet);
-            mockNetwork.ReceiveFromNetwork(source, packet);
+            MockNetwork.ReceiveFromNetwork(source, packet);
         }
     }
 
@@ -142,26 +125,21 @@ public abstract class EnvironmentInstance
         public StaticScope(EnvironmentInstance instance)
         {
             // Save previous static values
-            wasServer = ModInformation.IsServer;
-            if(GameInterface.ContainerProvider.TryGetContainer(out previousContainer) == false)
+            if(ContainerProvider.TryGetContainer(out previousContainer) == false)
             {
                 // If no previous container is set, set it to the current container
                 previousContainer = instance.Container;
             }
 
             // Set new static values
-            ModInformation.IsServer = instance is ServerInstance;
-            instance.Container.Resolve<TestMessageBroker>().SetStaticInstance();
-            GameInterface.ContainerProvider.SetContainer(instance.Container);
+            ContainerProvider.SetContainer(instance.Container);
             
         }
 
         public void Dispose()
         {
             // Restore previous static values
-            ModInformation.IsServer = wasServer;
-            GameInterface.ContainerProvider.SetContainer(previousContainer);
-            previousContainer.Resolve<TestMessageBroker>().SetStaticInstance();
+            ContainerProvider.SetContainer(previousContainer);
         }
     }
 

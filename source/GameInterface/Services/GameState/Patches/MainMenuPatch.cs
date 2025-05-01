@@ -12,6 +12,7 @@ internal class MainMenuEnteredPatch
     [HarmonyPatch("OnActivate")]
     static void OnActivate(ref InitialState __instance)
     {
-        MessageBroker.Instance.Publish(__instance, new MainMenuEntered());
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, new MainMenuEntered());
     }
 }

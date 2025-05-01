@@ -75,7 +75,12 @@ namespace GameInterface.Services.ItemRosters.Commands
                 return string.Format("ID: '{0}' not found", args[0]);
             }
 
-            var name = "!" + (ModInformation.IsServer ? "server-itemroster-export-" : "client-itemroster-export-") + $"{owner}.txt";
+            if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+            {
+                return $"Unable to resolve {typeof(IGameInterfaceConfig)}\n{Environment.StackTrace}";
+            }
+
+            var name = "!" + (config.IsServer ? "server-itemroster-export-" : "client-itemroster-export-") + $"{owner}.txt";
             File.WriteAllText(name, ItemRosterContent(roster));
 
             return $"Exported '{owner}' into '{name}'.\n Check bannerlord bin directory.";

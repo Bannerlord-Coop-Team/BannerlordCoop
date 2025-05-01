@@ -90,7 +90,7 @@ public class PropertyPrefixCreator
         var networkLocal = TryResolve<INetwork>(il);
 
         var objectManagerLocal = TryResolve<IObjectManager>(il);
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, prop.DeclaringType);
+        var idLocal = TryGetId(il, prop, OpCodes.Ldarg_0, objectManagerLocal, prop.DeclaringType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -130,8 +130,8 @@ public class PropertyPrefixCreator
         var networkLocal = TryResolve<INetwork>(il);
         var objectManagerLocal = TryResolve<IObjectManager>(il);
 
-        var idLocal = TryGetId(il, OpCodes.Ldarg_0, objectManagerLocal, prop.DeclaringType);
-        var valueIdLocal = TryGetId(il, OpCodes.Ldarg_1, objectManagerLocal, prop.PropertyType);
+        var idLocal = TryGetId(il, prop, OpCodes.Ldarg_0, objectManagerLocal, prop.DeclaringType);
+        var valueIdLocal = TryGetId(il, prop, OpCodes.Ldarg_1, objectManagerLocal, prop.PropertyType);
 
         il.Emit(OpCodes.Ldloc, networkLocal);
         il.Emit(OpCodes.Ldloc, idLocal);
@@ -181,7 +181,7 @@ public class PropertyPrefixCreator
         return local;
     }
 
-    private LocalBuilder TryGetId(ILGenerator il, OpCode argOpcode, LocalBuilder objectManagerLocal, Type objType)
+    private LocalBuilder TryGetId(ILGenerator il, PropertyInfo property, OpCode argOpcode, LocalBuilder objectManagerLocal, Type objType)
     {
         var validLabel = il.DefineLabel();
         var idLocal = il.DeclareLocal(typeof(string));
@@ -198,11 +198,11 @@ public class PropertyPrefixCreator
 
         // Log error
         il.Emit(OpCodes.Ldsfld, loggerField);
-        il.Emit(OpCodes.Ldstr, $"Could not resolve id for type {objType}");
+        il.Emit(OpCodes.Ldstr, $"Could not resolve id for type {objType} attempting to sync for proprty {property.Name}");
         il.Emit(OpCodes.Call, AccessTools.Method(typeof(PropertyPrefixCreator), nameof(LogMessage)));
 
         // Return false
-        il.Emit(OpCodes.Ldc_I4_0);
+        il.Emit(OpCodes.Ldc_I4_1);
         il.Emit(OpCodes.Ret);
 
         il.MarkLabel(validLabel);
@@ -224,7 +224,7 @@ public class PropertyPrefixCreator
 
     private void IsClientCheck(ILGenerator il, MemberInfo field)
     {
-        il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(ModInformation), nameof(ModInformation.IsClient)));
+        il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(GameInterfaceConfig), nameof(GameInterfaceConfig.IsClient)));
         var notClientLabel = il.DefineLabel();
 
         il.Emit(OpCodes.Brfalse, notClientLabel);

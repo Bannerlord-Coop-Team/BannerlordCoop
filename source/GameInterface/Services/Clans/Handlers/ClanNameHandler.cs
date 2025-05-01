@@ -40,7 +40,6 @@ namespace GameInterface.Services.Clans.Handlers
         private void Handle(MessagePayload<ClanNameChanged> obj)
         {
             var payload = obj.What;
-            bool isServer = ModInformation.IsServer;
             network.SendAll(new NetworkChangeClanName(payload.ClanId, payload.Name, payload.InformalName));
         }
 

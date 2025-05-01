@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using GameInterface.Services.Registry;
@@ -72,7 +73,12 @@ internal class HeroAuditor : IAuditor
 
     public string Audit()
     {
-        if (ModInformation.IsServer)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            return $"Unable to resolve {typeof(IGameInterfaceConfig)}\n{Environment.StackTrace}";
+        }
+
+        if (config.IsServer)
         {
             var errorMsg = "Audit is only available client side";
             Logger.Error(errorMsg);

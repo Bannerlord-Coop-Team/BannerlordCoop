@@ -16,8 +16,9 @@ internal class VillageDebugCommand
     /// </summary>
     /// <param name="villageId">string id of the village to search</param>
     /// <returns>Village or null.</returns>
-    private static Village findVillage(string villageId)
+    private static Village FindVillage(string villageId)
     {
+        // TODO USE OUR OBJ MANAGER
         List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
             .Where(settlement => settlement.IsVillage).ToList();
         Village village = settlements.Find(e => e.Village.StringId == villageId)?.Village;
@@ -62,7 +63,7 @@ internal class VillageDebugCommand
             return "Usage: coop.debug.village.info <villageId>";
         }
 
-        Village village = findVillage(args[0]);
+        Village village = FindVillage(args[0]);
 
         if (village == null)
         {
@@ -92,7 +93,11 @@ internal class VillageDebugCommand
     [CommandLineArgumentFunction("set_state", "coop.debug.village")]
     public static string SetVillageState(List<string> args)
     {
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+            return $"Unable to resolve {typeof(IGameInterfaceConfig)}\n" +
+                $"Callstack: {Environment.StackTrace}";
+
+        if (config.IsClient)
             return "Usage: This command can only be used by the server for debugging purposes.";
 
         if (args.Count < 2)
@@ -100,7 +105,7 @@ internal class VillageDebugCommand
             return "Usage: coop.debug.village.set_state <villageId> <BeingRaided | ForcedForVolunteers | ForcedForSupplies | Looted> ";
         }
 
-        Village village = findVillage(args[0]);
+        Village village = FindVillage(args[0]);
 
         if (village == null)
         {
@@ -127,7 +132,11 @@ internal class VillageDebugCommand
     [CommandLineArgumentFunction("set_hearth", "coop.debug.village")]
     public static string SetVillageHearth(List<string> args)
     {
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+            return $"Unable to resolve {typeof(IGameInterfaceConfig)}\n" +
+                $"Callstack: {Environment.StackTrace}";
+
+        if (config.IsClient)
             return "Usage: This command can only be used by the server for debugging purposes.";
 
         if (args.Count < 2)
@@ -135,7 +144,7 @@ internal class VillageDebugCommand
             return "Usage: coop.debug.village.set_hearth <villageId> <0.0> ";
         }
 
-        Village village = findVillage(args[0]);
+        Village village = FindVillage(args[0]);
 
         if (village == null)
         {
@@ -165,7 +174,11 @@ internal class VillageDebugCommand
     [CommandLineArgumentFunction("set_trade_tax_acc", "coop.debug.village")]
     public static string SetTradeTaxAccumulated(List<string> args)
     {
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+            return $"Unable to resolve {typeof(IGameInterfaceConfig)}\n" +
+                $"Callstack: {Environment.StackTrace}";
+
+        if (config.IsClient)
             return "Usage: This command can only be used by the server for debugging purposes.";
 
         if (args.Count < 2)
@@ -173,7 +186,7 @@ internal class VillageDebugCommand
             return "Usage: coop.debug.village.set_trade_tax_acc <villageId> <0.0> ";
         }
 
-        Village village = findVillage(args[0]);
+        Village village = FindVillage(args[0]);
 
         if (village == null)
         {
@@ -205,7 +218,11 @@ internal class VillageDebugCommand
     [CommandLineArgumentFunction("set_demand_time", "coop.debug.village")]
     public static string SetLastDemandTimeSatisified(List<string> args)
     {
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+            return $"Unable to resolve {typeof(IGameInterfaceConfig)}\n" +
+                $"Callstack: {Environment.StackTrace}";
+
+        if (config.IsClient)
             return "Usage: This command can only be used by the server for debugging purposes.";
 
         if (args.Count < 2)
@@ -213,7 +230,7 @@ internal class VillageDebugCommand
             return "Usage: coop.debug.village.set_demand_time <villageId> <0.0> ";
         }
 
-        Village village = findVillage(args[0]);
+        Village village = FindVillage(args[0]);
 
         if (village == null)
         {

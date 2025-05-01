@@ -12,7 +12,6 @@ using GameInterface;
 using GameInterface.Policies;
 using GameInterface.Surrogates;
 using Xunit.Abstractions;
-using ContainerProvider = Coop.Core.ContainerProvider;
 
 namespace E2E.Tests.Environment;
 
@@ -21,9 +20,6 @@ namespace E2E.Tests.Environment;
 /// </summary>
 public class TestEnvironment
 {
-    private ContainerProvider containerProvider;
-    public IContainer Container => containerProvider.GetContainer();
-
     private readonly TestNetworkRouter networkOrchestrator;
 
 
@@ -60,20 +56,15 @@ public class TestEnvironment
 
     private EnvironmentInstance CreateClient(ITestOutputHelper output)
     {
-        containerProvider = new ContainerProvider();
-
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ClientModule>();
         builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
         builder.RegisterType<ClientInstance>().AsSelf();
-        builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
 
         AddSharedDependencies(builder);
 
         var container = builder.Build();
-
-        containerProvider.SetProvider(container);
 
         var instance = container.Resolve<ClientInstance>()!;
 
@@ -84,22 +75,9 @@ public class TestEnvironment
 
     private EnvironmentInstance CreateServer(ITestOutputHelper output)
     {
-        containerProvider = new ContainerProvider();
 
-        var builder = new ContainerBuilder();
 
-        builder.RegisterModule<ServerModule>();
-        builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
-        builder.RegisterType<ServerInstance>().AsSelf();
-        builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
-
-        AddSharedDependencies(builder);
-
-        var container = builder.Build();
-
-        containerProvider.SetProvider(container);
-
-        var instance = container.Resolve<ServerInstance>()!;
+        var instance = new ServerInstance();
 
         networkOrchestrator.AddServer(instance);
 

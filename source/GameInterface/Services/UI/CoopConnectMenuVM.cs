@@ -96,7 +96,8 @@ namespace GameInterface.Services.UI
 
             IPAddress ip = hostEntry.AddressList.First();
 
-            MessageBroker.Instance.Publish(this, new AttemptJoin(ip, port));
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(this, new AttemptJoin(ip, port));
         }
 
         public void ActionCancel()

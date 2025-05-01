@@ -5,15 +5,27 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
 using static HarmonyLib.Code;
 using GameInterface;
+using System;
+using Serilog;
+using Common.Logging;
 
 
 [HarmonyPatch(typeof(Town), "DailyTick")]
 public static class TownDailyTickPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<TownDailyTickPatch>();
+
     [HarmonyPrefix]
     private static bool Prefix()
     {
-        return ModInformation.IsServer;
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            Logger.Error("Unable to resolve {type}\n"
+                    + "Callstack: {callstack}", typeof(IGameInterfaceConfig), Environment.StackTrace);
+            return true;
+        }
+
+        return config.IsServer;
     }
 
     [HarmonyTranspiler]
@@ -45,13 +57,13 @@ public static class TownDailyTickPatch
     public static void InterceptSetFoodStock(Fief fief, float value)
     {
  
-        if (ModInformation.IsClient) return;
+        if (GameInterfaceConfig.IsClient) return;
         fief.FoodStocks = value; // The message broker will be called by the prefix patch
     }
 
     public static void InterceptSetProsperity(Town town, float value)
     {
-        if (ModInformation.IsClient) return;
+        if (GameInterfaceConfig.IsClient) return;
         town.Prosperity = value; // The message broker will be called by the prefix patch
     }
 }

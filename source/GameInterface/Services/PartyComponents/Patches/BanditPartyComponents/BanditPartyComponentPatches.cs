@@ -27,18 +27,14 @@ public class BanditPartyComponentPatches
     private static bool SetIsBossPartyPrefix(BanditPartyComponent __instance, bool value)
     {
         // Call original if we called it
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client changed unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(BanditPartyComponent), Environment.StackTrace);
-            return false;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
         var message = new BanditPartyComponentUpdated(__instance, BanditPartyComponentType.IsBossParty, value.ToString());
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, message);
 
         return true;
     }
@@ -48,21 +44,17 @@ public class BanditPartyComponentPatches
     private static bool SetHideoutPrefix(BanditPartyComponent __instance, Hideout value)
     {
         // Call original if we called it
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client changed unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(BanditPartyComponent), Environment.StackTrace);
-            return false;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
         if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) return true;
         if (objectManager.TryGetId(value, out var hideoutId) == false) return true;
 
         var message = new BanditPartyComponentUpdated(__instance, BanditPartyComponentType.Hideout, hideoutId);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, message);
 
         return true;
     }

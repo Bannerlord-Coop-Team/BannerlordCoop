@@ -22,18 +22,15 @@ namespace GameInterface.Services.CharacterSkills.Patches
         private static bool CreateCharacterSkillsPrefix(ref MBCharacterSkills __instance)
         {
             // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(MBCharacterSkills), Environment.StackTrace);
-                return false;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new CharacterSkillsCreated(__instance);
 
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+
+            messageBroker?.Publish(__instance, message);
 
             return true;
         }

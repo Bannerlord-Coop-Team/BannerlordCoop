@@ -14,6 +14,7 @@ internal class GameExitedPatch
     [HarmonyPatch("OnExit")]
     static void OnExit(ref MapScreen __instance)
     {
-        MessageBroker.Instance.Publish(__instance, new GameExited());
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, new GameExited());
     }
 }

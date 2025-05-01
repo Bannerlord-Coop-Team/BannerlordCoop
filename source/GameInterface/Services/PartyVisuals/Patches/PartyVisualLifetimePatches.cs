@@ -20,14 +20,14 @@ namespace GameInterface.Services.PartyVisuals.Patches
         private static bool CreatePartyVisualPrefix(ref PartyVisual __instance, PartyBase partyBase)
         {
             // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            // TODO Maybe make this client side
-            if (ModInformation.IsClient) return true;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new PartyVisualCreated(__instance, partyBase);
 
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(__instance, message);
 
             return true;
         }
@@ -36,9 +36,9 @@ namespace GameInterface.Services.PartyVisuals.Patches
         [HarmonyPostfix]
         private static void OnMobilePartyDestroyedPostfix(ref PartyVisual __instance)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.IsOriginalAllowed()) return;
 
-            if (ModInformation.IsClient)
+            if (GameInterfaceConfig.IsClient)
             {
                 Logger.Error("Client destroyed unmanaged {name}\n"
                     + "Callstack: {callstack}", typeof(PartyVisual), Environment.StackTrace);
@@ -47,7 +47,8 @@ namespace GameInterface.Services.PartyVisuals.Patches
 
             var message = new PartyVisualDestroyed(__instance);
 
-            MessageBroker.Instance.Publish(__instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
         }
     }
 }

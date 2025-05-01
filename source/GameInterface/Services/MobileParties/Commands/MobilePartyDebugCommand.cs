@@ -62,7 +62,12 @@ internal static class MobilePartyDebugCommand
     [CommandLineArgumentFunction("createParty", "coop.debug.mobileparty")]
     public static string CreateNewParty(List<string> args)
     {
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            return $"Unable to resolve {typeof(IGameInterfaceConfig)}\n{Environment.StackTrace}";
+        }
+
+        if (config.IsClient)
         {
             return "Create party is only to be called on the server";
         }
@@ -99,7 +104,12 @@ internal static class MobilePartyDebugCommand
     [CommandLineArgumentFunction("destroyParty", "coop.debug.mobileparty")]
     public static string DestroyParty(List<string> args)
     {
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            return $"Unable to resolve {typeof(IGameInterfaceConfig)}\n{Environment.StackTrace}";
+        }
+
+        if (config.IsClient)
         {
             return "Create party is only to be called on the server";
         }

@@ -19,19 +19,14 @@ namespace GameInterface.Services.CraftingTemplates.Patches
         private static bool ctorPrefix(ref CraftingTemplate __instance)
         {
             // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(CraftingTemplate), Environment.StackTrace);
-
-                return true;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new CraftingTemplateCreated(__instance);
 
-            MessageBroker.Instance.Publish(null, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(null, message);
 
             return true;
         }

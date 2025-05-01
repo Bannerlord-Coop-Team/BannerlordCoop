@@ -26,9 +26,9 @@ internal class StanceLinkPatches
     private static bool CreateStanceLinkPrefix(ref StanceLink __instance, StanceType stanceType, IFaction faction1, IFaction faction2, bool isAtConstantWar)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
+        if (GameInterfaceConfig.IsClient)
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(StanceLink), Environment.StackTrace);
@@ -38,7 +38,8 @@ internal class StanceLinkPatches
 
         var message = new StanceLinkCreated(__instance, stanceType, faction1, faction2, isAtConstantWar);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
 
 
         return true;

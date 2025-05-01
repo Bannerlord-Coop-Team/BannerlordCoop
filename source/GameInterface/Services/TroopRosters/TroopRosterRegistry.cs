@@ -1,66 +1,89 @@
-﻿using Common;
-using Common.Util;
+﻿//using Common;
+//using Common.Util;
+//using GameInterface.Registry.Auto;
+//using HarmonyLib;
+//using Serilog;
+//using System;
+//using System.Collections.Generic;
+//using System.Linq;
+//using System.Reflection;
+//using TaleWorlds.CampaignSystem;
+//using TaleWorlds.CampaignSystem.Party;
+//using TaleWorlds.CampaignSystem.Roster;
+//using TaleWorlds.Library;
+
+//namespace GameInterface.Services.TroopRosters;
+//internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
+//{
+//    ILogger Logger { get; }
+//    public TroopRosterRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+//    {
+//        Logger = logger;
+
+//        autoRegistryFactory.RegisterType(this);
+//    }
+
+//    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+//        AccessTools.Constructor(typeof(TroopRoster), Array.Empty<Type>())
+//    };
+
+//    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+//    public void RegisterAllObjects(IRegistry<TroopRoster> registry)
+//    {
+//        foreach (MobileParty party in Campaign.Current.MobileParties)
+//        {
+
+//            if (registry.RegisterExistingObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster) == false)
+//                Logger.Error($"Unable to register {nameof(MobileParty.MemberRoster)}");
+//            if (registry.RegisterExistingObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster) == false)
+//                Logger.Error($"Unable to register {nameof(MobileParty.PrisonRoster)}");
+//        }
+//    }
+
+//    public void OnClientCreated(TroopRoster obj, string id)
+//    {
+//        using(new AllowedThread())
+//        {
+//            obj.data = new TroopRosterElement[4];
+//            obj._count = 0;
+//            obj._troopRosterElements = new MBList<TroopRosterElement>();
+//            obj.InitializeCachedData();
+//        }
+//    }
+
+//    public void OnClientDestroyed(TroopRoster obj, string id)
+//    {
+//    }
+
+//    public void OnServerCreated(TroopRoster obj, string id)
+//    {
+//    }
+
+//    public void OnServerDestroyed(TroopRoster obj, string id)
+//    {
+//    }
+//}
+
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
-using HarmonyLib;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
+using System.Threading;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.Library;
 
-namespace GameInterface.Services.TroopRosters;
-internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
+internal class TroopRosterRegistry : RegistryBase<TroopRoster>
 {
-    ILogger Logger { get; }
-    public TroopRosterRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
-    {
-        Logger = logger;
+    private static int InstanceCounter = 0;
 
-        autoRegistryFactory.RegisterType(this);
-    }
-
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(TroopRoster), new Type[0])
-    };
-
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
-
-    public void RegisterAllObjects(IRegistry<TroopRoster> registry)
-    {
-        foreach (MobileParty party in Campaign.Current.MobileParties)
-        {
-
-            if (registry.RegisterExistingObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster) == false)
-                Logger.Error($"Unable to register {nameof(MobileParty.MemberRoster)}");
-            if (registry.RegisterExistingObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster) == false)
-                Logger.Error($"Unable to register {nameof(MobileParty.PrisonRoster)}");
-        }
-    }
-
-    public void OnClientCreated(TroopRoster obj, string id)
-    {
-        using(new AllowedThread())
-        {
-            obj.data = new TroopRosterElement[4];
-            obj._count = 0;
-            obj._troopRosterElements = new MBList<TroopRosterElement>();
-            obj.InitializeCachedData();
-        }
-    }
-
-    public void OnClientDestroyed(TroopRoster obj, string id)
+    public TroopRosterRegistry(IRegistryCollection collection) : base(collection)
     {
     }
 
-    public void OnServerCreated(TroopRoster obj, string id)
+    public override void RegisterAll()
     {
     }
 
-    public void OnServerDestroyed(TroopRoster obj, string id)
+    protected override string GetNewId(TroopRoster obj)
     {
+        return $"{nameof(TroopRoster)}_{Interlocked.Increment(ref InstanceCounter)}";
     }
 }

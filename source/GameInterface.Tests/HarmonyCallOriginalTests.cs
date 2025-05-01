@@ -31,7 +31,8 @@ namespace GameInterface.Tests
             // Act
             var myClass = new MyClass();
 
-            MessageBroker.Instance.Subscribe<FieldChangeAttempted>((message) =>
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Subscribe<FieldChangeAttempted>((message) =>
             {
                 var payload = message.What;
                 ;
@@ -130,7 +131,8 @@ namespace GameInterface.Tests
                     throw new InvalidOperationException($"Unable to find {fieldName}");
                 }
 
-                MessageBroker.Instance.Publish(instance, new FieldChangeAttempted(instance, fieldInfo, newValue));
+                ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(instance, new FieldChangeAttempted(instance, fieldInfo, newValue));
             }
         }
 

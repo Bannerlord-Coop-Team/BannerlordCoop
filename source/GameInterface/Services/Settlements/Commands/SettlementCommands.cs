@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
@@ -31,15 +32,18 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("get_town_name", "coop.debug.settlements")]
     public static string GetTownName(List<string> strings)
     {
-        if (strings.Count != 1) return "Invalid usage, expected \"get_town_name <settlment id>\"";
+        if (strings.Count != 1)
+            return "Invalid usage, expected \"get_town_name <settlment id>\"";
 
         string settlementId = strings.Single();
 
-        if (ContainerProvider.TryGetContainer(out var container) == false) return "Unable to get town name";
+        if (ContainerProvider.TryGetContainer(out var container) == false)
+            return "Unable to get town name";
 
         var objectManager = container.Resolve<IObjectManager>();
 
-        if (objectManager.Contains(settlementId) == false) return $"{settlementId} does not exist";
+        if (objectManager.Contains(settlementId) == false)
+            return $"{settlementId} does not exist";
 
         if (objectManager.TryGetObject<Settlement>(settlementId, out var settlement) == false)
             return $"{settlementId} was in object manager but was not of type Settlement";
@@ -56,7 +60,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("set_enemies_spotted", "coop.debug.settlements")]
     public static string SetEnemiesSpotted(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"set_enemies_spotted <settlment id> <float_value>\"";
 
@@ -90,7 +94,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("set_allies_spotted", "coop.debug.settlements")]
     public static string SetAlliesSpotted(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"set_enemies_spotted <settlment id> <float_value>\"";
 
@@ -121,7 +125,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("set_bribe_paid", "coop.debug.settlements")]
     public static string SetBribePaid(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"set_bribe_paid <settlment id> <int_value>\"";
 
@@ -152,7 +156,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("set_hit_points", "coop.debug.settlements")]
     public static string SetHitPoints(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"set_bribe_paid <settlment id> <int_value>\"";
 
@@ -183,7 +187,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("last_attacker", "coop.debug.settlements")]
     public static string SetLastAttackerParty(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"last_attacker <settlementId> <last_attacker_id>\"";
 
@@ -234,7 +238,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("set_siege_state", "coop.debug.settlements")]
     public static string SetSiegeState(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <siege_state>\"";
 
@@ -269,7 +273,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("set_militia", "coop.debug.settlements")]
     public static string SetMiltiia(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <militia_float>\"";
 
@@ -303,7 +307,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("set_garrison_pay_limit", "coop.debug.settlements")]
     public static string SetGarrisonWageLimit(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"set_siege_state <settlementId> <militia_float>\"";
 
@@ -337,7 +341,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("collect_cache_notables", "coop.debug.settlements")]
     public static string CollectCacheNotables(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 1) return "Invalid usage, expected \"collect_cache_notables <settlementId>\"";
 
@@ -415,7 +419,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("set_owner", "coop.debug.settlementComponent")]
     public static string SetOwner(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <Mobile party id>\"";
 
@@ -454,7 +458,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("set_gold", "coop.debug.settlementComponent")]
     public static string SetGold(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <Gold>\"";
 
@@ -483,7 +487,7 @@ internal class SettlementCommands
     [CommandLineArgumentFunction("set_is_owner_unassigned", "coop.debug.settlementComponent")]
     public static string SetIsOwnerUnassigned(List<string> args)
     {
-        if (ModInformation.IsClient) return "This function can only be used by the server";
+        if (GameInterfaceConfig.IsClient) return "This function can only be used by the server";
 
         if (args.Count != 2) return "Invalid usage, expected \"set_owner <settlmentComponent id> <boolean>\"";
 

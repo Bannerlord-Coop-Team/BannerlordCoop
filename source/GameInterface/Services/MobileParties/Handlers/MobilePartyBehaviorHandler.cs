@@ -107,7 +107,9 @@ internal class MobilePartyBehaviorHandler : IHandler
             targetPoint
         );
 
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false) return;
+
+        if (config.IsClient)
         {
             party.Position2D = new Vec2(data.PartyPositionX, data.PartyPositionY);
         }

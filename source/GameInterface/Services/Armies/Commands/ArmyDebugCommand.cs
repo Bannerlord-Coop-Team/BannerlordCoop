@@ -53,7 +53,12 @@ public class ArmyDebugCommand
     [CommandLineArgumentFunction("create", "coop.debug.army")]
     public static string CreateArmy(List<string> args)
     {
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            return $" Unable to resolve {typeof(IGameInterfaceConfig)}";
+        }
+
+        if (config.IsClient)
         {
             return "Command is only available to run on the server";
         }
@@ -100,7 +105,9 @@ public class ArmyDebugCommand
 
         var tcs = new TaskCompletionSource<string>();
 
-        MessageBroker.Instance.Subscribe<ArmyCreated>((msg) =>
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+
+        messageBroker.Subscribe<ArmyCreated>((msg) =>
         {
             if (objectManager.TryGetId(msg.What.Army, out var armyId) == false)
             {
@@ -139,7 +146,12 @@ public class ArmyDebugCommand
     [CommandLineArgumentFunction("destroy", "coop.debug.army")]
     public static string DestroyArmy(List<string> args)
     {
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            return $" Unable to resolve {typeof(IGameInterfaceConfig)}";
+        }
+
+        if (config.IsClient)
         {
             return "Command is only available to run on the server";
         }

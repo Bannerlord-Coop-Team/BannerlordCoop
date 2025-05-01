@@ -47,18 +47,16 @@ internal class MapEventSideDataPatches
 
     public static void MapFactionIntercept(MapEventSide instance, IFaction newFaction)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
+        if (CallPolicy.IsOriginalAllowed())
         {
             instance._mapFaction = newFaction;
             return;
         }
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to update MapFaction: {callstack}", Environment.StackTrace);
-            return;
-        }
 
-        MessageBroker.Instance.Publish(instance, new MapEventSideIFactionChanged(instance, newFaction));
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(instance, new MapEventSideIFactionChanged(instance, newFaction));
 
         instance._mapFaction = newFaction;
     }

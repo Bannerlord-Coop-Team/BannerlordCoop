@@ -6,7 +6,6 @@ using HarmonyLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.GameState;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 
@@ -22,19 +21,15 @@ namespace GameInterface.Services.CraftingService.Patches
         static bool CreateCraftingPrefix(ref Crafting __instance, CraftingTemplate craftingTemplate, BasicCultureObject culture, TextObject name)
         {
             // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(Crafting), Environment.StackTrace);
-
-                return true;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new CraftingCreated(__instance, craftingTemplate, culture, name);
 
-            MessageBroker.Instance.Publish(null, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+
+            messageBroker?.Publish(null, message);
 
             return true;
         }
@@ -49,18 +44,14 @@ namespace GameInterface.Services.CraftingService.Patches
         [HarmonyPrefix]
         static bool Prefix(ref CraftingState __instance, ref Crafting value)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(CraftingState), Environment.StackTrace);
-                return false;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new CraftingRemoved(value);
 
-            MessageBroker.Instance.Publish(null, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(null, message);
 
             return true;
         }

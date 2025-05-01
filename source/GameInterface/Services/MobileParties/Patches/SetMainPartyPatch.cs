@@ -18,7 +18,8 @@ namespace GameInterface.Services.MobileParties.Patches
             if (value?.StringId == null) return;
             if (Campaign.Current?.MainParty == null) return;
 
-            MessageBroker.Instance.Publish(__instance, new MainPartyChanged(value.StringId));
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, new MainPartyChanged(value.StringId));
         }
     }
 }

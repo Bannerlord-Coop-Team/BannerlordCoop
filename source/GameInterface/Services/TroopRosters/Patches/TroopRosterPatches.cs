@@ -17,7 +17,7 @@ namespace GameInterface.Services.TroopRosters.Patches
         private static bool CreateDummyTroopRosterPrefix(ref TroopRoster __result)
         {
             // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallPolicy.IsOriginalAllowed()) return true;
 
             using(new AllowedThread())
             {

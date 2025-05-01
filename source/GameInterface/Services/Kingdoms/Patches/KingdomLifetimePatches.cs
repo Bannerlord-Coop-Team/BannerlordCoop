@@ -17,8 +17,7 @@ namespace GameInterface.Services.Kingdoms.Patches;
 [HarmonyPatch(typeof(Kingdom))]
 internal class KingdomLifetimePatches
 {
-	private static readonly ILogger Logger = LogManager.GetLogger<KingdomLifetimePatches>
-	();
+	private static readonly ILogger Logger = LogManager.GetLogger<KingdomLifetimePatches>();
 
 	[HarmonyPatch(typeof(Kingdom))]
 	[HarmonyPatch(MethodType.Constructor)]
@@ -26,18 +25,14 @@ internal class KingdomLifetimePatches
 	private static bool ConstructorPrefix(ref Kingdom __instance)
 	{
 		// Call original if we call this function
-		if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+		if (CallPolicy.IsOriginalAllowed()) return true;
 
-		if (ModInformation.IsClient)
-		{
-			Logger.Error("Client created unmanaged {name}\n"
-			+ "Callstack: {callstack}", typeof(Kingdom), Environment.StackTrace);
-			return true;
-		}
+		if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
 		var message = new KingdomCreated(__instance);
 
-		MessageBroker.Instance.Publish(__instance, message);
+		ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+		messageBroker?.Publish(__instance, message);
 
 		return true;
 	}

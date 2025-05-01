@@ -28,18 +28,14 @@ internal class MilitiaPartyComponentLifetimePatches
     private static bool Prefix(MilitiaPartyComponent __instance, Settlement settlement)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MilitiaPartyComponent), Environment.StackTrace);
-            return true;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
         var message = new PartyComponentCreated(__instance, settlement.StringId);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, message);
 
         return true;
     }

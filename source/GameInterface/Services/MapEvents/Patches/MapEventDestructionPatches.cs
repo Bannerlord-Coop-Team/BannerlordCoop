@@ -18,14 +18,9 @@ internal class MapEventDestructionPatches
     static bool Prefix()
     {
         // Call original if we called it
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
-            return false;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
         return true;
     }
@@ -34,17 +29,13 @@ internal class MapEventDestructionPatches
     static void Postfix(MapEvent __instance)
     {
         // Call original if we called it
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallPolicy.IsOriginalAllowed()) return;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
-            return;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
 
         var message = new MapEventDestroyed(__instance);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(__instance, message);
     }
 }

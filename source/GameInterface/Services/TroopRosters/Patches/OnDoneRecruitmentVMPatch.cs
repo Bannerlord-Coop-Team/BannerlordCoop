@@ -1,6 +1,8 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
@@ -12,11 +14,20 @@ namespace GameInterface.Services.TroopRosters.Patches;
 [HarmonyPatch(typeof(RecruitmentVM))]
 public class OnDoneRecruitmentVMPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<OnDoneRecruitmentVMPatch>();
+
     [HarmonyPatch("OnDone")]
     [HarmonyPrefix]
     public static bool OnDonePrefix(ref RecruitmentVM __instance)
     {
-        if (ModInformation.IsServer) return true;
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            Logger.Error("Unable to resolve {type}\n"
+                    + "Callstack: {callstack}", typeof(IGameInterfaceConfig), Environment.StackTrace);
+            return true;
+        }
+
+        if (config.IsServer) return true;
 
         string mobilePartyId = MobileParty.MainParty.StringId;
 
@@ -30,7 +41,8 @@ public class OnDoneRecruitmentVMPatch
         }
         var message = new OnDoneRecruitmentVMChanged(mobilePartyId, troopsInCart.ToArray(), totalCost);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
 
         return false;
     }

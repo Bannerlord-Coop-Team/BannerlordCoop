@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library.NewsManager;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Heroes.Patches
@@ -57,21 +58,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void LastTimeStampForActivityIntercept(Hero instance, int newTimestamp)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.LastTimeStampForActivity = newTimestamp;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.LastTimeStampForActivity = newTimestamp;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new LastTimeStampChanged(newTimestamp, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance.LastTimeStampForActivity = newTimestamp;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new LastTimeStampChanged(newTimestamp, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -94,21 +88,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void CharacterObjectIntercept(Hero instance, CharacterObject newCharacterObject)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._characterObject = newCharacterObject;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._characterObject = newCharacterObject;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject.StringId, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance._characterObject = newCharacterObject;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new CharacterObjectChanged(newCharacterObject.StringId, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -131,21 +118,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void FirstNameIntercept(Hero instance, TextObject newName)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._firstName = newName;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._firstName = newName;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance._firstName = newName;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new FirstNameChanged(newName.Value, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -168,21 +148,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void NameIntercept(Hero instance, TextObject newName)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._name = newName;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._name = newName;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance._name = newName;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new NameChanged(newName.Value, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -205,21 +178,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void HairTagsIntercept(Hero instance, string newTags)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.HairTags = newTags;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.HairTags = newTags;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new HairTagsChanged(newTags, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance.HairTags = newTags;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new HairTagsChanged(newTags, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -242,21 +208,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void BeardTagsIntercept(Hero instance, string newTags)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.BeardTags = newTags;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.BeardTags = newTags;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new BeardTagsChanged(newTags, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance.BeardTags = newTags;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new BeardTagsChanged(newTags, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -279,21 +238,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void TattooTagsIntercept(Hero instance, string newTags)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.TattooTags = newTags;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.TattooTags = newTags;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new TattooTagsChanged(newTags, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance.TattooTags = newTags;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new TattooTagsChanged(newTags, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -318,21 +270,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void HeroStateIntercept(Hero instance, Hero.CharacterStates newState)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._heroState = newState;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._heroState = newState;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance._heroState = newState;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new HeroStateChanged((int)newState, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -355,21 +300,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void SpcDaysInLocationIntercept(Hero instance, int days)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.SpcDaysInLocation = days;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.SpcDaysInLocation = days;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new SpcDaysInLocationChanged(days, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance.SpcDaysInLocation = days;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new SpcDaysInLocationChanged(days, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -394,21 +332,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void DefaultAgeIntercept(Hero instance, float age)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._defaultAge = age;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._defaultAge = age;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new DefaultAgeChanged(age, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance._defaultAge = age;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new DefaultAgeChanged(age, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -431,21 +362,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void BirthDayIntercept(Hero instance, CampaignTime birthDay)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._birthDay = birthDay;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._birthDay = birthDay;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new BirthDayChanged(birthDay.NumTicks, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance._birthDay = birthDay;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new BirthDayChanged(birthDay.NumTicks, instance.StringId)); 
         }
 
         [HarmonyTranspiler]
@@ -468,21 +392,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void PowerIntercept(Hero instance, float power)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._power = power;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._power = power;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new PowerChanged(power, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance._power = power;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new PowerChanged(power, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -505,22 +422,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void HomeSettlementIntercept(Hero instance, Settlement settlement)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance._homeSettlement = settlement;
-                return;
-            }
-
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance._homeSettlement = settlement;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement?.StringId, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance._homeSettlement = settlement;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new HomeSettlementChanged(settlement?.StringId, instance.StringId));
         }
 
         [HarmonyTranspiler]
@@ -543,21 +452,14 @@ namespace GameInterface.Services.Heroes.Patches
         }
         public static void PregnantIntercept(Hero instance, bool isPregnant)
         {
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                instance.IsPregnant = isPregnant;
-                return;
-            }
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                instance.IsPregnant = isPregnant;
-                return;
-            }
-
-            MessageBroker.Instance.Publish(instance, new PregnantChanged(isPregnant, instance.StringId));
-
+            // Change instance for all branches (prevent crashing)
             instance.IsPregnant = isPregnant;
+
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, new PregnantChanged(isPregnant, instance.StringId));
         }
     }
 }

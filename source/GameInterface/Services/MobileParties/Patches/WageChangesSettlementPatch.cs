@@ -1,8 +1,11 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MobileParties.Messages;
 using HarmonyLib;
+using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -19,6 +22,8 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(ClanFinanceExpenseItemVM))]
 internal class WageChangesSettlementPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<WageChangesSettlementPatch>();
+
     private static MethodInfo MobileParty_SetWagePaymentLimit = typeof(MobileParty).GetMethod(nameof(MobileParty.SetWagePaymentLimit));
 
     private static MethodInfo MobileParty_SetWagePaymentLimitOverride =
@@ -50,7 +55,14 @@ internal class WageChangesSettlementPatch
 
     private static void SetWagePaymentLimitOverride(MobileParty instance, int newValue)
     {
-        if (ModInformation.IsServer || AllowedThread.IsThisThreadAllowed())
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            Logger.Error("Unable to resolve {type}\n"
+                    + "Callstack: {callstack}", typeof(IGameInterfaceConfig), Environment.StackTrace);
+            return;
+        }
+
+        if (config.IsServer || AllowedThread.IsThisThreadAllowed())
         {
             instance.SetWagePaymentLimit(newValue);
             return;
@@ -61,7 +73,8 @@ internal class WageChangesSettlementPatch
         // This event doesn't exist and should be a IResponse from the server, there will also need to be a network message
 
         var message = new ChangedWagePaymentLimit(instance.StringId, newValue);
-        MessageBroker.Instance.Publish(instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+        messageBroker?.Publish(instance, message);
 
     }
 

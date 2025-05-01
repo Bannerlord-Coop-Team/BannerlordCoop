@@ -111,22 +111,18 @@ namespace GameInterface.Utils
             where TMessage : IEvent
         {
             // Allows original method call if this thread is allowed
-            if (CallOriginalPolicy.IsOriginalAllowed())
+            if (CallPolicy.IsOriginalAllowed())
             {
                 list.Add(item);
                 return;
             }
 
             // Skip method if called from client and allow origin
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                list.Add(item);
-                return;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
 
             var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item);
-            MessageBroker.Instance.Publish(instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, message);
 
             list.Add(item);
         }
@@ -147,23 +143,18 @@ namespace GameInterface.Utils
         public static bool ListRemoveIntercept<TItem, TMessage>(List<TItem> list, TItem item, TInstance instance)
             where TMessage : IEvent
         {
+            var result = list.Remove(item);
             // Allows original method call if this thread is allowed
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                return list.Remove(item);
-            }
+            if (CallPolicy.IsOriginalAllowed()) return result;
 
             // Skip method if called from client and allow origin
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                return list.Remove(item);
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return result;
 
             var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item);
-            MessageBroker.Instance.Publish(instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, message);
 
-            return list.Remove(item);
+            return result;
         }
         #endregion
 
@@ -250,25 +241,17 @@ namespace GameInterface.Utils
         public static void MBListAddIntercept<TItem, TMessage>(MBList<TItem> list, TItem item, TInstance instance)
             where TMessage : IEvent
         {
+            list.Add(item);
+
             // Allows original method call if this thread is allowed
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                list.Add(item);
-                return;
-            }
+            if (CallPolicy.IsOriginalAllowed()) return;
 
             // Skip method if called from client and allow origin
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                list.Add(item);
-                return;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
 
             var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item);
-            MessageBroker.Instance.Publish(instance, message);
-
-            list.Add(item);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, message);
         }
 
         /// <summary>
@@ -288,23 +271,18 @@ namespace GameInterface.Utils
         public static bool MBListRemoveIntercept<TItem, TMessage>(MBList<TItem> items, TItem item, TInstance instance)
             where TMessage : IEvent
         {
+            var result = items.Remove(item);
             // Allows original method call if this thread is allowed
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                return items.Remove(item);
-            }
+            if (CallPolicy.IsOriginalAllowed()) return result;
 
             // Skip method if called from client and allow origin
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                return items.Remove(item);
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return result;
 
             var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item);
-            MessageBroker.Instance.Publish(instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, message);
 
-            return items.Remove(item);
+            return result;
         }
         #endregion
 
@@ -390,25 +368,15 @@ namespace GameInterface.Utils
         public static void QueueEnqueueIntercept<TItem, TMessage>(Queue<TItem> queue, TItem item, TInstance instance)
             where TMessage : GenericQueueEvent<TInstance, TItem>
         {
-            // Allows original method call if this thread is allowed
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                queue.Enqueue(item);
-                return;
-            }
+            queue.Enqueue(item);
 
-            // Skip method if called from client and allow origin
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                queue.Enqueue(item);
-                return;
-            }
+            // Allows original method call if this thread is allowed
+            if (CallPolicy.IsOriginalAllowed()) return;
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
 
             var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item);
-            MessageBroker.Instance.Publish(instance, message);
-
-            queue.Enqueue(item);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, message);
         }
 
         /// <summary>
@@ -428,21 +396,17 @@ namespace GameInterface.Utils
         public static TItem QueueDequeueIntercept<TItem, TMessage>(Queue<TItem> queue, TInstance instance)
             where TMessage : GenericQueueEvent<TInstance, TItem>
         {
+            var item = queue.Dequeue();
+
             // Allows original method call if this thread is allowed
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                return queue.Dequeue();
-            }
+            if (CallPolicy.IsOriginalAllowed()) return item;
 
             // Skip method if called from client and allow origin
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-                return queue.Dequeue();
-            }
-            var item = queue.Dequeue();
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return item;
+
             var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item);
-            MessageBroker.Instance.Publish(instance, message);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, message);
 
             return item;
         }
@@ -510,23 +474,16 @@ namespace GameInterface.Utils
         public static void ArrayAssignIntercept<TItem, TMessage>(TItem[] items, int index, TItem item, TInstance instance)
             where TMessage : GenericArrayEvent<TInstance, TItem>
         {
-            // Call original if we call this function
-            if (CallOriginalPolicy.IsOriginalAllowed())
-            {
-                items[index] = item;
-                return;
-            }
-
-            if (ModInformation.IsClient)
-            {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(TInstance), Environment.StackTrace);
-                return;
-            }
-            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item, index);
-            MessageBroker.Instance.Publish(instance, message);
-
             items[index] = item;
+
+            // Call original if we call this function
+            if (CallPolicy.IsOriginalAllowed()) return;
+
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item, index);
+            ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+            messageBroker?.Publish(instance, message);
         }
         #endregion
 

@@ -54,7 +54,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         this.packetManager = packetManager;
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
 
-        ModInformation.IsServer = true;
+        GameInterfaceConfig.IsServer = true;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;

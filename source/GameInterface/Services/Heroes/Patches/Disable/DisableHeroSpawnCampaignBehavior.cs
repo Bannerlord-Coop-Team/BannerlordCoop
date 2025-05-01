@@ -15,5 +15,10 @@ internal class DisableHeroSpawnCampaignBehavior
     static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(HeroSpawnCampaignBehavior));
 
     [HarmonyPrefix]
-    static bool Prefix() => ModInformation.IsServer || CallOriginalPolicy.IsOriginalAllowed();
+    static bool Prefix()
+    {
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false) return false;
+
+        return config.IsServer || CallPolicy.IsOriginalAllowed();
+    }
 }

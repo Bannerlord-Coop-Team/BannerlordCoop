@@ -47,17 +47,14 @@ internal class MobilePartyDataPatches
 
     private static void SetPartyComponentIntercept(MobileParty instance, PartyComponent value)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
+        instance._partyComponent = value;
+
+        if (CallPolicy.IsOriginalAllowed())
         {
             instance._partyComponent = value;
             return;
         }
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
-            instance._partyComponent = value;
-            return;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
 
         if (ContainerProvider.TryResolve(out PartyComponentRegistry partyComponentRegistry) == false) return;
 
@@ -67,8 +64,9 @@ internal class MobilePartyDataPatches
             return;
         }
 
-        MessageBroker.Instance.Publish(instance, new PartyComponentChanged(instance.StringId, componentId));
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(instance, new PartyComponentChanged(instance.StringId, componentId));
 
-        instance._partyComponent = value;
+        
     }
 }

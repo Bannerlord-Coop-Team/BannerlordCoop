@@ -21,20 +21,21 @@ internal class VillagePatches
 {
     [HarmonyPatch("DailyTick")]
     [HarmonyPrefix]
-    private static bool DailyTickPrefix() => ModInformation.IsServer;
+    private static bool DailyTickPrefix() => GameInterfaceConfig.IsServer;
 
 
     [HarmonyPatch(nameof(Village.VillageState), MethodType.Setter)]
     [HarmonyPrefix]
     private static bool VillageStatePrefix(ref Village __instance, ref VillageStates value)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
+        if (GameInterfaceConfig.IsClient) return false;
         if (__instance._villageState == value) return false;
         
         var message = new VillageStateChanged(__instance.StringId, (int)value);
-        MessageBroker.Instance.Publish(__instance, message);    
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);    
         return true;
     }
 
@@ -62,12 +63,13 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool HearthPrefix(ref Village __instance, ref float value)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
+        if (GameInterfaceConfig.IsClient) return false;
 
         var message = new VillageHearthChanged(__instance.StringId, value);
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
         return true;
     }
 
@@ -86,14 +88,15 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool TradeBoundPrefix(ref Village __instance, ref Settlement value)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
+        if (GameInterfaceConfig.IsClient) return false;
 
         if (__instance._tradeBound == value) return false;
 
         var message = new VillageTradeBoundChanged(__instance.StringId, value.StringId);
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
 
         return true;
     }
@@ -114,12 +117,13 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool TradeTaxAccumulatedPrefix(ref Village __instance, ref int value)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
+        if (GameInterfaceConfig.IsClient) return false;
 
         var message = new VillageTaxAccumulateChanged(__instance.StringId, value);
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
         return true;
     }
 
@@ -138,12 +142,13 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool LastDemandSatisifiedTimePrefix(ref Village __instance, ref float value)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
+        if (GameInterfaceConfig.IsClient) return false;
 
         var message = new VillageDemandTimeChanged(__instance.StringId, value);
-        MessageBroker.Instance.Publish(__instance, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(__instance, message);
         return true;
     }
 

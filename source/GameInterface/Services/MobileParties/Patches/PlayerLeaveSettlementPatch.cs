@@ -31,7 +31,8 @@ internal class PlayerLeaveSettlementPatch
 
         var message = new EndSettlementEncounterAttempted(party.StringId);
 
-        MessageBroker.Instance.Publish(party, message);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(party, message);
 
         return false;
     }

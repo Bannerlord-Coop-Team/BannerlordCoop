@@ -1,4 +1,5 @@
 ﻿using GameInterface.Services.ItemRosters;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem;

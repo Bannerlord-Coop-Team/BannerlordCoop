@@ -130,9 +130,4 @@ public class TestMessageBroker : MessageBroker
     public IEnumerable<T> GetMessagesFromType<T>() where T : IMessage => Messages.Where(m => m is T).Cast<T>();
 
     public void Clear() => Messages.Clear();
-
-    public void SetStaticInstance()
-    {
-        instance = this;
-    }
 }

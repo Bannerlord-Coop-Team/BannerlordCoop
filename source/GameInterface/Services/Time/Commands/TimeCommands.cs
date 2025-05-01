@@ -24,12 +24,14 @@ class GetterTransaction
 {
     public GetterTransaction()
     {
-        MessageBroker.Instance.Subscribe<TimeControlModeResponse>(Handle);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Subscribe<TimeControlModeResponse>(Handle);
     }
 
     ~GetterTransaction()
     {
-        MessageBroker.Instance.Unsubscribe<TimeControlModeResponse>(Handle);
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Unsubscribe<TimeControlModeResponse>(Handle);
     }
 
     TaskCompletionSource<TimeControlEnum> tcs;
@@ -38,7 +40,8 @@ class GetterTransaction
         tcs = new TaskCompletionSource<TimeControlEnum>();
         var cts = new CancellationTokenSource(1000);
 
-        MessageBroker.Instance.Publish(this, new GetTimeControlMode());
+        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
+messageBroker?.Publish(this, new GetTimeControlMode());
 
         try
         {

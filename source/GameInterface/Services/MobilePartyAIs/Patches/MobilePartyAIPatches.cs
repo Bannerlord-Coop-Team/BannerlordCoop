@@ -1,4 +1,7 @@
-﻿using HarmonyLib;
+﻿using Common.Logging;
+using HarmonyLib;
+using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -7,6 +10,8 @@ namespace GameInterface.Services.MobilePartyAIs.Patches
     [HarmonyPatch(typeof(MobilePartyAi))]
     internal class MobilePartyAIPatches
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyAIPatches>();
+
         [HarmonyPatch("GetTargetPositionAndFace")]
         [HarmonyPrefix]
         static bool GetTargetPositionAndFace_Fix(ref MobilePartyAi __instance)
@@ -20,7 +25,14 @@ namespace GameInterface.Services.MobilePartyAIs.Patches
         [HarmonyPrefix]
         static void Prefix(ref MobilePartyAi __instance)
         {
-            if (ModInformation.IsServer) return;
+            if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+            {
+                Logger.Error("Unable to resolve {type}\n"
+                        + "Callstack: {callstack}", typeof(IGameInterfaceConfig), Environment.StackTrace);
+                return;
+            }
+
+            if (config.IsServer) return;
 
             if (__instance._mobileParty != MobileParty.MainParty) return;
 

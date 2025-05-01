@@ -51,7 +51,6 @@ internal class E2ETestEnvironment : IDisposable
 
         SetupMainHero();
 
-        Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
 
 

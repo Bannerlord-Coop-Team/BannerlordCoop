@@ -1,8 +1,8 @@
 ﻿using GameInterface.Services.Heroes.Audit;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -79,7 +79,12 @@ public class HeroDebugCommand
     [CommandLineArgumentFunction("createHero", "coop.debug.hero")]
     public static string CreateNewHero(List<string> args)
     {
-        if (ModInformation.IsClient)
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false)
+        {
+            return $"Unable to resolve {typeof(IGameInterfaceConfig)}\nCallstack: {Environment.StackTrace}";
+        }
+
+        if (config.IsClient)
         {
             return "Create hero is only to be called on the server";
         }
