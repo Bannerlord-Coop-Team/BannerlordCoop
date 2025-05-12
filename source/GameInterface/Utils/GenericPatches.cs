@@ -658,16 +658,21 @@ namespace GameInterface.Utils
             AddToFieldCache(fieldInfo);
             var fieldIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(FieldIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
 
+            // Used for easier testing
+            if (!GenericPatchHelpers.FieldInterceptCache.ContainsKey(fieldInfo))
+                GenericPatchHelpers.FieldInterceptCache.Add(fieldInfo, fieldIntercept);
             foreach (var instruction in instructions)
             {
                 if (instruction.StoresField(fieldInfo))
                 {
-                    yield return new CodeInstruction(OpCodes.Ldstr, fieldName);
-                    var inst = new CodeInstruction(OpCodes.Call, fieldIntercept);
-                    //if (instruction.labels.Any())
-                        //inst.labels = instruction.labels.ToList();
-                    yield return inst;
-                    
+                    var loadInst = new CodeInstruction(OpCodes.Ldstr, fieldName);
+
+                    if (instruction.labels.Any())
+                        loadInst.labels = instruction.labels.ToList();
+                    yield return loadInst;
+                    var interceptInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
+                    yield return interceptInst;
+
                 }
                 else
                 {
@@ -898,5 +903,10 @@ namespace GameInterface.Utils
             stack.Reverse();
             return stack;
         }
+    }
+
+    public class GenericPatchHelpers
+    {
+        public static Dictionary<FieldInfo, MethodInfo> FieldInterceptCache = new Dictionary<FieldInfo, MethodInfo>();
     }
 }

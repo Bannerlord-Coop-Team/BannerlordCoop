@@ -8,6 +8,7 @@ using GameInterface;
 using GameInterface.AutoSync;
 using GameInterface.DynamicSync;
 using GameInterface.Tests.Bootstrap;
+using GameInterface.Utils;
 using HarmonyLib;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -171,9 +172,10 @@ internal class E2ETestEnvironment : IDisposable
     /// </summary>
     /// <param name="field">Field to get intercept from</param>
     /// <returns>Field intercept as <see cref="MethodInfo"/></returns>
-    public MethodInfo GetIntercept(FieldInfo field, DynamicMessageAction dynamicMessageAction = DynamicMessageAction.Set)
+    public MethodInfo GetIntercept(FieldInfo field)
     {
-        Assert.True(Server.Resolve<DynamicSyncRegistry>().TryGetIntercept(field, out var intercept, dynamicMessageAction));
+
+        Assert.True(GenericPatchHelpers.FieldInterceptCache.TryGetValue(field, out var intercept));
         return intercept;
     }
 

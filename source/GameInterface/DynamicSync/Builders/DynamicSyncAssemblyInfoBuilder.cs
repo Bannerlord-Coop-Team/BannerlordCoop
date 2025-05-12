@@ -33,6 +33,11 @@ namespace GameInterface.DynamicSync.Builders
                 {
                     ignoreCheckAccessAssemblies.Add(propertyInfo.PropertyType.Assembly);
                 }
+
+                foreach (var targetMethod in dynamicRegistryItem.TargetMethods)
+                {
+                    ignoreCheckAccessAssemblies.Add(targetMethod.DeclaringType.Assembly);
+                }
             }
 
                 var assemblyInfoTemplate = TemplateParser.Parse("DynamicAssemblyInfoTemplate", new

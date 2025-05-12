@@ -14,19 +14,21 @@ internal class TownDynamicSync : IDynamicSync
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.LastCapturedBy)));
 
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._prosperity)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._prosperity)));
         //// TODO: Find out why these 2 values Break Harmony
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._wallLevel)));
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._isCastle)));
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._ownerClan)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._wallLevel)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._isCastle)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._ownerClan)));
         //// Not synced fields
         //// autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._security)));
         //// autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._loyalty)));
         //// Remove Prop or auto sync
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.BoostBuildingProcess)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.BoostBuildingProcess)));
         //// Remove Prop or auto sync
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeTax)));
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.InRebelliousState)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeTax)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.InRebelliousState)));
+        
+        // Already handled via property
         //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._governor)));
 
 

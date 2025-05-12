@@ -24,7 +24,6 @@ public class TownSyncTests : SyncTestBase
         TestEnvironment.AssertField<Town, int>(nameof(Town._tradeTax), 70);
         TestEnvironment.AssertField<Town, int>(nameof(Town.BoostBuildingProcess), 200);
         TestEnvironment.AssertField<Town, bool>(nameof(Town.InRebelliousState), true);
-        TestEnvironment.AssertReferenceField<Town, Hero>(nameof(Town._governor));
     }
 
     [Fact]
