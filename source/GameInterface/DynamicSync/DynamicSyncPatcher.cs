@@ -14,7 +14,7 @@ namespace GameInterface.DynamicSync
 {
     public class DynamicSyncPatcher
     {
-        public Assembly Assembly;
+        public static Assembly Assembly;
 
         private readonly Harmony harmony;
         private readonly DynamicSyncBuilder dynamicSyncBuilder;
@@ -61,8 +61,9 @@ namespace GameInterface.DynamicSync
         {
             if (!DynamicSyncConfiguration.Enabled)
                 return;
+            if (Assembly == null)
+                Assembly = dynamicSyncBuilder.Build();
 
-            Assembly = dynamicSyncBuilder.Build();
             harmony.PatchAllUncategorized(Assembly);
 
             BindHandlers(Assembly);
