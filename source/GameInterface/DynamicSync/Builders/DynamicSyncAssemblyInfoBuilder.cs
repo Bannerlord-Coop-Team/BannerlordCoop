@@ -16,7 +16,7 @@ namespace GameInterface.DynamicSync.Builders
         {
             this.dynamicSyncRegistry = dynamicSyncRegistry;
         }
-        public SyntaxTree Build()
+        public SyntaxTree Build(IEnumerable<string> assemblies)
         {
             List<Assembly> ignoreCheckAccessAssemblies = new List<Assembly>();
             foreach (var registration in dynamicSyncRegistry.Registrations)
@@ -42,7 +42,7 @@ namespace GameInterface.DynamicSync.Builders
 
                 var assemblyInfoTemplate = TemplateParser.Parse("DynamicAssemblyInfoTemplate", new
             {
-                Assemblies = ignoreCheckAccessAssemblies.Distinct()
+                Assemblies = ignoreCheckAccessAssemblies.Distinct().Select(a => a.GetName().Name).Concat(assemblies)
             });
 
             DynamicSyncConfiguration.ExportFile("AssemblyInfo.cs", assemblyInfoTemplate);

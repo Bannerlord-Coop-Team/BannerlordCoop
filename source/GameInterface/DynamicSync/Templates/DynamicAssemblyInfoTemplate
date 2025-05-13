@@ -3,22 +3,19 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 {{~ for assm in Assemblies ~}}
-[assembly: IgnoresAccessChecksTo("{{ assm }}")]
+[assembly: System.Runtime.CompilerServices.IgnoresAccessChecksTo("{{ assm }}")]
 {{~ end ~}}
 
-
+[assembly: InternalsVisibleTo("GameInterface")]
 [assembly: AssemblyVersion("1.0.0.0")]
 [assembly: AssemblyFileVersion("1.0.0.0")]
 namespace System.Runtime.CompilerServices
 {
     [AttributeUsage(AttributeTargets.Assembly, AllowMultiple = true)]
-    public class IgnoresAccessChecksToAttribute : Attribute
+    internal sealed class IgnoresAccessChecksToAttribute : Attribute
     {
-        public IgnoresAccessChecksToAttribute(string assemblyName)
+        internal IgnoresAccessChecksToAttribute(string assemblyName)
         {
-            AssemblyName = assemblyName;
         }
-
-        public string AssemblyName { get; }
     }
 }
