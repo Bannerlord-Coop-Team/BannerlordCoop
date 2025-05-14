@@ -21,7 +21,6 @@ namespace GameInterface.Services.PartyVisuals.Patches
         {
             // Call original if we call this function
             if (CallPolicy.IsOriginalAllowed()) return true;
-
             if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
 
             var message = new PartyVisualCreated(__instance, partyBase);
@@ -37,18 +36,12 @@ namespace GameInterface.Services.PartyVisuals.Patches
         private static void OnMobilePartyDestroyedPostfix(ref PartyVisual __instance)
         {
             if (CallPolicy.IsOriginalAllowed()) return;
-
-            if (GameInterfaceConfig.IsClient)
-            {
-                Logger.Error("Client destroyed unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(PartyVisual), Environment.StackTrace);
-                return;
-            }
+            if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
 
             var message = new PartyVisualDestroyed(__instance);
 
             ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
-messageBroker?.Publish(__instance, message);
+            messageBroker?.Publish(__instance, message);
         }
     }
 }

@@ -44,7 +44,7 @@ internal class E2ETestEnvironment : IDisposable
         GameBootStrap.Initialize();
 
 
-        IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
+        IntegrationEnvironment = new TestEnvironment(output, numClients);
 
         // Needs to be before patching
         SetupAutoSync();

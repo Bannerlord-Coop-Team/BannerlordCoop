@@ -56,8 +56,10 @@ public class PatchingTests
 
         var network = container.Resolve<TestNet>();
         var objManager = container.Resolve<IObjectManager>();
+        var config = container.Resolve<GameInterfaceConfig>();
 
-        GameInterfaceConfig.IsServer = true;
+        config.IsServer = true;
+
         Assert.NotNull(typeof(ProtoBufSerializer).GetMethods().Where(m => m.Name == nameof(ProtoBufSerializer.Deserialize) && m.IsGenericMethod));
 
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);

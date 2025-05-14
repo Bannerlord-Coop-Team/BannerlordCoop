@@ -22,16 +22,10 @@ class MobilePartyAiLifetimePatches
         // Call original if we call this function
         if (CallPolicy.IsOriginalAllowed()) return;
 
-        if (GameInterfaceConfig.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
-
-            return;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
 
         ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
-messageBroker?.Publish(__instance, new MobilePartyAiCreated(__instance, mobileParty));
+        messageBroker?.Publish(__instance, new MobilePartyAiCreated(__instance, mobileParty));
 
         return;
     }
@@ -43,16 +37,11 @@ messageBroker?.Publish(__instance, new MobilePartyAiCreated(__instance, mobilePa
         // Call original if we call this function
         if (CallPolicy.IsOriginalAllowed()) return;
 
-        if (GameInterfaceConfig.IsClient)
-        {
-            Logger.Error("Client destroyed unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
-            return;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return;
 
         var ai = __instance.Ai;
 
         ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
-messageBroker?.Publish(ai, new MobilePartyAiDestroyed(ai));
+        messageBroker?.Publish(ai, new MobilePartyAiDestroyed(ai));
     }
 }

@@ -1,15 +1,10 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
-using Common.Network;
-using Common.Util;
-using Serilog;
-using HarmonyLib;
-using TaleWorlds.CampaignSystem;
-using static TaleWorlds.Core.ViewModelCollection.CharacterViewModel;
 using GameInterface.Policies;
-using System;
 using GameInterface.Services.Stances.Messages.Lifetime;
+using HarmonyLib;
+using Serilog;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Stances.Patches;
 
@@ -28,18 +23,13 @@ internal class StanceLinkPatches
         // Call original if we call this function
         if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (GameInterfaceConfig.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(StanceLink), Environment.StackTrace);
-            return true;
-        }
+        if (CallPolicy.SkipIfClient(Logger, out var result)) return result;
 
 
         var message = new StanceLinkCreated(__instance, stanceType, faction1, faction2, isAtConstantWar);
 
         ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
-messageBroker?.Publish(__instance, message);
+        messageBroker?.Publish(__instance, message);
 
 
         return true;

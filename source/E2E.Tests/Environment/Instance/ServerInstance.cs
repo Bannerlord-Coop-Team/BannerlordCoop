@@ -14,7 +14,7 @@ public class ServerInstance : EnvironmentInstance
     protected override TestMessageBroker MessageBroker { get; }
     protected override MockNetworkBase MockNetwork { get; }
 
-    public ServerInstance()
+    public ServerInstance(TestNetworkRouter networkOrchestrator)
     {
         var builder = new ContainerBuilder();
 
@@ -22,12 +22,14 @@ public class ServerInstance : EnvironmentInstance
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
 
-        AddSharedDependencies(builder);
+        AddSharedDependencies(builder, networkOrchestrator, registerGameInterface: true);
 
         Container = builder.Build();
 
         MessageBroker = Container.Resolve<TestMessageBroker>();
         MockNetwork = Container.Resolve<MockNetworkBase>();
+
+        networkOrchestrator.AddServer(this);
     }
 
     public override void Dispose()

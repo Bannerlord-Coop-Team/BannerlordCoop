@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Coop.Core;
+using Coop.Core.Common.Configuration;
 using Coop.Lib.NoHarmony;
 using GameInterface.Services.UI;
 using Serilog;
@@ -117,7 +118,8 @@ namespace Coop
                         }
                         else
                         {
-                            Coop.StartAsClient();
+                            var networkConfig = new NetworkConfiguration();
+                            Coop.StartAsClient(networkConfig);
                         }
                     },
                     () => { return (false, new TextObject()); }

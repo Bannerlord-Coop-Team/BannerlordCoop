@@ -8,10 +8,11 @@ using GameInterface;
 using System;
 using Serilog;
 using Common.Logging;
+using GameInterface.Policies;
 
 
 [HarmonyPatch(typeof(Town), "DailyTick")]
-public static class TownDailyTickPatch
+public class TownDailyTickPatch
 {
     private static readonly ILogger Logger = LogManager.GetLogger<TownDailyTickPatch>();
 
@@ -56,14 +57,15 @@ public static class TownDailyTickPatch
 
     public static void InterceptSetFoodStock(Fief fief, float value)
     {
- 
-        if (GameInterfaceConfig.IsClient) return;
+        if (CallPolicy.SkipIfClient(Logger, out _)) return;
+
         fief.FoodStocks = value; // The message broker will be called by the prefix patch
     }
 
     public static void InterceptSetProsperity(Town town, float value)
     {
-        if (GameInterfaceConfig.IsClient) return;
+        if (CallPolicy.SkipIfClient(Logger, out _)) return;
+
         town.Prosperity = value; // The message broker will be called by the prefix patch
     }
 }

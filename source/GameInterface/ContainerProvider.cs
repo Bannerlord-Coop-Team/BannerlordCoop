@@ -10,6 +10,8 @@ public class ContainerProvider
 {
     private static ILogger Logger = LogManager.GetLogger<ContainerProvider>();
 
+    public static ILifetimeScope Container => _lifetimeScope;
+
     private static ILifetimeScope _lifetimeScope;
 
     public static bool Alive { get; } = _lifetimeScope != null;

@@ -27,7 +27,7 @@ public class TestEnvironment
     /// Constructor for TestEnvironment
     /// </summary>
     /// <param name="numClients">Number of clients to create, defaults to 2 clients</param>
-    public TestEnvironment(ITestOutputHelper output, int numClients = 2, bool registerGameInterface = false)
+    public TestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
         this.registerGameInterface = registerGameInterface;
 
@@ -54,35 +54,9 @@ public class TestEnvironment
 
     private readonly bool registerGameInterface;
 
-    private EnvironmentInstance CreateClient(ITestOutputHelper output)
-    {
-        var builder = new ContainerBuilder();
+    private EnvironmentInstance CreateClient(ITestOutputHelper output) => new ClientInstance(networkOrchestrator);
 
-        builder.RegisterModule<ClientModule>();
-        builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
-        builder.RegisterType<ClientInstance>().AsSelf();
-
-        AddSharedDependencies(builder);
-
-        var container = builder.Build();
-
-        var instance = container.Resolve<ClientInstance>()!;
-
-        networkOrchestrator.AddClient(instance);
-
-        return instance;
-    }
-
-    private EnvironmentInstance CreateServer(ITestOutputHelper output)
-    {
-
-
-        var instance = new ServerInstance();
-
-        networkOrchestrator.AddServer(instance);
-
-        return instance;
-    }
+    private EnvironmentInstance CreateServer(ITestOutputHelper output) => new ServerInstance(networkOrchestrator);
 
     private ContainerBuilder AddSharedDependencies(ContainerBuilder builder)
     {

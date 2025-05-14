@@ -28,7 +28,7 @@ public abstract class EnvironmentInstance
     /// </summary>
     public MessageCollection NetworkSentMessages => MockNetwork.NetworkSentMessages;
 
-    public abstract IContainer Container { get; }
+    public IContainer Container { get; set; }
 
     protected abstract TestMessageBroker MessageBroker { get; }
     protected abstract MockNetworkBase MockNetwork { get; }

@@ -14,7 +14,6 @@ namespace Coop.Tests.Autofac
         protected override void Load(ContainerBuilder builder)
         {
             builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
-            builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
             builder.RegisterType<NetworkConfiguration>().As<INetworkConfiguration>().OwnedByLifetimeScope();
             base.Load(builder);
         }

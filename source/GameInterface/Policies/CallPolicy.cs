@@ -47,4 +47,17 @@ public class CallPolicy
         // Not client, do nothing with the result
         return false;
     }
+
+    public static bool SkipIfServer(ILogger logger, out bool result)
+    {
+        result = true;
+
+        // Invalid setup, do nothing with the result
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false) return false;
+
+        if (config.IsServer) return true;
+
+        // Not client, do nothing with the result
+        return false;
+    }
 }

@@ -7,7 +7,9 @@ using Common.Util;
 using Coop.Core;
 using E2E.Tests.Environment.Mock;
 using GameInterface;
+using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Surrogates;
 using HarmonyLib;
 using LiteNetLib;
 using ProtoBuf.Meta;
@@ -52,6 +54,23 @@ public abstract class EnvironmentInstance : IDisposable
     public GameInstance GameInstance = new GameInstance();
 
     private readonly static object _lock = new object();
+
+    protected ContainerBuilder AddSharedDependencies(ContainerBuilder builder, TestNetworkRouter networkOrchestrator, bool registerGameInterface = false)
+    {
+        if (registerGameInterface)
+        {
+            builder.RegisterModule<GameInterfaceModule>();
+        }
+
+        builder.RegisterInstance(networkOrchestrator).AsSelf().SingleInstance();
+
+        builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
+        builder.RegisterType<TestPolicy>().As<ISyncPolicy>().InstancePerLifetimeScope();
+        builder.RegisterType<SerializableTypeMapper>().As<ISerializableTypeMapper>().SingleInstance();
+        builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
+
+        return builder;
+    }
 
     /// <summary>
     /// Simulate receiving a message from the message broker

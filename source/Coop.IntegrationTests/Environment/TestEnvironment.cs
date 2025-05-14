@@ -3,7 +3,6 @@ using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Common.Tests.Utils;
-using Coop.Core;
 using Coop.Core.Client;
 using Coop.Core.Server;
 using Coop.IntegrationTests.Environment.Instance;
@@ -19,9 +18,6 @@ namespace Coop.IntegrationTests.Environment;
 /// </summary>
 public class TestEnvironment
 {
-    private Core.ContainerProvider containerProvider;
-    public IContainer Container => containerProvider.GetContainer();
-
     private readonly TestNetworkRouter networkOrchestrator;
 
 
@@ -58,22 +54,21 @@ public class TestEnvironment
 
     private EnvironmentInstance CreateClient()
     {
-        containerProvider = new Core.ContainerProvider();
-
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ClientModule>();
         builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
         builder.RegisterType<ClientInstance>().AsSelf();
-        builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
 
         AddSharedDependencies(builder);
 
         var container = builder.Build();
 
-        containerProvider.SetProvider(container);
+        ContainerProvider.SetContainer(container);
 
         var instance = container.Resolve<ClientInstance>()!;
+
+        instance.Container = container;
 
         networkOrchestrator.AddClient(instance);
 
@@ -82,23 +77,22 @@ public class TestEnvironment
 
     private EnvironmentInstance CreateServer()
     {
-        containerProvider = new Core.ContainerProvider();
-
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ServerModule>();
         builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
         builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
-        builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
 
         AddSharedDependencies(builder);
 
         var container = builder.Build();
 
-        containerProvider.SetProvider(container);
+        ContainerProvider.SetContainer(container);
 
         var instance = container.Resolve<ServerInstance>()!;
+
+        instance.Container = container;
 
         networkOrchestrator.AddServer(instance);
 

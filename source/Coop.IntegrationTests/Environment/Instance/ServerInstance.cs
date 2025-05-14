@@ -8,8 +8,13 @@ namespace Coop.IntegrationTests.Environment.Instance;
 /// <inheritdoc cref="EnvironmentInstance"/>
 public class ServerInstance : EnvironmentInstance
 {
-    public ServerInstance(TestMessageBroker messageBroker, MockServer server, IContainerProvider containerProvider) :
-        base(messageBroker, server, containerProvider)
+    protected override TestMessageBroker MessageBroker { get; }
+
+    protected override MockNetworkBase MockNetwork { get; }
+
+    public ServerInstance(TestMessageBroker messageBroker, MockServer server)
     {
+        MessageBroker = messageBroker;
+        MockNetwork = server;
     }
 }

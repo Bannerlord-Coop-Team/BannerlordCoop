@@ -1,10 +1,12 @@
 ﻿using Common;
 using Common.Extensions;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Villages.Messages;
 using HarmonyLib;
+using Serilog;
 using System;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -19,9 +21,19 @@ namespace GameInterface.Services.Villages.Patches;
 [HarmonyPatch(typeof(Village))]
 internal class VillagePatches
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<VillagePatches>();
+
     [HarmonyPatch("DailyTick")]
     [HarmonyPrefix]
-    private static bool DailyTickPrefix() => GameInterfaceConfig.IsServer;
+    private static bool DailyTickPrefix()
+    {
+        if (ContainerProvider.TryResolve<GameInterfaceConfig>(out var config))
+        {
+            return config.IsServer;
+        }
+
+        return true;
+    }
 
 
     [HarmonyPatch(nameof(Village.VillageState), MethodType.Setter)]
@@ -30,7 +42,7 @@ internal class VillagePatches
     {
         if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (GameInterfaceConfig.IsClient) return false;
+        if (CallPolicy.SkipIfClient(Logger, out var result)) return result;
         if (__instance._villageState == value) return false;
         
         var message = new VillageStateChanged(__instance.StringId, (int)value);
@@ -65,7 +77,7 @@ messageBroker?.Publish(__instance, message);
     {
         if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (GameInterfaceConfig.IsClient) return false;
+        if (CallPolicy.SkipIfClient(Logger, out var result)) return result;
 
         var message = new VillageHearthChanged(__instance.StringId, value);
         ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
@@ -90,7 +102,7 @@ messageBroker?.Publish(__instance, message);
     {
         if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (GameInterfaceConfig.IsClient) return false;
+        if (CallPolicy.SkipIfClient(Logger, out var result)) return result;
 
         if (__instance._tradeBound == value) return false;
 
@@ -119,7 +131,7 @@ messageBroker?.Publish(__instance, message);
     {
         if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (GameInterfaceConfig.IsClient) return false;
+        if (CallPolicy.SkipIfClient(Logger, out var result)) return result;
 
         var message = new VillageTaxAccumulateChanged(__instance.StringId, value);
         ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
@@ -144,7 +156,7 @@ messageBroker?.Publish(__instance, message);
     {
         if (CallPolicy.IsOriginalAllowed()) return true;
 
-        if (GameInterfaceConfig.IsClient) return false;
+        if (CallPolicy.SkipIfClient(Logger, out var result)) return result;
 
         var message = new VillageDemandTimeChanged(__instance.StringId, value);
         ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);

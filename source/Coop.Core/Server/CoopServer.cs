@@ -47,14 +47,15 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IMessageBroker messageBroker,
         IPacketManager packetManager,
         IControllerIdProvider controllerIdProvider,
-        ICommonSerializer serializer) : base(configuration, serializer)
+        ICommonSerializer serializer,
+        GameInterfaceConfig gameInterfaceConfig) : base(configuration, serializer)
     {
         // Dependancy assignment
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
 
-        GameInterfaceConfig.IsServer = true;
+        gameInterfaceConfig.IsServer = true;
 
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
