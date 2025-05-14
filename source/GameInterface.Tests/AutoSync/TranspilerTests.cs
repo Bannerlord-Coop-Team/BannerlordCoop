@@ -126,6 +126,7 @@ public class TranspilerTests
     {
         var builder = new ContainerBuilder();
 
+        builder.RegisterType<GameInterfaceConfig>().AsSelf().InstancePerLifetimeScope();
         builder.RegisterType<TestNet>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
         builder.RegisterType<TestObjManager>().AsSelf().As<IObjectManager>().InstancePerLifetimeScope();
 

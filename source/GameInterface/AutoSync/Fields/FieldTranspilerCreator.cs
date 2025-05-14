@@ -638,8 +638,17 @@ public class FieldTranspilerCreator
 
     private void IsClientCheck(ILGenerator il, FieldInfo field)
     {
-        il.Emit(OpCodes.Call, AccessTools.PropertyGetter(typeof(GameInterfaceConfig), nameof(GameInterfaceConfig.IsClient)));
         var notClientLabel = il.DefineLabel();
+
+        var gameInterfaceConfigLocal = il.DeclareLocal(typeof(GameInterfaceConfig));
+        il.Emit(OpCodes.Ldloca, gameInterfaceConfigLocal);
+
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ContainerProvider), nameof(ContainerProvider.TryResolve)).MakeGenericMethod(typeof(GameInterfaceConfig)));
+        il.Emit(OpCodes.Brfalse, notClientLabel);
+
+        il.Emit(OpCodes.Ldloc, gameInterfaceConfigLocal);
+        il.Emit(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(GameInterfaceConfig), nameof(GameInterfaceConfig.IsClient)));
+        
 
         il.Emit(OpCodes.Brfalse, notClientLabel);
 
