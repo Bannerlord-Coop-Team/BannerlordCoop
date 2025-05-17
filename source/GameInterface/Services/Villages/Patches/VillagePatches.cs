@@ -27,7 +27,7 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool DailyTickPrefix()
     {
-        if (ContainerProvider.TryResolve<GameInterfaceConfig>(out var config))
+        if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config))
         {
             return config.IsServer;
         }

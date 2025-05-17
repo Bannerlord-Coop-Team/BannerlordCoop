@@ -63,7 +63,7 @@ public class AlleyCreationTests : IDisposable
         {
             Assert.True(client1.ObjectManager.TryGetObject<Settlement>(settlementId, out var settlement));
 
-            var alley = new Alley(settlement, "testClientAlley", new TaleWorlds.Localization.TextObject("testTextObject"));
+            var alley = new Alley(settlement, "testClientAlley", new TextObject("testTextObject"));
             Assert.False(client1.ObjectManager.TryGetId(alley, out clientAlleyId));
         });
 

@@ -20,7 +20,7 @@ public class ClientInstance : EnvironmentInstance
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ClientModule>();
-        builder.RegisterType<MockClient>().AsSelf().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
+        builder.RegisterType<MockClient>().AsSelf().As<MockNetworkBase>().As<INetwork>().As<ICoopClient>().InstancePerLifetimeScope();
         builder.RegisterType<ClientInstance>().AsSelf();
 
         AddSharedDependencies(builder, networkOrchestrator, registerGameInterface: true);

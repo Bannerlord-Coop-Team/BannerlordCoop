@@ -5,6 +5,7 @@ using GameInterface.AutoSync.Fields;
 using GameInterface.AutoSync.Properties;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -98,9 +99,6 @@ public class TranspilerTests
         
         using (ContainerProvider.UseContainerThreadSafe(container))
         {
-            var config = container.Resolve<GameInterfaceConfig>();
-            config.IsServer = true;
-
             testClass.SetMyInt(newValue);
             testClass.SetMyInt(newValue);
 
@@ -126,7 +124,12 @@ public class TranspilerTests
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterType<GameInterfaceConfig>().AsSelf().InstancePerLifetimeScope();
+        var gameInterfaceConfig = new GameInterfaceConfig
+        {
+            IsServer = true,
+        };
+
+        builder.RegisterInstance(gameInterfaceConfig).As<IGameInterfaceConfig>().SingleInstance();
         builder.RegisterType<TestNet>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
         builder.RegisterType<TestObjManager>().AsSelf().As<IObjectManager>().InstancePerLifetimeScope();
 

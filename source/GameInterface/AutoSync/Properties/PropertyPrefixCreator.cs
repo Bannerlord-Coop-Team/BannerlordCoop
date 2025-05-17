@@ -226,14 +226,14 @@ public class PropertyPrefixCreator
     {
         var notClientLabel = il.DefineLabel();
 
-        var gameInterfaceConfigLocal = il.DeclareLocal(typeof(GameInterfaceConfig));
+        var gameInterfaceConfigLocal = il.DeclareLocal(typeof(IGameInterfaceConfig));
         il.Emit(OpCodes.Ldloca, gameInterfaceConfigLocal);
 
-        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ContainerProvider), nameof(ContainerProvider.TryResolve)).MakeGenericMethod(typeof(GameInterfaceConfig)));
+        il.Emit(OpCodes.Call, AccessTools.Method(typeof(ContainerProvider), nameof(ContainerProvider.TryResolve)).MakeGenericMethod(typeof(IGameInterfaceConfig)));
         il.Emit(OpCodes.Brfalse, notClientLabel);
 
         il.Emit(OpCodes.Ldloc, gameInterfaceConfigLocal);
-        il.Emit(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(GameInterfaceConfig), nameof(GameInterfaceConfig.IsClient)));
+        il.Emit(OpCodes.Callvirt, AccessTools.PropertyGetter(typeof(IGameInterfaceConfig), nameof(IGameInterfaceConfig.IsClient)));
         il.Emit(OpCodes.Brfalse, notClientLabel);
 
         // Log error

@@ -56,9 +56,7 @@ public class PatchingTests
 
         var network = container.Resolve<TestNet>();
         var objManager = container.Resolve<IObjectManager>();
-        var config = container.Resolve<GameInterfaceConfig>();
-
-        config.IsServer = true;
+        var config = container.Resolve<IGameInterfaceConfig>();
 
         Assert.NotNull(typeof(ProtoBufSerializer).GetMethods().Where(m => m.Name == nameof(ProtoBufSerializer.Deserialize) && m.IsGenericMethod));
 
@@ -91,11 +89,16 @@ public class PatchingTests
         Assert.Equal(objId, packet.instanceId);
     }
 
-    private IContainer CreateContainer()
+    private IContainer CreateContainer(bool isServer = true)
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterType<GameInterfaceConfig>().AsSelf().InstancePerLifetimeScope();
+        var gameInterfaceConfig = new GameInterfaceConfig
+        {
+            IsServer = true,
+        };
+
+        builder.RegisterInstance(gameInterfaceConfig).As<IGameInterfaceConfig>().SingleInstance();
         builder.RegisterType<TestNet>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
         builder.RegisterType<TestObjManager>().AsSelf().As<IObjectManager>().InstancePerLifetimeScope();
 

@@ -19,7 +19,7 @@ public class ServerInstance : EnvironmentInstance
         var builder = new ContainerBuilder();
 
         builder.RegisterModule<ServerModule>();
-        builder.RegisterType<MockServer>().AsSelf().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
+        builder.RegisterType<MockServer>().AsSelf().As<MockNetworkBase>().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
 
         AddSharedDependencies(builder, networkOrchestrator, registerGameInterface: true);
