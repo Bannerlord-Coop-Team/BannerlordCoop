@@ -242,6 +242,13 @@
     </ItemGroup>
     <ItemGroup>
       <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfoTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayReferenceTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayValueTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalSetMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArrayChangeValueMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArraySetValueMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArraySetReferenceMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArrayChangeReferenceMessageTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\DynamicPatchTemplate">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </EmbeddedResource>
@@ -268,7 +275,7 @@
       <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
     </ItemGroup>
     <ItemGroup>
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalSetMessageTemplate">
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalArrayChangeMessageTemplate">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </EmbeddedResource>
     </ItemGroup>

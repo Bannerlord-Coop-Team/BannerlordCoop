@@ -1,2 +1,2 @@
-﻿        [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ArrayPropertyChangeTranspiler<{{MemberType}}, {{ChangeMessageType}}>(instructions, "{{MemberName}}");
+﻿[HarmonyTranspiler]
+static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ArrayPropertyChangeTranspiler<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeLocalMessage>(instructions, "{{MemberName}}");

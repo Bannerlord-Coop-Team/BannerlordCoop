@@ -1,0 +1,27 @@
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+{
+    var valueIds = new List<(int Index, {{ElementType}} Value)>();
+    for (int i = 0; i < data.Value.Length; i++)
+    {
+        if (data.Value[i] == null) continue;
+        valueIds.Add(new(i, data.Value[i]));
+    }
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueIds, data.Value.Length));
+});
+SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+    var newValue = new {{ElementType}}[data.Length];
+    for (int i = 0; i < data.Value.Count; i++)
+    {
+        newValue[data.Value[i].Index] = data.Value[i].Value;
+    }
+    instance.{{ MemberName }} = newValue;
+});
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeLocalMessage>((instanceId, data) => 
+{
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeNetworkMessage(instanceId, data.Value, data.Index));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeNetworkMessage>((instance, data) => 
+{
+    instance.{{ MemberName }}[data.Index] = data.Value;
+});

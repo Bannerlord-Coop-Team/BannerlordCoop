@@ -18,9 +18,6 @@ namespace GameInterface.DynamicSync
         {
             if (field == null) throw new ArgumentNullException(nameof(field));
 
-            // TODO: Add back collection support
-            if (field.FieldType.IsGenericType || field.FieldType.IsArray) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Field: Collection types are currently not supported");
-
             // TODO: verify interface support
             if (field.FieldType.IsInterface) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Field: Interfaces are currently not supported");
 
@@ -33,9 +30,6 @@ namespace GameInterface.DynamicSync
 
             // only prevent properties from being added if they are no collection like type
             if (property.CanWrite == false) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Property: {property.Name} does not have a set method");
-
-            // TODO: Add back collection support
-            if (property.PropertyType.IsGenericType || property.PropertyType.IsArray) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Property: Collection types are currently not supported");
 
             // TODO: verify interface support
             if (property.PropertyType.IsInterface) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Property: Interfaces are currently not supported");
@@ -84,37 +78,6 @@ namespace GameInterface.DynamicSync
             }
             else
                 throw new NotSupportedException($"Unsupported MemberInfo Type: {memberInfo.MemberType}");
-
-            return true;
-        }
-
-        public bool TryGetIntercept(FieldInfo fieldInfo, out MethodInfo intercept, DynamicMessageAction dynamicMessageAction = DynamicMessageAction.Set)
-        {
-            intercept = null;
-            if (dynamicMessageAction == DynamicMessageAction.None)
-                throw new InvalidOperationException("Not allowed Intercept Access");
-            
-            if (!Registrations.TryGetValue(fieldInfo.DeclaringType, out var registryItem))
-                return false;
-            
-            var member = registryItem.Fields.FirstOrDefault(m => m == fieldInfo);
-            if (member == null)
-                return false;
-
-            var dynamicPatch = Assembly.GetType($"DynamicSync.{fieldInfo.DeclaringType.Name}DynamicPatches");
-            if (dynamicPatch == null)
-                return false;
-
-            var genericPatch = dynamicPatch.BaseType;
-
-            if(dynamicMessageAction == DynamicMessageAction.Set)
-            {
-                var messageType = Assembly.GetType($"DynamicSync.{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetMessage");
-                var fieldIntercept = genericPatch.GetMethod("FieldIntercept").MakeGenericMethod(fieldInfo.FieldType, messageType);
-                intercept = fieldIntercept;
-            }
-
-            // TODO: Add Intercept for other actions like adding elements to collection
 
             return true;
         }

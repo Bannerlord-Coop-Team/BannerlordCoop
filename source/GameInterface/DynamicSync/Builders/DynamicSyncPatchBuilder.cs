@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 
 namespace GameInterface.DynamicSync.Builders
 {
@@ -11,11 +12,18 @@ namespace GameInterface.DynamicSync.Builders
     {
         private readonly DynamicSyncPropertyBuilder dynamicSyncPropertyBuilder;
         private readonly DynamicSyncFieldBuilder dynamicSyncFieldBuilder;
+        private readonly DynamicSyncPropertyArrayBuilder dynamicSyncPropertyArrayBuilder;
+        private readonly DynamicSyncFieldArrayBuilder dynamicSyncFieldArrayBuilder;
 
-        public DynamicSyncPatchBuilder(DynamicSyncPropertyBuilder dynamicSyncPropertyBuilder, DynamicSyncFieldBuilder dynamicSyncFieldBuilder)
+        public DynamicSyncPatchBuilder(DynamicSyncPropertyBuilder dynamicSyncPropertyBuilder,
+            DynamicSyncFieldBuilder dynamicSyncFieldBuilder,
+            DynamicSyncPropertyArrayBuilder dynamicSyncPropertyArrayBuilder,
+            DynamicSyncFieldArrayBuilder dynamicSyncFieldArrayBuilder)
         {
             this.dynamicSyncPropertyBuilder = dynamicSyncPropertyBuilder;
             this.dynamicSyncFieldBuilder = dynamicSyncFieldBuilder;
+            this.dynamicSyncPropertyArrayBuilder = dynamicSyncPropertyArrayBuilder;
+            this.dynamicSyncFieldArrayBuilder = dynamicSyncFieldArrayBuilder;
         }
 
         public List<SyntaxTree> Build(Type declaringType, DynamicSyncRegistryItem dynamicRegistryItem)
@@ -34,17 +42,37 @@ namespace GameInterface.DynamicSync.Builders
             foreach(var propertyInfo in dynamicRegistryItem.Properties)
             {
                 usings.Add(propertyInfo.PropertyType.Namespace);
-                prefixes.Add(dynamicSyncPropertyBuilder.GetPrefix(propertyInfo));
-                messages.AddRange(dynamicSyncPropertyBuilder.GetMessages(propertyInfo));
-                messageHandlers.Add(dynamicSyncPropertyBuilder.GetSubscription(propertyInfo));
+
+                if (!propertyInfo.PropertyType.IsGenericType && !propertyInfo.PropertyType.IsArray)
+                {
+                    prefixes.Add(dynamicSyncPropertyBuilder.GetPrefix(propertyInfo));
+                    messages.AddRange(dynamicSyncPropertyBuilder.GetMessages(propertyInfo));
+                    messageHandlers.Add(dynamicSyncPropertyBuilder.GetSubscription(propertyInfo));
+                }
+                else if(propertyInfo.PropertyType.IsArray)
+                {
+                    prefixes.Add(dynamicSyncPropertyArrayBuilder.GetPrefix(propertyInfo));
+                    transpilers.Add(dynamicSyncPropertyArrayBuilder.GetTranspiler(propertyInfo));
+                    messages.AddRange(dynamicSyncPropertyArrayBuilder.GetMessages(propertyInfo));
+                    messageHandlers.Add(dynamicSyncPropertyArrayBuilder.GetSubscription(propertyInfo));
+                }
             }
 
             foreach (var fieldInfo in dynamicRegistryItem.Fields)
             {
                 usings.Add(fieldInfo.FieldType.Namespace);
-                transpilers.Add(dynamicSyncFieldBuilder.GetTranspiler(fieldInfo));
-                messages.AddRange(dynamicSyncFieldBuilder.GetMessages(fieldInfo));
-                messageHandlers.Add(dynamicSyncFieldBuilder.GetSubscription(fieldInfo));
+                if(!fieldInfo.FieldType.IsGenericType && !fieldInfo.FieldType.IsArray)
+                { 
+                    transpilers.Add(dynamicSyncFieldBuilder.GetTranspiler(fieldInfo));
+                    messages.AddRange(dynamicSyncFieldBuilder.GetMessages(fieldInfo));
+                    messageHandlers.Add(dynamicSyncFieldBuilder.GetSubscription(fieldInfo));
+                }
+                else if (fieldInfo.FieldType.IsArray)
+                {
+                    transpilers.Add(dynamicSyncFieldArrayBuilder.GetTranspiler(fieldInfo));
+                    messages.AddRange(dynamicSyncFieldArrayBuilder.GetMessages(fieldInfo));
+                    messageHandlers.Add(dynamicSyncFieldArrayBuilder.GetSubscription(fieldInfo));
+                }
             }
 
             var patchTemplate = TemplateParser.Parse("Patches.DynamicPatchTemplate", new
