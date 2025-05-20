@@ -26,12 +26,6 @@ public class DynamicSyncBuilder
         if (Directory.Exists($@"{DynamicSyncConfiguration.ExportPath}"))
             Directory.Delete($@"{DynamicSyncConfiguration.ExportPath}", true);
 
-        var loadedAssemblyMap = AppDomain.CurrentDomain.GetAssemblies()
-            .ToDictionary(
-                asm => asm.FullName,
-                asm => asm
-            );
-
         List<Assembly> assemblies = new List<Assembly>
         {
             Assembly.GetExecutingAssembly(),
@@ -52,9 +46,9 @@ public class DynamicSyncBuilder
         {
             assemblies.Add(typeof(Enumerable).Assembly);
             assemblies.Add(typeof(Queue<>).Assembly);
-            assemblies.Add(loadedAssemblyMap["System.Runtime"]);
-            assemblies.Add(loadedAssemblyMap["System.Private.CoreLib"]);
-            assemblies.Add(loadedAssemblyMap["System.Collections"]);
+            assemblies.Add(Assembly.Load("System.Runtime"));
+            assemblies.Add(Assembly.Load("System.Private.CoreLib"));
+            assemblies.Add(Assembly.Load("System.Collections"));
             assemblies.Add(typeof(Console).Assembly);
 
         }
@@ -63,7 +57,7 @@ public class DynamicSyncBuilder
 
         foreach (var asm in Assembly.GetExecutingAssembly().GetReferencedAssemblies())
         {
-            assemblies.Add(loadedAssemblyMap[asm.FullName]);
+            assemblies.Add(Assembly.Load(asm.FullName));
         }
 
         foreach (var asm in AppDomain.CurrentDomain.GetAssemblies()
@@ -72,7 +66,7 @@ public class DynamicSyncBuilder
             .Where(asm => asm.FullName.Contains("AutoSyncAsm"))
         )
         {
-            assemblies.Add(loadedAssemblyMap[asm.FullName]);
+            assemblies.Add(Assembly.Load(asm.FullName));
         }
 
         var syntaxTrees = dynamicSyncRegistry.Registrations

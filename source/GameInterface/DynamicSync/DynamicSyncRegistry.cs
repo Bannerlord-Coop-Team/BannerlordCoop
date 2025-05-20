@@ -1,8 +1,8 @@
 ﻿using GameInterface.DynamicSync.Builders;
-using Microsoft.CodeAnalysis;
+using GameInterface.Services.ObjectManager;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 
 namespace GameInterface.DynamicSync
@@ -10,9 +10,6 @@ namespace GameInterface.DynamicSync
     public class DynamicSyncRegistry
     {
         public readonly Dictionary<Type, DynamicSyncRegistryItem> Registrations = new Dictionary<Type, DynamicSyncRegistryItem>();
-
-        // TODO:Fix
-        public Assembly Assembly;
 
         public void AddField(FieldInfo field)
         {
@@ -84,37 +81,6 @@ namespace GameInterface.DynamicSync
             }
             else
                 throw new NotSupportedException($"Unsupported MemberInfo Type: {memberInfo.MemberType}");
-
-            return true;
-        }
-
-        public bool TryGetIntercept(FieldInfo fieldInfo, out MethodInfo intercept, DynamicMessageAction dynamicMessageAction = DynamicMessageAction.Set)
-        {
-            intercept = null;
-            if (dynamicMessageAction == DynamicMessageAction.None)
-                throw new InvalidOperationException("Not allowed Intercept Access");
-            
-            if (!Registrations.TryGetValue(fieldInfo.DeclaringType, out var registryItem))
-                return false;
-            
-            var member = registryItem.Fields.FirstOrDefault(m => m == fieldInfo);
-            if (member == null)
-                return false;
-
-            var dynamicPatch = Assembly.GetType($"DynamicSync.{fieldInfo.DeclaringType.Name}DynamicPatches");
-            if (dynamicPatch == null)
-                return false;
-
-            var genericPatch = dynamicPatch.BaseType;
-
-            if(dynamicMessageAction == DynamicMessageAction.Set)
-            {
-                var messageType = Assembly.GetType($"DynamicSync.{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetMessage");
-                var fieldIntercept = genericPatch.GetMethod("FieldIntercept").MakeGenericMethod(fieldInfo.FieldType, messageType);
-                intercept = fieldIntercept;
-            }
-
-            // TODO: Add Intercept for other actions like adding elements to collection
 
             return true;
         }
