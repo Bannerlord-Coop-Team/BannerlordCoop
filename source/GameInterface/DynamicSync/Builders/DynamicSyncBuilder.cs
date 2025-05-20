@@ -52,9 +52,9 @@ public class DynamicSyncBuilder
         {
             assemblies.Add(typeof(Enumerable).Assembly);
             assemblies.Add(typeof(Queue<>).Assembly);
-            assemblies.Add(Assembly.Load("System.Runtime"));
-            assemblies.Add(Assembly.Load("System.Private.CoreLib"));
-            assemblies.Add(Assembly.Load("System.Collections"));
+            assemblies.Add(loadedAssemblyMap["System.Runtime"]);
+            assemblies.Add(loadedAssemblyMap["System.Private.CoreLib"]);
+            assemblies.Add(loadedAssemblyMap["System.Collections"]);
             assemblies.Add(typeof(Console).Assembly);
 
         }
@@ -87,12 +87,14 @@ public class DynamicSyncBuilder
 
         var topLevelBinderFlagsProperty = typeof(CSharpCompilationOptions).GetProperty("TopLevelBinderFlags", BindingFlags.Instance | BindingFlags.NonPublic);
         topLevelBinderFlagsProperty.SetValue(compilationOptions, (uint)1 << 22);
-        var dynamicAssembly = CSharpCompilation.Create("DynamicSync.dll",
-                                                        syntaxTrees: syntaxTrees,
-                                                        references:
-                                                        assemblies.Select(a => a.Location).Distinct().Select(a => MetadataReference.CreateFromFile(a)),
-                                                        options: compilationOptions
-                                                        );
+
+        var dynamicAssembly = CSharpCompilation.Create(
+            "DynamicSync.dll",
+            syntaxTrees: syntaxTrees,
+            references:
+            assemblies.Select(a => a.Location).Distinct().Select(a => MetadataReference.CreateFromFile(a)),
+            options: compilationOptions
+        );
 
         using (var assemblyStream = new MemoryStream())
         using (var pdbStream = new MemoryStream())
