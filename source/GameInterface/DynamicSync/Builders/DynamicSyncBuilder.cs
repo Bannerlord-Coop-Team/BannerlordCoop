@@ -1,14 +1,10 @@
-﻿using GameInterface.DynamicSync;
-using GameInterface.DynamicSync.Templates;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System;
-using System.Reflection;
 using System.Linq;
-using GameInterface.Services.ObjectManager;
-using TaleWorlds.Library;
+using System.Reflection;
 
 namespace GameInterface.DynamicSync.Builders;
 
@@ -63,9 +59,12 @@ public class DynamicSyncBuilder
             assemblies.Add(Assembly.Load(asm.FullName));
         }
 
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies()
+            .Where(asm => !asm.IsDynamic)
+            .Where(asm => !asm.FullName.Contains("Anonymously Hosted DynamicMethods Assembly"))
+            .Where(asm => asm.FullName.Contains("AutoSyncAsm"))
+        )
         {
-            if(!asm.IsDynamic && !asm.FullName.Contains("Anonymously Hosted DynamicMethods Assembly") && asm.FullName.Contains("AutoSyncAsm"))
                 assemblies.Add(Assembly.Load(asm.FullName));
         }
 
@@ -80,9 +79,10 @@ public class DynamicSyncBuilder
 
         // https://www.strathweb.com/2018/10/no-internalvisibleto-no-problem-bypassing-c-visibility-rules-with-roslyn/
         // Allow IgnoresAccessChecksTo for dynamic compilation
-        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).
-                                    WithMetadataImportOptions(MetadataImportOptions.All)
-                                    .WithAllowUnsafe(true);
+        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            .WithMetadataImportOptions(MetadataImportOptions.All)
+            .WithAllowUnsafe(true);
+
         var topLevelBinderFlagsProperty = typeof(CSharpCompilationOptions).GetProperty("TopLevelBinderFlags", BindingFlags.Instance | BindingFlags.NonPublic);
         topLevelBinderFlagsProperty.SetValue(compilationOptions, (uint)1 << 22);
         var dynamicAssembly = CSharpCompilation.Create("DynamicSync.dll",
@@ -91,7 +91,7 @@ public class DynamicSyncBuilder
                                                         assemblies.Select(a => a.Location).Distinct().Select(a => MetadataReference.CreateFromFile(a)),
                                                         options: compilationOptions
                                                         );
-        Assembly assembly;
+
         using (var assemblyStream = new MemoryStream())
         using (var pdbStream = new MemoryStream())
         {
@@ -99,13 +99,8 @@ public class DynamicSyncBuilder
 
             if (!result.Success)
                 throw new InvalidOperationException();
-            else
-                assembly = Assembly.Load(assemblyStream.GetBuffer());
-        }
-        return assembly;
-    }
 
-    public void Dispose()
-    {
+            return Assembly.Load(assemblyStream.GetBuffer());
+        };
     }
 }
