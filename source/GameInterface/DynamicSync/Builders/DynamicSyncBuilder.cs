@@ -27,9 +27,9 @@ public class DynamicSyncBuilder
             Directory.Delete($@"{DynamicSyncConfiguration.ExportPath}", true);
 
         List<Assembly> assemblies = new List<Assembly>
-            {
-                Assembly.GetExecutingAssembly(),
-            };
+        {
+            Assembly.GetExecutingAssembly(),
+        };
 
         // We need to load different dlls based on the runtime
         // currently the games runs .netframework 4.7.2
@@ -68,14 +68,9 @@ public class DynamicSyncBuilder
                 assemblies.Add(Assembly.Load(asm.FullName));
         }
 
-        List<SyntaxTree> syntaxTrees = new List<SyntaxTree>();
-
-        foreach (var registration in dynamicSyncRegistry.Registrations)
-        {
-            syntaxTrees.AddRange(dynamicSyncPatchBuilder.Build(registration.Key, registration.Value));
-        }
-
-        syntaxTrees.Add(dynamicSyncAssemblyInfoBuilder.Build(assemblies.Select(a => a.GetName().Name)));
+        var syntaxTrees = dynamicSyncRegistry.Registrations
+            .SelectMany(registration => dynamicSyncPatchBuilder.Build(registration.Key, registration.Value))
+            .Append(dynamicSyncAssemblyInfoBuilder.Build(assemblies.Select(a => a.GetName().Name)));
 
         // https://www.strathweb.com/2018/10/no-internalvisibleto-no-problem-bypassing-c-visibility-rules-with-roslyn/
         // Allow IgnoresAccessChecksTo for dynamic compilation
