@@ -1,14 +1,10 @@
-﻿using GameInterface.DynamicSync;
-using GameInterface.DynamicSync.Templates;
+﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis;
+using System;
 using System.Collections.Generic;
 using System.IO;
-using System;
-using System.Reflection;
 using System.Linq;
-using GameInterface.Services.ObjectManager;
-using TaleWorlds.Library;
+using System.Reflection;
 
 namespace GameInterface.DynamicSync.Builders;
 
@@ -31,9 +27,9 @@ public class DynamicSyncBuilder
             Directory.Delete($@"{DynamicSyncConfiguration.ExportPath}", true);
 
         List<Assembly> assemblies = new List<Assembly>
-            {
-                Assembly.GetExecutingAssembly(),
-            };
+        {
+            Assembly.GetExecutingAssembly(),
+        };
 
         // We need to load different dlls based on the runtime
         // currently the games runs .netframework 4.7.2
@@ -50,7 +46,6 @@ public class DynamicSyncBuilder
         {
             assemblies.Add(typeof(Enumerable).Assembly);
             assemblies.Add(typeof(Queue<>).Assembly);
-            assemblies.Add(Assembly.GetExecutingAssembly());
             assemblies.Add(Assembly.Load("System.Runtime"));
             assemblies.Add(Assembly.Load("System.Private.CoreLib"));
             assemblies.Add(Assembly.Load("System.Collections"));
@@ -58,40 +53,43 @@ public class DynamicSyncBuilder
 
         }
 
+        
+
         foreach (var asm in Assembly.GetExecutingAssembly().GetReferencedAssemblies())
         {
             assemblies.Add(Assembly.Load(asm.FullName));
         }
 
-        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+        foreach (var asm in AppDomain.CurrentDomain.GetAssemblies()
+            .Where(asm => !asm.IsDynamic)
+            .Where(asm => !asm.FullName.Contains("Anonymously Hosted DynamicMethods Assembly"))
+            .Where(asm => asm.FullName.Contains("AutoSyncAsm"))
+        )
         {
-            if(!asm.IsDynamic && !asm.FullName.Contains("Anonymously Hosted DynamicMethods Assembly") && asm.FullName.Contains("AutoSyncAsm"))
-                assemblies.Add(Assembly.Load(asm.FullName));
+            assemblies.Add(Assembly.Load(asm.FullName));
         }
 
-        List<SyntaxTree> syntaxTrees = new List<SyntaxTree>();
-
-        foreach (var registration in dynamicSyncRegistry.Registrations)
-        {
-            syntaxTrees.AddRange(dynamicSyncPatchBuilder.Build(registration.Key, registration.Value));
-        }
-
-        syntaxTrees.Add(dynamicSyncAssemblyInfoBuilder.Build(assemblies.Select(a => a.GetName().Name)));
+        var syntaxTrees = dynamicSyncRegistry.Registrations
+            .SelectMany(registration => dynamicSyncPatchBuilder.Build(registration.Key, registration.Value))
+            .Append(dynamicSyncAssemblyInfoBuilder.Build(assemblies.Select(a => a.GetName().Name)));
 
         // https://www.strathweb.com/2018/10/no-internalvisibleto-no-problem-bypassing-c-visibility-rules-with-roslyn/
         // Allow IgnoresAccessChecksTo for dynamic compilation
-        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary).
-                                    WithMetadataImportOptions(MetadataImportOptions.All)
-                                    .WithAllowUnsafe(true);
+        var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            .WithMetadataImportOptions(MetadataImportOptions.All)
+            .WithAllowUnsafe(true);
+
         var topLevelBinderFlagsProperty = typeof(CSharpCompilationOptions).GetProperty("TopLevelBinderFlags", BindingFlags.Instance | BindingFlags.NonPublic);
         topLevelBinderFlagsProperty.SetValue(compilationOptions, (uint)1 << 22);
-        var dynamicAssembly = CSharpCompilation.Create("DynamicSync.dll",
-                                                        syntaxTrees: syntaxTrees,
-                                                        references:
-                                                        assemblies.Select(a => a.Location).Distinct().Select(a => MetadataReference.CreateFromFile(a)),
-                                                        options: compilationOptions
-                                                        );
-        Assembly assembly;
+
+        var dynamicAssembly = CSharpCompilation.Create(
+            "DynamicSync.dll",
+            syntaxTrees: syntaxTrees,
+            references:
+            assemblies.Select(a => a.Location).Distinct().Select(a => MetadataReference.CreateFromFile(a)),
+            options: compilationOptions
+        );
+
         using (var assemblyStream = new MemoryStream())
         using (var pdbStream = new MemoryStream())
         {
@@ -99,13 +97,8 @@ public class DynamicSyncBuilder
 
             if (!result.Success)
                 throw new InvalidOperationException();
-            else
-                assembly = Assembly.Load(assemblyStream.GetBuffer());
-        }
-        return assembly;
-    }
 
-    public void Dispose()
-    {
+            return Assembly.Load(assemblyStream.GetBuffer());
+        };
     }
 }

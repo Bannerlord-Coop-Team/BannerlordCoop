@@ -1,6 +1,8 @@
 ﻿using GameInterface.DynamicSync.Templates;
+using GameInterface.Services.ObjectManager;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -10,16 +12,19 @@ namespace GameInterface.DynamicSync.Builders
 {
     public class DynamicSyncPatchBuilder
     {
+        private readonly IObjectManager objectManager;
         private readonly DynamicSyncPropertyBuilder dynamicSyncPropertyBuilder;
         private readonly DynamicSyncFieldBuilder dynamicSyncFieldBuilder;
         private readonly DynamicSyncPropertyArrayBuilder dynamicSyncPropertyArrayBuilder;
         private readonly DynamicSyncFieldArrayBuilder dynamicSyncFieldArrayBuilder;
 
-        public DynamicSyncPatchBuilder(DynamicSyncPropertyBuilder dynamicSyncPropertyBuilder,
+        public DynamicSyncPatchBuilder(IObjectManager objectManager,
+            DynamicSyncPropertyBuilder dynamicSyncPropertyBuilder,
             DynamicSyncFieldBuilder dynamicSyncFieldBuilder,
             DynamicSyncPropertyArrayBuilder dynamicSyncPropertyArrayBuilder,
             DynamicSyncFieldArrayBuilder dynamicSyncFieldArrayBuilder)
         {
+            this.objectManager = objectManager;
             this.dynamicSyncPropertyBuilder = dynamicSyncPropertyBuilder;
             this.dynamicSyncFieldBuilder = dynamicSyncFieldBuilder;
             this.dynamicSyncPropertyArrayBuilder = dynamicSyncPropertyArrayBuilder;
@@ -41,6 +46,7 @@ namespace GameInterface.DynamicSync.Builders
 
             foreach(var propertyInfo in dynamicRegistryItem.Properties)
             {
+                ValidateType(propertyInfo.PropertyType);
                 usings.Add(propertyInfo.PropertyType.Namespace);
 
                 if (!propertyInfo.PropertyType.IsGenericType && !propertyInfo.PropertyType.IsArray)
@@ -60,6 +66,7 @@ namespace GameInterface.DynamicSync.Builders
 
             foreach (var fieldInfo in dynamicRegistryItem.Fields)
             {
+                ValidateType(fieldInfo.FieldType);
                 usings.Add(fieldInfo.FieldType.Namespace);
                 if(!fieldInfo.FieldType.IsGenericType && !fieldInfo.FieldType.IsArray)
                 { 
@@ -99,6 +106,26 @@ namespace GameInterface.DynamicSync.Builders
             syntaxTrees.AddRange(messages.Select(m => CSharpSyntaxTree.ParseText(m)));
             syntaxTrees.Add(CSharpSyntaxTree.ParseText(handlerTemplate));
             return syntaxTrees;
+        }
+
+
+        private void ValidateType(Type type)
+        {
+            Type typeToVerify;
+            // TODO:Check if this is enough or if it needs to be restricted more to List,MBList,Queue
+            if (type.IsGenericType)
+                typeToVerify = type.GetGenericArguments()[0];
+            else if (type.IsArray)
+                typeToVerify = type.GetElementType();
+            else
+                typeToVerify = type;
+            // Prevent unsupported types
+            if (!objectManager.IsTypeManaged(typeToVerify) && !RuntimeTypeModel.Default.CanSerialize(typeToVerify))
+            {
+                throw new NotSupportedException(
+                    $"{typeToVerify.Name} is not serializable and not managed by the object manager. " +
+                    $"Either manage the type using the object manager or make this type serializable");
+            }
         }
     }
 }

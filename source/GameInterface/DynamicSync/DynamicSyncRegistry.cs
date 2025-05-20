@@ -1,8 +1,8 @@
 ﻿using GameInterface.DynamicSync.Builders;
-using Microsoft.CodeAnalysis;
+using GameInterface.Services.ObjectManager;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 
 namespace GameInterface.DynamicSync
@@ -10,9 +10,6 @@ namespace GameInterface.DynamicSync
     public class DynamicSyncRegistry
     {
         public readonly Dictionary<Type, DynamicSyncRegistryItem> Registrations = new Dictionary<Type, DynamicSyncRegistryItem>();
-
-        // TODO:Fix
-        public Assembly Assembly;
 
         public void AddField(FieldInfo field)
         {
