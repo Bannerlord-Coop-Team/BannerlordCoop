@@ -3,6 +3,7 @@ using Common.Network;
 using Common.Tests.Utils;
 using Coop.Core.Server;
 using E2E.Tests.Environment.Mock;
+using GameInterface;
 
 namespace E2E.Tests.Environment.Instance;
 
@@ -21,6 +22,8 @@ public class ServerInstance : EnvironmentInstance
         builder.RegisterModule<ServerModule>();
         builder.RegisterType<MockServer>().AsSelf().As<MockNetworkBase>().As<INetwork>().As<ICoopServer>().InstancePerLifetimeScope();
         builder.RegisterType<ServerInstance>().AsSelf();
+
+        builder.RegisterInstance(new GameInterfaceConfig { IsServer = true }).As<IGameInterfaceConfig>().SingleInstance();
 
         AddSharedDependencies(builder, networkOrchestrator, registerGameInterface: true);
 
