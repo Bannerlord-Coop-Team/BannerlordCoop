@@ -10,7 +10,7 @@ using {{ library }};
 namespace DynamicSync
 {
     [ProtoContract(SkipConstructor = true)]
-    public record {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ ElementType }}>
+    public record {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ ElementType }}>
     {
         [ProtoMember(1)]
         public string InstanceId { get; set; }
@@ -21,7 +21,7 @@ namespace DynamicSync
         [ProtoMember(3)]
         public int Index { get; set; }
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeNetworkMessage(string instanceId, string value, int index) : base(instanceId, valueId)
+        public {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(string instanceId, string value, int index) : base(instanceId, valueId)
         {
             Index = Index;
         }

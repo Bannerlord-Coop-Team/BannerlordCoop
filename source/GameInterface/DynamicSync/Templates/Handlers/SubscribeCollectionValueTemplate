@@ -10,18 +10,18 @@
 });
 SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
 {
-    var newValue = new {{ElementType}}[data.Length];
+    var newValue = new MBList<{{ElementType}}>();
     for (int i = 0; i < data.Value.Count; i++)
     {
-        newValue[data.Value[i].Index] = data.Value[i].Value;
+        newValue.Add(data.Value[i]);
     }
     instance.{{ MemberName }} = newValue;
 });
-Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeLocalMessage>((instanceId, data) => 
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeLocalMessage>((instanceId, data) => 
 {
-    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(instanceId, data.Value, data.Index));
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeNetworkMessage(instanceId, data.Value));
 });
-SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage>((instance, data) => 
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeNetworkMessage>((instance, data) => 
 {
-    instance.{{ MemberName }}[data.Index] = data.Value;
+    instance.Remove(data.Value);
 });

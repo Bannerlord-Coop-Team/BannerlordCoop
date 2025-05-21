@@ -5,9 +5,9 @@ using {{ library }};
 
 namespace DynamicSync
 {
-    public record {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeLocalMessage : GenericArrayChangedEvent<{{ MemberDeclaringType }}, {{ ElementType }}>
+    public record {{ MemberDeclaringType}}_{{ MemberName }}_ChangeLocalMessage : GenericArrayChangedEvent<{{ MemberDeclaringType }}, {{ ElementType }}>
     {
-        public {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeLocalMessage({{ MemberDeclaringType }} instance, {{ ElementType }} value, int index) : base(instance, value, index)
+        public {{ MemberDeclaringType}}_{{ MemberName }}_ChangeLocalMessage({{ MemberDeclaringType }} instance, {{ ElementType }} value, int index) : base(instance, value, index)
         {
         }
     }

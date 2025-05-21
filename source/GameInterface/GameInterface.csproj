@@ -35,17 +35,6 @@
     <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="DynamicSync\Dummy\**" />
-    <EmbeddedResource Remove="DynamicSync\Dummy\**" />
-    <None Remove="DynamicSync\Dummy\**" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Remove="DynamicSync\Templates\DynamicHandlerTemplate.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Remove="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
-  </ItemGroup>
-  <ItemGroup>
     <Reference Include="SandBox">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
@@ -242,42 +231,46 @@
     </ItemGroup>
     <ItemGroup>
       <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfoTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\DynamicHandlerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayReferenceTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayValueTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalSetMessageTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArrayChangeValueMessageTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArraySetValueMessageTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArraySetReferenceMessageTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArrayChangeReferenceMessageTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\DynamicPatchTemplate">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </EmbeddedResource>
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCollectionReferenceTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCollectionValueTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetReference" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomSetValue" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetValue" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetValueTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomSetValue" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetReferenceTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetValueTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetValueMessageTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalArrayChangeMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalCollectionAddMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalCollectionRemoveMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalSetMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArrayChangeReferenceMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArrayChangeValueMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArraySetReferenceMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArraySetValueMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionAddReferenceMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionAddValueMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionRemoveReferenceMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionRemoveValueMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionSetReferenceMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionSetValueMessageTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetReferenceMessageTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldListChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetValueMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\DynamicPatchTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldArrayChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldMBListChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldQueueChangeTranspilerTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyArrayChangeTranspilerTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldArrayChangeTranspilerTemplate" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyListChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldSetTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyArrayChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyListChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyMBListChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyQueueChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
-    </ItemGroup>
-    <ItemGroup>
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalArrayChangeMessageTemplate">
-        <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </EmbeddedResource>
     </ItemGroup>
   <ItemGroup>
     <Publicize Include="SandBox" />
@@ -338,8 +331,5 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Services\Kingdoms\Commands\" />
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="DynamicSync\Templates\Handlers\DynamicHandlerTemplate" />
   </ItemGroup>
 </Project>

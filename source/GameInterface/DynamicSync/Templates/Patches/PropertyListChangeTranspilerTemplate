@@ -1,2 +1,2 @@
 ﻿        [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ListPropertyChangeTranspiler<{{MemberType}}, {{AddMessageType}}, {{RemoveMessageType}}>(instructions, "{{MemberName}}");
+        static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ListPropertyChangeTranspiler<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMessage, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveLocalMessage>(instructions, "{{MemberName}}");

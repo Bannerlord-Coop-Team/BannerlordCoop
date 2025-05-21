@@ -19,12 +19,12 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNe
     }
     instance.{{ MemberName }} = newValue;
 });
-Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeLocalMessage>((instanceId, data) => 
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeLocalMessage>((instanceId, data) => 
 {
     if (!objectManager.TryGetId(data.Value, out string id)) return;
-    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeNetworkMessage(instanceId, id, data.Index));
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(instanceId, id, data.Index));
 });
-SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ArrayChangeNetworkMessage>((instance, data) => 
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage>((instance, data) => 
 {
     if (!objectManager.TryGetObject<{{ElementType}}>(data.ValueId, out {{ElementType}} element)) return;
     instance.{{ MemberName }}[data.Index] = element;
