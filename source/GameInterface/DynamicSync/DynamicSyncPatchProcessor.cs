@@ -1,14 +1,11 @@
 ﻿using GameInterface.DynamicSync.Templates;
-using HarmonyLib;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System;
 using System.Collections.Generic;
-using System.Dynamic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using TaleWorlds.Diamond.Rest;
 
 namespace GameInterface.DynamicSync
 {

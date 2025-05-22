@@ -6,11 +6,11 @@ using System.Reflection;
 
 namespace GameInterface.DynamicSync.Builders
 {
-    public class DynamicSyncFieldListBuilder
+    public class DynamicSyncFieldQueueBuilder
     {
         private readonly IObjectManager objectManager;
 
-        public DynamicSyncFieldListBuilder(IObjectManager objectManager)
+        public DynamicSyncFieldQueueBuilder(IObjectManager objectManager)
         {
             this.objectManager = objectManager;
         }
@@ -22,15 +22,15 @@ namespace GameInterface.DynamicSync.Builders
                 {
                     MemberDeclaringType = fieldInfo.DeclaringType.Name,
                     MemberName = fieldInfo.Name,
-                    MemberType = GetListTypeName(fieldInfo.FieldType)
+                    MemberType = GetQueueTypeNames(fieldInfo.FieldType)
                 });
 
-            string changeTemplate = TemplateParser.Parse("Patches.FieldListChangeTranspilerTemplate",
+            string changeTemplate = TemplateParser.Parse("Patches.FieldQueueChangeTranspilerTemplate",
                     new
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
-                        MemberType = GetListTypeName(fieldInfo.FieldType),
+                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                         ElementType = GetElementType(fieldInfo.FieldType).Name,
                         Libraries = new List<string>
                         {
@@ -51,7 +51,7 @@ namespace GameInterface.DynamicSync.Builders
                 {
                     MemberDeclaringType = fieldInfo.DeclaringType.Name,
                     MemberName = fieldInfo.Name,
-                    MemberType = GetListTypeName(fieldInfo.FieldType),
+                    MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                     Libraries = new List<string>
                     {
                         fieldInfo.DeclaringType.Namespace,
@@ -65,7 +65,7 @@ namespace GameInterface.DynamicSync.Builders
                 {
                     MemberDeclaringType = fieldInfo.DeclaringType.Name,
                     MemberName = fieldInfo.Name,
-                    MemberType = GetListTypeName(fieldInfo.FieldType),
+                    MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                     ElementType = GetElementType(fieldInfo.FieldType).Name,
                     Libraries = new List<string>
                     {
@@ -80,7 +80,7 @@ namespace GameInterface.DynamicSync.Builders
                 {
                     MemberDeclaringType = fieldInfo.DeclaringType.Name,
                     MemberName = fieldInfo.Name,
-                    MemberType = GetListTypeName(fieldInfo.FieldType),
+                    MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                     ElementType = GetElementType(fieldInfo.FieldType).Name,
                     Libraries = new List<string>
                     {
@@ -100,7 +100,7 @@ namespace GameInterface.DynamicSync.Builders
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
-                        MemberType = GetListTypeName(fieldInfo.FieldType),
+                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                         Libraries = new List<string>
                         {
                         fieldInfo.DeclaringType.Namespace,
@@ -114,7 +114,7 @@ namespace GameInterface.DynamicSync.Builders
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
-                        MemberType = GetListTypeName(fieldInfo.FieldType),
+                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                         ElementType = GetElementType(fieldInfo.FieldType).Name,
                         Libraries = new List<string>
                         {
@@ -128,7 +128,7 @@ namespace GameInterface.DynamicSync.Builders
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
-                        MemberType = GetListTypeName(fieldInfo.FieldType),
+                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                         ElementType = GetElementType(fieldInfo.FieldType).Name,
                         Libraries = new List<string>
                         {
@@ -145,7 +145,7 @@ namespace GameInterface.DynamicSync.Builders
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
-                        MemberType = GetListTypeName(fieldInfo.FieldType),
+                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                         ElementType = GetElementType(fieldInfo.FieldType).Name,
                         Libraries = new List<string>
                         {
@@ -160,7 +160,7 @@ namespace GameInterface.DynamicSync.Builders
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
-                        MemberType = GetListTypeName(fieldInfo.FieldType),
+                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                         ElementType = GetElementType(fieldInfo.FieldType).Name,
                         Libraries = new List<string>
                         {
@@ -175,7 +175,7 @@ namespace GameInterface.DynamicSync.Builders
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
-                        MemberType = GetListTypeName(fieldInfo.FieldType),
+                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                         ElementType = GetElementType(fieldInfo.FieldType).Name,
                         Libraries = new List<string>
                         {
@@ -207,12 +207,12 @@ namespace GameInterface.DynamicSync.Builders
         {
             if (objectManager.IsTypeManaged(GetElementType(fieldInfo.FieldType)))
             {
-                return TemplateParser.Parse("Handlers.SubscribeCollectionReferenceTemplate",
+                return TemplateParser.Parse("Handlers.SubscribeQueueReferenceTemplate",
                     new
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
-                        MemberType = GetListTypeName(fieldInfo.FieldType),
+                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
                         ElementType = GetElementType(fieldInfo.FieldType).Name,
                         Libraries = new List<string>
                         {
@@ -223,7 +223,7 @@ namespace GameInterface.DynamicSync.Builders
             }
             else
             {
-                return TemplateParser.Parse("Handlers.SubscribeCollectionValueTemplate",
+                return TemplateParser.Parse("Handlers.SubscribeQueueValueTemplate",
                     new
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
@@ -237,9 +237,10 @@ namespace GameInterface.DynamicSync.Builders
                     });
             }
         }
-        private string GetListTypeName(Type type)
+
+        private string GetQueueTypeNames(Type type)
         {
-            return $"List<{type.GetGenericArguments()[0].Name}>";
+            return $"Queue<{type.GetGenericArguments()[0].Name}>";
         }
 
         private Type GetElementType(Type type)

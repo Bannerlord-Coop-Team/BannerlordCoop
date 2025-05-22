@@ -235,12 +235,14 @@
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayReferenceTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayValueTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCollectionReferenceTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeQueueReferenceTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCollectionValueTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetReference" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomNetworkSetValue" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCustomSetValue" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetReferenceTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeGenericSetValueTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeQueueValueTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent" />
@@ -264,6 +266,7 @@
       <EmbeddedResource Include="DynamicSync\Templates\Patches\DynamicPatchTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldArrayChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldMBListChangeTranspilerTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldListChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldQueueChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldSetTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyArrayChangeTranspilerTemplate" />
