@@ -7,7 +7,7 @@ internal class {{ DeclaringType }}_{{ MemberType }}Handler : IHandler
     private readonly INetwork network;
     private readonly ILogger Logger = LogManager.GetLogger<{{ DeclaringType }}_{{ MemberType }}Handler>();
 
-    public ClanLifetimeHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+    public {{ DeclaringType }}_{{ MemberType }}Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
