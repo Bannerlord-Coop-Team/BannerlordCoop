@@ -11,10 +11,9 @@ namespace GameInterface.DynamicSync
 
         public static bool Enabled { get; } = true;
 
-        public string NetworkSetReferenceMessageTemplate { get; } = "NetworkSetReferenceMessageTemplate";
-        public string NetworkSetValueMessageTemplate { get; } = "NetworkSetValueMessageTemplate";
-
-        public string UpdatedMessageTemplate { get; } = "UpdatedMessageTemplate";
+        public string NetworkSetReferenceMessageTemplate { get; } = "Messages.NetworkSetReferenceMessageTemplate.txt";
+        public string NetworkSetValueMessageTemplate { get; } = "Messages.NetworkSetValueMessageTemplate.txt";
+        public string UpdatedMessageTemplate { get; } = "Messages.UpdatedMessageTemplate.txt";
 
         public static void ExportFile(string targetPath, string content)
         {

@@ -41,11 +41,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Remove="DynamicSync\Templates\DynamicHandlerTemplate.cs" />
+    <Compile Remove="DynamicSync\Templates\Patches\TranspilerTempate.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Remove="DynamicSync\Templates\Handlers\HandlerByNetworkIdTemplate.txt" />
     <None Remove="DynamicSync\Templates\Handlers\HandlerByValueTemplate.txt" />
     <None Remove="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
+    <None Remove="DynamicSync\Templates\Patches\TranspilerTemplate.txt" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="SandBox">
@@ -259,9 +261,9 @@
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericArrayChangedMessageTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArraySetEvent" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedEvent" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetValueMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetValueMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\GenericNetworkArrayChangedReferenceEvent" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetReferenceMessageTemplate" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetReferenceMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldListChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldMBListChangeTranspilerTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldQueueChangeTranspilerTemplate" />
@@ -274,9 +276,10 @@
       <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
     </ItemGroup>
     <ItemGroup>
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\UpdatedMessageTemplate">
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\UpdatedMessageTemplate.txt">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </EmbeddedResource>
+      <EmbeddedResource Include="DynamicSync\Templates\Patches\TranspilerTemplate.txt" />
     </ItemGroup>
   <ItemGroup>
     <Publicize Include="SandBox" />

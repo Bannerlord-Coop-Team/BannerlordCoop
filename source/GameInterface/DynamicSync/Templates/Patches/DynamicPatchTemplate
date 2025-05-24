@@ -15,7 +15,7 @@ using {{ library }};
 
 namespace DynamicSync
 {
-    [HarmonyPatch()]
+    [HarmonyPatch]
     public class {{DeclaringType}}_DynamicPatch : GenericPatches<{{DeclaringType}}_DynamicPatch, {{DeclaringType}}>
     {
         private static IEnumerable<MethodBase> TargetMethods()

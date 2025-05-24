@@ -16,16 +16,14 @@ internal class DynamicSyncModule : Module
     {
         var config = new DynamicSyncConfiguration();
 
-        builder.RegisterInstance(config).AsSelf().InstancePerLifetimeScope();
+        builder.RegisterInstance(config).AsSelf().SingleInstance();
 
         builder.RegisterType<DynamicSyncRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncPatcher>().InstancePerLifetimeScope();
-        builder.RegisterType<DynamicSyncPatchProcessor>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncAssemblyInfoBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncPatchBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<DynamicSyncPropertyBuilder>().InstancePerLifetimeScope();
-        builder.RegisterType<DynamicSyncFieldBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<DynamicSyncMemberBuilder>().As<IDynamicSyncMemberBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicHandler>().InstancePerLifetimeScope();
 
         foreach (var type in GetDynamicSyncClasses())

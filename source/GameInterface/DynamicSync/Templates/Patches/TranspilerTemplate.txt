@@ -1,0 +1,86 @@
+﻿using Common.Logging;
+using GameInterface.Utils;
+using HarmonyLib;
+using Helpers;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Text;
+using Common.Messaging;
+using GameInterface.Policies;
+using GameInterface;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace DynamicSync
+{
+    [HarmonyPatch]
+    internal class {{ TranspilerName }}
+    {
+        private static readonly ILogger Logger = LogManager.GetLogger<{{ TranspilerName }}>();
+
+        private static IEnumerable<MethodBase> TargetMethods()
+        {
+            foreach(var method in AccessTools.GetDeclaredMethods(typeof({{ DeclaringType.Name }})))
+            {
+                yield return method;
+            }
+            {{~ for targetMethod in TargetMethods ~}}
+            yield return AccessTools.Method(typeof({{targetMethod.DeclaringType.Name}}), "{{targetMethod.Name}}");
+            {{~ end ~}}
+        }
+
+        [HarmonyTranspiler]
+        private static IEnumerable<CodeInstruction> LastTimeStampForActivityTranspiler(IEnumerable<CodeInstruction> instructions)
+        {
+            {{~ for field in Fields ~}}
+            var {{ field.Name }}Field = AccessTools.Field(typeof({{ DeclaringType }}), nameof({{ DeclaringType }}.{{ field.Name }}));
+            var _{{ field.Name }}Intercept = AccessTools.Method(typeof({{ TranspilerName }}), nameof({{ field.Name }}Intercept));
+
+            {{~ end ~}}
+
+            foreach (var instruction in instructions)
+            {
+                {{~ for field in Fields ~}}
+                if (instruction.StoresField({{ field.Name }}Field))
+                {
+                    var newInstr = new CodeInstruction(OpCodes.Call, _{{ field.Name }}Intercept);
+
+                    newInstr.blocks = instruction.blocks;
+                    newInstr.labels = instruction.labels;
+
+                    yield return newInstr;
+                    continue;
+                }
+                {{~ end ~}}
+
+                yield return instruction;
+            }
+        }
+
+        {{~ for field in Fields ~}}
+        public static void {{ field.Name }}Intercept({{ DeclaringType.Name }} instance, {{ field.FieldType.Name }} newValue)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                instance.{{ field.Name }} = newValue;
+                return;
+            }
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                instance.{{ field.Name }} = newValue;
+                return;
+            }
+
+            MessageBroker.Instance.Publish(instance, new {{ $"{DeclaringType.Name}_{field.Name}UpdatedMessage" }}(instance, newValue));
+
+            instance.{{ field.Name }} = newValue;
+        }
+        {{~ end ~}}
+    }
+}

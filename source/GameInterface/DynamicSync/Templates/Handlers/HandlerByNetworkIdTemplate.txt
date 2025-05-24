@@ -1,13 +1,27 @@
-﻿namespace DynamicSync;
+﻿using Common.Logging;
+using Common.Messaging;
+using Common.Network;
+using Common.Util;
+using Serilog;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Utils;
+using System;
+using System.Linq;
+using System.Collections.Generic;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
 
-internal class {{ DeclaringType }}_{{ MemberType }}Handler : IHandler
+namespace DynamicSync;
+
+internal class {{ HandlerName }} : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-    private readonly ILogger Logger = LogManager.GetLogger<{{ DeclaringType }}_{{ MemberType }}Handler>();
+    private readonly ILogger Logger = LogManager.GetLogger<{{ HandlerName }}>();
 
-    public {{ DeclaringType }}_{{ MemberType }}Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+    public {{ HandlerName }}(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
     {
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
@@ -33,7 +47,7 @@ internal class {{ DeclaringType }}_{{ MemberType }}Handler : IHandler
 
         if (objectManager.TryGetId(payload.What.Value, out string valueId) == false)
         {
-            Logger.Error("Failed to get {type} id", typeof({{ MemberType }}));
+            Logger.Error("Failed to get {type} id", typeof({{ MemberName }}));
             return;
         }
 
@@ -50,9 +64,9 @@ internal class {{ DeclaringType }}_{{ MemberType }}Handler : IHandler
             return;
         }
 
-        if (objectManager.TryGetObject<{{ MemberType }}>(payload.ValueId, out var value) == false)
+        if (objectManager.TryGetObject<{{ MemberName }}>(payload.ValueId, out var value) == false)
         {
-            Logger.Error("Unable to find {{ MemberType }} with string id {stringId}", payload.ValueId);
+            Logger.Error("Unable to find {{ MemberName }} with string id {stringId}", payload.ValueId);
             return;
         }
 

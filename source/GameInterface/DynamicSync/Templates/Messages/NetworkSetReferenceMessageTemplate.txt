@@ -10,18 +10,18 @@ using {{ library }};
 namespace DynamicSync
 {
     [ProtoContract(SkipConstructor = true)]
-    public readonly struct NetworkSet_{{ MemberDeclaringType }}_{{ MemberName }}Message
+    public readonly struct {{ MessageName }} : ICommand
     {
         [ProtoMember(1)]
-        public override string InstanceId { get; }
+        public readonly string InstanceId;
 
         [ProtoMember(2)]
-        public {{ MemberType }} Value { get; }
+        public readonly string ValueId;
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(string instanceId, {{ MemberType }} value)
+        public {{ MessageName }}(string instanceId, string valueId)
         {
             InstanceId = instanceId;
-            Value = value;
+            ValueId = valueId;
         }
     }
 }
