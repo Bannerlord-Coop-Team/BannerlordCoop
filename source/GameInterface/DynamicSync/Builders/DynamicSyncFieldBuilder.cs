@@ -84,7 +84,7 @@ namespace GameInterface.DynamicSync.Builders
         {
             if (objectManager.IsTypeManaged(fieldInfo.FieldType))
             {
-                return TemplateParser.Parse("Handlers.SubscribeGenericSetReferenceTemplate",
+                return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate",
                     new
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
@@ -99,7 +99,7 @@ namespace GameInterface.DynamicSync.Builders
             }
             else
             {
-                return TemplateParser.Parse("Handlers.SubscribeGenericSetValueTemplate",
+                return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate",
                     new
                     {
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
