@@ -79,6 +79,7 @@ public class DynamicSyncMemberBuilder : IDynamicSyncMemberBuilder
                 NetworkMessage = $"NetworkSet_{declaringType.Name}_{memberInfo.Name}",
 
                 MemberName = memberInfo.Name,
+                MemberType = memberType.Name,
 
                 Libraries = new string[]
                 {

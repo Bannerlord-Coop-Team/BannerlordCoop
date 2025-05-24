@@ -11,7 +11,7 @@ namespace DynamicSync
         public readonly {{ MemberDeclaringType }} Instance;
         public readonly {{ MemberType }} Value;
 
-        public {{ MessageName }}({{ DeclaringType }} instance, {{ MemberType }} value)
+        public {{ MessageName }}({{ MemberDeclaringType }} instance, {{ MemberType }} value)
         {
             Instance = instance;
             Value = value;

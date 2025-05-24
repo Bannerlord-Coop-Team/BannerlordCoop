@@ -24,7 +24,7 @@ namespace DynamicSync
 
         private static IEnumerable<MethodBase> TargetMethods()
         {
-            foreach(var method in AccessTools.GetDeclaredMethods(typeof({{ DeclaringType.Name }})))
+            foreach(var method in AccessTools.GetDeclaredMethods(typeof({{ DeclaringType }})))
             {
                 yield return method;
             }
@@ -62,7 +62,7 @@ namespace DynamicSync
         }
 
         {{~ for field in Fields ~}}
-        public static void {{ field.Name }}Intercept({{ DeclaringType.Name }} instance, {{ field.FieldType.Name }} newValue)
+        public static void {{ field.Name }}Intercept({{ DeclaringType }} instance, {{ field.FieldType.Name }} newValue)
         {
             if (CallOriginalPolicy.IsOriginalAllowed())
             {
@@ -77,7 +77,7 @@ namespace DynamicSync
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new {{ $"{DeclaringType.Name}_{field.Name}UpdatedMessage" }}(instance, newValue));
+            MessageBroker.Instance.Publish(instance, new {{ $"{DeclaringType}_{field.Name}UpdatedMessage" }}(instance, newValue));
 
             instance.{{ field.Name }} = newValue;
         }

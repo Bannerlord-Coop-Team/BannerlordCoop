@@ -72,7 +72,7 @@ public class DynamicSyncPatchBuilder
             Libraries = usings,
             TranspilerName = $"{declaringType.Name}_FieldInterceptPatches",
             TargetMethods = dynamicRegistryItem.TargetMethods,
-            DeclaringType = declaringType,
+            DeclaringType = declaringType.Name,
             Fields = dynamicRegistryItem.Fields,
         });
 

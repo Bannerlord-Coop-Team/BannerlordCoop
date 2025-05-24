@@ -47,7 +47,7 @@ internal class {{ HandlerName }} : IHandler
 
         if (objectManager.TryGetId(payload.What.Value, out string valueId) == false)
         {
-            Logger.Error("Failed to get {type} id", typeof({{ MemberName }}));
+            Logger.Error("Failed to get {type} id", typeof({{ MemberType }}));
             return;
         }
 
@@ -64,9 +64,9 @@ internal class {{ HandlerName }} : IHandler
             return;
         }
 
-        if (objectManager.TryGetObject<{{ MemberName }}>(payload.ValueId, out var value) == false)
+        if (objectManager.TryGetObject<{{ MemberType }}>(payload.ValueId, out var value) == false)
         {
-            Logger.Error("Unable to find {{ MemberName }} with string id {stringId}", payload.ValueId);
+            Logger.Error("Unable to find {{ MemberType }} with string id {stringId}", payload.ValueId);
             return;
         }
 
