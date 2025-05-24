@@ -133,16 +133,14 @@ namespace GameInterface.DynamicSync
         {
             Type targetType;
             string baseTemplate = "";
-            (List<string> transpilers, List<string> prefixes) result = new()
-            {
-                transpilers = new List<string>(),
-                prefixes = new List<string>()
-            };
+            var transpilers = new List<string>();
+            var prefixes = new List<string>();
+
             if (memberPatchInfo.MemberInfo is FieldInfo fieldInfo)
             {
                 targetType = fieldInfo.FieldType;
                 baseTemplate = "FieldSetTranspilerTemplate";
-                result.transpilers.Add(TemplateParser.Parse($"Patches.{baseTemplate}",
+                transpilers.Add(TemplateParser.Parse($"Patches.{baseTemplate}",
                 new
                 {
                     MemberName = memberPatchInfo.MemberInfo.Name,
@@ -158,7 +156,7 @@ namespace GameInterface.DynamicSync
                 // Only create setter prefix if the property can actually change
                 if (propertyInfo.CanWrite)
                 {
-                    result.prefixes.Add(TemplateParser.Parse($"Patches.PropertySetPrefixTemplate",
+                    prefixes.Add(TemplateParser.Parse($"Patches.PropertySetPrefixTemplate",
                     new
                     {
                         MemberName = memberPatchInfo.MemberInfo.Name,
@@ -182,18 +180,18 @@ namespace GameInterface.DynamicSync
                         RemoveMessageType = memberPatchInfo.MessageInfos.First(mi => mi.Action == DynamicMessageAction.CollectionRemove).MessageName
                     };
 
-                    if (memberPatchInfo.PatchType == DynamicMemberPatchType.FieldList)
-                        result.transpilers.Add(TemplateParser.Parse("Patches.FieldListChangeTranspilerTemplate", templateData));
-                    else if (memberPatchInfo.PatchType == DynamicMemberPatchType.PropertyList)
-                        result.transpilers.Add(TemplateParser.Parse("Patches.PropertyListChangeTranspilerTemplate", templateData));
-                    else if (memberPatchInfo.PatchType == DynamicMemberPatchType.FieldMBList)
-                        result.transpilers.Add(TemplateParser.Parse("Patches.FieldMBListChangeTranspilerTemplate", templateData));
-                    else if (memberPatchInfo.PatchType == DynamicMemberPatchType.PropertyMBList)
-                        result.transpilers.Add(TemplateParser.Parse("Patches.PropertyMBListChangeTranspilerTemplate", templateData));
-                    else if (memberPatchInfo.PatchType == DynamicMemberPatchType.FieldQueue)
-                        result.transpilers.Add(TemplateParser.Parse("Patches.FieldQueueChangeTranspilerTemplate", templateData));
-                    else if (memberPatchInfo.PatchType == DynamicMemberPatchType.PropertyQueue)
-                        result.transpilers.Add(TemplateParser.Parse("Patches.PropertyQueueChangeTranspilerTemplate", templateData));
+                    var template = memberPatchInfo.PatchType switch
+                    {
+                        DynamicMemberPatchType.FieldList => "Patches.FieldListChangeTranspilerTemplate",
+                        DynamicMemberPatchType.PropertyList => "Patches.PropertyListChangeTranspilerTemplate",
+                        DynamicMemberPatchType.FieldMBList => "Patches.FieldMBListChangeTranspilerTemplate",
+                        DynamicMemberPatchType.PropertyMBList => "Patches.PropertyMBListChangeTranspilerTemplate",
+                        DynamicMemberPatchType.FieldQueue => "Patches.FieldQueueChangeTranspilerTemplate",
+                        DynamicMemberPatchType.PropertyQueue => "Patches.PropertyQueueChangeTranspilerTemplate",
+                        _ => throw new ArgumentException($"Unsupported patch type: {memberPatchInfo.PatchType}")
+                    };
+
+                    transpilers.Add(TemplateParser.Parse(template, templateData));
                 }
                 else
                 {
@@ -205,13 +203,18 @@ namespace GameInterface.DynamicSync
                         ChangeMessageType = memberPatchInfo.MessageInfos.First(mi => mi.Action == DynamicMessageAction.ArrayChange).MessageName,
                     };
 
-                    if (memberPatchInfo.PatchType == DynamicMemberPatchType.FieldArray)
-                        result.transpilers.Add(TemplateParser.Parse("Patches.FieldArrayChangeTranspilerTemplate", templateData));
-                    else if (memberPatchInfo.PatchType == DynamicMemberPatchType.PropertyArray)
-                        result.transpilers.Add(TemplateParser.Parse("Patches.PropertyArrayChangeTranspilerTemplate", templateData));
+                    var template = memberPatchInfo.PatchType switch
+                    {
+                        DynamicMemberPatchType.FieldArray => "Patches.FieldArrayChangeTranspilerTemplate",
+                        DynamicMemberPatchType.PropertyArray => "Patches.PropertyArrayChangeTranspilerTemplate",
+                        _ => throw new ArgumentException($"Unsupported patch type: {memberPatchInfo.PatchType}")
+                    };
+
+                    transpilers.Add(TemplateParser.Parse("Patches.PropertyArrayChangeTranspilerTemplate", templateData));
+
                 }
             }
-            return result;
+            return (transpilers, prefixes);
         }
         #endregion
         #region Messages

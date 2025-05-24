@@ -1,118 +1,95 @@
 ﻿using GameInterface.DynamicSync.Templates;
 using GameInterface.Services.ObjectManager;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 
-namespace GameInterface.DynamicSync.Builders
+namespace GameInterface.DynamicSync.Builders;
+
+public class DynamicSyncPropertyBuilder
 {
-    public class DynamicSyncPropertyBuilder
+    private readonly DynamicSyncConfiguration config;
+    private readonly IObjectManager objectManager;
+
+    public DynamicSyncPropertyBuilder(DynamicSyncConfiguration config, IObjectManager objectManager)
     {
-        private readonly IObjectManager objectManager;
+        this.config = config;
+        this.objectManager = objectManager;
+    }
+    public string GetPrefix(PropertyInfo propertyInfo)
+    {
+        // TODO move strings to config
+        var template = TemplateParser.Parse("Patches.PropertySetPrefixTemplate",
+            new
+            {
+                MemberDeclaringType = propertyInfo.DeclaringType.Name,
+                MemberName = propertyInfo.Name,
+                MemberType = propertyInfo.PropertyType.Name
+            });
 
-        public DynamicSyncPropertyBuilder(IObjectManager objectManager)
-        {
-            this.objectManager = objectManager;
-        }
-        public string GetPrefix(PropertyInfo propertyInfo)
-        {
-            var template = TemplateParser.Parse("Patches.PropertySetPrefixTemplate",
-                new
+        return template;
+    }
+
+    public IEnumerable<string> GetMessages(PropertyInfo propertyInfo)
+    {
+        string localMessage = TemplateParser.Parse(config.UpdatedMessageTemplate,
+            new
+            {
+                MemberDeclaringType = propertyInfo.DeclaringType.Name,
+                MemberName = propertyInfo.Name,
+                MemberType = propertyInfo.PropertyType.Name,
+                Libraries = new List<string>
                 {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                    MemberName = propertyInfo.Name,
-                    MemberType = propertyInfo.PropertyType.Name
-                });
+                    propertyInfo.DeclaringType.Namespace,
+                    propertyInfo.PropertyType.Namespace
+                }
+            });
 
-            return template;
-        }
-
-        public IEnumerable<string> GetMessages(PropertyInfo propertyInfo)
+        var template = objectManager.IsTypeManaged(propertyInfo.PropertyType) switch
         {
-            string localMessage = TemplateParser.Parse("Messages.LocalSetMessageTemplate",
-                new
+            true => config.NetworkSetReferenceMessageTemplate,
+            _ => config.NetworkSetValueMessageTemplate
+        };
+
+        string networkMessage = TemplateParser.Parse(template,
+            new
+            {
+                MemberDeclaringType = propertyInfo.DeclaringType.Name,
+                MemberName = propertyInfo.Name,
+                MemberType = propertyInfo.PropertyType.Name,
+                Libraries = new List<string>
                 {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                    MemberName = propertyInfo.Name,
-                    MemberType = propertyInfo.PropertyType.Name,
-                    Libraries = new List<string>
-                    {
-                        propertyInfo.DeclaringType.Namespace,
-                        propertyInfo.PropertyType.Namespace
-                    }
-                });
-            string networkMessage;
-            if(objectManager.IsTypeManaged(propertyInfo.PropertyType))
-            {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = new List<string>
-                        {
-                        propertyInfo.DeclaringType.Namespace,
-                        propertyInfo.PropertyType.Namespace
-                        }
-                    });
-            }
-            else
-            {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = new List<string>
-                        {
-                            propertyInfo.DeclaringType.Namespace,
-                            propertyInfo.PropertyType.Namespace
-                        }
-                    });
-            }
+                propertyInfo.DeclaringType.Namespace,
+                propertyInfo.PropertyType.Namespace
+                }
+            });
 
-            DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetLocalMessage.cs", localMessage);
-            DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetNetworkMessage.cs", networkMessage);
+        DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetLocalMessage.cs", localMessage);
+        DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetNetworkMessage.cs", networkMessage);
 
-            yield return localMessage;
-            yield return networkMessage;
-        }
+        yield return localMessage;
+        yield return networkMessage;
+    }
 
-        public string GetSubscription(PropertyInfo propertyInfo)
+    public string GetSubscription(PropertyInfo propertyInfo)
+    {
+        // TODO move strings to config
+        var template = objectManager.IsTypeManaged(propertyInfo.PropertyType) switch
         {
-            if (objectManager.IsTypeManaged(propertyInfo.PropertyType))
+            true => "Handlers.SubscribeGenericSetReferenceTemplate",
+            _ => "Handlers.SubscribeGenericSetValueTemplate"
+        };
+
+        return TemplateParser.Parse(template,
+            new
             {
-                return TemplateParser.Parse("Handlers.SubscribeGenericSetReferenceTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = new List<string>
-                        {
-                            propertyInfo.DeclaringType.Namespace,
-                            propertyInfo.PropertyType.Namespace
-                        }
-                    });
-            }
-            else
-            {
-                return TemplateParser.Parse("Handlers.SubscribeGenericSetValueTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = new List<string>
-                        {
-                            propertyInfo.DeclaringType.Namespace,
-                            propertyInfo.PropertyType.Namespace
-                        }
-                    });
-            }
-        }
+                MemberDeclaringType = propertyInfo.DeclaringType.Name,
+                MemberName = propertyInfo.Name,
+                MemberType = propertyInfo.PropertyType.Name,
+                Libraries = new List<string>
+                {
+                    propertyInfo.DeclaringType.Namespace,
+                    propertyInfo.PropertyType.Namespace
+                }
+            });
     }
 }

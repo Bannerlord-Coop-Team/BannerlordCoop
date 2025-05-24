@@ -3,7 +3,7 @@ using System.Reflection;
 
 namespace GameInterface.DynamicSync
 {
-    public static class DynamicSyncConfiguration
+    public class DynamicSyncConfiguration
     {
         public static string ExportPath => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + @"\DynamicSyncExport";
 
@@ -11,6 +11,10 @@ namespace GameInterface.DynamicSync
 
         public static bool Enabled { get; } = true;
 
+        public string NetworkSetReferenceMessageTemplate { get; } = "NetworkSetReferenceMessageTemplate";
+        public string NetworkSetValueMessageTemplate { get; } = "NetworkSetValueMessageTemplate";
+
+        public string UpdatedMessageTemplate { get; } = "UpdatedMessageTemplate";
 
         public static void ExportFile(string targetPath, string content)
         {

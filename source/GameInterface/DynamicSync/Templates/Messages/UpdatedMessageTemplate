@@ -1,0 +1,19 @@
+﻿using GameInterface.Utils.LocalEvents;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace DynamicSync
+{
+    public readonly struct {{ MemberDeclaringType }}_{{ MemberName }}_UpdatedMessage
+    {
+        public readonly {{ MemberDeclaringType }} Instance;
+        public readonly {{ MemberType }} Value;
+
+        public {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage({{ MemberDeclaringType }} instance, {{ MemberType }} value)
+        {
+            Instance = instance;
+            Value = value;
+        }
+    }
+}

@@ -1,0 +1,64 @@
+namespace DynamicSync;
+
+internal class TestClass_MobilePartyHandler : IHandler
+{
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+    private readonly INetwork network;
+    private readonly ILogger Logger = LogManager.GetLogger<TestClass_MobilePartyHandler>();
+
+    public ClanLifetimeHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+    {
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+        this.network = network;
+
+        messageBroker.Subscribe<TestInternalMessage>(Handle);
+        messageBroker.Subscribe<TestNetworkMessage>(Handle);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<TestInternalMessage>(Handle);
+        messageBroker.Unsubscribe<TestNetworkMessage>(Handle);
+    }
+
+    private void Handle(MessagePayload<TestInternalMessage> payload)
+    {
+        if (objectManager.TryGetId(payload.What.Instance, out string instanceId) == false)
+        {
+            Logger.Error("Failed to get {type} id", typeof(TestClass));
+            return;
+        }
+
+        if (objectManager.TryGetId(payload.What.Value, out string valueId) == false)
+        {
+            Logger.Error("Failed to get {type} id", typeof(MobileParty));
+            return;
+        }
+
+        network.SendAll(new TestNetworkMessage(instanceId, valueId));
+    }
+
+    private void Handle(MessagePayload<TestNetworkMessage> obj)
+    {
+        var payload = obj.What;
+
+        if (objectManager.TryGetObject<TestClass>(payload.InstanceId, out var instance) == false)
+        {
+            Logger.Error("Unable to find TestClass with string id {stringId}", payload.ValueId);
+            return;
+        }
+
+        if (objectManager.TryGetObject<MobileParty>(payload.ValueId, out var value) == false)
+        {
+            Logger.Error("Unable to find MobileParty with string id {stringId}", payload.ValueId);
+            return;
+        }
+
+        using (new AllowedThread())
+        {
+            instance.party = value;
+        }
+    }
+}

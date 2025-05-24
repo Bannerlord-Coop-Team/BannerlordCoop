@@ -2,52 +2,50 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
 
-namespace GameInterface.DynamicSync.Builders
+namespace GameInterface.DynamicSync.Builders;
+
+public class DynamicSyncAssemblyInfoBuilder
 {
-    public class DynamicSyncAssemblyInfoBuilder
+    private readonly DynamicSyncRegistry dynamicSyncRegistry;
+
+    public DynamicSyncAssemblyInfoBuilder(DynamicSyncRegistry dynamicSyncRegistry)
     {
-        private readonly DynamicSyncRegistry dynamicSyncRegistry;
+        this.dynamicSyncRegistry = dynamicSyncRegistry;
+    }
+    public SyntaxTree Build(IEnumerable<string> assemblies)
+    {
+        var ignoreCheckAccessAssemblies = new HashSet<Assembly>();
+        foreach (var registration in dynamicSyncRegistry.Registrations)
+        {
+            var dynamicRegistryItem = registration.Value;
+            ignoreCheckAccessAssemblies.Add(registration.Key.Assembly);
 
-        public DynamicSyncAssemblyInfoBuilder(DynamicSyncRegistry dynamicSyncRegistry)
-        {
-            this.dynamicSyncRegistry = dynamicSyncRegistry;
-        }
-        public SyntaxTree Build(IEnumerable<string> assemblies)
-        {
-            List<Assembly> ignoreCheckAccessAssemblies = new List<Assembly>();
-            foreach (var registration in dynamicSyncRegistry.Registrations)
+            foreach (var fieldInfo in dynamicRegistryItem.Fields)
             {
-                var dynamicRegistryItem = registration.Value;
-                ignoreCheckAccessAssemblies.Add(registration.Key.Assembly);
-
-                foreach (var fieldInfo in dynamicRegistryItem.Fields)
-                {
-                    ignoreCheckAccessAssemblies.Add(fieldInfo.FieldType.Assembly);
-                }
-
-                foreach (var propertyInfo in dynamicRegistryItem.Properties)
-                {
-                    ignoreCheckAccessAssemblies.Add(propertyInfo.PropertyType.Assembly);
-                }
-
-                foreach (var targetMethod in dynamicRegistryItem.TargetMethods)
-                {
-                    ignoreCheckAccessAssemblies.Add(targetMethod.DeclaringType.Assembly);
-                }
+                ignoreCheckAccessAssemblies.Add(fieldInfo.FieldType.Assembly);
             }
 
-                var assemblyInfoTemplate = TemplateParser.Parse("DynamicAssemblyInfoTemplate", new
+            foreach (var propertyInfo in dynamicRegistryItem.Properties)
             {
-                Assemblies = ignoreCheckAccessAssemblies.Distinct().Select(a => a.GetName().Name).Concat(assemblies)
-            });
+                ignoreCheckAccessAssemblies.Add(propertyInfo.PropertyType.Assembly);
+            }
 
-            DynamicSyncConfiguration.ExportFile("AssemblyInfo.cs", assemblyInfoTemplate);
-
-            return CSharpSyntaxTree.ParseText(assemblyInfoTemplate);
+            foreach (var targetMethod in dynamicRegistryItem.TargetMethods)
+            {
+                ignoreCheckAccessAssemblies.Add(targetMethod.DeclaringType.Assembly);
+            }
         }
+
+        var assemblyInfoTemplate = TemplateParser.Parse("DynamicAssemblyInfoTemplate", new
+        {
+            Assemblies = ignoreCheckAccessAssemblies.Select(a => a.GetName().Name).Concat(assemblies)
+        });
+
+        DynamicSyncConfiguration.ExportFile("AssemblyInfo.cs", assemblyInfoTemplate);
+
+        return CSharpSyntaxTree.ParseText(assemblyInfoTemplate);
     }
 }

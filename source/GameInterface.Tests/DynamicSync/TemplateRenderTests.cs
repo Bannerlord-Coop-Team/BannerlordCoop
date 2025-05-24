@@ -1,6 +1,7 @@
 ﻿using GameInterface.DynamicSync.Builders;
 using GameInterface.DynamicSync.Templates;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.Party;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -38,6 +39,34 @@ public class TemplateRenderTests
                 "Assembly1",
                 "Assembly2"
             }
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void HandlerByNetworkIdTemplateTest()
+    {
+        var result = TemplateParser.Parse("Handlers.HandlerByNetworkIdTemplate.txt", new
+        {
+            DeclaringType = "TestClass",
+            MemberType = nameof(MobileParty),
+            MemberName = "party",
+            InternalMessage = "TestInternalMessage",
+            NetworkMessage = "TestNetworkMessage",
+        });
+        SnapshotAssert.Equals(result);
+    }
+
+    [Fact]
+    public void HandlerByValueTemplateTest()
+    {
+        var result = TemplateParser.Parse("Handlers.HandlerByValueTemplate.txt", new
+        {
+            DeclaringType = "TestClass",
+            MemberType = nameof(MobileParty),
+            MemberName = "party",
+            InternalMessage = "TestInternalMessage",
+            NetworkMessage = "TestNetworkMessage",
         });
         SnapshotAssert.Equals(result);
     }

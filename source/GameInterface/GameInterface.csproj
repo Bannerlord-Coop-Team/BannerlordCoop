@@ -43,6 +43,8 @@
     <Compile Remove="DynamicSync\Templates\DynamicHandlerTemplate.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Remove="DynamicSync\Templates\Handlers\HandlerByNetworkIdTemplate.txt" />
+    <None Remove="DynamicSync\Templates\Handlers\HandlerByValueTemplate.txt" />
     <None Remove="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
   </ItemGroup>
   <ItemGroup>
@@ -241,6 +243,10 @@
 	    </AssemblyAttribute>
     </ItemGroup>
     <ItemGroup>
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\HandlerByValueTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Handlers\HandlerByNetworkIdTemplate.txt" />
+    </ItemGroup>
+    <ItemGroup>
       <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfoTemplate" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\DynamicPatchTemplate">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
@@ -268,7 +274,7 @@
       <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate" />
     </ItemGroup>
     <ItemGroup>
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalSetMessageTemplate">
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\UpdatedMessageTemplate">
         <CopyToOutputDirectory>Never</CopyToOutputDirectory>
       </EmbeddedResource>
     </ItemGroup>
