@@ -13,6 +13,7 @@ using GameInterface.Utils.LocalEvents;
 using GameInterface;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.Diamond;
+using System.Collections.Concurrent;
 
 namespace GameInterface.Utils
 {
@@ -57,8 +58,8 @@ namespace GameInterface.Utils
             var addIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ListAddIntercept)).MakeGenericMethod(typeof(TItem), typeof(TAddMessage));
             var removeMethod = typeof(List<TItem>).GetMethod("Remove");
             var removeIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
-            GenericPatchHelpers.CollectionAddInterceptCache.Add(fieldInfo, addIntercept);
-            GenericPatchHelpers.CollectionRemoveInterceptCache.Add(fieldInfo, removeIntercept);
+            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(fieldInfo, addIntercept);
+            GenericPatchHelpers.CollectionRemoveInterceptCache.TryAdd(fieldInfo, removeIntercept);
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsCorrectField(ci, fieldInfo),
                 addMethod,
@@ -100,8 +101,8 @@ namespace GameInterface.Utils
             var removeMethod = typeof(List<TItem>).GetMethod("Remove");
             var removeIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
-            GenericPatchHelpers.CollectionAddInterceptCache.Add(propertyInfo, addIntercept);
-            GenericPatchHelpers.CollectionRemoveInterceptCache.Add(propertyInfo, removeIntercept);
+            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(propertyInfo, addIntercept);
+            GenericPatchHelpers.CollectionRemoveInterceptCache.TryAdd(propertyInfo, removeIntercept);
 
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsPropertyGetter(ci, propertyInfo),
@@ -219,8 +220,8 @@ namespace GameInterface.Utils
             var removeMethod = typeof(MBList<TItem>).GetMethod("Remove");
             var removeIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(MBListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
-            GenericPatchHelpers.CollectionAddInterceptCache.Add(fieldInfo, addIntercept);
-            GenericPatchHelpers.CollectionRemoveInterceptCache.Add(fieldInfo, removeIntercept);
+            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(fieldInfo, addIntercept);
+            GenericPatchHelpers.CollectionRemoveInterceptCache.TryAdd(fieldInfo, removeIntercept);
 
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsCorrectField(ci, fieldInfo),
@@ -263,8 +264,8 @@ namespace GameInterface.Utils
             var removeMethod = typeof(List<TItem>).GetMethod("Remove");
             var removeIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(MBListRemoveIntercept)).MakeGenericMethod(typeof(TItem), typeof(TRemoveMessage));
 
-            GenericPatchHelpers.CollectionAddInterceptCache.Add(propertyInfo, addIntercept);
-            GenericPatchHelpers.CollectionRemoveInterceptCache.Add(propertyInfo, removeIntercept);
+            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(propertyInfo, addIntercept);
+            GenericPatchHelpers.CollectionRemoveInterceptCache.TryAdd(propertyInfo, removeIntercept);
 
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsPropertyGetter(ci, propertyInfo),
@@ -383,8 +384,8 @@ namespace GameInterface.Utils
             var dequeueMethod = typeof(Queue<TItem>).GetMethod("Dequeue");
             var dequeueIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueDequeueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TDequeueMessage));
 
-            GenericPatchHelpers.CollectionAddInterceptCache.Add(fieldInfo, enqueueMethod);
-            GenericPatchHelpers.CollectionRemoveInterceptCache.Add(fieldInfo, dequeueMethod);
+            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(fieldInfo, enqueueMethod);
+            GenericPatchHelpers.CollectionRemoveInterceptCache.TryAdd(fieldInfo, dequeueMethod);
 
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsCorrectField(ci, fieldInfo),
@@ -427,8 +428,8 @@ namespace GameInterface.Utils
             var dequeueMethod = typeof(Queue<TItem>).GetMethod("Dequeue");
             var dequeueIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueDequeueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TDequeueMessage));
 
-            GenericPatchHelpers.CollectionAddInterceptCache.Add(propertyInfo, enqueueMethod);
-            GenericPatchHelpers.CollectionRemoveInterceptCache.Add(propertyInfo, dequeueMethod);
+            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(propertyInfo, enqueueMethod);
+            GenericPatchHelpers.CollectionRemoveInterceptCache.TryAdd(propertyInfo, dequeueMethod);
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsPropertyGetter(ci, propertyInfo),
                 enqueueMethod,
@@ -540,7 +541,7 @@ namespace GameInterface.Utils
             var loadStack = new Stack<CodeInstruction>();
             var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
             var arrayAssignIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
-            GenericPatchHelpers.ArrayChangeInterceptCache.Add(fieldInfo, arrayAssignIntercept);
+            GenericPatchHelpers.ArrayChangeInterceptCache.TryAdd(fieldInfo, arrayAssignIntercept);
             // TODO: Implement properly with loading the correct instance onto the stack before call the method
 
             foreach (var instruction in instructions)
@@ -585,7 +586,7 @@ namespace GameInterface.Utils
             var loadStack = new Stack<CodeInstruction>();
             var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
             var arrayAssignIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(ArrayAssignIntercept)).MakeGenericMethod(typeof(TItem), typeof(TMessage));
-            GenericPatchHelpers.ArrayChangeInterceptCache.Add(propertyInfo, arrayAssignIntercept);
+            GenericPatchHelpers.ArrayChangeInterceptCache.TryAdd(propertyInfo, arrayAssignIntercept);
             // TODO: Implement properly with loading the correct instance onto the stack before call the method
 
             foreach (var instruction in instructions)
@@ -675,7 +676,7 @@ namespace GameInterface.Utils
 
             // Used for easier testing
             if (!GenericPatchHelpers.FieldInterceptCache.ContainsKey(fieldInfo))
-                GenericPatchHelpers.FieldInterceptCache.Add(fieldInfo, fieldIntercept);
+                GenericPatchHelpers.FieldInterceptCache.TryAdd(fieldInfo, fieldIntercept);
             foreach (var instruction in instructions)
             {
                 if (instruction.StoresField(fieldInfo))
@@ -922,9 +923,9 @@ namespace GameInterface.Utils
 
     public class GenericPatchHelpers
     {
-        public static Dictionary<FieldInfo, MethodInfo> FieldInterceptCache = new Dictionary<FieldInfo, MethodInfo>();
-        public static Dictionary<MemberInfo, MethodInfo> CollectionAddInterceptCache = new Dictionary<MemberInfo, MethodInfo>();
-        public static Dictionary<MemberInfo, MethodInfo> CollectionRemoveInterceptCache = new Dictionary<MemberInfo, MethodInfo>();
-        public static Dictionary<MemberInfo, MethodInfo> ArrayChangeInterceptCache = new Dictionary<MemberInfo, MethodInfo>();
+        public static ConcurrentDictionary<FieldInfo, MethodInfo> FieldInterceptCache = new ConcurrentDictionary<FieldInfo, MethodInfo>();
+        public static ConcurrentDictionary<MemberInfo, MethodInfo> CollectionAddInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
+        public static ConcurrentDictionary<MemberInfo, MethodInfo> CollectionRemoveInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
+        public static ConcurrentDictionary<MemberInfo, MethodInfo> ArrayChangeInterceptCache = new ConcurrentDictionary<MemberInfo, MethodInfo>();
     }
 }

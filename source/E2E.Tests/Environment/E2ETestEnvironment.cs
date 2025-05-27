@@ -182,6 +182,42 @@ internal class E2ETestEnvironment : IDisposable
     }
 
     /// <summary>
+    /// Gets the collection add intercept from the given <paramref name="member"/>
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Collection add intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetCollectionAddIntercept(MemberInfo member)
+    {
+
+        Assert.True(GenericPatchHelpers.CollectionAddInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the collection remove intercept from the given <paramref name="member"/>
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Collection remove intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetCollectionRemoveIntercept(MemberInfo member)
+    {
+
+        Assert.True(GenericPatchHelpers.CollectionRemoveInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
+    /// Gets the array change intercept from the given <paramref name="member"/>
+    /// </summary>
+    /// <param name="member">Member to get intercept from</param>
+    /// <returns>Array change intercept as <see cref="MethodInfo"/></returns>
+    public MethodInfo GetArrayChangeIntercept(MemberInfo member)
+    {
+
+        Assert.True(GenericPatchHelpers.ArrayChangeInterceptCache.TryGetValue(member, out var intercept));
+        return intercept;
+    }
+
+    /// <summary>
     /// Assert if the given field with a ValueType is properly synced between server and clients
     /// </summary>
     /// <typeparam name="TInstance">Type of instance that is tested</typeparam>

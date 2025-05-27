@@ -30,8 +30,6 @@ internal class TownDynamicSync : IDynamicSync
         // Already handled via property
         //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._governor)));
 
-
-        // TODO: Add back collection Support
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.Buildings)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.BuildingsInProgress)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeBoundVillagesCache)));
