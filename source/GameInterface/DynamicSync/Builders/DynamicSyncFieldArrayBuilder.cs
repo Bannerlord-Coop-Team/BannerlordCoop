@@ -17,13 +17,7 @@ namespace GameInterface.DynamicSync.Builders
 
         public string GetTranspiler(FieldInfo fieldInfo)
         {
-            string setTemplate = TemplateParser.Parse("Patches.FieldSetTranspilerTemplate",
-                new
-                {
-                    MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                    MemberName = fieldInfo.Name,
-                    MemberType = fieldInfo.FieldType.Name
-                });
+            string setTemplate = DynamicSyncBuilderHelper.GetSetTranspiler(fieldInfo);
 
             string changeTemplate = TemplateParser.Parse("Patches.FieldArrayChangeTranspilerTemplate",
                     new
@@ -45,18 +39,7 @@ namespace GameInterface.DynamicSync.Builders
 
         public IEnumerable<string> GetMessages(FieldInfo fieldInfo)
         {
-            string localMessage = TemplateParser.Parse("Messages.LocalSetMessageTemplate",
-                new
-                {
-                    MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                    MemberName = fieldInfo.Name,
-                    MemberType = GetArrayType(fieldInfo.FieldType),
-                    Libraries = new List<string>
-                    {
-                        fieldInfo.DeclaringType.Namespace,
-                        fieldInfo.FieldType.Namespace
-                    }
-                });
+            string localMessage = DynamicSyncBuilderHelper.GetLocalSetMessage(fieldInfo);
 
             string localChangeMessage = TemplateParser.Parse("Messages.LocalArrayChangeMessageTemplate",
                 new

@@ -17,30 +17,12 @@ namespace GameInterface.DynamicSync.Builders
         }
         public string GetTranspiler(FieldInfo fieldInfo)
         {
-            var template = TemplateParser.Parse("Patches.FieldSetTranspilerTemplate",
-                new
-                {
-                    MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                    MemberName = fieldInfo.Name,
-                    MemberType = fieldInfo.FieldType.Name
-                });
-            return template;
+            return DynamicSyncBuilderHelper.GetSetTranspiler(fieldInfo);
         }
 
         public IEnumerable<string> GetMessages(FieldInfo fieldInfo)
         {
-            string localMessage = TemplateParser.Parse("Messages.LocalSetMessageTemplate",
-                new
-                {
-                    MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                    MemberName = fieldInfo.Name,
-                    MemberType = fieldInfo.FieldType.Name,
-                    Libraries = new List<string>
-                    {
-                        fieldInfo.DeclaringType.Namespace,
-                        fieldInfo.FieldType.Namespace
-                    }
-                });
+            string localMessage = DynamicSyncBuilderHelper.GetLocalSetMessage(fieldInfo);
             string networkMessage;
             if (objectManager.IsTypeManaged(fieldInfo.FieldType))
             {

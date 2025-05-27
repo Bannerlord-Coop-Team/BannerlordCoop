@@ -14,18 +14,7 @@ namespace GameInterface.DynamicSync.Builders
         {
             this.objectManager = objectManager;
         }
-        public string GetPrefix(PropertyInfo propertyInfo)
-        {
-            var template = TemplateParser.Parse("Patches.PropertySetPrefixTemplate",
-                new
-                {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                    MemberName = propertyInfo.Name,
-                    MemberType = GetArrayType(propertyInfo.PropertyType)
-                });
-
-            return template;
-        }
+        public string GetPrefix(PropertyInfo propertyInfo) => DynamicSyncBuilderHelper.GetPrefix(propertyInfo);
 
         public string GetTranspiler(PropertyInfo propertyInfo)
         {
@@ -47,18 +36,7 @@ namespace GameInterface.DynamicSync.Builders
 
         public IEnumerable<string> GetMessages(PropertyInfo propertyInfo)
         {
-            string localMessage = TemplateParser.Parse("Messages.LocalSetMessageTemplate",
-                new
-                {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                    MemberName = propertyInfo.Name,
-                    MemberType = GetArrayType(propertyInfo.PropertyType),
-                    Libraries = new List<string>
-                    {
-                        propertyInfo.DeclaringType.Namespace,
-                        propertyInfo.PropertyType.Namespace
-                    }
-                });
+            string localMessage = DynamicSyncBuilderHelper.GetLocalSetMessage(propertyInfo);
 
             string localChangeMessage = TemplateParser.Parse("Messages.LocalArrayChangeMessageTemplate",
                 new

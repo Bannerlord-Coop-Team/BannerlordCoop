@@ -15,33 +15,12 @@ namespace GameInterface.DynamicSync.Builders
         {
             this.objectManager = objectManager;
         }
-        public string GetPrefix(PropertyInfo propertyInfo)
-        {
-            var template = TemplateParser.Parse("Patches.PropertySetPrefixTemplate",
-                new
-                {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                    MemberName = propertyInfo.Name,
-                    MemberType = propertyInfo.PropertyType.Name
-                });
-
-            return template;
-        }
+        public string GetPrefix(PropertyInfo propertyInfo) => DynamicSyncBuilderHelper.GetPrefix(propertyInfo);
 
         public IEnumerable<string> GetMessages(PropertyInfo propertyInfo)
         {
-            string localMessage = TemplateParser.Parse("Messages.LocalSetMessageTemplate",
-                new
-                {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                    MemberName = propertyInfo.Name,
-                    MemberType = propertyInfo.PropertyType.Name,
-                    Libraries = new List<string>
-                    {
-                        propertyInfo.DeclaringType.Namespace,
-                        propertyInfo.PropertyType.Namespace
-                    }
-                });
+            string localMessage = DynamicSyncBuilderHelper.GetLocalSetMessage(propertyInfo);
+
             string networkMessage;
             if(objectManager.IsTypeManaged(propertyInfo.PropertyType))
             {
