@@ -3,6 +3,7 @@ using Common.Network;
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace GameInterface.DynamicSync
@@ -23,7 +24,8 @@ namespace GameInterface.DynamicSync
 
         public void RegisterHandler(Type handlerType)
         {
-           handlers.Add((IHandler)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network }));
+           if(!handlers.Any(h => h.GetType() == handlerType))
+            handlers.Add((IHandler)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network }));
         }
 
         public void Dispose()

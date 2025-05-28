@@ -384,8 +384,8 @@ namespace GameInterface.Utils
             var dequeueMethod = typeof(Queue<TItem>).GetMethod("Dequeue");
             var dequeueIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueDequeueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TDequeueMessage));
 
-            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(fieldInfo, enqueueMethod);
-            GenericPatchHelpers.CollectionRemoveInterceptCache.TryAdd(fieldInfo, dequeueMethod);
+            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(fieldInfo, enqueueIntercept);
+            GenericPatchHelpers.CollectionRemoveInterceptCache.TryAdd(fieldInfo, dequeueIntercept);
 
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsCorrectField(ci, fieldInfo),
@@ -428,8 +428,8 @@ namespace GameInterface.Utils
             var dequeueMethod = typeof(Queue<TItem>).GetMethod("Dequeue");
             var dequeueIntercept = typeof(GenericPatches<TPatch, TInstance>).GetMethod(nameof(QueueDequeueIntercept)).MakeGenericMethod(typeof(TItem), typeof(TDequeueMessage));
 
-            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(propertyInfo, enqueueMethod);
-            GenericPatchHelpers.CollectionRemoveInterceptCache.TryAdd(propertyInfo, dequeueMethod);
+            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(propertyInfo, enqueueIntercept);
+            GenericPatchHelpers.CollectionRemoveInterceptCache.TryAdd(propertyInfo, dequeueIntercept);
             return PatchInstructions(instructions.ToList(),
                 (ci) => IsPropertyGetter(ci, propertyInfo),
                 enqueueMethod,

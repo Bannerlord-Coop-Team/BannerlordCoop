@@ -21,11 +21,11 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNe
 });
 Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeLocalMessage>((instanceId, data) => 
 {
-    if (!objectManager.TryGetId(data.Value, out string id)) return;
+    if (!objectManager.TryGetId(data.Value, out string id) && data.Value != null) return;
     network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(instanceId, id, data.Index));
 });
 SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage>((instance, data) => 
 {
-    if (!objectManager.TryGetObject<{{ElementType}}>(data.ValueId, out {{ElementType}} element)) return;
+    if (!objectManager.TryGetObject<{{ElementType}}>(data.ValueId, out {{ElementType}} element) && data.ValueId != null) return;
     instance.{{ MemberName }}[data.Index] = element;
 });

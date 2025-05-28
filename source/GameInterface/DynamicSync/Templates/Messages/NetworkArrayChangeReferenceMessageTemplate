@@ -23,7 +23,7 @@ namespace DynamicSync
 
         public {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(string instanceId, string valueId, int index) : base(instanceId, valueId)
         {
-            Index = Index;
+            Index = index;
         }
     }
 }

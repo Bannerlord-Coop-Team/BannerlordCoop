@@ -10,9 +10,13 @@ using GameInterface.DynamicSync;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Utils;
 using HarmonyLib;
+using Moq;
 using System.Reflection;
+using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
@@ -176,7 +180,6 @@ internal class E2ETestEnvironment : IDisposable
     /// <returns>Field intercept as <see cref="MethodInfo"/></returns>
     public MethodInfo GetIntercept(FieldInfo field)
     {
-
         Assert.True(GenericPatchHelpers.FieldInterceptCache.TryGetValue(field, out var intercept));
         return intercept;
     }
@@ -288,6 +291,571 @@ internal class E2ETestEnvironment : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<TField>(referenceId, out var clientFieldInstance));
             Assert.True(clientFieldInstance.Equals(fieldInfo.GetValue(clientInstance)), $"Expected: {clientFieldInstance} Actual: {fieldInfo.GetValue(clientInstance)}");
             Assert.NotNull(clientFieldInstance);
+        }
+    }
+
+    public void AssertCollectionReferenceField<TInstance, TField>(string fieldName, string? instanceStringId = null)
+        where TInstance : class
+        where TField : class
+    {
+        var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
+        string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
+
+        string firstReferenceId = CreateRegisteredObject<TField>();
+        string secondReferenceId = CreateRegisteredObject<TField>();
+
+        var setIntercept = GetIntercept(fieldInfo);
+        var addIntercept = GetCollectionAddIntercept(fieldInfo);
+        var removeIntercept = GetCollectionRemoveIntercept(fieldInfo);
+
+        Assert.True(Server.ObjectManager.TryGetObject<TField>(firstReferenceId, out TField valueInstance));
+
+        var initialValues = new List<TField>
+        {
+            valueInstance
+        };
+
+        var collection = (IEnumerable<TField>)Activator.CreateInstance(fieldInfo.FieldType, initialValues);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            setIntercept.Invoke(null, new object[] { serverInstance, collection, fieldName });
+            Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
+            Assert.Equal(1, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (IEnumerable<TField>)fieldInfo.GetValue(clientInstance);
+            
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+        
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(secondReferenceId, out var serverValue));
+            addIntercept.Invoke(null, new object[] { fieldInfo.GetValue(serverInstance), serverValue, serverInstance });
+            Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
+            Assert.Equal(2, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (IEnumerable<TField>)fieldInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(firstReferenceId, out var serverValue));
+            removeIntercept.Invoke(null, new object[] { fieldInfo.GetValue(serverInstance), serverValue, serverInstance });
+            Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
+            Assert.Equal(1, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (IEnumerable<TField>)fieldInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+    }
+
+    public void AssertCollectionReferenceProperty<TInstance, TField>(string propertyName, string? instanceStringId = null)
+        where TInstance : class
+        where TField : class
+    {
+        var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
+        string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
+
+        string firstReferenceId = CreateRegisteredObject<TField>();
+        string secondReferenceId = CreateRegisteredObject<TField>();
+
+        var addIntercept = GetCollectionAddIntercept(propertyInfo);
+        var removeIntercept = GetCollectionRemoveIntercept(propertyInfo);
+
+        Assert.True(Server.ObjectManager.TryGetObject<TField>(firstReferenceId, out TField valueInstance));
+
+        var initialValues = new List<TField>
+        {
+            valueInstance
+        };
+
+        var collection = (IEnumerable<TField>)Activator.CreateInstance(propertyInfo.PropertyType, initialValues);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            propertyInfo.SetValue(serverInstance, collection);
+
+            Assert.True(collection.Equals(propertyInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {propertyInfo.GetValue(serverInstance)}");
+            Assert.Equal(1, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (IEnumerable<TField>)propertyInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(secondReferenceId, out var serverValue));
+            addIntercept.Invoke(null, new object[] { propertyInfo.GetValue(serverInstance), serverValue, serverInstance });
+            Assert.True(collection.Equals(propertyInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {propertyInfo.GetValue(serverInstance)}");
+            Assert.Equal(2, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (IEnumerable<TField>)propertyInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(firstReferenceId, out var serverValue));
+            removeIntercept.Invoke(null, new object[] { propertyInfo.GetValue(serverInstance), serverValue, serverInstance });
+            Assert.True(collection.Equals(propertyInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {propertyInfo.GetValue(serverInstance)}");
+            Assert.Equal(1, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (IEnumerable<TField>)propertyInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+    }
+
+    public void AssertQueueReferenceField<TInstance, TField>(string fieldName, string? instanceStringId = null)
+        where TInstance : class
+        where TField : class
+    {
+        var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
+        string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
+
+        string firstReferenceId = CreateRegisteredObject<TField>();
+        string secondReferenceId = CreateRegisteredObject<TField>();
+
+        var setIntercept = GetIntercept(fieldInfo);
+        var addIntercept = GetCollectionAddIntercept(fieldInfo);
+        var removeIntercept = GetCollectionRemoveIntercept(fieldInfo);
+
+        Assert.True(Server.ObjectManager.TryGetObject<TField>(firstReferenceId, out TField valueInstance));
+
+        var initialValues = new List<TField>
+        {
+            valueInstance
+        };
+
+        var collection = (Queue<TField>)Activator.CreateInstance(fieldInfo.FieldType, initialValues);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            setIntercept.Invoke(null, new object[] { serverInstance, collection, fieldName });
+            Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
+            Assert.Equal(1, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (Queue<TField>)fieldInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(secondReferenceId, out var serverValue));
+            addIntercept.Invoke(null, new object[] { fieldInfo.GetValue(serverInstance), serverValue, serverInstance });
+            Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
+            Assert.Equal(2, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (Queue<TField>)fieldInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(firstReferenceId, out var serverValue));
+            removeIntercept.Invoke(null, new object[] { fieldInfo.GetValue(serverInstance), serverInstance });
+            Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
+            Assert.Equal(1, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (Queue<TField>)fieldInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+    }
+
+
+    public void AssertQueueReferenceProperty<TInstance, TField>(string propertyName, string? instanceStringId = null)
+        where TInstance : class
+        where TField : class
+    {
+        var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
+        string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
+
+        string firstReferenceId = CreateRegisteredObject<TField>();
+        string secondReferenceId = CreateRegisteredObject<TField>();
+
+        var addIntercept = GetCollectionAddIntercept(propertyInfo);
+        var removeIntercept = GetCollectionRemoveIntercept(propertyInfo);
+
+        Assert.True(Server.ObjectManager.TryGetObject<TField>(firstReferenceId, out TField valueInstance));
+
+        var initialValues = new List<TField>
+        {
+            valueInstance
+        };
+
+        var collection = (Queue<TField>)Activator.CreateInstance(propertyInfo.PropertyType, initialValues);
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            propertyInfo.SetValue(serverInstance, collection);
+            Assert.True(collection.Equals(propertyInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {propertyInfo.GetValue(serverInstance)}");
+            Assert.Equal(1, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (Queue<TField>)propertyInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(secondReferenceId, out var serverValue));
+            addIntercept.Invoke(null, new object[] { propertyInfo.GetValue(serverInstance), serverValue, serverInstance });
+            Assert.True(collection.Equals(propertyInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {propertyInfo.GetValue(serverInstance)}");
+            Assert.Equal(2, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (Queue<TField>)propertyInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(firstReferenceId, out var serverValue));
+            removeIntercept.Invoke(null, new object[] { propertyInfo.GetValue(serverInstance), serverInstance });
+            Assert.True(collection.Equals(propertyInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {propertyInfo.GetValue(serverInstance)}");
+            Assert.Equal(1, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (Queue<TField>)propertyInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+    }
+
+    public void AssertArrayReferenceField<TInstance, TField>(string fieldName, string? instanceStringId = null)
+        where TInstance : class
+        where TField : class
+    {
+        var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
+        string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
+
+        string firstReferenceId = CreateRegisteredObject<TField>();
+        string secondReferenceId = CreateRegisteredObject<TField>();
+
+        var setIntercept = GetIntercept(fieldInfo);
+        var changeIntercept = GetArrayChangeIntercept(fieldInfo);
+
+        Assert.True(Server.ObjectManager.TryGetObject<TField>(firstReferenceId, out TField valueInstance));
+        var collection = new TField[] { null, null, valueInstance, null, null }; 
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            setIntercept.Invoke(null, new object[] { serverInstance, collection, fieldName });
+            Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
+            Assert.Equal(1, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (TField[])fieldInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(secondReferenceId, out var serverValue));
+            changeIntercept.Invoke(null, new object[] { fieldInfo.GetValue(serverInstance), 1, serverValue, serverInstance });
+            Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
+            Assert.Equal(2, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (TField[])fieldInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(secondReferenceId, out var serverValue));
+            changeIntercept.Invoke(null, new object[] { fieldInfo.GetValue(serverInstance), 2, null, serverInstance });
+            Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
+            Assert.Equal(2, collection.Count());
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (TField[])fieldInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                Assert.Equal(serverReferenceId, clientReferenceId);
+            }
+        }
+    }
+
+    public void AssertArrayReferenceProperty<TInstance, TField>(string propertyName, string? instanceStringId = null)
+        where TInstance : class
+        where TField : class
+    {
+        var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
+        string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
+
+        string firstReferenceId = CreateRegisteredObject<TField>();
+        string secondReferenceId = CreateRegisteredObject<TField>();
+        var changeIntercept = GetArrayChangeIntercept(propertyInfo);
+
+        Assert.True(Server.ObjectManager.TryGetObject<TField>(firstReferenceId, out TField valueInstance));
+        var collection = new TField[] { null, null, valueInstance, null, null };
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            propertyInfo.SetValue(serverInstance, collection);
+            Assert.True(collection.Equals(propertyInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {propertyInfo.GetValue(serverInstance)}");
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (TField[])propertyInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                if(collection.ElementAt(i) == null)
+                {
+                    Assert.Equal(collection.ElementAt(i), clientList.ElementAt(i));
+                }
+                else 
+                { 
+                    Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                    Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                    Assert.Equal(serverReferenceId, clientReferenceId);
+                }
+            }
+        }
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(secondReferenceId, out var serverValue));
+            changeIntercept.Invoke(null, new object[] { propertyInfo.GetValue(serverInstance), 1, serverValue, serverInstance });
+            Assert.True(collection.Equals(propertyInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {propertyInfo.GetValue(serverInstance)}");
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (TField[])propertyInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                if (collection.ElementAt(i) == null)
+                {
+                    Assert.Equal(collection.ElementAt(i), clientList.ElementAt(i));
+                }
+                else
+                {
+                    Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                    Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                    Assert.Equal(serverReferenceId, clientReferenceId);
+                }
+            }
+        }
+
+        Server.Call(() =>
+        {
+            Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            Assert.True(Server.ObjectManager.TryGetObject<TField>(secondReferenceId, out var serverValue));
+            changeIntercept.Invoke(null, new object[] { propertyInfo.GetValue(serverInstance), 2, null, serverInstance });
+            Assert.True(collection.Equals(propertyInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {propertyInfo.GetValue(serverInstance)}");
+        });
+
+        // Assert
+        foreach (var client in Clients)
+        {
+            Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientList = (TField[])propertyInfo.GetValue(clientInstance);
+
+            Assert.Equal(collection.Count(), clientList.Count());
+            for (int i = 0; i < clientList.Count(); i++)
+            {
+                if (collection.ElementAt(i) == null)
+                {
+                    Assert.Equal(collection.ElementAt(i), clientList.ElementAt(i));
+                }
+                else
+                {
+                    Assert.True(Server.ObjectManager.TryGetId(collection.ElementAt(i), out string serverReferenceId));
+                    Assert.True(client.ObjectManager.TryGetId(clientList.ElementAt(i), out string clientReferenceId));
+                    Assert.Equal(serverReferenceId, clientReferenceId);
+                }
+            }
         }
     }
 

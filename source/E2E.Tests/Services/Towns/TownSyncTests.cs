@@ -1,10 +1,12 @@
 ﻿using E2E.Tests.Util;
+using GameInterface.DynamicSync;
 using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
+using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
@@ -12,12 +14,13 @@ namespace E2E.Tests.Services.Towns;
 public class TownSyncTests : SyncTestBase
 {
     private string townId;
+    private string secondBuildingId;
 
-	public TownSyncTests(ITestOutputHelper output) : base(output)
+    public TownSyncTests(ITestOutputHelper output) : base(output)
 	{
         townId = TestEnvironment.CreateRegisteredObject<Town>();
         TestEnvironment.CreateRegisteredObject<Hero>();
-	}
+    }
 
 
     [Fact]
@@ -30,26 +33,10 @@ public class TownSyncTests : SyncTestBase
         TestEnvironment.AssertField<Town, int>(nameof(Town.BoostBuildingProcess), 200);
         TestEnvironment.AssertField<Town, bool>(nameof(Town.InRebelliousState), true);
 
-        // Should work but currently the client side list of buildings is null instead of empty
-        var buildingId = TestEnvironment.CreateRegisteredObject<Building>();
-        var buildingsInfo = AccessTools.Field(typeof(Town), nameof(Town.Buildings));
-        var buildingIntercept = TestEnvironment.GetCollectionAddIntercept(buildingsInfo);
-        Server.Call(() =>
-        {
-            Assert.True(Server.ObjectManager.TryGetObject<Town>(townId, out var serverInstance));
-            Assert.True(Server.ObjectManager.TryGetObject<Building>(buildingId, out var buildingInstance));
-            buildingIntercept.Invoke(null, new object[] { serverInstance.Buildings, buildingInstance, serverInstance });
-        });
-
-        // Assert
-        foreach (var client in Clients)
-        {
-            Assert.True(client.ObjectManager.TryGetObject<Town>(townId, out var clientInstance));
-            Assert.True(client.ObjectManager.TryGetId<Building>(clientInstance.Buildings.Last(), out string id));
-
-            Assert.Equal(buildingId, id);
-
-        }
+        TestEnvironment.AssertCollectionReferenceField<Town, Building>(nameof(Town.Buildings));
+        TestEnvironment.AssertQueueReferenceField<Town, Building>(nameof(Town.BuildingsInProgress));
+        TestEnvironment.AssertCollectionReferenceField<Town, Village>(nameof(Town._tradeBoundVillagesCache));
+        TestEnvironment.AssertArrayReferenceProperty<Town, Workshop>(nameof(Town.Workshops));
     }
 
     [Fact]
