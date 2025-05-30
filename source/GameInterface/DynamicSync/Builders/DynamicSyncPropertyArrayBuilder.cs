@@ -32,62 +32,22 @@ namespace GameInterface.DynamicSync.Builders
 
         public IEnumerable<string> GetMessages(PropertyInfo propertyInfo)
         {
+            var templateData = GetTemplateData(propertyInfo);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
 
-            string localChangeMessage = TemplateParser.Parse("Messages.LocalArrayChangeMessageTemplate",
-                new
-                {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                    MemberName = propertyInfo.Name,
-                    MemberType = GetArrayType(propertyInfo.PropertyType),
-                    ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                    Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                });
+            string localChangeMessage = TemplateParser.Parse("Messages.LocalArrayChangeMessageTemplate", templateData);
 
             string networkMessage;
             string networkChangeMessage;
             if(objectManager.IsTypeManaged(propertyInfo.PropertyType.GetElementType()))
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetArrayType(propertyInfo.PropertyType),
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
-
-                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetArrayType(propertyInfo.PropertyType),
-                        ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
+                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetReferenceMessageTemplate", templateData);
+                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeReferenceMessageTemplate", templateData);
             }
             else
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetArrayType(propertyInfo.PropertyType),
-                        ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
-
-                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetArrayType(propertyInfo.PropertyType),
-                        ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
+                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetValueMessageTemplate", templateData);
+                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeValueMessageTemplate", templateData);
             }
 
             DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -104,33 +64,31 @@ namespace GameInterface.DynamicSync.Builders
 
         public string GetSubscription(PropertyInfo propertyInfo)
         {
+            var templateData = GetTemplateData(propertyInfo);
             if (objectManager.IsTypeManaged(propertyInfo.PropertyType.GetElementType()))
             {
-                return TemplateParser.Parse("Handlers.SubscribeArrayReferenceTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetArrayType(propertyInfo.PropertyType),
-                        ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
+                return TemplateParser.Parse("Handlers.SubscribeArrayReferenceTemplate", templateData);
             }
             else
             {
-                return TemplateParser.Parse("Handlers.SubscribeArrayValueTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
+                return TemplateParser.Parse("Handlers.SubscribeArrayValueTemplate", templateData);
             }
         }
         private string GetArrayType(Type type)
         {
             return type.GetElementType().Name + "[]";
+        }
+
+        private object GetTemplateData(PropertyInfo propertyInfo)
+        {
+            return new
+            {
+                MemberDeclaringType = propertyInfo.DeclaringType.Name,
+                MemberName = propertyInfo.Name,
+                MemberType = GetArrayType(propertyInfo.PropertyType),
+                ElementType = propertyInfo.PropertyType.GetElementType().Name,
+                Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
+            };
         }
     }
 }

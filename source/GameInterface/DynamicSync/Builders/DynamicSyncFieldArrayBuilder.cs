@@ -19,15 +19,7 @@ namespace GameInterface.DynamicSync.Builders
         {
             string setTemplate = DynamicSyncUtils.GetSetTranspiler(fieldInfo);
 
-            string changeTemplate = TemplateParser.Parse("Patches.FieldArrayChangeTranspilerTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetArrayType(fieldInfo.FieldType),
-                        ElementType = fieldInfo.FieldType.GetElementType().Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
+            string changeTemplate = TemplateParser.Parse("Patches.FieldArrayChangeTranspilerTemplate", GetTemplateData(fieldInfo));
 
             return string.Join(Environment.NewLine, setTemplate, changeTemplate);
         }
@@ -35,62 +27,22 @@ namespace GameInterface.DynamicSync.Builders
 
         public IEnumerable<string> GetMessages(FieldInfo fieldInfo)
         {
+            var templateData = GetTemplateData(fieldInfo);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(fieldInfo);
 
-            string localChangeMessage = TemplateParser.Parse("Messages.LocalArrayChangeMessageTemplate",
-                new
-                {
-                    MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                    MemberName = fieldInfo.Name,
-                    MemberType = GetArrayType(fieldInfo.FieldType),
-                    ElementType = fieldInfo.FieldType.GetElementType().Name,
-                    Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                });
+            string localChangeMessage = TemplateParser.Parse("Messages.LocalArrayChangeMessageTemplate", templateData);
 
             string networkMessage;
             string networkChangeMessage;
             if(objectManager.IsTypeManaged(fieldInfo.FieldType.GetElementType()))
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetArrayType(fieldInfo.FieldType),
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
-
-                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetArrayType(fieldInfo.FieldType),
-                        ElementType = fieldInfo.FieldType.GetElementType().Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
+                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetReferenceMessageTemplate", templateData);
+                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeReferenceMessageTemplate", templateData);
             }
             else
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetArrayType(fieldInfo.FieldType),
-                        ElementType = fieldInfo.FieldType.GetElementType().Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
-
-                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetArrayType(fieldInfo.FieldType),
-                        ElementType = fieldInfo.FieldType.GetElementType().Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
+                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetValueMessageTemplate", templateData);
+                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeValueMessageTemplate", templateData);
             }
 
             DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -107,33 +59,26 @@ namespace GameInterface.DynamicSync.Builders
 
         public string GetSubscription(FieldInfo fieldInfo)
         {
+            var templateData = GetTemplateData(fieldInfo);
             if (objectManager.IsTypeManaged(fieldInfo.FieldType.GetElementType()))
-            {
-                return TemplateParser.Parse("Handlers.SubscribeArrayReferenceTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetArrayType(fieldInfo.FieldType),
-                        ElementType = fieldInfo.FieldType.GetElementType().Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
-            }
+                return TemplateParser.Parse("Handlers.SubscribeArrayReferenceTemplate", templateData);
             else
-            {
-                return TemplateParser.Parse("Handlers.SubscribeArrayValueTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = fieldInfo.FieldType.Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
-            }
+                return TemplateParser.Parse("Handlers.SubscribeArrayValueTemplate", templateData);
         }
         private string GetArrayType(Type type)
         {
             return type.GetElementType().Name + "[]";
+        }
+        private object GetTemplateData(FieldInfo fieldInfo)
+        {
+            return new
+            {
+                MemberDeclaringType = fieldInfo.DeclaringType.Name,
+                MemberName = fieldInfo.Name,
+                MemberType = GetArrayType(fieldInfo.FieldType),
+                ElementType = fieldInfo.FieldType.GetElementType().Name,
+                Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
+            };
         }
     }
 }

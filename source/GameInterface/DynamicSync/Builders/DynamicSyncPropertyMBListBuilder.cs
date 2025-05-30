@@ -18,108 +18,32 @@ namespace GameInterface.DynamicSync.Builders
 
         public string GetTranspiler(PropertyInfo propertyInfo)
         {
-            string changeTemplate = TemplateParser.Parse("Patches.PropertyListChangeTranspilerTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                        ElementType = GetElementType(propertyInfo.PropertyType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
-
-            return changeTemplate;
+            return TemplateParser.Parse("Patches.PropertyListChangeTranspilerTemplate", GetTemplateData(propertyInfo));
         }
 
 
         public IEnumerable<string> GetMessages(PropertyInfo propertyInfo)
         {
+            var templateData = GetTemplateData(propertyInfo);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
 
-            string localAddMessage = TemplateParser.Parse("Messages.LocalCollectionAddMessageTemplate",
-                new
-                {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                    MemberName = propertyInfo.Name,
-                    MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                    ElementType = GetElementType(propertyInfo.PropertyType).Name,
-                    Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                });
-
-            string localRemoveMessage = TemplateParser.Parse("Messages.LocalCollectionRemoveMessageTemplate",
-                new
-                {
-                    MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                    MemberName = propertyInfo.Name,
-                    MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                    ElementType = GetElementType(propertyInfo.PropertyType).Name,
-                    Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                });
+            string localAddMessage = TemplateParser.Parse("Messages.LocalCollectionAddMessageTemplate", templateData);
+            string localRemoveMessage = TemplateParser.Parse("Messages.LocalCollectionRemoveMessageTemplate", templateData);
 
             string networkMessage;
             string networkAddMessage;
             string networkRemoveMessage;
             if (objectManager.IsTypeManaged(GetElementType(propertyInfo.PropertyType)))
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
-
-                networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                        ElementType = GetElementType(propertyInfo.PropertyType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
-                networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                        ElementType = GetElementType(propertyInfo.PropertyType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
+                networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetReferenceMessageTemplate", templateData);
+                networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddReferenceMessageTemplate", templateData);
+                networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveReferenceMessageTemplate", templateData);
             }
             else
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                        ElementType = GetElementType(propertyInfo.PropertyType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
-
-                networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                        ElementType = GetElementType(propertyInfo.PropertyType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
-
-                networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                        ElementType = GetElementType(propertyInfo.PropertyType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
+                networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetValueMessageTemplate", templateData);
+                networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddValueMessageTemplate", templateData);
+                networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveValueMessageTemplate", templateData);
             }
 
             DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -141,29 +65,11 @@ namespace GameInterface.DynamicSync.Builders
 
         public string GetSubscription(PropertyInfo propertyInfo)
         {
+            var templateData = GetTemplateData(propertyInfo);
             if (objectManager.IsTypeManaged(GetElementType(propertyInfo.PropertyType)))
-            {
-                return TemplateParser.Parse("Handlers.SubscribeCollectionReferenceTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = GetMbListTypeName(propertyInfo.PropertyType),
-                        ElementType = GetElementType(propertyInfo.PropertyType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
-            }
+                return TemplateParser.Parse("Handlers.SubscribeCollectionReferenceTemplate", templateData);
             else
-            {
-                return TemplateParser.Parse("Handlers.SubscribeCollectionValueTemplate",
-                    new
-                    {
-                        MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                        MemberName = propertyInfo.Name,
-                        MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
-                    });
-            }
+                return TemplateParser.Parse("Handlers.SubscribeCollectionValueTemplate", templateData);
         }
         private string GetMbListTypeName(Type type)
         {
@@ -173,6 +79,18 @@ namespace GameInterface.DynamicSync.Builders
         private Type GetElementType(Type type)
         {
             return type.GetGenericArguments()[0];
+        }
+
+        private object GetTemplateData(PropertyInfo propertyInfo)
+        {
+            return new
+            {
+                MemberDeclaringType = propertyInfo.DeclaringType.Name,
+                MemberName = propertyInfo.Name,
+                MemberType = GetMbListTypeName(propertyInfo.PropertyType),
+                ElementType = propertyInfo.PropertyType.GetElementType().Name,
+                Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
+            };
         }
     }
 }

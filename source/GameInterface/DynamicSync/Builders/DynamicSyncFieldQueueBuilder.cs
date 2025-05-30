@@ -19,15 +19,7 @@ namespace GameInterface.DynamicSync.Builders
         {
             string setTemplate = DynamicSyncUtils.GetSetTranspiler(fieldInfo);
 
-            string changeTemplate = TemplateParser.Parse("Patches.FieldQueueChangeTranspilerTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
-                        ElementType = GetElementType(fieldInfo.FieldType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
+            string changeTemplate = TemplateParser.Parse("Patches.FieldQueueChangeTranspilerTemplate", GetTemplateData(fieldInfo));
 
             return string.Join(Environment.NewLine, setTemplate, changeTemplate);
         }
@@ -35,92 +27,27 @@ namespace GameInterface.DynamicSync.Builders
 
         public IEnumerable<string> GetMessages(FieldInfo fieldInfo)
         {
+            var templateData = GetTemplateData(fieldInfo);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(fieldInfo);
 
-            string localAddMessage = TemplateParser.Parse("Messages.LocalCollectionAddMessageTemplate",
-                new
-                {
-                    MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                    MemberName = fieldInfo.Name,
-                    MemberType = GetQueueTypeNames(fieldInfo.FieldType),
-                    ElementType = GetElementType(fieldInfo.FieldType).Name,
-                    Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                });
+            string localAddMessage = TemplateParser.Parse("Messages.LocalCollectionAddMessageTemplate", templateData);
 
-            string localRemoveMessage = TemplateParser.Parse("Messages.LocalCollectionRemoveMessageTemplate",
-                new
-                {
-                    MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                    MemberName = fieldInfo.Name,
-                    MemberType = GetQueueTypeNames(fieldInfo.FieldType),
-                    ElementType = GetElementType(fieldInfo.FieldType).Name,
-                    Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                });
+            string localRemoveMessage = TemplateParser.Parse("Messages.LocalCollectionRemoveMessageTemplate", templateData);
 
             string networkMessage;
             string networkAddMessage;
             string networkRemoveMessage;
             if (objectManager.IsTypeManaged(GetElementType(fieldInfo.FieldType)))
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
-
-                networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
-                        ElementType = GetElementType(fieldInfo.FieldType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
-                networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
-                        ElementType = GetElementType(fieldInfo.FieldType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
+                networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetReferenceMessageTemplate", templateData);
+                networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddReferenceMessageTemplate", templateData);
+                networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveReferenceMessageTemplate", templateData);
             }
             else
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
-                        ElementType = GetElementType(fieldInfo.FieldType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
-
-                networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
-                        ElementType = GetElementType(fieldInfo.FieldType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
-
-                networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
-                        ElementType = GetElementType(fieldInfo.FieldType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
+                networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetValueMessageTemplate", templateData);
+                networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddValueMessageTemplate", templateData);
+                networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveValueMessageTemplate", templateData);
             }
 
             DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -142,28 +69,14 @@ namespace GameInterface.DynamicSync.Builders
 
         public string GetSubscription(FieldInfo fieldInfo)
         {
+            var templateData = GetTemplateData(fieldInfo);
             if (objectManager.IsTypeManaged(GetElementType(fieldInfo.FieldType)))
             {
-                return TemplateParser.Parse("Handlers.SubscribeQueueReferenceTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = GetQueueTypeNames(fieldInfo.FieldType),
-                        ElementType = GetElementType(fieldInfo.FieldType).Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
+                return TemplateParser.Parse("Handlers.SubscribeQueueReferenceTemplate", templateData);
             }
             else
             {
-                return TemplateParser.Parse("Handlers.SubscribeQueueValueTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = fieldInfo.FieldType.Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
+                return TemplateParser.Parse("Handlers.SubscribeQueueValueTemplate", templateData);
             }
         }
 
@@ -175,6 +88,18 @@ namespace GameInterface.DynamicSync.Builders
         private Type GetElementType(Type type)
         {
             return type.GetGenericArguments()[0];
+        }
+
+        private object GetTemplateData(FieldInfo fieldInfo)
+        {
+            return new
+            {
+                MemberDeclaringType = fieldInfo.DeclaringType.Name,
+                MemberName = fieldInfo.Name,
+                MemberType = GetQueueTypeNames(fieldInfo.FieldType),
+                ElementType = GetElementType(fieldInfo.FieldType).Name,
+                Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
+            };
         }
     }
 }

@@ -22,29 +22,16 @@ namespace GameInterface.DynamicSync.Builders
 
         public IEnumerable<string> GetMessages(FieldInfo fieldInfo)
         {
+            var templateData = GetTemplateData(fieldInfo);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(fieldInfo);
             string networkMessage;
             if (objectManager.IsTypeManaged(fieldInfo.FieldType))
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = fieldInfo.FieldType.Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
+                networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate", templateData);
             }
             else
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = fieldInfo.FieldType.Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
+                networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
             }
 
             DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -56,28 +43,22 @@ namespace GameInterface.DynamicSync.Builders
 
         public string GetSubscription(FieldInfo fieldInfo)
         {
+            var templateData = GetTemplateData(fieldInfo);
             if (objectManager.IsTypeManaged(fieldInfo.FieldType))
-            {
-                return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = fieldInfo.FieldType.Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
-            }
+                return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
             else
+                return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
+        }
+
+        private object GetTemplateData(FieldInfo fieldInfo)
+        {
+            return new
             {
-                return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate",
-                    new
-                    {
-                        MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                        MemberName = fieldInfo.Name,
-                        MemberType = fieldInfo.FieldType.Name,
-                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
-                    });
-            }
+                MemberDeclaringType = fieldInfo.DeclaringType.Name,
+                MemberName = fieldInfo.Name,
+                MemberType = fieldInfo.FieldType.Name,
+                Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
+            };
         }
     }
 }
