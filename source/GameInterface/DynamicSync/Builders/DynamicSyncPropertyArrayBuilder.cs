@@ -14,7 +14,7 @@ namespace GameInterface.DynamicSync.Builders
         {
             this.objectManager = objectManager;
         }
-        public string GetPrefix(PropertyInfo propertyInfo) => DynamicSyncBuilderHelper.GetPrefix(propertyInfo);
+        public string GetPrefix(PropertyInfo propertyInfo) => DynamicSyncUtils.GetPrefix(propertyInfo);
 
         public string GetTranspiler(PropertyInfo propertyInfo)
         {
@@ -25,18 +25,14 @@ namespace GameInterface.DynamicSync.Builders
                         MemberName = propertyInfo.Name,
                         MemberType = GetArrayType(propertyInfo.PropertyType),
                         ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                        Libraries = new List<string>
-                        {
-                            propertyInfo.DeclaringType.Namespace,
-                            propertyInfo.PropertyType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
         }
 
 
         public IEnumerable<string> GetMessages(PropertyInfo propertyInfo)
         {
-            string localMessage = DynamicSyncBuilderHelper.GetLocalSetMessage(propertyInfo);
+            string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
 
             string localChangeMessage = TemplateParser.Parse("Messages.LocalArrayChangeMessageTemplate",
                 new
@@ -45,11 +41,7 @@ namespace GameInterface.DynamicSync.Builders
                     MemberName = propertyInfo.Name,
                     MemberType = GetArrayType(propertyInfo.PropertyType),
                     ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                    Libraries = new List<string>
-                    {
-                        propertyInfo.DeclaringType.Namespace,
-                        propertyInfo.PropertyType.Namespace
-                    }
+                    Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                 });
 
             string networkMessage;
@@ -62,11 +54,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = propertyInfo.DeclaringType.Name,
                         MemberName = propertyInfo.Name,
                         MemberType = GetArrayType(propertyInfo.PropertyType),
-                        Libraries = new List<string>
-                        {
-                        propertyInfo.DeclaringType.Namespace,
-                        propertyInfo.PropertyType.GetElementType().Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
 
                 networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeReferenceMessageTemplate",
@@ -76,11 +64,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberName = propertyInfo.Name,
                         MemberType = GetArrayType(propertyInfo.PropertyType),
                         ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                        Libraries = new List<string>
-                        {
-                        propertyInfo.DeclaringType.Namespace,
-                        propertyInfo.PropertyType.GetElementType().Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
             }
             else
@@ -92,11 +76,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberName = propertyInfo.Name,
                         MemberType = GetArrayType(propertyInfo.PropertyType),
                         ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                        Libraries = new List<string>
-                        {
-                            propertyInfo.DeclaringType.Namespace,
-                            propertyInfo.PropertyType.GetElementType().Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
 
                 networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeValueMessageTemplate",
@@ -106,11 +86,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberName = propertyInfo.Name,
                         MemberType = GetArrayType(propertyInfo.PropertyType),
                         ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                        Libraries = new List<string>
-                        {
-                        propertyInfo.DeclaringType.Namespace,
-                        propertyInfo.PropertyType.GetElementType().Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
             }
 
@@ -137,11 +113,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberName = propertyInfo.Name,
                         MemberType = GetArrayType(propertyInfo.PropertyType),
                         ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                        Libraries = new List<string>
-                        {
-                            propertyInfo.DeclaringType.Namespace,
-                            propertyInfo.PropertyType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
             }
             else
@@ -152,11 +124,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = propertyInfo.DeclaringType.Name,
                         MemberName = propertyInfo.Name,
                         MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = new List<string>
-                        {
-                            propertyInfo.DeclaringType.Namespace,
-                            propertyInfo.PropertyType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
             }
         }

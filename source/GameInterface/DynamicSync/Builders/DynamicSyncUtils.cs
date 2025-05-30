@@ -6,7 +6,7 @@ using System.Text;
 
 namespace GameInterface.DynamicSync.Builders
 {
-    public static class DynamicSyncBuilderHelper
+    public static class DynamicSyncUtils
     {
         public static string GetSetTranspiler(FieldInfo fieldInfo)
         {
@@ -50,11 +50,11 @@ namespace GameInterface.DynamicSync.Builders
             var libraries = new List<string>
             {
                 memberInfo.DeclaringType.Namespace,
-                memberType.Namespace,
+                GetNamespace(memberType)
             };
 
             if(memberType.IsArray || memberType.IsGenericType)
-                libraries.Add(GetElementType(memberType).Namespace);
+                libraries.Add(GetNamespace(GetElementType(memberType)));
 
             return TemplateParser.Parse("Messages.LocalSetMessageTemplate",
                 new
@@ -93,6 +93,51 @@ namespace GameInterface.DynamicSync.Builders
                 return type.GetElementType();
             else
                 return type.GetGenericArguments()[0];
+        }
+
+        public static string GetNamespace(Type type)
+        {
+            string result = null;
+            if(type.DeclaringType != null)
+            {
+                result = $".{GetDeclaringTypeName(type.DeclaringType)}";
+            }
+
+            return $"{(result != null ? "static " : "") }{type.Namespace}{result}";
+        }
+
+        public static IEnumerable<string> GetLibraries(MemberInfo memberInfo)
+        {
+            Type memberType;
+            if (memberInfo is PropertyInfo propertyInfo)
+            {
+                memberType = propertyInfo.PropertyType;
+                yield return GetNamespace(propertyInfo.DeclaringType);
+            }
+            else if (memberInfo is FieldInfo fieldInfo)
+            {
+                memberType = fieldInfo.FieldType;
+                yield return GetNamespace(fieldInfo.DeclaringType);
+            }
+            else
+            {
+                throw new NotSupportedException($"Unsupported MemberInfo of type {memberInfo.MemberType} for GetLibraries");
+            }
+
+            if (memberType.IsArray || memberType.IsGenericType)
+            {
+                yield return GetNamespace(GetElementType(memberType));
+            }
+            yield return GetNamespace(memberType);
+        }
+
+        private static string GetDeclaringTypeName(Type type)
+        {
+            if(type.DeclaringType != null)
+            {
+                return $"{GetDeclaringTypeName(type.DeclaringType)}.{type.Name}";
+            }
+            return type.Name;
         }
     }
 }

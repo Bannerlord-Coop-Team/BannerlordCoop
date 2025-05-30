@@ -1,5 +1,5 @@
 ﻿[HarmonyPatch(typeof({{ MemberDeclaringType }}))]
-public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : GenericPatches<{{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix, Town>
+public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : GenericPatches<{{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix, {{ MemberDeclaringType }}>
 {
     [HarmonyPatch(nameof({{ MemberDeclaringType }}.{{ MemberName }}), MethodType.Setter)]
     [HarmonyPrefix]

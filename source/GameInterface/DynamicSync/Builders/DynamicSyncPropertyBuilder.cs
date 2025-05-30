@@ -15,11 +15,11 @@ namespace GameInterface.DynamicSync.Builders
         {
             this.objectManager = objectManager;
         }
-        public string GetPrefix(PropertyInfo propertyInfo) => DynamicSyncBuilderHelper.GetPrefix(propertyInfo);
+        public string GetPrefix(PropertyInfo propertyInfo) => DynamicSyncUtils.GetPrefix(propertyInfo);
 
         public IEnumerable<string> GetMessages(PropertyInfo propertyInfo)
         {
-            string localMessage = DynamicSyncBuilderHelper.GetLocalSetMessage(propertyInfo);
+            string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
 
             string networkMessage;
             if(objectManager.IsTypeManaged(propertyInfo.PropertyType))
@@ -30,11 +30,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = propertyInfo.DeclaringType.Name,
                         MemberName = propertyInfo.Name,
                         MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = new List<string>
-                        {
-                        propertyInfo.DeclaringType.Namespace,
-                        propertyInfo.PropertyType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
             }
             else
@@ -45,11 +41,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = propertyInfo.DeclaringType.Name,
                         MemberName = propertyInfo.Name,
                         MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = new List<string>
-                        {
-                            propertyInfo.DeclaringType.Namespace,
-                            propertyInfo.PropertyType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
             }
 
@@ -70,11 +62,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = propertyInfo.DeclaringType.Name,
                         MemberName = propertyInfo.Name,
                         MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = new List<string>
-                        {
-                            propertyInfo.DeclaringType.Namespace,
-                            propertyInfo.PropertyType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
             }
             else
@@ -85,11 +73,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = propertyInfo.DeclaringType.Name,
                         MemberName = propertyInfo.Name,
                         MemberType = propertyInfo.PropertyType.Name,
-                        Libraries = new List<string>
-                        {
-                            propertyInfo.DeclaringType.Namespace,
-                            propertyInfo.PropertyType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
                     });
             }
         }

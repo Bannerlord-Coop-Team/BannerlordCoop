@@ -17,12 +17,12 @@ namespace GameInterface.DynamicSync.Builders
         }
         public string GetTranspiler(FieldInfo fieldInfo)
         {
-            return DynamicSyncBuilderHelper.GetSetTranspiler(fieldInfo);
+            return DynamicSyncUtils.GetSetTranspiler(fieldInfo);
         }
 
         public IEnumerable<string> GetMessages(FieldInfo fieldInfo)
         {
-            string localMessage = DynamicSyncBuilderHelper.GetLocalSetMessage(fieldInfo);
+            string localMessage = DynamicSyncUtils.GetLocalSetMessage(fieldInfo);
             string networkMessage;
             if (objectManager.IsTypeManaged(fieldInfo.FieldType))
             {
@@ -32,11 +32,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
                         MemberType = fieldInfo.FieldType.Name,
-                        Libraries = new List<string>
-                        {
-                        fieldInfo.DeclaringType.Namespace,
-                        fieldInfo.FieldType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
             }
             else
@@ -47,11 +43,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
                         MemberType = fieldInfo.FieldType.Name,
-                        Libraries = new List<string>
-                        {
-                            fieldInfo.DeclaringType.Namespace,
-                            fieldInfo.FieldType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
             }
 
@@ -72,11 +64,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
                         MemberType = fieldInfo.FieldType.Name,
-                        Libraries = new List<string>
-                        {
-                            fieldInfo.DeclaringType.Namespace,
-                            fieldInfo.FieldType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
             }
             else
@@ -87,11 +75,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
                         MemberType = fieldInfo.FieldType.Name,
-                        Libraries = new List<string>
-                        {
-                            fieldInfo.DeclaringType.Namespace,
-                            fieldInfo.FieldType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
             }
         }

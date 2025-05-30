@@ -17,7 +17,7 @@ namespace GameInterface.DynamicSync.Builders
 
         public string GetTranspiler(FieldInfo fieldInfo)
         {
-            string setTemplate = DynamicSyncBuilderHelper.GetSetTranspiler(fieldInfo);
+            string setTemplate = DynamicSyncUtils.GetSetTranspiler(fieldInfo);
 
             string changeTemplate = TemplateParser.Parse("Patches.FieldArrayChangeTranspilerTemplate",
                     new
@@ -26,11 +26,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberName = fieldInfo.Name,
                         MemberType = GetArrayType(fieldInfo.FieldType),
                         ElementType = fieldInfo.FieldType.GetElementType().Name,
-                        Libraries = new List<string>
-                        {
-                            fieldInfo.DeclaringType.Namespace,
-                            fieldInfo.FieldType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
 
             return string.Join(Environment.NewLine, setTemplate, changeTemplate);
@@ -39,7 +35,7 @@ namespace GameInterface.DynamicSync.Builders
 
         public IEnumerable<string> GetMessages(FieldInfo fieldInfo)
         {
-            string localMessage = DynamicSyncBuilderHelper.GetLocalSetMessage(fieldInfo);
+            string localMessage = DynamicSyncUtils.GetLocalSetMessage(fieldInfo);
 
             string localChangeMessage = TemplateParser.Parse("Messages.LocalArrayChangeMessageTemplate",
                 new
@@ -48,11 +44,7 @@ namespace GameInterface.DynamicSync.Builders
                     MemberName = fieldInfo.Name,
                     MemberType = GetArrayType(fieldInfo.FieldType),
                     ElementType = fieldInfo.FieldType.GetElementType().Name,
-                    Libraries = new List<string>
-                    {
-                        fieldInfo.DeclaringType.Namespace,
-                        fieldInfo.FieldType.Namespace
-                    }
+                    Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                 });
 
             string networkMessage;
@@ -65,11 +57,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
                         MemberType = GetArrayType(fieldInfo.FieldType),
-                        Libraries = new List<string>
-                        {
-                        fieldInfo.DeclaringType.Namespace,
-                        fieldInfo.FieldType.GetElementType().Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
 
                 networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeReferenceMessageTemplate",
@@ -79,11 +67,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberName = fieldInfo.Name,
                         MemberType = GetArrayType(fieldInfo.FieldType),
                         ElementType = fieldInfo.FieldType.GetElementType().Name,
-                        Libraries = new List<string>
-                        {
-                        fieldInfo.DeclaringType.Namespace,
-                        fieldInfo.FieldType.GetElementType().Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
             }
             else
@@ -95,11 +79,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberName = fieldInfo.Name,
                         MemberType = GetArrayType(fieldInfo.FieldType),
                         ElementType = fieldInfo.FieldType.GetElementType().Name,
-                        Libraries = new List<string>
-                        {
-                            fieldInfo.DeclaringType.Namespace,
-                            fieldInfo.FieldType.GetElementType().Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
 
                 networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeValueMessageTemplate",
@@ -109,11 +89,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberName = fieldInfo.Name,
                         MemberType = GetArrayType(fieldInfo.FieldType),
                         ElementType = fieldInfo.FieldType.GetElementType().Name,
-                        Libraries = new List<string>
-                        {
-                        fieldInfo.DeclaringType.Namespace,
-                        fieldInfo.FieldType.GetElementType().Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
             }
 
@@ -140,11 +116,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberName = fieldInfo.Name,
                         MemberType = GetArrayType(fieldInfo.FieldType),
                         ElementType = fieldInfo.FieldType.GetElementType().Name,
-                        Libraries = new List<string>
-                        {
-                            fieldInfo.DeclaringType.Namespace,
-                            fieldInfo.FieldType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
             }
             else
@@ -155,11 +127,7 @@ namespace GameInterface.DynamicSync.Builders
                         MemberDeclaringType = fieldInfo.DeclaringType.Name,
                         MemberName = fieldInfo.Name,
                         MemberType = fieldInfo.FieldType.Name,
-                        Libraries = new List<string>
-                        {
-                            fieldInfo.DeclaringType.Namespace,
-                            fieldInfo.FieldType.Namespace
-                        }
+                        Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
                     });
             }
         }

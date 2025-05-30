@@ -228,7 +228,7 @@ internal class E2ETestEnvironment : IDisposable
     /// <param name="fieldName">Name of the field to be verified</param>
     /// <param name="value">Value to use for assertions has to be of type <typeparamref name="TField"/></param>
     /// <param name="instanceStringId">The specific stringId of the instance to be tested defaults to the first registered instance <typeparamref name="TInstance"/></param>
-    public void AssertField<TInstance, TField>(string fieldName, TField value, string instanceStringId = null)
+    public void AssertField<TInstance, TField>(string fieldName, TField value, string instanceStringId = null, TField? defaultValue = default(TField))
         where TInstance : class
     {
         bool isTextObject = typeof(TField) == typeof(TextObject);
@@ -239,8 +239,11 @@ internal class E2ETestEnvironment : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+            if (isTextObject && (defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue()) is TextObject)
+                Assert.Equal(((defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue()) as TextObject)?.Value, (fieldInfo.GetValue(serverInstance) as TextObject)?.Value);
+            else
+                Assert.Equal(defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
 
-            Assert.Equal(fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
             intercept.Invoke(null, new object[] { serverInstance, value, fieldName });
             Assert.True(value.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {value} Actual: {fieldInfo.GetValue(serverInstance)}");
         });
@@ -871,14 +874,17 @@ internal class E2ETestEnvironment : IDisposable
     public void AssertProperty<TInstance, TProperty>(string propertyName, TProperty value, TProperty? defaultValue = default, string? instanceStringId = null)
         where TInstance : class
     {
+        bool isTextObject = typeof(TProperty) == typeof(TextObject);
         Assert.True(typeof(TProperty).IsValueType || typeof(TProperty) == typeof(string) || typeof(TProperty) == typeof(TextObject));
         var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
         string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
         Server.Call((Action)(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
-
-            Assert.Equal(defaultValue, propertyInfo.GetValue((object)serverInstance));
+            if (isTextObject && (defaultValue ?? propertyInfo.GetUnderlyingType().GetDefaultValue()) is TextObject)
+                Assert.Equal(((defaultValue ?? propertyInfo.GetUnderlyingType().GetDefaultValue()) as TextObject)?.Value, (propertyInfo.GetValue(serverInstance) as TextObject)?.Value);
+            else
+                Assert.Equal(defaultValue ?? propertyInfo.GetUnderlyingType().GetDefaultValue(), propertyInfo.GetValue(serverInstance));
             var set = propertyInfo.GetSetMethod();
             set.Invoke(serverInstance, new object[] { value });
         }));
