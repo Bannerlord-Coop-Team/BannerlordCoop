@@ -90,7 +90,8 @@ namespace GameInterface.DynamicSync.Builders
                 MemberName = fieldInfo.Name,
                 MemberType = GetListTypeName(fieldInfo.FieldType),
                 ElementType = GetElementType(fieldInfo.FieldType).Name,
-                Libraries = DynamicSyncUtils.GetLibraries(fieldInfo)
+                Libraries = DynamicSyncUtils.GetLibraries(fieldInfo),
+                NotReadOnly = !fieldInfo.IsInitOnly
             };
         }
     }

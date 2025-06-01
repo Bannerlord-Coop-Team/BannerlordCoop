@@ -89,7 +89,8 @@ namespace GameInterface.DynamicSync.Builders
                 MemberName = propertyInfo.Name,
                 MemberType = GetMbListTypeName(propertyInfo.PropertyType),
                 ElementType = propertyInfo.PropertyType.GetElementType().Name,
-                Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
+                Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
+                NotReadOnly = propertyInfo.SetMethod != null
             };
         }
     }

@@ -1,4 +1,7 @@
-﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+﻿{{ 
+if NotReadOnly;
+}}
+Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
 {
     var valueIds = new List<(int Index, {{ElementType}} Value)>();
     for (int i = 0; i < data.Value.Length; i++)
@@ -17,6 +20,9 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNe
     }
     instance.{{ MemberName }} = newValue;
 });
+{{
+end
+}}
 Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeLocalMessage>((instanceId, data) => 
 {
     network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(instanceId, data.Value, data.Index));
