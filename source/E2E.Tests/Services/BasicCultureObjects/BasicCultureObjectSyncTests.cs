@@ -1,73 +1,35 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Environment.Instance;
+﻿using E2E.Tests.Util;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.BasicCultureObjects
 {
-    public class BasicCultureObjectSyncTests
+    public class BasicCultureObjectSyncTests : SyncTestBase
     {
-        E2ETestEnvironment TestEnvironment { get; }
-
-        EnvironmentInstance Server => TestEnvironment.Server;
-
-        IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
-
-        public BasicCultureObjectSyncTests(ITestOutputHelper output)
+        public BasicCultureObjectSyncTests(ITestOutputHelper output) : base(output)
         {
-            TestEnvironment = new E2ETestEnvironment(output);
+            TestEnvironment.CreateRegisteredObject<BasicCultureObject>();
         }
 
         [Fact]
-        public void ServerBasicCultureObject_SyncAll()
+        public void Server_BasicCultureObject_Properties()
         {
             // Arrange
-            var server = TestEnvironment.Server;
-
-            // Act
-            string? cultureId = null;
-            server.Call(() =>
-            {
-                BasicCultureObject culture = new BasicCultureObject();
-
-                Assert.True(server.ObjectManager.TryGetId(culture, out cultureId));
-
-                culture.BackgroundColor1 = 33U;
-                culture.BackgroundColor2 = 33U;
-                culture.BannerKey = "testBanner";
-                culture.CanHaveSettlement = true;
-                culture.ClothAlternativeColor = 33U;
-                culture.ClothAlternativeColor2 = 33U;
-                culture.Color = 33U;
-                culture.Color2 = 33U;
-                culture.EncounterBackgroundMesh = "testMesh";
-                culture.ForegroundColor1 = 33U;
-                culture.ForegroundColor2 = 33U;
-                culture.IsBandit = true;
-                culture.IsMainCulture = true;
-                culture.Name = new TextObject("testName");
-            });
-
-            foreach (var client in TestEnvironment.Clients)
-            {
-                Assert.True(client.ObjectManager.TryGetObject(cultureId, out BasicCultureObject clientCulture));
-
-                Assert.Equal(33U, clientCulture.BackgroundColor1);
-                Assert.Equal(33U, clientCulture.BackgroundColor2);
-                Assert.Equal("testBanner", clientCulture.BannerKey);
-                Assert.True(clientCulture.CanHaveSettlement);
-                Assert.Equal(33U, clientCulture.ClothAlternativeColor);
-                Assert.Equal(33U, clientCulture.ClothAlternativeColor2);
-                Assert.Equal(33U, clientCulture.Color);
-                Assert.Equal(33U, clientCulture.Color2);
-                Assert.Equal("testMesh", clientCulture.EncounterBackgroundMesh);
-                Assert.Equal(33U, clientCulture.ForegroundColor1);
-                Assert.Equal(33U, clientCulture.ForegroundColor2);
-                Assert.True(clientCulture.IsBandit);
-                Assert.True(clientCulture.IsMainCulture);
-                Assert.Equal("testName", clientCulture.Name.Value);
-            }
+            TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.BackgroundColor1), 11U);
+            TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.BackgroundColor2), 22U);
+            TestEnvironment.AssertProperty<BasicCultureObject, string>(nameof(BasicCultureObject.BannerKey), "testBanner");
+            TestEnvironment.AssertProperty<BasicCultureObject, bool>(nameof(BasicCultureObject.CanHaveSettlement), true);
+            TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.ClothAlternativeColor),33U);
+            TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.ClothAlternativeColor2),44U);
+            TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.Color), 55U);
+            TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.Color2), 66U);
+            TestEnvironment.AssertProperty<BasicCultureObject, string>(nameof(BasicCultureObject.EncounterBackgroundMesh), "testMesh");
+            TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.ForegroundColor1),77U);
+            TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.ForegroundColor2), 88U);
+            TestEnvironment.AssertProperty<BasicCultureObject, bool>(nameof(BasicCultureObject.IsBandit), true);
+            TestEnvironment.AssertProperty<BasicCultureObject, bool>(nameof(BasicCultureObject.IsMainCulture), true);
+            TestEnvironment.AssertProperty<BasicCultureObject, TextObject>(nameof(BasicCultureObject.Name), new TextObject("testName"));
         }
     }
 }

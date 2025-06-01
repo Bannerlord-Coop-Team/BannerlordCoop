@@ -5,15 +5,11 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Towns;
-internal class TownDynamicSync : IDynamicSync
+internal class TownSync : IDynamicSync
 {
-    public TownDynamicSync(DynamicSyncRegistry dynamicSyncRegistry)
+    public TownSync(DynamicSyncRegistry dynamicSyncRegistry)
     {
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Governor)));
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Security)));
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.LastCapturedBy)));
-
+        // Fields
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._prosperity)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._wallLevel)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._isCastle)));
@@ -33,9 +29,15 @@ internal class TownDynamicSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.Buildings)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.BuildingsInProgress)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeBoundVillagesCache)));
+
+        // Properties
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Governor)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Security)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.LastCapturedBy)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Workshops)));
 
-
+        // Targetmethods
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeCurrentBuildingQueue)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeCurrentBuilding)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(WorkshopsCampaignBehavior), nameof(WorkshopsCampaignBehavior.BuildArtisanWorkshop)));
@@ -44,7 +46,7 @@ internal class TownDynamicSync : IDynamicSync
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.DecideProject)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.ApplyRebellionConsequencesToSettlement)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.CheckAndSetTownRebelliousState)));
-        // TODO: Verify why this breaks
+        // TODO: Verify why this breaks or if its even necessary
         //dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.BuildDevelopmentsAtGameStart)));
     }
 }

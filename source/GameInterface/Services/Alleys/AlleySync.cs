@@ -13,5 +13,9 @@ public class AlleySync : IDynamicSync
         registry.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._settlement)));
         registry.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._tag)));
         registry.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._owner)));
+
+        // Properties
+
+        // Targetmethods
     }
 }

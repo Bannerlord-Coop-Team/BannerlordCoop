@@ -885,8 +885,7 @@ internal class E2ETestEnvironment : IDisposable
                 Assert.Equal(((defaultValue ?? propertyInfo.GetUnderlyingType().GetDefaultValue()) as TextObject)?.Value, (propertyInfo.GetValue(serverInstance) as TextObject)?.Value);
             else
                 Assert.Equal(defaultValue ?? propertyInfo.GetUnderlyingType().GetDefaultValue(), propertyInfo.GetValue(serverInstance));
-            var set = propertyInfo.GetSetMethod();
-            set.Invoke(serverInstance, new object[] { value });
+            propertyInfo.SetValue(serverInstance,value);
         }));
 
         // Assert

@@ -16,7 +16,7 @@ namespace E2E.Tests.Services.BasicCharacterObjects
         }
 
         [Fact]
-        public void ServerBasicCharacterObject_SyncAll_Properties()
+        public void Server_BasicCharacterObject_Properties()
         {
             // Arrange
             TestEnvironment.AssertProperty<BasicCharacterObject, float>(nameof(BasicCharacterObject.Age), 5f);
@@ -41,7 +41,7 @@ namespace E2E.Tests.Services.BasicCharacterObjects
         }
 
         [Fact]
-        public void ServerBasicCharacterObject_SyncAll_Fields()
+        public void Server_BasicCharacterObject_Fields()
         {
             // Arrange
             TestEnvironment.AssertField<BasicCharacterObject, bool>(nameof(BasicCharacterObject._isBasicHero), true);

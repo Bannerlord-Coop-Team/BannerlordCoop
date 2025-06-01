@@ -29,7 +29,6 @@ namespace GameInterface.DynamicSync.Builders
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(fieldInfo);
 
             string localAddMessage = TemplateParser.Parse("Messages.LocalCollectionAddMessageTemplate", templateData);
-
             string localRemoveMessage = TemplateParser.Parse("Messages.LocalCollectionRemoveMessageTemplate", templateData);
 
             string networkMessage;

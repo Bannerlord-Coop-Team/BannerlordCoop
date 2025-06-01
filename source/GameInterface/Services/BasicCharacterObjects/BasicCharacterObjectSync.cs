@@ -1,39 +1,44 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.BasicCharacterObjects
 {
-    internal class BasicCharacterObjectSync : IAutoSync
+    internal class BasicCharacterObjectSync : IDynamicSync
     {
-        public BasicCharacterObjectSync(IAutoSyncBuilder autoSyncBuilder) 
+        public BasicCharacterObjectSync(DynamicSyncRegistry dynamicSyncRegistry)
         {
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Age)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.BeardTags)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Culture)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultFormationClass)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultFormationGroup)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DismountResistance)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.BodyPropertyRange)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FaceDirtAmount)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FaceMeshCache)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FormationPositionPreference)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.HairTags)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsFemale)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsObsolete)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsSoldier)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.KnockbackResistance)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.KnockdownResistance)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Level)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Race)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.TattooTags)));
+            // Fields
+            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isBasicHero)));
+            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isMounted)));
+            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isRanged)));
+            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._equipmentRoster)));
+            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultCharacterSkills)));
+            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._basicName)));
 
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isBasicHero)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isMounted)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._isRanged)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._equipmentRoster)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultCharacterSkills)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(BasicCharacterObject), nameof(BasicCharacterObject._basicName))); 
+            // Properties
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Age)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.BeardTags)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Culture)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultFormationClass)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultFormationGroup)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DismountResistance)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.BodyPropertyRange)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FaceDirtAmount)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FaceMeshCache)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FormationPositionPreference)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.HairTags)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsFemale)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsObsolete)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsSoldier)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.KnockbackResistance)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.KnockdownResistance)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Level)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Race)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.TattooTags)));
+
+            // Targetmethods
         }
     }
 }
