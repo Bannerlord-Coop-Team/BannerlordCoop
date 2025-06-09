@@ -3,6 +3,9 @@ using TaleWorlds.CampaignSystem.Siege;
 using Xunit.Abstractions;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 using TaleWorlds.CampaignSystem.Party;
+using HarmonyLib;
+using System.Reflection;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace E2E.Tests.Services.BesiegerCamps
 {
@@ -10,9 +13,16 @@ namespace E2E.Tests.Services.BesiegerCamps
     {
         public BesiegerCampSyncTests(ITestOutputHelper output) : base(output)
         {
-            TestEnvironment.CreateRegisteredObject<SiegeEvent>();
-            TestEnvironment.CreateRegisteredObject<BesiegerCamp>();
+            TestEnvironment.CreateRegisteredObject<SiegeEvent>(new List<MethodBase>
+                {
+                    AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+                    AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+                    AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
+                });
             TestEnvironment.CreateRegisteredObject<MobileParty>();
+            TestEnvironment.CreateRegisteredObject<BesiegerCamp>();
+            TestEnvironment.CreateRegisteredObject<SiegeEnginesContainer>();
+            TestEnvironment.CreateRegisteredObject<SiegeStrategy>();
         }
 
         [Fact]
