@@ -1,23 +1,20 @@
 ﻿using E2E.Tests.Environment;
 using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
+using GameInterface.DynamicSync;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Clans
 {
-    public class ClanSyncTests : IDisposable
+    public class ClanSyncTests : SyncTestBase
     {
-        E2ETestEnvironment TestEnvironment { get; }
-
-        EnvironmentInstance Server => TestEnvironment.Server;
-
-        IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
         private string KingdomId;
         private string SettlementId;
@@ -26,15 +23,59 @@ namespace E2E.Tests.Services.Clans
         private string CultureId;
         private string ClanId;
 
-        public ClanSyncTests(ITestOutputHelper output)
+        public ClanSyncTests(ITestOutputHelper output) : base(output)
         {
-            TestEnvironment = new E2ETestEnvironment(output);
+            ClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+            KingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+            SettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+            CharacterObjectId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+            HeroId = TestEnvironment.CreateRegisteredObject<Hero>();
         }
 
-        public void Dispose()
+        [Fact]
+        public void Server_Clan_Fields()
         {
-            TestEnvironment.Dispose();
+            TestEnvironment.AssertField<Clan, bool>(nameof(Clan._isEliminated), true);
+            TestEnvironment.AssertReferenceField<Clan, Kingdom>(nameof(Clan._kingdom));
+            TestEnvironment.AssertField<Clan, float>(nameof(Clan._influence), 0.5f);
+            TestEnvironment.AssertReferenceField<Clan,Settlement>(nameof(Clan._clanMidSettlement));
+            TestEnvironment.AssertReferenceField<Clan, CharacterObject>(nameof(Clan._basicTroop));
+            TestEnvironment.AssertReferenceField<Clan, Hero>(nameof(Clan._leader));
+            //TestEnvironment.AssertField<Clan, Banner>(nameof(Clan._banner), new Banner());
+            TestEnvironment.AssertField<Clan, int>(nameof(Clan._tier), 2);
+            TestEnvironment.AssertField<Clan, float>(nameof(Clan._aggressiveness), 0.8f);
+            TestEnvironment.AssertField<Clan, int>(nameof(Clan._tributeWallet), 20000);
+            TestEnvironment.AssertReferenceField<Clan, Settlement>(nameof(Clan._home));
+            TestEnvironment.AssertField<Clan, int>(nameof(Clan._clanDebtToKingdom), 5000);
         }
+
+        //[Fact]
+        //public void Server_Clan_Properties()
+        //{
+        //    // Arrange
+
+        //    // Assert
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.Name)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.InformalName)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.Culture)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.LastFactionChangeTime)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.AutoRecruitmentExpenses)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.IsNoble)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.TotalStrength)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.MercenaryAwardMultiplier)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.LabelColor)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.InitialPosition)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.IsRebelClan)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.IsUnderMercenaryService)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.Color)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.Color2)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.BannerBackgroundColorPrimary)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.BannerBackgroundColorSecondary)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.BannerIconColor)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan._midPointCalculated)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.Renown)));
+        //    TestEnvironment.AssertProperty(typeof(Clan), nameof(Clan.NotAttackableByPlayerUntilTime)));
+        //}
 
         [Fact]
         public void ServerUpdateClan_SyncAllClients()
