@@ -21,7 +21,7 @@ public class AlleySyncTests : SyncTestBase
     {
         Server.ObjectManager.TryGetObject<Alley>(alleyId, out Alley serverInstance);
         Assert.NotNull(serverInstance.Settlement);
-        TestEnvironment.AssertField<Alley, TextObject>(nameof(Alley._name), new TextObject("test alley name"), defaultValue: new TextObject("TestAlley"));
+        TestEnvironment.AssertField<Alley, TextObject>(nameof(Alley._name), new TextObject("test alley name"), defaultValue: serverInstance.Name);
         TestEnvironment.AssertReferenceField<Alley, Settlement>(nameof(Alley._settlement), defaultValue: serverInstance.Settlement);
         TestEnvironment.AssertField<Alley, string>(nameof(Alley._tag), "testtag", defaultValue: "tag");
         TestEnvironment.AssertReferenceField<Alley, Hero>(nameof(Alley._owner));

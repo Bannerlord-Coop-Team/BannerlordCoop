@@ -1,5 +1,4 @@
-﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+﻿using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 
@@ -9,6 +8,21 @@ internal class ClanSync : IDynamicSync
 {
     public ClanSync(DynamicSyncRegistry dynamicSyncRegistry)
     {
+        // Fields
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._isEliminated)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._kingdom)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._influence)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanMidSettlement)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._basicTroop)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._leader)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._banner)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._tier)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._aggressiveness)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._tributeWallet)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._home)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanDebtToKingdom)));
+
+        // Properties
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Name)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InformalName)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Culture)));
@@ -29,18 +43,5 @@ internal class ClanSync : IDynamicSync
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan._midPointCalculated)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Renown)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.NotAttackableByPlayerUntilTime)));
-
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._isEliminated)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._kingdom)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._influence)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanMidSettlement)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._basicTroop)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._leader)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._banner)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._tier)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._aggressiveness)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._tributeWallet)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._home)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanDebtToKingdom)));
     }
 }
