@@ -283,7 +283,7 @@ internal class E2ETestEnvironment : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<TField>(referenceId, out var serverFieldInstance));
             Assert.Equal(defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
             intercept.Invoke(null, new object[] { serverInstance, serverFieldInstance, fieldName });
-            Assert.True(serverFieldInstance.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {serverFieldInstance} Actual: {fieldInfo.GetValue(serverInstance)}");
+        Assert.True(serverFieldInstance.Equals(fieldInfo.GetValue(serverInstance)));// TODO: re add error, $"Expected: {serverFieldInstance} Actual: {fieldInfo.GetValue(serverInstance)}");
             Assert.NotNull(serverFieldInstance);
         });
 
@@ -292,7 +292,7 @@ internal class E2ETestEnvironment : IDisposable
         {
             Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
             Assert.True(client.ObjectManager.TryGetObject<TField>(referenceId, out var clientFieldInstance));
-            Assert.True(clientFieldInstance.Equals(fieldInfo.GetValue(clientInstance)), $"Expected: {clientFieldInstance} Actual: {fieldInfo.GetValue(clientInstance)}");
+            Assert.True(clientFieldInstance.Equals(fieldInfo.GetValue(clientInstance)));// TODO: re add error, $"Expected: {clientFieldInstance} Actual: {fieldInfo.GetValue(clientInstance)}");
             Assert.NotNull(clientFieldInstance);
         }
     }
