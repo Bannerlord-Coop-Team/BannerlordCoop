@@ -1,18 +1,13 @@
 ﻿using GameInterface.AutoSync;
-using GameInterface.Registry.Auto;
+using GameInterface.DynamicSync;
 using HarmonyLib;
-using Serilog;
-using System;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters;
 
-internal class TroopRosterSync : IAutoSync
+internal class TroopRosterSync : IDynamicSync
 {
-    public TroopRosterSync(IAutoSyncBuilder autoSyncBuilder)
+    public TroopRosterSync(DynamicSyncRegistry autoSyncBuilder)
     {
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(TroopRoster), nameof(TroopRoster.OwnerParty)));
         
