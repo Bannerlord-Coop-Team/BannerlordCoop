@@ -1,6 +1,7 @@
 ﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
@@ -30,13 +31,15 @@ namespace E2E.Tests.Services.Clans
         [Fact]
         public void Server_Clan_Fields()
         {
+            var banner = new Banner();
+            banner.BannerDataList.Add(new BannerData(1, 2, 3, Vec2.One, Vec2.Zero, true, true, 0f));
             TestEnvironment.AssertField<Clan, bool>(nameof(Clan._isEliminated), true);
             TestEnvironment.AssertReferenceField<Clan, Kingdom>(nameof(Clan._kingdom));
             TestEnvironment.AssertField<Clan, float>(nameof(Clan._influence), 0.5f);
             TestEnvironment.AssertReferenceField<Clan,Settlement>(nameof(Clan._clanMidSettlement));
-            // TestEnvironment.AssertReferenceField<Clan, CharacterObject>(nameof(Clan._basicTroop));
+            TestEnvironment.AssertReferenceField<Clan, CharacterObject>(nameof(Clan._basicTroop));
             TestEnvironment.AssertReferenceField<Clan, Hero>(nameof(Clan._leader));
-            // TestEnvironment.AssertField<Clan, Banner>(nameof(Clan._banner), new Banner());
+            TestEnvironment.AssertField<Clan, Banner>(nameof(Clan._banner), banner);
             TestEnvironment.AssertField<Clan, int>(nameof(Clan._tier), 2);
             TestEnvironment.AssertField<Clan, float>(nameof(Clan._aggressiveness), 0.8f);
             TestEnvironment.AssertField<Clan, int>(nameof(Clan._tributeWallet), 20000);

@@ -11,6 +11,7 @@ using GameInterface.Tests.Bootstrap;
 using GameInterface.Utils;
 using HarmonyLib;
 using Moq;
+using Newtonsoft.Json;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
@@ -232,7 +233,7 @@ internal class E2ETestEnvironment : IDisposable
         where TInstance : class
     {
         bool isTextObject = typeof(TField) == typeof(TextObject);
-        Assert.True(typeof(TField).IsValueType || typeof(TField) == typeof(string) || isTextObject);
+        // Assert.True(typeof(TField).IsValueType || typeof(TField) == typeof(string) || isTextObject);
         var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
         var intercept = GetIntercept(fieldInfo);
         string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
@@ -252,10 +253,13 @@ internal class E2ETestEnvironment : IDisposable
         foreach (var client in Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+            var clientValue = fieldInfo.GetValue(clientInstance);
             if (isTextObject && value is TextObject)
-                Assert.True((value as TextObject).Equals(fieldInfo.GetValue(clientInstance) as TextObject), $"Expected: {value} Actual: {fieldInfo.GetValue(clientInstance)}");
+                Assert.True((value as TextObject).Equals(clientValue as TextObject), $"Expected: {value} Actual: {clientValue}");
+            else if(typeof(TField).IsValueType || typeof(TField) == typeof(string))
+                Assert.True(value.Equals(clientValue), $"Expected: {value} Actual: {clientValue}");
             else
-                Assert.True(value.Equals(fieldInfo.GetValue(clientInstance)), $"Expected: {value} Actual: {fieldInfo.GetValue(clientInstance)}");
+                Assert.True(JsonConvert.SerializeObject(value).Equals(JsonConvert.SerializeObject(clientValue)), $"Expected: {JsonConvert.SerializeObject(value)} Actual: {JsonConvert.SerializeObject(clientValue)}");
         }
     }
 
@@ -875,7 +879,7 @@ internal class E2ETestEnvironment : IDisposable
         where TInstance : class
     {
         bool isTextObject = typeof(TProperty) == typeof(TextObject);
-        Assert.True(typeof(TProperty).IsValueType || typeof(TProperty) == typeof(string) || typeof(TProperty) == typeof(TextObject));
+        // Assert.True(typeof(TProperty).IsValueType || typeof(TProperty) == typeof(string) || typeof(TProperty) == typeof(TextObject));
         var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
         string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
         Server.Call((Action)(() =>
@@ -892,7 +896,13 @@ internal class E2ETestEnvironment : IDisposable
         foreach (var client in Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
-            Assert.Equal(value, propertyInfo.GetValue(clientInstance));
+            var clientValue = propertyInfo.GetValue(clientInstance);
+            if (isTextObject && value is TextObject)
+                Assert.True((value as TextObject).Equals(clientValue as TextObject), $"Expected: {value} Actual: {clientValue}");
+            else if (typeof(TProperty).IsValueType || typeof(TProperty) == typeof(string))
+                Assert.True(value.Equals(clientValue), $"Expected: {value} Actual: {clientValue}");
+            else
+                Assert.True(JsonConvert.SerializeObject(value).Equals(JsonConvert.SerializeObject(clientValue)), $"Expected: {JsonConvert.SerializeObject(value)} Actual: {JsonConvert.SerializeObject(clientValue)}");
         }
     }
 

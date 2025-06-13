@@ -5,6 +5,7 @@ using GameInterface.Utils;
 using System;
 using System.Linq;
 using System.Collections.Generic;
+using GameInterface.DynamicSync;
 {{~ for library in Libraries ~}}
 using {{ library }};
 {{~ end ~}}
