@@ -1,22 +1,22 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Util;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 
 namespace E2E.Tests.Services.PartyComponents;
-public class MilitiaPartyComponentTests : IDisposable
+public class MilitiaPartyComponentTests : SyncTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-    public MilitiaPartyComponentTests(ITestOutputHelper output)
+    public MilitiaPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        TestEnvironment.CreateRegisteredObject<MilitiaPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Settlement>();
     }
 
-    public void Dispose()
+    [Fact]
+    public void Server_MilitiaPartyComponent_Properties()
     {
-        TestEnvironment.Dispose();
+        TestEnvironment.AssertReferenceProperty<MilitiaPartyComponent, Settlement>(nameof(MilitiaPartyComponent.Settlement));
     }
 
     [Fact]

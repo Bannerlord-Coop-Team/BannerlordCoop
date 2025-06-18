@@ -10,17 +10,18 @@ using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
-public class CaravanPartyComponentTests : IDisposable
+public class CaravanPartyComponentTests : SyncTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-    public CaravanPartyComponentTests(ITestOutputHelper output)
+    public CaravanPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        TestEnvironment.CreateRegisteredObject<CaravanPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Hero>();
     }
 
-    public void Dispose()
+    [Fact]
+    public void Server_CaravanPartyComponent_Fields()
     {
-        TestEnvironment.Dispose();
+        TestEnvironment.AssertReferenceField<CaravanPartyComponent, Hero>(nameof(CaravanPartyComponent._leader));
     }
 
     [Fact]
@@ -28,10 +29,6 @@ public class CaravanPartyComponentTests : IDisposable
     {
         // Arrange
         var server = TestEnvironment.Server;
-
-        var leaderField = AccessTools.Field(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent._leader));
-
-        var leaderIntercept = TestEnvironment.GetIntercept(leaderField);
 
         // Act
         string? partyId = null;
@@ -47,8 +44,6 @@ public class CaravanPartyComponentTests : IDisposable
             var newParty = CaravanPartyComponent.CreateCaravanParty(owner, settlement, caravanLeader: owner);
             partyId = newParty.StringId;
 
-            leaderIntercept.Invoke(null, new object[] { newParty.CaravanPartyComponent, newLeaderHero });
-
         }, new MethodBase[]
         {
             AccessTools.Method(typeof(EnterSettlementAction), nameof(EnterSettlementAction.ApplyForParty)),
@@ -63,8 +58,6 @@ public class CaravanPartyComponentTests : IDisposable
             Assert.NotNull(newLeaderHero);
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
             Assert.IsType<CaravanPartyComponent>(newParty.PartyComponent);
-
-            Assert.Equal(newLeaderHero.StringId, newParty.CaravanPartyComponent._leader.StringId);
         }
     }
 

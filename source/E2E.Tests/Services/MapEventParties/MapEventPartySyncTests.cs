@@ -1,96 +1,40 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
+﻿using E2E.Tests.Util;
 using HarmonyLib;
+using Newtonsoft.Json.Bson;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.MapEventParties
 {
-    public class MapEventPartySyncTests : IDisposable
+    public class MapEventPartySyncTests : SyncTestBase
     {
-        E2ETestEnvironment TestEnvironment { get; }
 
-        EnvironmentInstance Server => TestEnvironment.Server;
-
-        IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
-
-        private string MapEventPartyId;
-        private string PartyId;
-        private int newInt = 50;
-        private float newFloat = 25f;
-
-        public MapEventPartySyncTests(ITestOutputHelper output)
+        public MapEventPartySyncTests(ITestOutputHelper output) : base(output)
         {
-            TestEnvironment = new E2ETestEnvironment(output);
-        }
-
-        public void Dispose()
-        {
-            TestEnvironment.Dispose();
+            TestEnvironment.CreateRegisteredObject<MapEventParty>();
+            TestEnvironment.CreateRegisteredObject<PartyBase>();
         }
 
         [Fact]
-        public void Server_MapEventParty_Sync()
+        public void Server_MapEventParty_Properties()
         {
-            var contributionField = AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._contributionToBattle));
-            var contributionIntercept = TestEnvironment.GetIntercept(contributionField);
+            TestEnvironment.AssertProperty<MapEventParty, float>(nameof(MapEventParty.GainedInfluence), 5f);
+            TestEnvironment.AssertProperty<MapEventParty, float>(nameof(MapEventParty.GainedRenown), 2f);
+            TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty.GoldLost), 3);
+            TestEnvironment.AssertProperty<MapEventParty, float>(nameof(MapEventParty.MoraleChange), 3f);
+            TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty.GoldLost), 3);
+            TestEnvironment.AssertReferenceProperty<MapEventParty, PartyBase>(nameof(MapEventParty.Party));
+            TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty.PlunderedGold), 3);
+            
+        }
 
-            var healthyField = AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._healthyManCountAtStart));
-            var healthyIntercept = TestEnvironment.GetIntercept(healthyField);
+        [Fact]
+        public void Server_MapEventParty_Fields()
+        {
+            TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty._contributionToBattle), 3);
+            TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty._healthyManCountAtStart), 3);
 
-            // Arrange
-            var server = TestEnvironment.Server;
-
-            // Act
-            server.Call(() =>
-            {
-                var mapEventParty = GameObjectCreator.CreateInitializedObject<MapEventParty>();
-                var mobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
-                var party = new PartyBase(mobileParty);
-
-                // Create objects on the server
-                Assert.True(server.ObjectManager.TryGetId(mapEventParty, out MapEventPartyId));
-                Assert.True(server.ObjectManager.TryGetId(party, out PartyId));
-
-                mapEventParty.GainedInfluence = newFloat;
-                mapEventParty.GainedRenown = newFloat;
-                mapEventParty.GoldLost = newInt;
-                mapEventParty.MoraleChange = newFloat;
-                mapEventParty.Party = party;
-                mapEventParty.PlunderedGold = newInt;
-
-                contributionIntercept.Invoke(null, new object[] { mapEventParty, newInt });
-                healthyIntercept.Invoke(null, new object[] { mapEventParty, newInt });
-
-                Assert.Equal(newFloat, mapEventParty.GainedInfluence);
-                Assert.Equal(newFloat, mapEventParty.GainedRenown);
-                Assert.Equal(newInt, mapEventParty.GoldLost);
-                Assert.Equal(newFloat, mapEventParty.MoraleChange);
-                Assert.Equal(party, mapEventParty.Party);
-                Assert.Equal(newInt, mapEventParty.PlunderedGold);
-                Assert.Equal(newInt, mapEventParty._contributionToBattle);
-                Assert.Equal(newInt, mapEventParty._healthyManCountAtStart);
-            });
-
-            // Assert
-            foreach (var client in Clients)
-            {
-                Assert.True(client.ObjectManager.TryGetObject<MapEventParty>(MapEventPartyId, out var clientMapEventParty));
-                Assert.True(client.ObjectManager.TryGetObject<PartyBase>(PartyId, out var clientParty));
-
-                Assert.Equal(newFloat, clientMapEventParty.GainedInfluence);
-                Assert.Equal(newFloat, clientMapEventParty.GainedRenown);
-                Assert.Equal(newInt, clientMapEventParty.GoldLost);
-                Assert.Equal(newFloat, clientMapEventParty.MoraleChange);
-                Assert.Equal(clientParty, clientMapEventParty.Party);
-                Assert.Equal(newInt, clientMapEventParty.PlunderedGold);
-                Assert.Equal(newInt, clientMapEventParty._contributionToBattle);
-                Assert.Equal(newInt, clientMapEventParty._healthyManCountAtStart);
-            }
         }
     }
 }

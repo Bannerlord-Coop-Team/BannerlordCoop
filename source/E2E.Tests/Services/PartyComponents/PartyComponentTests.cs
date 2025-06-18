@@ -1,27 +1,12 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Util;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem.Party.PartyComponents;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
-public class PartyComponentTests : IDisposable
+public class PartyComponentTests : SyncTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-    public PartyComponentTests(ITestOutputHelper output)
+    public PartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
-    }
-
-    public void Dispose()
-    {
-        TestEnvironment.Dispose();
     }
 
     [Fact]

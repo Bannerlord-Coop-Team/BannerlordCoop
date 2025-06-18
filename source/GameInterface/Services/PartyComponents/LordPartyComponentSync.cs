@@ -1,12 +1,13 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
 namespace GameInterface.Services.PartyComponents
 {
-    internal class LordPartyComponentSync : IAutoSync
+    internal class LordPartyComponentSync : IDynamicSync
     {
-        public LordPartyComponentSync(IAutoSyncBuilder autoSyncBuilder)
+        public LordPartyComponentSync(DynamicSyncRegistry autoSyncBuilder)
         {
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(LordPartyComponent), nameof(LordPartyComponent.Owner)));
 

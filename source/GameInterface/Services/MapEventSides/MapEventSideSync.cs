@@ -1,12 +1,13 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEventSides
 {
-    internal class MapEventSideSync : IAutoSync
+    internal class MapEventSideSync : IDynamicSync
     {
-        public MapEventSideSync(IAutoSyncBuilder autoSyncBuilder)
+        public MapEventSideSync(DynamicSyncRegistry autoSyncBuilder)
         {
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventSide), nameof(MapEventSide.CasualtyStrength)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventSide), nameof(MapEventSide.LeaderParty)));
@@ -19,7 +20,7 @@ namespace GameInterface.Services.MapEventSides
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.RenownAtMapEventEnd)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.RenownValue)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.StrengthRatio)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapEvent)));
+            //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapEvent)));
             
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._requiresTroopCacheUpdate)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroop)));

@@ -1,16 +1,17 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties;
-internal class MobilePartySync : IAutoSync
+internal class MobilePartySync : IDynamicSync
 {
-    public MobilePartySync(IAutoSyncBuilder autoSyncBuilder)
+    public MobilePartySync(DynamicSyncRegistry autoSyncBuilder)
     {
         // Sync Fields
-        autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(DefaultClanFinanceModel), nameof(DefaultClanFinanceModel.ApplyMoraleEffect)));
-        autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(MobilePartyAi), nameof(MobilePartyAi.GetFleeBehavior)));
+        autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(DefaultClanFinanceModel), nameof(DefaultClanFinanceModel.ApplyMoraleEffect)));
+        autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(MobilePartyAi), nameof(MobilePartyAi.GetFleeBehavior)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._attachedTo)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty.HasUnpaidWages)));

@@ -1,23 +1,22 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Util;
-using TaleWorlds.CampaignSystem;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
-public class VillagerPartyComponentTests : IDisposable
+public class VillagerPartyComponentTests : SyncTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-    public VillagerPartyComponentTests(ITestOutputHelper output)
+    public VillagerPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        TestEnvironment.CreateRegisteredObject<VillagerPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Village>();
     }
 
-    public void Dispose()
+    [Fact]
+    public void Server_VillagerPartyComponent_Properties()
     {
-        TestEnvironment.Dispose();
+        TestEnvironment.AssertReferenceProperty<VillagerPartyComponent, Village>(nameof(VillagerPartyComponent.Village));
     }
 
     [Fact]

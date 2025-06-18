@@ -7,17 +7,19 @@ using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
-public class GarrisonPartyComponentTests : IDisposable
+public class GarrisonPartyComponentTests : SyncTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-    public GarrisonPartyComponentTests(ITestOutputHelper output)
+    public GarrisonPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        TestEnvironment.CreateRegisteredObject<GarrisonPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Settlement>();
+
     }
 
-    public void Dispose()
+    [Fact]
+    public void Server_GarrisonPartyComponent_Properties()
     {
-        TestEnvironment.Dispose();
+        TestEnvironment.AssertReferenceProperty<GarrisonPartyComponent, Settlement>(nameof(GarrisonPartyComponent.Settlement));
     }
 
     [Fact]
