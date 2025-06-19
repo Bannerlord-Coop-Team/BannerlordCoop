@@ -1,15 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using GameInterface.AutoSync;
+﻿using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Kingdoms
 {
-    internal class KingdomSync : IAutoSync
+    internal class KingdomSync : IDynamicSync
     {
-        public KingdomSync(IAutoSyncBuilder autoSyncBuilder) 
+        public KingdomSync(DynamicSyncRegistry autoSyncBuilder) 
         {
             // Props
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.AlternativeColor)));
