@@ -11,9 +11,11 @@ namespace E2E.Tests.Services.SiegeEvents;
 
 public class SiegeEventTests : SyncTestBase
 {
+    private string siegeEventId;
+
     public SiegeEventTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment.CreateRegisteredObject<SiegeEvent>(new List<MethodBase>
+        siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(new List<MethodBase>
         {
             AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
             AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
@@ -35,6 +37,9 @@ public class SiegeEventTests : SyncTestBase
     [Fact]
     public void Server_SiegeEvent_Properties()
     {
-        TestEnvironment.AssertProperty<SiegeEvent, CampaignTime>(nameof(SiegeEvent.SiegeStartTime), new CampaignTime(500));
+        TestEnvironment.Server.ObjectManager.TryGetObject(siegeEventId, out SiegeEvent siegeEvent);
+        var defaultCampaignTime = new CampaignTime(200);
+        siegeEvent.SiegeStartTime = defaultCampaignTime;
+        TestEnvironment.AssertProperty<SiegeEvent, CampaignTime>(nameof(SiegeEvent.SiegeStartTime), new CampaignTime(500), defaultValue: defaultCampaignTime);
     }
 }

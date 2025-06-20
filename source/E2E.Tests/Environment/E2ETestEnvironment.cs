@@ -239,12 +239,14 @@ internal class E2ETestEnvironment : IDisposable
         string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
         Server.Call(() =>
         {
+            var defaultVal = (defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue());
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
-            if (isTextObject && (defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue()) is TextObject)
-                Assert.Equal(((defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue()) as TextObject)?.Value, (fieldInfo.GetValue(serverInstance) as TextObject)?.Value);
+            if (isTextObject && defaultVal is TextObject)
+                Assert.Equal((defaultVal as TextObject)?.Value, (fieldInfo.GetValue(serverInstance) as TextObject)?.Value);
+            else if ((typeof(TField).IsValueType || typeof(TField) == typeof(string)) && typeof(TField) != typeof(CampaignTime))
+                Assert.True(fieldInfo.GetValue(serverInstance).Equals(defaultVal), $"Expected: {defaultVal} Actual: {value}");
             else
-                Assert.Equal(defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
-
+                Assert.True(JsonConvert.SerializeObject(fieldInfo.GetValue(serverInstance)).Equals(JsonConvert.SerializeObject(defaultVal)), $"Expected: {JsonConvert.SerializeObject(value)} Actual: {JsonConvert.SerializeObject(defaultVal)}");
             intercept.Invoke(null, new object[] { serverInstance, value, fieldName });
             Assert.True(value.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {value} Actual: {fieldInfo.GetValue(serverInstance)}");
         });
@@ -256,7 +258,7 @@ internal class E2ETestEnvironment : IDisposable
             var clientValue = fieldInfo.GetValue(clientInstance);
             if (isTextObject && value is TextObject)
                 Assert.True((value as TextObject).Equals(clientValue as TextObject), $"Expected: {value} Actual: {clientValue}");
-            else if(typeof(TField).IsValueType || typeof(TField) == typeof(string))
+            else if((typeof(TField).IsValueType || typeof(TField) == typeof(string)) && typeof(TField) != typeof(CampaignTime))
                 Assert.True(value.Equals(clientValue), $"Expected: {value} Actual: {clientValue}");
             else
                 Assert.True(JsonConvert.SerializeObject(value).Equals(JsonConvert.SerializeObject(clientValue)), $"Expected: {JsonConvert.SerializeObject(value)} Actual: {JsonConvert.SerializeObject(clientValue)}");
@@ -884,11 +886,15 @@ internal class E2ETestEnvironment : IDisposable
         string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
         Server.Call((Action)(() =>
         {
+            var defaultVal = (defaultValue ?? propertyInfo.GetUnderlyingType().GetDefaultValue());
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
-            if (isTextObject && (defaultValue ?? propertyInfo.GetUnderlyingType().GetDefaultValue()) is TextObject)
-                Assert.Equal(((defaultValue ?? propertyInfo.GetUnderlyingType().GetDefaultValue()) as TextObject)?.Value, (propertyInfo.GetValue(serverInstance) as TextObject)?.Value);
+            var serverVal = propertyInfo.GetValue(serverInstance);
+            if (isTextObject && defaultVal is TextObject)
+                Assert.Equal((defaultVal as TextObject)?.Value, (serverVal as TextObject)?.Value);
+            else if ((typeof(TProperty).IsValueType || typeof(TProperty) == typeof(string)) && typeof(TProperty) != typeof(CampaignTime))
+                Assert.True(serverVal.Equals(defaultVal), $"Expected: {defaultVal} Actual: {serverVal}");
             else
-                Assert.Equal(defaultValue ?? propertyInfo.GetUnderlyingType().GetDefaultValue(), propertyInfo.GetValue(serverInstance));
+                Assert.True(JsonConvert.SerializeObject(serverVal).Equals(JsonConvert.SerializeObject(defaultVal)), $"Expected: {JsonConvert.SerializeObject(value)} Actual: {JsonConvert.SerializeObject(defaultVal)}");
             propertyInfo.SetValue(serverInstance,value);
         }));
 
@@ -899,7 +905,7 @@ internal class E2ETestEnvironment : IDisposable
             var clientValue = propertyInfo.GetValue(clientInstance);
             if (isTextObject && value is TextObject)
                 Assert.True((value as TextObject).Equals(clientValue as TextObject), $"Expected: {value} Actual: {clientValue}");
-            else if (typeof(TProperty).IsValueType || typeof(TProperty) == typeof(string))
+            else if ((typeof(TProperty).IsValueType || typeof(TProperty) == typeof(string)) && typeof(TProperty) != typeof(CampaignTime))
                 Assert.True(value.Equals(clientValue), $"Expected: {value} Actual: {clientValue}");
             else
                 Assert.True(JsonConvert.SerializeObject(value).Equals(JsonConvert.SerializeObject(clientValue)), $"Expected: {JsonConvert.SerializeObject(value)} Actual: {JsonConvert.SerializeObject(clientValue)}");
