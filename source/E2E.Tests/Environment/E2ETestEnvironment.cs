@@ -246,7 +246,7 @@ internal class E2ETestEnvironment : IDisposable
             else if ((typeof(TField).IsValueType || typeof(TField) == typeof(string)) && typeof(TField) != typeof(CampaignTime))
                 Assert.True(fieldInfo.GetValue(serverInstance).Equals(defaultVal), $"Expected: {defaultVal} Actual: {value}");
             else
-                Assert.True(JsonConvert.SerializeObject(fieldInfo.GetValue(serverInstance)).Equals(JsonConvert.SerializeObject(defaultVal)), $"Expected: {JsonConvert.SerializeObject(value)} Actual: {JsonConvert.SerializeObject(defaultVal)}");
+                Assert.True(JsonConvert.SerializeObject(fieldInfo.GetValue(serverInstance)).Equals(JsonConvert.SerializeObject(defaultVal)), $"Expected: {JsonConvert.SerializeObject(defaultVal)} Actual: {JsonConvert.SerializeObject(value)}");
             intercept.Invoke(null, new object[] { serverInstance, value, fieldName });
             Assert.True(value.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {value} Actual: {fieldInfo.GetValue(serverInstance)}");
         });
