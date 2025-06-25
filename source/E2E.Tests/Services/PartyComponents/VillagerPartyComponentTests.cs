@@ -7,15 +7,18 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.PartyComponents;
 public class VillagerPartyComponentTests : SyncTestBase
 {
+    string ComponentId;
     public VillagerPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment.CreateRegisteredObject<VillagerPartyComponent>();
+        ComponentId = TestEnvironment.CreateRegisteredObject<VillagerPartyComponent>();
         TestEnvironment.CreateRegisteredObject<Village>();
     }
 
     [Fact]
     public void Server_VillagerPartyComponent_Properties()
     {
+        Server.ObjectManager.TryGetObject(ComponentId, out VillagerPartyComponent component);
+        component.Village = null;
         TestEnvironment.AssertReferenceProperty<VillagerPartyComponent, Village>(nameof(VillagerPartyComponent.Village));
     }
 

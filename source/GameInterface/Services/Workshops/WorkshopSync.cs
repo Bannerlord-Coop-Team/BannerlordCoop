@@ -1,12 +1,13 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 
 namespace GameInterface.Services.Workshops
 {
-    public class WorkshopSync : IAutoSync
+    public class WorkshopSync : IDynamicSync
     {
-        public WorkshopSync(IAutoSyncBuilder autoSyncBuilder)
+        public WorkshopSync(DynamicSyncRegistry autoSyncBuilder)
         {
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Workshop), nameof(Workshop._owner)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Workshop), nameof(Workshop._customName)));

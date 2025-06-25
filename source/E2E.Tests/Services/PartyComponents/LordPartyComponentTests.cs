@@ -9,15 +9,18 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.PartyComponents;
 public class LordPartyComponentTests : SyncTestBase
 {
+    string ComponentId;
     public LordPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment.CreateRegisteredObject<LordPartyComponent>();
+        ComponentId = TestEnvironment.CreateRegisteredObject<LordPartyComponent>();
         TestEnvironment.CreateRegisteredObject<Hero>();
     }
 
     [Fact]
     public void Server_LordPartyComponent_Fields()
     {
+        Server.ObjectManager.TryGetObject(ComponentId, out LordPartyComponent component);
+        component._leader = null;
         TestEnvironment.AssertReferenceField<LordPartyComponent, Hero>(nameof(LordPartyComponent._leader));
         TestEnvironment.AssertField<LordPartyComponent, int>(nameof(LordPartyComponent._wagePaymentLimit), 5);
     }

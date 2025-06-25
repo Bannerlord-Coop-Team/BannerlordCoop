@@ -1,12 +1,13 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Fiefs;
 
-class FiefSync : IAutoSync
+class FiefSync : IDynamicSync
 {
-    public FiefSync(IAutoSyncBuilder autoSyncBuilder)
+    public FiefSync(DynamicSyncRegistry autoSyncBuilder)
     {
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Fief), nameof(Fief.GarrisonPartyComponent)));
 

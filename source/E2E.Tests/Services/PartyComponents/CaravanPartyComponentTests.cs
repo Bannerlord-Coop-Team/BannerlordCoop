@@ -12,15 +12,20 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.PartyComponents;
 public class CaravanPartyComponentTests : SyncTestBase
 {
+    string CaravanId;
+
     public CaravanPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment.CreateRegisteredObject<CaravanPartyComponent>();
+        CaravanId = TestEnvironment.CreateRegisteredObject<CaravanPartyComponent>();
         TestEnvironment.CreateRegisteredObject<Hero>();
     }
 
     [Fact]
     public void Server_CaravanPartyComponent_Fields()
     {
+        Server.ObjectManager.TryGetObject(CaravanId, out CaravanPartyComponent caravan);
+        caravan._leader = null;
+
         TestEnvironment.AssertReferenceField<CaravanPartyComponent, Hero>(nameof(CaravanPartyComponent._leader));
     }
 

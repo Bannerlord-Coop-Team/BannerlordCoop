@@ -13,9 +13,10 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.PartyComponents;
 public class CustomPartyComponentTests : SyncTestBase
 {
+    string PartyId;
     public CustomPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment.CreateRegisteredObject<CustomPartyComponent>();
+        PartyId = TestEnvironment.CreateRegisteredObject<CustomPartyComponent>();
         TestEnvironment.CreateRegisteredObject<Settlement>();
         TestEnvironment.CreateRegisteredObject<Hero>();
     }
@@ -23,13 +24,15 @@ public class CustomPartyComponentTests : SyncTestBase
     [Fact]
     public void Server_CustomPartyComponent_Fields()
     {
-        TestEnvironment.AssertReferenceProperty<CustomPartyComponent, TextObject>(nameof(CustomPartyComponent._name));
-        TestEnvironment.AssertReferenceProperty<CustomPartyComponent, Settlement>(nameof(CustomPartyComponent._homeSettlement));
-        TestEnvironment.AssertReferenceProperty<CustomPartyComponent, Hero>(nameof(CustomPartyComponent._owner));
-        TestEnvironment.AssertProperty<CustomPartyComponent, float>(nameof(CustomPartyComponent._customPartyBaseSpeed), 5f);
-        TestEnvironment.AssertProperty<CustomPartyComponent, string>(nameof(CustomPartyComponent._partyMountStringId), "testMount");
-        TestEnvironment.AssertProperty<CustomPartyComponent, string>(nameof(CustomPartyComponent._partyHarnessStringId), "testHarness");
-        TestEnvironment.AssertProperty<CustomPartyComponent, bool>(nameof(CustomPartyComponent._avoidHostileActions), true);
+        Server.ObjectManager.TryGetObject(PartyId, out CustomPartyComponent component);
+
+        TestEnvironment.AssertField<CustomPartyComponent, TextObject>(nameof(CustomPartyComponent._name), new TextObject("name"));
+        TestEnvironment.AssertReferenceField<CustomPartyComponent, Settlement>(nameof(CustomPartyComponent._homeSettlement));
+        TestEnvironment.AssertReferenceField<CustomPartyComponent, Hero>(nameof(CustomPartyComponent._owner));
+        TestEnvironment.AssertField<CustomPartyComponent, float>(nameof(CustomPartyComponent._customPartyBaseSpeed), 5f);
+        TestEnvironment.AssertField<CustomPartyComponent, string>(nameof(CustomPartyComponent._partyMountStringId), "testMount", "");
+        TestEnvironment.AssertField<CustomPartyComponent, string>(nameof(CustomPartyComponent._partyHarnessStringId), "testHarness", "");
+        TestEnvironment.AssertField<CustomPartyComponent, bool>(nameof(CustomPartyComponent._avoidHostileActions), true);
     }
 
     [Fact]

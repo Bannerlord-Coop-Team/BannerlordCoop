@@ -1,4 +1,5 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using GameInterface.Registry.Auto;
 using HarmonyLib;
 using System;
@@ -12,9 +13,9 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Services.Heroes
 {
-    internal class HeroSync : IAutoSync
+    internal class HeroSync : IDynamicSync
     {
-        private IEnumerable<MethodBase> externalMethods => new MethodBase[]
+        private IEnumerable<MethodInfo> externalMethods => new MethodInfo[]
         {
             AccessTools.Method(typeof(HeroDeveloper), "CheckLevel"),
             AccessTools.Method(typeof(HeroDeveloper), "ClearHeroLevel"),
@@ -25,11 +26,12 @@ namespace GameInterface.Services.Heroes
             AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring)),
         };
 
-        public HeroSync(IAutoSyncBuilder autoSyncBuilder)
+        public HeroSync(DynamicSyncRegistry autoSyncBuilder)
         {
             foreach (var method in externalMethods)
             {
-                autoSyncBuilder.AddFieldChangeMethod(method);
+                //ISSUES WITH THIS
+                //autoSyncBuilder.AddTargetMethod(typeof(Hero), method);
             }
 
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.StaticBodyProperties)));

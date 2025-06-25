@@ -9,9 +9,10 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.PartyComponents;
 public class GarrisonPartyComponentTests : SyncTestBase
 {
+    string ComponentId;
     public GarrisonPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment.CreateRegisteredObject<GarrisonPartyComponent>();
+        ComponentId = TestEnvironment.CreateRegisteredObject<GarrisonPartyComponent>();
         TestEnvironment.CreateRegisteredObject<Settlement>();
 
     }
@@ -19,6 +20,8 @@ public class GarrisonPartyComponentTests : SyncTestBase
     [Fact]
     public void Server_GarrisonPartyComponent_Properties()
     {
+        Server.ObjectManager.TryGetObject(ComponentId, out GarrisonPartyComponent component);
+        component.Settlement = null;
         TestEnvironment.AssertReferenceProperty<GarrisonPartyComponent, Settlement>(nameof(GarrisonPartyComponent.Settlement));
     }
 

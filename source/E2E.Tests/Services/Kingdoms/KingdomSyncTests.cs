@@ -30,7 +30,7 @@ public class KingdomSyncTests : SyncTestBase
         TestEnvironment.AssertField<Kingdom, bool>(nameof(Kingdom._isEliminated), true);
         TestEnvironment.AssertField<Kingdom, int>(nameof(Kingdom._kingdomBudgetWallet), 5);
         TestEnvironment.AssertField<Kingdom, int>(nameof(Kingdom._tributeWallet), 5);
-        TestEnvironment.AssertField<Kingdom, bool>(nameof(Kingdom._distanceToClosestNonAllyFortificationCacheDirty), true);
+        TestEnvironment.AssertField<Kingdom, bool>(nameof(Kingdom._distanceToClosestNonAllyFortificationCacheDirty), false, defaultValue: true);
     }
 
     [Fact]

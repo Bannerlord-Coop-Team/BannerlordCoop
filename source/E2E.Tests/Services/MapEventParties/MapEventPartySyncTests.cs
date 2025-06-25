@@ -9,16 +9,18 @@ namespace E2E.Tests.Services.MapEventParties
 {
     public class MapEventPartySyncTests : SyncTestBase
     {
-
+        string MepId;
         public MapEventPartySyncTests(ITestOutputHelper output) : base(output)
         {
-            TestEnvironment.CreateRegisteredObject<MapEventParty>();
+            MepId = TestEnvironment.CreateRegisteredObject<MapEventParty>();
             TestEnvironment.CreateRegisteredObject<PartyBase>();
         }
 
         [Fact]
         public void Server_MapEventParty_Properties()
         {
+            Server.ObjectManager.TryGetObject(MepId, out MapEventParty eventParty);
+            eventParty.Party = null;
             TestEnvironment.AssertProperty<MapEventParty, float>(nameof(MapEventParty.GainedInfluence), 5f);
             TestEnvironment.AssertProperty<MapEventParty, float>(nameof(MapEventParty.GainedRenown), 2f);
             TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty.GoldLost), 3);
@@ -33,7 +35,6 @@ namespace E2E.Tests.Services.MapEventParties
         {
             TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty._contributionToBattle), 3, defaultValue: 1);
             TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty._healthyManCountAtStart), 3, defaultValue: 1);
-
         }
     }
 }
