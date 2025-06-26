@@ -1,4 +1,5 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -7,12 +8,12 @@ using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEngines
 {
-    internal class SiegeEnginesContainerSync:IAutoSync
+    internal class SiegeEnginesContainerSync: IDynamicSync
     {
-        public SiegeEnginesContainerSync(IAutoSyncBuilder autoSyncBuilder)
+        public SiegeEnginesContainerSync(DynamicSyncRegistry autoSyncBuilder)
         {
             // Fields
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEnginesContainer), nameof(SiegeEnginesContainer.SiegePreparations)));
+            //autoSyncBuilder.AddField(AccessTools.Field(typeof(SiegeEnginesContainer), nameof(SiegeEnginesContainer.SiegePreparations)));
         }
     }
 }

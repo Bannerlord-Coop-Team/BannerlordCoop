@@ -1,12 +1,13 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents;
 
-internal class MapEventSync : IAutoSync
+internal class MapEventSync : IDynamicSync
 {
-    public MapEventSync(IAutoSyncBuilder autoSyncBuilder)
+    public MapEventSync(DynamicSyncRegistry autoSyncBuilder)
     {
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.AttackersRanAway)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.BattleState)));
