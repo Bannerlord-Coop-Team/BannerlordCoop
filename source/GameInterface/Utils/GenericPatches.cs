@@ -704,7 +704,7 @@ namespace GameInterface.Utils
 
             var fieldValue = (TItem)fieldInfo.GetValue(instance);
             // Skip if value hasn´t changed
-            if ((fieldValue == null && item == null) || item.Equals(fieldValue))
+            if ((fieldValue == null && item == null) || item?.Equals(fieldValue) == true)
                 return;
 
             if (CallOriginalPolicy.IsOriginalAllowed())
@@ -763,7 +763,7 @@ namespace GameInterface.Utils
 
             var propertyValue = (TItem)propertyInfo.GetValue(instance);
             //// Skip if value hasn´t changed
-            if ((propertyValue == null && item == null) || item.Equals(propertyValue))
+            if ((propertyValue == null && item == null) || item?.Equals(propertyValue) == true)
                 return;
 
             if (CallOriginalPolicy.IsOriginalAllowed())
