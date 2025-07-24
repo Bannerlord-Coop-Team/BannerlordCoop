@@ -52,7 +52,7 @@ static class PartyBehaviorPatch
         ref PartyBase targetPartyFigure,
         ref Vec2 bestTargetPoint)
     {
-        if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref targetPartyFigure, ref bestTargetPoint)) return false;
+        if (__instance._mobileParty != Campaign.Current.MainParty && BehaviorIsSame(ref __instance, ref newAiBehavior, ref targetPartyFigure, ref bestTargetPoint)) return false;
 
         if (__instance._mobileParty.IsPartyControlled() == false) return false;
 

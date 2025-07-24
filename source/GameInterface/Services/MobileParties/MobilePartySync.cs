@@ -24,7 +24,6 @@ internal class MobilePartySync : IDynamicSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._customHomeSettlement)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._isDisorganized)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._isCurrentlyUsedByAQuest)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._partyTradeGold)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._ignoredUntilTime)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._besiegerCampResetStarted)));
 
@@ -37,5 +36,35 @@ internal class MobilePartySync : IDynamicSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.TargetParty)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.TargetSettlement)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.TargetPosition)));
+        //new
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.CustomName)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Aggressiveness)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Objective)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Army)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsActive)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsPartyTradeActive)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyTradeGold)));
+        //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyTradeTaxGold)));
+        ////StationaryStartTime called on tick so lags out, disregard?
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.VersionNo)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.ShouldJoinPlayerBattles)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsDisbanding)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.AttachedTo)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.BesiegerCamp)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Scout)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Engineer)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Quartermaster)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Surgeon)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyTradeTaxGold)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.RecentEventsMorale)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.EventPositionAdder)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyComponent)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsMilitia)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsLordParty)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsVillager)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsCaravan)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsGarrison)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsCustomParty)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsBandit)));
     }
 }
