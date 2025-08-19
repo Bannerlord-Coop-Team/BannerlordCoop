@@ -8,6 +8,8 @@ using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
+using Common.Logging;
+using Serilog;
 
 namespace GameInterface.AutoSync;
 public interface IAutoSyncBuilder : IDisposable
@@ -48,6 +50,7 @@ public interface IAutoSyncBuilder : IDisposable
 }
 internal class AutoSyncBuilder : IAutoSyncBuilder
 {
+    private readonly ILogger Logger = LogManager.GetLogger<AutoSyncBuilder>();
     private readonly HashSet<FieldInfo> fields = new HashSet<FieldInfo>();
     private readonly HashSet<PropertyInfo> properties = new HashSet<PropertyInfo>();
     private readonly HashSet<MethodBase> externalFieldChangeMethods = new HashSet<MethodBase>();
@@ -69,8 +72,19 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
     public void AddField(FieldInfo field)
     {
         if (field == null) throw new ArgumentNullException(nameof(field));
-        if (field.FieldType.IsInterface) throw new NotSupportedException($"{field.Name} cannot be autosynced as interfaces types are not supported");
-        if (field.FieldType.IsAbstract) throw new NotSupportedException($"{field.Name} cannot be autosynced as abstract types are not supported");
+        
+        // Check if we can resolve concrete types for interface/abstract fields
+        if (field.FieldType.IsInterface || field.FieldType.IsAbstract)
+        {
+            if (!InterfaceResolver.TryResolveConcreteTypes(field.FieldType, out var concreteTypes))
+            {
+                Logger.Warning($"{field.Name} has interface/abstract type {field.FieldType.Name} with no concrete implementations found. Field will be registered but may not sync properly.");
+            }
+            else
+            {
+                Logger.Information($"Field {field.Name} with interface/abstract type {field.FieldType.Name} will sync for {concreteTypes.Count} concrete types");
+            }
+        }
 
         if (fields.Contains(field)) throw new ArgumentException($"{field.Name} has already been registered as a synced field");
         fields.Add(field);
@@ -80,8 +94,19 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
     {
         if (property == null) throw new ArgumentNullException(nameof(property));
         if (property.CanWrite == false) throw new ArgumentException($"{property.Name} does not have a set method");
-        if (property.PropertyType.IsInterface) throw new NotSupportedException($"{property.Name} cannot be autosynced as interfaces types are not supported");
-        if (property.PropertyType.IsAbstract) throw new NotSupportedException($"{property.Name} cannot be autosynced as abstract types are not supported");
+        
+        // Check if we can resolve concrete types for interface/abstract properties
+        if (property.PropertyType.IsInterface || property.PropertyType.IsAbstract)
+        {
+            if (!InterfaceResolver.TryResolveConcreteTypes(property.PropertyType, out var concreteTypes))
+            {
+                Logger.Warning($"{property.Name} has interface/abstract type {property.PropertyType.Name} with no concrete implementations found. Property will be registered but may not sync properly.");
+            }
+            else
+            {
+                Logger.Information($"Property {property.Name} with interface/abstract type {property.PropertyType.Name} will sync for {concreteTypes.Count} concrete types");
+            }
+        }
 
         if (properties.Contains(property)) throw new ArgumentException($"{property.Name} has already been registered as a synced property");
         properties.Add(property);
