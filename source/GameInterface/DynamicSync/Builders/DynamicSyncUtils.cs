@@ -87,14 +87,6 @@ namespace GameInterface.DynamicSync.Builders
                 return type.Name;
         }
 
-        private static Type GetElementType(Type type)
-        {
-            if (type.IsArray)
-                return type.GetElementType();
-            else
-                return type.GetGenericArguments()[0];
-        }
-
         public static string GetNamespace(Type type)
         {
             string result = null;
@@ -138,6 +130,14 @@ namespace GameInterface.DynamicSync.Builders
                 return $"{GetDeclaringTypeName(type.DeclaringType)}.{type.Name}";
             }
             return type.Name;
+        }
+
+        private static Type GetElementType(Type type)
+        {
+            if (type.IsArray)
+                return type.GetElementType();
+            else
+                return type.GetGenericArguments()[0];
         }
     }
 }

@@ -1,6 +1,5 @@
 ﻿using GameInterface.DynamicSync.Builders;
-using GameInterface.Services.ObjectManager;
-using ProtoBuf.Meta;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -10,6 +9,13 @@ namespace GameInterface.DynamicSync
     public class DynamicSyncRegistry
     {
         public readonly Dictionary<Type, DynamicSyncRegistryItem> Registrations = new Dictionary<Type, DynamicSyncRegistryItem>();
+
+        public readonly Dictionary<Type, DynamicSyncRegistrySerializer> Serializers = new Dictionary<Type, DynamicSyncRegistrySerializer>();
+        public readonly DynamicSyncRegistrySerializer DefaultSerializer = new DynamicSyncRegistrySerializer
+        {
+            Serialize = AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Serialize)),
+            Deserialize = AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Deserialize))
+        };
 
         public void AddField(FieldInfo field)
         {
@@ -48,6 +54,22 @@ namespace GameInterface.DynamicSync
             Registrations[type].TargetMethods.Add(methodInfo);
 
             return true;
+        }
+
+        /// <summary>
+        /// Add CustomSerializers for DynamicSync
+        /// </summary>
+        /// <typeparam name="TargetType"></typeparam>
+        /// <param name="serialize"></param>
+        /// <param name="deserialize"></param>
+        public void AddSerializer<TargetType>(Func<TargetType, byte[]> serialize, Func<byte[], TargetType, TargetType>deserialize)
+        {
+            DynamicSyncRegistrySerializer serializer = new DynamicSyncRegistrySerializer
+            {
+                Serialize = serialize.GetMethodInfo(),
+                Deserialize = deserialize.GetMethodInfo()
+            };
+            Serializers.Add(typeof(TargetType), serializer);
         }
 
         private bool AddMember(Type type, MemberInfo memberInfo)

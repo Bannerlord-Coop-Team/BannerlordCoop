@@ -6,11 +6,11 @@ using System.Reflection;
 
 namespace GameInterface.DynamicSync.Builders
 {
-    public class DynamicSyncPropertyArrayBuilder
+    public class DynamicSyncPropertyArrayBuilder : DynamicSyncBuilderBase
     {
         private readonly IObjectManager objectManager;
 
-        public DynamicSyncPropertyArrayBuilder(IObjectManager objectManager)
+        public DynamicSyncPropertyArrayBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry) : base(dynamicSyncRegistry)
         {
             this.objectManager = objectManager;
         }
@@ -81,6 +81,7 @@ namespace GameInterface.DynamicSync.Builders
 
         private object GetTemplateData(PropertyInfo propertyInfo)
         {
+            var serializers = GetSerializerMethodNames(propertyInfo.PropertyType.GetElementType());
             return new
             {
                 MemberDeclaringType = propertyInfo.DeclaringType.Name,
@@ -88,7 +89,9 @@ namespace GameInterface.DynamicSync.Builders
                 MemberType = GetArrayType(propertyInfo.PropertyType),
                 ElementType = propertyInfo.PropertyType.GetElementType().Name,
                 Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
-                NotReadOnly = propertyInfo.SetMethod != null
+                NotReadOnly = propertyInfo.SetMethod != null,
+                SerializeMethod = serializers.serialize,
+                DeserializeMethod = serializers.deserialize
             };
         }
     }

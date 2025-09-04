@@ -16,12 +16,12 @@ namespace DynamicSync
         public override string InstanceId { get; set; }
 
         [ProtoMember(2)]
-        public List<(int Index, {{ ElementType }} Value)> Value { get; set; }
+        public List<(int Index, byte[] Value)> Value { get; set; }
         
         [ProtoMember(3)]
         public int Length { get; set; }
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<(int Index, {{ ElementType }} Value)> value, int length) : base(instanceId)
+        public {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<(int Index, byte[] Value)> value, int length) : base(instanceId)
         {
             Value = value;
             Length = length;

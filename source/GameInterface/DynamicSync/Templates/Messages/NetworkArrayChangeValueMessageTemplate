@@ -16,12 +16,12 @@ namespace DynamicSync
         public string InstanceId { get; set; }
 
         [ProtoMember(2)]
-        public {{ ElementType }} Value { get; set; }
+        public byte[] Value { get; set; }
         
         [ProtoMember(3)]
         public int Index { get; set; }
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(string instanceId, string value, int index) : base(instanceId, valueId)
+        public {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(string instanceId, byte[] value, int index) : base(instanceId, valueId)
         {
             Index = index;
         }

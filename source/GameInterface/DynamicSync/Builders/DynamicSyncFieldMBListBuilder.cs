@@ -6,11 +6,11 @@ using System.Reflection;
 
 namespace GameInterface.DynamicSync.Builders
 {
-    public class DynamicSyncFieldMBListBuilder
+    public class DynamicSyncFieldMBListBuilder : DynamicSyncBuilderBase
     {
         private readonly IObjectManager objectManager;
 
-        public DynamicSyncFieldMBListBuilder(IObjectManager objectManager)
+        public DynamicSyncFieldMBListBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry) : base(dynamicSyncRegistry)
         {
             this.objectManager = objectManager;
         }
@@ -85,6 +85,7 @@ namespace GameInterface.DynamicSync.Builders
 
         private object GetTemplateData(FieldInfo fieldInfo)
         {
+            var serializers = GetSerializerMethodNames(GetElementType(fieldInfo.FieldType));
             return new
             {
                 MemberDeclaringType = fieldInfo.DeclaringType.Name,
@@ -92,7 +93,9 @@ namespace GameInterface.DynamicSync.Builders
                 MemberType = GetMbListTypeName(fieldInfo.FieldType),
                 ElementType = GetElementType(fieldInfo.FieldType).Name,
                 Libraries = DynamicSyncUtils.GetLibraries(fieldInfo),
-                NotReadOnly = !fieldInfo.IsInitOnly
+                NotReadOnly = !fieldInfo.IsInitOnly,
+                SerializeMethod = serializers.serialize,
+                DeserializeMethod = serializers.deserialize
             };
         }
     }

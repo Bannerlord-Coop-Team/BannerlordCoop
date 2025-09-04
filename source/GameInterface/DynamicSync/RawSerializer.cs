@@ -13,7 +13,7 @@ public class RawSerializer
         }
     }
 
-    public static T Deserialize<T>(byte[] bytes)
+    public static T Deserialize<T>(byte[] bytes, T currentVal)
     {
         using (MemoryStream memoryStream = new MemoryStream(bytes))
         {

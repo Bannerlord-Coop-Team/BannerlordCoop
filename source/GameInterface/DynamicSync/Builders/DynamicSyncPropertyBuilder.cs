@@ -7,11 +7,11 @@ using System.Text;
 
 namespace GameInterface.DynamicSync.Builders
 {
-    public class DynamicSyncPropertyBuilder
+    public class DynamicSyncPropertyBuilder : DynamicSyncBuilderBase
     {
         private readonly IObjectManager objectManager;
 
-        public DynamicSyncPropertyBuilder(IObjectManager objectManager)
+        public DynamicSyncPropertyBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry) : base(dynamicSyncRegistry)
         {
             this.objectManager = objectManager;
         }
@@ -49,12 +49,15 @@ namespace GameInterface.DynamicSync.Builders
 
         private object GetTemplateData(PropertyInfo propertyInfo)
         {
+            var serializerNames = GetSerializerMethodNames(propertyInfo.PropertyType);
             return new
             {
                 MemberDeclaringType = propertyInfo.DeclaringType.Name,
                 MemberName = propertyInfo.Name,
                 MemberType = propertyInfo.PropertyType.Name,
-                Libraries = DynamicSyncUtils.GetLibraries(propertyInfo)
+                Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
+                SerializeMethod = serializerNames.serialize,
+                DeserializeMethod = serializerNames.deserialize
             };
         }
     }

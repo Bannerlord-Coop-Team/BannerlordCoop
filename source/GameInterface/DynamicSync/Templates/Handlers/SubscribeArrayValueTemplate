@@ -3,11 +3,11 @@ if NotReadOnly;
 }}
 Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
 {
-    var valueIds = new List<(int Index, {{ElementType}} Value)>();
+    var valueIds = new List<(int Index, byte[] Value)>();
     for (int i = 0; i < data.Value.Length; i++)
     {
         if (data.Value[i] == null) continue;
-        valueIds.Add(new(i, data.Value[i]));
+        valueIds.Add(new(i, {{SerializeMethod}}(data.Value[i])));
     }
     network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueIds, data.Value.Length));
 });
@@ -16,7 +16,7 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNe
     var newValue = new {{ElementType}}[data.Length];
     for (int i = 0; i < data.Value.Count; i++)
     {
-        newValue[data.Value[i].Index] = data.Value[i].Value;
+        newValue[data.Value[i].Index] = {{DeserializeMethod}}(data.Value[i].Value, default(ElementType));
     }
     instance.{{ MemberName }} = newValue;
 });
@@ -25,9 +25,9 @@ end
 }}
 Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeLocalMessage>((instanceId, data) => 
 {
-    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(instanceId, data.Value, data.Index));
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(instanceId, {{SerializeMethod}}(data.Value), data.Index));
 });
 SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage>((instance, data) => 
 {
-    instance.{{ MemberName }}[data.Index] = data.Value;
+    instance.{{ MemberName }}[data.Index] = {{DeserializeMethod}}(data.Value, instance.{{ MemberName }}[data.Index]);
 });

@@ -16,9 +16,9 @@ namespace DynamicSync
         public override string InstanceId { get; set; }
 
         [ProtoMember(2)]
-        public List<{{ ElementType }})> Value { get; set; }
+        public List<byte[])> Value { get; set; }
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<({{ ElementType }}> value) : base(instanceId)
+        public {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(string instanceId, List<(byte[]> value) : base(instanceId)
         {
             Value = value;
         }
