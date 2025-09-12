@@ -15,7 +15,6 @@ namespace E2E.Tests.Services.MobilePartyAis
             _secondPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         }
 
-
         [Fact]
         public void Server_MobilePartyAi_Fields()
         {

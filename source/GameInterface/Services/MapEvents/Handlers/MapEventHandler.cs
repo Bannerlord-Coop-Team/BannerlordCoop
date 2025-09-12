@@ -59,10 +59,7 @@ internal class MapEventHandler : IHandler
 
     private void Handle(MessagePayload<NetworkCreateMapEvent> payload)
     {
-        var newMapEvent = ObjectHelper.SkipConstructor<MapEvent>();
-
-        // TODO find better way of doing this
-        newMapEvent._sides = new MapEventSide[2];
+        var newMapEvent = new MapEvent();
 
         objectManager.AddExisting(payload.What.MapEventId, newMapEvent);
     }

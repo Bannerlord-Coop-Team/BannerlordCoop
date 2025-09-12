@@ -31,7 +31,6 @@ internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
     {
         foreach (MobileParty party in Campaign.Current.MobileParties)
         {
-
             if (registry.RegisterExistingObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster) == false)
                 Logger.Error($"Unable to register {nameof(MobileParty.MemberRoster)}");
             if (registry.RegisterExistingObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster) == false)
@@ -41,6 +40,7 @@ internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
 
     public void OnClientCreated(TroopRoster obj, string id)
     {
+        ;
     }
 
     public void OnClientDestroyed(TroopRoster obj, string id)
@@ -49,6 +49,7 @@ internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
 
     public void OnServerCreated(TroopRoster obj, string id)
     {
+        ;
     }
 
     public void OnServerDestroyed(TroopRoster obj, string id)

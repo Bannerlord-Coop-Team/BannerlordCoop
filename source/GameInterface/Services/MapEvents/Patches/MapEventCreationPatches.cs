@@ -27,7 +27,7 @@ internal class MapEventCreationPatches
         {
             Logger.Error("Client created unmanaged {name}\n"
                 + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
-            return true;
+            return false;
         }
 
         var message = new MapEventCreated(__instance);

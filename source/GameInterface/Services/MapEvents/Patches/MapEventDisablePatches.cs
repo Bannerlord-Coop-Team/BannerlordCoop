@@ -7,25 +7,25 @@ using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
-[HarmonyPatch(typeof(MapEvent))]
-internal class MapEventDisablePatches
-{
-    private static readonly ILogger Logger = LogManager.GetLogger<MapEventCollectionPatches>();
+//[HarmonyPatch(typeof(MapEvent))]
+//internal class MapEventDisablePatches
+//{
+//    private static readonly ILogger Logger = LogManager.GetLogger<MapEventCollectionPatches>();
 
-    [HarmonyPatch(nameof(MapEvent.Initialize))]
-    [HarmonyPrefix]
-    static bool InitializePrefix()
-    {
-        // Call original if we called it
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+//    [HarmonyPatch(nameof(MapEvent.Initialize))]
+//    [HarmonyPrefix]
+//    static bool InitializePrefix()
+//    {
+//        // Call original if we called it
+//        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
-            return false;
-        }
+//        if (ModInformation.IsClient)
+//        {
+//            Logger.Error("Client created unmanaged {name}\n"
+//                + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
+//            return false;
+//        }
 
-        return true;
-    }
-}
+//        return true;
+//    }
+//}

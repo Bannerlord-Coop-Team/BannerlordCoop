@@ -47,7 +47,8 @@ namespace GameInterface.Services.FlattenedTroopRosters.Handlers
         {
             var payload = obj.What;
 
-            var troopRoster = ObjectHelper.SkipConstructor<FlattenedTroopRoster>();
+            var troopRoster = new FlattenedTroopRoster(payload.Count);
+
             if (objectManager.AddExisting(payload.FlattenedTroopRosterId, troopRoster) == false)
             {
                 Logger.Error("Failed to add existing TroopRoster, {id}", payload.FlattenedTroopRosterId);
