@@ -61,6 +61,10 @@ internal class MapEventHandler : IHandler
     {
         var newMapEvent = new MapEvent();
 
+        newMapEvent._sides = new MapEventSide[2];
+        newMapEvent.StrengthOfSide = new float[2];
+        newMapEvent.MapEventVisual = Campaign.Current.VisualCreator.CreateMapEventVisual(newMapEvent);
+
         objectManager.AddExisting(payload.What.MapEventId, newMapEvent);
     }
 

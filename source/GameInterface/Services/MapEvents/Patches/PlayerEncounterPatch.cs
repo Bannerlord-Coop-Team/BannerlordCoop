@@ -16,24 +16,24 @@ namespace GameInterface.Services.MapEvents.Patches
     /// <summary>
     /// Patches the StartBattle in PlayerEncounter, only runs on local client
     /// </summary>
-    [HarmonyPatch(typeof(PlayerEncounter))]
-    public class PlayerEncounterPatch
-    {
-        [HarmonyPatch("StartBattleInternal")]
-        [HarmonyPrefix]
-        public static bool Prefix(ref PlayerEncounter __instance)
-        {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
+    //[HarmonyPatch(typeof(PlayerEncounter))]
+    //public class PlayerEncounterPatch
+    //{
+    //    [HarmonyPatch("StartBattleInternal")]
+    //    [HarmonyPrefix]
+    //    public static bool Prefix(ref PlayerEncounter __instance)
+    //    {
+    //        if (AllowedThread.IsThisThreadAllowed()) return true;
 
-            if (ModInformation.IsServer) return true;
+    //        if (ModInformation.IsServer) return true;
 
-            var message = new PlayerStartBattle();
+    //        var message = new PlayerStartBattle();
 
-            MessageBroker.Instance.Publish(__instance, message);
+    //        MessageBroker.Instance.Publish(__instance, message);
 
-            return false;
-        }
-    }
+    //        return true;
+    //    }
+    //}
 
     [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
     public class TestPatching2

@@ -109,6 +109,8 @@ namespace GameInterface.Services.Battles.Handlers
                 {
                     Campaign.Current.PlayerEncounter._mapEvent = mapEvent;
 
+                    Campaign.Current.PlayerEncounter._mapEvent.StrengthOfSide = new float[2];
+
                     //Get which side player is on
                     MobileParty.MainParty.Party._mapEventSide = playerSide;
 
