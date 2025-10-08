@@ -60,7 +60,9 @@ namespace GameInterface.DynamicSync.Builders
                 MemberType = fieldInfo.FieldType.Name,
                 Libraries = DynamicSyncUtils.GetLibraries(fieldInfo),
                 SerializeMethod = serializerNames.serialize,
-                DeserializeMethod = serializerNames.deserialize
+                DeserializeMethod = serializerNames.deserialize,
+                ReadOnly = fieldInfo.IsInitOnly,
+                ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadonlyFieldSetter(fieldInfo) : (int?)null
             };
         }
     }

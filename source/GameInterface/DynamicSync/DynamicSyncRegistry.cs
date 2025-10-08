@@ -16,6 +16,7 @@ namespace GameInterface.DynamicSync
             Serialize = AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Serialize)),
             Deserialize = AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Deserialize))
         };
+        public readonly List<Action<object, object>> ReadonlySetters = new List<Action<object, object>>();
 
         public void AddField(FieldInfo field)
         {
@@ -70,6 +71,13 @@ namespace GameInterface.DynamicSync
                 Deserialize = deserialize.GetMethodInfo()
             };
             Serializers.Add(typeof(TargetType), serializer);
+        }
+
+        public int AddReadonlySetter(Action<object, object> accessor)
+        {
+            ReadonlySetters.Add(accessor);
+
+            return ReadonlySetters.Count - 1;
         }
 
         private bool AddMember(Type type, MemberInfo memberInfo)

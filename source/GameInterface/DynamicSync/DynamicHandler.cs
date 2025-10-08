@@ -4,7 +4,6 @@ using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace GameInterface.DynamicSync
 {
@@ -13,19 +12,21 @@ namespace GameInterface.DynamicSync
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
+        private readonly DynamicSyncRegistry dynamicSyncRegistry;
         private List<IHandler> handlers = new List<IHandler>();
 
-        public DynamicHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
+        public DynamicHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, DynamicSyncRegistry dynamicSyncRegistry)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
+            this.dynamicSyncRegistry = dynamicSyncRegistry;
         }
 
         public void RegisterHandler(Type handlerType)
         {
            if(!handlers.Any(h => h.GetType() == handlerType))
-            handlers.Add((IHandler)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network }));
+            handlers.Add((IHandler)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network, dynamicSyncRegistry }));
         }
 
         public void Dispose()

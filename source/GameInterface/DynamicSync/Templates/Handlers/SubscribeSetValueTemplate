@@ -1,2 +1,0 @@
-﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, {{SerializeMethod}}(data.Value))));
-SubscribeNetwork<byte[], {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => instance.{{MemberName}} = {{DeserializeMethod}}(data.Value, instance.{{MemberName}}));

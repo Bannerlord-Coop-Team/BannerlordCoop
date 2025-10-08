@@ -96,7 +96,7 @@ public class DynamicSyncBuilder
             var result = dynamicAssembly.Emit(assemblyStream, pdbStream);
 
             if (!result.Success)
-                throw new InvalidOperationException();
+                throw new InvalidOperationException(string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => $"{d.Location.ToString()} {d.GetMessage()}")));
 
             return Assembly.Load(assemblyStream.GetBuffer());
         };

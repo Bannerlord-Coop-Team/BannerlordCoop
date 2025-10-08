@@ -14,8 +14,7 @@ namespace DynamicSync
 {
     public class {{DeclaringType}}_Handler : GenericHandler<{{DeclaringType}}_Handler, {{DeclaringType}}>
     {
-
-        public {{DeclaringType}}_Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network) : base(messageBroker, objectManager, network)
+        public {{DeclaringType}}_Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, DynamicSyncRegistry dynamicSyncRegistry) : base(messageBroker, objectManager, network)
         {
             {{~ for subscription in Subscriptions ~}}
             {{ subscription }}

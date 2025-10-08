@@ -1,7 +1,4 @@
-﻿{{ 
-if NotReadOnly;
-}}
-Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
 {
     var temp = data.Value.ToList();
     var valueIds = new List<string>();
@@ -21,11 +18,18 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNe
         if (!objectManager.TryGetObject<{{ElementType}}>(data.Value[i], out {{ElementType}} element)) continue;
         newValue.Enqueue(element);
     }
-    instance.{{ MemberName }} = newValue;
+    {{ 
+    if ReadOnly;
+    }}
+	    dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue));
+    {{
+    else
+    }}
+	    instance.{{MemberName}} = newValue;
+    {{
+    end
+    }}
 });
-{{
-end
-}}
 Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMessage>((instanceId, data) => 
 {
     if (!objectManager.TryGetId(data.Value, out string id)) return;
