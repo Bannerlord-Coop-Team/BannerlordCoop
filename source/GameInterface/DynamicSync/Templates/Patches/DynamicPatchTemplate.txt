@@ -6,6 +6,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using Common.Messaging;
+using System.Linq;
+using System.Reflection.Emit;
 using GameInterface.Policies;
 using GameInterface;
 {{~ for library in Libraries ~}}
@@ -13,28 +15,27 @@ using {{ library }};
 {{~ end ~}}
 
 
-namespace DynamicSync
-{
-    [HarmonyPatch()]
-    public class {{DeclaringType}}_DynamicPatch : GenericPatches<{{DeclaringType}}_DynamicPatch, {{DeclaringType}}>
-    {
-        private static IEnumerable<MethodBase> TargetMethods()
-        {
-            foreach (var method in AccessTools.GetDeclaredMethods(typeof({{DeclaringType}})))
-            {
-                yield return method;
-            }
-            {{~ for targetMethod in TargetMethods ~}}
-            yield return AccessTools.Method(typeof({{targetMethod.DeclaringType}}), "{{targetMethod.Name}}");
-            {{~ end ~}}
-        }
-        {{~ for transpiler in Transpilers ~}}
+namespace DynamicSync;
 
-        {{ transpiler }}
+[HarmonyPatch]
+public class {{DeclaringType}}_DynamicPatches : GenericPatches<{{DeclaringType}}_DynamicPatches, {{DeclaringType}}>
+{
+    private static IEnumerable<MethodBase> TargetMethods()
+    {
+        foreach (var method in AccessTools.GetDeclaredMethods(typeof({{DeclaringType}})))
+        {
+            yield return method;
+        }
+        {{~ for targetMethod in TargetMethods ~}}
+        yield return AccessTools.Method(typeof({{targetMethod.DeclaringType}}), "{{targetMethod.Name}}");
         {{~ end ~}}
     }
-    {{~ for prefix in Prefixes ~}}
+    {{~ for transpiler in Transpilers ~}}
 
-    {{ prefix }}
+    {{ transpiler }}
     {{~ end ~}}
 }
+{{~ for prefix in Prefixes ~}}
+
+{{ prefix }}
+{{~ end ~}}

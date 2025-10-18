@@ -42,10 +42,10 @@ namespace GameInterface.DynamicSync
                     return false;
                 }
             }));
+
             var handlers = assembly.GetTypes()
-            .Where(type => {
-                return type.Name.EndsWith("_Handler");
-            }).ToList();
+                .Where(type => type.Name.EndsWith("_Handler"));
+
             foreach (var handler in handlers)
             {
                 dynamicHandler.RegisterHandler(handler);

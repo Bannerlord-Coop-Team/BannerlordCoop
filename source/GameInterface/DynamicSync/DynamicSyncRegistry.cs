@@ -63,7 +63,7 @@ namespace GameInterface.DynamicSync
         /// <typeparam name="TargetType"></typeparam>
         /// <param name="serialize"></param>
         /// <param name="deserialize"></param>
-        public void AddSerializer<TargetType>(Func<TargetType, byte[]> serialize, Func<byte[], TargetType, TargetType>deserialize)
+        public void AddSerializer<TargetType>(Func<TargetType, byte[]> serialize, Func<byte[], TargetType, TargetType> deserialize)
         {
             DynamicSyncRegistrySerializer serializer = new DynamicSyncRegistrySerializer
             {
@@ -73,7 +73,7 @@ namespace GameInterface.DynamicSync
             Serializers.Add(typeof(TargetType), serializer);
         }
 
-        public int AddReadonlySetter(Action<object, object> accessor)
+        public int AddReadOnlySetter(Action<object, object> accessor)
         {
             ReadonlySetters.Add(accessor);
 

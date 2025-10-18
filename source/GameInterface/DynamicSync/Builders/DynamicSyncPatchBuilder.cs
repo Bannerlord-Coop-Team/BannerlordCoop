@@ -157,7 +157,7 @@ namespace GameInterface.DynamicSync.Builders
                 Transpilers = transpilers
             });
 
-            DynamicSyncConfiguration.ExportFile($"{declaringType.Name}/{declaringType.Name}_DynamicPatch.cs", patchTemplate);
+            DynamicSyncConfiguration.ExportFile($"{declaringType.Name}/{declaringType.Name}_DynamicPatches.cs", patchTemplate);
 
             var handlerTemplate = TemplateParser.Parse("Handlers.DynamicHandlerTemplate", new
             {

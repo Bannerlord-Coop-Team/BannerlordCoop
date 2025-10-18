@@ -1,6 +1,7 @@
 ﻿using Common.Util;
 using E2E.Tests.Environment;
 using HarmonyLib;
+using System.Reflection;
 using System.Runtime.ConstrainedExecution;
 using System.Runtime.InteropServices;
 using TaleWorlds.CampaignSystem;
@@ -39,14 +40,13 @@ namespace E2E.Tests.Services.CraftingService
 
             var currentHistoryIntercept = TestEnvironment.GetIntercept(currentHistoryIndexField);
             var craftingItemObjectIntercept = TestEnvironment.GetIntercept(craftedItemObjectField);
-            
 
             server.Call(() =>
             {
                 CraftingTemplate craftingTemplate = new CraftingTemplate();
                 CultureObject cultureObject = new CultureObject();
                 Crafting crafting = new Crafting(craftingTemplate, cultureObject, new TextObject("test"));
-                
+
 
                 Assert.True(server.ObjectManager.TryGetId(crafting, out craftingId));
             });
@@ -78,11 +78,23 @@ namespace E2E.Tests.Services.CraftingService
                 img.AddItemModifier(modifier);
                 serverCrafting.CurrentItemModifierGroup = img;
                 serverCrafting.CraftedWeaponName = new TextObject("craftedWeapon");
-                WeaponDesign weaponDesign = ObjectHelper.SkipConstructor<WeaponDesign>();
+
+                var weaponDesign = new WeaponDesign(
+                    new CraftingTemplate(),
+                    new TextObject("Excaliber"),
+                    new WeaponDesignElement[] {
+                        new WeaponDesignElement(new CraftingPiece())
+                    });
                 serverCrafting.CurrentWeaponDesign = weaponDesign;
+            },
+            new MethodInfo[]
+            {
+                AccessTools.Method(typeof(WeaponDesign), nameof(WeaponDesign.CalculatePivotDistances)),
+                AccessTools.Method(typeof(WeaponDesign), nameof(WeaponDesign.CalculateHolsterShiftAmount))
             });
 
             server.ObjectManager.TryGetId(serverCrafting._craftedItemObject, out string serverObjectId);
+            server.ObjectManager.TryGetId(serverCrafting.CurrentWeaponDesign, out string serverWeaponDesignId);
 
             foreach (var client in TestEnvironment.Clients)
             {
@@ -90,9 +102,10 @@ namespace E2E.Tests.Services.CraftingService
                 Assert.Equal(serverCrafting._currentHistoryIndex, clientCrafting._currentHistoryIndex);
 
                 client.ObjectManager.TryGetId(clientCrafting._craftedItemObject, out string clientObjectId);
+                client.ObjectManager.TryGetId(clientCrafting.CurrentWeaponDesign, out string clientWeaponDesignId);
 
                 Assert.Equal(serverObjectId, clientObjectId);
-                Assert.Equal(serverCrafting.CurrentWeaponDesign, clientCrafting.CurrentWeaponDesign);
+                Assert.Equal(serverWeaponDesignId, clientWeaponDesignId);
                 Assert.Equal(serverCrafting.CurrentItemModifierGroup.ItemModifiers.Count, clientCrafting.CurrentItemModifierGroup.ItemModifiers.Count);
                 Assert.Equal(serverCrafting.CraftedWeaponName.ToString(), clientCrafting.CraftedWeaponName.ToString());
             }

@@ -245,7 +245,7 @@ internal class E2ETestEnvironment : IDisposable
                 Assert.True(fieldInfo.GetValue(serverInstance).Equals(defaultVal), $"Expected: {defaultVal} Actual: {fieldInfo.GetValue(serverInstance)}");
             else
                 Assert.True(JsonConvert.SerializeObject(fieldInfo.GetValue(serverInstance)).Equals(JsonConvert.SerializeObject(defaultVal)), $"Expected: {JsonConvert.SerializeObject(defaultVal)} Actual: {JsonConvert.SerializeObject(fieldInfo.GetValue(serverInstance))}");
-            intercept.Invoke(null, new object[] { serverInstance, value, fieldName });
+            intercept.Invoke(null, new object[] { serverInstance, value });
             Assert.True(value.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {value} Actual: {fieldInfo.GetValue(serverInstance)}");
         });
 
@@ -286,7 +286,7 @@ internal class E2ETestEnvironment : IDisposable
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
             Assert.True(Server.ObjectManager.TryGetObject<TField>(referenceId, out var serverFieldInstance));
             Assert.Equal(defaultValue ?? fieldInfo.GetUnderlyingType().GetDefaultValue(), fieldInfo.GetValue(serverInstance));
-            intercept.Invoke(null, new object[] { serverInstance, serverFieldInstance, fieldName });
+            intercept.Invoke(null, new object[] { serverInstance, serverFieldInstance });
         Assert.True(serverFieldInstance.Equals(fieldInfo.GetValue(serverInstance)));// TODO: re add error, $"Expected: {serverFieldInstance} Actual: {fieldInfo.GetValue(serverInstance)}");
             Assert.NotNull(serverFieldInstance);
         });
