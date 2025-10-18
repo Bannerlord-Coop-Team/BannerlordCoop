@@ -4,21 +4,21 @@ using GameInterface.Policies;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Metrics;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Registry.Auto;
-internal class LifetimePatches
+public class LifetimePatches<T>
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<LifetimePatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<T>();
 
-    internal static void CreatePrefix(object __instance, MethodBase __originalMethod)
+    public static void CreatePrefix(T __instance, MethodBase __originalMethod)
     {
         // Call original if we call this function
         if (CallPolicy.IsOriginalAllowed()) return;
 
         if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false) return;
+        if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) == false) return;
 
         if (config.IsClient)
         {
@@ -27,18 +27,17 @@ internal class LifetimePatches
             return;
         }
 
-        var message = CreateInstanceCreatedEventFast(__instance, __originalMethod.DeclaringType);
-
-        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
-        messageBroker?.Publish(__instance, message);
+        var createMessage = CreateInstanceCreatedEventFast(__instance, __originalMethod.DeclaringType);
+        messageBroker.Publish(__instance, createMessage);
     }
 
-    internal static void DestroyPostfix(ref object __instance, MethodBase __originalMethod)
+    public static void DestroyPostfix(T __instance, MethodBase __originalMethod)
     {
         // Call original if we call this function
         if (CallPolicy.IsOriginalAllowed()) return;
 
         if (ContainerProvider.TryResolve<IGameInterfaceConfig>(out var config) == false) return;
+        if (ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker) == false) return;
 
         if (config.IsClient)
         {
@@ -48,9 +47,7 @@ internal class LifetimePatches
         }
 
         var destroyMessage = CreateInstanceDestroyedEventFast(__instance, __originalMethod.DeclaringType);
-
-        ContainerProvider.TryResolve<IMessageBroker>(out var messageBroker);
-messageBroker?.Publish(__instance, destroyMessage);
+        messageBroker?.Publish(__instance, destroyMessage);
     }
 
     private static Dictionary<Type, IEvent> CreateEventsCache = new Dictionary<Type, IEvent>();

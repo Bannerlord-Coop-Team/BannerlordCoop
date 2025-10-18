@@ -25,8 +25,6 @@ public class AddToCountsTroopRosterPatch
     {
         if (CallPolicy.IsOriginalAllowed()) return true;
         if (CallPolicy.SkipIfClient(Logger, out var returnResult)) return returnResult;
-        // Owner Party
-        // TODO: use publicizer later when it comes out
         if (__instance.OwnerParty == null) return false;
 
         MobileParty mobileParty = __instance.OwnerParty.MobileParty;

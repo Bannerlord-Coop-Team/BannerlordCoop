@@ -15,7 +15,8 @@ internal class FactionRegistry : IAutoRegistry<IFaction>
     {
         Logger = logger;
 
-        autoRegistryFactory.RegisterType(this);
+        // TODO add interface functionality
+        // autoRegistryFactory.RegisterType(this);
     }
 
     public IEnumerable<MethodBase> Constructors => new MethodBase[] {

@@ -3,7 +3,6 @@ using Common.Network;
 using Common.Serialization;
 using GameInterface.AutoSync;
 using GameInterface.Services.ObjectManager;
-using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -15,12 +14,12 @@ public interface IAutoRegistryFactory : IDisposable
     bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<AutoRegistry<T>> registerAll, AutoRegistryCallbacks<T> callbacks) where T : class;
 
     void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class;
+    void BuildPatches();
 }
 
 internal class AutoRegistryFactory : IAutoRegistryFactory
 {
-    const string HarmonyID = "CoopAutoRegistryFactory";
-    private readonly Harmony harmony = new Harmony(HarmonyID);
+    private readonly IAutoRegistryPatchCreator patchCreator;
 
     IRegistryCollection Collection { get; }
     IMessageBroker MessageBroker { get; }
@@ -28,13 +27,18 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     IAutoSyncPatchCollector SyncPatchCollector { get; }
     IObjectManager ObjectManager { get; }
     ISerializableTypeMapper TypeMapper { get; }
+
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
+
+    HashSet<(MethodBase, Type)> CtorsToPatch = new HashSet<(MethodBase, Type)>();
+    HashSet<(MethodBase, Type)> DestuctorsToPatch = new HashSet<(MethodBase, Type)>();
 
     public AutoRegistryFactory(
         IRegistryCollection collection,
         IMessageBroker messageBroker,
         INetwork network,
         IAutoSyncPatchCollector syncPatchCollector,
+        IAutoRegistryPatchCreator patchCreator,
         IObjectManager objectManager,
         ISerializableTypeMapper typeMapper)
     {
@@ -42,6 +46,7 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         MessageBroker = messageBroker;
         Network = network;
         SyncPatchCollector = syncPatchCollector;
+        this.patchCreator = patchCreator;
         ObjectManager = objectManager;
         TypeMapper = typeMapper;
     }
@@ -54,6 +59,8 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     public void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class
     {
         var callbacks = new AutoRegistryCallbacks<T>(autoRegistry);
+
+        if (typeof(T).IsInterface) throw new InvalidOperationException("Interfaces are not supported yet");
 
         TryRegisterType(autoRegistry.Constructors, autoRegistry.DestroyMethods, autoRegistry.RegisterAllObjects, callbacks);
     }
@@ -81,17 +88,20 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
 
         foreach (var ctor in ctrosToPatch)
         {
-            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.CreatePrefix));
+            var tuple = (ctor, typeof(T));
 
-            SyncPatchCollector.AddPrefix(ctor, patch);
+            if (CtorsToPatch.Contains(tuple)) throw new InvalidOperationException($"{ctor} is already reporting for {typeof(T).Name}");
+            CtorsToPatch.Add(tuple);
         }
 
         foreach (var destroy in destroyMethods)
         {
-            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.DestroyPostfix));
+            var tuple = (destroy, typeof(T));
 
-            SyncPatchCollector.AddPostfix(destroy, patch);
+            if (DestuctorsToPatch.Contains(tuple)) throw new InvalidOperationException($"{tuple} is already reporting for {typeof(T).Name}");
+            DestuctorsToPatch.Add(tuple);
         }
+
 
         Disposables.Add(registry);
         Disposables.Add(handler);
@@ -109,6 +119,36 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         if (exceptions.Any())
         {
             throw new AggregateException(exceptions);
+        }
+    }
+
+    public void BuildPatches()
+    {
+        var prefixNameMap = new Dictionary<Type, string>();
+        var postfixNameMap = new Dictionary<Type, string>();
+
+        foreach (var type in CtorsToPatch.Select(tuple => tuple.Item2).Distinct())
+        {
+            prefixNameMap.Add(type, patchCreator.AddCreateEvent(type));
+        }
+
+        foreach (var type in DestuctorsToPatch.Select(tuple => tuple.Item2).Distinct())
+        {
+            postfixNameMap.Add(type, patchCreator.AddDestroyEvent(type));
+        }
+
+        var dynamicType = patchCreator.Build();
+
+        foreach (var (ctor, type) in CtorsToPatch)
+        {
+            var patch = dynamicType.GetMethod(prefixNameMap[type]);
+            SyncPatchCollector.AddPrefix(ctor, patch);
+        }
+
+        foreach (var (dtor, type) in DestuctorsToPatch)
+        {
+            var patch = dynamicType.GetMethod(postfixNameMap[type]);
+            SyncPatchCollector.AddPostfix(dtor, patch);
         }
     }
 }

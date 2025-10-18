@@ -27,7 +27,7 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 
     //protected readonly Dictionary<string, WeakReference<T>> objIds = new Dictionary<string, WeakReference<T>>();
     protected readonly Dictionary<string, T> objIds = new Dictionary<string, T>();
-    protected readonly Dictionary<T, string> idObjs = new Dictionary<T, string>(new ReferenceComparer<T>());
+    protected readonly Dictionary<T, string> idObjs = new Dictionary<T, string>();
     private readonly IRegistryCollection collection;
 
     protected RegistryBase(IRegistryCollection collection)
@@ -81,14 +81,6 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
         if (TryCast(obj, out T castedObj) == false) return false;
 
         var newId = GetNewId(castedObj);
-
-        foreach (var key in idObjs.Keys)
-        {
-            if (ReferenceEquals(key, obj))
-            {
-                ;
-            }
-        }
 
         if (objIds.ContainsKey(newId) || idObjs.ContainsKey(castedObj))
         {
@@ -154,6 +146,5 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     public void Clear()
     {
         objIds.Clear();
-        idObjs.Clear();
     }
 }

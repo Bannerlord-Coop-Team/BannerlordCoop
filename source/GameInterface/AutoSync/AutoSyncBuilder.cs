@@ -52,16 +52,14 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
     private readonly HashSet<PropertyInfo> properties = new HashSet<PropertyInfo>();
     private readonly HashSet<MethodBase> externalFieldChangeMethods = new HashSet<MethodBase>();
     private readonly IObjectManager objectManager;
-    private readonly Harmony harmony;
     private readonly IPacketSwitchProvider packetSwitchProvider;
     private readonly IAutoSyncPatchCollector patchCollector;
 
     private Dictionary<FieldInfo, MethodInfo> interceptMap = new Dictionary<FieldInfo, MethodInfo>();
 
-    public AutoSyncBuilder(IObjectManager objectManager, Harmony harmony, IPacketSwitchProvider packetSwitchProvider, IAutoSyncPatchCollector patchCollector)
+    public AutoSyncBuilder(IObjectManager objectManager, IPacketSwitchProvider packetSwitchProvider, IAutoSyncPatchCollector patchCollector)
     {
         this.objectManager = objectManager;
-        this.harmony = harmony;
         this.packetSwitchProvider = packetSwitchProvider;
         this.patchCollector = patchCollector;
     }

@@ -6,6 +6,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.Registry.Auto;
 using GameInterface.Tests.Bootstrap;
 using HarmonyLib;
 using System.Reflection;
@@ -48,6 +49,7 @@ internal class E2ETestEnvironment : IDisposable
 
         // Needs to be before patching
         SetupAutoSync();
+        SetupAutoRegistry();
 
         SetupMainHero();
 
@@ -81,6 +83,16 @@ internal class E2ETestEnvironment : IDisposable
         foreach (var client in Clients)
         {
             client.Resolve<IAutoSyncBuilder>().Build();
+        }
+    }
+
+    private void SetupAutoRegistry()
+    {
+        Server.Resolve<IAutoRegistryFactory>().BuildPatches();
+
+        foreach (var client in Clients)
+        {
+            client.Resolve<IAutoRegistryFactory>().BuildPatches();
         }
     }
 

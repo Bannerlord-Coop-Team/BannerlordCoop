@@ -23,7 +23,7 @@ public interface IAutoRegistry<T> where T : class
 
 public class AutoRegistry<T> : RegistryBase<T> where T : class
 {
-    private static readonly string InstanceId = $"Coop_{typeof(T)}";
+    private static readonly string InstanceId = $"Coop_{typeof(T).Name}";
 
     private static int InstanceCounter = 0;
 

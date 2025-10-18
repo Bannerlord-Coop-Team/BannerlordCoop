@@ -3,6 +3,7 @@ using SandBox.BoardGames.Pawns;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.AutoSync;
 
@@ -18,9 +19,9 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
 {
     private readonly Harmony harmony;
 
-    private readonly List<(MethodBase, MethodInfo)> prefixes = new List<(MethodBase, MethodInfo)>();
-    private readonly List<(MethodBase, MethodInfo)> postfixes = new List<(MethodBase, MethodInfo)>();
-    private readonly List<(MethodBase, MethodInfo)> transpilers = new List<(MethodBase, MethodInfo)>();
+    private readonly HashSet<(MethodBase, MethodInfo)> prefixes = new HashSet<(MethodBase, MethodInfo)>();
+    private readonly HashSet<(MethodBase, MethodInfo)> postfixes = new HashSet<(MethodBase, MethodInfo)>();
+    private readonly HashSet<(MethodBase, MethodInfo)> transpilers = new HashSet<(MethodBase, MethodInfo)>();
     
 
     public AutoSyncPatchCollector(Harmony harmony)
@@ -28,21 +29,9 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
         this.harmony = harmony;
     }
 
-    public void AddPrefix(MethodBase patchMethod, MethodInfo patch)
-    {
-        if (patchMethod == null) throw new ArgumentNullException(nameof(patchMethod));
-        if (patch == null) throw new ArgumentNullException(nameof(patch));
+    public void AddPrefix(MethodBase patchMethod, MethodInfo patch) => AddGeneric(patchMethod, patch, prefixes);
 
-        prefixes.Add((patchMethod, patch));
-    }
-
-    public void AddPostfix(MethodBase patchMethod, MethodInfo patch)
-    {
-        if (patchMethod == null) throw new ArgumentNullException(nameof(patchMethod));
-        if (patch == null) throw new ArgumentNullException(nameof(patch));
-
-        postfixes.Add((patchMethod, patch));
-    }
+    public void AddPostfix(MethodBase patchMethod, MethodInfo patch) => AddGeneric(patchMethod, patch, postfixes);
 
     public void AddTranspiler(MethodBase patchMethod, MethodInfo patch)
     {
@@ -50,6 +39,18 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
         if (patch == null) throw new ArgumentNullException(nameof(patch));
 
         transpilers.Add((patchMethod, patch));
+    }
+
+    private void AddGeneric(MethodBase patchMethod, MethodInfo patch, HashSet<(MethodBase, MethodInfo)> set)
+    {
+        if (patchMethod == null) throw new ArgumentNullException(nameof(patchMethod));
+        if (patch == null) throw new ArgumentNullException(nameof(patch));
+
+        var tuple = (patchMethod, patch);
+
+        if (set.Contains(tuple)) throw new ArgumentException("This patch already exists");
+
+        set.Add((patchMethod, patch));
     }
 
     public void PatchAll()

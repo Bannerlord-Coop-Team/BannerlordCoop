@@ -1,39 +1,60 @@
-﻿using GameInterface.Registry;
-using System.Linq;
-using System.Threading;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.CharacterSkills
 {
-    internal class CharacterSkillsRegistry : RegistryBase<MBCharacterSkills>
+    internal class CharacterSkillsRegistry : IAutoRegistry<MBCharacterSkills>
     {
-        private const string IdPrefix = "CoopCharacterSkills";
-        private static int InstanceCounter = 0;
+        public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MBCharacterSkills));
 
-        public CharacterSkillsRegistry(IRegistryCollection collection) : base(collection)
+        public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+        public ILogger Logger { get; }
+
+        public CharacterSkillsRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
         {
+            Logger = logger;
+
+            autoRegistryFactory.RegisterType(this);
         }
 
-        public override void RegisterAll()
+        public void RegisterAllObjects(IRegistry<MBCharacterSkills> registry)
         {
-            var objectManager = MBObjectManager.Instance;
+            var mbObjectManager = MBObjectManager.Instance;
 
-            if (objectManager == null)
+            if (mbObjectManager == null)
             {
                 Logger.Error("Unable to register objects when CampaignObjectManager is null");
                 return;
             }
 
-            foreach (var skill in objectManager.GetObjectTypeList<MBCharacterSkills>())
+            foreach (var skill in mbObjectManager.GetObjectTypeList<MBCharacterSkills>())
             {
-                RegisterExistingObject(skill.StringId, skill);
+                registry.RegisterExistingObject(skill.StringId, skill);
             }
         }
 
-        protected override string GetNewId(MBCharacterSkills obj)
+        public void OnClientCreated(MBCharacterSkills obj, string id)
         {
-            return $"{IdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+        }
+
+        public void OnClientDestroyed(MBCharacterSkills obj, string id)
+        {
+        }
+
+        public void OnServerCreated(MBCharacterSkills obj, string id)
+        {
+        }
+
+        public void OnServerDestroyed(MBCharacterSkills obj, string id)
+        {
         }
     }
 }

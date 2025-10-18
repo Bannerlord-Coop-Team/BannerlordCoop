@@ -12,6 +12,7 @@ internal class RegistryModule : Module
     protected override void Load(ContainerBuilder builder)
     {
         builder.RegisterType<AutoRegistryFactory>().As<IAutoRegistryFactory>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<AutoRegistryPatchCreator>().As<IAutoRegistryPatchCreator>().InstancePerLifetimeScope();
 
         foreach (var type in GetRegistries())
         {
