@@ -67,9 +67,10 @@ namespace GameInterface.Utils
             {
                 var data = payload.What;
                 if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-                AllowedThread.AllowThisThread();
-                messageHandler(instance, data);
-                AllowedThread.RevokeThisThread();
+                using (new AllowedThread())
+                {
+                    messageHandler(instance, data);
+                }
             };
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
@@ -83,9 +84,11 @@ namespace GameInterface.Utils
                 var data = payload.What;
                 if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
                 if (!objectManager.TryGetObject(data.ValueId, out TValue value) && data.ValueId != null) return;
-                AllowedThread.AllowThisThread();
-                messageHandler(instance, value, data);
-                AllowedThread.RevokeThisThread();
+
+                using(new AllowedThread())
+                {
+                    messageHandler(instance, value, data);
+                }
             };
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));

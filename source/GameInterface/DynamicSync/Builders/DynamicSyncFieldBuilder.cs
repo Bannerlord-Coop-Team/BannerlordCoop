@@ -44,10 +44,7 @@ namespace GameInterface.DynamicSync.Builders
         public string GetSubscription(FieldInfo fieldInfo)
         {
             var templateData = GetTemplateData(fieldInfo);
-            if (objectManager.IsTypeManaged(fieldInfo.FieldType))
-                return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
-            else
-                return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
+            return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
         }
 
         private object GetTemplateData(FieldInfo fieldInfo)
@@ -62,6 +59,7 @@ namespace GameInterface.DynamicSync.Builders
                 SerializeMethod = serializerNames.serialize,
                 DeserializeMethod = serializerNames.deserialize,
                 ReadOnly = fieldInfo.IsInitOnly,
+                IsFieldManaged = objectManager.IsTypeManaged(fieldInfo.FieldType),
                 ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null
             };
         }

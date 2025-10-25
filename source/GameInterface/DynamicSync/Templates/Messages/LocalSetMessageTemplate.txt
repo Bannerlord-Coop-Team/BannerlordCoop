@@ -1,18 +1,20 @@
-﻿using GameInterface.Utils.LocalEvents;
+﻿using Common.Messaging;
+using GameInterface.Utils.LocalEvents;
 {{~ for library in Libraries ~}}
 using {{ library }};
 {{~ end ~}}
 
 namespace DynamicSync
 {
-    public record {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage : GenericEvent<{{ MemberDeclaringType }}, {{ MemberType }}>
+    public record {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage : IEvent
     {
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage()
-        {
-        }
+        public {{ MemberDeclaringType }} Instance { get; }
+        public {{ MemberType }} Value { get; }
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage({{ MemberDeclaringType }} instance, {{ MemberType }} value) : base(instance, value)
+        public {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage({{ MemberDeclaringType }} instance, {{ MemberType }} value)
         {
+            Instance = instance;
+            Value = value;
         }
     }
 }

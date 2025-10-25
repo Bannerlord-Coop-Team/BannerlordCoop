@@ -66,23 +66,24 @@ namespace GameInterface.DynamicSync.Builders
 
             foreach(var propertyInfo in dynamicRegistryItem.Properties)
             {
-                ValidateType(propertyInfo.PropertyType);
-                usings.Add(DynamicSyncUtils.GetNamespace(propertyInfo.PropertyType));
+                var propertyType = propertyInfo.PropertyType;
+                ValidateType(propertyType);
+                usings.Add(DynamicSyncUtils.GetNamespace(propertyType));
 
-                if (!propertyInfo.PropertyType.IsGenericType && !propertyInfo.PropertyType.IsArray)
+                if (!propertyType.IsGenericType && !propertyType.IsArray)
                 {
                     prefixes.Add(dynamicSyncPropertyBuilder.GetPrefix(propertyInfo));
                     messages.AddRange(dynamicSyncPropertyBuilder.GetMessages(propertyInfo));
                     messageHandlers.Add(dynamicSyncPropertyBuilder.GetSubscription(propertyInfo));
                 }
-                else if(propertyInfo.PropertyType.IsArray)
+                else if(propertyType.IsArray)
                 {
                     prefixes.Add(dynamicSyncPropertyArrayBuilder.GetPrefix(propertyInfo));
                     transpilers.Add(dynamicSyncPropertyArrayBuilder.GetTranspiler(propertyInfo));
                     messages.AddRange(dynamicSyncPropertyArrayBuilder.GetMessages(propertyInfo));
                     messageHandlers.Add(dynamicSyncPropertyArrayBuilder.GetSubscription(propertyInfo));
                 }
-                else if (propertyInfo.PropertyType.Name.Contains("MBList"))
+                else if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(MBList<>))
                 {
                     usings.Add(DynamicSyncUtils.GetNamespace(propertyInfo.PropertyType.GetGenericArguments()[0]));
                     prefixes.Add(dynamicSyncPropertyMBListBuilder.GetPrefix(propertyInfo));
@@ -90,7 +91,7 @@ namespace GameInterface.DynamicSync.Builders
                     messages.AddRange(dynamicSyncPropertyMBListBuilder.GetMessages(propertyInfo));
                     messageHandlers.Add(dynamicSyncPropertyMBListBuilder.GetSubscription(propertyInfo));
                 }
-                else if (propertyInfo.PropertyType.Name.Contains("List"))
+                else if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(List<>))
                 {
                     usings.Add(DynamicSyncUtils.GetNamespace(propertyInfo.PropertyType.GetGenericArguments()[0]));
                     prefixes.Add(dynamicSyncPropertyListBuilder.GetPrefix(propertyInfo));
@@ -98,7 +99,7 @@ namespace GameInterface.DynamicSync.Builders
                     messages.AddRange(dynamicSyncPropertyListBuilder.GetMessages(propertyInfo));
                     messageHandlers.Add(dynamicSyncPropertyListBuilder.GetSubscription(propertyInfo));
                 }
-                else if (propertyInfo.PropertyType.Name.Contains("Queue"))
+                else if (propertyType.IsGenericType && propertyType.GetGenericTypeDefinition() == typeof(Queue<>))
                 {
                     usings.Add(DynamicSyncUtils.GetNamespace(propertyInfo.PropertyType.GetGenericArguments()[0]));
                     prefixes.Add(dynamicSyncPropertyQueueBuilder.GetPrefix(propertyInfo));
@@ -110,38 +111,39 @@ namespace GameInterface.DynamicSync.Builders
 
             foreach (var fieldInfo in dynamicRegistryItem.Fields)
             {
-                ValidateType(fieldInfo.FieldType);
-                usings.Add(DynamicSyncUtils.GetNamespace(fieldInfo.FieldType));
-                if (!fieldInfo.FieldType.IsGenericType && !fieldInfo.FieldType.IsArray)
+                var fieldType = fieldInfo.FieldType;
+                ValidateType(fieldType);
+                usings.Add(DynamicSyncUtils.GetNamespace(fieldType));
+                if (!fieldType.IsGenericType && !fieldType.IsArray)
                 {
                     transpilers.Add(dynamicSyncFieldBuilder.GetTranspiler(fieldInfo));
                     messages.AddRange(dynamicSyncFieldBuilder.GetMessages(fieldInfo));
                     messageHandlers.Add(dynamicSyncFieldBuilder.GetSubscription(fieldInfo));
                 }
-                else if (fieldInfo.FieldType.IsArray)
+                else if (fieldType.IsArray)
                 {
-                    usings.Add(DynamicSyncUtils.GetNamespace(fieldInfo.FieldType.GetElementType()));
+                    usings.Add(DynamicSyncUtils.GetNamespace(fieldType.GetElementType()));
                     transpilers.Add(dynamicSyncFieldArrayBuilder.GetTranspiler(fieldInfo));
                     messages.AddRange(dynamicSyncFieldArrayBuilder.GetMessages(fieldInfo));
                     messageHandlers.Add(dynamicSyncFieldArrayBuilder.GetSubscription(fieldInfo));
                 }
-                else if (fieldInfo.FieldType.Name.Contains("MBList"))
+                else if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(MBList<>))
                 {
-                    usings.Add(DynamicSyncUtils.GetNamespace(fieldInfo.FieldType.GetGenericArguments()[0]));
+                    usings.Add(DynamicSyncUtils.GetNamespace(fieldType.GetGenericArguments()[0]));
                     transpilers.Add(dynamicSyncFieldMBListBuilder.GetTranspiler(fieldInfo));
                     messages.AddRange(dynamicSyncFieldMBListBuilder.GetMessages(fieldInfo));
                     messageHandlers.Add(dynamicSyncFieldMBListBuilder.GetSubscription(fieldInfo));
                 }
-                else if (fieldInfo.FieldType.Name.Contains("List"))
+                else if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(List<>))
                 {
-                    usings.Add(DynamicSyncUtils.GetNamespace(fieldInfo.FieldType.GetGenericArguments()[0]));
+                    usings.Add(DynamicSyncUtils.GetNamespace(fieldType.GetGenericArguments()[0]));
                     transpilers.Add(dynamicSyncFieldListBuilder.GetTranspiler(fieldInfo));
                     messages.AddRange(dynamicSyncFieldListBuilder.GetMessages(fieldInfo));
                     messageHandlers.Add(dynamicSyncFieldListBuilder.GetSubscription(fieldInfo));
                 }
-                else if (fieldInfo.FieldType.Name.Contains("Queue"))
+                else if (fieldType.IsGenericType && fieldType.GetGenericTypeDefinition() == typeof(Queue<>))
                 {
-                    usings.Add(DynamicSyncUtils.GetNamespace(fieldInfo.FieldType.GetGenericArguments()[0]));
+                    usings.Add(DynamicSyncUtils.GetNamespace(fieldType.GetGenericArguments()[0]));
                     transpilers.Add(dynamicSyncFieldQueueBuilder.GetTranspiler(fieldInfo));
                     messages.AddRange(dynamicSyncFieldQueueBuilder.GetMessages(fieldInfo));
                     messageHandlers.Add(dynamicSyncFieldQueueBuilder.GetSubscription(fieldInfo));
@@ -163,7 +165,7 @@ namespace GameInterface.DynamicSync.Builders
             {
                 Libraries = usings.Distinct(),
                 DeclaringType = declaringType.Name,
-                Subscriptions = messageHandlers
+                HandlerMethods = messageHandlers
             });
 
             DynamicSyncConfiguration.ExportFile($"{declaringType.Name}/{declaringType.Name}_Handler.cs", handlerTemplate);
@@ -180,7 +182,7 @@ namespace GameInterface.DynamicSync.Builders
             Type typeToVerify;
             // TODO:Check if this is enough or if it needs to be restricted more to List,MBList,Queue
             if (type.IsGenericType)
-                typeToVerify = type.GetGenericArguments()[0];
+                typeToVerify = type.GetGenericArguments().First();
             else if (type.IsArray)
                 typeToVerify = type.GetElementType();
             else

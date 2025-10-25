@@ -1,11 +1,13 @@
 ﻿using GameInterface.Utils;
 using HarmonyLib;
 using Helpers;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using Common.Messaging;
+using Common.Logging;
 using System.Linq;
 using System.Reflection.Emit;
 using GameInterface.Policies;
@@ -18,8 +20,10 @@ using {{ library }};
 namespace DynamicSync;
 
 [HarmonyPatch]
-public class {{DeclaringType}}_DynamicPatches : GenericPatches<{{DeclaringType}}_DynamicPatches, {{DeclaringType}}>
+public class {{DeclaringType}}_DynamicPatches
 {
+    private static readonly ILogger logger = LogManager.GetLogger<{{DeclaringType}}_DynamicPatches>();
+
     private static IEnumerable<MethodBase> TargetMethods()
     {
         foreach (var method in AccessTools.GetDeclaredMethods(typeof({{DeclaringType}})))

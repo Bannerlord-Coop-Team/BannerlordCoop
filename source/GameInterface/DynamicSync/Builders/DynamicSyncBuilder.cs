@@ -15,7 +15,10 @@ public class DynamicSyncBuilder
     private readonly DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder;
     private readonly DynamicSyncPatchBuilder dynamicSyncPatchBuilder;
 
-    public DynamicSyncBuilder(DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder, DynamicSyncPatchBuilder dynamicSyncPatchBuilder)
+    public DynamicSyncBuilder(
+        DynamicSyncRegistry dynamicSyncRegistry,
+        DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder,
+        DynamicSyncPatchBuilder dynamicSyncPatchBuilder)
     {
         this.dynamicSyncRegistry = dynamicSyncRegistry;
         this.dynamicSyncAssemblyInfoBuilder = dynamicSyncAssemblyInfoBuilder;
@@ -30,6 +33,7 @@ public class DynamicSyncBuilder
         List<Assembly> assemblies = new List<Assembly>
         {
             Assembly.GetExecutingAssembly(),
+            Assembly.Load("GameInterface.Tests"),
         };
 
         // We need to load different dlls based on the runtime

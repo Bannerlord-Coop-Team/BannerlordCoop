@@ -1,7 +1,9 @@
 ﻿using Common.Messaging;
 using Common.Network;
+using Common.Logging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils;
+using Serilog;
 using System;
 using System.Linq;
 using System.Collections.Generic;
@@ -10,15 +12,26 @@ using GameInterface.DynamicSync;
 using {{ library }};
 {{~ end ~}}
 
-namespace DynamicSync
+namespace DynamicSync;
+
+public class {{DeclaringType}}_Handler
 {
-    public class {{DeclaringType}}_Handler : GenericHandler<{{DeclaringType}}_Handler, {{DeclaringType}}>
+    private static readonly ILogger logger = LogManager.GetLogger<{{DeclaringType}}_Handler>();
+
+    private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
+    private readonly INetwork network;
+    private readonly DynamicSyncRegistry dynamicSyncRegistry;
+
+    public {{DeclaringType}}_Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, DynamicSyncRegistry dynamicSyncRegistry)
     {
-        public {{DeclaringType}}_Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, DynamicSyncRegistry dynamicSyncRegistry) : base(messageBroker, objectManager, network)
-        {
-            {{~ for subscription in Subscriptions ~}}
-            {{ subscription }}
-            {{~ end ~}}
-        }
+        this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
+        this.network = network;
+        this.dynamicSyncRegistry = dynamicSyncRegistry;
     }
+
+    {{~ for handlerMethod in HandlerMethods ~}}
+    {{ handlerMethod }}
+    {{~ end ~}}
 }

@@ -2,6 +2,7 @@
 using GameInterface.Services.ObjectManager;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace GameInterface.DynamicSync.Builders
@@ -73,12 +74,12 @@ namespace GameInterface.DynamicSync.Builders
         }
         private string GetMbListTypeName(Type type)
         {
-            return $"MBList<{type.GetGenericArguments()[0].Name}>";
+            return $"MBList<{type.GetGenericArguments().First().Name}>";
         }
 
         private Type GetElementType(Type type)
         {
-            return type.GetGenericArguments()[0];
+            return type.GetGenericArguments().First();
         }
 
         private object GetTemplateData(PropertyInfo propertyInfo)

@@ -1,14 +1,46 @@
-﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, {{SerializeMethod}}(data.Value))));
-SubscribeNetwork<byte[], {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+﻿private void Handle_{{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage({{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage message)
 {
-{{ 
-if ReadOnly;
-}}
-	dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{DeserializeMethod}}(data.Value, instance.{{MemberName}}));
-{{
-else
-}}
-	instance.{{MemberName}} = {{DeserializeMethod}}(data.Value, instance.{{MemberName}});
-{{end}}
+	if (objectManager.TryGetId(message.Instance, out var instanceId) == false)
+    {
+        logger.Error("Failed to get object id for {name}", message.Instance.GetType().Name);
+    }
+
+{{ if IsFieldManaged; }}
+
+	if (objectManager.TryGetId(message.Value, out var valueId) == false)
+    {
+        logger.Error("Failed to get object id for {name}", message.Instance.GetType().Name);
+		return;
+    }
+
+	var networkMessage = new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueId);
+
+{{ else }}
+	var networkMessage = new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, message.Value);
+{{ end }}
+
+	network.SendAll(networkMessage);
 }
-);
+
+private void Handle_{{ MemberDeclaringType }}_{{ MemberName }}_SetNetworkMessage({{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage message)
+{
+	if (objectManager.TryGetObject<{{ MemberDeclaringType }}>(message.InstanceId, out var instance) == false)
+    {
+        logger.Error("Failed to get instance {type} using id {id}", typeof({{ MemberDeclaringType }}), message.InstanceId);
+		return;
+    }
+
+{{ if IsFieldManaged; }}
+
+	if (objectManager.TryGetObject<{{ MemberType }}>(message.ValueId, out var value) == false)
+    {
+        logger.Error("Failed to get value {type} using id {id}", typeof({{ MemberType }}), message.ValueId);
+		return;
+    }
+
+	instance.{{MemberName}} = value;
+
+{{ else }}
+	instance.{{MemberName}} = message.Value;
+{{ end }}
+}
