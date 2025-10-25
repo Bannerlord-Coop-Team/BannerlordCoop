@@ -3,13 +3,7 @@ using GameInterface.DynamicSync;
 using GameInterface.DynamicSync.Builders;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
-using Microsoft.Extensions.DependencyInjection;
 using Moq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Xunit;
 
 namespace GameInterface.Tests.DynamicSync;
@@ -76,7 +70,21 @@ public class FieldTests
     {
         var dynamicSyncRegistry = container.Resolve<DynamicSyncRegistry>();
 
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(PropertyTestClass), "MyProperty"));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(PropertyTestClass), nameof(PropertyTestClass.MyProperty)));
+
+        var builder = container.Resolve<DynamicSyncBuilder>();
+
+        builder.Build();
+    }
+
+    [Fact]
+    public void BuildFromRefProperty()
+    {
+        var dynamicSyncRegistry = container.Resolve<DynamicSyncRegistry>();
+
+        objectManagerMock.Setup(x => x.IsTypeManaged(typeof(RefClass))).Returns(true);
+
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(PropertyRefTestClass), nameof(PropertyRefTestClass.MyRefProperty)));
 
         var builder = container.Resolve<DynamicSyncBuilder>();
 
@@ -84,8 +92,11 @@ public class FieldTests
     }
 }
 
+public class RefClass { }
+
 public class FieldTestClass
 {
+    public readonly int MyReadonlyInt = 100;
     private int MyField = 5;
     public void SetField(int newValue)
     {
@@ -96,12 +107,6 @@ public class FieldTestClass
         return MyField;
     }
 }
-
-public class PropertyTestClass
-{
-    public int MyProperty { get; private set; } = 213;
-}
-
 
 public class FieldRefTestClass
 {
@@ -117,4 +122,13 @@ public class FieldRefTestClass
     }
 }
 
-public class RefClass { }
+public class PropertyTestClass
+{
+    public int MyReadonlyProperty { get; } = 200;
+    public int MyProperty { get; set; } = 213;
+}
+
+public class PropertyRefTestClass
+{
+    public RefClass MyRefProperty { get; set; }
+}

@@ -1,15 +1,15 @@
-﻿private void Handle_{{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage({{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage message)
+﻿private void Handle_{{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage({{ MemberDeclaringType }}_{{ MemberName }}_SetLocalMessage message)
 {
 	if (objectManager.TryGetId(message.Instance, out var instanceId) == false)
     {
-        logger.Error("Failed to get object id for {name}", message.Instance.GetType().Name);
+        logger.Error("Failed to get object id for {{ MemberDeclaringType}}");
     }
 
-{{ if IsFieldManaged; }}
+{{ if IsManagedType; }}
 
 	if (objectManager.TryGetId(message.Value, out var valueId) == false)
     {
-        logger.Error("Failed to get object id for {name}", message.Instance.GetType().Name);
+        logger.Error("Failed to get object id for {{ MemberName }}");
 		return;
     }
 
@@ -30,7 +30,7 @@ private void Handle_{{ MemberDeclaringType }}_{{ MemberName }}_SetNetworkMessage
 		return;
     }
 
-{{ if IsFieldManaged; }}
+{{ if IsManagedType; }}
 
 	if (objectManager.TryGetObject<{{ MemberType }}>(message.ValueId, out var value) == false)
     {

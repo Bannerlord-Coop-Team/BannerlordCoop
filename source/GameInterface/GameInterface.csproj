@@ -237,7 +237,6 @@
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCollectionReferenceTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeQueueReferenceTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCollectionValueTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeSetReferenceTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeSetValueTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeQueueValueTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalArrayChangeMessageTemplate.txt" />
