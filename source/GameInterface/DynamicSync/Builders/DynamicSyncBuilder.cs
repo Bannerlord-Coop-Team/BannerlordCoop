@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Reflection.Emit;
 
 namespace GameInterface.DynamicSync.Builders;
 
@@ -38,22 +39,20 @@ public class DynamicSyncBuilder
         {
             assemblies.Add(typeof(System.Collections.ArrayList).Assembly);
             assemblies.Add(typeof(System.Runtime.AssemblyTargetedPatchBandAttribute).Assembly);
-            assemblies.Add(typeof(Enumerable).Assembly);
-            assemblies.Add(typeof(Queue<>).Assembly);
-            assemblies.Add(typeof(Console).Assembly);
         }
         else
         {
-            assemblies.Add(typeof(Enumerable).Assembly);
-            assemblies.Add(typeof(Queue<>).Assembly);
             assemblies.Add(Assembly.Load("System.Runtime"));
             assemblies.Add(Assembly.Load("System.Private.CoreLib"));
             assemblies.Add(Assembly.Load("System.Collections"));
-            assemblies.Add(typeof(Console).Assembly);
-
         }
 
-        
+        assemblies.Add(typeof(Enumerable).Assembly);
+        assemblies.Add(typeof(Queue<>).Assembly);
+        assemblies.Add(typeof(Console).Assembly);
+        assemblies.Add(Assembly.Load("System.Reflection.Primitives"));
+        assemblies.Add(Assembly.Load("System.Collections.Concurrent"));
+        assemblies.Add(Assembly.Load("System.Numerics.Vectors"));
 
         foreach (var asm in Assembly.GetExecutingAssembly().GetReferencedAssemblies())
         {
@@ -83,7 +82,7 @@ public class DynamicSyncBuilder
         topLevelBinderFlagsProperty.SetValue(compilationOptions, (uint)1 << 22);
 
         var dynamicAssembly = CSharpCompilation.Create(
-            "DynamicSync.dll",
+            "DynamicSync",
             syntaxTrees: syntaxTrees,
             references:
             assemblies.Select(a => a.Location).Distinct().Select(a => MetadataReference.CreateFromFile(a)),

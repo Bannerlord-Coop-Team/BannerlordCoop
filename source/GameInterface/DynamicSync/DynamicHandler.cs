@@ -26,7 +26,7 @@ namespace GameInterface.DynamicSync
         public void RegisterHandler(Type handlerType)
         {
            if(!handlers.Any(h => h.GetType() == handlerType))
-            handlers.Add((IHandler)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network, dynamicSyncRegistry }));
+                handlers.Add((IHandler)Activator.CreateInstance(handlerType, new object[] { messageBroker, objectManager, network, dynamicSyncRegistry }));
         }
 
         public void Dispose()

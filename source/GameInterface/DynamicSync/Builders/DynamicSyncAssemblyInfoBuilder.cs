@@ -40,7 +40,7 @@ namespace GameInterface.DynamicSync.Builders
                 }
             }
 
-                var assemblyInfoTemplate = TemplateParser.Parse("DynamicAssemblyInfoTemplate", new
+            var assemblyInfoTemplate = TemplateParser.Parse("DynamicAssemblyInfoTemplate", new
             {
                 Assemblies = ignoreCheckAccessAssemblies.Distinct().Select(a => a.GetName().Name).Concat(assemblies)
             });
