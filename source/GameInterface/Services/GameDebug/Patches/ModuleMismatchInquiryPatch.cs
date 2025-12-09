@@ -2,7 +2,6 @@
 using SandBox;
 using System.Collections;
 
-#if DEBUG
 namespace GameInterface.Services.GameDebug.Patches
 {
     /// <summary>
@@ -20,4 +19,3 @@ namespace GameInterface.Services.GameDebug.Patches
         }
     }
 }
-#endif

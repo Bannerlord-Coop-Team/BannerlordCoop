@@ -23,6 +23,7 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     private Thread UpdateThread { get; set; }
     private CancellationTokenSource CancellationTokenSource;
+    private bool Disposed;
 
     protected readonly NetManager netManager;
 
@@ -50,23 +51,33 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     public virtual void Dispose()
     {
-        netManager.Stop();
+        if (Disposed) return;
+        Disposed = true;
 
-        CancellationTokenSource.Cancel();
-        CancellationTokenSource.Dispose();
-        UpdateThread?.Join(Configuration.ObjectCreationTimeout);
+        try { netManager.Stop(); } catch { }
+
+        try { CancellationTokenSource?.Cancel(); } catch (ObjectDisposedException) { }
+        try { CancellationTokenSource?.Dispose(); } catch { }
+        CancellationTokenSource = null;
+
+        try { UpdateThread?.Join(Configuration.ObjectCreationTimeout); } catch { }
     }
 
     private void UpdateThreadMethod()
     {
         var lastTime = DateTime.Now;
-        while (CancellationTokenSource.IsCancellationRequested == false)
+        while (true)
         {
+            var cts = CancellationTokenSource;
+            if (cts == null || cts.IsCancellationRequested) break;
+
             var now = DateTime.Now;
-            TimeSpan deltaTime = now - lastTime;
+            var deltaTime = now - lastTime;
             lastTime = now;
             Update(deltaTime);
-            Thread.Sleep(Configuration.NetworkPollInterval);
+
+            var poll = Configuration != null ? Configuration.NetworkPollInterval : TimeSpan.FromMilliseconds(50);
+            Thread.Sleep(poll);
         }
     }
 

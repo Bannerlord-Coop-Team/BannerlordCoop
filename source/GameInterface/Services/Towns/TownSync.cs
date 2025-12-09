@@ -1,4 +1,4 @@
-﻿using GameInterface.AutoSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -12,7 +12,7 @@ internal class TownSync : IAutoSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._prosperity)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._wallLevel)));
+        
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._isCastle)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._ownerClan)));
         // Not synced fields

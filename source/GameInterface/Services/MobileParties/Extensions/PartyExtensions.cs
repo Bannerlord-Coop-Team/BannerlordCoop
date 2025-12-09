@@ -1,7 +1,7 @@
-﻿using Common.Logging;
+using Common.Logging;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
+using TaleWorlds.CampaignSystem;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -42,13 +42,6 @@ internal static class PartyExtensions
     /// <returns>return true if the MobileParty is a player otherwise false.</returns>
     public static bool IsPlayerParty(this MobileParty party)
     {
-        // Allow method if container or registry cannot be resolved
-        if (ContainerProvider.TryResolve<IPlayerRegistry>(out var playerRegistry) == false)
-        {
-            Logger.Error("Unable to resolve {name}", nameof(IPlayerRegistry));
-            return false;
-        };
-
-        return playerRegistry.Contains(party);
+        return party != null && MobileParty.MainParty != null && party == MobileParty.MainParty;
     }
 }

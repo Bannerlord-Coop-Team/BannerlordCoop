@@ -1,10 +1,11 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -67,16 +68,12 @@ public class TimeHandler : IHandler
 
     internal void Handle_NetworkRequestTimeSpeedChange(MessagePayload<NetworkRequestTimeSpeedChange> obj)
     {
-        var newMode = obj.What.NewControlMode;
-
-        SetTimeMode(newMode);
+        messageBroker.Publish(this, new SendInformationMessage("Contrôle du temps désactivé par le serveur"));
     }
 
     internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
     {
-        var newMode = obj.What.NewControlMode;
-
-        SetTimeMode(newMode);
+        messageBroker.Publish(this, new SendInformationMessage("Contrôle du temps désactivé par le serveur"));
     }
 
     private bool PlayersLoadingPolicy()
@@ -118,7 +115,7 @@ public class TimeHandler : IHandler
     {
         tcs = new();
 
-        var cts = new CancellationTokenSource(1000);
+        var cts = new CancellationTokenSource(5000);
 
         timeControlMode = TimeControlEnum.Pause;
         try

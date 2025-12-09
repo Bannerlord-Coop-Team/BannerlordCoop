@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -68,24 +68,6 @@
     <Reference Include="TaleWorlds.Diamond">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.Diamond.AccessProvider.Epic">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Epic.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Diamond.AccessProvider.GDK">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.GDK.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Diamond.AccessProvider.GOG">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.GOG.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Diamond.AccessProvider.Steam">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Steam.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Diamond.AccessProvider.Test">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.AccessProvider.Test.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.Diamond.ChatSystem.Library">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Diamond.ChatSystem.Library.dll</HintPath>
-    </Reference>
     <Reference Include="TaleWorlds.DotNet">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.DotNet.dll</HintPath>
     </Reference>
@@ -112,9 +94,6 @@
     </Reference>
     <Reference Include="TaleWorlds.GauntletUI.PrefabSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.PrefabSystem.dll</HintPath>
-    </Reference>
-    <Reference Include="TaleWorlds.GauntletUI.TooltipExtensions">
-      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.GauntletUI.TooltipExtensions.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.InputSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
@@ -206,21 +185,128 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Remove="Services\Bandits\Patches\DisableBanditsCampaignBehavior.cs" />
+    <Compile Remove="Services\Bandits\Patches\DisableOutlawClansCampaignBehavior.cs" />
+    <Compile Remove="Services\Towns\Patches\Disabled\DisablePrisonBreakCampaignBehavior.cs" />
+    <Compile Remove="Services\Towns\Patches\Disabled\DisableTownMerchantsCampaignBehavior.cs" />
+    <Compile Remove="Services\UI\CharacterCreationUI\**\*.cs" />
+    <Compile Remove="Services\MobilePartyAIs\Patches\PartyBehaviorPatch.cs" />
+    <Compile Remove="Services\PartyVisuals\**\*.cs" />
+    <Compile Remove="Services\PartyBases\Extensions\PartyBaseExtensions.cs" />
+    <Compile Remove="Services\MobileParties\Patches\ParallelRobustnessPatches.cs" />
+    <Compile Remove="Services\MobileParties\Patches\MobilePartyPropertyPatches.cs" />
+    <Compile Remove="Services\MobileParties\Patches\DebugFixPatch.cs" />
+    <Compile Remove="Services\Settlements\Patches\EntitiesSpottedSettlementPatch.cs" />
+    <Compile Remove="Services\Characters\Patches\DisableTradeSkillCampaingBehavior.cs" />
+    <Compile Remove="Services\Towns\Patches\Disabled\DisableTavernEmployeesCampaignBehavior.cs" />
+    <Compile Remove="Serialization\External\**\*.cs" />
+    <Compile Remove="Services\Companions\Patches\DisableCompanionRolesCampaignBehavior.cs" />
+    <Compile Remove="Services\MobileParties\Messages\MobilePartyPropertyChanged.cs" />
+    <Compile Remove="Services\Barters\Patches\DisableMarriageBarterBehavior.cs" />
+    <Compile Remove="Services\Bandits\Patches\DisableAiBanditPatrollingBehavior.cs" />
+    <Compile Remove="Services\Heroes\Patches\HeroFieldPatches.cs" />
+    <Compile Remove="Services\Heroes\Handlers\HeroFieldsHandler.cs" />
+    <Compile Remove="Services\Heroes\Messages\TattooTagsChanged.cs" />
+    <Compile Remove="Services\Heroes\Messages\SpcDaysInLocationChanged.cs" />
+    <Compile Remove="Services\Heroes\Messages\ChangeSpcDaysInLocation.cs" />
+    <Compile Remove="Services\Heroes\Messages\ChangeTattooTags.cs" />
+    <Compile Remove="Services\TroopRosters\Handlers\TroopRosterCollectionHandler.cs" />
+    <Compile Remove="Services\TroopRosters\Messages\NetworkUpdateTroopRosterData.cs" />
+    <Compile Remove="Services\Settlements\Commands\**\*.cs" />
+    <Compile Remove="Services\Settlements\SettlementSync.cs" />
+    
+    <Compile Remove="Services\Settlements\Patches\SettlementClaimantCampaignBehaviorOnOwnerChangedPatch.cs" />
+    <Compile Remove="Services\Settlements\Patches\ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.cs" />
+    <Compile Remove="Services\Settlements\Handlers\SettlementHandler.cs" />
+    <Compile Remove="Services\GameDebug\**\*.cs" />
+    <Compile Remove="Services\MobileParties\Handlers\MobilePartyPropertyHandler.cs" />
+    <Compile Remove="Services\MobilePartyAIs\**\*.cs" />
+    <Compile Remove="Services\Kingdoms\**\*.cs" />
+    <Compile Remove="Services\TroopRosters\**\*.cs" />
+    <Compile Remove="Services\LoadingScreen\**\*.cs" />
+    <Compile Remove="Services\StanceLinks\**\*.cs" />
+    <Compile Remove="Services\Alleys\**\*.cs" />
+    <Compile Remove="Services\FlattenedTroopRosters\**\*.cs" />
+    <Compile Remove="Services\Heroes\Patches\Disable\**\*.cs" />
+    <Compile Remove="Services\MobileParties\Handlers\MobilePartyBehaviorHandler.cs" />
+    <Compile Remove="Services\UI\**\*.cs" />
+    <Compile Remove="Services\Towns\Commands\**\*.cs" />
+    <Compile Remove="Services\GameState\**\*.cs" />
+    <Compile Remove="Services\Heroes\**\*.cs" />
+    <Compile Remove="Services\Players\**\*.cs" />
+    <Compile Remove="Services\MobileParties\Handlers\NewPlayerPartyHandler.cs" />
+    <Compile Remove="Services\BasicCharacterObjects\**\*.cs" />
+    <Compile Remove="Services\BasicCultureObjects\**\*.cs" />
+    <Compile Remove="Services\Buildings\**\*.cs" />
+    <Compile Remove="Services\Clans\**\*.cs" />
+    <Compile Remove="Services\Hideouts\**\*.cs" />
+    <Compile Remove="Services\PartyBases\**\*.cs" />
+    <Compile Remove="Services\Workshops\**\*.cs" />
+    <Compile Remove="Services\Settlements\**\*.cs" />
+    <Compile Remove="Services\Towns\Handlers\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Services\Settlements\SettlementSync.cs" />
+    <Compile Include="Services\UI\Messages\AttemptJoin.cs" />
+    <Compile Include="Services\UI\Messages\HostSaveGame.cs" />
+    <Compile Include="Services\UI\Messages\EndLoadingScreen.cs" />
+    <Compile Include="Services\GameState\Messages\EnterMissionState.cs" />
+    <Compile Include="Services\GameState\Messages\EnterCampaignState.cs" />
+    <Compile Include="Services\GameState\Messages\LoadGameSave.cs" />
+    <Compile Include="Services\GameDebug\Messages\SendInformationMessage.cs" />
+    <Compile Include="Services\GameDebug\Messages\SendPopupMessage.cs" />
+    <Compile Include="Services\GameDebug\Messages\LoadGame.cs" />
+    <Compile Include="Services\GameDebug\Messages\StartDebugGame.cs" />
+    <Compile Include="Services\GameDebug\Messages\CharacterCreationStarted.cs" />
+    <Compile Include="Services\Settlements\Messages\**\*.cs" />
+    <Compile Include="Services\MobileParties\Messages\MobilePartyPropertyChanged.cs" />
+    <Compile Include="Services\Settlements\Audit\**\*.cs" />
+    <Compile Include="Services\Kingdoms\Messages\**\*.cs" />
+    <Compile Include="Services\Kingdoms\Data\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Services\GameState\Messages\EnterMainMenu.cs" />
+    <Compile Include="Services\GameState\Messages\CampaignReady.cs" />
+    
+    <Compile Include="Services\Heroes\Data\HeroChangeNameData.cs" />
+    <Compile Include="Services\Players\Data\Player.cs" />
+    <Compile Include="Services\Players\Messages\PlayerRegistered.cs" />
+    <Compile Include="Services\Players\Messages\RegisterPlayer.cs" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Compile Include="Services\UI\LoadGameUI\CoopLoadUI.cs" />
+  </ItemGroup>
+  
+  <ItemGroup>
+    <Compile Include="Services\Heroes\Messages\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Services\GameState\Interfaces\GameStateInterface.cs" />
+  </ItemGroup>
+  <Target Name="CopyToCoopModule" AfterTargets="Build">
+    <PropertyGroup>
+      <CoopModuleDir>F:\jeux\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Coop\bin\Win64_Shipping_Client</CoopModuleDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(CoopModuleDir)" />
+  </Target>
+  <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{e474a5b5-3f73-46cb-b68c-e8fa5199950b}</Project>
       <Name>Common</Name>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Autofac" Version="8.2.0" />
+    <PackageReference Include="Autofac" Version="9.0.0" />
     <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Lib.Harmony" Version="2.3.5" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.2" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Scrutor" Version="6.0.1" />
+    <PackageReference Include="Lib.Harmony" Version="2.4.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <PackageReference Include="Scrutor" Version="7.0.0" />
   </ItemGroup>
     <ItemGroup>
 	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">

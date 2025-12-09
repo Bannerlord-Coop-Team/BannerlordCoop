@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.Core;
@@ -10,7 +10,7 @@ namespace GameInterface.Services.Equipments.Patches;
 [HarmonyPatch]
 internal class EquipmentCollectionPatches : GenericCollectionPatches<EquipmentCollectionPatches, Equipment>
 {
-    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(Equipment));
+    new static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(Equipment));
     
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)

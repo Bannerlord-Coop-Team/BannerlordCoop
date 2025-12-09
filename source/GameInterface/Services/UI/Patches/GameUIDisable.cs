@@ -11,15 +11,7 @@ namespace GameInterface.Services.UI.Patches
         [HarmonyPrefix]
         public static bool PushStatePatch(TaleWorlds.Core.GameState gameState)
         {
-            return gameState switch
-            {
-                KingdomState => false,
-                QuestsState => false,
-                CharacterDeveloperState => false,
-                PartyState => false,
-                InventoryState => false,
-                _ => true,
-            };
+            return true;
         }
     }
 }

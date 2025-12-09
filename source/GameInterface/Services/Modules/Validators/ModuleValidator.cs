@@ -28,26 +28,12 @@ namespace GameInterface.Services.Modules.Validators
             {
                 var clientModule = clientModules.FirstOrDefault(module => module.Id == serverModule.Id);
 
-                if (clientModule.Id == null)
+                if (!clientModules.Any(module => module.Id == serverModule.Id) || clientModule.Id == null)
                 {
                     return
                         $"To join the server the module '{serverModule.Id}' with version '{serverModule.Version.ToString()}' is required.";
                 }
-                else if (!serverModule.Version.IsSame(clientModule.Version, true))
-                {
-                    return
-                        $"Wrong version of module '{serverModule.Id}' detected. Server uses '{serverModule.Version.ToString()}', client uses '{clientModule.Version.ToString()}'.";
-                }
-            }
-
-            var modulesOnlyClientSide = clientModules.Where(clientModule =>
-                serverModules.All(serverModule => serverModule.Id != clientModule.Id)).ToList();
-
-            if (modulesOnlyClientSide.Any())
-            {
-                return string.Join(Environment.NewLine,
-                    modulesOnlyClientSide.Select(clientModule =>
-                        $"Server does not support module '{clientModule.Id}'."));
+                // Version mismatch is allowed
             }
 
             return null;

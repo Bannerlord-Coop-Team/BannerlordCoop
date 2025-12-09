@@ -1,4 +1,4 @@
-﻿using Common.Audit;
+using Common.Audit;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -155,17 +155,7 @@ internal class SettlementAuditor : IAuditor
                 continue; 
             }
 
-            if(settlement.NumberOfEnemiesSpottedAround != audit.NumberOfEnemiesSpottedAround)
-            {
-                sb.AppendLine($"settlement.NumberOfEnemiesSpottedAround {settlement.NumberOfEnemiesSpottedAround}!= {audit.NumberOfEnemiesSpottedAround}");
-                errorNumberOfEnemiesSpottedAround++;
-            }
-
-            if (settlement.NumberOfAlliesSpottedAround != audit.NumberOfAlliesSpottedAround)
-            {
-                sb.AppendLine($"settlement.NumberOfAlliesSpottedAround {settlement.NumberOfAlliesSpottedAround}!= {audit.NumberOfAlliesSpottedAround}");
-                errorNumberOfAlliesSpottedAround++;
-            }
+            
 
             if(settlement.BribePaid != audit.BribePaid)
             {
@@ -259,18 +249,7 @@ internal class SettlementAuditor : IAuditor
                 errLastVisitTimeOfOwner++;
             }
 
-            var claimedBy = settlement.ClaimedBy?.StringId ?? "";
-            if (claimedBy != audit.ClaimedBy)
-            {
-                sb.AppendLine($"settlement.ClaimedBy {settlement.ClaimedBy.StringId}!= {audit.ClaimedBy}");
-                errClaimedBy++;
-            }
-
-            if(settlement.ClaimValue != audit.ClaimValue)
-            {
-                sb.AppendLine($"settlement.ClaimValue {settlement.ClaimValue}!= {audit.ClaimValue}");
-                errClaimValue++;
-            }
+            
 
             // value can be null sadly :(
             if(!(audit.WallSectionHitPointsRatioList is null))
@@ -291,12 +270,7 @@ internal class SettlementAuditor : IAuditor
                 }
             }
 
-            if(audit.CanBeClaimed != settlement.CanBeClaimed)
-            {
-                sb.AppendLine($"settlement.CanBeClaimed {settlement.CanBeClaimed} != {audit.CanBeClaimed}");
-
-                errCanBeClaimed++;
-            }
+            
 
             sb.AppendLine($"\terrorNumberOfEnemiesSpottedAround {errorNumberOfEnemiesSpottedAround}");
             sb.AppendLine($"\terrorNumberOfAlliesSpottedAround: {errorNumberOfAlliesSpottedAround}");

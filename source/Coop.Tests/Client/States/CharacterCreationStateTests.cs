@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Common.Messaging;
 using Common.Tests.Utils;
 using Coop.Core.Client;
@@ -39,7 +39,7 @@ namespace Coop.Tests.Client.States
             // Arrange
             var characterCreationState = clientLogic.SetState<CharacterCreationState>();
 
-            var playerHeroRegistered = new NewPlayerHeroRegistered(null, null);
+            var playerHeroRegistered = new NewPlayerHeroRegistered(null, string.Empty, null);
             var payload = new MessagePayload<NetworkPlayerData>(
                 this, new NetworkPlayerData(playerHeroRegistered));
 

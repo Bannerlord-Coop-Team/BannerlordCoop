@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Common.Audit;
 using Common.Extensions;
 using Common.Logging;

@@ -1,4 +1,4 @@
-﻿// Ignore Spelling: Finalizer
+// Ignore Spelling: Finalizer
 
 using Common.Messaging;
 using Common.Network;
@@ -8,6 +8,7 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
+using GameInterface.Services.GameDebug.Messages;
 
 namespace Coop.Core.Client.States;
 
@@ -33,6 +34,7 @@ public class CampaignState : ClientStateBase
         messageBroker.Subscribe<MissionStateEntered>(Handle_MissionStateEntered);
 
         
+        messageBroker.Publish(this, new SendInformationMessage("Entrée en campagne, notification serveur"));
         network.SendAll(new NetworkPlayerCampaignEntered());
     }
 

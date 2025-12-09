@@ -5,6 +5,7 @@ using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Common;
 using GameInterface.Services.GameState.Messages;
 using LiteNetLib;
+using GameInterface.Services.GameDebug.Messages;
 
 namespace Coop.Core.Client.States;
 
@@ -43,7 +44,17 @@ public class ReceivingSavedDataState : ClientStateBase
     internal void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
     {
         saveDataMessage = obj.What;
-        Logic.EnterMainMenu();
+        var saveData = saveDataMessage?.GameSaveData;
+        var size = saveData?.Length ?? 0;
+        if (saveData == null || size == 0)
+        {
+            messageBroker.Publish(this, new SendInformationMessage("Échec: sauvegarde vide reçue"));
+            return;
+        }
+        messageBroker.Publish(this, new SendInformationMessage($"Sauvegarde reçue ({size} octets), chargement..."));
+        var commandLoad = new LoadGameSave(saveData);
+        messageBroker.Publish(this, commandLoad);
+        Logic.LoadSavedData();
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
@@ -51,8 +62,13 @@ public class ReceivingSavedDataState : ClientStateBase
         var saveData = saveDataMessage?.GameSaveData;
 
         if (saveData == null) return;
-        if (saveData.Length == 0) return;
+        if (saveData.Length == 0)
+        {
+            messageBroker.Publish(this, new SendInformationMessage("Échec: sauvegarde vide reçue"));
+            return;
+        }
 
+        messageBroker.Publish(this, new SendInformationMessage("Chargement de la sauvegarde côté client"));
         var commandLoad = new LoadGameSave(saveData);
         messageBroker.Publish(this, commandLoad);
 

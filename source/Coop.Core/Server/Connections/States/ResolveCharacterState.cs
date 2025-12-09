@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
@@ -6,6 +6,7 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.GameDebug.Messages;
 using LiteNetLib;
 using Serilog;
 using TaleWorlds.Library;
@@ -55,7 +56,16 @@ public class ResolveCharacterState : ConnectionStateBase
         var clientModules = obj.What.Modules;
         var serverModules = moduleInfoProvider.GetModuleInfos();
 
+        Logger.Information("Validating modules: client={ClientCount} server={ServerCount}", clientModules.Length, serverModules.Count);
         var result = moduleValidator.Validate(serverModules, clientModules.Select(ConvertToModuleInfo).ToList());
+        if (result == null)
+        {
+            Logger.Information("Module validation succeeded");
+        }
+        else
+        {
+            Logger.Warning("Module validation failed: {Reason}", result);
+        }
 
         var validateMessage = new NetworkModuleVersionsValidated(result == null, result);
         var playerPeer = ConnectionLogic.Peer;
@@ -67,11 +77,15 @@ public class ResolveCharacterState : ConnectionStateBase
         var peer = obj.Who as NetPeer;
         if (peer != ConnectionLogic.Peer) return;
 
-        messageBroker.Publish(this, new ResolveHero(obj.What.PlayerId));
+        messageBroker.Publish(this, new SendInformationMessage("Validation client reçue, démarrage transfert (bypass héros)"));
+        var validateMessage = new NetworkClientValidated(true, string.Empty);
+        network.Send(peer, validateMessage);
+        ConnectionLogic.TransferSave();
     }
 
     internal void ResolveHeroHandler(MessagePayload<HeroResolved> obj)
     {
+        messageBroker.Publish(this, new SendInformationMessage("Validation client OK, transfert sauvegarde"));
         var validateMessage = new NetworkClientValidated(true, obj.What.HeroId);
         var playerPeer = ConnectionLogic.Peer;
         network.Send(playerPeer, validateMessage);
@@ -80,6 +94,7 @@ public class ResolveCharacterState : ConnectionStateBase
 
     internal void HeroNotFoundHandler(MessagePayload<ResolveHeroNotFound> obj)
     {
+        messageBroker.Publish(this, new SendInformationMessage("Aucun héros trouvé, création de personnage"));
         var validateMessage = new NetworkClientValidated(false, string.Empty);
         var playerPeer = ConnectionLogic.Peer;
         network.Send(playerPeer, validateMessage);

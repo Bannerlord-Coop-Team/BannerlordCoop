@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+using System;
+using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
@@ -7,6 +8,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules;
+using GameInterface.Services.GameDebug.Messages;
 
 namespace Coop.Core.Client.States;
 
@@ -19,6 +21,7 @@ public class ValidateModuleState : ClientStateBase
     private readonly INetwork network;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ICoopFinalizer coopFinalizer;
+    private DateTime? ignoreMainMenuUntilUtc;
 
     public ValidateModuleState(
         IClientLogic logic,
@@ -36,6 +39,8 @@ public class ValidateModuleState : ClientStateBase
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
         messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
+
+        ignoreMainMenuUntilUtc = DateTime.UtcNow.AddMinutes(2);
 
 #if DEBUG
         controllerIdProvider.SetControllerFromProgramArgs();
@@ -58,6 +63,8 @@ public class ValidateModuleState : ClientStateBase
     {
         if (obj.What.Matches)
         {
+            ignoreMainMenuUntilUtc = null;
+            messageBroker.Publish(this, new SendInformationMessage("Modules validés"));
             network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
         }
         else
@@ -71,11 +78,15 @@ public class ValidateModuleState : ClientStateBase
     {
         if (obj.What.HeroExists)
         {
+            ignoreMainMenuUntilUtc = null;
+            messageBroker.Publish(this, new SendInformationMessage($"Héros reconnu: {obj.What.HeroId}"));
             Logic.ControlledHeroId = obj.What.HeroId;
             Logic.LoadSavedData();
         }
         else
         {
+            ignoreMainMenuUntilUtc = null;
+            messageBroker.Publish(this, new SendInformationMessage("Démarrage de la création de personnage"));
             Logic.StartCharacterCreation();   
         }
     }
@@ -87,9 +98,9 @@ public class ValidateModuleState : ClientStateBase
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
     {
-        coopFinalizer.Finalize("Client has been stopped");
-
-        Logic.SetState<MainMenuState>();
+        // En phase de connexion/validation, ignorer les notifications d'entrée du menu principal
+        // pour éviter un retour prématuré au menu.
+        return;
     }
 
     public override void EnterMainMenu()

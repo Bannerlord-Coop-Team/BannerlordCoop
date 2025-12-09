@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.IO;
 
 namespace Coop
 {
@@ -9,21 +10,24 @@ namespace Coop
     {
         private static readonly string[] RedirectedAssemblies = new string[]
         {
-            "System.Collections.Immutable",
-            "System.Runtime.CompilerServices.Unsafe",
-            "Microsoft.Bcl.AsyncInterfaces",
-            "System.Threading.Tasks.Extensions",
-            "System.Text.Json",
             "Serilog",
+            "Serilog.Sinks.File",
+            "Serilog.Sinks.Debug",
+            "Serilog.Enrichers.Process",
             "System.Diagnostics.DiagnosticSource",
-            "System.Memory",
             "System.Buffers",
+            "System.Collections.Immutable",
+            "System.IO.Pipelines",
+            "System.Memory",
             "System.Numerics.Vectors",
-            "Autofac"
+            "System.Runtime.CompilerServices.Unsafe",
+            "System.Text.Encodings.Web",
+            "System.Text.Json",
+            "System.Threading.Channels",
+            "System.Threading.Tasks.Extensions",
+            "Microsoft.Bcl.AsyncInterfaces"
         };
 
-        private static readonly Dictionary<string, Assembly> LoadedRedirects = RedirectedAssemblies
-            .ToDictionary(str => str, str => AppDomain.CurrentDomain.Load(str));
 
         /// <summary>
         /// Creates runtime binding redirects for any assembly listed in <see cref="RedirectedAssemblies"/>.
@@ -31,11 +35,24 @@ namespace Coop
         public static void CreateAssemblyBindingRedirects()
         {
             AppDomain.CurrentDomain.AssemblyResolve += (sender, args) => {
-                var requestedAssembly = new AssemblyName(args.Name);
-                if (LoadedRedirects.TryGetValue(requestedAssembly.Name, out Assembly assembly))
+                var requestedName = new AssemblyName(args.Name).Name;
+                if (!RedirectedAssemblies.Contains(requestedName)) return null;
+
+                var alreadyLoaded = AppDomain.CurrentDomain
+                    .GetAssemblies()
+                    .FirstOrDefault(a => a.GetName().Name == requestedName);
+                if (alreadyLoaded != null) return alreadyLoaded;
+
+                try
                 {
-                    return assembly;
+                    var baseDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+                    var candidate = Path.Combine(baseDir ?? string.Empty, requestedName + ".dll");
+                    if (File.Exists(candidate))
+                    {
+                        return Assembly.LoadFrom(candidate);
+                    }
                 }
+                catch {}
 
                 return null;
             };

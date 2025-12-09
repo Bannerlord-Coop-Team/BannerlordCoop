@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
@@ -35,7 +36,8 @@ namespace GameInterface.Services.GameDebug.Handlers
 
         private void Handle(MessagePayload<LoadGame> obj)
         {
-            gameDebugInterface.LoadGame(obj.What.SaveName);
+            messageBroker.Publish(this, new StartLoadingScreen());
+            GameLoopRunner.RunOnMainThread(() => gameDebugInterface.LoadGame(obj.What.SaveName), true);
         }
     }
 }

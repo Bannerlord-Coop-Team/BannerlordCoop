@@ -12,6 +12,9 @@ using Serilog;
 using System;
 using System.Net;
 using System.Net.Sockets;
+using System.Linq;
+using System.Text;
+using LiteNetLib.Utils;
 
 namespace Coop.Core.Client;
 
@@ -33,6 +36,11 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     private readonly IPacketManager packetManager;
 
     private bool isConnected = false;
+    private DateTime? connectStart;
+    private int reconnectAttempts = 0;
+    private bool serverReachable = false;
+    private DateTime? pingSentAt;
+    private IPEndPoint serverEndPoint;
 
     public CoopClient(
         INetworkConfiguration config,
@@ -51,7 +59,9 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
     {
-        throw new NotImplementedException();
+        Logger.Error("Network error {SocketError} at {EndPoint}", socketError, endPoint);
+        messageBroker.Publish(this, new SendInformationMessage($"Erreur réseau: {socketError}"));
+        AttemptReconnect("Erreur réseau");
     }
 
     public override void OnNetworkLatencyUpdate(NetPeer peer, int latency)
@@ -67,7 +77,21 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
-        throw new NotImplementedException();
+        var data = reader.GetRemainingBytes();
+        var text = Encoding.UTF8.GetString(data);
+        if (messageType == UnconnectedMessageType.BasicMessage && text == "CoopPong")
+        {
+            if (serverEndPoint != null && remoteEndPoint.Equals(serverEndPoint))
+            {
+                serverReachable = true;
+                Logger.Information("Server reachable via UDP ping {Remote}", remoteEndPoint);
+                messageBroker.Publish(this, new SendInformationMessage("Serveur joignable (UDP)"));
+                netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
+                connectStart = DateTime.Now;
+            }
+            return;
+        }
+        Logger.Warning("Unconnected message {MessageType} from {RemoteEndPoint}", messageType, remoteEndPoint);
     }
 
     public override void OnPeerConnected(NetPeer peer)
@@ -86,7 +110,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
         if (isConnected == true)
         {
             messageBroker.Publish(this, new SendInformationMessage(disconnectInfo.Reason.ToString()));
-            messageBroker.Publish(this, new NetworkDisconnected(disconnectInfo));
+            AttemptReconnect("Peer disconnected: " + disconnectInfo.Reason);
         }
     }
 
@@ -99,14 +123,87 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             Dispose();
         }
 
-        netManager.Start();
+        var started = netManager.Start();
+        if (!started)
+        {
+            Logger.Error("Client network start failed");
+            messageBroker.Publish(this, new SendInformationMessage("Client: démarrage réseau échoué"));
+            return;
+        }
 
-        netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
+        try
+        {
+            var hostEntry = Dns.GetHostEntry(Configuration.Address);
+            var ip = hostEntry.AddressList.First();
+            serverEndPoint = new IPEndPoint(ip, Configuration.Port);
+            var writer = new NetDataWriter();
+            writer.Put("CoopPing");
+            netManager.SendUnconnectedMessage(writer, serverEndPoint);
+            pingSentAt = DateTime.Now;
+            serverReachable = false;
+            messageBroker.Publish(this, new SendInformationMessage($"Ping serveur {Configuration.Address}:{Configuration.Port}"));
+        }
+        catch (Exception ex)
+        {
+            Logger.Error("DNS resolve/connect error {Error}", ex.Message);
+            messageBroker.Publish(this, new SendInformationMessage("Erreur de résolution DNS pour l'adresse du serveur"));
+        }
     }
 
     public override void Update(TimeSpan frameTime)
     {
         netManager.PollEvents();
+        if (isConnected == false && connectStart.HasValue)
+        {
+            var now = DateTime.Now;
+            if (now - connectStart.Value > Configuration.ConnectionTimeout)
+            {
+                AttemptReconnect("Connexion échouée: timeout");
+            }
+        }
+        if (!serverReachable && pingSentAt.HasValue)
+        {
+            var now = DateTime.Now;
+            if (now - pingSentAt.Value > TimeSpan.FromSeconds(3))
+            {
+                messageBroker.Publish(this, new SendInformationMessage("Serveur injoignable (pas de réponse ping UDP), tentative de connexion directe"));
+                pingSentAt = null;
+                try
+                {
+                    netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
+                    connectStart = DateTime.Now;
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error("Direct connect failed {Error}", ex.Message);
+                }
+            }
+        }
+    }
+
+    private void AttemptReconnect(string reason)
+    {
+        reconnectAttempts++;
+        Logger.Warning("Attempting reconnect #{Attempt} ({Reason})", reconnectAttempts, reason);
+        messageBroker.Publish(this, new SendInformationMessage($"Reconnexion en cours (tentative {reconnectAttempts})"));
+
+        try
+        {
+            netManager.Stop();
+        }
+        catch { }
+
+        var started = netManager.Start();
+        if (!started)
+        {
+            Logger.Error("Client network restart failed");
+            messageBroker.Publish(this, new SendInformationMessage("Client: redémarrage réseau échoué"));
+            return;
+        }
+
+        Logger.Information("Reconnecting to {Address}:{Port}", Configuration.Address, Configuration.Port);
+        netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
+        connectStart = DateTime.Now;
     }
 
     public override void SendAll(IPacket packet)

@@ -68,9 +68,9 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
     public void AddField(FieldInfo field)
     {
-        if (field == null) throw new ArgumentNullException(nameof(field));
-        if (field.FieldType.IsInterface) throw new NotSupportedException($"{field.Name} cannot be autosynced as interfaces types are not supported");
-        if (field.FieldType.IsAbstract) throw new NotSupportedException($"{field.Name} cannot be autosynced as abstract types are not supported");
+        if (field == null) return;
+        if (field.FieldType.IsInterface) return;
+        if (field.FieldType.IsAbstract) return;
 
         if (fields.Contains(field)) throw new ArgumentException($"{field.Name} has already been registered as a synced field");
         fields.Add(field);
@@ -78,10 +78,10 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
     public void AddProperty(PropertyInfo property)
     {
-        if (property == null) throw new ArgumentNullException(nameof(property));
-        if (property.CanWrite == false) throw new ArgumentException($"{property.Name} does not have a set method");
-        if (property.PropertyType.IsInterface) throw new NotSupportedException($"{property.Name} cannot be autosynced as interfaces types are not supported");
-        if (property.PropertyType.IsAbstract) throw new NotSupportedException($"{property.Name} cannot be autosynced as abstract types are not supported");
+        if (property == null) return;
+        if (property.CanWrite == false) return;
+        if (property.PropertyType.IsInterface) return;
+        if (property.PropertyType.IsAbstract) return;
 
         if (properties.Contains(property)) throw new ArgumentException($"{property.Name} has already been registered as a synced property");
         properties.Add(property);

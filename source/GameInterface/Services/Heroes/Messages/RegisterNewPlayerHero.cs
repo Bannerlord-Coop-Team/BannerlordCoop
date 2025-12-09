@@ -24,11 +24,13 @@ public record RegisterNewPlayerHero : ICommand
 public record NewPlayerHeroRegistered : IResponse
 {
     public NetPeer SendingPeer { get; }
+    public string ControllerId { get; }
     public Player Player { get; }
 
-    public NewPlayerHeroRegistered(NetPeer sendingPeer, Player playerData)
+    public NewPlayerHeroRegistered(NetPeer sendingPeer, string controllerId, Player playerData)
     {
         SendingPeer = sendingPeer;
+        ControllerId = controllerId;
 
         Player = playerData;
     }

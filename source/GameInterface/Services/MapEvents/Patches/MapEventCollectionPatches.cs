@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Utils;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -10,7 +10,7 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch]
 internal class MapEventCollectionPatches : GenericCollectionPatches<MapEventCollectionPatches, MapEvent>
 {
-    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(MapEvent));
+    new static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(MapEvent));
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)

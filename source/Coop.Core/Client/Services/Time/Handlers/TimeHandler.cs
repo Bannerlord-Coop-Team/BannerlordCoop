@@ -34,12 +34,9 @@ namespace Coop.Core.Client.Services.Time.Handlers
 
         internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
         {
-            var newMode = obj.What.NewControlMode;
-
-            Logger.Verbose("Client changing time to {mode} from server", newMode);
-
-            var payload = new NetworkRequestTimeSpeedChange(newMode);
-            network.SendAll(payload);
+            // Disable client-originated time changes; server controls time.
+            // No-op to prevent pause/play UI from affecting network time state.
+            var _ = obj.What.NewControlMode;
         }
 
         internal void Handle_NetworkTimeSpeedChanged(MessagePayload<NetworkChangeTimeControlMode> obj)

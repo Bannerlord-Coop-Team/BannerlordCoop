@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager.Extensions;
@@ -54,7 +54,6 @@ internal class HeroRegistry : IAutoRegistry<Hero>
     {
         using(new AllowedThread())
         {
-            obj.Init();
             AccessTools.Field(typeof(Hero), nameof(Hero._children)).SetValue(obj, new MBList<Hero>());
             AccessTools.Field(typeof(Hero), nameof(Hero._ownedWorkshops)).SetValue(obj, new MBList<Workshop>());
         }

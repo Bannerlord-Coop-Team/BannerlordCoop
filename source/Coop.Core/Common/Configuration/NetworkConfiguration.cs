@@ -1,4 +1,4 @@
-﻿using Common.Network;
+using Common.Network;
 using System;
 
 namespace Coop.Core.Common.Configuration;
@@ -12,8 +12,8 @@ public class NetworkConfiguration : INetworkConfiguration
     public string Address { get; set; } =  "localhost";
     public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromMinutes(5);
 #else
-    public string Address { get; set; } = "bannerlordcoop.duckdns.org";
-    public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(10);
+    public string Address { get; set; } = "localhost";
+    public TimeSpan ConnectionTimeout { get; set; } = TimeSpan.FromSeconds(60);
 #endif
 
     public int Port { get; set; } = 4200;
@@ -23,7 +23,7 @@ public class NetworkConfiguration : INetworkConfiguration
 
     public string P2PToken => throw new NotImplementedException();
 
-    public int MaxPacketsInQueue => 1000;
+    public int MaxPacketsInQueue => 5000;
 
     public TimeSpan AuditTimeout => TimeSpan.FromSeconds(15);
 
