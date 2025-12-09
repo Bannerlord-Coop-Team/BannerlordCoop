@@ -14,14 +14,44 @@ namespace GameInterface.Services.GameState.Patches;
 [HarmonyPatch(typeof(MBGameManager))]
 internal class GameLoadedPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<GameLoadedPatch>();
     [HarmonyPostfix]
     [HarmonyPatch("OnAfterGameInitializationFinished")]
     static void OnGameLoaded(ref MBGameManager __instance)
     {
-        // Removes disabled states fixing camera bug when new game is loaded,
-        // I think this is because opening the escape menu is supposed to call this but it never opens here
-        Game.Current.GameStateManager.UnregisterActiveStateDisableRequest(MapScreen.Instance);
+        try
+        {
+            if (Game.Current?.GameStateManager != null && MapScreen.Instance != null)
+            {
+                Game.Current.GameStateManager.UnregisterActiveStateDisableRequest(MapScreen.Instance);
+            }
+        }
+        catch { }
 
+        Logger.Information("Publishing CampaignReady (OnAfterGameInitializationFinished)");
         MessageBroker.Instance.Publish(__instance, new CampaignReady());
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch("OnGameLoaded")]
+    static void OnGameLoadedAlt(ref MBGameManager __instance)
+    {
+        Logger.Information("Publishing CampaignReady (OnGameLoaded)");
+        MessageBroker.Instance.Publish(__instance, new CampaignReady());
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch("OnGameInitializationFinished")]
+    static void OnGameInitializationFinished(ref MBGameManager __instance)
+    {
+        Logger.Information("Publishing CampaignReady (OnGameInitializationFinished)");
+        MessageBroker.Instance.Publish(__instance, new CampaignReady());
+    }
+
+    [HarmonyPostfix]
+    [HarmonyPatch("OnGameStart")]
+    static void OnGameStart(ref MBGameManager __instance)
+    {
+        // Publication supprimée: trop tôt dans le cycle d'initialisation et provoque des crashes
     }
 }

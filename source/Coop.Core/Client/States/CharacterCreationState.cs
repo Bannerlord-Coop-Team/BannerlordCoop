@@ -1,4 +1,4 @@
-﻿// Ignore Spelling: Finalizer
+// Ignore Spelling: Finalizer
 
 using Common.Messaging;
 using Common.Network;
@@ -36,7 +36,7 @@ public class CharacterCreationState : ClientStateBase
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
         this.coopFinalizer = coopFinalizer;
-        messageBroker.Subscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
+        messageBroker.Subscribe<GameInterface.Services.CharacterCreation.Messages.NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectRegistered);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -45,7 +45,7 @@ public class CharacterCreationState : ClientStateBase
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
+        messageBroker.Unsubscribe<GameInterface.Services.CharacterCreation.Messages.NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Unsubscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectRegistered);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -62,7 +62,7 @@ public class CharacterCreationState : ClientStateBase
         messageBroker.Publish(this, new PackageMainHero());
     }
 
-    internal void Handle_NewHeroPackaged(MessagePayload<NewHeroPackaged> obj)
+    internal void Handle_NewHeroPackaged(MessagePayload<GameInterface.Services.CharacterCreation.Messages.NewHeroPackaged> obj)
     {
         var playerId = controllerIdProvider.ControllerId;
         var data = obj.What.Package;

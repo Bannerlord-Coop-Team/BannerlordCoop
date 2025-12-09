@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -23,6 +23,7 @@
     <DefineConstants>DEBUG;TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
@@ -31,16 +32,17 @@
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <PlatformTarget>x64</PlatformTarget>
   </PropertyGroup>
   <PropertyGroup>
-    <RunPostBuildEvent>Always</RunPostBuildEvent>
+    <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony, Version=2.3.5.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Lib.Harmony.2.3.5\lib\net472\0Harmony.dll</HintPath>
+    <Reference Include="0Harmony, Version=2.4.2.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\Lib.Harmony.2.4.2\lib\net472\0Harmony.dll</HintPath>
     </Reference>
-    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=9.0.0.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.9.0.2\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.10.0.0\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
     </Reference>
     <Reference Include="Mono.Cecil, Version=0.11.6.0, Culture=neutral, PublicKeyToken=50cebf1cceb9d05e, processorArchitecture=MSIL">
       <HintPath>..\packages\Mono.Cecil.0.11.6\lib\net40\Mono.Cecil.dll</HintPath>
@@ -57,20 +59,20 @@
     <Reference Include="MonoMod.Backports, Version=1.1.2.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\MonoMod.Backports.1.1.2\lib\net452\MonoMod.Backports.dll</HintPath>
     </Reference>
-    <Reference Include="MonoMod.Core, Version=1.2.3.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\MonoMod.Core.1.2.3\lib\net452\MonoMod.Core.dll</HintPath>
+    <Reference Include="MonoMod.Core, Version=1.3.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MonoMod.Core.1.3.3\lib\net452\MonoMod.Core.dll</HintPath>
     </Reference>
     <Reference Include="MonoMod.Iced, Version=1.21.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\MonoMod.Core.1.2.3\lib\net452\MonoMod.Iced.dll</HintPath>
+      <HintPath>..\packages\MonoMod.Core.1.3.3\lib\net452\MonoMod.Iced.dll</HintPath>
     </Reference>
     <Reference Include="MonoMod.ILHelpers, Version=1.1.0.0, Culture=neutral, processorArchitecture=MSIL">
       <HintPath>..\packages\MonoMod.ILHelpers.1.1.0\lib\net452\MonoMod.ILHelpers.dll</HintPath>
     </Reference>
-    <Reference Include="MonoMod.RuntimeDetour, Version=25.2.3.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\MonoMod.RuntimeDetour.25.2.3\lib\net452\MonoMod.RuntimeDetour.dll</HintPath>
+    <Reference Include="MonoMod.RuntimeDetour, Version=25.3.3.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MonoMod.RuntimeDetour.25.3.3\lib\net452\MonoMod.RuntimeDetour.dll</HintPath>
     </Reference>
-    <Reference Include="MonoMod.Utils, Version=25.0.8.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\MonoMod.Utils.25.0.8\lib\net452\MonoMod.Utils.dll</HintPath>
+    <Reference Include="MonoMod.Utils, Version=25.0.11.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\MonoMod.Utils.25.0.11\lib\net452\MonoMod.Utils.dll</HintPath>
     </Reference>
     <Reference Include="SandBox.GauntletUI">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.GauntletUI.dll</HintPath>
@@ -81,8 +83,8 @@
     <Reference Include="SandBox.ViewModelCollection">
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.ViewModelCollection.dll</HintPath>
     </Reference>
-    <Reference Include="Serilog, Version=4.2.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
-      <HintPath>..\packages\Serilog.4.2.0\lib\net471\Serilog.dll</HintPath>
+    <Reference Include="Serilog, Version=4.3.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.4.3.0\lib\net471\Serilog.dll</HintPath>
     </Reference>
     <Reference Include="Serilog.Enrichers.Process, Version=3.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
       <HintPath>..\packages\Serilog.Enrichers.Process.3.0.0\lib\net471\Serilog.Enrichers.Process.dll</HintPath>
@@ -90,51 +92,48 @@
     <Reference Include="Serilog.Sinks.Debug, Version=3.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
       <HintPath>..\packages\Serilog.Sinks.Debug.3.0.0\lib\net471\Serilog.Sinks.Debug.dll</HintPath>
     </Reference>
-    <Reference Include="Serilog.Sinks.File, Version=6.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
-      <HintPath>..\packages\Serilog.Sinks.File.6.0.0\lib\net471\Serilog.Sinks.File.dll</HintPath>
+    <Reference Include="Serilog.Sinks.File, Version=7.0.0.0, Culture=neutral, PublicKeyToken=24c2f752a8e58a10, processorArchitecture=MSIL">
+      <HintPath>..\packages\Serilog.Sinks.File.7.0.0\lib\net471\Serilog.Sinks.File.dll</HintPath>
     </Reference>
     <Reference Include="System" />
-    <Reference Include="System.Buffers, Version=4.0.4.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Buffers.4.6.0\lib\net462\System.Buffers.dll</HintPath>
+    <Reference Include="System.Buffers, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Buffers.4.6.1\lib\net462\System.Buffers.dll</HintPath>
     </Reference>
-    <Reference Include="System.Collections.Immutable, Version=9.0.0.2, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Collections.Immutable.9.0.2\lib\net462\System.Collections.Immutable.dll</HintPath>
+    <Reference Include="System.Collections.Immutable, Version=10.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Collections.Immutable.10.0.0\lib\net462\System.Collections.Immutable.dll</HintPath>
     </Reference>
     <Reference Include="System.Core" />
-    <Reference Include="System.Diagnostics.DiagnosticSource, Version=9.0.0.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.9.0.2\lib\net462\System.Diagnostics.DiagnosticSource.dll</HintPath>
+    <Reference Include="System.Diagnostics.DiagnosticSource, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Diagnostics.DiagnosticSource.10.0.0\lib\net462\System.Diagnostics.DiagnosticSource.dll</HintPath>
     </Reference>
     <Reference Include="System.Drawing" />
     <Reference Include="System.IdentityModel" />
-    <Reference Include="System.IO.Pipelines, Version=9.0.0.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.IO.Pipelines.9.0.2\lib\net462\System.IO.Pipelines.dll</HintPath>
+    <Reference Include="System.IO.Pipelines, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.IO.Pipelines.10.0.0\lib\net462\System.IO.Pipelines.dll</HintPath>
     </Reference>
-    <Reference Include="System.Memory, Version=4.0.2.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Memory.4.6.0\lib\net462\System.Memory.dll</HintPath>
+    <Reference Include="System.Memory, Version=4.0.5.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.6.3\lib\net462\System.Memory.dll</HintPath>
     </Reference>
     <Reference Include="System.Numerics" />
-    <Reference Include="System.Numerics.Vectors, Version=4.1.5.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Numerics.Vectors.4.6.0\lib\net462\System.Numerics.Vectors.dll</HintPath>
+    <Reference Include="System.Numerics.Vectors, Version=4.1.6.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Numerics.Vectors.4.6.1\lib\net462\System.Numerics.Vectors.dll</HintPath>
     </Reference>
-    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.1.0\lib\net462\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.3.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.1.2\lib\net462\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
     </Reference>
-    <Reference Include="System.Text.Encodings.Web, Version=9.0.0.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Text.Encodings.Web.9.0.2\lib\net462\System.Text.Encodings.Web.dll</HintPath>
+    <Reference Include="System.Text.Encodings.Web, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Encodings.Web.10.0.0\lib\net462\System.Text.Encodings.Web.dll</HintPath>
     </Reference>
-    <Reference Include="System.Text.Json, Version=9.0.0.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Text.Json.9.0.2\lib\net462\System.Text.Json.dll</HintPath>
+    <Reference Include="System.Text.Json, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Json.10.0.0\lib\net462\System.Text.Json.dll</HintPath>
     </Reference>
-    <Reference Include="System.Threading.Channels, Version=9.0.0.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Threading.Channels.9.0.2\lib\net462\System.Threading.Channels.dll</HintPath>
+    <Reference Include="System.Threading.Channels, Version=10.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Channels.10.0.0\lib\net462\System.Threading.Channels.dll</HintPath>
     </Reference>
-    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.1.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.6.0\lib\net462\System.Threading.Tasks.Extensions.dll</HintPath>
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.4.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.6.3\lib\net462\System.Threading.Tasks.Extensions.dll</HintPath>
     </Reference>
     <Reference Include="System.Transactions" />
-    <Reference Include="System.ValueTuple, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
-      <HintPath>..\packages\System.ValueTuple.4.5.0\lib\net47\System.ValueTuple.dll</HintPath>
-    </Reference>
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -187,10 +186,20 @@
     <Reference Include="TaleWorlds.ScreenSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ScreenSystem.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.InputSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.InputSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.TwoDimension">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.TwoDimension.Standalone">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.TwoDimension.Standalone.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyHellscape.cs" />
     <Compile Include="CoopMod.cs" />
+    <Compile Include="CoopConnectionVM.cs" />
     <Compile Include="Lib\NoHarmony\NoHarmonyLoader.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -205,22 +214,69 @@
       <Project>{E474A5B5-3F73-46CB-B68C-E8FA5199950B}</Project>
       <Name>Common</Name>
     </ProjectReference>
-    <ProjectReference Include="..\Coop.Core\Coop.Core.csproj">
-      <Project>{442b73f2-b103-4ef6-8b4b-a2f36f169515}</Project>
-      <Name>Coop.Core</Name>
-    </ProjectReference>
     <ProjectReference Include="..\GameInterface\GameInterface.csproj">
       <Project>{D22CB8FA-40CC-4F47-986F-1C5A4415980B}</Project>
       <Name>GameInterface</Name>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <Content Include="ILLink\ILLink.Descriptors.LibraryBuild.xml" />
+    <ProjectReference Include="..\Coop.Core\Coop.Core.csproj">
+      <Project>{442B73F2-B103-4EF6-8B4B-A2F36F169515}</Project>
+      <Name>Coop.Core</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>powershell -ExecutionPolicy Unrestricted ^
-            -File "$(SolutionDir)..\deploy.ps1" -SolutionDir "$(SolutionDir)\" ^
-            -TargetDir "$(SolutionDir)Coop\bin\$(Configuration)\\"</PostBuildEvent>
+    <PostBuildEvent>if not exist "$(ProjectDir)..\..\..\Modules\Coop\bin\Win64_Shipping_Client" mkdir "$(ProjectDir)..\..\..\Modules\Coop\bin\Win64_Shipping_Client" &amp;&amp; copy /Y "$(TargetPath)" "$(ProjectDir)..\..\..\Modules\Coop\bin\Win64_Shipping_Client\" &amp;&amp; copy /Y "$(ProjectDir)..\Common\bin\$(Configuration)\netstandard2.0\Common.dll" "$(ProjectDir)..\..\..\Modules\Coop\bin\Win64_Shipping_Client\" &amp;&amp; copy /Y "$(ProjectDir)..\Coop.Core\bin\$(Configuration)\netstandard2.0\Coop.Core.dll" "$(ProjectDir)..\..\..\Modules\Coop\bin\Win64_Shipping_Client\" &amp;&amp; copy /Y "$(TargetDir)Serilog.dll" "$(ProjectDir)..\..\..\Modules\Coop\bin\Win64_Shipping_Client\" &amp;&amp; copy /Y "$(TargetDir)Serilog.Sinks.File.dll" "$(ProjectDir)..\..\..\Modules\Coop\bin\Win64_Shipping_Client\" &amp;&amp; copy /Y "$(TargetDir)Serilog.Sinks.Debug.dll" "$(ProjectDir)..\..\..\Modules\Coop\bin\Win64_Shipping_Client\" &amp;&amp; copy /Y "$(TargetDir)Serilog.Enrichers.Process.dll" "$(ProjectDir)..\..\..\Modules\Coop\bin\Win64_Shipping_Client\" &amp;&amp; copy /Y "$(TargetDir)0Harmony.dll" "$(ProjectDir)..\..\..\Modules\Coop\bin\Win64_Shipping_Client\"</PostBuildEvent>
   </PropertyGroup>
+  <Target Name="CopyToCoopModule" AfterTargets="Build" Condition="'$(SkipCopyToModule)' != 'true'">
+    <PropertyGroup>
+      <CoopModuleDir>F:\jeux\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Coop\bin\Win64_Shipping_Client</CoopModuleDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(ProjectDir)..\Common\bin\$(Configuration)\netstandard2.0\Common.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(ProjectDir)..\Coop.Core\bin\$(Configuration)\netstandard2.0\Coop.Core.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(ProjectDir)..\GameInterface\bin\$(Configuration)\netstandard2.0\GameInterface.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Serilog.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Serilog.Sinks.File.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Serilog.Sinks.Debug.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Serilog.Enrichers.Process.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)0Harmony.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Autofac.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)LiteNetLib.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Newtonsoft.Json.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)protobuf-net.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)protobuf-net.Core.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Mono.Cecil.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Mono.Cecil.Mdb.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Mono.Cecil.Pdb.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Mono.Cecil.Rocks.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)MonoMod.Backports.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)MonoMod.Core.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)MonoMod.Iced.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)MonoMod.ILHelpers.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)MonoMod.RuntimeDetour.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)MonoMod.Utils.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)Microsoft.Bcl.AsyncInterfaces.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.Buffers.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.Collections.Immutable.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.Diagnostics.DiagnosticSource.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.IO.Pipelines.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.Memory.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.Numerics.Vectors.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.Runtime.CompilerServices.Unsafe.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.Text.Encodings.Web.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.Text.Json.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.Threading.Channels.dll" DestinationFolder="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetDir)System.Threading.Tasks.Extensions.dll" DestinationFolder="$(CoopModuleDir)" />
+  </Target>
+  <Import Project="..\packages\Serilog.4.3.0\build\Serilog.targets" Condition="Exists('..\packages\Serilog.4.3.0\build\Serilog.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>Ce projet fait référence à des packages NuGet qui sont manquants sur cet ordinateur. Utilisez l'option de restauration des packages NuGet pour les télécharger. Pour plus d'informations, consultez http://go.microsoft.com/fwlink/?LinkID=322105. Le fichier manquant est : {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Serilog.4.3.0\build\Serilog.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Serilog.4.3.0\build\Serilog.targets'))" />
+    <Error Condition="!Exists('..\packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets'))" />
+  </Target>
+  <Import Project="..\packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets" Condition="Exists('..\packages\System.ValueTuple.4.6.1\build\net471\System.ValueTuple.targets')" />
 </Project>

@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
 using ProtoBuf;
 
@@ -16,6 +16,7 @@ public record NetworkPlayerData : IEvent
 
         if (playerData == null) return;
 
+        PlayerId = registrationData.ControllerId;
         HeroData = playerData.HeroData;
         HeroStringId = playerData.HeroStringId;
         PartyStringId = playerData.PartyStringId;

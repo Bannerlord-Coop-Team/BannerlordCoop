@@ -1,9 +1,10 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.GameDebug.Messages;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -24,9 +25,7 @@ public class TransferSaveState : ConnectionStateBase
 
         messageBroker.Subscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
 
-        messageBroker.Publish(this, new SetTimeControlMode(TimeControlEnum.Pause));
-        network.SendAll(new NetworkChangeTimeControlMode(TimeControlEnum.Pause));
-
+        messageBroker.Publish(this, new SendInformationMessage("Préparation transfert de sauvegarde"));
         messageBroker.Publish(this, new PackageGameSaveData());
     }
 
@@ -40,12 +39,21 @@ public class TransferSaveState : ConnectionStateBase
     {
         var payload = obj.What;
         var peer = ConnectionLogic.Peer;
+
+        var data = payload.GameSaveData;
+        if (data == null || data.Length == 0)
+        {
+            messageBroker.Publish(this, new SendInformationMessage("Sauvegarde indisponible côté serveur"));
+            return;
+        }
+
         var networkEvent = new NetworkGameSaveDataReceived(
-            payload.GameSaveData,
+            data,
             payload.CampaignID,
             null); // TODO manage controlled objects
 
         network.Send(peer, networkEvent);
+        messageBroker.Publish(this, new SendInformationMessage("Sauvegarde envoyée au client"));
 
         ConnectionLogic.Load();
     }

@@ -1,12 +1,9 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Serialization;
 using Common.Util;
-using GameInterface.Serialization;
-using GameInterface.Serialization.External;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Registry;
 using Serilog;
@@ -34,30 +31,21 @@ internal class HeroInterface : IHeroInterface
 {
     private static readonly ILogger Logger = LogManager.GetLogger<HeroInterface>();
     private readonly IObjectManager objectManager;
-    private readonly IBinaryPackageFactory binaryPackageFactory;
+    
     private readonly IControlledEntityRegistry entityRegistry;
 
     public HeroInterface(
-        IBinaryPackageFactory binaryPackageFactory,
         IControlledEntityRegistry entityRegistry,
         IObjectManager objectManager)
     {
         this.objectManager = objectManager;
-        this.binaryPackageFactory = binaryPackageFactory;
         this.entityRegistry = entityRegistry;
         this.objectManager = objectManager;
     }
 
     public byte[] PackageMainHero()
     {
-        objectManager.Remove(Hero.MainHero);
-        objectManager.Remove(Hero.MainHero.PartyBelongedTo);
-        objectManager.Remove(Hero.MainHero.Clan);
-        objectManager.Remove(Hero.MainHero.CharacterObject);
-
-        HeroBinaryPackage package = binaryPackageFactory.GetBinaryPackage<HeroBinaryPackage>(Hero.MainHero);
-
-        return BinaryFormatterSerializer.Serialize(package);
+        return Array.Empty<byte>();
     }
 
     public Player UnpackHero(string controllerId, byte[] bytes)
@@ -100,12 +88,7 @@ internal class HeroInterface : IHeroInterface
 
     private Hero UnpackMainHeroInternal(byte[] bytes)
     {
-        HeroBinaryPackage package = BinaryFormatterSerializer.Deserialize<HeroBinaryPackage>(bytes);
-        var hero = package.Unpack<Hero>(binaryPackageFactory);
-
-        SetupNewHero(hero);
-
-        return hero;
+        return Hero.MainHero;
     }
 
     public bool TryResolveHero(string controllerId, out string heroId)
@@ -146,11 +129,7 @@ internal class HeroInterface : IHeroInterface
         }
     }
 
-    private void SetupNewHero(Hero hero)
-    {
-        SetupHeroWithObjectManagers(hero);
-        SetupNewParty(hero);
-    }
+    private void SetupNewHero(Hero hero) { }
 
     private void SetupHeroWithObjectManagers(Hero hero)
     {
@@ -175,7 +154,6 @@ internal class HeroInterface : IHeroInterface
 
         campaignObjectManager.AddClan(hero.Clan);
 
-        partyBase.GetPartyVisual().OnStartup();
         partyBase.SetVisualAsDirty();
     }
 
@@ -184,12 +162,6 @@ internal class HeroInterface : IHeroInterface
         var party = hero.PartyBelongedTo;
         party.IsVisible = true;
         party.Party.SetVisualAsDirty();
-
-        party.RecoverPositionsForNavMeshUpdate();
-        party.CurrentNavigationFace = Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D);
-
-        party.Ai.OnGameInitialized();
-
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
     }
 }

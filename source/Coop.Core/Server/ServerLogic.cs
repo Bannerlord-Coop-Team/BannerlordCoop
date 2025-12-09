@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -56,6 +56,7 @@ public class ServerLogic : IServerLogic
 
     public void Start()
     {
+        Logger.Information("Server logic Start invoked");
         State.Start();
     }
 
@@ -68,6 +69,7 @@ public class ServerLogic : IServerLogic
     {
         TState newState = stateFactory.CreateServerState<TState>(this);
         State = newState;
+        Logger.Information("Server state set to {StateName}", typeof(TState).Name);
         return newState;
     }
 }

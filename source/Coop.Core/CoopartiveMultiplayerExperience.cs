@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Common.LogicStates;
 using Common.Messaging;
 using Common.Network;
@@ -17,6 +17,7 @@ namespace Coop.Core
 {
     public class CoopartiveMultiplayerExperience : IDisposable
     {
+        private static readonly Serilog.ILogger Logger = global::Common.Logging.LogManager.GetLogger<CoopartiveMultiplayerExperience>();
         private readonly IMessageBroker messageBroker;
         private INetworkConfiguration configuration;
         private IContainer container;
@@ -55,13 +56,15 @@ namespace Coop.Core
                 Port = connectMessage.Port,
             };
 
+            Logger.Information("Client join requested {Address}:{Port}", configuration.Address, configuration.Port);
+            messageBroker.Publish(this, new GameInterface.Services.GameDebug.Messages.SendInformationMessage($"Join requested {configuration.Address}:{configuration.Port}"));
             StartAsClient(configuration);
         }
 
         private void Handle(MessagePayload<HostSaveGame> obj)
         {
+            Logger.Information("Host requested with save {Save}", obj.What.SaveName);
             StartAsServer();
-
             messageBroker.Publish(this, new LoadGame(obj.What.SaveName));
         }
 
@@ -96,6 +99,7 @@ namespace Coop.Core
             network = container.Resolve<INetwork>();
 
             var logic = container.Resolve<ILogic>();
+            Logger.Information("Starting server logic");
             logic.Start();
         }
 
@@ -127,6 +131,8 @@ namespace Coop.Core
             network = container.Resolve<INetwork>();
 
             var logic = container.Resolve<ILogic>();
+            Logger.Information("Starting client logic");
+            messageBroker.Publish(this, new GameInterface.Services.GameDebug.Messages.SendInformationMessage("Starting client logic"));
             logic.Start();
         }
 

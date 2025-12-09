@@ -1,4 +1,4 @@
-﻿using GameInterface.AutoSync;
+using GameInterface.AutoSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
@@ -16,9 +16,7 @@ internal class MobilePartySync : IAutoSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty.HasUnpaidWages)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._disorganizedUntilTime)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._partySizeRatioLastCheckVersion)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._latestUsedPaymentRatio)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._cachedPartySizeRatio)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._cachedPartySizeLimit)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._doNotAttackMainParty)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._customHomeSettlement)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._isDisorganized)));

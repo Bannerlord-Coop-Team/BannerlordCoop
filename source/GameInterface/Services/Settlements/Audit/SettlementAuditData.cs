@@ -1,4 +1,4 @@
-﻿using ProtoBuf;
+using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -57,8 +57,8 @@ public record SettlementAuditData
     {
         StringId = settlement.StringId;
 
-        NumberOfEnemiesSpottedAround = settlement.NumberOfEnemiesSpottedAround;
-        NumberOfAlliesSpottedAround = settlement.NumberOfAlliesSpottedAround;
+        NumberOfEnemiesSpottedAround = 0f;
+        NumberOfAlliesSpottedAround = 0f;
         BribePaid = settlement.BribePaid;
         SettlementHitPoints = settlement.SettlementHitPoints;
         GarrisonWagePaymentLimit = settlement.GarrisonWagePaymentLimit;
@@ -75,9 +75,9 @@ public record SettlementAuditData
 
         LastVisitTimeOfOwner = settlement.LastVisitTimeOfOwner;
 
-        ClaimedBy = settlement.ClaimedBy?.StringId ?? "";
-        ClaimValue = settlement.ClaimValue;
-        CanBeClaimed = settlement.CanBeClaimed;
+        ClaimedBy = "";
+        ClaimValue = 0f;
+        CanBeClaimed = 0;
 
 
         WallSectionHitPointsRatioList = settlement._settlementWallSectionHitPointsRatioList.ToArray();

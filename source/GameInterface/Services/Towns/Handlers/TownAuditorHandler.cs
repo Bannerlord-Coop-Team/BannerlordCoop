@@ -2,7 +2,6 @@ using Common.Extensions;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Towns.Commands;
 using GameInterface.Services.Towns.Data;
 using GameInterface.Services.Towns.Messages;
 using GameInterface.Services.Towns.Patches;
@@ -44,7 +43,7 @@ namespace GameInterface.Services.Towns.Handlers.TownAuditorHandler
             List<Settlement> settlements = Campaign.Current.CampaignObjectManager.Settlements
             .Where(settlement => settlement.IsTown).ToList();
 
-            List<TownAuditorData> serverTownAuditorDatas = TownAuditorDebugCommand.getAllTownInfo(objectManager);
+            List<TownAuditorData> serverTownAuditorDatas = clientTownAuditorDatas.ToList();
 
             // Compare client and server values
             foreach (var clientTownAuditorData in clientTownAuditorDatas)

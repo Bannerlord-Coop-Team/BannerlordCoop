@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
@@ -8,7 +8,7 @@ namespace GameInterface.Services.Heroes.Handlers;
 
 internal class ResolveHeroHandler : IHandler
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<NewHeroHandler>();
+    private static readonly ILogger Logger = LogManager.GetLogger<ResolveHeroHandler>();
 
     private readonly IHeroInterface heroInterface;
     private readonly IMessageBroker messageBroker;

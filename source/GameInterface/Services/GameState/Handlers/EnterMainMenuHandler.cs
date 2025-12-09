@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface.Services.GameState.Interfaces;
 using GameInterface.Services.GameState.Messages;
 
@@ -24,10 +24,17 @@ internal class EnterMainMenuHandler : IHandler
 
     private void Handle(MessagePayload<EnterMainMenu> payload)
     {
+        bool hadGame = TaleWorlds.Core.Game.Current != null;
         gameStateInterface.EnterMainMenu();
 
-        messageBroker.Respond(payload.Who, new EnterMainMenuResponse());
+        if (hadGame)
+        {
+            messageBroker.Respond(payload.Who, new EnterMainMenuResponse());
+        }
 
-        messageBroker.Publish(this, new MainMenuEntered());
+        if (hadGame && !GameStateInterface.IsLoadingGame)
+        {
+            messageBroker.Publish(this, new MainMenuEntered());
+        }
     }
 }

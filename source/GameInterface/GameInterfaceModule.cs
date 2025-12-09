@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Autofac.Core;
 using Autofac.Core.Registration;
 using Autofac.Core.Resolving.Pipeline;
@@ -11,7 +11,6 @@ using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
 using GameInterface.Services.Time;
 using GameInterface.Surrogates;
 using HarmonyLib;
@@ -33,12 +32,15 @@ public class GameInterfaceModule : Module
 
         builder.RegisterType<SurrogateCollection>().As<ISurrogateCollection>().InstancePerLifetimeScope().AutoActivate();
 
-        builder.RegisterType<GameInterface>().As<IGameInterface>().InstancePerLifetimeScope().AutoActivate();
+        builder.RegisterType<GameInterface>()
+            .As<IGameInterface>()
+            .InstancePerLifetimeScope()
+            .OnActivated(e => e.Instance.PatchAll())
+            .AutoActivate();
         builder.RegisterType<BinaryPackageFactory>().As<IBinaryPackageFactory>().InstancePerLifetimeScope();
         builder.RegisterType<ControllerIdProvider>().As<IControllerIdProvider>().InstancePerLifetimeScope();
         builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
-        builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
 
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
 

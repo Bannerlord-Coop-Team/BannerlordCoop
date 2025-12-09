@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Network;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.GameDebug.Messages;
@@ -29,23 +29,24 @@ public class InitialServerState : ServerStateBase
 
     internal void Handle_GameLoaded(MessagePayload<CampaignReady> payload)
     {
-        // Start server when game is fully loaded
-        network.Start();
+        global::Common.Logging.LogManager.GetLogger<InitialServerState>().Information("Campaign ready");
 
-        // Remove server party
-        messageBroker.Publish(this, new RemoveMainParty());
-
-        // Register all objects after main party is removed to keep order
         messageBroker.Publish(this, new RegisterAllGameObjects());
 
-        // Change to server running state
+        global::Common.Logging.LogManager.GetLogger<InitialServerState>().Information("Switching to ServerRunningState");
         Logic.SetState<ServerRunningState>();
     }
 
     public override void Start()
     {
+        global::Common.Logging.LogManager.GetLogger<InitialServerState>().Information("InitialServerState Start, starting network listener");
+        network.Start();
+        if (network is Coop.Core.Common.Network.CoopNetworkBase nb)
+        {
+            messageBroker.Publish(this, new SendInformationMessage($"Serveur: écoute sur port {nb.Configuration.Port}"));
+        }
 #if DEBUG
-       messageBroker.Publish(this, new LoadDebugGame());
+        messageBroker.Publish(this, new LoadDebugGame());
 #endif
     }
 

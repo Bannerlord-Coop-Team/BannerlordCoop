@@ -52,14 +52,22 @@ internal class SettlementExitEnterHandler : IHandler
 
         if (objectManager.TryGetObject(payload.PartyId, out MobileParty mobileParty) == false)
         {
-            Logger.Error("PartyId not found: {id}", payload.PartyId);
-            return;
+            mobileParty = Campaign.Current?.CampaignObjectManager?.Find<MobileParty>(payload.PartyId);
+            if (mobileParty == null)
+            {
+                Logger.Error("PartyId not found: {id}", payload.PartyId);
+                return;
+            }
         }
 
         if (objectManager.TryGetObject(payload.SettlementId, out Settlement settlement) == false)
         {
-            Logger.Error("SettlementId not found: {id}", payload.SettlementId);
-            return;
+            settlement = Campaign.Current?.CampaignObjectManager?.Find<Settlement>(payload.SettlementId);
+            if (settlement == null)
+            {
+                Logger.Error("SettlementId not found: {id}", payload.SettlementId);
+                return;
+            }
         }
 
         EnterSettlementActionPatches.OverrideApplyForParty(mobileParty, settlement);
@@ -71,8 +79,12 @@ internal class SettlementExitEnterHandler : IHandler
 
         if (objectManager.TryGetObject(payload.PartyId, out MobileParty mobileParty) == false)
         {
-            Logger.Error("PartyId not found: {id}", payload.PartyId);
-            return;
+            mobileParty = Campaign.Current?.CampaignObjectManager?.Find<MobileParty>(payload.PartyId);
+            if (mobileParty == null)
+            {
+                Logger.Error("PartyId not found: {id}", payload.PartyId);
+                return;
+            }
         }
 
         LeaveSettlementActionPatches.OverrideApplyForParty(mobileParty);
@@ -84,14 +96,22 @@ internal class SettlementExitEnterHandler : IHandler
 
         if (objectManager.TryGetObject(payload.PartyId, out MobileParty mobileParty) == false)
         {
-            Logger.Error("PartyId not found: {id}", payload.PartyId);
-            return;
+            mobileParty = Campaign.Current?.CampaignObjectManager?.Find<MobileParty>(payload.PartyId);
+            if (mobileParty == null)
+            {
+                Logger.Error("PartyId not found: {id}", payload.PartyId);
+                return;
+            }
         }
 
         if (objectManager.TryGetObject(payload.SettlementId, out Settlement settlement) == false)
         {
-            Logger.Error("SettlementId not found: {id}", payload.SettlementId);
-            return;
+            settlement = Campaign.Current?.CampaignObjectManager?.Find<Settlement>(payload.SettlementId);
+            if (settlement == null)
+            {
+                Logger.Error("SettlementId not found: {id}", payload.SettlementId);
+                return;
+            }
         }
 
         var settlementParty = settlement.Party;

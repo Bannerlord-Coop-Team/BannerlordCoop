@@ -20,7 +20,14 @@ namespace GameInterface.Services.UI
             };
             AddLayer(_gauntletLayer);
             _gauntletLayer.InputRestrictions.SetInputRestrictions();
-            _gauntletMovie = _gauntletLayer.LoadMovie("CoopConnectionUIMovie", _dataSource);
+            try
+            {
+                _gauntletMovie = _gauntletLayer.LoadMovie("CoopConnectionUIMovie", _dataSource);
+            }
+            catch
+            {
+                TaleWorlds.Library.InformationManager.DisplayMessage(new TaleWorlds.Library.InformationMessage("Erreur UI: CoopConnectionUIMovie introuvable"));
+            }
         }
 
         protected override void OnActivate()

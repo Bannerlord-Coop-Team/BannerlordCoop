@@ -1,6 +1,7 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
 using LiteNetLib;
+using GameInterface.Services.GameDebug.Messages;
 
 namespace Coop.Core.Server.Connections.States;
 
@@ -30,6 +31,7 @@ public class LoadingState : ConnectionStateBase
 
         if (playerId == ConnectionLogic.Peer)
         {
+            messageBroker.Publish(this, new SendInformationMessage("Client a rejoint la campagne"));
             ConnectionLogic.EnterCampaign();
             messageBroker.Publish(this, new PlayerCampaignEntered(playerId));
         }

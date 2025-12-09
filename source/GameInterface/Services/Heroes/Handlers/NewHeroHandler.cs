@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes.Interfaces;
@@ -36,6 +36,7 @@ internal class NewHeroHandler : IHandler
     {
         byte[] bytes = heroInterface.PackageMainHero();
         messageBroker.Publish(this, new NewHeroPackaged(bytes));
+        messageBroker.Publish(this, new GameInterface.Services.CharacterCreation.Messages.NewHeroPackaged(bytes));
     }
 
     private void Handle(MessagePayload<RegisterNewPlayerHero> obj)
@@ -48,7 +49,7 @@ internal class NewHeroHandler : IHandler
 
         Logger.Debug("New Hero ID: {id}", playerData.HeroStringId);
 
-        var registerMessage = new NewPlayerHeroRegistered(sendingPeer, playerData);
+        var registerMessage = new NewPlayerHeroRegistered(sendingPeer, controllerId, playerData);
 
         messageBroker.Publish(this, registerMessage);
     }

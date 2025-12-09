@@ -1,7 +1,8 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface.Services.UI.Messages;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using TaleWorlds.Library;
 using TaleWorlds.ScreenSystem;
 
@@ -18,7 +19,7 @@ namespace GameInterface.Services.UI
         public string PortText => "Port:";
         public string PasswordText => "Password:";
 
-        public string connectIP = "bannerlordcoop.duckdns.org";
+        public string connectIP = "127.0.0.1";
 
         public string connectPort = "4200";
 
@@ -94,8 +95,15 @@ namespace GameInterface.Services.UI
                 return;
             }
 
-            IPAddress ip = hostEntry.AddressList.First();
+            IPAddress ip = hostEntry.AddressList.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork);
 
+            if (ip == null)
+            {
+                InformationManager.DisplayMessage(new InformationMessage("ERROR: No IPv4 address found for host"));
+                return;
+            }
+
+            InformationManager.DisplayMessage(new InformationMessage($"Attempting join to {ip}:{port}"));
             MessageBroker.Instance.Publish(this, new AttemptJoin(ip, port));
         }
 

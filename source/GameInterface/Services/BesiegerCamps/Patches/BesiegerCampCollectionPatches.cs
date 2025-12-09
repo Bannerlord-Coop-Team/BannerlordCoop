@@ -11,7 +11,7 @@ namespace GameInterface.Services.BesiegerCamps.Patches
     [HarmonyPatch]
     internal class BesiegerCampCollectionPatches : GenericCollectionPatches<BesiegerCampCollectionPatches, BesiegerCamp>
     {
-        private static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(BesiegerCamp));
+        private new static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(BesiegerCamp));
 
         [HarmonyTranspiler]
         private static IEnumerable<CodeInstruction> BesiegerPartiesTranspiler(IEnumerable<CodeInstruction> instructions)

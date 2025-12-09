@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Patches;
@@ -19,7 +19,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 internal class MobilePartyDataPatches
 {
 
-    private static readonly ILogger Logger = LogManager.GetLogger<HeroFieldPatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyDataPatches>();
 
     private static IEnumerable<MethodBase> TargetMethods()
     {

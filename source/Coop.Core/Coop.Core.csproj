@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -48,23 +48,35 @@
     <TreatWarningsAsErrors>False</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <Compile Remove="Client\Services\Towns\**\*.cs" />
     <Compile Remove="Server\Services\Armies\Messages\**" />
-    <Compile Remove="Server\Services\Kingdoms\Messages\**" />
-    <EmbeddedResource Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <Compile Remove="Server\Services\Heroes\**\*.cs" />
+    <Compile Remove="Server\Services\TroopRosters\**\*.cs" />
+    <EmbeddedResource Remove="Client\Services\Settlements\**\*.cs" />
+    <EmbeddedResource Remove="Client\Services\Towns\**\*.cs" />
     <EmbeddedResource Remove="Server\Services\Armies\Messages\**" />
-    <EmbeddedResource Remove="Server\Services\Kingdoms\Messages\**" />
-    <None Remove="Client\Services\MobileParties\Messages\Data\**" />
+    <EmbeddedResource Remove="Server\Services\Settlements\**\*.cs" />
+    <EmbeddedResource Remove="Server\Services\Towns\**\*.cs" />
+    <EmbeddedResource Remove="Server\Services\Heroes\**\*.cs" />
+    <EmbeddedResource Remove="Server\Services\TroopRosters\**\*.cs" />
+    <None Remove="Client\Services\Settlements\**\*.cs" />
+    <None Remove="Client\Services\Towns\**\*.cs" />
     <None Remove="Server\Services\Armies\Messages\**" />
-    <None Remove="Server\Services\Kingdoms\Messages\**" />
+    <None Remove="Server\Services\Settlements\**\*.cs" />
+    <None Remove="Server\Services\Towns\**\*.cs" />
+    <None Remove="Server\Services\Heroes\**\*.cs" />
+    <None Remove="Server\Services\TroopRosters\**\*.cs" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Autofac" Version="8.2.0" />
+    <Compile Remove="Client\Services\TroopRosters\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Autofac" Version="9.0.0" />
     <PackageReference Include="Krafs.Publicizer" Version="2.3.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="System.Collections.Immutable" Version="9.0.2" />
+    <PackageReference Include="System.Collections.Immutable" Version="10.0.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
@@ -91,8 +103,6 @@
 	</AssemblyAttribute>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Server\Services\Kingdoms\Messages\NetworkAddDecision.cs" />
-    <Compile Include="Server\Services\Kingdoms\Messages\NetworkRemoveDecision.cs" />
   </ItemGroup>
   <ItemGroup>
 	  <Reference Include="TaleWorlds.Library">
@@ -102,4 +112,11 @@
   <ItemGroup>
     <Publicize Include="TaleWorlds.Library" />
   </ItemGroup>
+  <Target Name="CopyToCoopModule" AfterTargets="Build">
+    <PropertyGroup>
+      <CoopModuleDir>F:\jeux\Steam\steamapps\common\Mount &amp; Blade II Bannerlord\Modules\Coop\bin\Win64_Shipping_Client</CoopModuleDir>
+    </PropertyGroup>
+    <MakeDir Directories="$(CoopModuleDir)" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(CoopModuleDir)" />
+  </Target>
 </Project>

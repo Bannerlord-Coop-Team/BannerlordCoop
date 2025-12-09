@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
@@ -6,10 +6,13 @@ using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.Services.GameDebug.Messages;
 using GameInterface;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
 using LiteNetLib;
+using LiteNetLib.Utils;
+using System.Text;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -59,6 +62,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         // Netmanager initialization
         netManager.NatPunchEnabled = true;
         netManager.NatPunchModule.Init(this);
+        netManager.UnconnectedMessagesEnabled = true;
 
         controllerIdProvider.SetControllerId(ServerControllerId);
     }
@@ -73,17 +77,21 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     {
         if (allowJoining)
         {
+            Logger.Information("Connection request accepted from {Remote}", request.RemoteEndPoint);
             request.Accept();
+            messageBroker.Publish(this, new SendInformationMessage($"Connexion acceptée: {request.RemoteEndPoint}"));
         }
         else
         {
+            Logger.Warning("Connection request rejected from {Remote} (joining disabled)", request.RemoteEndPoint);
             request.Reject();
+            messageBroker.Publish(this, new SendInformationMessage($"Connexion refusée: {request.RemoteEndPoint} (joining désactivé)"));
         }
     }
 
     public void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
     {
-        throw new NotImplementedException();
+        Logger.Warning("NAT introduction request from {Local} to {Remote} token {Token}", localEndPoint, remoteEndPoint, token);
     }
 
     public void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
@@ -93,7 +101,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
     {
-        throw new NotImplementedException();
+        Logger.Error("Network error {SocketError} at {EndPoint}", socketError, endPoint);
     }
 
     public override void OnNetworkLatencyUpdate(NetPeer peer, int latency)
@@ -109,19 +117,34 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
-        throw new NotImplementedException();
+        var data = reader.GetRemainingBytes();
+        var text = Encoding.UTF8.GetString(data);
+        if (messageType == UnconnectedMessageType.BasicMessage && text == "CoopPing")
+        {
+            var writer = new NetDataWriter();
+            writer.Put("CoopPong");
+            netManager.SendUnconnectedMessage(writer, remoteEndPoint);
+            return;
+        }
+        Logger.Warning("Unconnected message {MessageType} from {RemoteEndPoint}", messageType, remoteEndPoint);
+        messageBroker.Publish(this, new SendInformationMessage($"Paquet non-connecté: {messageType} de {remoteEndPoint}"));
     }
 
     public override void OnPeerConnected(NetPeer peer)
     {
+        Logger.Information("Peer connected {Peer}", peer);
         PlayerConnected message = new PlayerConnected(peer);
         messageBroker.Publish(this, message);
+        messageBroker.Publish(this, new SendInformationMessage($"Client connecté: {peer.Address}"));
+        try { GameInterface.Services.Naval.NavalRuntime.ClientCount++; } catch {}
     }
 
     public override void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo)
     {
         PlayerDisconnected message = new PlayerDisconnected(peer, disconnectInfo);
         messageBroker.Publish(this, message);
+        messageBroker.Publish(this, new SendInformationMessage($"Client déconnecté: {peer.Address} ({disconnectInfo.Reason})"));
+        try { if (GameInterface.Services.Naval.NavalRuntime.ClientCount > 0) GameInterface.Services.Naval.NavalRuntime.ClientCount--; } catch {}
     }
 
     public override void Update(TimeSpan frameTime)
@@ -132,7 +155,20 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void Start()
     {
-        netManager.Start(Configuration.Port);
+        Logger.Information("CoopServer starting on port {Port}", Configuration.Port);
+        var started = netManager.Start(Configuration.Port);
+        if (started)
+        {
+            messageBroker.Publish(this, new SendInformationMessage($"Serveur: écoute sur port {Configuration.Port}"));
+            allowJoining = true;
+            Logger.Information("Joining enabled (startup)");
+            messageBroker.Publish(this, new SendInformationMessage("Connexions activées"));
+        }
+        else
+        {
+            Logger.Error("Failed to start server on port {Port}", Configuration.Port);
+            messageBroker.Publish(this, new SendInformationMessage($"Échec démarrage serveur sur port {Configuration.Port}"));
+        }
     }
 
     public override void SendAll(IPacket packet)
@@ -167,5 +203,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
         allowJoining = true;
+        Logger.Information("All game objects registered; joining enabled");
+        messageBroker.Publish(this, new SendInformationMessage("Serveur prêt: connexions activées"));
     }
 }

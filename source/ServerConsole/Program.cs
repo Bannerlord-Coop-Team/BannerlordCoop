@@ -1,10 +1,11 @@
-﻿using IntroServer.Config;
+using IntroServer.Config;
 using IntroServer.Server;
 using LiteNetLib;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using Serilog.Events;
 using ILogger = Serilog.ILogger;
 
 namespace ServerConsole
@@ -19,13 +20,15 @@ namespace ServerConsole
 
         private static async Task Main()
 		{
-			Logger = new LoggerConfiguration()
-				.WriteTo.Console(
-					outputTemplate:
-					"[{Timestamp:HH:mm:ss} {Level:u3} ({SourceContext})] {Message:lj}{NewLine}{Exception}")
-				.MinimumLevel.Verbose()
-				.CreateLogger()
-				.ForContext<Program>();
+            Logger = new LoggerConfiguration()
+                .WriteTo.Console(
+                    outputTemplate:
+                    "[{Timestamp:HH:mm:ss} {Level:u3} ({SourceContext})] {Message:lj}{NewLine}{Exception}")
+                .MinimumLevel.Verbose()
+                .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
+                .MinimumLevel.Override("System", LogEventLevel.Warning)
+                .CreateLogger()
+                .ForContext<Program>();
 			try
             {
                 Logger.Verbose("Building Network Configuration");
@@ -37,7 +40,11 @@ namespace ServerConsole
                 var config = configurationBuilder
                     .Build()
                     .Get<NetworkConfiguration>(options => 
-                        options.BindNonPublicProperties = true)!;
+                        options.BindNonPublicProperties = true);
+
+                config ??= new NetworkConfiguration();
+                Logger.Information("Configuration réseau utilisée: NAT={NAT}, LAN={Lan}:{LanPort}, WAN_PORT={WanPort}",
+                    config.NATType, config.LanAddress, config.LanPort, config.WanPort);
 
                 await using var provider = new ServiceCollection()
                     .AddTransient<MissionTestServer>()

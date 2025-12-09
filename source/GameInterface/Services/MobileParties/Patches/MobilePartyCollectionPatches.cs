@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Utils;
 using HarmonyLib;
 using System.Collections.Generic;
@@ -10,7 +10,7 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch]
 internal class MobilePartyCollectionPatches : GenericCollectionPatches<MobilePartyCollectionPatches, MobileParty>
 {
-    static IEnumerable<MethodBase> TargetMethods()
+    new static IEnumerable<MethodBase> TargetMethods()
     {
         return AccessTools.GetDeclaredMethods(typeof(MobileParty));
     }

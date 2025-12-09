@@ -1,52 +1,124 @@
 ﻿using HarmonyLib;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Stances.Patches
 {
-    /// <summary>
-    /// Disables all functionality for <see cref="FactionManager"/>
-    /// </summary>
-    [HarmonyPatch(typeof(FactionManager))]
-    internal class FactionManagerPatches
+    [HarmonyPatch]
+    internal class FactionManager_AddStance_Patch
     {
-        [HarmonyPatch("AddStance")]
+        private static bool Prepare()
+        {
+            return AccessTools.Method(typeof(FactionManager), "AddStance") != null;
+        }
+
+        private static MethodBase TargetMethod()
+        {
+            return AccessTools.Method(typeof(FactionManager), "AddStance");
+        }
+
         [HarmonyPrefix]
-        private static bool AddStancePrefix()
+        private static bool Prefix()
         {
             return true;
         }
+    }
 
-        [HarmonyPatch("RemoveStance")]
+    [HarmonyPatch]
+    internal class FactionManager_RemoveStance_Patch
+    {
+        private static bool Prepare()
+        {
+            return AccessTools.Method(typeof(FactionManager), "RemoveStance") != null;
+        }
+
+        private static MethodBase TargetMethod()
+        {
+            return AccessTools.Method(typeof(FactionManager), "RemoveStance");
+        }
+
         [HarmonyPrefix]
-        private static bool RemoveStancePrefix()
+        private static bool Prefix()
         {
             return false;
         }
+    }
 
-        [HarmonyPatch("SetStance")]
+    [HarmonyPatch]
+    internal class FactionManager_SetStance_Patch
+    {
+        private static bool Prepare()
+        {
+            return AccessTools.Method(typeof(FactionManager), "SetStance") != null;
+        }
+
+        private static MethodBase TargetMethod()
+        {
+            return AccessTools.Method(typeof(FactionManager), "SetStance");
+        }
+
         [HarmonyPrefix]
-        private static bool SetStancePrefix()
+        private static bool Prefix()
         {
             return false;
         }
+    }
 
-        [HarmonyPatch("DeclareAlliance")]
+    [HarmonyPatch]
+    internal class FactionManager_DeclareAlliance_Patch
+    {
+        private static bool Prepare()
+        {
+            return AccessTools.Method(typeof(FactionManager), "DeclareAlliance") != null;
+        }
+
+        private static MethodBase TargetMethod()
+        {
+            return AccessTools.Method(typeof(FactionManager), "DeclareAlliance");
+        }
+
         [HarmonyPrefix]
-        private static bool DeclareAlliancePrefix()
+        private static bool Prefix()
         {
             return false;
         }
+    }
 
-        [HarmonyPatch("DeclareWar")]
+    [HarmonyPatch]
+    internal class FactionManager_DeclareWar_Patch
+    {
+        private static bool Prepare()
+        {
+            return AccessTools.Method(typeof(FactionManager), "DeclareWar") != null;
+        }
+
+        private static MethodBase TargetMethod()
+        {
+            return AccessTools.Method(typeof(FactionManager), "DeclareWar");
+        }
+
         [HarmonyPrefix]
-        private static bool DeclareWarPrefix()
+        private static bool Prefix()
         {
             return false;
         }
+    }
 
-        [HarmonyPatch("SetNeutral")]
+    [HarmonyPatch]
+    internal class FactionManager_SetNeutral_Patch
+    {
+        private static bool Prepare()
+        {
+            return AccessTools.Method(typeof(FactionManager), "SetNeutral") != null;
+        }
+
+        private static MethodBase TargetMethod()
+        {
+            return AccessTools.Method(typeof(FactionManager), "SetNeutral");
+        }
+
         [HarmonyPrefix]
-        private static bool SetNeutralPrefix()
+        private static bool Prefix()
         {
             return false;
         }

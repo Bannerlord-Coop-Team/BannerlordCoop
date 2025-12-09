@@ -1,0 +1,579 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v8.0",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v8.0": {
+      "ILSpy.BamlDecompiler.Plugin/1.0.0": {
+        "dependencies": {
+          "ICSharpCode.BamlDecompiler": "8.0.0-noversion",
+          "ICSharpCode.Decompiler": "8.0.0-noversion",
+          "ILSpy": "1.0.0",
+          "TomsToolbox.Composition.Analyzer": "2.22.0"
+        },
+        "runtime": {
+          "ILSpy.BamlDecompiler.Plugin.dll": {}
+        }
+      },
+      "AvalonEdit/6.3.1.120": {
+        "runtime": {
+          "lib/net8.0-windows7.0/ICSharpCode.AvalonEdit.dll": {
+            "assemblyVersion": "6.3.1.120",
+            "fileVersion": "6.3.1.120"
+          }
+        }
+      },
+      "DataGridExtensions/2.6.0": {
+        "dependencies": {
+          "Microsoft.Xaml.Behaviors.Wpf": "1.1.135"
+        },
+        "runtime": {
+          "lib/net8.0-windows7.0/DataGridExtensions.dll": {
+            "assemblyVersion": "2.6.0.0",
+            "fileVersion": "2.6.0.0"
+          }
+        }
+      },
+      "Dirkster.AvalonDock/4.72.1": {
+        "runtime": {
+          "lib/net5.0-windows7.0/AvalonDock.dll": {
+            "assemblyVersion": "4.72.1.0",
+            "fileVersion": "4.72.1.0"
+          }
+        },
+        "resources": {
+          "lib/net5.0-windows7.0/ca-ES/AvalonDock.resources.dll": {
+            "locale": "ca-ES"
+          },
+          "lib/net5.0-windows7.0/cs-CZ/AvalonDock.resources.dll": {
+            "locale": "cs-CZ"
+          },
+          "lib/net5.0-windows7.0/de/AvalonDock.resources.dll": {
+            "locale": "de"
+          },
+          "lib/net5.0-windows7.0/es/AvalonDock.resources.dll": {
+            "locale": "es"
+          },
+          "lib/net5.0-windows7.0/fr/AvalonDock.resources.dll": {
+            "locale": "fr"
+          },
+          "lib/net5.0-windows7.0/hu/AvalonDock.resources.dll": {
+            "locale": "hu"
+          },
+          "lib/net5.0-windows7.0/it/AvalonDock.resources.dll": {
+            "locale": "it"
+          },
+          "lib/net5.0-windows7.0/ja/AvalonDock.resources.dll": {
+            "locale": "ja"
+          },
+          "lib/net5.0-windows7.0/ko/AvalonDock.resources.dll": {
+            "locale": "ko"
+          },
+          "lib/net5.0-windows7.0/nl-BE/AvalonDock.resources.dll": {
+            "locale": "nl-BE"
+          },
+          "lib/net5.0-windows7.0/pl/AvalonDock.resources.dll": {
+            "locale": "pl"
+          },
+          "lib/net5.0-windows7.0/pt/AvalonDock.resources.dll": {
+            "locale": "pt"
+          },
+          "lib/net5.0-windows7.0/ro/AvalonDock.resources.dll": {
+            "locale": "ro"
+          },
+          "lib/net5.0-windows7.0/ru/AvalonDock.resources.dll": {
+            "locale": "ru"
+          },
+          "lib/net5.0-windows7.0/sv/AvalonDock.resources.dll": {
+            "locale": "sv"
+          },
+          "lib/net5.0-windows7.0/zh-Hans/AvalonDock.resources.dll": {
+            "locale": "zh-Hans"
+          },
+          "lib/net5.0-windows7.0/zh-Hant/AvalonDock.resources.dll": {
+            "locale": "zh-Hant"
+          }
+        }
+      },
+      "Dirkster.AvalonDock.Themes.VS2013/4.72.1": {
+        "dependencies": {
+          "Dirkster.AvalonDock": "4.72.1"
+        },
+        "runtime": {
+          "lib/net5.0-windows7.0/AvalonDock.Themes.VS2013.dll": {
+            "assemblyVersion": "4.72.1.0",
+            "fileVersion": "4.72.1.0"
+          }
+        }
+      },
+      "K4os.Compression.LZ4/1.3.8": {
+        "runtime": {
+          "lib/net6.0/K4os.Compression.LZ4.dll": {
+            "assemblyVersion": "1.3.8.0",
+            "fileVersion": "1.3.8.0"
+          }
+        }
+      },
+      "McMaster.Extensions.CommandLineUtils/4.1.1": {
+        "dependencies": {
+          "System.ComponentModel.Annotations": "5.0.0"
+        },
+        "runtime": {
+          "lib/netstandard2.1/McMaster.Extensions.CommandLineUtils.dll": {
+            "assemblyVersion": "4.1.1.0",
+            "fileVersion": "4.1.1.0"
+          }
+        }
+      },
+      "Microsoft.Extensions.DependencyInjection/8.0.1": {
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2"
+        },
+        "runtime": {
+          "lib/net8.0/Microsoft.Extensions.DependencyInjection.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.1024.46610"
+          }
+        }
+      },
+      "Microsoft.Extensions.DependencyInjection.Abstractions/8.0.2": {
+        "runtime": {
+          "lib/net8.0/Microsoft.Extensions.DependencyInjection.Abstractions.dll": {
+            "assemblyVersion": "8.0.0.0",
+            "fileVersion": "8.0.1024.46610"
+          }
+        }
+      },
+      "Microsoft.Xaml.Behaviors.Wpf/1.1.135": {
+        "runtime": {
+          "lib/net6.0-windows7.0/Microsoft.Xaml.Behaviors.dll": {
+            "assemblyVersion": "1.1.0.0",
+            "fileVersion": "1.1.135.29210"
+          }
+        }
+      },
+      "Mono.Cecil/0.11.6": {
+        "runtime": {
+          "lib/netstandard2.0/Mono.Cecil.Mdb.dll": {
+            "assemblyVersion": "0.11.6.0",
+            "fileVersion": "0.11.6.0"
+          },
+          "lib/netstandard2.0/Mono.Cecil.Pdb.dll": {
+            "assemblyVersion": "0.11.6.0",
+            "fileVersion": "0.11.6.0"
+          },
+          "lib/netstandard2.0/Mono.Cecil.Rocks.dll": {
+            "assemblyVersion": "0.11.6.0",
+            "fileVersion": "0.11.6.0"
+          },
+          "lib/netstandard2.0/Mono.Cecil.dll": {
+            "assemblyVersion": "0.11.6.0",
+            "fileVersion": "0.11.6.0"
+          }
+        }
+      },
+      "NaturalSort.Extension/4.3.0": {
+        "runtime": {
+          "lib/net8.0/NaturalSort.Extension.dll": {
+            "assemblyVersion": "4.0.0.0",
+            "fileVersion": "4.3.0.0"
+          }
+        }
+      },
+      "System.Collections.Immutable/9.0.4": {
+        "runtime": {
+          "lib/net8.0/System.Collections.Immutable.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.425.16305"
+          }
+        }
+      },
+      "System.ComponentModel.Annotations/5.0.0": {},
+      "System.Composition.AttributedModel/9.0.4": {
+        "runtime": {
+          "lib/net8.0/System.Composition.AttributedModel.dll": {
+            "assemblyVersion": "9.0.0.4",
+            "fileVersion": "9.0.425.16305"
+          }
+        }
+      },
+      "System.Reflection.Metadata/9.0.4": {
+        "dependencies": {
+          "System.Collections.Immutable": "9.0.4"
+        },
+        "runtime": {
+          "lib/net8.0/System.Reflection.Metadata.dll": {
+            "assemblyVersion": "9.0.0.0",
+            "fileVersion": "9.0.425.16305"
+          }
+        }
+      },
+      "System.Runtime.CompilerServices.Unsafe/6.1.2": {},
+      "TomsToolbox.Composition/2.22.0": {
+        "dependencies": {
+          "TomsToolbox.Essentials": "2.22.0"
+        },
+        "runtime": {
+          "lib/net8.0/TomsToolbox.Composition.dll": {
+            "assemblyVersion": "2.22.0.0",
+            "fileVersion": "2.22.0.0"
+          }
+        }
+      },
+      "TomsToolbox.Composition.Analyzer/2.22.0": {},
+      "TomsToolbox.Composition.MicrosoftExtensions/2.22.0": {
+        "dependencies": {
+          "Microsoft.Extensions.DependencyInjection": "8.0.1",
+          "TomsToolbox.Composition": "2.22.0"
+        },
+        "runtime": {
+          "lib/net8.0/TomsToolbox.Composition.MicrosoftExtensions.dll": {
+            "assemblyVersion": "2.22.0.0",
+            "fileVersion": "2.22.0.0"
+          }
+        }
+      },
+      "TomsToolbox.Essentials/2.22.0": {
+        "runtime": {
+          "lib/net8.0/TomsToolbox.Essentials.dll": {
+            "assemblyVersion": "2.22.0.0",
+            "fileVersion": "2.22.0.0"
+          }
+        }
+      },
+      "TomsToolbox.ObservableCollections/2.22.0": {
+        "dependencies": {
+          "TomsToolbox.Essentials": "2.22.0"
+        },
+        "runtime": {
+          "lib/net8.0/TomsToolbox.ObservableCollections.dll": {
+            "assemblyVersion": "2.22.0.0",
+            "fileVersion": "2.22.0.0"
+          }
+        }
+      },
+      "TomsToolbox.Wpf/2.22.0": {
+        "dependencies": {
+          "Microsoft.Xaml.Behaviors.Wpf": "1.1.135",
+          "TomsToolbox.Essentials": "2.22.0",
+          "TomsToolbox.ObservableCollections": "2.22.0"
+        },
+        "runtime": {
+          "lib/net8.0-windows7.0/TomsToolbox.Wpf.dll": {
+            "assemblyVersion": "2.22.0.0",
+            "fileVersion": "2.22.0.0"
+          }
+        }
+      },
+      "TomsToolbox.Wpf.Composition/2.22.0": {
+        "dependencies": {
+          "Microsoft.Xaml.Behaviors.Wpf": "1.1.135",
+          "TomsToolbox.Composition": "2.22.0",
+          "TomsToolbox.Essentials": "2.22.0",
+          "TomsToolbox.Wpf": "2.22.0"
+        },
+        "runtime": {
+          "lib/net8.0-windows7.0/TomsToolbox.Wpf.Composition.dll": {
+            "assemblyVersion": "2.22.0.0",
+            "fileVersion": "2.22.0.0"
+          }
+        }
+      },
+      "TomsToolbox.Wpf.Composition.AttributedModel/2.22.0": {
+        "dependencies": {
+          "System.Composition.AttributedModel": "9.0.4",
+          "TomsToolbox.Wpf.Composition": "2.22.0"
+        },
+        "runtime": {
+          "lib/net8.0-windows7.0/TomsToolbox.Wpf.Composition.AttributedModel.dll": {
+            "assemblyVersion": "2.22.0.0",
+            "fileVersion": "2.22.0.0"
+          }
+        }
+      },
+      "TomsToolbox.Wpf.Styles/2.22.0": {
+        "dependencies": {
+          "Microsoft.Xaml.Behaviors.Wpf": "1.1.135",
+          "TomsToolbox.Essentials": "2.22.0",
+          "TomsToolbox.Wpf": "2.22.0"
+        },
+        "runtime": {
+          "lib/net8.0-windows7.0/TomsToolbox.Wpf.Styles.dll": {
+            "assemblyVersion": "2.22.0.0",
+            "fileVersion": "2.22.0.0"
+          }
+        }
+      },
+      "ICSharpCode.BamlDecompiler/8.0.0-noversion": {
+        "dependencies": {
+          "ICSharpCode.Decompiler": "8.0.0-noversion"
+        },
+        "runtime": {
+          "ICSharpCode.BamlDecompiler.dll": {
+            "assemblyVersion": "8.0.0-noversion",
+            "fileVersion": "0.0.0.0"
+          }
+        }
+      },
+      "ICSharpCode.Decompiler/8.0.0-noversion": {
+        "dependencies": {
+          "System.Collections.Immutable": "9.0.4",
+          "System.Reflection.Metadata": "9.0.4"
+        },
+        "runtime": {
+          "ICSharpCode.Decompiler.dll": {
+            "assemblyVersion": "8.0.0-noversion",
+            "fileVersion": "9.1.0.7988"
+          }
+        }
+      },
+      "ICSharpCode.ILSpyX/8.0.0-noversion": {
+        "dependencies": {
+          "ICSharpCode.Decompiler": "8.0.0-noversion",
+          "K4os.Compression.LZ4": "1.3.8",
+          "Mono.Cecil": "0.11.6",
+          "System.Composition.AttributedModel": "9.0.4",
+          "System.Reflection.Metadata": "9.0.4",
+          "System.Runtime.CompilerServices.Unsafe": "6.1.2"
+        },
+        "runtime": {
+          "ICSharpCode.ILSpyX.dll": {
+            "assemblyVersion": "8.0.0-noversion",
+            "fileVersion": "9.1.0.7988"
+          }
+        }
+      },
+      "ILSpy/1.0.0": {
+        "dependencies": {
+          "AvalonEdit": "6.3.1.120",
+          "DataGridExtensions": "2.6.0",
+          "Dirkster.AvalonDock.Themes.VS2013": "4.72.1",
+          "ICSharpCode.Decompiler": "8.0.0-noversion",
+          "ICSharpCode.ILSpyX": "8.0.0-noversion",
+          "McMaster.Extensions.CommandLineUtils": "4.1.1",
+          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
+          "Microsoft.Xaml.Behaviors.Wpf": "1.1.135",
+          "NaturalSort.Extension": "4.3.0",
+          "TomsToolbox.Composition.MicrosoftExtensions": "2.22.0",
+          "TomsToolbox.Wpf.Composition.AttributedModel": "2.22.0",
+          "TomsToolbox.Wpf.Styles": "2.22.0"
+        },
+        "runtime": {
+          "ILSpy.dll": {
+            "assemblyVersion": "1.0.0",
+            "fileVersion": "9.1.0.7988"
+          }
+        },
+        "resources": {
+          "zh-Hans/ILSpy.resources.dll": {
+            "locale": "zh-Hans"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "ILSpy.BamlDecompiler.Plugin/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "AvalonEdit/6.3.1.120": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-6ASBKPzAg64BLDlFOJo4Ypr1sA/6hB5+TfHLJaZYUSTE0jgxvKlVqKeo/ISTG9qEMxu604qUu6BGugmJkfdrNw==",
+      "path": "avalonedit/6.3.1.120",
+      "hashPath": "avalonedit.6.3.1.120.nupkg.sha512"
+    },
+    "DataGridExtensions/2.6.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-9unJ/zHoO086RhY7kYRwHfUIJqAxUr1E4g+yeVuWGVxphgNg5i6ip1qM5FW95NeG0f6fNfHu1dcjnxa4vcBJmw==",
+      "path": "datagridextensions/2.6.0",
+      "hashPath": "datagridextensions.2.6.0.nupkg.sha512"
+    },
+    "Dirkster.AvalonDock/4.72.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-m5J03HVntDM3eu7GyzLWlNdr2c2TTBAoD33Pq1yCID7vEtk13VVngtlmegp67WUvpL5JUC8G2xU8n+ThZKKz0Q==",
+      "path": "dirkster.avalondock/4.72.1",
+      "hashPath": "dirkster.avalondock.4.72.1.nupkg.sha512"
+    },
+    "Dirkster.AvalonDock.Themes.VS2013/4.72.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-g+hcHokgRFSvznqsVWxHxPCrUMxe18MTJjXMRVQJTVNo/Kwx8krdNiRnCSUDkuVtr2z29EtC4QofZhwUB7FS+w==",
+      "path": "dirkster.avalondock.themes.vs2013/4.72.1",
+      "hashPath": "dirkster.avalondock.themes.vs2013.4.72.1.nupkg.sha512"
+    },
+    "K4os.Compression.LZ4/1.3.8": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-LhwlPa7c1zs1OV2XadMtAWdImjLIsqFJPoRcIWAadSRn0Ri1DepK65UbWLPmt4riLqx2d40xjXRk0ogpqNtK7g==",
+      "path": "k4os.compression.lz4/1.3.8",
+      "hashPath": "k4os.compression.lz4.1.3.8.nupkg.sha512"
+    },
+    "McMaster.Extensions.CommandLineUtils/4.1.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-zxgDY+G5yVq2q8sVB3Z275Qkxed1jC95nwAfnlSyoG4l5Nicvd4+ke1jXusEZEfyuErlAgXCKS937c13FmZWBg==",
+      "path": "mcmaster.extensions.commandlineutils/4.1.1",
+      "hashPath": "mcmaster.extensions.commandlineutils.4.1.1.nupkg.sha512"
+    },
+    "Microsoft.Extensions.DependencyInjection/8.0.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-BmANAnR5Xd4Oqw7yQ75xOAYODybZQRzdeNucg7kS5wWKd2PNnMdYtJ2Vciy0QLylRmv42DGl5+AFL9izA6F1Rw==",
+      "path": "microsoft.extensions.dependencyinjection/8.0.1",
+      "hashPath": "microsoft.extensions.dependencyinjection.8.0.1.nupkg.sha512"
+    },
+    "Microsoft.Extensions.DependencyInjection.Abstractions/8.0.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-3iE7UF7MQkCv1cxzCahz+Y/guQbTqieyxyaWKhrRO91itI9cOKO76OHeQDahqG4MmW5umr3CcCvGmK92lWNlbg==",
+      "path": "microsoft.extensions.dependencyinjection.abstractions/8.0.2",
+      "hashPath": "microsoft.extensions.dependencyinjection.abstractions.8.0.2.nupkg.sha512"
+    },
+    "Microsoft.Xaml.Behaviors.Wpf/1.1.135": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-r8qBEXmQfORso2+MVHnt8PSH4761zJ0SIxgQTSEDVLU97EN2FZdG6/ZCYUPhQy+OrPKgnpYBCAs3PS6Bs7wRsg==",
+      "path": "microsoft.xaml.behaviors.wpf/1.1.135",
+      "hashPath": "microsoft.xaml.behaviors.wpf.1.1.135.nupkg.sha512"
+    },
+    "Mono.Cecil/0.11.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-f33RkDtZO8VlGXCtmQIviOtxgnUdym9xx/b1p9h91CRGOsJFxCFOFK1FDbVt1OCf1aWwYejUFa2MOQyFWTFjbA==",
+      "path": "mono.cecil/0.11.6",
+      "hashPath": "mono.cecil.0.11.6.nupkg.sha512"
+    },
+    "NaturalSort.Extension/4.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-NGr3z/Izk16yxEcXKsopZvfYH8hh3iY7mmLJlT8iWVWBlidqGHeq2ykoy2JposrdM6aGvqjMfso9l0N8FzxAUw==",
+      "path": "naturalsort.extension/4.3.0",
+      "hashPath": "naturalsort.extension.4.3.0.nupkg.sha512"
+    },
+    "System.Collections.Immutable/9.0.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-wfm2NgK22MmBe5qJjp52qzpkeDZKb4l9LbdubhZSehY1z4LS+lld6R+B+UQNb2AZRHu/QJlHxEUcRst5hIEejg==",
+      "path": "system.collections.immutable/9.0.4",
+      "hashPath": "system.collections.immutable.9.0.4.nupkg.sha512"
+    },
+    "System.ComponentModel.Annotations/5.0.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-dMkqfy2el8A8/I76n2Hi1oBFEbG1SfxD2l5nhwXV3XjlnOmwxJlQbYpJH4W51odnU9sARCSAgv7S3CyAFMkpYg==",
+      "path": "system.componentmodel.annotations/5.0.0",
+      "hashPath": "system.componentmodel.annotations.5.0.0.nupkg.sha512"
+    },
+    "System.Composition.AttributedModel/9.0.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-g+zXB4pcrbMTa6VElfHQ60kbbiFLm552nTIqzUtNFG8OzLPudE/04GbkZp94wKSBNbSR0b/85IYwrpqLkFJUbw==",
+      "path": "system.composition.attributedmodel/9.0.4",
+      "hashPath": "system.composition.attributedmodel.9.0.4.nupkg.sha512"
+    },
+    "System.Reflection.Metadata/9.0.4": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-qeJNsMmZPc/Lieg0Md+D4F6LoLcxV3b9QsUNmBRXc2ZVOkMbAcwuO9l2jbQFv3n+fLiHJilN8v6i5aJNivjrCQ==",
+      "path": "system.reflection.metadata/9.0.4",
+      "hashPath": "system.reflection.metadata.9.0.4.nupkg.sha512"
+    },
+    "System.Runtime.CompilerServices.Unsafe/6.1.2": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-2hBr6zdbIBTDE3EhK7NSVNdX58uTK6iHW/P/Axmm9sl1xoGSLqDvMtpecn226TNwHByFokYwJmt/aQQNlO5CRw==",
+      "path": "system.runtime.compilerservices.unsafe/6.1.2",
+      "hashPath": "system.runtime.compilerservices.unsafe.6.1.2.nupkg.sha512"
+    },
+    "TomsToolbox.Composition/2.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-X+SxtOuqlTADWq0u5ss5tNtKDvEZ7tWkfuW6wwCJo+z4jax0LlB9WXjSs2F2LD5kLTwhEOWrqXFz0X174++bzQ==",
+      "path": "tomstoolbox.composition/2.22.0",
+      "hashPath": "tomstoolbox.composition.2.22.0.nupkg.sha512"
+    },
+    "TomsToolbox.Composition.Analyzer/2.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-weoSADFwnD+3fyvTX3NEdQHOHXZs3wiCiv1WCvjd19KHCXjS0o0vEib/PVsymWrLjmp8ryCoxO8t5N0t3GSc5g==",
+      "path": "tomstoolbox.composition.analyzer/2.22.0",
+      "hashPath": "tomstoolbox.composition.analyzer.2.22.0.nupkg.sha512"
+    },
+    "TomsToolbox.Composition.MicrosoftExtensions/2.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-pD72VMpz+SEV47LMLTsJSzGhRRbsGGbo/5FsJVjghXCnuOJ+m0fXhcaFRTumw5mgDMXFNEjnR7na4VD5mSU+KQ==",
+      "path": "tomstoolbox.composition.microsoftextensions/2.22.0",
+      "hashPath": "tomstoolbox.composition.microsoftextensions.2.22.0.nupkg.sha512"
+    },
+    "TomsToolbox.Essentials/2.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-HfwsUd9WYxkKPiFMapcdDDlJ0hNOSTTxdC8SPwKbFNnAwKHFix+3oVki6RXVXGx+5duM22WSbEsJLqiG2pXuGw==",
+      "path": "tomstoolbox.essentials/2.22.0",
+      "hashPath": "tomstoolbox.essentials.2.22.0.nupkg.sha512"
+    },
+    "TomsToolbox.ObservableCollections/2.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-bxNKBdkH6orIcg1HR6VUOkXajIldKdAnfHwQymnzJh7UW4GQWOcS1vry+sck2ixGNLL6aqQzzXmDleN7YX76wg==",
+      "path": "tomstoolbox.observablecollections/2.22.0",
+      "hashPath": "tomstoolbox.observablecollections.2.22.0.nupkg.sha512"
+    },
+    "TomsToolbox.Wpf/2.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-OtpZG+Y75jdR/nT3VwUs1v/qlY6+hrQ+g1HUFxlG5+8DbA2riJ5q1c+E53F64IkHv+J0+GVptN9TNRV9HqAcjw==",
+      "path": "tomstoolbox.wpf/2.22.0",
+      "hashPath": "tomstoolbox.wpf.2.22.0.nupkg.sha512"
+    },
+    "TomsToolbox.Wpf.Composition/2.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-akAkGnE/ARavILRwEYO4Ixi/rvRlWgFrLKhzum19s4FUgcpMmZGjGNepp1I+COuLAwO7OcNe57uVjjhGOqhbyw==",
+      "path": "tomstoolbox.wpf.composition/2.22.0",
+      "hashPath": "tomstoolbox.wpf.composition.2.22.0.nupkg.sha512"
+    },
+    "TomsToolbox.Wpf.Composition.AttributedModel/2.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-DQg6Y6MMmRxzhahPkugdfxyXI+ouktPfBM214EAeVKlm+n1Pz5TQkzJsLJ6FyKHNsJlQcjn6aOoPXhA5lFrcNg==",
+      "path": "tomstoolbox.wpf.composition.attributedmodel/2.22.0",
+      "hashPath": "tomstoolbox.wpf.composition.attributedmodel.2.22.0.nupkg.sha512"
+    },
+    "TomsToolbox.Wpf.Styles/2.22.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-k7Yz6NScWCJ9zKCAr604tD5JUyDeSkRDxpGkhRWB2XP9WBN0RY6Y5g2SGP5BERKWQYLDbyPjMrIbjrlgTSeiMw==",
+      "path": "tomstoolbox.wpf.styles/2.22.0",
+      "hashPath": "tomstoolbox.wpf.styles.2.22.0.nupkg.sha512"
+    },
+    "ICSharpCode.BamlDecompiler/8.0.0-noversion": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ICSharpCode.Decompiler/8.0.0-noversion": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ICSharpCode.ILSpyX/8.0.0-noversion": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "ILSpy/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}

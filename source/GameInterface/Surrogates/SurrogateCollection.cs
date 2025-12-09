@@ -1,8 +1,9 @@
-﻿using ProtoBuf.Meta;
+using ProtoBuf.Meta;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Surrogates;
 
@@ -29,5 +30,8 @@ internal class SurrogateCollection : ISurrogateCollection
             
         if (RuntimeTypeModel.Default.CanSerialize(typeof(Banner)) == false)
             RuntimeTypeModel.Default.SetSurrogate<Banner, BannerSurrogate>();
+
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(MBGUID)) == false)
+            RuntimeTypeModel.Default.SetSurrogate<MBGUID, MBGUIDSurrogate>();
     }
 }
