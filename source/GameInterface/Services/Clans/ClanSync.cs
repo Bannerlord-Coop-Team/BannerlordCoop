@@ -12,7 +12,7 @@ internal class ClanSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._isEliminated)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._kingdom)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._influence)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanMidSettlement)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._midSettlement)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._basicTroop)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._leader)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._banner)));
@@ -29,10 +29,10 @@ internal class ClanSync : IDynamicSync
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LastFactionChangeTime)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.AutoRecruitmentExpenses)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsNoble)));
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.TotalStrength)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.CurrentTotalStrength)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.MercenaryAwardMultiplier)));
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LabelColor)));
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InitialPosition)));
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LabelColor)));
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InitialPosition)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsRebelClan)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsUnderMercenaryService)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Color)));
@@ -40,7 +40,6 @@ internal class ClanSync : IDynamicSync
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerBackgroundColorPrimary)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerBackgroundColorSecondary)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerIconColor)));
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan._midPointCalculated)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Renown)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.NotAttackableByPlayerUntilTime)));
     }

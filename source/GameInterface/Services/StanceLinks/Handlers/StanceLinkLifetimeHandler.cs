@@ -113,7 +113,7 @@ public class StanceLinkLifetimeHandler : IHandler
 
         using(new AllowedThread())
         {
-            var stanceLink = new StanceLink((StanceType)payload.StanceType, faction1, faction2, payload.IsAtConstantWar);
+            var stanceLink = new StanceLink((StanceType)payload.StanceType, faction1, faction2);
             if (objectManager.AddExisting(payload.StringId, stanceLink) == false)
             {
                 Logger.Error("Failed to add existing StanceLink, {id}", payload.StringId);

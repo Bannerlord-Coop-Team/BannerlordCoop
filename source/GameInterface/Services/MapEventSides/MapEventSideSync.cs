@@ -13,11 +13,10 @@ namespace GameInterface.Services.MapEventSides
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventSide), nameof(MapEventSide.LeaderParty)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEventSide), nameof(MapEventSide.MissionSide)));
 
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.Casualties)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.TroopCasualties)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.InfluenceValue)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.IsSurrendered)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.LeaderSimulationModifier)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.RenownAtMapEventEnd)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.RenownValue)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.StrengthRatio)));
             //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapEvent)));

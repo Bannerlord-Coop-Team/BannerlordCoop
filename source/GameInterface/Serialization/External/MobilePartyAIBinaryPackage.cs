@@ -37,8 +37,8 @@ namespace GameInterface.Serialization.External
         {
             base.UnpackFields();
 
-            Object._lastTargetedParties = new List<MobileParty>();
-            Object.InitCached();
+            //Object._lastTargetedParties = new List<MobileParty>();
+            //Object.InitCached();
         }
     }
 }

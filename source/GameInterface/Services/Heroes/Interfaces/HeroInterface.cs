@@ -186,7 +186,7 @@ internal class HeroInterface : IHeroInterface
         party.Party.SetVisualAsDirty();
 
         party.RecoverPositionsForNavMeshUpdate();
-        party.CurrentNavigationFace = Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D);
+        party.CurrentNavigationFace = Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position);
 
         party.Ai.OnGameInitialized();
 

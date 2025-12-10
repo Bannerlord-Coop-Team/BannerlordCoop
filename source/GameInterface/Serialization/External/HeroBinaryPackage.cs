@@ -67,7 +67,7 @@ namespace GameInterface.Serialization.External
                 return;
             }
 
-            Object.Init();
+            //Object.Init();
 
             // Set the values of all the stored fields on the object
             base.UnpackFields();

@@ -1,15 +1,16 @@
 ﻿using Common.Messaging;
 using SandBox.View.Map;
+using SandBox.View.Map.Visuals;
 
 namespace GameInterface.Services.PartyVisuals.Messages
 {
     internal record PartyVisualDestroyed : IEvent
     {
-        public PartyVisual PartyVisual { get; }
+        public MobilePartyVisual MobilePartyVisual { get; }
 
-        public PartyVisualDestroyed(PartyVisual partyVisual)
+        public PartyVisualDestroyed(MobilePartyVisual partyVisual)
         {
-            PartyVisual = partyVisual;
+            MobilePartyVisual = partyVisual;
         }
     }
 }

@@ -38,7 +38,7 @@ public class KingdomDebugCommand
             { nameof(KingdomPolicyDecision), TryGetKingdomPolicyDecision },
             { nameof(SettlementClaimantDecision), TryGetSettlementClaimantDecision },
             { nameof(SettlementClaimantPreliminaryDecision), TryGetSettlementClaimantPreliminaryDecision },
-            { nameof(MakePeaceKingdomDecision), TryGetMakePeaceKingdomDecision },
+            //{ nameof(MakePeaceKingdomDecision), TryGetMakePeaceKingdomDecision },
         };
 
 
@@ -476,52 +476,53 @@ public class KingdomDebugCommand
     /// <param name="kingdomDecision">kingdom decision result.</param>
     /// <param name="message">message result.</param>
     /// <returns>True if kingdomdecision is successfully returned, else false.</returns>
-    private static bool TryGetMakePeaceKingdomDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
-    {
-        if (args.Count < 7)
-        {
-            kingdomDecision = null;
-            message = AddMakePeaceKingdomDecisionUsage;
-            return false;
-        }
 
-        string factionId = args[4];
-        string dailyTribute = args[5];
-        string applyResults = args[6];
+    //private static bool TryGetMakePeaceKingdomDecision(IObjectManager objectManager, List<string> args, Clan proposerClan, out KingdomDecision kingdomDecision, out string message)
+    //{
+    //    if (args.Count < 7)
+    //    {
+    //        kingdomDecision = null;
+    //        message = AddMakePeaceKingdomDecisionUsage;
+    //        return false;
+    //    }
 
-        if (!objectManager.TryGetObject(factionId, out Kingdom kingdom) & !objectManager.TryGetObject(factionId, out Clan clan))
-        {
-            kingdomDecision = null;
-            message = $"Argument5: Faction is not found by Id: {factionId}";
-            return false;
-        }
+    //    string factionId = args[4];
+    //    string dailyTribute = args[5];
+    //    string applyResults = args[6];
 
-        IFaction faction;
-        if (kingdom != null)
-        {
-            faction = kingdom;
-        }
-        else
-        {
-            faction = clan;
-        }
+    //    if (!objectManager.TryGetObject(factionId, out Kingdom kingdom) & !objectManager.TryGetObject(factionId, out Clan clan))
+    //    {
+    //        kingdomDecision = null;
+    //        message = $"Argument5: Faction is not found by Id: {factionId}";
+    //        return false;
+    //    }
 
-        if (!int.TryParse(dailyTribute, out int dailyTributeToBePaid))
-        {
-            kingdomDecision = null;
-            message = $"Argument6: The given value is not an integer value: {dailyTribute}";
-            return false;
-        }
+    //    IFaction faction;
+    //    if (kingdom != null)
+    //    {
+    //        faction = kingdom;
+    //    }
+    //    else
+    //    {
+    //        faction = clan;
+    //    }
 
-        if (!bool.TryParse(applyResults, out bool applyResult))
-        {
-            kingdomDecision = null;
-            message = $"Argument7: The given value is not a boolean value: {applyResults}";
-            return false;
-        }
+    //    if (!int.TryParse(dailyTribute, out int dailyTributeToBePaid))
+    //    {
+    //        kingdomDecision = null;
+    //        message = $"Argument6: The given value is not an integer value: {dailyTribute}";
+    //        return false;
+    //    }
 
-        kingdomDecision = new MakePeaceKingdomDecision(proposerClan, faction, dailyTributeToBePaid, applyResult);
-        message = string.Empty;
-        return true;
-    }
+    //    if (!bool.TryParse(applyResults, out bool applyResult))
+    //    {
+    //        kingdomDecision = null;
+    //        message = $"Argument7: The given value is not a boolean value: {applyResults}";
+    //        return false;
+    //    }
+
+    //    kingdomDecision = new MakePeaceKingdomDecision(proposerClan, faction, dailyTributeToBePaid, applyResult);
+    //    message = string.Empty;
+    //    return true;
+    //}
 }

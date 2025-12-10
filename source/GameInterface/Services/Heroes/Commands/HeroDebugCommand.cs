@@ -107,7 +107,7 @@ public class HeroDebugCommand
             return $"Unable to get {typeof(CharacterObject)} with id: {characterObjectId}";
         }
 
-        HeroCreator.CreateBasicHero(template, out var newHero);
+        HeroCreator.CreateBasicHero(characterObjectId, template, out var newHero);
 
         return $"Created new hero with string id: {newHero.StringId}";
     }

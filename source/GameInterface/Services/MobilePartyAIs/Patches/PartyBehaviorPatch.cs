@@ -50,7 +50,7 @@ static class PartyBehaviorPatch
         ref MobilePartyAi __instance,
         ref AiBehavior newAiBehavior,
         ref PartyBase targetPartyFigure,
-        ref Vec2 bestTargetPoint)
+        ref CampaignVec2 bestTargetPoint)
     {
         if (__instance._mobileParty != Campaign.Current.MainParty && BehaviorIsSame(ref __instance, ref newAiBehavior, ref targetPartyFigure, ref bestTargetPoint)) return false;
 
@@ -69,7 +69,7 @@ static class PartyBehaviorPatch
                 : targetPartyFigure.MobileParty.StringId;
         }
 
-        var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint, party.Position2D);
+        var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint, party.Position);
         var message = new PartyBehaviorChangeAttempted(party, data);
         MessageBroker.Instance.Publish(__instance, message);
 
@@ -80,24 +80,24 @@ static class PartyBehaviorPatch
         ref MobilePartyAi __instance,
         ref AiBehavior newAiBehavior,
         ref PartyBase targetPartyFigure,
-        ref Vec2 bestTargetPoint)
+        ref CampaignVec2 bestTargetPoint)
     {
         MobileParty party = __instance._mobileParty;
-        IMapEntity targetEntity = null;
+        IMapPoint targetEntity = null;
 
         if (targetPartyFigure != null)
         {
             targetEntity = targetPartyFigure.IsSettlement ? targetPartyFigure.Settlement : targetPartyFigure.MobileParty;
         }
 
-        return __instance.AiBehaviorMapEntity == targetEntity &&
+        return __instance.BehaviorTarget == targetEntity.Position &&
             party.ShortTermBehavior == newAiBehavior &&
             __instance.BehaviorTarget == bestTargetPoint;
 
     }
 
     public static void SetAiBehavior(
-        MobilePartyAi partyAi, AiBehavior newBehavior, IMapEntity targetMapEntity, Vec2 targetPoint)
+        MobilePartyAi partyAi, AiBehavior newBehavior, IMapPoint targetMapEntity, CampaignVec2 targetPoint)
     {
         if (partyAi == null)
         {
@@ -107,25 +107,25 @@ static class PartyBehaviorPatch
             return;
         }
 
-        partyAi.DefaultBehavior = newBehavior;
+        partyAi._mobileParty.ShortTermBehavior = newBehavior;
 
         var mobileParty = partyAi._mobileParty;
 
         if (typeof(Settlement).IsAssignableFrom(targetMapEntity?.GetType()))
         {
-            mobileParty.TargetSettlement = (Settlement)targetMapEntity;
+            mobileParty._targetSettlement = (Settlement)targetMapEntity;
             mobileParty.TargetParty = null;
         }
 
         else if (typeof(MobileParty).IsAssignableFrom(targetMapEntity?.GetType()))
         {
-            mobileParty.TargetSettlement = null;
+            mobileParty._targetSettlement = null;
             mobileParty.TargetParty = (MobileParty)targetMapEntity;
         }
 
         mobileParty.TargetPosition = targetPoint;
 
-        partyAi.SetShortTermBehavior(newBehavior, targetMapEntity);
+        partyAi._mobileParty.SetShortTermBehavior(newBehavior, (IInteractablePoint)targetMapEntity);
         partyAi.BehaviorTarget = targetPoint;
         partyAi.UpdateBehavior();
     }

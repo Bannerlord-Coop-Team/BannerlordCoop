@@ -73,7 +73,7 @@ internal class CoopLoadingScreen : GlobalLayer
             this._loadingWindowViewModel.Enabled = false;
             this._loadingWindowViewModel.SetTotalGenericImageCount(this._sploadingCategory.SpriteSheetCount);
             bool shouldClear = true;
-            this._gauntletLayer = new GauntletLayer(100003, "GauntletLayer", shouldClear);
+            this._gauntletLayer = new GauntletLayer("GauntletLayer", 100003, shouldClear);
             this._gauntletLayer.LoadMovie("LoadingWindow", this._loadingWindowViewModel);
             base.Layer = this._gauntletLayer;
             _isInitialized = true;

@@ -30,7 +30,7 @@ namespace E2E.Tests.Services.PartyVisuals
             {
                 var MobileParty = new MobileParty();
                 var partyBase = new PartyBase(MobileParty);
-                var partyVisual = new PartyVisual(partyBase);
+                var MobilePartyVisual = new PartyVisual(partyBase);
 
                 Assert.True(server.ObjectManager.TryGetId(partyVisual, out visualId));
             });
@@ -66,7 +66,7 @@ namespace E2E.Tests.Services.PartyVisuals
             client1.Call(() =>
             {
                 Assert.True(server.ObjectManager.TryGetObject(baseId, out PartyBase baseParty));
-                var partyVisual = new PartyVisual(baseParty);
+                var MobilePartyVisual = new PartyVisual(baseParty);
 
                 Assert.False(client1.ObjectManager.TryGetId(partyVisual, out PartyVisualId));
             });

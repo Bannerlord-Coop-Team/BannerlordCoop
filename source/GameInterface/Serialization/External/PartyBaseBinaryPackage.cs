@@ -36,6 +36,6 @@ public class PartyBaseBinaryPackage : BinaryPackageBase<PartyBase>
     {
         base.UnpackFields();
 
-        Object.CreateNewPartyVisual();
+        Object.MobileParty.CreateNewPartyVisual();
     }
 }

@@ -2,6 +2,7 @@
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using GameInterface.Services.MobileParties.Handlers;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.MobileParties.Data
 {
@@ -36,7 +37,7 @@ namespace GameInterface.Services.MobileParties.Data
         [ProtoMember(8)]
         public float PartyPositionY { get; set; }
 
-        public PartyBehaviorUpdateData(string partyId, AiBehavior aiBehavior, bool hasTarget, string targetId, Vec2 targetPoint, Vec2 partyPosition)
+        public PartyBehaviorUpdateData(string partyId, AiBehavior aiBehavior, bool hasTarget, string targetId, CampaignVec2 targetPoint, CampaignVec2 partyPosition)
         {
             PartyId = partyId;
             Behavior = aiBehavior;

@@ -75,7 +75,7 @@ internal class SettlementCommands
             return $"Error setting the value: {args[1]} to a float.";
         }
 
-        settlement.NumberOfEnemiesSpottedAround = num;
+        settlement.NearbyLandThreatIntensity = num;
 
         return $"Successfully set the Settlement ({settlementId}) NumberOfEnemiesSpottedAround to '{args[1]}'";
     }
@@ -106,7 +106,7 @@ internal class SettlementCommands
         if (float.TryParse(args[1], out var num) == false)
             return $"Error setting the value: {args[1]} to a float.";
 
-        settlement.NumberOfAlliesSpottedAround = num;
+        settlement.NearbyLandAllyIntensity = num;
 
         return $"Successfully set the Settlement ({settlementId}) NumberOfAlliesSpottedAround to '{args[1]}'";
     }
@@ -387,8 +387,8 @@ internal class SettlementCommands
         string lastAttackerParty = settlement.LastAttackerParty?.ArmyName.ToString() ?? "None";
 
         sb.AppendLine($"------------------- SETTLEMENT: {settlement.Name} -------------------");
-        sb.AppendLine($"NumberOfEnemiesSpottedAround: '{settlement.NumberOfEnemiesSpottedAround}'");
-        sb.AppendLine($"NumberOfAlliesSpottedAround: '{settlement.NumberOfAlliesSpottedAround}'");
+        sb.AppendLine($"NumberOfEnemiesSpottedAround: '{settlement.NearbyLandThreatIntensity}'");
+        sb.AppendLine($"NumberOfAlliesSpottedAround: '{settlement.NearbyLandAllyIntensity}'");
         sb.AppendLine($"BribePaid: {settlement.BribePaid}");
         sb.AppendLine($"SettlementHitPoints: '{settlement.SettlementHitPoints}'");
         sb.AppendLine($"GarrisonWagePaymentLimit: '{settlement.GarrisonWagePaymentLimit}'");
@@ -397,9 +397,9 @@ internal class SettlementCommands
         sb.AppendLine($"CurrentSiegeState:   '{settlement.CurrentSiegeState}'");
         sb.AppendLine($"Militia :   '{settlement.Militia}'");
         sb.AppendLine($"LastVisitTimeOfOwner  :   '{settlement.LastVisitTimeOfOwner}'");
-        sb.AppendLine($"ClaimedBy   :   '{settlement.ClaimedBy}'");
-        sb.AppendLine($"ClaimValue    :   '{settlement.ClaimValue}'");
-        sb.AppendLine($"CanBeClaimed     :   '{Convert.ToBoolean(settlement.CanBeClaimed)}'");
+        //sb.AppendLine($"ClaimedBy   :   '{settlement.ClaimedBy}'");
+        //sb.AppendLine($"ClaimValue    :   '{settlement.ClaimValue}'");
+        //sb.AppendLine($"CanBeClaimed     :   '{Convert.ToBoolean(settlement.CanBeClaimed)}'");
         sb.AppendLine($"------------------- SETTLEMENT: {settlement.Name} -------------------");
 
         return sb.ToString();

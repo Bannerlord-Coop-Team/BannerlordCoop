@@ -154,7 +154,7 @@ namespace Coop.UI.LoadGameUI
             _spriteCategory = spriteData.SpriteCategories["ui_saveload"];
             _spriteCategory.Load(resourceContext, uiresourceDepot);
 
-            _gauntletLayer = new GauntletLayer(1, "GauntletLayer");
+            _gauntletLayer = new GauntletLayer("GauntletLayer", 1);
             _gauntletLayer.LoadMovie("SaveLoadScreen", _dataSource);
 			_gauntletLayer.InputRestrictions.SetInputRestrictions(true, InputUsageMask.All);
             _gauntletLayer.InputRestrictions.SetInputRestrictions(true, InputUsageMask.All);

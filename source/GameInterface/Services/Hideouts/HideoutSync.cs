@@ -9,8 +9,6 @@ namespace GameInterface.Services.Hideouts
     {
         public HideoutSync(DynamicSyncRegistry autoSyncBuilder)
         {
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hideout), nameof(Hideout.SceneName)));
-
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hideout), nameof(Hideout._isSpotted)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(Hideout), nameof(Hideout._nextPossibleAttackTime)));
         }

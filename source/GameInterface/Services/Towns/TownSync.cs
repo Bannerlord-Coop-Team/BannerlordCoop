@@ -11,7 +11,6 @@ internal class TownSync : IDynamicSync
     {
         // Fields
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._prosperity)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._wallLevel)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._isCastle)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._ownerClan)));
         //// Not synced fields
@@ -39,11 +38,9 @@ internal class TownSync : IDynamicSync
 
         // Targetmethods
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeCurrentBuildingQueue)));
-        dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeCurrentBuilding)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(WorkshopsCampaignBehavior), nameof(WorkshopsCampaignBehavior.BuildArtisanWorkshop)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(WorkshopsCampaignBehavior), nameof(WorkshopsCampaignBehavior.BuildWorkshopForHeroAtGameStart)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(WorkshopsCampaignBehavior), nameof(WorkshopsCampaignBehavior.BuildWorkshopsAtGameStart)));
-        dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.DecideProject)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.ApplyRebellionConsequencesToSettlement)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Town), AccessTools.Method(typeof(RebellionsCampaignBehavior), nameof(RebellionsCampaignBehavior.CheckAndSetTownRebelliousState)));
         // TODO: Verify why this breaks or if its even necessary

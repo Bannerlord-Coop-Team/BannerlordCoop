@@ -13,7 +13,5 @@ internal class MobilePartyAiSync : IDynamicSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobilePartyAi), nameof(MobilePartyAi._isDisabled)));
 
         //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobilePartyAi), nameof(MobilePartyAi.DefaultBehavior)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobilePartyAi), nameof(MobilePartyAi.PartyMoveMode)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobilePartyAi), nameof(MobilePartyAi.MoveTargetParty)));
     }
 }

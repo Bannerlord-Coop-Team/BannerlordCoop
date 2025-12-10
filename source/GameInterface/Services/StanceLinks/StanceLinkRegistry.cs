@@ -44,19 +44,19 @@ internal class StanceLinkRegistry : IAutoRegistry<StanceLink>
 
         HashSet<StanceLink> visitedStances = new();
 
-        foreach (var faction in factions)
-        {
-            int counter = 1;
-            foreach (var stance in faction.Stances)
-            {
-                if (visitedStances.Contains(stance)) continue;
+        //foreach (var faction in factions)
+        //{
+        //    int counter = 1;
+        //    foreach (var stance in faction.Stances)
+        //    {
+        //        if (visitedStances.Contains(stance)) continue;
 
-                var networkId = $"{nameof(StanceLink)}_{faction.StringId}_{counter++}";
-                registry.RegisterExistingObject(networkId, stance);
+        //        var networkId = $"{nameof(StanceLink)}_{faction.StringId}_{counter++}";
+        //        registry.RegisterExistingObject(networkId, stance);
 
-                visitedStances.Add(stance);
-            }
-        }
+        //        visitedStances.Add(stance);
+        //    }
+        //}
     }
 
     public void OnClientCreated(StanceLink obj, string id)

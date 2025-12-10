@@ -13,7 +13,8 @@ namespace GameInterface.Serialization.External
         string stringId;
 
         string[] supporterNotablesIds;
-        string[] lordsIds;
+        string[] deadLordsIds;
+        string[] aliveLordsIds;
         string[] heroesIds;
         string[] companionsIds;
 
@@ -25,7 +26,8 @@ namespace GameInterface.Serialization.External
         private static HashSet<string> excludes = new HashSet<string>
         {
             "_supporterNotablesCache",
-            "_lordsCache",
+            "_aliveLordsCache",
+            "_deadLordsCache",
             "_heroesCache",
             "_companionsCache",
         };
@@ -37,7 +39,8 @@ namespace GameInterface.Serialization.External
             base.PackFields();
             
             supporterNotablesIds = ResolveIds(Object._supporterNotablesCache);
-            lordsIds = ResolveIds(Object._lordsCache);
+            deadLordsIds = ResolveIds(Object._deadLordsCache);
+            aliveLordsIds = ResolveIds(Object._aliveLordsCache);
             heroesIds = ResolveIds(Object._heroesCache);
             companionsIds = ResolveIds(Object._companionsCache);
         }
@@ -57,7 +60,8 @@ namespace GameInterface.Serialization.External
 
             // Unpack special cases
             Object._supporterNotablesCache = ResolveObjects<Hero>(supporterNotablesIds).ToMBList();
-            Object._lordsCache = ResolveObjects<Hero>(lordsIds).ToMBList();
+            Object._deadLordsCache = ResolveObjects<Hero>(deadLordsIds).ToMBList();
+            Object._aliveLordsCache = ResolveObjects<Hero>(aliveLordsIds).ToMBList();
             Object._heroesCache = ResolveObjects<Hero>(heroesIds).ToMBList();
             Object._companionsCache = ResolveObjects<Hero>(companionsIds).ToMBList();
         }

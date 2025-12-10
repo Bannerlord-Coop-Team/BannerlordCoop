@@ -1,5 +1,5 @@
 ﻿using HarmonyLib;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using SandBox.CampaignBehaviors;
 
 namespace GameInterface.Services.Towns.Patches.Disabled;
 

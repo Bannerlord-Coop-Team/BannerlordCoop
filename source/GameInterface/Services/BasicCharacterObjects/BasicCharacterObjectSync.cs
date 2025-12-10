@@ -19,7 +19,6 @@ namespace GameInterface.Services.BasicCharacterObjects
 
             // Properties
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Age)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.BeardTags)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Culture)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultFormationClass)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.DefaultFormationGroup)));
@@ -28,7 +27,6 @@ namespace GameInterface.Services.BasicCharacterObjects
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FaceDirtAmount)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FaceMeshCache)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.FormationPositionPreference)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.HairTags)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsFemale)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsObsolete)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.IsSoldier)));
@@ -36,7 +34,6 @@ namespace GameInterface.Services.BasicCharacterObjects
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.KnockdownResistance)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Level)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.Race)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCharacterObject), nameof(BasicCharacterObject.TattooTags)));
 
             // Targetmethods
         }

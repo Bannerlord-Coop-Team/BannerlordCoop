@@ -30,9 +30,6 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Subscribe<ChangeCharacterObject>(Handle);
             messageBroker.Subscribe<ChangeFirstName>(Handle);
             messageBroker.Subscribe<ChangeName>(Handle);
-            messageBroker.Subscribe<ChangeHairTags>(Handle);
-            messageBroker.Subscribe<ChangeBeardTags>(Handle);
-            messageBroker.Subscribe<ChangeTattooTags>(Handle);
             messageBroker.Subscribe<ChangeHeroState>(Handle);
             messageBroker.Subscribe<ChangeHeroLevel>(Handle);
             messageBroker.Subscribe<ChangeSpcDaysInLocation>(Handle);
@@ -50,9 +47,6 @@ namespace GameInterface.Services.Heroes.Handlers
             messageBroker.Unsubscribe<ChangeCharacterObject>(Handle);
             messageBroker.Unsubscribe<ChangeFirstName>(Handle);
             messageBroker.Unsubscribe<ChangeName>(Handle);
-            messageBroker.Unsubscribe<ChangeHairTags>(Handle);
-            messageBroker.Unsubscribe<ChangeBeardTags>(Handle);
-            messageBroker.Unsubscribe<ChangeTattooTags>(Handle);
             messageBroker.Unsubscribe<ChangeHeroState>(Handle);
             messageBroker.Unsubscribe<ChangeHeroLevel>(Handle);
             messageBroker.Unsubscribe<ChangeSpcDaysInLocation>(Handle);
@@ -155,7 +149,8 @@ namespace GameInterface.Services.Heroes.Handlers
                 Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
                 return;
             }
-            instance.SpcDaysInLocation = data.Days;
+
+            //instance.SpcDaysInLocation = data.Days;
         }
 
         private void Handle(MessagePayload<ChangeHeroLevel> payload)
@@ -178,38 +173,6 @@ namespace GameInterface.Services.Heroes.Handlers
                 return;
             }
             instance._heroState = (Hero.CharacterStates)data.HeroState;
-        }
-        private void Handle(MessagePayload<ChangeTattooTags> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-                return;
-            }
-            instance.TattooTags = data.TattooTags;
-        }
-
-        private void Handle(MessagePayload<ChangeBeardTags> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-                return;
-            }
-            instance.BeardTags = data.BeardTags;
-        }
-
-        private void Handle(MessagePayload<ChangeHairTags> payload)
-        {
-            var data = payload.What;
-            if (objectManager.TryGetObject<Hero>(data.HeroId, out var instance) == false)
-            {
-                Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.HeroId);
-                return;
-            }
-            instance.HairTags = data.HairTags;
         }
 
         private void Handle(MessagePayload<ChangeName> payload)

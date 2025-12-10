@@ -14,7 +14,7 @@ namespace GameInterface.Services.BasicCultureObjects
             // Properties
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.BackgroundColor1)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.BackgroundColor2)));
-            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.BannerKey)));
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.Banner)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.CanHaveSettlement)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.ClothAlternativeColor)));
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(BasicCultureObject), nameof(BasicCultureObject.ClothAlternativeColor2)));

@@ -26,7 +26,6 @@ internal class HeroCollectionPatches : GenericPatches<HeroCollectionPatches, Her
         yield return AccessTools.Method(typeof(RecruitmentCampaignBehavior), nameof(RecruitmentCampaignBehavior.RecruitVolunteersFromNotable));
         yield return AccessTools.Method(typeof(RecruitmentCampaignBehavior), nameof(RecruitmentCampaignBehavior.UpdateVolunteersOfNotablesInSettlement));
         yield return AccessTools.Method(typeof(RecruitmentCampaignBehavior), nameof(RecruitmentCampaignBehavior.ApplyInternal));
-        yield return AccessTools.Method(typeof(Town), nameof(Town.DailyGarrisonAdjustment));
         // Carvans
         yield return AccessTools.Method(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.OnFinalize));
         yield return AccessTools.Method(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.OnInitialize));
