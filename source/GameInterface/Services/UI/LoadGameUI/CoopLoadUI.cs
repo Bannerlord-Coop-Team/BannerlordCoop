@@ -150,7 +150,7 @@ namespace Coop.UI.LoadGameUI
 
             SpriteData spriteData = UIResourceManager.SpriteData;
             TwoDimensionEngineResourceContext resourceContext = UIResourceManager.ResourceContext;
-            ResourceDepot uiresourceDepot = UIResourceManager.UIResourceDepot;
+            ResourceDepot uiresourceDepot = UIResourceManager.ResourceDepot;
             _spriteCategory = spriteData.SpriteCategories["ui_saveload"];
             _spriteCategory.Load(resourceContext, uiresourceDepot);
 

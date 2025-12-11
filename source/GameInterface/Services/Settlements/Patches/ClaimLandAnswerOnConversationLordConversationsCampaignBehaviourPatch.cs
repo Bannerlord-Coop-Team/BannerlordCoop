@@ -25,9 +25,9 @@ public class ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatc
     //    typeof(ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch)
     //    .GetMethod(nameof(SetClaimedBy), BindingFlags.NonPublic | BindingFlags.Static);
 
-    private static MethodInfo SettlementBehaviorSetLastClaimValue =
-    typeof(ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch)
-    .GetMethod(nameof(SetClaimValue), BindingFlags.NonPublic | BindingFlags.Static);
+    //private static MethodInfo SettlementBehaviorSetLastClaimValue =
+    //typeof(ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch)
+    //.GetMethod(nameof(SetClaimValue), BindingFlags.NonPublic | BindingFlags.Static);
 
     //[HarmonyPatch("conversation_player_ask_to_claim_land_answer_on_consequence")]
     //[HarmonyTranspiler]

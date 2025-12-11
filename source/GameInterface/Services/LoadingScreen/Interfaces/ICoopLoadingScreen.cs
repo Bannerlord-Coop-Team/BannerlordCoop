@@ -89,9 +89,9 @@ internal class CoopLoadingScreen : GlobalLayer
             if (isMultiplayer)
             {
                 this._mpLoadingCategory = UIResourceManager.SpriteData.SpriteCategories["ui_mploading"];
-                this._mpLoadingCategory.Load(UIResourceManager.ResourceContext, UIResourceManager.UIResourceDepot);
+                this._mpLoadingCategory.Load(UIResourceManager.ResourceContext, UIResourceManager.ResourceDepot);
                 this._mpBackgroundCategory = UIResourceManager.SpriteData.SpriteCategories["ui_mpbackgrounds"];
-                this._mpBackgroundCategory.Load(UIResourceManager.ResourceContext, UIResourceManager.UIResourceDepot);
+                this._mpBackgroundCategory.Load(UIResourceManager.ResourceContext, UIResourceManager.ResourceDepot);
                 return;
             }
             this._mpLoadingCategory.Unload();
@@ -108,7 +108,7 @@ internal class CoopLoadingScreen : GlobalLayer
             {
                 return;
             }
-            sploadingCategory.PartialLoadAtIndex(UIResourceManager.ResourceContext, UIResourceManager.UIResourceDepot, index);
+            sploadingCategory.PartialLoadAtIndex(UIResourceManager.ResourceContext, UIResourceManager.ResourceDepot, index);
             return;
         }
         else
