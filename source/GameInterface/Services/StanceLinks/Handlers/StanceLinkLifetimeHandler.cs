@@ -54,7 +54,6 @@ public class StanceLinkLifetimeHandler : IHandler
         var stanceType = (short)(payload.What.StanceType);
         var faction1 = payload.What.Faction1;
         var faction2 = payload.What.Faction2;
-        var isAtConstantWar = payload.What.IsAtConstantWar;
 
         //get ID of necessary object - if error abort
         if (objectManager.TryGetId(faction1, out var faction1Id) == false) return;
@@ -64,7 +63,7 @@ public class StanceLinkLifetimeHandler : IHandler
         if (objectManager.AddNewObject(stanceLink, out var stanceLinkId) == false) return;
 
         //send network message to register object on client side
-        var data = new StanceLinkCreationData(stanceLinkId, stanceType, faction1Id, faction2Id, isAtConstantWar);
+        var data = new StanceLinkCreationData(stanceLinkId, stanceType, faction1Id, faction2Id);
         var message = new NetworkCreateStanceLink(data);
         network.SendAll(message);
     }

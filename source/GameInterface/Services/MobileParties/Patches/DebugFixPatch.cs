@@ -13,10 +13,10 @@ class DebugFixPatch
 {
 
     [HarmonyPrefix]
-    static bool Prefix(PartyBase partyBase)
+    static bool Prefix(MobileParty mobileParty, bool shouldTick)
     {
         Dictionary<PartyBase, MobilePartyVisual> dict = MobilePartyVisualManager.Current._partiesAndVisuals;
-        if (dict.ContainsKey(partyBase))
+        if (dict.ContainsKey(mobileParty.Party))
         {
             return false;
         }

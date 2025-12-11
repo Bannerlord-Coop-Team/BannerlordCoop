@@ -18,7 +18,7 @@ namespace GameInterface.Services.WeaponDesigns.Patches
     {
         private static ILogger Logger = LogManager.GetLogger<WeaponDesignLifetimePatches>();
 
-        [HarmonyPatch(typeof(WeaponDesign), MethodType.Constructor, new[] { typeof(CraftingTemplate), typeof(TextObject), typeof(WeaponDesignElement[]) })]
+        [HarmonyPatch(typeof(WeaponDesign), MethodType.Constructor, new[] { typeof(CraftingTemplate), typeof(TextObject), typeof(WeaponDesignElement[]), typeof(string) })]
         [HarmonyPrefix]
         private static bool CreateWeaponDesignPrefix(ref WeaponDesign __instance)
         {

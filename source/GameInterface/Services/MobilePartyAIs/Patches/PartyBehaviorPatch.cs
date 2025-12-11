@@ -14,6 +14,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -49,10 +50,10 @@ static class PartyBehaviorPatch
     private static bool SetAiBehaviorPrefix(
         ref MobilePartyAi __instance,
         ref AiBehavior newAiBehavior,
-        ref PartyBase targetPartyFigure,
+        ref IInteractablePoint interactablePoint,
         ref CampaignVec2 bestTargetPoint)
     {
-        if (__instance._mobileParty != Campaign.Current.MainParty && BehaviorIsSame(ref __instance, ref newAiBehavior, ref targetPartyFigure, ref bestTargetPoint)) return false;
+        if (__instance._mobileParty != Campaign.Current.MainParty && BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
 
         if (__instance._mobileParty.IsPartyControlled() == false) return false;
 
@@ -61,12 +62,18 @@ static class PartyBehaviorPatch
         bool hasTargetEntity = false;
         string targetEntityId = string.Empty;
 
-        if (targetPartyFigure != null)
+        if (interactablePoint != null)
         {
             hasTargetEntity = true;
-            targetEntityId = targetPartyFigure.IsSettlement
-                ? targetPartyFigure.Settlement.StringId
-                : targetPartyFigure.MobileParty.StringId;
+
+            if (interactablePoint is AnchorPoint anchorPoint)
+            {
+                targetEntityId = anchorPoint.Owner.StringId;
+            }
+            else if (interactablePoint is PartyBase targetParty)
+            {
+                targetEntityId = targetParty.MobileParty.StringId;
+            }
         }
 
         var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint, party.Position);
@@ -79,18 +86,25 @@ static class PartyBehaviorPatch
     private static bool BehaviorIsSame(
         ref MobilePartyAi __instance,
         ref AiBehavior newAiBehavior,
-        ref PartyBase targetPartyFigure,
+        ref IInteractablePoint interactablePoint,
         ref CampaignVec2 bestTargetPoint)
     {
         MobileParty party = __instance._mobileParty;
         IMapPoint targetEntity = null;
 
-        if (targetPartyFigure != null)
+        if (interactablePoint != null)
         {
-            targetEntity = targetPartyFigure.IsSettlement ? targetPartyFigure.Settlement : targetPartyFigure.MobileParty;
+            if (interactablePoint is AnchorPoint anchorPoint)
+            {
+                targetEntity = anchorPoint.Owner;
+            }
+            else if (interactablePoint is PartyBase targetParty)
+            {
+                targetEntity = targetParty.MobileParty;
+            }
         }
 
-        return __instance.BehaviorTarget == targetEntity.Position &&
+        return __instance.BehaviorTarget == targetEntity?.Position &&
             party.ShortTermBehavior == newAiBehavior &&
             __instance.BehaviorTarget == bestTargetPoint;
 
@@ -146,25 +160,25 @@ public static class MapCameraViewPatches
     /// </summary>
     /// <param name="instructions">instructions of the patched method.</param>
     /// <returns></returns>
-    [HarmonyPatch(nameof(MapCameraView.OnBeforeTick))]
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> OnBeforeTickPatch(IEnumerable<CodeInstruction> instructions)
-    {
-        bool FoundGoTo = false;
-        bool FoundLabel = false;
-        foreach (CodeInstruction instruction in instructions)
-        {
-            bool isGoTo33 = (instruction.opcode == OpCodes.Brfalse_S && instruction.operand is Label && (int)LabelNumberField.GetValue(instruction.operand) == 33);
-            FoundGoTo = FoundGoTo || isGoTo33;
-            FoundLabel = FoundLabel || (instruction.opcode == OpCodes.Ldarg_0 && instruction.labels.Any(label=> (int)LabelNumberField.GetValue(label) == 33));
-            if (FoundGoTo && !FoundLabel && !isGoTo33)
-            {
-                yield return new CodeInstruction(OpCodes.Nop);
-            }
-            else
-            {
-                yield return instruction;
-            }
-        }
-    }
+    //[HarmonyPatch(nameof(MapCameraView.OnBeforeTick))]
+    //[HarmonyTranspiler]
+    //private static IEnumerable<CodeInstruction> OnBeforeTickPatch(IEnumerable<CodeInstruction> instructions)
+    //{
+    //    bool FoundGoTo = false;
+    //    bool FoundLabel = false;
+    //    foreach (CodeInstruction instruction in instructions)
+    //    {
+    //        bool isGoTo33 = (instruction.opcode == OpCodes.Brfalse_S && instruction.operand is Label && (int)LabelNumberField.GetValue(instruction.operand) == 33);
+    //        FoundGoTo = FoundGoTo || isGoTo33;
+    //        FoundLabel = FoundLabel || (instruction.opcode == OpCodes.Ldarg_0 && instruction.labels.Any(label=> (int)LabelNumberField.GetValue(label) == 33));
+    //        if (FoundGoTo && !FoundLabel && !isGoTo33)
+    //        {
+    //            yield return new CodeInstruction(OpCodes.Nop);
+    //        }
+    //        else
+    //        {
+    //            yield return instruction;
+    //        }
+    //    }
+    //}
 }

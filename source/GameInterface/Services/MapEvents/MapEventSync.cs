@@ -20,7 +20,6 @@ internal class MapEventSync : IDynamicSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.State)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.DiplomaticallyFinished)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.SimulationContext)));
         //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._battleResultExplainers)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._mapEventResultsCalculated)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._battleState)));
