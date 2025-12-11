@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<NPCCharacters>
+  <NPCCharacter id="coop_debug_npc"
+                default_group="Infantry"
+                is_hero="false"
+                occupation="Soldier"
+                culture="Culture.empire"
+                name="{=coop_debug_npc}Coop NPC">
+    <face>
+      <face_key_template value="BodyProperty.fighter_empire" />
+    </face>
+    <skills>
+      <skill id="OneHanded" value="60" />
+      <skill id="TwoHanded" value="60" />
+      <skill id="Athletics" value="60" />
+    </skills>
+  </NPCCharacter>
+</NPCCharacters>

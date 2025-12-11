@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Module>
+    <Name value="Coop"/>
+    <Id value="Coop"/>
+    <Version value="v0.0.1"/>
+    <SingleplayerModule value="true"/>
+    <MultiplayerModule value="false"/>
+    <DependedModules>
+        <DependedModule Id="Native" DependentVersion="v1.3.10"/>
+        <DependedModule Id="SandBoxCore" DependentVersion="v1.3.10"/>
+        <DependedModule Id="Sandbox" DependentVersion="v1.3.10"/>
+        <DependedModule Id="CustomBattle" DependentVersion="v1.3.10"/>
+        <DependedModule Id="StoryMode" DependentVersion="v1.3.10"/>
+    </DependedModules>
+    <SubModules>
+        <SubModule>
+            <Name value="Coop"/>
+            <DLLName value="Coop.dll"/>
+            <SubModuleClassType value="Coop.CoopMod"/>
+            <Tags>
+                <Tag key="DedicatedServerType" value="none" />
+                <Tag key="IsNoRenderModeElement" value="false" />
+            </Tags>
+        </SubModule>
+    </SubModules>
+    <Xmls>
+        <XmlNode>
+            <XmlName id="CraftingPieces" path="new_pieces"/>
+        </XmlNode>
+        <XmlNode>
+            <XmlName id="WeaponDescriptions" path="new_weapon_descriptions"/>
+        </XmlNode>
+        <XmlNode>
+            <XmlName id="CraftingTemplates" path="new_templates"/>
+        </XmlNode>
+        <XmlNode>
+            <XmlName id="BodyProperties" path="BodyProperties"/>
+        </XmlNode>
+        <XmlNode>
+            <XmlName id="Items" path="spitems"/>
+        </XmlNode>
+        <XmlNode>
+            <XmlName id="NPCCharacters" path="characters"/>
+        </XmlNode>
+        <XmlNode>
+            <XmlName id="Settlements" path="settlements"/>
+        </XmlNode>
+        <XmlNode>
+            <XmlName id="GameText" path="module_strings"/>
+        </XmlNode>
+    </Xmls>
+</Module>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Items>
+  <Item id="coop_debug_token"
+        name="{=coop_debug_token}Coop Token"
+        mesh="crate_a"
+        is_merchandise="false"
+        weight="1"
+        Type="Goods">
+    <Flags Civilian="true" />
+  </Item>
+</Items>
