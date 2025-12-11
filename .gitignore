@@ -399,8 +399,7 @@ MigrationBackup/
 
 # NUnit
 
-# Coop module build outputs (game installation tree)
-/Modules/
+# Coop local utilities
 /ILSpy_binaries_*/
 /nuget.exe
 
