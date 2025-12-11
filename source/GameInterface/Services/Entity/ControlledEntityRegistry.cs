@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using GameInterface.Services.Entity.Data;
 using ProtoBuf;
@@ -146,7 +146,11 @@ internal class ControlledEntityRegistry : IControlledEntityRegistry
     public bool RegisterAsControlled(string ownerId, string entityId, out ControlledEntity newEntity)
     {
         newEntity = null;
-
+        if (string.IsNullOrEmpty(ownerId) || string.IsNullOrEmpty(entityId))
+        {
+            Logger.Error("RegisterAsControlled refused: ownerId/entityId null or empty");
+            return false;
+        }
         if (controllerIdLookup.ContainsKey(entityId)) return false;
 
         var result = true;

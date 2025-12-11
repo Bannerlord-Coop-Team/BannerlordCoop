@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
 using HarmonyLib;
@@ -33,6 +33,7 @@ internal class SettlementRegistry : IAutoRegistry<Settlement>
     {
         foreach (var settlement in Settlement.All.OrderBy(obj => obj.Id))
         {
+            if (registry.TryGetValue<Settlement>(settlement.StringId, out _)) continue;
             registry.RegisterExistingObject(settlement.StringId, settlement);
         }
     }

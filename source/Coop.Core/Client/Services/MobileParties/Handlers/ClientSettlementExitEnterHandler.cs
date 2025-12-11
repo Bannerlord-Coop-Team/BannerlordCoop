@@ -77,7 +77,10 @@ public class ClientSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<NetworkPartyEnterSettlement> obj)
     {
         var payload = obj.What;
-
+        if (payload.PartyId == "player_party")
+        {
+            return;
+        }
         var message = new PartyEnterSettlement(payload.SettlementId, payload.PartyId);
         messageBroker.Publish(this, message);
     }
@@ -85,6 +88,10 @@ public class ClientSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<NetworkPartyLeaveSettlement> obj)
     {
         var payload = obj.What;
+        if (payload.PartyId == "player_party")
+        {
+            return;
+        }
         var message = new PartyLeaveSettlement(payload.PartyId);
 
         messageBroker.Publish(this, message);

@@ -1,8 +1,10 @@
-﻿using Common;
+using Common;
+using Common.Util;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using TaleWorlds.CampaignSystem;
+using System;
 
 namespace GameInterface.Services.Heroes.Handlers;
 
@@ -30,13 +32,24 @@ internal class SaveHandler : IHandler
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
-            var gameData = saveInterface.SaveCurrentGame();
+            using (new AllowedThread())
+            {
+                byte[] gameData;
+                try
+                {
+                    gameData = saveInterface.SaveCurrentGame();
+                }
+                catch
+                {
+                    gameData = Array.Empty<byte>();
+                }
 
-            var packagedMessage = new GameSaveDataPackaged(
-                gameData,
-                Campaign.Current?.UniqueGameId);
+                var packagedMessage = new GameSaveDataPackaged(
+                    gameData,
+                    Campaign.Current?.UniqueGameId);
 
-            messageBroker.Respond(obj.Who, packagedMessage);
+                messageBroker.Respond(obj.Who, packagedMessage);
+            }
         });
     }
 }

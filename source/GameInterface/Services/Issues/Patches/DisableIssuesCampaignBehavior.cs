@@ -1,5 +1,6 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface;
 
 namespace GameInterface.Services.Issues.Patches;
 
@@ -7,5 +8,5 @@ namespace GameInterface.Services.Issues.Patches;
 internal class DisableIssuesCampaignBehavior
 {
     [HarmonyPatch(nameof(IssuesCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

@@ -49,7 +49,24 @@ internal class SaveGameHandler : IHandler
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
         messageBroker.Unsubscribe<LoadGame>(Handle_LoadGameByName);
     }
+    private void Handle_LoadGameByName(MessagePayload<LoadGame> obj)
+    {
+        var provided = obj.What.SaveName;
+        var nameOnly = Path.GetFileNameWithoutExtension(provided);
+        var docs = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
+        var dir = Path.Combine(docs, "Mount and Blade II Bannerlord", "Game Saves");
+        var pathCandidate = Path.Combine(dir, nameOnly + ".sav");
+        var path = File.Exists(pathCandidate) ? pathCandidate : provided;
 
+        if (!File.Exists(path))
+        {
+            messageBroker.Publish(this, new SendInformationMessage($"Sauvegarde introuvable: {provided}"));
+            return;
+        }
+
+        var bytes = File.ReadAllBytes(path);
+        messageBroker.Publish(this, new LoadGameSave(bytes));
+    }
     private void Handle_GameSaved(MessagePayload<GameSaved> obj)
     {
         var saveName = obj.What.SaveName;
@@ -81,24 +98,10 @@ internal class SaveGameHandler : IHandler
 
         // Auto-enable time after world registration completes
         messageBroker.Publish(this, new SetTimeControlMode(GameInterface.Services.Heroes.Enum.TimeControlEnum.Play_1x));
+
+        // Déclenche une sauvegarde automatique juste après l'enregistrement du monde
+        messageBroker.Publish(this, new PackageGameSaveData());
     }
 
-    private void Handle_LoadGameByName(MessagePayload<LoadGame> obj)
-    {
-        var provided = obj.What.SaveName;
-        var nameOnly = Path.GetFileNameWithoutExtension(provided);
-        var docs = Environment.GetFolderPath(Environment.SpecialFolder.Personal);
-        var dir = Path.Combine(docs, "Mount and Blade II Bannerlord", "Game Saves");
-        var pathCandidate = Path.Combine(dir, nameOnly + ".sav");
-        var path = File.Exists(pathCandidate) ? pathCandidate : provided;
-
-        if (!File.Exists(path))
-        {
-            messageBroker.Publish(this, new SendInformationMessage($"Sauvegarde introuvable: {provided}"));
-            return;
-        }
-
-        var bytes = File.ReadAllBytes(path);
-        messageBroker.Publish(this, new LoadGameSave(bytes));
-    }
+    
 }

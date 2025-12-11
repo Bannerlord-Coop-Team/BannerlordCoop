@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Settlements.Patches.Disable;
@@ -13,7 +14,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_arena_on_consequence")]
     static bool DisableArena()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -23,7 +24,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_tavern_on_consequence")]
     static bool DisableTavern()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -33,7 +34,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_castle_dungeon_on_consequence")]
     static bool DisableCastleDungeon()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -43,7 +44,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_dungeon_on_consequence")]
     static bool DisableTownDungeon()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -53,7 +54,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_market_on_consequence")]
     static bool DisableTownMarket()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -63,7 +64,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_town_streets_on_consequence")]
     static bool DisableTownCenter()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -73,7 +74,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_lordshall_on_consequence")]
     static bool DisableTownHall()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -83,7 +84,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_go_to_keep_on_consequence")]
     static bool DisableTownKeep()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -93,7 +94,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_village_village_center_on_consequence")]
     static bool DisableVillageCenter()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -103,7 +104,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_castle_lordshall_on_consequence")]
     static bool DisableCastleHall()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -113,7 +114,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_leave_troops_garrison_on_consequece")]
     static bool DisableGarrison()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -123,7 +124,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_ui_town_manage_town_on_consequence")]
     static bool DisableTownManagement()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -133,7 +134,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_ui_town_castle_manage_town_on_consequence")]
     static bool DisableCastleManagement()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -143,7 +144,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_castle_take_a_walk_around_the_castle_on_consequence")]
     static bool DisableCastleWalkAround()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -153,7 +154,7 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_ui_village_buy_good_on_consequence")]
     static bool DisableVillageBuyGoods()
     {
-        return false;
+        return true;
     }
 
     /// <summary>
@@ -175,6 +176,6 @@ internal class DisablePlayerTownVisitCampaignBehavior
     [HarmonyPatch("game_menu_town_keep_open_stash_on_consequence")]
     static bool DisableTownStash()
     {
-        return false;
+        return true;
     }
 }

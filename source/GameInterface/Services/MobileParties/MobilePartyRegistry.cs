@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
 using HarmonyLib;
@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
+using GameInterface.Services.ItemRosters;
 
 namespace GameInterface.Services.MobileParties;
 
@@ -37,7 +38,12 @@ internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
     {
         foreach (var party in MobileParty.All)
         {
+            if (registry.TryGetValue<MobileParty>(party.StringId, out _)) continue;
             registry.RegisterExistingObject(party.StringId, party);
+            if (party.Party != null && party.ItemRoster != null)
+            {
+                ItemRosterLookup.Set(party.ItemRoster, party.Party);
+            }
         }
     }
 
@@ -52,6 +58,11 @@ internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
         MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
 
         Campaign.Current?.CampaignObjectManager?.AddMobileParty(obj);
+
+        if (obj.Party != null && obj.ItemRoster != null)
+        {
+            ItemRosterLookup.Set(obj.ItemRoster, obj.Party);
+        }
     }
 
     public void OnClientDestroyed(MobileParty obj, string id)

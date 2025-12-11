@@ -23,13 +23,19 @@ public class NetworkConfiguration : INetworkConfiguration
 
     public string P2PToken => throw new NotImplementedException();
 
-    public int MaxPacketsInQueue => 3000;
+    public int MaxPacketsInQueue => 15000;
 
     public TimeSpan AuditTimeout => TimeSpan.FromSeconds(15);
 
     public TimeSpan ObjectCreationTimeout => TimeSpan.FromSeconds(5);
 
     public TimeSpan NetworkPollInterval => TimeSpan.FromMilliseconds(50);
+
+#if DEBUG
+    public bool AllowAutoPause => true;
+#else
+    public bool AllowAutoPause => false;
+#endif
 
     public void LoadFromFile()
     {

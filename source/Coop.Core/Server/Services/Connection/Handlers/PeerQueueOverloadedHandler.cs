@@ -1,7 +1,8 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.GameDebug.Messages;
@@ -27,6 +28,7 @@ internal class PeerQueueOverloadedHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly TimeHandler timeHandler;
+    private readonly IClientRegistry clientRegistry;
     private readonly ILogger logger;
     
 
@@ -37,13 +39,15 @@ internal class PeerQueueOverloadedHandler : IHandler
     public PeerQueueOverloadedHandler(
         IMessageBroker messageBroker,
         INetwork network,
-        TimeHandler timeHandler
+        TimeHandler timeHandler,
+        IClientRegistry clientRegistry
     )
     {
         this.messageBroker = messageBroker;
         this.network = network;
 
         this.timeHandler = timeHandler;
+        this.clientRegistry = clientRegistry;
 
         logger = LogManager.GetLogger<PeerQueueOverloaded>();
 
@@ -68,6 +72,9 @@ internal class PeerQueueOverloadedHandler : IHandler
 
     internal void Handle(MessagePayload<PeerQueueOverloaded> payload)
     {
+        if (clientRegistry.LoadingPeers.Contains(payload.What.NetPeer))
+            return;
+
         lock (overloadedPeers)
         {
             if (overloadedPeers.Contains(payload.What.NetPeer))
@@ -86,8 +93,10 @@ internal class PeerQueueOverloadedHandler : IHandler
             originalSpeed = TimeControlEnum.Play_1x;
         }
 
-        // pause time
-        timeHandler.SetTimeMode(TimeControlEnum.Pause);
+        if (network.Configuration.AllowAutoPause)
+        {
+            timeHandler.SetTimeMode(TimeControlEnum.Pause);
+        }
 
         // notify server and clients that the game is pausing
         var msg = new SendInformationMessage($"{overloadedPeers.Count} clients are catching up, pausing");
@@ -96,8 +105,11 @@ internal class PeerQueueOverloadedHandler : IHandler
 
         logger.Information("Clients overloaded, paused.");
 
-        // start the poll task to determine when the overloaded queue becomes clear
-        Poller.Start();
+        if (network.Configuration.AllowAutoPause)
+        {
+            // start the poll task to determine when the overloaded queue becomes clear
+            Poller.Start();
+        }
     }
 
     internal void Poll(TimeSpan _)
@@ -111,9 +123,11 @@ internal class PeerQueueOverloadedHandler : IHandler
             if (overloadedPeers.Count > 0) return;
         }
 
-        ResumeTime();
-
-        Poller.Stop();
+        if (network.Configuration.AllowAutoPause)
+        {
+            ResumeTime();
+            Poller.Stop();
+        }
     }
 
     private bool IsClientCaughtUp(NetPeer peer)

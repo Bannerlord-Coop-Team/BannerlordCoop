@@ -38,12 +38,6 @@ static class TimeControlModePatch
     [HarmonyPatch(MethodType.Setter)]
     static bool Prefix(Campaign __instance, ref CampaignTimeControlMode value)
     {
-        //if (__instance != null && !__instance.TimeControlModeLock &&
-        //    value != __instance.TimeControlMode && TimeControl.CanSyncTimeControlMode)
-        //{
-        //    _timeControlModeRef(__instance) = value;
-        //}
-
-        return false;
+        return true;
     }
 }

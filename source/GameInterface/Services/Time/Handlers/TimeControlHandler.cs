@@ -1,7 +1,8 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Enum;
 using System;
 using TaleWorlds.CampaignSystem;
 

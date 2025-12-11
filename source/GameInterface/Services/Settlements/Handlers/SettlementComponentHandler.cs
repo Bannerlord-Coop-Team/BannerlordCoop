@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
@@ -17,7 +17,7 @@ namespace GameInterface.Services.Settlements.Handlers
     /// </summary>
     public class SettlementComponentHandler : IHandler
     {
-        private static readonly ILogger Logger = LogManager.GetLogger<SettlementHandler>();
+        private static readonly ILogger Logger = LogManager.GetLogger<SettlementComponentHandler>();
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
 

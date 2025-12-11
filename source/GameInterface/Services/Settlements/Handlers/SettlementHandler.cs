@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
@@ -156,15 +156,23 @@ public class SettlementHandler : IHandler
         var obj = payload.What;
         if (objectManager.TryGetObject<Settlement>(obj.SettlementId, out var settlement) == false)
         {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
+            settlement = Campaign.Current?.CampaignObjectManager?.Find<Settlement>(obj.SettlementId);
+            if (settlement == null)
+            {
+                Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
+                return;
+            }
         }
 
 
         if (objectManager.TryGetObject<MobileParty>(obj.MobilePartyId, out var mobileParty) == false)
         {
-            Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
-            return;
+            mobileParty = Campaign.Current?.CampaignObjectManager?.Find<MobileParty>(obj.MobilePartyId);
+            if (mobileParty == null)
+            {
+                Logger.Error("Unable to find MobileParty ({MobilePartyId})", obj.MobilePartyId);
+                return;
+            }
         }
 
         MobilePartyCachePatch.RunMobileParty(settlement, mobileParty, obj.NumberOfLordParties, obj.AddMobileParty);

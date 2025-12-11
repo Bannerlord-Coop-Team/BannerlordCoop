@@ -54,6 +54,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnConnectionRequest(ConnectionRequest request)
     {
+        // Client should not accept inbound connection requests; reject by design.
         request.Reject();
     }
 
@@ -61,6 +62,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
     {
         Logger.Error("Network error {SocketError} at {EndPoint}", socketError, endPoint);
         messageBroker.Publish(this, new SendInformationMessage($"Erreur réseau: {socketError}"));
+        // Attempt to reconnect on errors to keep UX smooth.
         AttemptReconnect("Erreur réseau");
     }
 
@@ -71,6 +73,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
     public override void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
+        // Deserialize and route packets to the packet manager for handling.
         IPacket packet = (IPacket)serializer.Deserialize(reader.GetRemainingBytes());
         packetManager.HandleReceive(peer, packet);
     }
@@ -86,6 +89,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
                 serverReachable = true;
                 Logger.Information("Server reachable via UDP ping {Remote}", remoteEndPoint);
                 messageBroker.Publish(this, new SendInformationMessage("Serveur joignable (UDP)"));
+                // On ping response, perform a normal Connect using LiteNetLib token.
                 netManager.Connect(Configuration.Address, Configuration.Port, Configuration.Token);
                 connectStart = DateTime.Now;
             }
@@ -101,6 +105,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
             isConnected = true;
 
             messageBroker.Publish(this, new SendInformationMessage("Connected! Please wait for transfer"));
+            // Notify client logic to transition out of MainMenuState into validation flow.
             messageBroker.Publish(this, new NetworkConnected());
         }
     }
@@ -120,6 +125,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         if (isConnected)
         {
+            // Ensure a clean start by disposing any previous manager instance.
             Dispose();
         }
 
@@ -133,6 +139,7 @@ public class CoopClient : CoopNetworkBase, ICoopClient
 
         try
         {
+            // Resolve server IP (supports hostnames), then send an unconnected UDP ping.
             var hostEntry = Dns.GetHostEntry(Configuration.Address);
             var ip = hostEntry.AddressList.FirstOrDefault(a => a.AddressFamily == AddressFamily.InterNetwork) ?? hostEntry.AddressList.FirstOrDefault();
             if (ip == null)

@@ -16,6 +16,8 @@ public class TransferSaveState : ConnectionStateBase
 {
     private IMessageBroker messageBroker;
     private INetwork network;
+    private byte[] pendingSaveData;
+    private string pendingCampaignId;
 
     public TransferSaveState(IConnectionLogic connectionLogic, IMessageBroker messageBroker, INetwork network)
         : base(connectionLogic)
@@ -24,6 +26,7 @@ public class TransferSaveState : ConnectionStateBase
         this.messageBroker = messageBroker;
 
         messageBroker.Subscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
+        messageBroker.Subscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
 
         messageBroker.Publish(this, new SendInformationMessage("Préparation transfert de sauvegarde"));
         messageBroker.Publish(this, new PackageGameSaveData());
@@ -32,6 +35,7 @@ public class TransferSaveState : ConnectionStateBase
     public override void Dispose()
     {
         messageBroker.Unsubscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
+        messageBroker.Unsubscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
     }
 
     
@@ -46,15 +50,21 @@ public class TransferSaveState : ConnectionStateBase
             messageBroker.Publish(this, new SendInformationMessage("Sauvegarde indisponible côté serveur"));
             return;
         }
+        pendingSaveData = data;
+        pendingCampaignId = payload.CampaignID;
+        messageBroker.Publish(this, new PackageObjectGuids());
+    }
 
+    internal void Handle_ObjectGuidsPackaged(MessagePayload<ObjectGuidsPackaged> obj)
+    {
+        var peer = ConnectionLogic.Peer;
+        if (pendingSaveData == null || pendingSaveData.Length == 0) return;
         var networkEvent = new NetworkGameSaveDataReceived(
-            data,
-            payload.CampaignID,
-            null); // TODO manage controlled objects
-
+            pendingSaveData,
+            pendingCampaignId,
+            obj.What.GameObjectGuids);
         network.Send(peer, networkEvent);
         messageBroker.Publish(this, new SendInformationMessage("Sauvegarde envoyée au client"));
-
         ConnectionLogic.Load();
     }
 

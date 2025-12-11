@@ -1,5 +1,6 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using SandBox.CampaignBehaviors;
+using GameInterface;
 
 namespace GameInterface.Services.Villages.Patches;
 
@@ -7,5 +8,5 @@ namespace GameInterface.Services.Villages.Patches;
 internal class DisableCommonVillagersCampaignBehavior
 {
     [HarmonyPatch(nameof(CommonVillagersCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

@@ -62,16 +62,19 @@ namespace Coop.UI.LoadGameUI
 
         public new void ExecuteSaveLoad()
         {
-            if (Game.Current != null)
+            try
             {
-                ScreenManager.PopScreen();
-                GameStateManager.Current.CleanStates(0);
-                GameStateManager.Current = TaleWorlds.MountAndBlade.Module.CurrentModule.GlobalGameStateManager;
+                InformationManager.DisplayMessage(new InformationMessage($"Hébergement en cours sur la sauvegarde {Save.Name}..."));
+                MessageBroker.Instance.Publish(this, new HostSaveGame(Save.Name));
             }
-
-            InformationManager.DisplayMessage(new InformationMessage($"Hébergement en cours sur la sauvegarde {Save.Name}..."));
-
-            MessageBroker.Instance.Publish(this, new HostSaveGame(Save.Name));
+            catch (NotSupportedException ex)
+            {
+                InformationManager.DisplayMessage(new InformationMessage($"Chargement non supporté: {ex.Message}"));
+            }
+            catch (Exception ex)
+            {
+                InformationManager.DisplayMessage(new InformationMessage($"Erreur chargement: {ex.Message}"));
+            }
         }
 	}
 
@@ -197,26 +200,38 @@ namespace Coop.UI.LoadGameUI
 
         public new void ExecuteLoadSave()
         {
-            SelectedGameVM currentSelectedSave = _currentSelectedOverride;
-            if (currentSelectedSave == null)
+            try
             {
-                try
+                SelectedGameVM currentSelectedSave = _currentSelectedOverride;
+                if (currentSelectedSave == null)
                 {
-                    var selectedSaveProp = typeof(SaveLoadVM).GetProperty("SelectedSave", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                    currentSelectedSave = selectedSaveProp?.GetValue(this) as SelectedGameVM;
-                    if (currentSelectedSave == null)
+                    try
                     {
-                        var currentSelectedProp = typeof(SaveLoadVM).GetProperty("CurrentSelectedSave", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-                        currentSelectedSave = currentSelectedProp?.GetValue(this) as SelectedGameVM;
+                        var selectedSaveProp = typeof(SaveLoadVM).GetProperty("SelectedSave", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                        currentSelectedSave = selectedSaveProp?.GetValue(this) as SelectedGameVM;
+                        if (currentSelectedSave == null)
+                        {
+                            var currentSelectedProp = typeof(SaveLoadVM).GetProperty("CurrentSelectedSave", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+                            currentSelectedSave = currentSelectedProp?.GetValue(this) as SelectedGameVM;
+                        }
                     }
+                    catch { }
                 }
-                catch { }
+                if (currentSelectedSave == null)
+                {
+                    InformationManager.DisplayMessage(new InformationMessage("Aucune sauvegarde sélectionnée"));
+                    return;
+                }
+                currentSelectedSave.ExecuteSaveLoad();
             }
-            if (currentSelectedSave == null)
+            catch (NotSupportedException ex)
             {
-                return;
+                InformationManager.DisplayMessage(new InformationMessage($"Chargement non supporté: {ex.Message}"));
             }
-            currentSelectedSave.ExecuteSaveLoad();
+            catch (Exception ex)
+            {
+                InformationManager.DisplayMessage(new InformationMessage($"Erreur chargement: {ex.Message}"));
+            }
         }
 
 		public void ExecuteDeleteSelectedSave()
@@ -464,14 +479,16 @@ namespace Coop.UI.LoadGameUI
             _spriteCategory = spriteData.SpriteCategories["ui_saveload"];
             
 
-            _gauntletLayer = new GauntletLayer("SaveLoadLayer", 1, true);
+            InformationManager.DisplayMessage(new InformationMessage("Ouverture de l’écran de chargement des sauvegardes"));
+            _gauntletLayer = new GauntletLayer("GauntletLayer", 1, true);
+            AddLayer(_gauntletLayer);
             _gauntletLayer.LoadMovie("SaveLoadScreen", _dataSource);
+            InformationManager.DisplayMessage(new InformationMessage("Écran de chargement des sauvegardes chargé"));
             _gauntletLayer.InputRestrictions.SetInputRestrictions(true, InputUsageMask.All);
             _gauntletLayer.InputRestrictions.SetInputRestrictions(true, InputUsageMask.All);
             _gauntletLayer.IsFocusLayer = true;
             _gauntletLayer.Input.RegisterHotKeyCategory(HotKeyManager.GetCategory("GenericPanelGameKeyCategory"));
             ScreenManager.TrySetFocus(_gauntletLayer);
-            AddLayer(_gauntletLayer);
             try { _dataSource.SelectFirst(); } catch { }
         }
 

@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Data;
@@ -57,10 +57,15 @@ internal class MobilePartyControlHandler : IHandler
         partyInterface.RegisterAllPartiesAsControlled(ownerId);
     }
 
-    private void Handle_UpdateMobilePartyControl(MessagePayload<UpdateMobilePartyControl> obj)
-    {
-        string partyId = obj.What.PartyId;
-        var controllerId = obj.What.ControllerId;
+        private void Handle_UpdateMobilePartyControl(MessagePayload<UpdateMobilePartyControl> obj)
+        {
+            string partyId = obj.What.PartyId;
+            var controllerId = obj.What.ControllerId;
+
+            if (string.IsNullOrEmpty(partyId) || string.IsNullOrEmpty(controllerId))
+            {
+                return;
+            }
 
         if (obj.What.IsRevocation == false)
         {
@@ -80,18 +85,22 @@ internal class MobilePartyControlHandler : IHandler
         }
     }
 
-    private void Handle_MobilePartyCreated(MessagePayload<PartyCreated> obj)
-    {
-        if (!controlPartiesByDefault) return;
+        private void Handle_MobilePartyCreated(MessagePayload<PartyCreated> obj)
+        {
+            if (!controlPartiesByDefault) return;
 
-        var stringId = obj.What.Instance.StringId;
+            var stringId = obj.What.Instance.StringId;
+
+            if (string.IsNullOrEmpty(stringId)) return;
 
         controlledEntityRegistry.RegisterAsControlled(ownerId, stringId);
     }
 
-    private void Handle_MobilePartyDestroyed(MessagePayload<PartyDestroyed> obj)
-    {
-        var stringId = obj.What.Instance.StringId;
+        private void Handle_MobilePartyDestroyed(MessagePayload<PartyDestroyed> obj)
+        {
+            var stringId = obj.What.Instance.StringId;
+
+            if (string.IsNullOrEmpty(stringId)) return;
 
         if (!controlledEntityRegistry.TryGetControlledEntity(stringId, out var controlledEntity))
             return;

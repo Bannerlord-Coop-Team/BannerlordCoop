@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using GameInterface.Registry.Auto;
 using HarmonyLib;
 using Serilog;
@@ -32,9 +32,13 @@ internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
         foreach (MobileParty party in Campaign.Current.MobileParties)
         {
 
-            if (registry.RegisterExistingObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster) == false)
+            if (registry.TryGetValue<TroopRoster>($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", out _))
+                ;
+            else if (registry.RegisterExistingObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster) == false)
                 Logger.Error($"Unable to register {nameof(MobileParty.MemberRoster)}");
-            if (registry.RegisterExistingObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster) == false)
+            if (registry.TryGetValue<TroopRoster>($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", out _))
+                ;
+            else if (registry.RegisterExistingObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster) == false)
                 Logger.Error($"Unable to register {nameof(MobileParty.PrisonRoster)}");
         }
     }

@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.ObjectManager;
 
@@ -85,11 +87,48 @@ internal class ObjectManager : IObjectManager
 
     public bool AddExisting<T>(string id, T obj)
     {
-        if (string.IsNullOrEmpty(id)) return false;
-
         if (obj == null) return false;
 
         if (TryGetRegistry(typeof(T), out IRegistry registry) == false) return false;
+
+        if (string.IsNullOrEmpty(id))
+        {
+            if (registry.TryGetId(obj, out var existingId))
+            {
+                id = existingId;
+            }
+            else
+            {
+                var mBObj = obj as MBObjectBase;
+                if (mBObj != null)
+                {
+                    var stringId = mBObj.StringId;
+                    if (!string.IsNullOrEmpty(stringId))
+                    {
+                        id = stringId;
+                    }
+                    else
+                    {
+                        var guid = mBObj.Id;
+                        if (guid != default)
+                        {
+                            id = typeof(T).Name + "_" + guid.InternalValue.ToString();
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(id))
+                {
+                    var objectType = obj.GetType();
+                    var className = nameof(ObjectManager);
+                    var stackTrace = Environment.StackTrace;
+                    logger.Error("Unable to derive id for {name} in {objectManager}\nStackTrace: {stackTrace}", objectType, className, stackTrace);
+                    return false;
+                }
+            }
+        }
+
+        if (Contains(id)) return true;
 
         return LogIfRegistrationError(
             registry.RegisterExistingObject(id, obj),
@@ -121,7 +160,7 @@ internal class ObjectManager : IObjectManager
     {
         if (string.IsNullOrEmpty(id)) return false;
 
-        if (RegistryMap.Values.Any(registry => registry.TryGetId(id, out _))) return true;
+        if (RegistryMap.Values.Any(registry => registry.TryGetValue<object>(id, out _))) return true;
 
         return false;
     }
@@ -145,8 +184,43 @@ internal class ObjectManager : IObjectManager
         if (string.IsNullOrEmpty(id)) return false;
 
         if (TryGetRegistry(typeof(T), out IRegistry registry) == false) return false;
+        if (registry.TryGetValue(id, out obj)) return true;
 
-        return registry.TryGetValue(id, out obj);
+        object candidate = null;
+
+        var com = Campaign.Current?.CampaignObjectManager;
+        if (com != null)
+        {
+            try
+            {
+                var find = com.GetType().GetMethod("Find")?.MakeGenericMethod(typeof(T));
+                candidate = find?.Invoke(com, new object[] { id });
+            }
+            catch { }
+        }
+
+        if (candidate == null)
+        {
+            var mb = MBObjectManager.Instance;
+            if (mb != null)
+            {
+                try
+                {
+                    var get = mb.GetType().GetMethods().FirstOrDefault(m => m.Name == "GetObject" && m.IsGenericMethod)?.MakeGenericMethod(typeof(T));
+                    candidate = get?.Invoke(mb, new object[] { id });
+                }
+                catch { }
+            }
+        }
+
+        if (candidate is T found)
+        {
+            registry.RegisterExistingObject(id, found);
+            obj = found;
+            return true;
+        }
+
+        return false;
     }
 
     public bool Remove<T>(T obj)

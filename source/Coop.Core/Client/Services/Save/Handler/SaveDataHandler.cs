@@ -1,6 +1,7 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Coop.Core.Client.Messages;
 using GameInterface.Services.UI.Messages;
+using GameInterface.Registry;
 
 namespace Coop.Core.Client.Services.Save.Handler
 {
@@ -31,6 +32,11 @@ namespace Coop.Core.Client.Services.Save.Handler
         {
             messageBroker.Publish(this, new EndLoadingScreen());
             saveDataMessage = obj.What;
+            var guids = saveDataMessage.GameObjectGuids;
+            if (guids != null)
+            {
+                RegistrySnapshot.ItemRosterOwners = guids.ItemRosterOwners;
+            }
         }
     }
 }

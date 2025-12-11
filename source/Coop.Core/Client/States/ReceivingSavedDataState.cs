@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Coop.Core.Client.Messages;
 using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Client.Services.MobileParties.Messages;
@@ -14,6 +14,7 @@ namespace Coop.Core.Client.States;
 /// </summary>
 public class ReceivingSavedDataState : ClientStateBase
 {
+    // Holds the last save data message to coordinate menu return and loading.
     private NetworkGameSaveDataReceived saveDataMessage = default;
     private readonly IMessageBroker messageBroker;
     private readonly IDeferredHeroRepository deferredHeroRepo;
@@ -28,6 +29,7 @@ public class ReceivingSavedDataState : ClientStateBase
         this.messageBroker = messageBroker;
         this.deferredHeroRepo = deferredHeroRepo;
         this.coopFinalizer = coopFinalizer;
+        // Subscribe to save data transfer and menu events to sequence a safe load.
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
@@ -51,10 +53,9 @@ public class ReceivingSavedDataState : ClientStateBase
             messageBroker.Publish(this, new SendInformationMessage("Échec: sauvegarde vide reçue"));
             return;
         }
-        messageBroker.Publish(this, new SendInformationMessage($"Sauvegarde reçue ({size} octets), chargement..."));
-        var commandLoad = new LoadGameSave(saveData);
-        messageBroker.Publish(this, commandLoad);
-        Logic.LoadSavedData();
+        // Do not load immediately; first return to main menu to reset game states safely.
+        messageBroker.Publish(this, new SendInformationMessage($"Sauvegarde reçue ({size} octets), retour menu principal..."));
+        messageBroker.Publish(this, new EnterMainMenu());
     }
 
     internal void Handle_MainMenuEntered(MessagePayload<MainMenuEntered> obj)
@@ -68,6 +69,7 @@ public class ReceivingSavedDataState : ClientStateBase
             return;
         }
 
+        // Now that we're safely in main menu, command the game to load the save.
         messageBroker.Publish(this, new SendInformationMessage("Chargement de la sauvegarde côté client"));
         var commandLoad = new LoadGameSave(saveData);
         messageBroker.Publish(this, commandLoad);
@@ -77,8 +79,11 @@ public class ReceivingSavedDataState : ClientStateBase
 
     private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
     {
-        var peer = (NetPeer)obj.Who;
-        deferredHeroRepo.AddDeferredHero(peer, obj.What.PlayerId, obj.What.PlayerHero);
+        var peer = obj.Who as NetPeer;
+        if (peer != null)
+        {
+            deferredHeroRepo.AddDeferredHero(peer, obj.What.PlayerId, obj.What.PlayerHero);
+        }
     }
 
     public override void EnterMainMenu()

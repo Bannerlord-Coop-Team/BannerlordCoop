@@ -1,6 +1,7 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface;
 
 namespace GameInterface.Services.Characters.Patches;
 
@@ -8,5 +9,5 @@ namespace GameInterface.Services.Characters.Patches;
 internal class DisableWorkshopsCharactersCampaignBehavior
 {
     [HarmonyPatch(nameof(WorkshopsCharactersCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

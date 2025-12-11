@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using GameInterface.Registry.Auto;
 using HarmonyLib;
 using Serilog;
@@ -30,8 +30,13 @@ internal class MBBodyPropertyRegistry : IAutoRegistry<MBBodyProperty>
     {
         foreach (CharacterObject character in CharacterObject.All.DistinctBy(c => c.BodyPropertyRange))
         {
-            var networkId = nameof(MBBodyProperty) + "_" + character.StringId;
-            registry.RegisterExistingObject(networkId, character.BodyPropertyRange);
+            if (character == null) continue;
+            var range = character.BodyPropertyRange;
+            if (range == null) continue;
+            var sid = character.StringId;
+            if (string.IsNullOrEmpty(sid)) continue;
+            var networkId = nameof(MBBodyProperty) + "_" + sid;
+            registry.RegisterExistingObject(networkId, range);
         }
     }
 

@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;
@@ -45,8 +45,12 @@ public class VillageHandler : IHandler
 
         if (objectManager.TryGetObject<Village>(obj.VillageId, out var village) == false)
         {
-            Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
-            return;
+            village = TaleWorlds.CampaignSystem.Campaign.Current?.CampaignObjectManager?.Find<Village>(obj.VillageId);
+            if (village == null)
+            {
+                Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
+                return;
+            }
         }
 
         VillagePatches.RunLastDemandTimeSatisified(village, obj.LastDemandSatifiedTime);
@@ -59,8 +63,12 @@ public class VillageHandler : IHandler
 
         if (objectManager.TryGetObject<Village>(obj.VillageId, out var village) == false)
         {
-            Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
-            return;
+            village = TaleWorlds.CampaignSystem.Campaign.Current?.CampaignObjectManager?.Find<Village>(obj.VillageId);
+            if (village == null)
+            {
+                Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
+                return;
+            }
         }
 
         VillagePatches.RunTradeTaxChange(village, obj.TradeTaxAccumulated);
@@ -86,14 +94,22 @@ public class VillageHandler : IHandler
 
         if (objectManager.TryGetObject<Village>(obj.VillageId, out var village) == false)
         {
-            Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
-            return;
+            village = TaleWorlds.CampaignSystem.Campaign.Current?.CampaignObjectManager?.Find<Village>(obj.VillageId);
+            if (village == null)
+            {
+                Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
+                return;
+            }
         }
 
         if (objectManager.TryGetObject<Settlement>(obj.TradeBoundID, out var settlement) == false)
         {
-            Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
-            return;
+            settlement = TaleWorlds.CampaignSystem.Campaign.Current?.CampaignObjectManager?.Find<Settlement>(obj.TradeBoundID);
+            if (settlement == null)
+            {
+                Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
+                return;
+            }
         }
 
 
@@ -106,8 +122,12 @@ public class VillageHandler : IHandler
 
         if(objectManager.TryGetObject<Village>(obj.VillageId, out var village) == false)
         {
-            Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
-            return;
+            village = TaleWorlds.CampaignSystem.Campaign.Current?.CampaignObjectManager?.Find<Village>(obj.VillageId);
+            if (village == null)
+            {
+                Logger.Error("Unable to find Village ({villageId})", obj.VillageId);
+                return;
+            }
         }
 
         VillagePatches.RunVillageStateChange(village, (Village.VillageStates)obj.State);

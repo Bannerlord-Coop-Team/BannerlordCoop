@@ -26,11 +26,13 @@ internal class GameStateInterface : IGameStateInterface
     public static DateTime? EnterMainMenuBlockedUntil { get; set; }
     public void EnterMainMenu()
     {
+        // Guard against returning to menu while a blocking load is in progress.
         if (IsLoadingGame)
         {
             Logger.Warning("EnterMainMenu ignored: loading in progress");
             return;
         }
+        // Prevent rapid re-entry to menu immediately after load to stabilize state changes.
         if (EnterMainMenuBlockedUntil.HasValue && DateTime.UtcNow < EnterMainMenuBlockedUntil.Value)
         {
             Logger.Warning("EnterMainMenu ignored: blocked until {BlockedUntil}", EnterMainMenuBlockedUntil);
@@ -39,11 +41,13 @@ internal class GameStateInterface : IGameStateInterface
         if (Campaign.Current == null) return;
         if (Game.Current == null) return;
 
+        // End the current game from the main thread to reset all states and screens.
         EndGame();
     }
 
     public void LoadSaveGame(byte[] saveData)
     {
+        // Set loading flag to coordinate blocking calls and menu re-entry.
         IsLoadingGame = true;
         Logger.Information("LoadSaveGame invoked (bytes={Length})", saveData?.Length ?? 0);
         GameLoopRunner.RunOnMainThread(() => InteralLoadSaveGame(saveData), blocking: true);
@@ -60,6 +64,7 @@ internal class GameStateInterface : IGameStateInterface
 
         try
         {
+            // Use in-memory save driver to load transferred data, then start a SandBox game with it.
             ISaveDriver driver = new CoopInMemSaveDriver(saveData);
             LoadResult loadResult = SaveManager.Load("", driver, loadAsLateInitialize: true);
             Logger.Information("Save loaded: Result={Result}", loadResult);
@@ -73,6 +78,7 @@ internal class GameStateInterface : IGameStateInterface
         }
         finally
         {
+            // Clear loading flag and block menu re-entry for a short period to avoid race conditions.
             IsLoadingGame = false;
             EnterMainMenuBlockedUntil = DateTime.UtcNow.AddSeconds(5);
         }
@@ -82,12 +88,14 @@ internal class GameStateInterface : IGameStateInterface
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
+            // Start an empty SandBox game to enter character creation flow.
             MBGameManager.StartNewGame(new SandBoxGameManager(default(LoadResult)));
         });
     }
 
     public void EndGame()
     {
+        // Request Bannerlord to end current game; UI transitions happen on main thread.
         GameLoopRunner.RunOnMainThread(MBGameManager.EndGame);
     }
 }

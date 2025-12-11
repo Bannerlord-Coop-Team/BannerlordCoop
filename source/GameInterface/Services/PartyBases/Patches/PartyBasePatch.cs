@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.ItemRosters;
+using GameInterface.Services.ItemRosters;
 using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
@@ -13,9 +13,11 @@ internal class PartyBasePatch
     [HarmonyPostfix]
     public static void ItemRosterSetterPostfix(PartyBase __instance)
     {
-        if (ModInformation.IsClient) return;
-
-        ItemRosterLookup.Set(__instance.ItemRoster, __instance);
+        var roster = __instance.ItemRoster;
+        if (roster != null)
+        {
+            ItemRosterLookup.Set(roster, __instance);
+        }
     }
 }
 
@@ -26,16 +28,24 @@ internal class PartyBaseHelperPatch
     [HarmonyPrefix]
     public static bool HasFeat(PartyBase party, FeatObject feat, ref bool __result)
     {
-        if (party == null)
-            __result = false;
-        if (party.LeaderHero != null)
-            __result = party.LeaderHero.Culture.HasFeat(feat);
-        if (party.Culture != null)
-            __result = party.Culture.HasFeat(feat);
-        if (party.Owner != null)
-            __result = party.Owner.Culture.HasFeat(feat);
-        __result = party.Settlement != null && party.Settlement.Culture.HasFeat(feat);
+        bool hasFeat = false;
 
+        if (party != null)
+        {
+            if (party.LeaderHero != null && party.LeaderHero.Culture != null)
+                hasFeat |= party.LeaderHero.Culture.HasFeat(feat);
+
+            if (party.Culture != null)
+                hasFeat |= party.Culture.HasFeat(feat);
+
+            if (party.Owner != null && party.Owner.Culture != null)
+                hasFeat |= party.Owner.Culture.HasFeat(feat);
+
+            if (party.Settlement != null && party.Settlement.Culture != null)
+                hasFeat |= party.Settlement.Culture.HasFeat(feat);
+        }
+
+        __result = hasFeat;
         return false;
     }
 }

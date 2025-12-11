@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Serialization;
 using Coop.Core.Server.Services.Save.Data;
 using System;
@@ -18,7 +18,7 @@ namespace Coop.Core.Server.Services.Save
 
     internal class CoopSaveManager : ICoopSaveManager
     {
-        public string DefaultPath { get; } = "./saves/";
+        public string DefaultPath { get; } = GetDefaultPath();
         public string FileType { get; } = ".json";
 
         /// <summary>
@@ -54,6 +54,18 @@ namespace Coop.Core.Server.Services.Save
             var fileIO = new JsonFileIO();
 
             fileIO.WriteToFile(filePath, session);
+        }
+
+        private static string GetDefaultPath()
+        {
+            var asmPath = System.Reflection.Assembly.GetExecutingAssembly().Location;
+            var binDir = Path.GetDirectoryName(asmPath);
+            var moduleRoot = Directory.GetParent(binDir)?.Parent?.FullName ?? string.Empty;
+            if (string.IsNullOrEmpty(moduleRoot))
+            {
+                return Path.Combine("Modules", "Coop", "saves", "server") + Path.DirectorySeparatorChar;
+            }
+            return Path.Combine(moduleRoot, "saves", "server") + Path.DirectorySeparatorChar;
         }
     }
 }

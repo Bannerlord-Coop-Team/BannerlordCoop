@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Serilog;
 using System;
@@ -53,6 +53,11 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     /// <inheritdoc cref="IRegistry"/>
     public virtual bool RegisterExistingObject(string id, object obj)
     {
+        if (string.IsNullOrEmpty(id))
+        {
+            Logger.Error("Attempted to register object with null/empty id in {type}", typeof(T));
+            return false;
+        }
         if (TryCast(obj, out var castedObj) == false) return false;
 
         if (objIds.ContainsKey(id))
@@ -62,7 +67,46 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
         }
 
         objIds.Add(id, castedObj);
-        idObjs.Add(castedObj, id);
+        try
+        {
+            idObjs.Add(castedObj, id);
+        }
+        catch (System.ArgumentNullException)
+        {
+            try
+            {
+                object resolved = null;
+                var com = TaleWorlds.CampaignSystem.Campaign.Current?.CampaignObjectManager;
+                if (com != null)
+                {
+                    var mi = com.GetType().GetMethod("Find")?.MakeGenericMethod(typeof(T));
+                    resolved = mi?.Invoke(com, new object[] { id });
+                }
+                if (resolved == null)
+                {
+                    var mbo = TaleWorlds.ObjectSystem.MBObjectManager.Instance;
+                    if (mbo != null)
+                    {
+                        var containsMi = mbo.GetType().GetMethod("ContainsObject")?.MakeGenericMethod(typeof(T));
+                        var getMi = mbo.GetType().GetMethod("GetObject")?.MakeGenericMethod(typeof(T));
+                        var has = containsMi != null && (bool)containsMi.Invoke(mbo, new object[] { id });
+                        if (has && getMi != null)
+                        {
+                            resolved = getMi.Invoke(mbo, new object[] { id });
+                        }
+                    }
+                }
+                if (resolved is T casted)
+                {
+                    idObjs.Add(casted, id);
+                    objIds[id] = casted;
+                    return true;
+                }
+            }
+            catch { }
+            Logger.Error("Failed to add to idObjs (key null) for {type} id={id}\nStackTrace: {stack}", typeof(T), id, Environment.StackTrace);
+            return false;
+        }
 
         return true;
     }
@@ -79,7 +123,15 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
         if (idObjs.TryGetValue(castedObj, out var outvar)) return false;
 
         objIds.Add(newId, castedObj);
-        idObjs.Add(castedObj, newId);
+        try
+        {
+            idObjs.Add(castedObj, newId);
+        }
+        catch (System.ArgumentNullException)
+        {
+            Logger.Error("Failed to add new object to idObjs (key null) for {type} id={id}\nStackTrace: {stack}", typeof(T), newId, Environment.StackTrace);
+            return false;
+        }
 
         id = newId;
 
@@ -97,6 +149,7 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 
     public virtual bool Remove(string id)
     {
+        if (string.IsNullOrEmpty(id)) return false;
         if (objIds.TryGetValue(id, out var obj) == false) return false;
 
         return objIds.Remove(id) && idObjs.Remove(obj);
@@ -114,6 +167,7 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     public virtual bool TryGetValue<T1>(string id, out T1 obj) where T1 : class
     {
         obj = null;
+        if (string.IsNullOrEmpty(id)) return false;
         if (objIds.TryGetValue(id, out var internalobj) == false) return false;
 
         obj = internalobj as T1;
@@ -123,12 +177,15 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     protected virtual bool TryCast(object obj, out T castedObj)
     {
         castedObj = obj as T;
-
         if (castedObj == null)
         {
-            Logger.Error($"Attempted to get {obj.GetType()} from a registry that only accepts {typeof(T)}");
+            try
+            {
+                var objType = obj?.GetType();
+                Logger.Error("Attempted to get {objType} from a registry that only accepts {type}", objType, typeof(T));
+            }
+            catch { }
         }
-
         return castedObj != null;
     }
 

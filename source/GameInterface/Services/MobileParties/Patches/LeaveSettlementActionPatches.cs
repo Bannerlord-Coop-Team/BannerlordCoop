@@ -1,5 +1,7 @@
-﻿using Common;
+using Common;
 using Common.Messaging;
+using Common.Logging;
+using Serilog;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -17,10 +19,15 @@ namespace GameInterface.Services.MobileParties.Patches;
 [HarmonyPatch(typeof(LeaveSettlementAction))]
 public class LeaveSettlementActionPatches
 {
+    private static ILogger Logger = LogManager.GetLogger<LeaveSettlementActionPatches>();
     [HarmonyPrefix]
     [HarmonyPatch(nameof(LeaveSettlementAction.ApplyForParty))]
     private static bool Prefix(MobileParty mobileParty)
     {
+        Logger.Information(
+            "LeaveSettlementAction.ApplyForParty intercept party={partyId} current={current}",
+            mobileParty.StringId,
+            mobileParty.CurrentSettlement?.StringId ?? "none");
         if (mobileParty.CurrentSettlement == null) return false;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
@@ -34,6 +41,10 @@ public class LeaveSettlementActionPatches
 
     public static void OverrideApplyForParty(MobileParty party)
     {
+        Logger.Information(
+            "Override LeaveSettlementAction.ApplyForParty party={partyId} current={current}",
+            party.StringId,
+            party.CurrentSettlement?.StringId ?? "none");
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
@@ -41,5 +52,9 @@ public class LeaveSettlementActionPatches
                 if (party.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(party);
             }
         }, blocking: true);
+        Logger.Information(
+            "Override LeaveSettlementAction.ApplyForParty terminé party={partyId} current={current}",
+            party.StringId,
+            party.CurrentSettlement?.StringId ?? "none");
     }
 }

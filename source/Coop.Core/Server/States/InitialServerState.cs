@@ -4,6 +4,7 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
+using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Core.Server.States;
 
@@ -35,6 +36,9 @@ public class InitialServerState : ServerStateBase
 
         global::Common.Logging.LogManager.GetLogger<InitialServerState>().Information("Switching to ServerRunningState");
         Logic.SetState<ServerRunningState>();
+
+        // Auto-save au démarrage du serveur
+        messageBroker.Publish(this, new PackageGameSaveData());
     }
 
     public override void Start()

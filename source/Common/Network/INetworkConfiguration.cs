@@ -13,4 +13,5 @@ public interface INetworkConfiguration
     TimeSpan AuditTimeout { get; }
     TimeSpan ObjectCreationTimeout { get; }
     TimeSpan NetworkPollInterval { get; }
+    bool AllowAutoPause { get; }
 }

@@ -1,4 +1,4 @@
-﻿using GameInterface.Registry;
+using GameInterface.Registry;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -20,8 +20,8 @@ internal class MapEventRegistry : RegistryBase<MapEvent>
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
             if (mapEvent.StringId == null) return;
-
-            if (RegisterExistingObject(mapEvent.StringId, mapEvent) == false)
+            if (TryGetValue<MapEvent>(mapEvent.StringId, out _)) { }
+            else if (RegisterExistingObject(mapEvent.StringId, mapEvent) == false)
             {
                 Logger.Error($"Unable to register {mapEvent}");
             }

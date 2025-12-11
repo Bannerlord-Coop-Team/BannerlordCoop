@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Coop.Tests.Extensions;
@@ -14,7 +14,21 @@ namespace Coop.Tests.Mocks;
 
 public class TestNetwork : INetwork
 {
-    public INetworkConfiguration Configuration => throw new NotImplementedException();
+    private class TestNetworkConfiguration : INetworkConfiguration
+    {
+        public string Address => "localhost";
+        public int Port => 4200;
+        public string Token => "TempToken";
+        public string P2PToken => "";
+        public TimeSpan ConnectionTimeout => TimeSpan.FromSeconds(60);
+        public int MaxPacketsInQueue => 3000;
+        public TimeSpan AuditTimeout => TimeSpan.FromSeconds(15);
+        public TimeSpan ObjectCreationTimeout => TimeSpan.FromSeconds(5);
+        public TimeSpan NetworkPollInterval => TimeSpan.FromMilliseconds(50);
+        public bool AllowAutoPause => true;
+    }
+
+    public INetworkConfiguration Configuration { get; } = new TestNetworkConfiguration();
 
     public int Priority => throw new NotImplementedException();
 

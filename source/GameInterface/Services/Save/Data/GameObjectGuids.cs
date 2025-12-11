@@ -1,4 +1,5 @@
 ﻿using ProtoBuf;
+using GameInterface.Services.ItemRosters.Data;
 using System;
 using System.Linq;
 
@@ -9,6 +10,9 @@ public class GameObjectGuids
 {
     [ProtoMember(1)]
     public string[] ControlledHeros { get; set; } = Array.Empty<string>();
+
+    [ProtoMember(2)]
+    public ItemRosterOwner[] ItemRosterOwners { get; set; } = Array.Empty<ItemRosterOwner>();
 
 
     public GameObjectGuids(string[] controlledHeros)

@@ -52,7 +52,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         IControllerIdProvider controllerIdProvider,
         ICommonSerializer serializer) : base(configuration, serializer)
     {
-        // Dependancy assignment
+        // Dependency assignment and server network setup.
         this.messageBroker = messageBroker;
         this.packetManager = packetManager;
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
@@ -60,10 +60,12 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         ModInformation.IsServer = true;
 
         // Netmanager initialization
+        // Enable NAT punch and unconnected messaging for UDP ping and NAT traversal.
         netManager.NatPunchEnabled = true;
         netManager.NatPunchModule.Init(this);
         netManager.UnconnectedMessagesEnabled = true;
 
+        // Use a fixed controller id for server-side ownership when needed.
         controllerIdProvider.SetControllerId(ServerControllerId);
     }
 
@@ -121,6 +123,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
         var text = Encoding.UTF8.GetString(data);
         if (messageType == UnconnectedMessageType.BasicMessage && text == "CoopPing")
         {
+            // Respond to UDP ping to signal reachability to the client prior to Connect.
             var writer = new NetDataWriter();
             writer.Put("CoopPong");
             netManager.SendUnconnectedMessage(writer, remoteEndPoint);
@@ -195,6 +198,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
             if (outgoingPacketCount > Configuration.MaxPacketsInQueue)
             {
+                // Warn and publish overload message to throttle or notify subsystems.
                 messageBroker.Publish(this, new PeerQueueOverloaded(netPeer));
             }
         }
@@ -202,6 +206,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
+        // Once server-side objects are fully registered, allow clients to join.
         allowJoining = true;
         Logger.Information("All game objects registered; joining enabled");
         messageBroker.Publish(this, new SendInformationMessage("Serveur prêt: connexions activées"));

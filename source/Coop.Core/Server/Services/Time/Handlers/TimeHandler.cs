@@ -35,7 +35,10 @@ public class TimeHandler : IHandler
         this.messageBroker.Subscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
         this.messageBroker.Subscribe<TimeControlModeResponse>(Handle_TimeControlModeResponse);
 
-        AddUnpausePolicy(PlayersLoadingPolicy);
+        if (network.Configuration.AllowAutoPause)
+        {
+            AddUnpausePolicy(PlayersLoadingPolicy);
+        }
     }
 
     public void Dispose()
@@ -44,7 +47,10 @@ public class TimeHandler : IHandler
         messageBroker.Unsubscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
         messageBroker.Unsubscribe<TimeControlModeResponse>(Handle_TimeControlModeResponse);
 
-        RemoveUnpausePolicy(PlayersLoadingPolicy);
+        if (network.Configuration.AllowAutoPause)
+        {
+            RemoveUnpausePolicy(PlayersLoadingPolicy);
+        }
     }
 
     List<WeakDelegate> unpausePolicies = new List<WeakDelegate>();
@@ -101,6 +107,7 @@ public class TimeHandler : IHandler
     public bool SetTimeMode(TimeControlEnum timeMode)
     {
         if (timeMode != TimeControlEnum.Pause && UnpauseDisallowed()) return false;  
+        if (timeMode == TimeControlEnum.Pause && !network.Configuration.AllowAutoPause) return false;
 
         Logger.Verbose("Server changing time to {mode}", timeMode);
 

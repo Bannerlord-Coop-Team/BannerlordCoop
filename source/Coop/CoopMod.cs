@@ -46,6 +46,7 @@ namespace Coop
 
         public CoopMod()
         {
+            // Module entry point: enable detailed logging and capture unhandled exceptions.
             MBDebug.DisableLogging = false;
 
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
@@ -53,6 +54,7 @@ namespace Coop
 
         internal static void StartGameFromSaveReflection(LoadResult loadResult)
         {
+            // Fallback path to start a game from a loaded save via reflection.
             InformationManager.DisplayMessage(new InformationMessage("Sauvegarde chargée, initialisation de la campagne"));
             var asmTypes = AppDomain.CurrentDomain.GetAssemblies();
             Type sbMgrType = null;
@@ -72,6 +74,7 @@ namespace Coop
 
         internal static void TryLoadSaveViaReflection(SaveGameFileInfo save)
         {
+            // Fallback path to load a save using SandBox API via reflection when UI classes are not directly available.
             var asmTypes = AppDomain.CurrentDomain.GetAssemblies();
             Type helperType = null;
             foreach (var a in asmTypes)
@@ -117,6 +120,7 @@ namespace Coop
             ValidateDependencies();
             EnableExceptionTracing();
 
+            // Capture the Bannerlord game loop thread-ID for main-thread dispatch.
             GameLoopRunner.Instance.SetGameLoopThread();
 
             try
@@ -151,6 +155,7 @@ namespace Coop
 
             try
             {
+                // Configure Serilog sinks to both server/client files and Debug output, for visibility in-game.
                 File.AppendAllText(serverFilePath, "BOOTSTRAP\n");
                 File.AppendAllText(clientFilePath, "BOOTSTRAP\n");
                 File.AppendAllText(serverAltFilePath, "BOOTSTRAP\n");
@@ -183,6 +188,7 @@ namespace Coop
                     // Filter to server-related namespaces to avoid spam
                     if (src.StartsWith("Coop.Core.Server") || src.StartsWith("Common.Network") || src.StartsWith("Coop.Core.Common.Network"))
                     {
+                        // Display server-side info messages in the UI, buffering until UI is ready.
                         GameLoopRunner.RunOnMainThread(() =>
                         {
                             if (UiReady)
@@ -197,6 +203,7 @@ namespace Coop
                     }
                     else if (src.StartsWith("Coop.Core.Client"))
                     {
+                        // Display client-side info messages similarly.
                         GameLoopRunner.RunOnMainThread(() =>
                         {
                             if (UiReady)
@@ -265,7 +272,69 @@ namespace Coop
         {
             AppDomain.CurrentDomain.FirstChanceException += (sender, e) =>
             {
-                Logger?.Fatal(e.Exception, "FirstChanceException");
+                try
+                {
+                    var ex = e.Exception;
+                    var typeName = ex?.GetType().FullName ?? "<unknown>";
+                    var msg = ex?.Message ?? "<no message>";
+                    var target = ex?.TargetSite?.ToString() ?? "<none>";
+                    var threadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                    var threadName = System.Threading.Thread.CurrentThread.Name ?? "<unnamed>";
+                    var senderType = sender?.GetType().FullName ?? "<unknown>";
+
+                    Logger?.Fatal("FirstChance {Type}: {Message}", typeName, msg);
+                    Logger?.Fatal("TargetSite: {TargetSite}", target);
+                    Logger?.Fatal("Thread: {ThreadId} {ThreadName}", threadId, threadName);
+                    Logger?.Fatal("AppDomain: {AppDomainFriendlyName}", AppDomain.CurrentDomain.FriendlyName);
+                    Logger?.Fatal("Sender: {SenderType}", senderType);
+
+                    try
+                    {
+                        var st = new System.Diagnostics.StackTrace(ex, true);
+                        var frames = st.GetFrames();
+                        if (frames != null && frames.Length > 0)
+                        {
+                            var sb = new System.Text.StringBuilder();
+                            var max = System.Math.Min(frames.Length, 32);
+                            for (int i = 0; i < max; i++)
+                            {
+                                var f = frames[i];
+                                var method = f.GetMethod();
+                                var declType = method?.DeclaringType?.FullName ?? "<unknown>";
+                                var methodName = method?.Name ?? "<unknown>";
+                                var file = f.GetFileName() ?? "<nofile>";
+                                var line = f.GetFileLineNumber();
+                                sb.Append("  at ")
+                                  .Append(declType)
+                                  .Append('.')
+                                  .Append(methodName)
+                                  .Append(" in ")
+                                  .Append(file)
+                                  .Append(":line ")
+                                  .Append(line)
+                                  .Append('\n');
+                            }
+                            Logger?.Fatal("StackTraceDetailed:\n{Stack}", sb.ToString());
+                        }
+                    }
+                    catch { }
+
+                    try
+                    {
+                        var envStack = System.Environment.StackTrace;
+                        Logger?.Fatal("EnvironmentStack:\n{Stack}", envStack);
+                    }
+                    catch { }
+                }
+                catch
+                {
+                    try
+                    {
+                        Logger?.Fatal(e.Exception, "FirstChanceException");
+                        Logger?.Fatal("StackTrace: {StackTrace}", e.Exception.StackTrace);
+                    }
+                    catch { }
+                }
             };
         }
 
@@ -365,6 +434,7 @@ namespace Coop
         {
             if(m_IsFirstTick)
             {
+                // Re-capture game loop thread ID when the application starts ticking.
                 GameLoopRunner.Instance.SetGameLoopThread();
                 
                 m_IsFirstTick = false;
@@ -401,6 +471,7 @@ namespace Coop
             var t = Type.GetType(typeName, throwOnError: false);
             if (t != null && typeof(ScreenBase).IsAssignableFrom(t))
             {
+                // Preferred path: use GameInterface-provided screen type if available.
                 var screen = (ScreenBase)Activator.CreateInstance(t);
                 ScreenManager.PushScreen(screen);
                 return;
@@ -415,6 +486,7 @@ namespace Coop
                 },
                 onConnect: (ip, port, password) =>
                 {
+                    // Resolve host, publish AttemptJoin, then close connection overlay layer.
                     InformationManager.DisplayMessage(new InformationMessage($"Connexion à {ip}:{port}"));
                     var broker = MessageBroker.Instance;
                     IPAddress addr;
@@ -433,33 +505,12 @@ namespace Coop
                         }
                     }
                     broker.Publish(null, new AttemptJoin(addr, port));
-                    try
-                    {
-                        var exp = coopExperience;
-                        var expType = exp?.GetType();
-                        var cfgType = Type.GetType("Coop.Core.Common.Configuration.NetworkConfiguration, Coop.Core", throwOnError: false);
-                        var cfg = cfgType != null ? Activator.CreateInstance(cfgType) : null;
-                        if (cfg != null)
-                        {
-                            var propAddr = cfgType.GetProperty("Address");
-                            var propPort = cfgType.GetProperty("Port");
-                            propAddr?.SetValue(cfg, addr.ToString());
-                            propPort?.SetValue(cfg, port);
-                        }
-                        var startClient = expType?.GetMethod("StartAsClient", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
-                        if (startClient != null)
-                        {
-                            Common.Logging.LogManager.GetLogger<CoopMod>().Information("StartAsClient invoked directly with {Address}:{Port}", addr, port);
-                            startClient.Invoke(exp, new object[] { cfg });
-                            InformationManager.DisplayMessage(new InformationMessage($"[Client] Démarrage client {addr}:{port}"));
-                        }
-                    }
-                    catch { }
                     try { ScreenManager.TryLoseFocus(layer); } catch { }
                     try { ScreenManager.TopScreen.RemoveLayer(layer); } catch { }
                 },
                 onHost: (port, password) =>
                 {
+                    // Host flow: open load screen UI via reflection or Gauntlet fallback.
                     InformationManager.DisplayMessage(new InformationMessage($"Hébergement sur port {port}"));
                     try { ScreenManager.TryLoseFocus(layer); } catch { }
                     try { ScreenManager.TopScreen.RemoveLayer(layer); } catch { }
@@ -499,6 +550,7 @@ namespace Coop
                     }
                     if (screen == null)
                     {
+                        // Ultimate fallback: push a Gauntlet layer and load the movie manually.
                         screen = new HostLoadGauntletScreen();
                         resolvedType = typeof(HostLoadGauntletScreen);
                     }
@@ -548,8 +600,8 @@ namespace Coop
 
                             overlay.InputRestrictions.SetInputRestrictions(true, InputUsageMask.All);
                             overlay.Input.RegisterHotKeyCategory(genericCategory);
-                            overlay.LoadMovie("SaveLoadScreen", (ViewModel)vmInstance);
                             ScreenManager.TopScreen.AddLayer(overlay);
+                            overlay.LoadMovie("SaveLoadScreen", (ViewModel)vmInstance);
                             ScreenManager.TrySetFocus(overlay);
                             Common.Logging.LogManager.GetLogger<CoopMod>().Information("Fallback overlay opened");
                             return;
@@ -567,15 +619,16 @@ namespace Coop
             );
 
             layer.InputRestrictions.SetInputRestrictions();
+            ScreenManager.TopScreen.AddLayer(layer);
             try
             {
+                // Load the connection movie/view model for the custom UI.
                 layer.LoadMovie("CoopConnectionUIMovie", vm);
             }
             catch
             {
                 InformationManager.DisplayMessage(new InformationMessage("Erreur UI: CoopConnectionUIMovie introuvable"));
             }
-            ScreenManager.TopScreen.AddLayer(layer);
             ScreenManager.TrySetFocus(layer);
         }
 
@@ -699,13 +752,13 @@ namespace Coop
             dataSource.SetCancelInputKey(HotKeyManager.GetCategory("GenericPanelGameKeyCategory").GetHotKey("Exit"));
             Game.Current?.GameStateManager.RegisterActiveStateDisableRequest(this);
             gauntletLayer = new GauntletLayer("HostLoadLayer", 1, true);
+            AddLayer(gauntletLayer);
             gauntletLayer.LoadMovie("SaveLoadScreen", dataSource);
             gauntletLayer.InputRestrictions.SetInputRestrictions(true, InputUsageMask.All);
             gauntletLayer.InputRestrictions.SetInputRestrictions(true, InputUsageMask.All);
             gauntletLayer.IsFocusLayer = true;
             gauntletLayer.Input.RegisterHotKeyCategory(HotKeyManager.GetCategory("GenericPanelGameKeyCategory"));
             ScreenManager.TrySetFocus(gauntletLayer);
-            AddLayer(gauntletLayer);
         }
         protected override void OnFrameTick(float dt)
         {

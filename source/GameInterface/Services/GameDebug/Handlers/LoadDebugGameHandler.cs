@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Interfaces;
 using GameInterface.Services.GameDebug.Messages;
@@ -17,8 +17,6 @@ namespace GameInterface.Services.GameDebug.Handlers
             this.messageBroker = messageBroker;
 
             messageBroker.Subscribe<LoadDebugGame>(Handle);
-
-            // TODO move to different service
             messageBroker.Subscribe<LoadGame>(Handle);
         }
 
@@ -27,17 +25,17 @@ namespace GameInterface.Services.GameDebug.Handlers
             messageBroker.Unsubscribe<LoadDebugGame>(Handle);
             messageBroker.Unsubscribe<LoadGame>(Handle);
         }
-
+        private void Handle(MessagePayload<LoadGame> obj)
+        {
+            messageBroker.Publish(this, new StartLoadingScreen());
+            GameLoopRunner.RunOnMainThread(() => gameDebugInterface.LoadGame(obj.What.SaveName), true);
+        }
         private void Handle(MessagePayload<LoadDebugGame> payload)
         {
             messageBroker.Publish(this, new StartLoadingScreen());
             gameDebugInterface.LoadDebugGame();
         }
 
-        private void Handle(MessagePayload<LoadGame> obj)
-        {
-            messageBroker.Publish(this, new StartLoadingScreen());
-            GameLoopRunner.RunOnMainThread(() => gameDebugInterface.LoadGame(obj.What.SaveName), true);
-        }
+        
     }
 }

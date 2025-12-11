@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
@@ -28,7 +28,7 @@ public class CampaignState : ConnectionStateBase
 
     internal void PlayerMissionEnteredHandler(MessagePayload<NetworkPlayerMissionEntered> obj)
     {
-        var playerId = (NetPeer)obj.Who;
+        var playerId = obj.Who as NetPeer;
 
         if (playerId == ConnectionLogic.Peer)
         {

@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Util;
 using GameInterface.Registry.Auto;
@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using System.Linq;
 
 namespace GameInterface.Services.MobileParties.Interfaces;
 
@@ -58,7 +59,31 @@ internal class MobilePartyInterface : IMobilePartyInterface
     {
         foreach(var party in MobileParty.All)
         {
-            if (objectManager.TryGetId(party, out var id) == false)
+            var success = objectManager.TryGetId(party, out var id);
+            if (success == false)
+            {
+                var fallbackId = party.StringId;
+                if (!string.IsNullOrEmpty(fallbackId))
+                {
+                    var canonical = Campaign.Current?.CampaignObjectManager?.Find<MobileParty>(fallbackId)
+                                    ?? MobileParty.All.FirstOrDefault(p => p.StringId == fallbackId)
+                                    ?? party;
+
+                    if (objectManager.Contains(fallbackId) == false)
+                    {
+                        if (objectManager.AddExisting(fallbackId, canonical))
+                        {
+                            id = fallbackId;
+                        }
+                    }
+                    else
+                    {
+                        id = fallbackId;
+                    }
+                }
+            }
+
+            if (string.IsNullOrEmpty(id))
             {
                 Logger.Error($"Failed to retrieve object id for MobileParty with identifier {party.Id}. Registration skipped.");
                 continue;

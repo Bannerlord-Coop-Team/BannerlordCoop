@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -23,8 +23,7 @@ namespace GameInterface.Services.MobilePartyAIs.Patches
             if (ModInformation.IsServer) return;
 
             if (__instance._mobileParty != MobileParty.MainParty) return;
-
-            EncounterManager.HandleEncounterForMobileParty(__instance._mobileParty, 0f);
+            return;
         }
     }
 }

@@ -25,10 +25,12 @@ namespace Coop.Core
 
         public CoopartiveMultiplayerExperience()
         {
-            // TODO use DI maybe?
+            // Central orchestrator for client/server startup driven by UI messages.
+            // TODO consider DI bootstrap at module level.
             messageBroker = MessageBroker.Instance;
             configuration = new NetworkConfiguration();
 
+            // Subscribe to UI commands to start client/server or end Coop mode.
             messageBroker.Subscribe<AttemptJoin>(Handle);
             messageBroker.Subscribe<HostSaveGame>(Handle);
             messageBroker.Subscribe<EndCoopMode>(Handle);
@@ -50,6 +52,7 @@ namespace Coop.Core
         {
             var connectMessage = obj.What;
 
+            // Build configuration from UI input and start client container.
             configuration = new NetworkConfiguration()
             {
                 Address = connectMessage.Address.ToString(),
@@ -84,6 +87,7 @@ namespace Coop.Core
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
+            // Compose server-side DI modules
             builder.RegisterModule<ServerModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
             builder.RegisterModule<GameInterfaceModule>();
@@ -93,6 +97,7 @@ namespace Coop.Core
             GameInterface.ContainerProvider.SetContainer(container);
 
             // Create harmony patches
+            // Patch game engine interfaces and auto-sync patches before starting logic.
             container.Resolve<IGameInterface>().PatchAll();
             container.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
@@ -110,6 +115,7 @@ namespace Coop.Core
             var containerProvider = new ContainerProvider();
 
             ContainerBuilder builder = new ContainerBuilder();
+            // Compose client-side DI modules
             builder.RegisterModule<ClientModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance().ExternallyOwned();
             builder.RegisterModule<GameInterfaceModule>();
@@ -125,6 +131,7 @@ namespace Coop.Core
             GameInterface.ContainerProvider.SetContainer(container);
 
             // Create harmony patches
+            // Patch game engine interfaces and auto-sync patches before starting logic.
             container.Resolve<IGameInterface>().PatchAll();
             container.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
@@ -138,6 +145,7 @@ namespace Coop.Core
 
         private void DestroyContainer()
         {
+            // Cleanly unpatch and dispose DI container to tear down coop mode.
             container?.Resolve<Harmony>().UnpatchAll();
             container?.Dispose();
             container = null;

@@ -399,6 +399,11 @@ MigrationBackup/
 
 # NUnit
 
+# Coop module build outputs (game installation tree)
+/Modules/
+/ILSpy_binaries_*/
+/nuget.exe
+
 # Build Results of an ATL Project
 
 # Benchmark Results

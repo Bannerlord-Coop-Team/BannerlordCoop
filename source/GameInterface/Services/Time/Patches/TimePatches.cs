@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Time;
@@ -15,43 +15,42 @@ namespace GameInterface.Services.Heroes.Patches;
 [HarmonyPatch(typeof(Campaign))]
 internal class TimePatches
 {
-    private static CampaignTimeControlMode CurrentMode = CampaignTimeControlMode.Stop;
-
     private static readonly TimeControlModeConverter timeControlModeConverter = new();
 
     [HarmonyPatch("TimeControlMode")]
     [HarmonyPatch(MethodType.Setter)]
     private static bool Prefix(ref Campaign __instance, ref CampaignTimeControlMode value)
     {
-        // We only want ExecuteTimeControlChange, which is called from the time control button clicks,
-        // to publish the TimeSpeedChanged message.
-        // To do this we skip this method if this thread is not "allowed"
-        // We set this thread to "allowed" in AllowTimeControlFromControlsPatches
-        if (AllowedThread.IsThisThreadAllowed() == false) return false;
-
-        if (value != __instance._timeControlMode)
+        // Empêcher toute accélération; laisser STOP et PLAY passer normalement
+        switch (value)
         {
-            var controlMode = timeControlModeConverter.Convert(value);
-            MessageBroker.Instance.Publish(__instance, new AttemptedTimeSpeedChanged(controlMode));
+            case CampaignTimeControlMode.StoppableFastForward:
+            case CampaignTimeControlMode.UnstoppableFastForward:
+            case CampaignTimeControlMode.UnstoppableFastForwardForPartyWaitTime:
+            case CampaignTimeControlMode.Stop:
+            case CampaignTimeControlMode.FastForwardStop:
+                value = CampaignTimeControlMode.StoppablePlay;
+                break;
+            default:
+                break;
         }
 
-        return false;
-    }
-
-    [HarmonyPatch("TimeControlMode")]
-    [HarmonyPatch(MethodType.Getter)]
-    private static void Postfix(ref CampaignTimeControlMode __result)
-    {
-        __result = CurrentMode;
+        // Laisser le setter original s'exécuter pour préserver les invariants internes
+        return true;
     }
 
     public static void OverrideTimeControlMode(Campaign campaign, CampaignTimeControlMode value)
     {
         if (campaign == null) return;
-
-        // _timeControlMode is getting set magically somewhere so we use our own value instead
-        CurrentMode = value;
-        campaign._timeControlMode = value;
+        // Clamp via interface également
+        var clamped = value switch
+        {
+            CampaignTimeControlMode.StoppableFastForward => CampaignTimeControlMode.StoppablePlay,
+            CampaignTimeControlMode.UnstoppableFastForward => CampaignTimeControlMode.StoppablePlay,
+            CampaignTimeControlMode.UnstoppableFastForwardForPartyWaitTime => CampaignTimeControlMode.StoppablePlay,
+            _ => value,
+        };
+        campaign._timeControlMode = clamped;
     }
 }
 

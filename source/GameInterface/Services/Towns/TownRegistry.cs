@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -32,14 +32,14 @@ internal class TownRegistry : IAutoRegistry<Town>
         foreach (var town in Town.AllTowns)
         {
             var networkId = $"{nameof(Town)}_{town.StringId}";
-            registry.RegisterExistingObject(networkId, town.StringId);
+            registry.RegisterExistingObject(networkId, town);
         }
     }
 
     public void OnClientCreated(Town obj, string id)
     {
-        var networkId = $"{nameof(Fief)}_{id}";
-        ObjectManager.AddExisting<Fief>(networkId, obj);
+        var networkId = $"{nameof(Town)}_{id}";
+        ObjectManager.AddExisting<Town>(networkId, obj);
     }
 
     public void OnClientDestroyed(Town obj, string id)
@@ -49,8 +49,8 @@ internal class TownRegistry : IAutoRegistry<Town>
     public void OnServerCreated(Town obj, string id)
     {
 
-        var networkId = $"{nameof(Fief)}_{id}";
-        ObjectManager.AddExisting<Fief>(networkId, obj);
+        var networkId = $"{nameof(Town)}_{id}";
+        ObjectManager.AddExisting<Town>(networkId, obj);
     }
 
     public void OnServerDestroyed(Town obj, string id)

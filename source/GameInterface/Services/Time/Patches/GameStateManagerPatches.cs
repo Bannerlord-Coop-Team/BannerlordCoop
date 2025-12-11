@@ -1,9 +1,10 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem.GameState;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Time.Patches
@@ -13,13 +14,19 @@ namespace GameInterface.Services.Time.Patches
     {
         private static readonly MethodInfo MapState_OnTick = typeof(MapState).GetMethod("OnTick", BindingFlags.NonPublic | BindingFlags.Instance);
 
-        // Prevents pausing in menus without their own game state (such as the encyclopedia)
-        [HarmonyPatch(nameof(GameStateManager.RegisterActiveStateDisableRequest))]
-        static bool RegisterActiveStateDisableRequest_Prefix() => true;
-
-        // Prevents pausing in menus with their own game states (such as the banner editor, party screen, clan screen, etc.)
         [HarmonyPatch(nameof(GameStateManager.OnTick))]
-        static bool OnTick_Prefix() => true;
+        static void OnTick_Postfix(ref GameStateManager __instance, float dt)
+        {
+            if (__instance.ActiveState is MapState) return;
+
+            var mapState = __instance.LastOrDefault<MapState>();
+            if (mapState == null) return;
+
+            if (PlayerEncounter.Current != null && PlayerEncounter.EncounterSettlement != null)
+            {
+                MapState_OnTick?.Invoke(mapState, new object[] { dt });
+            }
+        }
 
     }
 }

@@ -1,5 +1,6 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface;
 
 namespace GameInterface.Services.Heroes.Patches.Disable;
 
@@ -8,5 +9,5 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 internal class DisableHeroAgentSpawnCampaignBehavior
 {
     [HarmonyPatch(nameof(HeroAgentSpawnCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

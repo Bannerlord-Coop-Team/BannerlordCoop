@@ -8,7 +8,6 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Modules;
-using GameInterface.Services.GameDebug.Messages;
 
 namespace Coop.Core.Client.States;
 
@@ -35,11 +34,13 @@ public class ValidateModuleState : ClientStateBase
         this.network = network;
         this.controllerIdProvider = controllerIdProvider;
         this.coopFinalizer = coopFinalizer;
+        // During connection, subscribe to key events to drive validation and branch to next states.
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<NetworkModuleVersionsValidated>(Handle_NetworkModuleVersionsValidated);
         messageBroker.Subscribe<NetworkClientValidated>(Handle_NetworkClientValidated);
         messageBroker.Subscribe<CharacterCreationStarted>(Handle_CharacterCreationStarted);
 
+        // Temporary gate to ignore menu re-entry while validation is in progress.
         ignoreMainMenuUntilUtc = DateTime.UtcNow.AddMinutes(2);
 
 #if DEBUG
@@ -48,6 +49,7 @@ public class ValidateModuleState : ClientStateBase
         controllerIdProvider.SetControllerAsPlatformId();
 #endif
 
+        // Kick off module validation against the server to ensure binary compatibility.
         network.SendAll(new NetworkModuleVersionsValidate(moduleInfoProvider.GetModuleInfos()));
     }
 
@@ -65,6 +67,7 @@ public class ValidateModuleState : ClientStateBase
         {
             ignoreMainMenuUntilUtc = null;
             messageBroker.Publish(this, new SendInformationMessage("Modules validés"));
+            // Proceed to client validation (associate this controller with a hero).
             network.SendAll(new NetworkClientValidate(controllerIdProvider.ControllerId));
         }
         else
@@ -81,18 +84,21 @@ public class ValidateModuleState : ClientStateBase
             ignoreMainMenuUntilUtc = null;
             messageBroker.Publish(this, new SendInformationMessage($"Héros reconnu: {obj.What.HeroId}"));
             Logic.ControlledHeroId = obj.What.HeroId;
+            // Existing hero found; begin save-transfer and load path.
             Logic.LoadSavedData();
         }
         else
         {
             ignoreMainMenuUntilUtc = null;
             messageBroker.Publish(this, new SendInformationMessage("Démarrage de la création de personnage"));
+            // No hero found; start the character creation flow.
             Logic.StartCharacterCreation();   
         }
     }
 
     internal void Handle_CharacterCreationStarted(MessagePayload<CharacterCreationStarted> obj)
     {
+        // Transition to CharacterCreationState once Bannerlord signals the character creation state has activated.
         Logic.SetState<CharacterCreationState>();
     }
 
@@ -136,6 +142,7 @@ public class ValidateModuleState : ClientStateBase
 
     public override void StartCharacterCreation()
     {
+        // Publish the command that triggers GameInterface to start a new SandBox game, entering character creation.
         messageBroker.Publish(this, new StartCharacterCreation());
     }
 

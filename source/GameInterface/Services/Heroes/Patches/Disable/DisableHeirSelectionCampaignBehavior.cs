@@ -1,5 +1,6 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using SandBox.CampaignBehaviors;
+using GameInterface;
 
 namespace GameInterface.Services.Heroes.Patches.Disable;
 
@@ -7,5 +8,5 @@ namespace GameInterface.Services.Heroes.Patches.Disable;
 internal class DisableHeirSelectionCampaignBehavior
 {
     [HarmonyPatch(nameof(HeirSelectionCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

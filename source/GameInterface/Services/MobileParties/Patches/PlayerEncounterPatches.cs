@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -28,25 +28,27 @@ internal class EncounterManagerPatches
     [HarmonyPatch(nameof(EncounterManager.StartSettlementEncounter))]
     private static bool Prefix(MobileParty attackerParty, Settlement settlement)
     {
-        if (ModInformation.IsServer) return true;
-
-        if (attackerParty.IsPartyControlled() == false) return false;
-
-        var message = new StartSettlementEncounterAttempted(
+        Logger.Information(
+            "EncounterManager.StartSettlementEncounter intercept party={partyId} settlement={settlementId} partyNull={partyNull} settlementPartyNull={settlementNull} current={current}",
             attackerParty.StringId,
-            settlement.StringId);
-        MessageBroker.Instance.Publish(attackerParty, message);
-
-        return false;
+            settlement.StringId,
+            attackerParty.Party == null,
+            settlement.Party == null,
+            attackerParty.CurrentSettlement?.StringId ?? "none");
+        // Toujours laisser l'original se charger pour éviter de créer l'UI avant que UIContext soit prêt
+        return true;
     }
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
     internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty)
     {
-        // Skip this method if party is not controlled
-        if (mobileParty.IsPartyControlled() == false) return false;
-
+        Logger.Information(
+            "EncounterManager.HandleEncounterForMobileParty intercept party={partyId} partyNull={partyNull} current={current}",
+            mobileParty.StringId,
+            mobileParty.Party == null,
+            mobileParty.CurrentSettlement?.StringId ?? "none");
+        // Toujours laisser l'original pour éviter de perturber les autres parties
         return true;
     }
 }

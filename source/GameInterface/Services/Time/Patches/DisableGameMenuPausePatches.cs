@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Heroes.Patches;
+using GameInterface.Services.Heroes.Patches;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,18 +16,16 @@ namespace GameInterface.Services.Time.Patches;
 [HarmonyPatch]
 internal static class DisableGameMenuPausePatches
 {
+    [HarmonyPrepare]
+    static bool Prepare()
+    {
+        return AccessTools.Method(typeof(MapScreen), "HandleLeftMouseButtonClick") != null;
+    }
+
     static IEnumerable<MethodBase> TargetMethods()
     {
-        return new MethodBase[]
-        {
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ActivateGameMenu)),
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.StartWait)),
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.EndWait)),
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.ExitToLast)),
-            AccessTools.Method(typeof(GameMenu), nameof(GameMenu.SwitchToMenu)),
-            AccessTools.Method(typeof(MapScreen), "HandleLeftMouseButtonClick"),
-            AccessTools.Method(typeof(MapScreen), "HandleMouse"),
-        };
+        var m = AccessTools.Method(typeof(MapScreen), "HandleLeftMouseButtonClick");
+        return m != null ? new MethodBase[] { m } : System.Array.Empty<MethodBase>();
     }
 
     [HarmonyTranspiler]

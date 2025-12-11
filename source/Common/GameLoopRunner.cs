@@ -1,4 +1,4 @@
-﻿using Common.Logging;
+using Common.Logging;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -31,6 +31,7 @@ public class GameLoopRunner : IUpdateable
 
     public void Update(TimeSpan frameTime)
     {
+        // Must be called from the game loop thread; otherwise throw to avoid race conditions.
         if (Thread.CurrentThread.ManagedThreadId != Instance.m_GameLoopThreadId)
         {
             throw new ArgumentException("Wrong thread!");
@@ -63,13 +64,14 @@ public class GameLoopRunner : IUpdateable
     /// False queues and returns</param>
     public static void RunOnMainThread(Action action, bool blocking = false)
     {
+        // If already on the game loop thread, execute immediately.
         if (Thread.CurrentThread.ManagedThreadId == Instance.m_GameLoopThreadId)
         {
             action();
         }
         else
         {
-            
+            // Otherwise, enqueue the action and optionally wait until it completes.
 
             EventWaitHandle ewh = blocking ?
                 new EventWaitHandle(false, EventResetMode.ManualReset) :
@@ -85,6 +87,7 @@ public class GameLoopRunner : IUpdateable
 
     public void SetGameLoopThread()
     {
+        // Captures the thread ID of the Bannerlord game loop to enforce main-thread execution.
         m_GameLoopThreadId = Thread.CurrentThread.ManagedThreadId;
     }
 }

@@ -43,57 +43,71 @@ public class ServerSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<NetworkRequestStartSettlementEncounter> obj)
     {
         var payload = obj.What;
-        var peer = (NetPeer)obj.Who;
+        var peer = obj.Who as NetPeer;
 
-        network.Send(peer, new NetworkStartSettlementEncounter(payload));
+        if (peer != null)
+            network.Send(peer, new NetworkStartSettlementEncounter(payload));
 
         var partyEnteredSettlement = new NetworkPartyEnterSettlement(
             payload.SettlementId, payload.PartyId);
 
-        network.SendAllBut(peer, partyEnteredSettlement);
+        if (peer != null)
+            network.SendAllBut(peer, partyEnteredSettlement);
+        else
+            network.SendAll(partyEnteredSettlement);
 
-        var partySettlementEnter = new PartyEnterSettlement(payload.SettlementId, payload.PartyId);
-
-        messageBroker.Publish(this, partySettlementEnter);
+        
     }
 
     private void Handle(MessagePayload<NetworkRequestEndSettlementEncounter> obj)
     {
         var payload = obj.What;
-        var peer = (NetPeer)obj.Who;
+        var peer = obj.Who as NetPeer;
 
         // The sending client is currently in a settlement encounter, this is handled
         // slightly differently from ai or other clients parties
-        network.Send(peer, new NetworkEndSettlementEncounter());
+        if (peer != null)
+            network.Send(peer, new NetworkEndSettlementEncounter());
 
         var networkMessage = new NetworkPartyLeaveSettlement(payload.PartyId);
 
-        network.SendAllBut(peer, networkMessage);
+        if (peer != null)
+            network.SendAllBut(peer, networkMessage);
+        else
+            network.SendAll(networkMessage);
 
-        var internalMessage = new PartyLeaveSettlement(payload.PartyId);
-
-        messageBroker.Publish(this, internalMessage);
+        
     }
 
     private void Handle(MessagePayload<PartyEnterSettlementAttempted> obj)
     {
         var payload = obj.What;
+        var peer = obj.Who as NetPeer;
 
         // The sending client is currently starting a settlement encounter, this is handled
         // slightly differently from ai or other clients parties
         var networkMessage = new NetworkPartyEnterSettlement(payload.SettlementId, payload.PartyId);
 
-        network.SendAll(networkMessage);
+        if (peer != null)
+            network.SendAllBut(peer, networkMessage);
+        else
+            network.SendAll(networkMessage);
 
-        var internalMessage = new PartyEnterSettlement(payload.SettlementId, payload.PartyId);
-
-        messageBroker.Publish(this, internalMessage);
+        
     }
 
     private void Handle(MessagePayload<PartyLeaveSettlementAttempted> obj)
     {
         var payload = obj.What;
-        PartyLeaveSettlement(payload.PartyId);
+        var peer = obj.Who as NetPeer;
+
+        var networkMessage = new NetworkPartyLeaveSettlement(payload.PartyId);
+        if (peer != null)
+            network.SendAllBut(peer, networkMessage);
+        else
+            network.SendAll(networkMessage);
+
+        
     }
 
     private void PartyLeaveSettlement(string partyId)

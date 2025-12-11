@@ -37,6 +37,7 @@ public class ResolveCharacterState : ConnectionStateBase
         this.moduleValidator = moduleValidator;
         this.moduleInfoProvider = moduleInfoProvider;
 
+        // Resolve whether the connecting client has an existing hero; also validate modules.
         messageBroker.Subscribe<NetworkClientValidate>(ClientValidateHandler);
         messageBroker.Subscribe<HeroResolved>(ResolveHeroHandler);
         messageBroker.Subscribe<ResolveHeroNotFound>(HeroNotFoundHandler);
@@ -57,6 +58,7 @@ public class ResolveCharacterState : ConnectionStateBase
         var serverModules = moduleInfoProvider.GetModuleInfos();
 
         Logger.Information("Validating modules: client={ClientCount} server={ServerCount}", clientModules.Length, serverModules.Count);
+        // Validate module lists and versions; send result back to the client.
         var result = moduleValidator.Validate(serverModules, clientModules.Select(ConvertToModuleInfo).ToList());
         if (result == null)
         {
@@ -77,6 +79,7 @@ public class ResolveCharacterState : ConnectionStateBase
         var peer = obj.Who as NetPeer;
         if (peer != ConnectionLogic.Peer) return;
 
+        // Fast path: immediately allow save transfer without hero association for MVP.
         messageBroker.Publish(this, new SendInformationMessage("Validation client reçue, démarrage transfert (bypass héros)"));
         var validateMessage = new NetworkClientValidated(true, string.Empty);
         network.Send(peer, validateMessage);
@@ -85,6 +88,7 @@ public class ResolveCharacterState : ConnectionStateBase
 
     internal void ResolveHeroHandler(MessagePayload<HeroResolved> obj)
     {
+        // Server found an existing hero for the player; proceed to save transfer.
         messageBroker.Publish(this, new SendInformationMessage("Validation client OK, transfert sauvegarde"));
         var validateMessage = new NetworkClientValidated(true, obj.What.HeroId);
         var playerPeer = ConnectionLogic.Peer;
@@ -94,6 +98,7 @@ public class ResolveCharacterState : ConnectionStateBase
 
     internal void HeroNotFoundHandler(MessagePayload<ResolveHeroNotFound> obj)
     {
+        // No hero exists; instruct client to start character creation.
         messageBroker.Publish(this, new SendInformationMessage("Aucun héros trouvé, création de personnage"));
         var validateMessage = new NetworkClientValidated(false, string.Empty);
         var playerPeer = ConnectionLogic.Peer;

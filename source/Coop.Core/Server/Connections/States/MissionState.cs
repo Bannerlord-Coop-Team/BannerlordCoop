@@ -1,4 +1,4 @@
-﻿using Common.Messaging;
+using Common.Messaging;
 using Coop.Core.Server.Connections.Messages;
 using LiteNetLib;
 
@@ -25,7 +25,7 @@ public class MissionState : ConnectionStateBase
 
     internal void PlayerTransitionsCampaignHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
     {
-        var playerId = (NetPeer)obj.Who;
+        var playerId = obj.Who as NetPeer;
         if (playerId != ConnectionLogic.Peer) return;
 
         ConnectionLogic.EnterCampaign();

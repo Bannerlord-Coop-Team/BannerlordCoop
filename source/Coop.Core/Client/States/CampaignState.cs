@@ -48,8 +48,12 @@ public class CampaignState : ClientStateBase
 
     private void Handle_NetworkNewPartyCreated(MessagePayload<NetworkNewPartyCreated> obj)
     {
-        var message = new RegisterNewPlayerHero((NetPeer)obj.Who, obj.What.PlayerId, obj.What.PlayerHero);
-        messageBroker.Publish(this, message);
+        var peer = obj.Who as NetPeer;
+        if (peer != null)
+        {
+            var message = new RegisterNewPlayerHero(peer, obj.What.PlayerId, obj.What.PlayerHero);
+            messageBroker.Publish(this, message);
+        }
     }
 
     internal void Handle_MissionStateEntered(MessagePayload<MissionStateEntered> obj)

@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -9,6 +9,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using GameInterface.Services.ItemRosters;
 
 namespace GameInterface.Services.Settlements.Patches;
 
@@ -101,7 +102,15 @@ public class MobilePartyCachePatch
                     settlement._partiesCache.Remove(party);
                     settlement.SettlementHitPoints = numberOfLordParties;
                 }
+                if (party?.Party != null && party.ItemRoster != null)
+                {
+                    ItemRosterLookup.Set(party.ItemRoster, party.Party);
+                }
 
+                if (settlement?.Party != null && settlement.ItemRoster != null)
+                {
+                    ItemRosterLookup.Set(settlement.ItemRoster, settlement.Party);
+                }
             }
         });
     }

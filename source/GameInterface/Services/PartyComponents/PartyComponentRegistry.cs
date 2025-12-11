@@ -1,4 +1,4 @@
-﻿using GameInterface.Registry;
+using GameInterface.Registry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,6 +36,7 @@ internal class PartyComponentRegistry : RegistryBase<PartyComponent>
         foreach (var party in MobileParty.All)
         {
             var networkId = $"{party.PartyComponent.GetType().Name}_{party.StringId}";
+            if (TryGetValue<PartyComponent>(networkId, out _)) continue;
             RegisterExistingObject(networkId, party.PartyComponent);
         }
     }

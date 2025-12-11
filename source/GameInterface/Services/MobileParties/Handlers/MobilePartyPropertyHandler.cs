@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Handlers
 {
@@ -35,7 +36,8 @@ namespace GameInterface.Services.MobileParties.Handlers
         private void Handle(MessagePayload<ChangeMobilePartyProperty> payload)
         {
             var data = payload.What;
-            if (objectManager.TryGetObject<MobileParty>(data.PartyId, out var instance) == false)
+            var instance = ResolveAndRegister<MobileParty>(data.PartyId);
+            if (instance == null)
             {
                 Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.PartyId);
                 return;
@@ -62,11 +64,8 @@ namespace GameInterface.Services.MobileParties.Handlers
                         instance._army = null;
                         return;
                     }
-                    if (objectManager.TryGetObject<Army>(data.Value2, out var army) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(Army), data.Value2);
-                        return;
-                    }
+                    var army = ResolveAndRegister<Army>(data.Value2);
+                    if (army == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(Army), data.Value2); return; }
                     instance._army = army;
                     return;
 
@@ -75,11 +74,8 @@ namespace GameInterface.Services.MobileParties.Handlers
                     return;
 
                 case PropertyType.LastVisitedSettlement:
-                    if (objectManager.TryGetObject<Settlement>(data.Value2, out var settlement) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.Value2);
-                        return;
-                    }
+                    var settlement = ResolveAndRegister<Settlement>(data.Value2);
+                    if (settlement == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.Value2); return; }
                     instance.LastVisitedSettlement = settlement;
                     return;
 
@@ -138,20 +134,14 @@ namespace GameInterface.Services.MobileParties.Handlers
                     return;
 
                 case PropertyType.CurrentSettlement:
-                    if (objectManager.TryGetObject<Settlement>(data.Value2, out var curSettlement) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.Value2);
-                        return;
-                    }
+                    var curSettlement = ResolveAndRegister<Settlement>(data.Value2);
+                    if (curSettlement == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(Settlement), data.Value2); return; }
                     instance._currentSettlement = curSettlement;
                     return;
 
                 case PropertyType.AttachedTo:
-                    if (objectManager.TryGetObject<MobileParty>(data.Value2, out var attachedToParty) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2);
-                        return;
-                    }
+                    var attachedToParty = ResolveAndRegister<MobileParty>(data.Value2);
+                    if (attachedToParty == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(MobileParty), data.Value2); return; }
                     instance.AttachedTo = attachedToParty;
                     return;
 
@@ -161,11 +151,8 @@ namespace GameInterface.Services.MobileParties.Handlers
                         instance._besiegerCamp = null;
                         return;
                     }
-                    if (objectManager.TryGetObject<BesiegerCamp>(data.Value2, out var besiegerCamp) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(BesiegerCamp), data.Value2);
-                        return;
-                    }
+                    var besiegerCamp = ResolveAndRegister<BesiegerCamp>(data.Value2);
+                    if (besiegerCamp == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(BesiegerCamp), data.Value2); return; }
 
                     instance._besiegerCamp = besiegerCamp;
                     return;
@@ -176,20 +163,14 @@ namespace GameInterface.Services.MobileParties.Handlers
                         instance.Scout = null;
                         return;
                     }
-                    if (objectManager.TryGetObject<Hero>(data.Value2, out var scout) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2);
-                        return;
-                    }
+                    var scout = ResolveAndRegister<Hero>(data.Value2);
+                    if (scout == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2); return; }
                     instance.Scout = scout;
                     return;
 
                 case PropertyType.Engineer:
-                    if (objectManager.TryGetObject<Hero>(data.Value2, out var engineer) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2);
-                        return;
-                    }
+                    var engineer = ResolveAndRegister<Hero>(data.Value2);
+                    if (engineer == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2); return; }
                     instance.Engineer = engineer;
                     return;
 
@@ -199,11 +180,8 @@ namespace GameInterface.Services.MobileParties.Handlers
                         instance.Quartermaster = null;
                         return;
                     }
-                    if (objectManager.TryGetObject<Hero>(data.Value2, out var quatermaster) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2);
-                        return;
-                    }
+                    var quatermaster = ResolveAndRegister<Hero>(data.Value2);
+                    if (quatermaster == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2); return; }
                     instance.Quartermaster = quatermaster;
                     return;
 
@@ -213,11 +191,8 @@ namespace GameInterface.Services.MobileParties.Handlers
                         instance.Surgeon = null;
                         return;
                     }
-                    if (objectManager.TryGetObject<Hero>(data.Value2, out var surgeon) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2);
-                        return;
-                    }
+                    var surgeon = ResolveAndRegister<Hero>(data.Value2);
+                    if (surgeon == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(Hero), data.Value2); return; }
                     instance.Surgeon = surgeon;
                     return;
 
@@ -227,11 +202,8 @@ namespace GameInterface.Services.MobileParties.Handlers
                         instance.ActualClan = null;
                         return;
                     }
-                    if (objectManager.TryGetObject<Clan>(data.Value2, out var actualClan) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(Clan), data.Value2);
-                        return;
-                    }
+                    var actualClan = ResolveAndRegister<Clan>(data.Value2);
+                    if (actualClan == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(Clan), data.Value2); return; }
                     instance.ActualClan = actualClan;
                     return;
 
@@ -244,11 +216,8 @@ namespace GameInterface.Services.MobileParties.Handlers
                     return;
 
                 case PropertyType.PartyComponent:
-                    if (objectManager.TryGetObject<PartyComponent>(data.Value2, out var partyComponent) == false)
-                    {
-                        Logger.Error("Unable to find {type} with id: {id}", typeof(PartyComponent), data.Value2);
-                        return;
-                    }
+                    var partyComponent = ResolveAndRegister<PartyComponent>(data.Value2);
+                    if (partyComponent == null) { Logger.Error("Unable to find {type} with id: {id}", typeof(PartyComponent), data.Value2); return; }
                     instance.PartyComponent = partyComponent;
                     return;
 
@@ -289,6 +258,47 @@ namespace GameInterface.Services.MobileParties.Handlers
         public void Dispose()
         {
             messageBroker.Unsubscribe<ChangeMobilePartyProperty>(Handle);
+        }
+
+        private T ResolveAndRegister<T>(string id) where T : class
+        {
+            if (objectManager.TryGetObject<T>(id, out var obj)) return obj;
+            object found = null;
+            var com = Campaign.Current?.CampaignObjectManager;
+            var mbo = MBObjectManager.Instance;
+            try
+            {
+                if (com != null)
+                {
+                    var mi = com.GetType().GetMethod("Find")?.MakeGenericMethod(typeof(T));
+                    if (mi != null) found = mi.Invoke(com, new object[] { id });
+                }
+            }
+            catch { }
+            if (found == null)
+            {
+                try
+                {
+                    if (mbo != null)
+                    {
+                        var containsMi = mbo.GetType().GetMethod("ContainsObject")?.MakeGenericMethod(typeof(T));
+                        var getMi = mbo.GetType().GetMethod("GetObject")?.MakeGenericMethod(typeof(T));
+                        if (containsMi != null && getMi != null)
+                        {
+                            var has = (bool)containsMi.Invoke(mbo, new object[] { id });
+                            if (has) found = getMi.Invoke(mbo, new object[] { id });
+                        }
+                    }
+                }
+                catch { }
+            }
+            if (found is T t)
+            {
+                if (objectManager.Contains(id) == false)
+                    objectManager.AddExisting(id, t);
+                return t;
+            }
+            return null;
         }
     }
 }

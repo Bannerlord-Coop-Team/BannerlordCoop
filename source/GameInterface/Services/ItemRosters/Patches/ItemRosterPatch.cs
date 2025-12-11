@@ -1,4 +1,4 @@
-﻿using Common;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
@@ -8,6 +8,9 @@ using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.ItemRosters.Patches
 {
@@ -15,6 +18,61 @@ namespace GameInterface.Services.ItemRosters.Patches
     internal class ItemRosterPatch
     {
         private static readonly ILogger Logger = LogManager.GetLogger<ItemRosterPatch>();
+        private static bool TryResolvePartyBase(ItemRoster roster, out PartyBase partyBase)
+        {
+            if (ItemRosterLookup.TryGetValue(roster, out partyBase)) return true;
+
+            var campaignManager = Campaign.Current?.CampaignObjectManager;
+            if (campaignManager != null)
+            {
+                foreach (var mp in campaignManager.MobileParties)
+                {
+                    var pb = mp?.Party;
+                    if (pb != null && pb.ItemRoster == roster)
+                    {
+                        partyBase = pb;
+                        ItemRosterLookup.Set(roster, partyBase);
+                        return true;
+                    }
+                }
+
+                foreach (var settlement in campaignManager.Settlements)
+                {
+                    var pb = settlement?.Party;
+                    if (pb != null && pb.ItemRoster == roster)
+                    {
+                        partyBase = pb;
+                        ItemRosterLookup.Set(roster, partyBase);
+                        return true;
+                    }
+                }
+            }
+
+            foreach (var mp in MobileParty.All)
+            {
+                var pb = mp?.Party;
+                if (pb != null && pb.ItemRoster == roster)
+                {
+                    partyBase = pb;
+                    ItemRosterLookup.Set(roster, partyBase);
+                    return true;
+                }
+            }
+
+            foreach (var settlement in Settlement.All)
+            {
+                var pb = settlement?.Party;
+                if (pb != null && pb.ItemRoster == roster)
+                {
+                    partyBase = pb;
+                    ItemRosterLookup.Set(roster, partyBase);
+                    return true;
+                }
+            }
+
+            partyBase = null;
+            return false;
+        }
 
         [HarmonyPatch(nameof(ItemRoster.AddToCounts), new[] { typeof(EquipmentElement), typeof(int) })]
         [HarmonyPrefix]
@@ -49,7 +107,7 @@ namespace GameInterface.Services.ItemRosters.Patches
                 return; // Don't publish unsucessful calls
             }
 
-            if (ItemRosterLookup.TryGetValue(__instance, out var partyBase) == false)
+            if (TryResolvePartyBase(__instance, out var partyBase) == false)
             {
                 Logger.Error("Unable to find party from item roster");
                 return;
@@ -74,7 +132,7 @@ namespace GameInterface.Services.ItemRosters.Patches
                 return false; // Disallow on clients
             }
 
-            if (ItemRosterLookup.TryGetValue(__instance, out var partyBase) == false)
+            if (TryResolvePartyBase(__instance, out var partyBase) == false)
             {
                 Logger.Error("Unable to find party from item roster");
                 return false;

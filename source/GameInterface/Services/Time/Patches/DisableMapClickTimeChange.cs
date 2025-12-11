@@ -1,4 +1,4 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using SandBox.View.Map;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,6 +11,12 @@ namespace GameInterface.Services.Heroes.Patches;
 [HarmonyPatch(typeof(MapScreen))]
 internal class DisableMapClickTimeChange
 {
+    [HarmonyPrepare]
+    static bool Prepare()
+    {
+        return AccessTools.Method(typeof(MapScreen), "HandleLeftMouseButtonClick") != null;
+    }
+
     private static void SetTimeControlModeDeference(Campaign _, CampaignTimeControlMode _2)
     {
         ;

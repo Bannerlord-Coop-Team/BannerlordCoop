@@ -21,7 +21,9 @@ namespace GameInterface.Services.ItemRosters
         public static void Set(ItemRoster roster, PartyBase party)
         {
             if (roster == null)
-                throw new ArgumentNullException("ItemRoster must not be null");
+                return;
+            if (party == null)
+                return;
 
             if (TryGetValue(roster, out _))
                 table.Remove(roster);
@@ -38,8 +40,9 @@ namespace GameInterface.Services.ItemRosters
         /// <exception cref="ArgumentNullException"/>
         public static bool TryGetValue(ItemRoster roster, out PartyBase party)
         {
+            party = null;
             if (roster == null)
-                throw new ArgumentNullException("ItemRoster must not be null");
+                return false;
 
             return table.TryGetValue(roster, out party);
         }

@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.Time;
 using TaleWorlds.CampaignSystem;

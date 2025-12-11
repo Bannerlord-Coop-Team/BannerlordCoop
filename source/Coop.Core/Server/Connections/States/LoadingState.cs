@@ -27,7 +27,7 @@ public class LoadingState : ConnectionStateBase
 
     internal void PlayerCampaignEnteredHandler(MessagePayload<NetworkPlayerCampaignEntered> obj)
     {
-        var playerId = (NetPeer)obj.Who;
+        var playerId = obj.Who as NetPeer;
 
         if (playerId == ConnectionLogic.Peer)
         {

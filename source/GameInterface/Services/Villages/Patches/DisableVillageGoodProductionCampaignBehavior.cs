@@ -1,5 +1,6 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using GameInterface;
 
 namespace GameInterface.Services.Villages.Patches;
 
@@ -7,5 +8,5 @@ namespace GameInterface.Services.Villages.Patches;
 internal class DisableVillageGoodProductionCampaignBehavior
 {
     [HarmonyPatch(nameof(VillageGoodProductionCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

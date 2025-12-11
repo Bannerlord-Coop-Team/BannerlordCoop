@@ -14,6 +14,7 @@ internal class EnterMainMenuHandler : IHandler
         this.gameStateInterface = gameStateInterface;
         this.messageBroker = messageBroker;
 
+        // Listen for EnterMainMenu command to safely end current game and transition UI.
         messageBroker.Subscribe<EnterMainMenu>(Handle);
     }
 
@@ -24,6 +25,7 @@ internal class EnterMainMenuHandler : IHandler
 
     private void Handle(MessagePayload<EnterMainMenu> payload)
     {
+        // Track whether a game was active; only publish responses/events when applicable.
         bool hadGame = TaleWorlds.Core.Game.Current != null;
         gameStateInterface.EnterMainMenu();
 
@@ -34,6 +36,7 @@ internal class EnterMainMenuHandler : IHandler
 
         if (hadGame && !GameStateInterface.IsLoadingGame)
         {
+            // Signal to clients that the menu has been entered; used to sequence save loading.
             messageBroker.Publish(this, new MainMenuEntered());
         }
     }
