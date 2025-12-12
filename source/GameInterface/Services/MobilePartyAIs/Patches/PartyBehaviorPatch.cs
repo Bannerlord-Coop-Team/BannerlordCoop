@@ -68,11 +68,11 @@ static class PartyBehaviorPatch
 
             if (interactablePoint is AnchorPoint anchorPoint)
             {
-                targetEntityId = anchorPoint.Owner.StringId;
+                targetEntityId = anchorPoint.Owner?.StringId;
             }
             else if (interactablePoint is PartyBase targetParty)
             {
-                targetEntityId = targetParty.MobileParty.StringId;
+                targetEntityId = targetParty.MobileParty?.StringId;
             }
         }
 
@@ -111,7 +111,7 @@ static class PartyBehaviorPatch
     }
 
     public static void SetAiBehavior(
-        MobilePartyAi partyAi, AiBehavior newBehavior, IMapPoint targetMapEntity, CampaignVec2 targetPoint)
+        MobilePartyAi partyAi, AiBehavior newBehavior, IInteractablePoint targetMapEntity, CampaignVec2 targetPoint)
     {
         if (partyAi == null)
         {
@@ -125,21 +125,21 @@ static class PartyBehaviorPatch
 
         var mobileParty = partyAi._mobileParty;
 
-        if (typeof(Settlement).IsAssignableFrom(targetMapEntity?.GetType()))
-        {
-            mobileParty._targetSettlement = (Settlement)targetMapEntity;
-            mobileParty.TargetParty = null;
-        }
+        //if (typeof(Settlement).IsAssignableFrom(targetMapEntity?.GetType()))
+        //{
+        //    mobileParty._targetSettlement = (Settlement)targetMapEntity;
+        //    mobileParty.TargetParty = null;
+        //}
 
-        else if (typeof(MobileParty).IsAssignableFrom(targetMapEntity?.GetType()))
+        if (typeof(PartyBase).IsAssignableFrom(targetMapEntity?.GetType()))
         {
             mobileParty._targetSettlement = null;
-            mobileParty.TargetParty = (MobileParty)targetMapEntity;
+            mobileParty.TargetParty = (targetMapEntity as PartyBase).MobileParty;
         }
 
         mobileParty.TargetPosition = targetPoint;
 
-        partyAi._mobileParty.SetShortTermBehavior(newBehavior, (IInteractablePoint)targetMapEntity);
+        partyAi._mobileParty.SetShortTermBehavior(newBehavior, targetMapEntity);
         partyAi.BehaviorTarget = targetPoint;
         partyAi.UpdateBehavior();
     }

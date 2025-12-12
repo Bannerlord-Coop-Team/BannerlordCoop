@@ -58,7 +58,7 @@ internal class MobilePartyInterface : IMobilePartyInterface
     {
         foreach(var party in MobileParty.All)
         {
-            if (objectManager.TryGetId(party.Id, out var id) == false)
+            if (objectManager.TryGetId(party, out var id) == false)
             {
                 Logger.Error($"Failed to retrieve object id for MobileParty with identifier {party.Id}. Registration skipped.");
                 continue;

@@ -55,6 +55,8 @@ public class StanceLinkLifetimeHandler : IHandler
         var faction1 = payload.What.Faction1;
         var faction2 = payload.What.Faction2;
 
+        return;
+
         //get ID of necessary object - if error abort
         if (objectManager.TryGetId(faction1, out var faction1Id) == false) return;
         if (objectManager.TryGetId(faction2, out var faction2Id) == false) return;

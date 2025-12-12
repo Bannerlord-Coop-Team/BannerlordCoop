@@ -91,15 +91,15 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         CampaignVec2 targetPoint = new CampaignVec2(new Vec2(data.TargetPointX, data.TargetPointY), true);
 
-        IMapPoint targetMapEntity = null;
+        IInteractablePoint targetMapEntity = null;
         if (data.HasTarget && targetParty != null)
         {
-            targetMapEntity = targetParty;
+            targetMapEntity = targetParty.Party;
         }
-        else if (data.HasTarget && targetSettlement != null)
-        {
-            targetMapEntity = targetSettlement;
-        }
+        //else if (data.HasTarget && targetSettlement != null)
+        //{
+        //    targetMapEntity = targetSettlement;
+        //}
 
         PartyBehaviorPatch.SetAiBehavior(
             party.Ai,

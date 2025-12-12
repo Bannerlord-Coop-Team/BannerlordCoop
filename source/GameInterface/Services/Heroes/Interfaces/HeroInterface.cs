@@ -185,8 +185,7 @@ internal class HeroInterface : IHeroInterface
         party.IsVisible = true;
         party.Party.SetVisualAsDirty();
 
-        //party.RecoverPositionsForNavMeshUpdate();
-        //party.CurrentNavigationFace = Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position);
+        party.CheckPositionsForMapChangeAndUpdateIfNeeded();
 
         //party.Ai.OnGameInitialized();
 
