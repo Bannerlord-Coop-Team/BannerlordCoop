@@ -15,11 +15,11 @@ namespace GameInterface.Serialization.External
         }
         protected override void PackInternal()
         {
-            stringId = Object.StringId;
+            stringId = ResolveId(Object);
         }
         protected override void UnpackInternal()
         {
-            Object = ResolveId<BasicCultureObject>(stringId);
+            Object = ResolveObject<BasicCultureObject>(stringId);
         }
     }
 }

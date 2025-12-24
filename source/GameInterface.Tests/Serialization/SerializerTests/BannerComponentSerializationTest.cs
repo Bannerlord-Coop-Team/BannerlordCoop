@@ -13,6 +13,7 @@ using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 using Common.Serialization;
+using System.Xml.Linq;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
@@ -55,25 +56,26 @@ namespace GameInterface.Tests.Serialization.SerializerTests
         public void BannerComponent_Full_Serialization()
         {
             ItemObject itemObject = new ItemObject("Attached Item");
-            BannerComponent BannerComponent = new BannerComponent(itemObject);
+            BannerComponent bannerComponent = new BannerComponent(itemObject);
             var objectManager = container.Resolve<IObjectManager>();
 
             objectManager.AddExisting(itemObject.StringId, itemObject);
 
             foreach (var property in typeof(BannerComponent).GetProperties())
             {
-                property.SetRandom(BannerComponent);
+                property.SetRandom(bannerComponent);
             }
 
             // Set banner effect and register it with the object manager
             BannerEffect effect = new BannerEffect("myEffect");
-            Assert.True(objectManager.AddExisting(effect.StringId, effect));
+            effect.Initialize("myEffect", "", 1.1f, 1.1f, 1.1f, BannerEffect.EffectIncrementType.Add);
+            Assert.True(objectManager.AddNewObject(effect, out var _));
 
-            BannerComponent.BannerEffect = effect;
+            bannerComponent.BannerEffect = effect;
 
             // Setup binary package with dependencies 
             var factory = container.Resolve<IBinaryPackageFactory>();
-            BannerComponentBinaryPackage package = new BannerComponentBinaryPackage(BannerComponent, factory);
+            BannerComponentBinaryPackage package = new BannerComponentBinaryPackage(bannerComponent, factory);
 
             package.Pack();
 
@@ -100,10 +102,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             foreach (var property in properties)
             {
-                Assert.Equal(property.GetValue(BannerComponent), property.GetValue(newBannerComponent));
+                Assert.Equal(property.GetValue(bannerComponent), property.GetValue(newBannerComponent));
             }
 
-            Assert.Equal(BannerComponent.BannerEffect, newBannerComponent.BannerEffect);
+            Assert.Equal(bannerComponent.BannerEffect, newBannerComponent.BannerEffect);
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -17,25 +17,20 @@ internal class MapEventPartyRegistry : RegistryBase<MapEventParty>
     {
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            foreach (MapEventParty mep in mapEvent.PartiesOnSide(TaleWorlds.Core.BattleSideEnum.None))
+            int counter = 1;
+            
+            foreach (var side in mapEvent._sides)
             {
-                if (RegisterNewObject(mep, out var newId) == false)
+                if (side == null) continue;
+
+                foreach (var party in side.Parties)
                 {
-                    Logger.Error("Unable to register MapEventParty {id} in the object manager", mep.ToString());
-                }
-            }
-            foreach (MapEventParty mep in mapEvent.PartiesOnSide(TaleWorlds.Core.BattleSideEnum.Attacker))
-            {
-                if (RegisterNewObject(mep, out var newId) == false)
-                {
-                    Logger.Error("Unable to register MapEventParty {id} in the object manager", mep.ToString());
-                }
-            }
-            foreach (MapEventParty mep in mapEvent.PartiesOnSide(TaleWorlds.Core.BattleSideEnum.Defender))
-            {
-                if (RegisterNewObject(mep, out var newId) == false)
-                {
-                    Logger.Error("Unable to register MapEventParty {id} in the object manager", mep.ToString());
+                    if (party == null) continue;
+
+                    var networkId = nameof(MapEventParty) + "_" + mapEvent.StringId + "_" + counter++;
+
+                    if (RegisterExistingObject(networkId, party) == false)
+                        Logger.Error("Unable to register MapEventParty {id} in the object manager", party.ToString());
                 }
             }
         }

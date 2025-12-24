@@ -28,7 +28,6 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool VillageStatePrefix(ref Village __instance, ref VillageStates value)
     {
-        if(AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
@@ -63,7 +62,6 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool HearthPrefix(ref Village __instance, ref float value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
@@ -88,7 +86,6 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool TradeBoundPrefix(ref Village __instance, ref Settlement value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
@@ -117,7 +114,6 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool TradeTaxAccumulatedPrefix(ref Village __instance, ref int value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
@@ -142,7 +138,6 @@ internal class VillagePatches
     [HarmonyPrefix]
     private static bool LastDemandSatisifiedTimePrefix(ref Village __instance, ref float value)
     {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;

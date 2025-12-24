@@ -2,6 +2,7 @@
 using Common.Serialization;
 using Coop.Core.Server.Services.Save.Data;
 using System;
+using System.Collections;
 using System.IO;
 
 namespace Coop.Core.Server.Services.Save
@@ -17,7 +18,7 @@ namespace Coop.Core.Server.Services.Save
 
     internal class CoopSaveManager : ICoopSaveManager
     {
-        public string DefaultPath { get; } = "./Saves/";
+        public string DefaultPath { get; } = "./saves/";
         public string FileType { get; } = ".json";
 
         /// <summary>

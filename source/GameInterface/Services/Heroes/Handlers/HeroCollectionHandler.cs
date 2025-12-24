@@ -88,7 +88,7 @@ namespace GameInterface.Services.Heroes.Handlers
             var data = payload.What;
 
             if (!TryGetId(data.Instance, out string HeroId)) return;
-            if (!TryGetId(data.Value, out string CharacterObjectId)) return;
+            if (!TryGetId(data.Value, out string CharacterObjectId) && data.Value != null) return;
 
             network.SendAll(new NetworkUpdateArray(HeroId, CharacterObjectId, data.Index));
         }
@@ -98,7 +98,7 @@ namespace GameInterface.Services.Heroes.Handlers
             var data = payload.What;
 
             if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out CharacterObject characterObject)) return;
+            if (!objectManager.TryGetObject(data.ValueId, out CharacterObject characterObject) && data.ValueId != null) return;
 
             hero.VolunteerTypes[data.Index] = characterObject;
         }
@@ -138,9 +138,9 @@ namespace GameInterface.Services.Heroes.Handlers
             var data = payload.What;
 
             if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out CaravanPartyComponent caravan)) return;
+            if (!objectManager.TryGetObject(data.ValueId, out PartyComponent caravan)) return;
 
-            hero.OwnedCaravans.Add(caravan);
+            hero.OwnedCaravans.Add((CaravanPartyComponent)caravan);
         }
 
         private void Handle(MessagePayload<CaravanListRemoved> payload)
@@ -158,9 +158,9 @@ namespace GameInterface.Services.Heroes.Handlers
             var data = payload.What;
 
             if (!objectManager.TryGetObject(data.HeroId, out Hero hero)) return;
-            if (!objectManager.TryGetObject(data.ValueId, out CaravanPartyComponent caravan)) return;
+            if (!objectManager.TryGetObject(data.ValueId, out PartyComponent caravan)) return;
 
-            hero.OwnedCaravans.Remove(caravan);
+            hero.OwnedCaravans.Remove((CaravanPartyComponent)caravan);
         }
 
         private void Handle(MessagePayload<AlleyListUpdated> payload)
@@ -243,7 +243,7 @@ namespace GameInterface.Services.Heroes.Handlers
             hero._ownedWorkshops.Remove(workshop);  
         }
 
-        private bool TryGetId(object value, out string id)
+        private bool TryGetId<T>(T value, out string id)
         {
             id = null;
             if (value == null) return false;

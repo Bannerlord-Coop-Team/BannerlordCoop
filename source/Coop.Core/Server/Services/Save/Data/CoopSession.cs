@@ -1,5 +1,10 @@
-﻿using GameInterface.Services.Heroes.Data;
+﻿using Autofac.Features.OwnedInstances;
+using Common;
+using GameInterface.Services.Entity.Data;
+using GameInterface.Services.Heroes.Data;
 using ProtoBuf;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace Coop.Core.Server.Services.Save.Data;
 
@@ -9,8 +14,8 @@ namespace Coop.Core.Server.Services.Save.Data;
 /// </summary>
 public interface ICoopSession
 {
-    string UniqueGameId { get; set; }
-    GameObjectGuids GameObjectGuids { get; set; }
+    string UniqueGameId { get; }
+    Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
 }
 
 /// <inheritdoc cref="ICoopSession"/>
@@ -18,9 +23,15 @@ public interface ICoopSession
 public class CoopSession : ICoopSession
 {
     [ProtoMember(1)]
-    public string UniqueGameId { get; set; }
+    public string UniqueGameId { get; }
     [ProtoMember(2)]
-    public GameObjectGuids GameObjectGuids { get; set; }
+    public Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
+
+    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>>  controlledEntityMap)
+    {
+        UniqueGameId = uniqueGameId;
+        ControlledEntityMap = controlledEntityMap;
+    }
 
     public override bool Equals(object obj)
     {
@@ -28,13 +39,21 @@ public class CoopSession : ICoopSession
 
         if (UniqueGameId != session.UniqueGameId) return false;
 
-        if (GameObjectGuids.Equals(session.GameObjectGuids) == false) return false;
+        if (ControlledEntityMap.Count != session.ControlledEntityMap.Count) return false;
+
+        if (ControlledEntityMap.Zip(session.ControlledEntityMap, (l, r) =>
+        {
+            return l.Key == r.Key && l.Value.SetEquals(r.Value);
+        }).All(x => x) == false) return false;
 
         return true;
     }
 
     public override int GetHashCode()
     {
-        return base.GetHashCode();
+        int hash = 1236898;
+        hash = (hash * 31) + UniqueGameId.GetHashCode();
+        hash = (hash * 31) + ControlledEntityMap.GetHashCode();
+        return hash;
     }
 }

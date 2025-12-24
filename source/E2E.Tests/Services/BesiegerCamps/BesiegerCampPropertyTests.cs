@@ -3,6 +3,7 @@ using E2E.Tests.Environment.Instance;
 using E2E.Tests.Util;
 using HarmonyLib;
 using System.Reflection;
+using System.Runtime;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using Xunit.Abstractions;
@@ -40,12 +41,6 @@ namespace E2E.Tests.Services.BesiegerCamps
             besiegerCampId = TestEnvironment.CreateRegisteredObject<BesiegerCamp>(disabledMethods);
             siegeEventId = TestEnvironment.CreateRegisteredObject<SiegeEvent>(disabledMethods);
             siegeEnginesId = TestEnvironment.CreateRegisteredObject<SiegeEnginesContainer>(disabledMethods);
-
-            foreach (var client in Clients)
-            {
-                var _besiegerCamp = new BesiegerCamp(null);
-                client.ObjectManager.AddExisting(this.besiegerCampId, _besiegerCamp);
-            }
         }
 
         [Fact]
@@ -86,7 +81,7 @@ namespace E2E.Tests.Services.BesiegerCamps
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
                 client.ObjectManager.TryGetId(clientBesiegerCamp.SiegeEvent, out string clientSiegeEventId);
-                Assert.Equal(clientSiegeEventId, siegeEventId);
+                Assert.Equal(siegeEventId, clientSiegeEventId);
             }
         }
 
@@ -94,8 +89,10 @@ namespace E2E.Tests.Services.BesiegerCamps
         public void ServerChangeBesiegerCampSiegeStrategy_SyncAllClients()
         {
             // Arrange
+            var serverSiegeStrategyId = TestEnvironment.CreateRegisteredObject<SiegeStrategy>();
+
             Assert.True(Server.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var serverBesiegerCamp));
-            var serverSiegeStrategy = GameObjectCreator.CreateInitializedObject<SiegeStrategy>();
+            Assert.True(Server.ObjectManager.TryGetObject<SiegeStrategy>(serverSiegeStrategyId, out var serverSiegeStrategy));
 
             // Act
             Server.Call(() =>
@@ -107,7 +104,9 @@ namespace E2E.Tests.Services.BesiegerCamps
             foreach (var client in TestEnvironment.Clients)
             {
                 Assert.True(client.ObjectManager.TryGetObject<BesiegerCamp>(besiegerCampId, out var clientBesiegerCamp));
-                Assert.Equal(clientBesiegerCamp.SiegeStrategy.StringId, serverSiegeStrategy.StringId);
+                Assert.True(client.ObjectManager.TryGetId(clientBesiegerCamp.SiegeStrategy, out var clientSiegeStrategyId));
+
+                Assert.Equal(serverSiegeStrategyId, clientSiegeStrategyId);
             }
         }
 

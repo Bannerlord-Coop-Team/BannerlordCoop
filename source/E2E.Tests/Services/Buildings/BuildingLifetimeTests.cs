@@ -6,7 +6,7 @@ using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Buildings
 {
-    public class BuildingLifetimeTests
+    public class BuildingLifetimeTests : IDisposable
     {
         E2ETestEnvironment TestEnvironment { get; }
 

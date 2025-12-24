@@ -1,10 +1,12 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
 using Coop.Core.Client.Services.MobileParties.Packets;
 using Coop.Core.Server.Services.MobileParties.Packets;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using LiteNetLib;
+using Serilog;
 
 namespace Coop.Core.Server.Services.MobileParties.PacketHandlers;
 
@@ -13,6 +15,7 @@ namespace Coop.Core.Server.Services.MobileParties.PacketHandlers;
 /// </summary>
 internal class RequestMobilePartyBehaviorPacketHandler : IPacketHandler
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<RequestMobilePartyBehaviorPacketHandler>();
     public PacketType PacketType => PacketType.RequestUpdatePartyBehavior;
 
     private readonly IPacketManager packetManager;

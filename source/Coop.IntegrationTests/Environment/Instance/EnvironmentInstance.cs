@@ -188,7 +188,7 @@ public abstract class EnvironmentInstance
         {
             for (int i = 0; i < methods.Length; i++)
             {
-                harmony.Unpatch(methods[i], patches[i].method);
+                harmony.Unpatch(methods[i], HarmonyPatchType.Prefix, harmony.Id);
             }
         }
 

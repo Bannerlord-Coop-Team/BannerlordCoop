@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,7 +14,7 @@ namespace GameInterface.Services.PartyComponents;
 internal class PartyComponentRegistry : RegistryBase<PartyComponent>
 {
     private const string PartyComponentIdPrefix = "CoopPartyComponent";
-    private static int InstanceCounter = 0;
+    private int InstanceCounter = 0;
 
     public PartyComponentRegistry(IRegistryCollection collection) : base(collection) { }
 
@@ -33,9 +33,10 @@ internal class PartyComponentRegistry : RegistryBase<PartyComponent>
 
     public override void RegisterAll()
     {
-        foreach (var component in MobileParty.All.Select(p => p.PartyComponent).Where(c => c != null))
+        foreach (var party in MobileParty.All)
         {
-            RegisterNewObject(component, out var _);
+            var networkId = $"{party.PartyComponent.GetType().Name}_{party.StringId}";
+            RegisterExistingObject(networkId, party.PartyComponent);
         }
     }
 

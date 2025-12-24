@@ -75,7 +75,7 @@ namespace Coop.Core.Server.Services.Connection.Handlers
             if (clientRegistry.PlayersLoading)
             {
                 var loadingPeers = clientRegistry.LoadingPeers;
-                Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.EndPoint.ToString()))} are currently loading, unable to change time");
+                Logger.Information($"{string.Join(",", loadingPeers.Select(p => p.Address))} are currently loading, unable to change time");
                 return true;
             }
 

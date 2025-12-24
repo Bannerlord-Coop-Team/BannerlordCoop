@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using Coop.Core.Server.Services.Save.Data;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
@@ -16,21 +17,22 @@ internal class SaveGameHandler : IHandler
     private readonly ICoopSaveManager saveManager;
     private readonly ICoopServer coopServer;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
 
     public SaveGameHandler(
         IMessageBroker messageBroker,
         ICoopSaveManager saveManager,
         ICoopServer coopServer,
-        IControllerIdProvider controllerIdProvider) 
+        IControllerIdProvider controllerIdProvider,
+        IControlledEntityRegistry controlledEntityRegistry) 
     {
         this.messageBroker = messageBroker;
         this.saveManager = saveManager;
         this.coopServer = coopServer;
         this.controllerIdProvider = controllerIdProvider;
+        this.controlledEntityRegistry = controlledEntityRegistry;
         messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
-        messageBroker.Subscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
         messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
-        messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
 
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
@@ -38,28 +40,19 @@ internal class SaveGameHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<GameSaved>(Handle_GameSaved);
-        messageBroker.Unsubscribe<ObjectGuidsPackaged>(Handle_ObjectGuidsPackaged);
         messageBroker.Unsubscribe<GameLoaded>(Handle_GameLoaded);
-        messageBroker.Unsubscribe<CampaignReady>(Handle_CampaignLoaded);
 
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
     }
 
-    private string saveName;
     private void Handle_GameSaved(MessagePayload<GameSaved> obj)
     {
-        saveName = obj.What.SaveName;
+        var saveName = obj.What.SaveName;
         messageBroker.Publish(this, new PackageObjectGuids());
-    }
 
-    private void Handle_ObjectGuidsPackaged(MessagePayload<ObjectGuidsPackaged> obj)
-    {
-        var payload = obj.What;
-        CoopSession session = new CoopSession()
-        {
-            UniqueGameId = payload.UniqueGameId,
-            GameObjectGuids = payload.GameObjectGuids,
-        };
+        var controlledEntities = controlledEntityRegistry.PackageControlledEntities();
+
+        CoopSession session = new CoopSession(saveName, controlledEntities);
 
         saveManager.SaveCoopSession(saveName, session);
     }
@@ -70,21 +63,15 @@ internal class SaveGameHandler : IHandler
         savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
     }
 
-    private void Handle_CampaignLoaded(MessagePayload<CampaignReady> obj)
+    private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
         if (savedSession == null)
         {
-            messageBroker.Publish(this, new RegisterAllGameObjects());
+            messageBroker.Publish(this, new RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId));
         }
         else
         {
-            var message = new LoadExistingObjectGuids(savedSession.GameObjectGuids);
-            messageBroker.Publish(this, message);
+            controlledEntityRegistry.LoadControlledEntities(savedSession.ControlledEntityMap);
         }
-    }
-
-    private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
-    {
-        messageBroker.Publish(this, new RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId));
     }
 }

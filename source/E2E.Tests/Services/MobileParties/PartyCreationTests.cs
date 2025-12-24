@@ -63,9 +63,7 @@ public class PartyCreationTests : IDisposable
         string? partyId = null;
         client1.Call(() =>
         {
-            var clientParty = MobileParty.CreateParty("This should not set", null, (party) =>
-            {
-            });
+            var clientParty = new MobileParty();
 
             partyId = clientParty.StringId;
         }, new[] { AccessTools.Method(typeof(MobileParty), nameof(MobileParty.ResetCached)) });

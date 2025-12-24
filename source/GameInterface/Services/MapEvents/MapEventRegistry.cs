@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Registry;
+﻿using GameInterface.Registry;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -11,7 +11,7 @@ namespace GameInterface.Services.MapEvents;
 internal class MapEventRegistry : RegistryBase<MapEvent>
 {
     private const string MapEventIdPrefix = "CoopMapEvent";
-    private static int InstanceCounter = 0;
+    private int InstanceCounter = 0;
 
     public MapEventRegistry(IRegistryCollection collection) : base(collection) { }
 
@@ -19,7 +19,9 @@ internal class MapEventRegistry : RegistryBase<MapEvent>
     {
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (RegisterNewObject(mapEvent, out var _) == false)
+            if (mapEvent.StringId == null) return;
+
+            if (RegisterExistingObject(mapEvent.StringId, mapEvent) == false)
             {
                 Logger.Error($"Unable to register {mapEvent}");
             }

@@ -2,6 +2,7 @@
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -22,9 +23,22 @@ public class HeroDebugCommand
     {
         StringBuilder stringBuilder = new StringBuilder();
 
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
         foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes())
         {
-            stringBuilder.Append(string.Format("ID: '{0}'\nName: '{1}'\n", hero.StringId, hero.Name));
+            if (objectManager.TryGetId(hero, out var id))
+            {
+                stringBuilder.AppendLine($"ID: '{id}', Name: '{hero.Name}', Game ID: {hero.Id}, Game StringId {hero.StringId}");
+            }
+            else
+            {
+                stringBuilder.AppendLine($"Name: '{hero.Name}' was not registered with object manager");
+            }
+            
         }
 
         return stringBuilder.ToString();
@@ -34,7 +48,7 @@ public class HeroDebugCommand
     [CommandLineArgumentFunction("info", "coop.debug.hero")]
     public static string Info(List<string> args)
     {
-        if (args.Count == 1)
+        if (args.Count != 1)
         {
             return "Usage: coop.debug.hero.info <heroId>";
         }

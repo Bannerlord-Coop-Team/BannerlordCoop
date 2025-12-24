@@ -17,7 +17,7 @@ public class AttachedPartiesTests
     public void ServerReceivesAttachedPartyAdded_PublishesAddAttachedParty_AllClients()
     {
         // Arrange
-        var triggerMessage = new AttachedPartyAdded(null);
+        var triggerMessage = new AttachedPartyAdded();
 
         var server = TestEnvironment.Server;
 
@@ -43,7 +43,7 @@ public class AttachedPartiesTests
     public void ServerReceivesAttachedPartyRemoved_PublishesRemoveAttachedParty_AllClients()
     {
         // Arrange
-        var triggerMessage = new AttachedPartyRemoved(null);
+        var triggerMessage = new AttachedPartyRemoved();
 
         var server = TestEnvironment.Server;
 

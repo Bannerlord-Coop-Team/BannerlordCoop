@@ -59,7 +59,7 @@ namespace GameInterface.Services.Kingdoms.Data
             SetKingdomDecisionProperties(makePeaceKingdomDecision, proposerClan, kingdom);
             FactionToMakePeaceWithField.SetValue(makePeaceKingdomDecision, faction);
             DailyTributeToBePaidField.SetValue(makePeaceKingdomDecision, DailyTributeToBePaid);
-            ApplyResultsField.SetValue(makePeaceKingdomDecision._applyResults, ApplyResults);
+            ApplyResultsField.SetValue(makePeaceKingdomDecision, ApplyResults);
             kingdomDecision = makePeaceKingdomDecision;
             return true;
         }

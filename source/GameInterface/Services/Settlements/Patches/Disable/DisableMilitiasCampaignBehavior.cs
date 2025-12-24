@@ -8,5 +8,5 @@ namespace GameInterface.Services.Settlements.Patches.Disable;
 internal class DisableMilitiasCampaignBehavior
 {
     [HarmonyPatch(nameof(MilitiasCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }
