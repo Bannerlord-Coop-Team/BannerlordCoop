@@ -1,10 +1,10 @@
 ﻿using Common;
 using Common.Messaging;
-using GameInterface.Services.Heroes.Interfaces;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Save.Interfaces;
+using GameInterface.Services.Save.Messages;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Handlers;
+namespace GameInterface.Services.Save.Handlers;
 
 internal class SaveHandler : IHandler
 {

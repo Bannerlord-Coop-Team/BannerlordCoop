@@ -6,7 +6,7 @@ using TaleWorlds.Core;
 using TaleWorlds.SaveSystem;
 using TaleWorlds.SaveSystem.Load;
 
-namespace GameInterface.Services.Heroes.Patches;
+namespace GameInterface.Services.Save.Patches;
 
 [HarmonyPatch(typeof(SaveManager), "Load", new Type[] { typeof(string), typeof(ISaveDriver), typeof(bool) })]
 internal class LoadPatches

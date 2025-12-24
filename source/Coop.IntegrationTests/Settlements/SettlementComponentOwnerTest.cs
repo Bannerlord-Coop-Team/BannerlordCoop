@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Coop.Core.Server.Services.Settlements.Messages;
 
 namespace Coop.IntegrationTests.Settlements
 {

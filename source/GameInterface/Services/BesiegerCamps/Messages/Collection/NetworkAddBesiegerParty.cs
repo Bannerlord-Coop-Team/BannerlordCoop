@@ -1,9 +1,8 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.BesiegerCamps.Messages.Collection;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem.Siege;
 
-namespace GameInterface.Services.BesiegerCamps.Messages;
+namespace GameInterface.Services.BesiegerCamps.Messages.Collection;
 
 /// <summary>
 /// Command to add an besieger party on <see cref="BesiegerCamp._besiegerParties"/>

@@ -1,5 +1,5 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Time.Enum;
 using ProtoBuf;
 
 namespace Coop.Core.Server.Services.Time.Messages;

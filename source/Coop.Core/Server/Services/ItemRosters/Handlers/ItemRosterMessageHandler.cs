@@ -3,7 +3,7 @@ using Common.Network;
 using Coop.Core.Server.Services.ItemRosters.Messages;
 using GameInterface.Services.ItemRosters.Messages;
 
-namespace Coop.Core.Server.Services.PartyBases.Handlers;
+namespace Coop.Core.Server.Services.ItemRosters.Handlers;
 
 /// <summary>
 /// Handles ItemRosterUpdated and sends network event to all clients.

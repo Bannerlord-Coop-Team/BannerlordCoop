@@ -4,6 +4,7 @@ using Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Time.Messages;
 using Serilog;
 
 namespace Coop.Core.Client.Services.Time.Handlers

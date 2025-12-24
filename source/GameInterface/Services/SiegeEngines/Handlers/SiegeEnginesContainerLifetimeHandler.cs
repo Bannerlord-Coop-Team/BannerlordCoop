@@ -3,11 +3,11 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.SiegeEnginesContainers.Messages;
+using GameInterface.Services.SiegeEngines.Messages;
 using Serilog;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
-namespace GameInterface.Services.SiegeEnginesContainers.Handlers;
+namespace GameInterface.Services.SiegeEngines.Handlers;
 
 internal class SiegeEnginesContainerLifetimeHandler : IHandler
 {

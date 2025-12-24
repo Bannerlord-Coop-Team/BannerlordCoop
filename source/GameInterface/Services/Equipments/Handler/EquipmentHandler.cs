@@ -14,7 +14,7 @@ using HarmonyLib;
 using System.Reflection;
 
 
-namespace GameInterface.Services.Equipments.Handlers
+namespace GameInterface.Services.Equipments.Handler
 {
     /// <summary>
     /// Handles all changes to Equipments on client.

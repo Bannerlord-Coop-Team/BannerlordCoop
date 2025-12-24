@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.BarterBehaviors;
 
-namespace GameInterface.Services.Settlements.Patches;
+namespace GameInterface.Services.Barters.Patches;
 
 [HarmonyPatch(typeof(GoldBarterBehavior))]
 internal class DisableGoldBarterBehavior

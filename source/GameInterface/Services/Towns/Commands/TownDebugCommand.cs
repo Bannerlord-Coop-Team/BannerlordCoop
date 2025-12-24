@@ -16,7 +16,7 @@ using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
-namespace GameInterface.Services.Villages.Commands;
+namespace GameInterface.Services.Towns.Commands;
 
 public class TownDebugCommand
 {
@@ -106,8 +106,8 @@ public class TownDebugCommand
 
         sb.AppendFormat("ID: '{0}'\n", args[0]);
         sb.AppendFormat("Name: '{0}'\n", town.Name);
-        sb.AppendFormat("Governor: '{0}'\n", (town.Governor != null) ? town.Governor.Name : "null");
-        sb.AppendFormat("LastCapturedBy: '{0}'\n", (town.LastCapturedBy != null) ? town.LastCapturedBy.Name : "null");
+        sb.AppendFormat("Governor: '{0}'\n", town.Governor != null ? town.Governor.Name : "null");
+        sb.AppendFormat("LastCapturedBy: '{0}'\n", town.LastCapturedBy != null ? town.LastCapturedBy.Name : "null");
         sb.AppendFormat("Prosperity: '{0}'\n", town.Prosperity);
         sb.AppendFormat("Loyalty: '{0}'\n", town.Loyalty);
         sb.AppendFormat("Security: '{0}'\n", town.Security);

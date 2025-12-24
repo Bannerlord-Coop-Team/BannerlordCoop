@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEvents.Handlers;
-using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;

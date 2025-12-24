@@ -8,7 +8,7 @@ using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
-namespace GameInterface.Services.GameDebug.Commands
+namespace GameInterface.Services.Clans.Commands
 {
     public class ClanDebugCommands
     {

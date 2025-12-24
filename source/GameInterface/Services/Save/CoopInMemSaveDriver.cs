@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using TaleWorlds.SaveSystem;
 
-namespace GameInterface.Services.Heroes;
+namespace GameInterface.Services.Save;
 
 internal class CoopInMemSaveDriver : InMemDriver
 {

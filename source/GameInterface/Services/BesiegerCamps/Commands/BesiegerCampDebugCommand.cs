@@ -7,7 +7,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
-namespace GameInterface.Services.Villages.Commands;
+namespace GameInterface.Services.BesiegerCamps.Commands;
 
 public class BesiegerCampDebugCommand
 {

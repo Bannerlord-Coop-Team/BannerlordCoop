@@ -2,7 +2,7 @@
 using HarmonyLib;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
-namespace GameInterface.Services.SiegeEnginesConstructionProgress
+namespace GameInterface.Services.SiegeEngineConstructionProgressService
 {
     internal class SiegeEngineConstructionProgressSync : IAutoSync
     {

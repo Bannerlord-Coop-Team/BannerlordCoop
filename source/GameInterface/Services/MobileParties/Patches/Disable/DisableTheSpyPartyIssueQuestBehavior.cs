@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using SandBox.Issues;
 
-namespace GameInterface.Services.MobileParties.Patches;
+namespace GameInterface.Services.MobileParties.Patches.Disable;
 
 [HarmonyPatch(typeof(TheSpyPartyIssueQuestBehavior))]
 internal class DisableTheSpyPartyIssueQuestBehavior

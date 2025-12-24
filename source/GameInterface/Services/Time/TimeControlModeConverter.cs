@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.Heroes.Enum;
+﻿using GameInterface.Services.Time.Enum;
 using System;
 using System.Collections.Generic;
 using System.Text;

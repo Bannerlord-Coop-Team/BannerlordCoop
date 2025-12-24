@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.Armies.Messages.Lifetime;
+namespace GameInterface.Services.Buildings.Messages;
 
 [ProtoContract(SkipConstructor = true)]
 internal class NetworkCreateBuilding : ICommand

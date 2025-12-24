@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.SaveSystem;
 
-namespace GameInterface.Services.Heroes.Interfaces;
+namespace GameInterface.Services.Save.Interfaces;
 
 internal interface ISaveInterface : IGameAbstraction
 {

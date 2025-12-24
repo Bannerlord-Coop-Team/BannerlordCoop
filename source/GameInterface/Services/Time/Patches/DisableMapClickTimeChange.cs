@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Patches;
+namespace GameInterface.Services.Time.Patches;
 
 [HarmonyPatch(typeof(MapScreen))]
 internal class DisableMapClickTimeChange

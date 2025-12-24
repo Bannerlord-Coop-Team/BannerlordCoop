@@ -9,7 +9,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
-namespace GameInterface.Services.SiegeEnginesContainers.Patches;
+namespace GameInterface.Services.SiegeEngines.Patches;
 
 [HarmonyPatch()]
 internal class SiegeEnginesContainerCreationPatches

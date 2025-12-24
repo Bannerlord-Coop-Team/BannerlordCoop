@@ -11,7 +11,7 @@ using GameInterface.Policies;
 using System;
 using GameInterface.Services.Stances.Messages.Lifetime;
 
-namespace GameInterface.Services.Stances.Patches;
+namespace GameInterface.Services.StanceLinks.Patches;
 
 /// <summary>
 /// Patches required for creating a StanceLink

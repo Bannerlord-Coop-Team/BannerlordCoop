@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using SandBox.CampaignBehaviors;
 
-namespace GameInterface.Services.Cheats.Patches
+namespace GameInterface.Services.Companions.Patches
 {
     [HarmonyPatch(typeof(CompanionRolesCampaignBehavior))]
     internal class DisableCompanionRolesCampaignBehavior

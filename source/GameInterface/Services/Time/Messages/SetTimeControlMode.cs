@@ -1,9 +1,9 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
-using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Time.Enum;
 using System;
 
-namespace GameInterface.Services.Heroes.Messages;
+namespace GameInterface.Services.Time.Messages;
 
 [BatchLogMessage]
 public record SetTimeControlMode : ICommand

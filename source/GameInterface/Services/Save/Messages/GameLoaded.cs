@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
 
-namespace GameInterface.Services.Heroes.Messages;
+namespace GameInterface.Services.Save.Messages;
 
 public record GameLoaded : IEvent
 {

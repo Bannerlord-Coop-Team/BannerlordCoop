@@ -9,7 +9,7 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.ItemCategorys;
+namespace GameInterface.Services.ItemCategories;
 internal class ItemCategoryRegistry : IAutoRegistry<ItemCategory>
 {
     ILogger Logger { get; }

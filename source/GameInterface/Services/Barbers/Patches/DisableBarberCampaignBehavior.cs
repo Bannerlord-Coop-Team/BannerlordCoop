@@ -2,7 +2,7 @@
 using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.Banners.Patches;
+namespace GameInterface.Services.Barbers.Patches;
 
 [HarmonyPatch(typeof(BarberCampaignBehavior))]
 internal class DisableBarberCampaignBehavior

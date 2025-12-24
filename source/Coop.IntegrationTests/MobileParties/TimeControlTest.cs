@@ -1,6 +1,6 @@
 ﻿using Coop.IntegrationTests.Environment;
-using GameInterface.Services.Heroes.Enum;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Time.Enum;
+using GameInterface.Services.Time.Messages;
 using TaleWorlds.CampaignSystem;
 
 namespace Coop.IntegrationTests.MobileParties;

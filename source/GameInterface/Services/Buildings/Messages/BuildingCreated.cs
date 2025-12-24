@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
-namespace GameInterface.Services.Armies.Messages.Lifetime;
+namespace GameInterface.Services.Buildings.Messages;
 
 /// <summary>
 /// Event to create a new building.

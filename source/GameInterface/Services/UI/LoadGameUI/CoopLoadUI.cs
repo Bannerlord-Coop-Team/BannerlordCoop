@@ -18,7 +18,7 @@ using TaleWorlds.TwoDimension;
 using Common.Messaging;
 using GameInterface.Services.UI.Messages;
 
-namespace Coop.UI.LoadGameUI
+namespace GameInterface.Services.UI.LoadGameUI
 {
 	class SelectedGameVM : SavedGameVM
 	{

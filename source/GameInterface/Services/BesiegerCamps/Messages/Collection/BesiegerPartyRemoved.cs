@@ -2,7 +2,7 @@
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 
-namespace GameInterface.Services.BesiegerCamps.Messages;
+namespace GameInterface.Services.BesiegerCamps.Messages.Collection;
 
 /// <summary>
 /// Internal event for <see cref="BesiegerCamp._besiegerParties" Remove/>

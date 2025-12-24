@@ -4,7 +4,7 @@ using System.Threading;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
-namespace GameInterface.Services.MapEvents;
+namespace GameInterface.Services.MapEventSides;
 
 /// <summary>
 /// Registry for <see cref="MapEventSide"/> objects

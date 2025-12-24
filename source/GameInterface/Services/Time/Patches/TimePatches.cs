@@ -10,7 +10,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Map.MapBar;
 
-namespace GameInterface.Services.Heroes.Patches;
+namespace GameInterface.Services.Time.Patches;
 
 [HarmonyPatch(typeof(Campaign))]
 internal class TimePatches

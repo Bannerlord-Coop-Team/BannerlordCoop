@@ -1,9 +1,9 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Time.Enum;
 using System;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Messages;
+namespace GameInterface.Services.Time.Messages;
 
 public record AttemptedTimeSpeedChanged : IEvent
 {

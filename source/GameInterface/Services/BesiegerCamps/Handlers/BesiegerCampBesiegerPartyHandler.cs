@@ -1,7 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.BesiegerCamps.Messages;
 using GameInterface.Services.BesiegerCamps.Messages.Collection;
 using GameInterface.Services.ObjectManager;
 using Serilog;

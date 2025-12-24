@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.MapEvents.Messages;
+namespace GameInterface.Services.MapEventSides.Messages;
 
 [ProtoContract(SkipConstructor = true)]
 internal record NetworkDestroyMapEventSide(string MapEventSideId) : IEvent

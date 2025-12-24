@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.MobileParties.Patches;
+namespace GameInterface.Services.MobileParties.Patches.Disable;
 
 /// <summary>
 /// Disables party encounters

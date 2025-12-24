@@ -2,7 +2,7 @@
 using System;
 using System.Linq;
 
-namespace GameInterface.Services.Heroes.Data;
+namespace GameInterface.Services.Save.Data;
 
 [ProtoContract(SkipConstructor = true)]
 public class GameObjectGuids

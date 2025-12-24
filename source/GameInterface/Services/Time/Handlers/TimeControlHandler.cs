@@ -1,11 +1,11 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.Heroes.Interaces;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Time.Interaces;
+using GameInterface.Services.Time.Messages;
 using System;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Handlers;
+namespace GameInterface.Services.Time.Handlers;
 
 internal class TimeControlHandler : IHandler
 {

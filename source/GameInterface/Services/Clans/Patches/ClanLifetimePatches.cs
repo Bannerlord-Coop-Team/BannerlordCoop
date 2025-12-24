@@ -16,7 +16,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.MobileParties.Patches;
+namespace GameInterface.Services.Clans.Patches;
 
 /// <summary>
 /// Patches for lifecycle of <see cref="Clan"/> objects.

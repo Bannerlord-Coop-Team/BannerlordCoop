@@ -1,8 +1,8 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Stances.Data;
+using GameInterface.Services.StanceLinks.Data;
 using ProtoBuf;
 
-namespace GameInterface.Services.Stances.Messages.Lifetime;
+namespace GameInterface.Services.StanceLinks.Messages.Lifetime;
 
 [ProtoContract(SkipConstructor = true)]
 internal class NetworkCreateStanceLink : ICommand

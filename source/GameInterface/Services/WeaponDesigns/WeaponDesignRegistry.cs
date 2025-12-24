@@ -6,7 +6,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.Core;
 using static TaleWorlds.CampaignSystem.CampaignBehaviors.CraftingCampaignBehavior;
 
-namespace GameInterface.Services.ItemObjects
+namespace GameInterface.Services.WeaponDesigns
 {
     internal class WeaponDesignRegistry : RegistryBase<WeaponDesign>
     {

@@ -1,6 +1,6 @@
 ﻿using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Enum;
+namespace GameInterface.Services.Time.Enum;
 
 public enum TimeControlEnum
 {

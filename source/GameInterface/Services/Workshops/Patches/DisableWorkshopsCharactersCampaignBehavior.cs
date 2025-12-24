@@ -2,7 +2,7 @@
 using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.Characters.Patches;
+namespace GameInterface.Services.Workshops.Patches;
 
 [HarmonyPatch(typeof(WorkshopsCharactersCampaignBehavior))]
 internal class DisableWorkshopsCharactersCampaignBehavior

@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.MobileParties.Patches;
+namespace GameInterface.Services.MobileParties.Patches.Disable;
 
 
 [HarmonyPatch(typeof(RecruitPrisonersCampaignBehavior))]

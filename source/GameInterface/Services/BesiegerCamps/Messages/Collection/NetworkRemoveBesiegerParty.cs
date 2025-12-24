@@ -1,8 +1,7 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.BesiegerCamps.Messages.Collection;
 using ProtoBuf;
 
-namespace GameInterface.Services.BesiegerCamps.Messages;
+namespace GameInterface.Services.BesiegerCamps.Messages.Collection;
 
 /// <summary>
 /// Command to remove an besieger party on <see cref="BesiegerCamp._besiegerParties"/>

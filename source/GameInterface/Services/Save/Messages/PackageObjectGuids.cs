@@ -1,8 +1,8 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Save.Data;
 using System;
 
-namespace GameInterface.Services.Heroes.Messages;
+namespace GameInterface.Services.Save.Messages;
 
 public record PackageObjectGuids : ICommand
 {

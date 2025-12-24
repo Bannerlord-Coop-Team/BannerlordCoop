@@ -3,8 +3,8 @@ using Common.Tests.Utils;
 using Coop.Core.Client.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
 using Coop.Tests.Mocks;
-using GameInterface.Services.Heroes.Enum;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Time.Enum;
+using GameInterface.Services.Time.Messages;
 using System.Linq;
 using Xunit;
 

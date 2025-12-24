@@ -4,7 +4,6 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
-using GameInterface.Services.Registry;
 using LiteNetLib;
 using Serilog;
 using System;

@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Time.Enum;
 
-namespace GameInterface.Services.Heroes.Messages;
+namespace GameInterface.Services.Time.Messages;
 
 public record GetTimeControlMode : ICommand
 {
@@ -13,6 +13,6 @@ public record TimeControlModeResponse : IResponse
 
     public TimeControlModeResponse(TimeControlEnum timeMode)
     {
-        this.TimeMode = timeMode;
+        TimeMode = timeMode;
     }
 }

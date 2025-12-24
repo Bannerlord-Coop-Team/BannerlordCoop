@@ -5,7 +5,7 @@ using Common.Util;
 using Coop.Core.Server.Services.Time.Handlers;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.GameDebug.Messages;
-using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Time.Enum;
 using LiteNetLib;
 using Serilog;
 using System;

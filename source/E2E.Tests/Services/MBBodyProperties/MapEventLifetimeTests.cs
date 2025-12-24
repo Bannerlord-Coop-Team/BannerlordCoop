@@ -4,7 +4,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.MBBodyPropertys;
+namespace E2E.Tests.Services.MBBodyProperties;
 public class MBBodyPropertyLifetimeTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }

@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.SiegeEnginesContainers.Messages;
+namespace GameInterface.Services.SiegeEngines.Messages;
 
 [ProtoContract(SkipConstructor = true)]
 internal class NetworkCreateSiegeEnginesContainer : ICommand

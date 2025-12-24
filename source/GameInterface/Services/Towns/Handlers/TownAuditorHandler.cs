@@ -17,7 +17,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
-namespace GameInterface.Services.Towns.Handlers.TownAuditorHandler
+namespace GameInterface.Services.Towns.Handlers
 {
     /// <summary>
     /// Handles Town Auditor (send all sync).

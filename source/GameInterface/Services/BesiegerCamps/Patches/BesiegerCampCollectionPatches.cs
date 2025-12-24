@@ -1,4 +1,4 @@
-﻿using GameInterface.Services.BesiegerCamps.Messages;
+﻿using GameInterface.Services.BesiegerCamps.Messages.Collection;
 using GameInterface.Utils;
 using HarmonyLib;
 using System.Collections.Generic;

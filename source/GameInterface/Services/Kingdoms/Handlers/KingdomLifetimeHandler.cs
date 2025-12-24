@@ -2,11 +2,11 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.Kingdoms.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using Common;
+using GameInterface.Services.Kingdoms.Messages.Lifetime;
 namespace GameInterface.Services.Kingdoms.Handlers;
 
 

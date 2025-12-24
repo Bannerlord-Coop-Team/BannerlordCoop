@@ -5,7 +5,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using Xunit.Abstractions;
 
-namespace E2E.Tests.Services.MapEvents;
+namespace E2E.Tests.Services.MapEventSides;
 public class MapEventSideLifetimeTests : IDisposable
 {
     E2ETestEnvironment TestEnvironment { get; }

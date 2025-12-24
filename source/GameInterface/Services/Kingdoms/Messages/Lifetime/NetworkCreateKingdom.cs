@@ -1,7 +1,7 @@
 using Common.Messaging;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem;
-namespace GameInterface.Services.Kingdoms.Messages;
+namespace GameInterface.Services.Kingdoms.Messages.Lifetime;
 
 
 /// <summary>

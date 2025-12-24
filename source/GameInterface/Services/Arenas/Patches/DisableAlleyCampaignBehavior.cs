@@ -2,7 +2,7 @@
 using SandBox.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
 
-namespace GameInterface.Services.Alleys.Patches;
+namespace GameInterface.Services.Arenas.Patches;
 
 [HarmonyPatch(typeof(ArenaMasterCampaignBehavior))]
 internal class DisableArenaMasterCampaignBehavior

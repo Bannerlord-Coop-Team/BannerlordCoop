@@ -11,7 +11,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
-namespace GameInterface.Services.MapEvents.Patches;
+namespace GameInterface.Services.MapEventSides.Patches;
 
 [HarmonyPatch]
 internal class MapEventSideCreationPatches

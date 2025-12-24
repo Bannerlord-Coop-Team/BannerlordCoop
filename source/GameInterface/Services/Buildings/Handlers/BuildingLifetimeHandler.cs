@@ -2,7 +2,7 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.Armies.Messages.Lifetime;
+using GameInterface.Services.Buildings.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;

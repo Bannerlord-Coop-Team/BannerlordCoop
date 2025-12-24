@@ -1,6 +1,6 @@
 ﻿using GameInterface.Services.Template.Handlers;
 
-namespace GameInterface.Services.MobileParties.Extensions;
+namespace GameInterface.Services.Template.Extensions;
 
 /// <summary>
 /// TODO fill me out

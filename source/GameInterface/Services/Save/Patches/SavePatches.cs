@@ -3,7 +3,7 @@ using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using TaleWorlds.Core;
 
-namespace GameInterface.Services.Heroes.Patches;
+namespace GameInterface.Services.Save.Patches;
 
 [HarmonyPatch(typeof(Game), "Save")]
 class SavePatches

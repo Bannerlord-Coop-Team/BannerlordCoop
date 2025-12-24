@@ -1,9 +1,9 @@
-﻿using GameInterface.Services.Heroes.Enum;
-using GameInterface.Services.Heroes.Patches;
-using GameInterface.Services.Time;
+﻿using GameInterface.Services.Time;
+using GameInterface.Services.Time.Enum;
+using GameInterface.Services.Time.Patches;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Interaces;
+namespace GameInterface.Services.Time.Interaces;
 
 internal interface ITimeControlInterface : IGameAbstraction
 {

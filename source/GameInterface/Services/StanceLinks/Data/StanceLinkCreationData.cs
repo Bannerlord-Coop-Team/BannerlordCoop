@@ -1,7 +1,7 @@
 ﻿using ProtoBuf;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Stances.Data;
+namespace GameInterface.Services.StanceLinks.Data;
 
 /// <summary>
 /// Data required for creating a StanceLink

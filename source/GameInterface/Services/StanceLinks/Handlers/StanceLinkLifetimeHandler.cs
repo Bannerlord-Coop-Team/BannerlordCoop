@@ -7,8 +7,8 @@ using Common.Util;
 using GameInterface.Services.Armies.Data;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.StanceLinks.Messages.Lifetime;
 using GameInterface.Services.Stances.Data;
-using GameInterface.Services.Stances.Messages.Lifetime;
 using GameInterface.Services.Template.Messages;
 using GameInterface.Services.Template.Patches;
 using Serilog;
@@ -17,7 +17,7 @@ using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Core.ViewModelCollection.CharacterViewModel;
 
-namespace GameInterface.Services.Template.Handlers;
+namespace GameInterface.Services.StanceLinks.Handlers;
 
 /// <summary>
 /// Handler for <see cref="StanceLink"/> messages
@@ -51,7 +51,7 @@ public class StanceLinkLifetimeHandler : IHandler
     {
         //create temp objects to manipulate data easier
         var stanceLink = payload.What.StanceLink;
-        var stanceType = (short)(payload.What.StanceType);
+        var stanceType = (short)payload.What.StanceType;
         var faction1 = payload.What.Faction1;
         var faction2 = payload.What.Faction2;
         var isAtConstantWar = payload.What.IsAtConstantWar;

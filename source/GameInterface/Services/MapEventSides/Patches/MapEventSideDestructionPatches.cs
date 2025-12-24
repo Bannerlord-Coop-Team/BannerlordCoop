@@ -7,7 +7,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.MapEvents;
 
-namespace GameInterface.Services.MapEvents.Patches;
+namespace GameInterface.Services.MapEventSides.Patches;
 
 [HarmonyPatch(typeof(MapEventSide))]
 internal class MapEventSideDestructionPatches

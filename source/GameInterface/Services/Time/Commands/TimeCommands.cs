@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Heroes.Enum;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Time.Enum;
+using GameInterface.Services.Time.Messages;
 using System;
 using System.Collections.Generic;
 using System.Threading;

@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.MapEvents.Messages;
+namespace GameInterface.Services.MapEventSides.Messages;
 
 [ProtoContract(SkipConstructor = true)]
 internal record NetworkCreateMapEventSide(string MapEventSideId, string MapEventId, int BattleSide, string MobilePartyId) : IEvent

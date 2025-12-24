@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Stances.Messages.Lifetime
+namespace GameInterface.Services.StanceLinks.Messages.Lifetime
 {
     /// <summary>
     /// Command to create a new StanceLink on client side.

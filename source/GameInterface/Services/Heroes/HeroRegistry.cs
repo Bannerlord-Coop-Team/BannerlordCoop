@@ -13,7 +13,7 @@ using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.Registry;
+namespace GameInterface.Services.Heroes;
 
 /// <summary>
 /// Registry for identifying ownership of <see cref="Hero"/> objects

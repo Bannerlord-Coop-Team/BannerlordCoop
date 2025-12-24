@@ -10,7 +10,7 @@ using TaleWorlds.CampaignSystem.Settlements;
 using static TaleWorlds.CampaignSystem.Settlements.Settlement;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
-namespace GameInterface.Services.Template.Commands;
+namespace GameInterface.Services.Settlements.Commands;
 
 internal class SettlementCommands
 {
@@ -219,8 +219,8 @@ internal class SettlementCommands
 
         StringBuilder sb = new();
 
-        foreach(int i in Enum.GetValues(typeof(Settlement.SiegeState))) {
-            sb.AppendLine($"{i}: {Enum.GetName(typeof(Settlement.SiegeState), i)}");
+        foreach(int i in Enum.GetValues(typeof(SiegeState))) {
+            sb.AppendLine($"{i}: {Enum.GetName(typeof(SiegeState), i)}");
         }
         return sb.ToString();
     }

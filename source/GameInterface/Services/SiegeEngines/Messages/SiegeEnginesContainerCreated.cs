@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
-namespace GameInterface.Services.SiegeEnginesContainers.Messages;
+namespace GameInterface.Services.SiegeEngines.Messages;
 
 internal class SiegeEnginesContainerCreated : IEvent
 {

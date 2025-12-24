@@ -10,7 +10,7 @@ using System;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
-namespace GameInterface.Services.PartyComponents.Handlers;
+namespace GameInterface.Services.ItemComponents.Handlers;
 internal class ItemComponentHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<ItemComponentHandler>();

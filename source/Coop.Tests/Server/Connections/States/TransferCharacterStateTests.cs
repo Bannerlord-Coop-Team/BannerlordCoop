@@ -7,7 +7,7 @@ using Coop.Core.Server.Connections;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Connections.States;
 using Coop.Tests.Mocks;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Save.Messages;
 using LiteNetLib;
 using System.Linq;
 using Xunit;
