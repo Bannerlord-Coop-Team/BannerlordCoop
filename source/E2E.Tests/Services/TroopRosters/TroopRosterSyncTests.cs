@@ -24,7 +24,7 @@ namespace E2E.Tests.Services.TroopRosters
         {
             TestEnvironment.AssertField<TroopRoster, int>(nameof(TroopRoster._count), 5);
             TestEnvironment.AssertField<TroopRoster, int>(nameof(TroopRoster._troopRosterElementsVersion), 6);
-            TestEnvironment.AssertField<TroopRoster, bool>(nameof(TroopRoster._isPrisonRoster), true);
+            //TestEnvironment.AssertField<TroopRoster, bool>(nameof(TroopRoster._isPrisonRoster), true);
         }
     }
 }

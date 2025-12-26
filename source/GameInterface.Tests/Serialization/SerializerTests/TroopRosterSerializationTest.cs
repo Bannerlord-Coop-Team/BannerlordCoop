@@ -65,7 +65,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 }
             };
 
-            TroopRoster.IsPrisonRoster = true;
+            //TroopRoster.IsPrisonRoster = true;
             TroopRoster.data = elements;
             TroopRoster._isInitialized = true;
             TroopRoster._totalHeroes = 33;

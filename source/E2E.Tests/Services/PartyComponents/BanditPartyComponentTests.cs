@@ -5,6 +5,7 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 using TaleWorlds.Localization;
+using TaleWorlds.Library;
 
 namespace E2E.Tests.Services.PartyComponents;
 public class BanditPartyComponentTests : SyncTestBase
@@ -35,7 +36,8 @@ public class BanditPartyComponentTests : SyncTestBase
         {
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
-            var newParty = BanditPartyComponent.CreateBanditParty("TestId", clan, hideout, true);
+            var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
+            var newParty = BanditPartyComponent.CreateBanditParty("TestId", clan, hideout, true, template, new CampaignVec2(new Vec2(2, 2), true));
             partyId = newParty.StringId;
         });
 
@@ -62,8 +64,12 @@ public class BanditPartyComponentTests : SyncTestBase
         client1.Call(() =>
         {
             var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
+            var clan = GameObjectCreator.CreateInitializedObject<Clan>();
+            var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
             var isBossParty = false;
-            partyComponent = new BanditPartyComponent(hideout, isBossParty);
+            var initArgs = new BanditPartyComponent.InitializationArgs(clan, template, new CampaignVec2(new Vec2(2, 2), true));
+            
+            partyComponent = new BanditPartyComponent(hideout, isBossParty, initArgs);
         });
 
         Assert.NotNull(partyComponent);

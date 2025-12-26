@@ -66,7 +66,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Equipment newEquipment = returnedPackage.Unpack<Equipment>(deserializeFactory);
 
             Assert.Equal(equipment.IsCivilian, newEquipment.IsCivilian);
-            Assert.Equal(equipment.IsValid, newEquipment.IsValid);
             Assert.Equal(equipment._equipmentType, newEquipment._equipmentType);
             for (int i = 0; i < 12; i++)
             {

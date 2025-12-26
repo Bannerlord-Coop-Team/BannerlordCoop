@@ -42,7 +42,7 @@ public class GarrisonPartyComponentTests : SyncTestBase
 
             var newSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
-            var newParty = GarrisonPartyComponent.CreateGarrisonParty("TestId", settlement, true);
+            var newParty = GarrisonPartyComponent.CreateGarrisonParty("TestId", settlement);
             GarrisonPartyComponent garrison = (GarrisonPartyComponent)newParty.PartyComponent;
             garrison.Settlement = newSettlement;
 
@@ -80,7 +80,7 @@ public class GarrisonPartyComponentTests : SyncTestBase
         PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            partyComponent = new GarrisonPartyComponent(settlement);
+            partyComponent = new GarrisonPartyComponent(settlement, new GarrisonPartyComponent.InitializationArgs());
         });
 
         Assert.NotNull(partyComponent);

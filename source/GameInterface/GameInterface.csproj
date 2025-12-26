@@ -226,7 +226,6 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Scriban" Version="6.0.0" />
     <PackageReference Include="Scrutor" Version="6.0.1" />
-    <PackageReference Include="System.Reflection.Primitives" Version="4.3.0" />
   </ItemGroup>
     <ItemGroup>
 	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">

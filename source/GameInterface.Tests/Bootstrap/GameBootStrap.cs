@@ -1,17 +1,30 @@
 ﻿using HarmonyLib;
+using ManagedCallbacks;
+using Microsoft.Extensions.Options;
 using SandBox;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.BarterSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.DotNet;
+using TaleWorlds.Engine;
 using TaleWorlds.Library;
+using TaleWorlds.ModuleManager;
+using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.SaveSystem;
+using TaleWorlds.SaveSystem.Load;
 using Xunit;
+using static TaleWorlds.CampaignSystem.SaveHandler.SaveArgs;
 
 namespace GameInterface.Tests.Bootstrap
 {
@@ -74,8 +87,11 @@ namespace GameInterface.Tests.Bootstrap
         private static void InitializeGame()
         {
             TaleWorlds.MountAndBlade.Module.CurrentModule = new TaleWorlds.MountAndBlade.Module();
-            SandBoxGameManager gameManager = new SandBoxGameManager();
-            
+            SandBoxGameManager gameManager = new SandBoxGameManager(new LoadResult());
+
+            string[] modules = { "Native", "SandBoxCore", "SandBox", "StoryMode", "Coop" };
+            ModuleHelper.InitializeModules(modules);
+
             Campaign campaign = new Campaign(CampaignGameMode.Campaign);
             Campaign.Current = campaign;
             Game game = Game.CreateGame(campaign, gameManager);

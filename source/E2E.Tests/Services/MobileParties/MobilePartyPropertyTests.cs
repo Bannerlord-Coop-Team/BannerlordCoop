@@ -28,7 +28,7 @@ public class MobilePartyPropertyTests : SyncTestBase
     public void Server_MobileParty_Properties()
     {
         Server.ObjectManager.TryGetObject(MobilePartyId, out MobileParty mobileParty);
-        TestEnvironment.AssertProperty<MobileParty, TextObject>(nameof(MobileParty.CustomName), new TextObject("customName"), mobileParty.CustomName);
+        TestEnvironment.AssertProperty<MobileParty, TextObject>(nameof(MobileParty.Name), new TextObject("customName"), mobileParty.Name);
         TestEnvironment.AssertReferenceProperty<MobileParty, Settlement>(nameof(MobileParty.LastVisitedSettlement));
         //TestEnvironment.AssertProperty<MobileParty, float>(nameof(MobileParty.Aggressiveness), 5f);
         TestEnvironment.AssertProperty<MobileParty, PartyObjective>(nameof(MobileParty.Objective), PartyObjective.Aggressive);

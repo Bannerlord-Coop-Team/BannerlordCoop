@@ -7,6 +7,6 @@ internal class GarrisonPartyComponentBuilder : IObjectBuilder
     public object Build()
     {
         Settlement settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-        return new GarrisonPartyComponent(settlement);
+        return new GarrisonPartyComponent(settlement, new GarrisonPartyComponent.InitializationArgs());
     }
 }

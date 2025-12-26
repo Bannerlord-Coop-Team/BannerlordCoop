@@ -110,6 +110,12 @@ internal class E2ETestEnvironment : IDisposable
             using (new AllowedThread())
             {
                 var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+                
+                //StealthEquipment Temporary fix
+                characterObject.Culture.DefaultBattleEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+                characterObject.Culture.DefaultStealthEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+                characterObject.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
+
                 var mainHero = HeroCreator.CreateSpecialHero(characterObject);
                 characterObject.HeroObject = mainHero;
                 Game.Current.PlayerTroop = characterObject;
@@ -124,6 +130,13 @@ internal class E2ETestEnvironment : IDisposable
                 using (new AllowedThread())
                 {
                     var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+
+                    //StealthEquipment Temporary fix
+                    characterObject.Culture.DefaultBattleEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+                    characterObject.Culture.DefaultStealthEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+                    characterObject.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
+
+
                     var mainHero = HeroCreator.CreateSpecialHero(characterObject);
                     characterObject.HeroObject = mainHero;
                     Game.Current.PlayerTroop = characterObject;

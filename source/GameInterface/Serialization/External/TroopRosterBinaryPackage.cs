@@ -22,7 +22,6 @@ namespace GameInterface.Serialization.External
         {
             "_troopRosterElements",
             "_troopRosterElementsVersion",
-            "<NumberChangedCallback>k__BackingField",
             "<VersionNo>k__BackingField",
         };
 

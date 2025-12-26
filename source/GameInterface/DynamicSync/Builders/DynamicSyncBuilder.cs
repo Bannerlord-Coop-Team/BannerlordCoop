@@ -50,9 +50,9 @@ public class DynamicSyncBuilder
         assemblies.Add(typeof(Enumerable).Assembly);
         assemblies.Add(typeof(Queue<>).Assembly);
         assemblies.Add(typeof(Console).Assembly);
-        //assemblies.Add(Assembly.Load("System.Reflection.Primitives"));
-        //assemblies.Add(Assembly.Load("System.Collections.Concurrent"));
-        //assemblies.Add(Assembly.Load("System.Numerics.Vectors"));
+        assemblies.Add(Assembly.Load("System.Reflection.Primitives"));
+        assemblies.Add(Assembly.Load("System.Collections.Concurrent"));
+        assemblies.Add(Assembly.Load("System.Numerics.Vectors"));
 
         foreach (var asm in Assembly.GetExecutingAssembly().GetReferencedAssemblies())
         {

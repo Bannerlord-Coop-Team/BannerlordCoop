@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Environment;
 using SandBox.View.Map;
+using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem.Party;
 using Xunit.Abstractions;
 
@@ -30,9 +31,9 @@ namespace E2E.Tests.Services.PartyVisuals
             {
                 var MobileParty = new MobileParty();
                 var partyBase = new PartyBase(MobileParty);
-                var MobilePartyVisual = new PartyVisual(partyBase);
+                var mobilePartyVisual = new MobilePartyVisual(partyBase);
 
-                Assert.True(server.ObjectManager.TryGetId(partyVisual, out visualId));
+                Assert.True(server.ObjectManager.TryGetId(mobilePartyVisual, out visualId));
             });
 
             // Assert
@@ -40,7 +41,7 @@ namespace E2E.Tests.Services.PartyVisuals
 
             foreach (var client in TestEnvironment.Clients)
             {
-                Assert.True(client.ObjectManager.TryGetObject<PartyVisual>(visualId, out var _));
+                Assert.True(client.ObjectManager.TryGetObject<MobilePartyVisual>(visualId, out var _));
             }
         }
 
@@ -66,7 +67,7 @@ namespace E2E.Tests.Services.PartyVisuals
             client1.Call(() =>
             {
                 Assert.True(server.ObjectManager.TryGetObject(baseId, out PartyBase baseParty));
-                var MobilePartyVisual = new PartyVisual(baseParty);
+                var partyVisual = new MobilePartyVisual(baseParty);
 
                 Assert.False(client1.ObjectManager.TryGetId(partyVisual, out PartyVisualId));
             });

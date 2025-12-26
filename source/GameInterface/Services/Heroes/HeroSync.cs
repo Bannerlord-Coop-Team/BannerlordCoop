@@ -42,6 +42,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.IsFemale)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero._battleEquipment)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero._civilianEquipment)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero._stealthEquipment)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.CaptivityStartTime)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.PreferredUpgradeFormation)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HeroState)));

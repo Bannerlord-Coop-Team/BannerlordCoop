@@ -16,11 +16,11 @@ public class MapEventSideSyncTests : SyncTestBase
     [Fact]
     public void Server_MapEventSide_Sync()
     {
-        TestEnvironment.AssertField<MapEventSide, int>(nameof(MapEventSide.Casualties), 5);
+        TestEnvironment.AssertField<MapEventSide, int>(nameof(MapEventSide.TroopCasualties), 5);
         TestEnvironment.AssertField<MapEventSide, float>(nameof(MapEventSide.InfluenceValue), 5f);
         TestEnvironment.AssertField<MapEventSide, bool>(nameof(MapEventSide.IsSurrendered), true);
         TestEnvironment.AssertField<MapEventSide, float>(nameof(MapEventSide.LeaderSimulationModifier), 5f);
-        TestEnvironment.AssertField<MapEventSide, float>(nameof(MapEventSide.RenownAtMapEventEnd), 5f);
+        //TestEnvironment.AssertField<MapEventSide, float>(nameof(MapEventSide.RenownAtMapEventEnd), 5f);
         TestEnvironment.AssertField<MapEventSide, float>(nameof(MapEventSide.RenownValue), 5f);
         TestEnvironment.AssertField<MapEventSide, float>(nameof(MapEventSide.StrengthRatio), 5f);
         //TestEnvironment.AssertReferenceField<MapEventSide, MapEvent>(nameof(MapEventSide._mapEvent));
