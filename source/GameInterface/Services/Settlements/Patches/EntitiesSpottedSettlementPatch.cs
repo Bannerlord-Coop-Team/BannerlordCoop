@@ -10,11 +10,11 @@ namespace GameInterface.Services.Settlements.Patches;
 [HarmonyPatch(typeof(Settlement))]
 internal class EntitiesSpottedSettlementPatch
 {
-    [HarmonyPatch(nameof(Settlement.NumberOfEnemiesSpottedAround), MethodType.Setter)]
+    [HarmonyPatch(nameof(Settlement.NearbyLandThreatIntensity), MethodType.Setter)]
     [HarmonyPrefix]
     static bool NumberEnemiesSpottedPrefix() => ModInformation.IsServer;
 
-    [HarmonyPatch(nameof(Settlement.NumberOfAlliesSpottedAround), MethodType.Setter)]
+    [HarmonyPatch(nameof(Settlement.NearbyLandAllyIntensity), MethodType.Setter)]
     [HarmonyPrefix]
     static bool NumberAlliesSpottedPrefix() => ModInformation.IsServer;
 }

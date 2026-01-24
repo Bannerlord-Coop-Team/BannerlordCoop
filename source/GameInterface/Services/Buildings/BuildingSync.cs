@@ -22,7 +22,6 @@ namespace GameInterface.Services.Buildings
             dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Building), nameof(Building.Town)));
 
             // Targetmethods
-            dynamicSyncRegistry.AddTargetMethod(typeof(Building), AccessTools.Method(typeof(Town), nameof(Town.TickCurrentBuilding)));
             dynamicSyncRegistry.AddTargetMethod(typeof(Building), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeDefaultBuilding)));
             dynamicSyncRegistry.AddTargetMethod(typeof(Building), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.BuildDevelopmentsAtGameStart)));
         }

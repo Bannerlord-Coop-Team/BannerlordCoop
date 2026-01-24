@@ -2,6 +2,7 @@
 using Xunit.Abstractions;
 using TaleWorlds.Core;
 using HarmonyLib;
+using static TaleWorlds.Core.Equipment;
 
 
 
@@ -41,8 +42,8 @@ public class EquipmentSyncTests : IDisposable
             Assert.True(server.ObjectManager.TryGetId(Equip, out EquipmentId));
 
             // EquipmentType Param
-            bool isCivil = true;
-            var civilEquip = new Equipment(isCivil);
+            EquipmentType equipmentType = EquipmentType.Civilian;
+            var civilEquip = new Equipment(equipmentType);
             string test2 = civilEquip.CalculateEquipmentCode();
             Assert.True(server.ObjectManager.TryGetId(civilEquip, out civilEquipmentId));
 
@@ -102,8 +103,8 @@ public class EquipmentSyncTests : IDisposable
             Assert.False(client1.ObjectManager.TryGetId(Equip, out EquipmentId));
 
             // Equipment(bool IsCivil) 
-            bool isCivil = true;
-            var civilEquip = new Equipment(isCivil);
+            EquipmentType equipmentType = EquipmentType.Civilian;
+            var civilEquip = new Equipment(equipmentType);
             Assert.False(client1.ObjectManager.TryGetId(civilEquip, out civilEquipmentId));
 
             // Equipment(Equipment equipment) 

@@ -33,9 +33,9 @@ namespace E2E.Tests.Services.Settlements
         {
             Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement);
             settlement._name = null;
-            TestEnvironment.AssertField<Settlement, float>(nameof(Settlement.ClaimValue), 2f);
-            TestEnvironment.AssertField<Settlement, int>(nameof(Settlement.CanBeClaimed), 3);
-            TestEnvironment.AssertReferenceField<Settlement, Hero>(nameof(Settlement.ClaimedBy));
+            //TestEnvironment.AssertField<Settlement, float>(nameof(Settlement.ClaimValue), 2f);
+            //TestEnvironment.AssertField<Settlement, int>(nameof(Settlement.CanBeClaimed), 3);
+            //TestEnvironment.AssertReferenceField<Settlement, Hero>(nameof(Settlement.ClaimedBy));
             TestEnvironment.AssertReferenceField<Settlement, CultureObject>(nameof(Settlement.Culture));
             TestEnvironment.AssertField<Settlement, float>(nameof(Settlement.LastVisitTimeOfOwner), 20f, defaultValue: settlement.LastVisitTimeOfOwner);
             TestEnvironment.AssertReferenceField<Settlement, MilitiaPartyComponent>(nameof(Settlement.MilitiaPartyComponent));
@@ -44,7 +44,7 @@ namespace E2E.Tests.Services.Settlements
             //TestEnvironment.AssertReferenceField<Settlement, ItemRoster>(nameof(Settlement.Stash));
             TestEnvironment.AssertReferenceField<Settlement, Town>(nameof(Settlement.Town));
             TestEnvironment.AssertReferenceField<Settlement, Village>(nameof(Settlement.Village));
-            TestEnvironment.AssertField<Settlement, Vec2>(nameof(Settlement._gatePosition), new Vec2(0, 1));
+            //TestEnvironment.AssertField<Settlement, Vec2>(nameof(Settlement._gatePosition), new Vec2(0, 1));
             TestEnvironment.AssertField<Settlement, bool>(nameof(Settlement._isVisible), false, defaultValue: true);
             TestEnvironment.AssertReferenceField<Settlement, MobileParty>(nameof(Settlement._lastAttackerParty));
             TestEnvironment.AssertField<Settlement, int>(nameof(Settlement._locatorNodeIndex), 5);

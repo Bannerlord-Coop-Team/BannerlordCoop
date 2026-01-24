@@ -38,7 +38,7 @@ public class VillagerPartyComponentTests : SyncTestBase
 
             var newVillage = GameObjectCreator.CreateInitializedObject<Village>();
 
-            var newParty = VillagerPartyComponent.CreateVillagerParty("TestId", village, 5);
+            var newParty = VillagerPartyComponent.CreateVillagerParty("TestId", village);
             VillagerPartyComponent villagers = (VillagerPartyComponent)newParty.PartyComponent;
             villagers.Village = newVillage;
 
@@ -76,7 +76,7 @@ public class VillagerPartyComponentTests : SyncTestBase
         PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            partyComponent = new VillagerPartyComponent(village);
+            partyComponent = new VillagerPartyComponent(village, new VillagerPartyComponent.InitializationArgs());
         });
 
         Assert.NotNull(partyComponent);

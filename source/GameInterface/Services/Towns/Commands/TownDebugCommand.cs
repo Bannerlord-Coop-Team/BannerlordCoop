@@ -544,7 +544,7 @@ public class TownDebugCommand
         {
             return $"{nameof(Town)} with ID: '{townId}' not found";
         }
-        BuildingHelper.ChangeCurrentBuilding(town.Buildings.Last().BuildingType, town);
+        //BuildingHelper.ChangeCurrentBuilding(town.Buildings.Last().BuildingType, town);
         return "success";
     }
 

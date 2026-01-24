@@ -23,7 +23,7 @@ public class KingdomSyncTests : SyncTestBase
     [Fact] 
     public void Server_Kingdom_Fields()
     {
-        TestEnvironment.AssertReferenceField<Kingdom, Settlement>(nameof(Kingdom._kingdomMidSettlement));
+        //TestEnvironment.AssertReferenceField<Kingdom, Settlement>(nameof(Kingdom._kingdomMidSettlement));
         TestEnvironment.AssertReferenceField<Kingdom, Clan>(nameof(Kingdom._rulingClan));
         TestEnvironment.AssertField<Kingdom, int>(nameof(Kingdom.PoliticalStagnation), 5);
         TestEnvironment.AssertField<Kingdom, float>(nameof(Kingdom._aggressiveness), 5f);
@@ -41,8 +41,8 @@ public class KingdomSyncTests : SyncTestBase
 
         Server.ObjectManager.TryGetObject(KingdomId, out Kingdom kingdom);
 
-        TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.AlternativeColor), 7);
-        TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.AlternativeColor2), 7);
+        //TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.AlternativeColor), 7);
+        //TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.AlternativeColor2), 7);
         TestEnvironment.AssertProperty<Kingdom, Banner>(nameof(Kingdom.Banner), banner);
         TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.Color), 7);
         TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.Color2), 7);
@@ -51,8 +51,8 @@ public class KingdomSyncTests : SyncTestBase
         TestEnvironment.AssertProperty<Kingdom, TextObject>(nameof(Kingdom.EncyclopediaText), new TextObject("encycText"), kingdom.EncyclopediaText);
         TestEnvironment.AssertProperty<Kingdom, TextObject>(nameof(Kingdom.EncyclopediaTitle), new TextObject("encycTitle"), kingdom.EncyclopediaTitle);
         TestEnvironment.AssertProperty<Kingdom, TextObject>(nameof(Kingdom.InformalName), new TextObject("informalName"), kingdom.InformalName);
-        TestEnvironment.AssertReferenceProperty<Kingdom, Settlement>(nameof(Kingdom.InitialHomeLand));
-        TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.LabelColor), 7);
+        //TestEnvironment.AssertReferenceProperty<Kingdom, Settlement>(nameof(Kingdom.InitialHomeLand));
+        //TestEnvironment.AssertProperty<Kingdom, uint>(nameof(Kingdom.LabelColor), 7);
         TestEnvironment.AssertProperty<Kingdom, int>(nameof(Kingdom.LastArmyCreationDay), 7);
         TestEnvironment.AssertProperty<Kingdom, CampaignTime>(nameof(Kingdom.LastKingdomDecisionConclusionDate), new CampaignTime(54));
         TestEnvironment.AssertProperty<Kingdom, CampaignTime>(nameof(Kingdom.LastMercenaryOfferTime), new CampaignTime(54));

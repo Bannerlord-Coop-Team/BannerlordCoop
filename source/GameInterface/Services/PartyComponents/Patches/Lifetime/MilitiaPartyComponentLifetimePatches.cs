@@ -22,10 +22,9 @@ internal class MilitiaPartyComponentLifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MilitiaPartyComponentLifetimePatches>();
 
-
-    [HarmonyPatch(typeof(MilitiaPartyComponent), MethodType.Constructor, typeof(Settlement))]
+    [HarmonyPatch(typeof(MilitiaPartyComponent), MethodType.Constructor, typeof(Settlement), typeof(MilitiaPartyComponent.InitializationArgs))]
     [HarmonyPrefix]
-    private static bool Prefix(MilitiaPartyComponent __instance, Settlement settlement)
+    private static bool Prefix(MilitiaPartyComponent __instance, Settlement settlement, MilitiaPartyComponent.InitializationArgs args)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;

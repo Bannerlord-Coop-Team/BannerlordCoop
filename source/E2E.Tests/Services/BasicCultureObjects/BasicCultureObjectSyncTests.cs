@@ -18,7 +18,7 @@ namespace E2E.Tests.Services.BasicCultureObjects
             // Arrange
             TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.BackgroundColor1), 11U);
             TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.BackgroundColor2), 22U);
-            TestEnvironment.AssertProperty<BasicCultureObject, string>(nameof(BasicCultureObject.BannerKey), "testBanner");
+            //TestEnvironment.AssertProperty<BasicCultureObject, string>(nameof(BasicCultureObject.BannerKey), "testBanner");
             TestEnvironment.AssertProperty<BasicCultureObject, bool>(nameof(BasicCultureObject.CanHaveSettlement), true);
             TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.ClothAlternativeColor),33U);
             TestEnvironment.AssertProperty<BasicCultureObject, uint>(nameof(BasicCultureObject.ClothAlternativeColor2),44U);

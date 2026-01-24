@@ -25,7 +25,7 @@ public class OnDoneRecruitmentVMPatch
         
         foreach(RecruitVolunteerTroopVM recruitVolunteerTroopVM in __instance.TroopsInCart)
         {
-            totalCost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(recruitVolunteerTroopVM.Character, Hero.MainHero, false);
+            //totalCost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(recruitVolunteerTroopVM.Character, Hero.MainHero, false);
             troopsInCart.Add((recruitVolunteerTroopVM.Owner.OwnerHero.StringId, recruitVolunteerTroopVM.Character.StringId, recruitVolunteerTroopVM.Index));
         }
         var message = new OnDoneRecruitmentVMChanged(mobilePartyId, troopsInCart.ToArray(), totalCost);

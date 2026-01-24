@@ -43,7 +43,7 @@ public class LordPartyComponentTests : SyncTestBase
 
             leaderhero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            var newParty = LordPartyComponent.CreateLordParty(null, leaderhero, new Vec2(5, 5), 5, spawnSettlement, leaderhero);
+            var newParty = LordPartyComponent.CreateLordParty(null, leaderhero, new CampaignVec2(new Vec2(5, 5), true), 5, spawnSettlement, leaderhero);
             partyId = newParty.StringId;
         });
 
@@ -74,9 +74,10 @@ public class LordPartyComponentTests : SyncTestBase
 
         // Act
         PartyComponent? partyComponent = null;
+        Settlement setlement = new Settlement();
         client1.Call(() =>
         {
-            partyComponent = new LordPartyComponent(leaderHero, leaderHero);
+            partyComponent = new LordPartyComponent(leaderHero, leaderHero, new LordPartyComponent.InitializationArgs(new CampaignVec2(new Vec2(2, 2), true), 2f, setlement));
         });
 
         Assert.NotNull(partyComponent);

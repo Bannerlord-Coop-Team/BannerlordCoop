@@ -11,6 +11,6 @@ internal class MilitiaPartyComponentBuilder : IObjectBuilder
     {
         var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
-        return new MilitiaPartyComponent(settlement);
+        return new MilitiaPartyComponent(settlement, new MilitiaPartyComponent.InitializationArgs());
     }
 }

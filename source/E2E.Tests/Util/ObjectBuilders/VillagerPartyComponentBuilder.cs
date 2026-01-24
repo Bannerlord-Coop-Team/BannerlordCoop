@@ -11,6 +11,6 @@ internal class VillagerPartyComponentBuilder : IObjectBuilder
     {
         var village = GameObjectCreator.CreateInitializedObject<Village>();
 
-        return new VillagerPartyComponent(village);
+        return new VillagerPartyComponent(village, new VillagerPartyComponent.InitializationArgs());
     }
 }

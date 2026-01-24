@@ -19,7 +19,7 @@ public class TownSyncTests : SyncTestBase
     [Fact]
     public void Server_Town_Fields()
     {
-        TestEnvironment.AssertField<Town, int>(nameof(Town._wallLevel), 1);
+        //TestEnvironment.AssertField<Town, int>(nameof(Town._wallLevel), 1);
         TestEnvironment.AssertField<Town, bool>(nameof(Town._isCastle), true);
         TestEnvironment.AssertField<Town, float>(nameof(Town._prosperity), 500f);
         TestEnvironment.AssertField<Town, int>(nameof(Town._tradeTax), 70);

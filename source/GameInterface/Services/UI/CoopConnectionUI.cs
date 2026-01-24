@@ -14,13 +14,13 @@ namespace GameInterface.Services.UI
         {
             base.OnInitialize();
             _dataSource = new CoopConnectMenuVM();
-            _gauntletLayer = new GauntletLayer(100)
+            _gauntletLayer = new GauntletLayer("CoopConnectionUI", 100)
             {
                 IsFocusLayer = true
             };
             AddLayer(_gauntletLayer);
             _gauntletLayer.InputRestrictions.SetInputRestrictions();
-            _gauntletMovie = _gauntletLayer.LoadMovie("CoopConnectionUIMovie", _dataSource);
+            _gauntletMovie = (IGauntletMovie)_gauntletLayer.LoadMovie("CoopConnectionUIMovie", _dataSource);
         }
 
         protected override void OnActivate()
@@ -43,6 +43,5 @@ namespace GameInterface.Services.UI
             _dataSource = null;
             _gauntletLayer = null;
         }
-
     }
 }

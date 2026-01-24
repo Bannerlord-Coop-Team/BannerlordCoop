@@ -81,7 +81,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             Assert.Equal(stanceLink.Faction1, newStanceLink.Faction1);
             Assert.Equal(stanceLink.Faction2, newStanceLink.Faction2);
-            Assert.Equal(stanceLink.Casualties1, newStanceLink.Casualties1);
+            Assert.Equal(stanceLink.TroopCasualties1, newStanceLink.TroopCasualties1);
         }
     }
 }

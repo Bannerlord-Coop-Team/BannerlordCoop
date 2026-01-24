@@ -8,6 +8,7 @@ using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -88,17 +89,17 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         if (party.Ai == null) return;
 
-        Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
+        CampaignVec2 targetPoint = new CampaignVec2(new Vec2(data.TargetPointX, data.TargetPointY), true);
 
-        IMapEntity targetMapEntity = null;
+        IInteractablePoint targetMapEntity = null;
         if (data.HasTarget && targetParty != null)
         {
-            targetMapEntity = targetParty;
+            targetMapEntity = targetParty.Party;
         }
-        else if (data.HasTarget && targetSettlement != null)
-        {
-            targetMapEntity = targetSettlement;
-        }
+        //else if (data.HasTarget && targetSettlement != null)
+        //{
+        //    targetMapEntity = targetSettlement;
+        //}
 
         PartyBehaviorPatch.SetAiBehavior(
             party.Ai,
@@ -109,12 +110,12 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         if (ModInformation.IsClient)
         {
-            party.Position2D = new Vec2(data.PartyPositionX, data.PartyPositionY);
+            party.Position = new CampaignVec2(new Vec2(data.PartyPositionX, data.PartyPositionY), true);
         }
         else
         {
-            data.PartyPositionX = party.Position2D.x;
-            data.PartyPositionY = party.Position2D.y;
+            data.PartyPositionX = party.Position._position.x;
+            data.PartyPositionY = party.Position._position.y;
             messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
         }
     }

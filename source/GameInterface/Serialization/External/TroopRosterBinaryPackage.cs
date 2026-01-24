@@ -22,7 +22,6 @@ namespace GameInterface.Serialization.External
         {
             "_troopRosterElements",
             "_troopRosterElementsVersion",
-            "<NumberChangedCallback>k__BackingField",
             "<VersionNo>k__BackingField",
         };
 
@@ -34,10 +33,10 @@ namespace GameInterface.Serialization.External
         protected override void UnpackInternal()
         {
             base.UnpackFields();
-            if (Object?.OwnerParty != null)
-            {
-                Object.NumberChangedCallback = Object.OwnerParty.MemberRosterNumberChanged;
-            }
+            //if (Object?.OwnerParty != null)
+            //{
+            //    Object.NumberChangedCallback = Object.OwnerParty.MemberRosterNumberChanged;
+            //}
 
             Object._troopRosterElements = new MBList<TroopRosterElement>();
             Object.VersionNo = -1;

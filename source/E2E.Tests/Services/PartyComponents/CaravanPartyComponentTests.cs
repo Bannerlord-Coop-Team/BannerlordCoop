@@ -45,8 +45,9 @@ public class CaravanPartyComponentTests : SyncTestBase
             newLeaderHero = GameObjectCreator.CreateInitializedObject<Hero>();
             var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             var culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
+            var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
             settlement.Culture = culture;
-            var newParty = CaravanPartyComponent.CreateCaravanParty(owner, settlement, caravanLeader: owner);
+            var newParty = CaravanPartyComponent.CreateCaravanParty(owner, settlement, template, caravanLeader: owner);
             partyId = newParty.StringId;
 
         }, new MethodBase[]
@@ -74,18 +75,21 @@ public class CaravanPartyComponentTests : SyncTestBase
         var client1 = TestEnvironment.Clients.First();
         Hero hero = null;
         Settlement settlement = null;
+        PartyTemplateObject template = null;
 
         server.Call(() =>
         {
             hero = GameObjectCreator.CreateInitializedObject<Hero>();
             settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
+            template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
         });
 
             // Act
             PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            partyComponent = new CaravanPartyComponent(settlement, hero, hero);
+            var initArgs = new CaravanPartyComponent.InitializationArgs(template);
+            partyComponent = new CaravanPartyComponent(settlement, hero, hero, false, initArgs);
         });
 
         Assert.NotNull(partyComponent);

@@ -1,20 +1,13 @@
 ﻿using Common;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem;
-using System.Linq;
-using TaleWorlds.Core;
-using System.Collections;
-using System.Threading;
-using GameInterface.Registry;
-using Common.Util;
 using GameInterface.Registry.Auto;
 using HarmonyLib;
+using Helpers;
 using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
-using TaleWorlds.ObjectSystem;
+using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.StanceLinks;
 
@@ -46,8 +39,10 @@ internal class StanceLinkRegistry : IAutoRegistry<StanceLink>
 
         foreach (var faction in factions)
         {
+            
             int counter = 1;
-            foreach (var stance in faction.Stances)
+
+            foreach (var stance in FactionHelper.GetStances(faction))
             {
                 if (visitedStances.Contains(stance)) continue;
 

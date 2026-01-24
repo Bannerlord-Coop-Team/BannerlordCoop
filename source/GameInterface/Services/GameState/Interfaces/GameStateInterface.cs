@@ -51,7 +51,7 @@ internal class GameStateInterface : IGameStateInterface
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
-            MBGameManager.StartNewGame(new SandBoxGameManager());
+            MBGameManager.StartNewGame(new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign)));
         });
     }
 

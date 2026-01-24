@@ -78,7 +78,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             settlements.Add(settlement2);
 
             // Create StanceLink for testing
-            List<StanceLink> stances = kingdomObject._stances;
+            List<StanceLink> stances = new();
 
             StanceLink stance = (StanceLink)FormatterServices.GetUninitializedObject(typeof(StanceLink));
             stances.Add(stance);

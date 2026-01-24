@@ -24,7 +24,7 @@ public class BesiegerCampLifetimeTests : IDisposable
 
         disabledMethods = new List<MethodBase> {
                 AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
-                AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.SetSiegeCampPartyPosition)),
+                AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.SetPositionAfterMapChange)),
                 AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
         };
     }
@@ -84,7 +84,7 @@ public class BesiegerCampLifetimeTests : IDisposable
             Assert.True(firstClient.ObjectManager.TryGetObject<MapEvent>(mapEventId, out var mapEvent));
             Assert.True(firstClient.ObjectManager.TryGetObject<MobileParty>(mobilePartyId, out var mobileParty));
 
-            var BesiegerCamp = new BesiegerCamp(null);
+            var BesiegerCamp = new BesiegerCamp(null, null);
 
             Assert.False(firstClient.ObjectManager.TryGetId(BesiegerCamp, out clientBeseigerCampId));
         });

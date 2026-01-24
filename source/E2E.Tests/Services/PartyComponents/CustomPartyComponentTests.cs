@@ -2,6 +2,7 @@
 using E2E.Tests.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Patches.CustomPartyComponents;
+using GameInterface.Services.WeaponDesigns.Messages;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -52,7 +53,7 @@ public class CustomPartyComponentTests : SyncTestBase
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var partyTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
 
-            var newParty = CustomPartyComponent.CreateQuestParty(new Vec2(5, 5), 5, spawnSettlement, name, clan, partyTemplate, hero);
+            var newParty = CustomPartyComponent.CreateCustomPartyWithPartyTemplate(new CampaignVec2(new Vec2(5, 5), true), 5, spawnSettlement, name, clan, partyTemplate, hero);
             partyId = newParty.StringId;
         });
 
@@ -77,9 +78,18 @@ public class CustomPartyComponentTests : SyncTestBase
 
         // Act
         PartyComponent? partyComponent = null;
+        Settlement settlement = new Settlement();
+        Clan clan = new Clan();
         client1.Call(() =>
         {
-            partyComponent = new CustomPartyComponent();
+            partyComponent = new CustomPartyComponent(settlement, 
+                new TextObject(""), 
+                new Hero(), 
+                "test", 
+                "testH", 
+                1f, 
+                false,
+                new CustomPartyComponent.InitializationArgs(new CampaignVec2(new Vec2(2, 2), true), 2f, clan));
         });
 
         Assert.NotNull(partyComponent);

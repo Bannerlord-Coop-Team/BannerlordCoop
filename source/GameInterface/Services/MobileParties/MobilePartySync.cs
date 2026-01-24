@@ -10,22 +10,21 @@ internal class MobilePartySync : IDynamicSync
     public MobilePartySync(DynamicSyncRegistry autoSyncBuilder)
     {
         // Sync Fields
-        autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(DefaultClanFinanceModel), nameof(DefaultClanFinanceModel.ApplyMoraleEffect)));
+        //autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(DefaultClanFinanceModel), nameof(DefaultClanFinanceModel.ApplyMoraleEffect)));
         autoSyncBuilder.AddTargetMethod(typeof(MobileParty), AccessTools.Method(typeof(MobilePartyAi), nameof(MobilePartyAi.GetFleeBehavior)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._attachedTo)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty.HasUnpaidWages)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._disorganizedUntilTime)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._partySizeRatioLastCheckVersion)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._latestUsedPaymentRatio)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._cachedPartySizeRatio)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._cachedPartySizeLimit)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._doNotAttackMainParty)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._customHomeSettlement)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._isDisorganized)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._isCurrentlyUsedByAQuest)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._ignoredUntilTime)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._besiegerCampResetStarted)));
+        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._targetSettlement)));
 
         // Sync Properties
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Ai)));
@@ -34,10 +33,8 @@ internal class MobilePartySync : IDynamicSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.ActualClan)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.LastVisitedSettlement)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.TargetParty)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.TargetSettlement)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.TargetPosition)));
         //new
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.CustomName)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Aggressiveness)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Objective)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Army)));
@@ -58,7 +55,6 @@ internal class MobilePartySync : IDynamicSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyTradeTaxGold)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.RecentEventsMorale)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.EventPositionAdder)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyComponent)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsMilitia)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsLordParty)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsVillager)));

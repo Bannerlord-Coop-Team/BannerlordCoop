@@ -65,7 +65,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        SettlementClaimantCampaignBehaviorOnOwnerChangedPatch.RunCanBeClaimed(settlement, obj.CanBeClaimed);
+        //SettlementClaimantCampaignBehaviorOnOwnerChangedPatch.RunCanBeClaimed(settlement, obj.CanBeClaimed);
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaimValueOthers(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaimValueOthers> payload)
@@ -76,7 +76,7 @@ public class SettlementHandler : IHandler
             Logger.Error("Unable to find Settlement ({SettlementId})", obj.SettlementId);
             return;
         }
-        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
+        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaimValue(MessagePayload<ChangeLordConversationCampaignBehaviourPlayerClaimValue> payload)
@@ -88,7 +88,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
+        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedValue(settlement, obj.ClaimValue);
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaimOthers(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaimOthers> payload)
@@ -106,7 +106,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
+        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaim(MessagePayload<ChangeLordConversationCampaignBehaviorPlayerClaim> payload)
@@ -124,7 +124,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
+        //ClaimLandAnswerOnConversationLordConversationsCampaignBehaviourPatch.RunClaimedBy(settlement, hero);
     }
 
     private void HandleLastVisitTimeOfOwner(MessagePayload<ChangeSettlementLastVisitTimeOfOwner> payload)

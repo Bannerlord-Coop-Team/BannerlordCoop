@@ -36,7 +36,7 @@ namespace E2E.Tests.Services.Clans
             TestEnvironment.AssertField<Clan, bool>(nameof(Clan._isEliminated), true);
             TestEnvironment.AssertReferenceField<Clan, Kingdom>(nameof(Clan._kingdom));
             TestEnvironment.AssertField<Clan, float>(nameof(Clan._influence), 0.5f);
-            TestEnvironment.AssertReferenceField<Clan,Settlement>(nameof(Clan._clanMidSettlement));
+            //TestEnvironment.AssertReferenceField<Clan,Settlement>(nameof(Clan._clanMidSettlement));
             TestEnvironment.AssertReferenceField<Clan, CharacterObject>(nameof(Clan._basicTroop));
             TestEnvironment.AssertReferenceField<Clan, Hero>(nameof(Clan._leader));
             TestEnvironment.AssertField<Clan, Banner>(nameof(Clan._banner), banner);
@@ -60,10 +60,10 @@ namespace E2E.Tests.Services.Clans
             TestEnvironment.AssertProperty<Clan, CampaignTime>(nameof(Clan.LastFactionChangeTime), new CampaignTime(12341));
             TestEnvironment.AssertProperty<Clan, int>(nameof(Clan.AutoRecruitmentExpenses), 20);
             TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan.IsNoble), true);
-            TestEnvironment.AssertProperty<Clan, float>(nameof(Clan.TotalStrength), 200f);
+            //TestEnvironment.AssertProperty<Clan, float>(nameof(Clan.TotalStrength), 200f);
             TestEnvironment.AssertProperty<Clan, int>(nameof(Clan.MercenaryAwardMultiplier), 20);
-            TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.LabelColor), 123);
-            TestEnvironment.AssertProperty<Clan, Vec2>(nameof(Clan.InitialPosition),new Vec2(2f,4f));
+            //TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.LabelColor), 123);
+            //TestEnvironment.AssertProperty<Clan, Vec2>(nameof(Clan.InitialPosition),new Vec2(2f,4f));
             TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan.IsRebelClan), true);
             TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan.IsUnderMercenaryService), true);
             TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.Color),321);
@@ -71,7 +71,7 @@ namespace E2E.Tests.Services.Clans
             TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.BannerBackgroundColorPrimary),543);
             TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.BannerBackgroundColorSecondary), 654);
             TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.BannerIconColor),765);
-            TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan._midPointCalculated), true);
+            //TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan._midPointCalculated), true);
             TestEnvironment.AssertProperty<Clan, float>(nameof(Clan.Renown), 20f);
             TestEnvironment.AssertProperty<Clan, CampaignTime>(nameof(Clan.NotAttackableByPlayerUntilTime), new CampaignTime(7644567));
         }

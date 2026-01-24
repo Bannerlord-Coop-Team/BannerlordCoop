@@ -23,7 +23,7 @@ internal class ParallelRobustnessPatches
 
             if (mobileParty.Party == null) continue;
 
-            mobileParty.CheckExitingSettlementParallel(ref __instance._exitingSettlementCount, ref __instance._exitingSettlementMobilePartyList);
+            mobileParty.CheckExitingSettlementParallel(ref __instance._exitingSettlementCount, ref __instance._exitingSettlementMobilePartyList, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
         }
 
         return false;
@@ -58,11 +58,11 @@ internal class ParallelRobustnessPatches
 
             if (party.Ai == null)
             {
-                Logger.Error("MobileParty with id {id} AI was null", party.StringId);
+                Logger.Error("MobileParty with id {id} was null", party.StringId);
                 continue;
             }
 
-            party.Ai.CacheTargetPartyVariablesAtFrameStart(ref __instance._cacheData[i].LocalVariables);
+            party.CacheTargetPartyVariablesAtFrameStart(ref __instance._cacheData[i].LocalVariables);
         }
 
         return false;
@@ -89,7 +89,7 @@ internal class ParallelRobustnessPatches
         return false;
     }
 
-    [HarmonyPatch(nameof(CampaignTickCacheDataStore.ParallelTickArmies))]
+    [HarmonyPatch(nameof(CampaignTickCacheDataStore.ParallelTickMovingArmies))]
     [HarmonyPrefix]
     static bool ParallelTickArmies(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
     {
@@ -102,8 +102,8 @@ internal class ParallelRobustnessPatches
             if (mobileParty.AttachedTo == null) continue;
 
             MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
-            mobileParty.TickForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
-            mobileParty.TickForMobileParty2(ref localVariables, __instance._currentRealDt, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
+            mobileParty.FillCurrentTickMoveDataForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
+            mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
             mobileParty.ValidateSpeed();
         }
 
@@ -122,8 +122,8 @@ internal class ParallelRobustnessPatches
             if (mobileParty.Party == null) continue;
 
             MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
-            mobileParty.TickForMovingMobileParty(ref localVariables, __instance._currentDt, __instance._currentRealDt);
-            mobileParty.TickForMobileParty2(ref localVariables, __instance._currentRealDt, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
+            mobileParty.FillCurrentTickMoveDataForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
+            mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
         }
 
         return false;
@@ -143,7 +143,6 @@ internal class ParallelRobustnessPatches
 
             MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
             mobileParty.TickForStationaryMobileParty(ref localVariables, __instance._currentDt, __instance._currentRealDt);
-            mobileParty.TickForMobileParty2(ref localVariables, __instance._currentRealDt, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
         }
 
         return false;

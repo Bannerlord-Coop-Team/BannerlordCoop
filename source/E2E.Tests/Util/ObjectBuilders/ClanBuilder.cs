@@ -9,7 +9,7 @@ internal class ClanBuilder : IObjectBuilder
     public object Build()
     {
         var clan = new Clan();
-        var defaultTemplate = ObjectHelper.SkipConstructor<PartyTemplateObject>();
+        var defaultTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
         clan._defaultPartyTemplate = defaultTemplate;
 
         // To make this unique

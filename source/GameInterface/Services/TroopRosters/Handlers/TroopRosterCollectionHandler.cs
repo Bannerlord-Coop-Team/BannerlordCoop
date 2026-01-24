@@ -45,8 +45,7 @@ namespace GameInterface.Services.TroopRosters.Handlers
 
             objectManager.TryGetId(data.Value.Character, out string CharacterId);
 
-            network.SendAll(new NetworkUpdateTroopRosterData(RosterId, CharacterId, 
-                data.Value.DeltaXp,
+            network.SendAll(new NetworkUpdateTroopRosterData(RosterId, CharacterId,
                 data.Value._number,
                 data.Value._woundedNumber,
                 data.Value._xp,
@@ -63,7 +62,6 @@ namespace GameInterface.Services.TroopRosters.Handlers
             TroopRosterElement newElement = new TroopRosterElement()
             {
                 Character = character,
-                DeltaXp = data.DeltaXp,
                 Number = data.Number,
                 WoundedNumber = data.WoundedNumber,
                 Xp = data.Xp,

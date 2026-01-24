@@ -29,7 +29,7 @@ internal class HeroRegistry : IAutoRegistry<Hero>
     }
 
     public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(Hero), new Type[] { typeof(string) })
+        AccessTools.Constructor(typeof(Hero), new Type[] { })
     };
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
@@ -54,7 +54,7 @@ internal class HeroRegistry : IAutoRegistry<Hero>
     {
         using(new AllowedThread())
         {
-            obj.Init();
+            //obj.Init();
             AccessTools.Field(typeof(Hero), nameof(Hero._children)).SetValue(obj, new MBList<Hero>());
             AccessTools.Field(typeof(Hero), nameof(Hero._ownedWorkshops)).SetValue(obj, new MBList<Workshop>());
         }

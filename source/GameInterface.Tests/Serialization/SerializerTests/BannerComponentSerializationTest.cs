@@ -68,7 +68,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             // Set banner effect and register it with the object manager
             BannerEffect effect = new BannerEffect("myEffect");
-            effect.Initialize("myEffect", "", 1.1f, 1.1f, 1.1f, BannerEffect.EffectIncrementType.Add);
+            effect.Initialize("myEffect", "", 1.1f, 1.1f, 1.1f, EffectIncrementType.Add);
             Assert.True(objectManager.AddNewObject(effect, out var _));
 
             bannerComponent.BannerEffect = effect;

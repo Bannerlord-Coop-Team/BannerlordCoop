@@ -16,8 +16,8 @@ internal class CharacterObjectBuilder : IObjectBuilder
         //List<Equipment> list = characterObject.AllEquipments.Where((Equipment t) => !t.IsEmpty() && !t.IsCivilian).ToList();
         //List<Equipment> list2 = characterObject.AllEquipments.Where((Equipment t) => !t.IsEmpty() && t.IsCivilian).ToList();
 
-        var battleEquipment = new Equipment(false);
-        var civilianEquipment = new Equipment(true);
+        var battleEquipment = new Equipment(Equipment.EquipmentType.Battle);
+        var civilianEquipment = new Equipment(Equipment.EquipmentType.Civilian);
 
         for (int i = 0; i < 12; i++)
         {

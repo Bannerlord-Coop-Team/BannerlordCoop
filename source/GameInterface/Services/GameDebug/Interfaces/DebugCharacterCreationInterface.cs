@@ -6,6 +6,7 @@ using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterCreationContent;
+using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterCreation;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.MountAndBlade;
@@ -53,58 +54,61 @@ namespace GameInterface.Services.GameDebug.Interfaces
             gameManager.LaunchSandboxCharacterCreation();
 
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
-            if (characterCreationState.CurrentStage is CharacterCreationCultureStage)
+            CharacterCreationStageBase currentStage = characterCreationState._characterCreationManager.CurrentStage;
+
+            if (currentStage is CharacterCreationCultureStage)
             {
-                var cultures = CharacterCreationContentBase.Instance.GetCultures();
+                var cultures = characterCreationState._characterCreationManager.CharacterCreationContent.GetCultures();
                 CultureObject culture = cultures.First(c => c.Name.ToString() == "Empire");
-                CharacterCreationContentBase.Instance.SetSelectedCulture(culture, characterCreationState.CharacterCreation);
-                characterCreationState.NextStage();
+                characterCreationState._characterCreationManager.CharacterCreationContent.SetSelectedCulture(culture, characterCreationState._characterCreationManager);
+                characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (characterCreationState.CurrentStage is CharacterCreationFaceGeneratorStage)
+            if (currentStage is CharacterCreationFaceGeneratorStage)
             {
-                ICharacterCreationStageListener listener = characterCreationState.CurrentStage.Listener;
+                ICharacterCreationStageListener listener = characterCreationState._characterCreationManager.CurrentStage.Listener;
                 BodyGeneratorView bgv = (listener as CharacterCreationFaceGeneratorView)._faceGeneratorView;
 
                 FaceGenVM facegen = bgv.DataSource;
 
                 facegen.FaceProperties.Randomize();
-                characterCreationState.NextStage();
+                characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (characterCreationState.CurrentStage is CharacterCreationGenericStage)
+            if (currentStage is CharacterCreationNarrativeStage)
             {
-                for (int i = 0; i < characterCreationState.CharacterCreation.CharacterCreationMenuCount; i++)
+                for (int i = 0; i < characterCreationState._characterCreationManager.CharacterCreationMenuCount; i++)
                 {
-                    CharacterCreationOption characterCreationOption = characterCreationState.CharacterCreation.GetCurrentMenuOptions(i).FirstOrDefault((CharacterCreationOption o) => o.OnCondition == null || o.OnCondition());
+                    NarrativeMenuOption characterCreationOption = characterCreationState._characterCreationManager.GetCurrentMenuOptions(i).FirstOrDefault((NarrativeMenuOption o) => o.OnCondition == null || o.OnCondition(characterCreationState._characterCreationManager));
                     bool flag4 = characterCreationOption != null;
                     if (flag4)
                     {
-                        characterCreationState.CharacterCreation.RunConsequence(characterCreationOption, i, false);
+                        //characterCreationState.CharacterCreation.RunConsequence(characterCreationOption, i, false);
                     }
                 }
-                characterCreationState.NextStage();
+                characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (characterCreationState.CurrentStage is CharacterCreationBannerEditorStage)
+            if (currentStage is CharacterCreationBannerEditorStage)
             {
-                characterCreationState.NextStage();
+                characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (characterCreationState.CurrentStage is CharacterCreationClanNamingStage)
+            if (currentStage is CharacterCreationClanNamingStage)
             {
-                characterCreationState.CharacterCreation.Name = "RandomPlayer";
-                characterCreationState.NextStage();
+
+                characterCreationState._characterCreationManager.CharacterCreationContent.MainCharacterName = "RandomPlayer";
+                characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (characterCreationState.CurrentStage is CharacterCreationReviewStage)
+            if (currentStage is CharacterCreationReviewStage)
             {
-                characterCreationState.NextStage();
+                characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (characterCreationState.CurrentStage is CharacterCreationOptionsStage)
+            if (currentStage is CharacterCreationOptionsStage)
             {
-                characterCreationState.NextStage();
+                characterCreationState._characterCreationManager.NextStage();
             }
         }
     }

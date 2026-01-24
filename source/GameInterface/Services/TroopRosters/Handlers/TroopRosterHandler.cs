@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Recruitment;
 using TaleWorlds.Engine.GauntletUI;
@@ -41,13 +42,17 @@ public class TroopRosterHandler : IHandler
 
     private void Handle(MessagePayload<ClientCloseRecruitmentVM> payload)
     {
-        foreach (Tuple<IGauntletMovie, ViewModel> tuple in (ScreenManager.FocusedLayer as GauntletLayer).MoviesAndDataSources)
+        foreach(KeyValuePair<string, GameMenu> kvp in Campaign.Current.GameMenuManager._gameMenus)
         {
-            if (tuple.Item2 is RecruitmentVM)
-            {
-                (tuple.Item2 as RecruitmentVM).Deactivate();
-            }
+            Logger.Debug("GameMenu Key: {key}", kvp.Key);
         }
+        //foreach (Tuple<IGauntletMovie, ViewModel> tuple in (ScreenManager.FocusedLayer as GauntletLayer).MoviesAndDataSources)
+        //{
+        //    if (tuple.Item2 is RecruitmentVM)
+        //    {
+        //        (tuple.Item2 as RecruitmentVM).Deactivate();
+        //    }
+        //}
     }
 
 

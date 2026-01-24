@@ -25,9 +25,9 @@ class TestPatch
             if (__instance.Party == null) return false;
 
             variables.HasMapEvent = __instance.MapEvent != null;
-            variables.CurrentPosition = __instance.Position2D;
-            variables.TargetPartyPositionAtFrameStart = Vec2.Invalid;
-            variables.LastCurrentPosition = __instance.Position2D;
+            variables.CurrentPosition = __instance.Position;
+            variables.TargetPartyPositionAtFrameStart = CampaignVec2.Invalid;
+            variables.LastCurrentPosition = __instance.Position;
             variables.IsAttachedArmyMember = false;
             variables.IsMoving = __instance.IsMoving || __instance.IsMainParty;
             variables.IsArmyLeader = false;
