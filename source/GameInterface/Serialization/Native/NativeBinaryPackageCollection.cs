@@ -7,22 +7,17 @@ namespace GameInterface.Serialization.Native
 {
     public class NativeBinaryPackageCollection
     {
-        public static Dictionary<Type, Type> CollectTypes()
+        public static Dictionary<Type, Type> Types = new Dictionary<Type, Type>
         {
-            Dictionary<Type, Type> types = new Dictionary<Type, Type>
-            {
-                { typeof(Array), typeof(EnumerableBinaryPackage) },
-                { typeof(List<>), typeof(EnumerableBinaryPackage) },
+            { typeof(Array), typeof(EnumerableBinaryPackage) },
+            { typeof(List<>), typeof(EnumerableBinaryPackage) },
 
-                { typeof(Dictionary<,>), typeof(DictionaryBinaryPackage) },
-                { typeof(KeyValuePair<,>), typeof(KeyValuePairBinaryPackage) },
-                { typeof(ValueTuple<,>), typeof(ValueTupleBinaryPackage) },
+            { typeof(Dictionary<,>), typeof(DictionaryBinaryPackage) },
+            { typeof(KeyValuePair<,>), typeof(KeyValuePairBinaryPackage) },
+            { typeof(ValueTuple<,>), typeof(ValueTupleBinaryPackage) },
 
-                { typeof(MBReadOnlyList<>), typeof(MBReadOnlyListBinaryPackage) },
-                { typeof(MBList<>), typeof(MBReadOnlyListBinaryPackage) },
-            };
-
-            return types;
-        }
+            { typeof(MBReadOnlyList<>), typeof(MBReadOnlyListBinaryPackage) },
+            { typeof(MBList<>), typeof(MBReadOnlyListBinaryPackage) },
+        };
     }
 }

@@ -62,7 +62,7 @@ namespace GameInterface.Serialization
 
         private static  void RegisterEnumerableBinaryPackage()
         {
-            foreach(var kvp in NativeBinaryPackageCollection.CollectTypes())
+            foreach(var kvp in NativeBinaryPackageCollection.Types)
             {
                 PackagesTypes.Add(kvp.Key.AssemblyQualifiedName, kvp.Value.AssemblyQualifiedName);
             }
@@ -104,12 +104,18 @@ namespace GameInterface.Serialization
         {
             Type objectType = obj.GetType();
 
-            objectType = objectType.IsGenericType ? objectType.GetGenericTypeDefinition() : objectType;
+            if (objectType.IsGenericType) 
+            {
+                var nativeTypes = NativeBinaryPackageCollection.Types;
+                var genericType = objectType.GetGenericTypeDefinition();
+                objectType = nativeTypes.ContainsKey(genericType) ? genericType : objectType;
+            }
+            
             objectType = objectType.IsArray ? typeof(Array) : objectType;
             if (PackagesTypes.TryGetValue(objectType.AssemblyQualifiedName, out string packageTypeStr) == false)
             { 
                 throw new Exception($"No binary package exists for {objectType}");
-            }  
+            }
 
             return (IBinaryPackage)Activator.CreateInstance(Type.GetType(packageTypeStr), new object[] { obj, this });
         }
