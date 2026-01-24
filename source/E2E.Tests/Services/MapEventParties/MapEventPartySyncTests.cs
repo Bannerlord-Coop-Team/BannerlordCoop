@@ -33,8 +33,8 @@ namespace E2E.Tests.Services.MapEventParties
         [Fact]
         public void Server_MapEventParty_Fields()
         {
-            TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty._contributionToBattle), 3, defaultValue: 1);
-            TestEnvironment.AssertProperty<MapEventParty, int>(nameof(MapEventParty._healthyManCountAtStart), 3, defaultValue: 1);
+            TestEnvironment.AssertField<MapEventParty, int>(nameof(MapEventParty._contributionToBattle), 3, defaultValue: 1);
+            TestEnvironment.AssertField<MapEventParty, int>(nameof(MapEventParty._healthyManCountAtStart), 3, defaultValue: 1);
         }
     }
 }
