@@ -1,11 +1,12 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Reflection.Emit;
+using System.Runtime.Loader;
 
 namespace GameInterface.DynamicSync.Builders;
 
@@ -15,10 +16,7 @@ public class DynamicSyncBuilder
     private readonly DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder;
     private readonly DynamicSyncPatchBuilder dynamicSyncPatchBuilder;
 
-    public DynamicSyncBuilder(
-        DynamicSyncRegistry dynamicSyncRegistry,
-        DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder,
-        DynamicSyncPatchBuilder dynamicSyncPatchBuilder)
+    public DynamicSyncBuilder(DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder, DynamicSyncPatchBuilder dynamicSyncPatchBuilder)
     {
         this.dynamicSyncRegistry = dynamicSyncRegistry;
         this.dynamicSyncAssemblyInfoBuilder = dynamicSyncAssemblyInfoBuilder;
@@ -33,7 +31,6 @@ public class DynamicSyncBuilder
         List<Assembly> assemblies = new List<Assembly>
         {
             Assembly.GetExecutingAssembly(),
-            Assembly.Load("GameInterface.Tests"),
         };
 
         // We need to load different dlls based on the runtime
@@ -79,6 +76,7 @@ public class DynamicSyncBuilder
         // https://www.strathweb.com/2018/10/no-internalvisibleto-no-problem-bypassing-c-visibility-rules-with-roslyn/
         // Allow IgnoresAccessChecksTo for dynamic compilation
         var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            .WithOptimizationLevel(OptimizationLevel.Debug)
             .WithMetadataImportOptions(MetadataImportOptions.All)
             .WithAllowUnsafe(true);
 
@@ -96,12 +94,31 @@ public class DynamicSyncBuilder
         using (var assemblyStream = new MemoryStream())
         using (var pdbStream = new MemoryStream())
         {
-            var result = dynamicAssembly.Emit(assemblyStream, pdbStream);
+            var emitOptions = new EmitOptions(
+                debugInformationFormat: DebugInformationFormat.PortablePdb
+            );
+
+            // Emit assembly
+            var result = dynamicAssembly.Emit(
+                assemblyStream,
+                pdbStream,
+                options: emitOptions);
 
             if (!result.Success)
-                throw new InvalidOperationException(string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => $"{d.Location.ToString()} {d.GetMessage()}")));
+            {
+                var errors = result.Diagnostics
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => $"{d.Location.ToString()} {d.GetMessage()}");
 
-            return Assembly.Load(assemblyStream.GetBuffer());
+                throw new InvalidOperationException(string.Join("\n", errors));
+            }
+
+            var alc = AssemblyLoadContext.Default;
+
+            assemblyStream.Position = 0;
+            pdbStream.Position = 0;
+
+            return alc.LoadFromStream(assemblyStream, pdbStream);
         };
     }
 }

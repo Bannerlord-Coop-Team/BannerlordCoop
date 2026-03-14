@@ -59,6 +59,7 @@ namespace GameInterface.DynamicSync
             if (Assembly == null)
                 Assembly = dynamicSyncBuilder.Build();
 
+            // TODO catagorize patches
             harmony.PatchAllUncategorized(Assembly);
 
             BindHandlers(Assembly);

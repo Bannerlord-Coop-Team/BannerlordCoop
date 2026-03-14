@@ -34,17 +34,6 @@ public interface IAutoSyncBuilder : IDisposable
     /// Build autosync and dynamic assembly
     /// </summary>
     void Build();
-
-    /// <summary>
-    /// Attempt to retreive the intercept for a specified sync field
-    /// </summary>
-    /// <remarks>
-    /// Mainly used for testing
-    /// </remarks>
-    /// <param name="field">Field to get intercept</param>
-    /// <param name="intercept">Out parameter</param>
-    /// <returns>True if successful, false if otherwise</returns>
-    bool TryGetIntercept(FieldInfo field, out MethodInfo intercept);
 }
 internal class AutoSyncBuilder : IAutoSyncBuilder
 {
@@ -271,7 +260,4 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
     {
         ClearCollections();
     }
-
-    /// <inheritdoc/>
-    public bool TryGetIntercept(FieldInfo field, out MethodInfo intercept) => interceptMap.TryGetValue(field, out intercept);
 }

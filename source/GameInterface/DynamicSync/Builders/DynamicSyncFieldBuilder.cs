@@ -41,10 +41,18 @@ namespace GameInterface.DynamicSync.Builders
             yield return networkMessage;
         }
 
-        public string GetSubscription(FieldInfo fieldInfo)
+        public string CreateInternalMessageHandler(FieldInfo fieldInfo)
         {
             var templateData = GetTemplateData(fieldInfo);
-            return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
+
+            return TemplateParser.Parse("Handlers.HandleInternalMessage", templateData);
+        }
+
+        public string CreateNetworkMessageHandler(FieldInfo fieldInfo)
+        {
+            var templateData = GetTemplateData(fieldInfo);
+
+            return TemplateParser.Parse("Handlers.HandleNetworkMessage", templateData);
         }
 
         private object GetTemplateData(FieldInfo fieldInfo)
@@ -59,7 +67,6 @@ namespace GameInterface.DynamicSync.Builders
                 SerializeMethod = serializerNames.serialize,
                 DeserializeMethod = serializerNames.deserialize,
                 ReadOnly = fieldInfo.IsInitOnly,
-                IsManagedType = objectManager.IsTypeManaged(fieldInfo.FieldType),
                 ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null
             };
         }

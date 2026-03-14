@@ -1,0 +1,14 @@
+﻿SubscribeGenericReference<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>();
+SubscribeNetworkReference<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage >((instance, value, _) => { 
+{{ 
+    if ReadOnly;
+    }}
+	    dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, value);
+    {{
+    else
+    }}
+	    instance.{{MemberName}} = value;
+    {{
+    end
+    }}
+});

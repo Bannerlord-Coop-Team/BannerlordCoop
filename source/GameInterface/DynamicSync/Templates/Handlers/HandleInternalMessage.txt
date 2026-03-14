@@ -1,0 +1,24 @@
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, {{SerializeMethod}}(data.Value))));
+SubscribeNetwork<byte[], {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+	if (objectManager.TryGetId(message.Instance, out var instanceId) == false)
+    {
+        logger.Error("Failed to get object id for {{ MemberDeclaringType}}");
+    }
+
+{{ if IsManagedType; }}
+
+	if (objectManager.TryGetId(message.Value, out var valueId) == false)
+    {
+        logger.Error("Failed to get object id for {{ MemberName }}");
+		return;
+    }
+
+	var networkMessage = new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueId);
+
+{{ else }}
+	var networkMessage = new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, message.Value);
+{{ end }}
+
+	network.SendAll(networkMessage);
+}

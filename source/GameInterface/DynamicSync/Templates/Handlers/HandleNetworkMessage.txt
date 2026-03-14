@@ -1,0 +1,22 @@
+﻿private void Handle_{{ MemberDeclaringType }}_{{ MemberName }}_SetNetworkMessage({{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage message)
+{
+	if (objectManager.TryGetObject<{{ MemberDeclaringType }}>(message.InstanceId, out var instance) == false)
+    {
+        logger.Error("Failed to get instance {type} using id {id}", typeof({{ MemberDeclaringType }}), message.InstanceId);
+		return;
+    }
+
+{{ if IsManagedType; }}
+
+	if (objectManager.TryGetObject<{{ MemberType }}>(message.ValueId, out var value) == false)
+    {
+        logger.Error("Failed to get value {type} using id {id}", typeof({{ MemberType }}), message.ValueId);
+		return;
+    }
+
+	instance.{{MemberName}} = value;
+
+{{ else }}
+	instance.{{MemberName}} = message.Value;
+{{ end }}
+}

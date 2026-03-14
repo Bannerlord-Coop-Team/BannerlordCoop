@@ -9,7 +9,10 @@ namespace GameInterface.DynamicSync.Templates
         public static string Parse(string templateName, object model)
         {
             string templateContent;
-            using (Stream stream = typeof(GameInterface).Assembly.GetManifestResourceStream($"{templateBasePath}{templateName}.txt") ?? throw new FileNotFoundException())
+
+            var path = $"{templateBasePath}{templateName}.txt";
+
+            using (Stream stream = typeof(GameInterface).Assembly.GetManifestResourceStream(path) ?? throw new FileNotFoundException(path))
             using (StreamReader reader = new StreamReader(stream))
             {
                 templateContent = reader.ReadToEnd();

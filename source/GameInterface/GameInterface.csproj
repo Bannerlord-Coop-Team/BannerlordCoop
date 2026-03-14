@@ -226,6 +226,7 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="Scriban" Version="6.0.0" />
     <PackageReference Include="Scrutor" Version="6.0.1" />
+    <PackageReference Include="System.Runtime.Loader" Version="4.3.0" />
   </ItemGroup>
     <ItemGroup>
 	    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
@@ -233,42 +234,7 @@
 	    </AssemblyAttribute>
     </ItemGroup>
     <ItemGroup>
-      <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfoTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\DynamicHandlerTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayReferenceTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayValueTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCollectionReferenceTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeQueueReferenceTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeCollectionValueTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeSetValueTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeQueueValueTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalArrayChangeMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalCollectionAddMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalCollectionRemoveMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\LocalSetMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArrayChangeReferenceMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArrayChangeValueMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArraySetReferenceMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkArraySetValueMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionAddReferenceMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionAddValueMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionRemoveReferenceMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionRemoveValueMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionSetReferenceMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionSetValueMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetReferenceMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetValueMessageTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\DynamicPatchTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldArrayChangeTranspilerTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldMBListChangeTranspilerTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldListChangeTranspilerTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldQueueChangeTranspilerTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\FieldSetTranspilerTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyArrayChangeTranspilerTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyListChangeTranspilerTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyMBListChangeTranspilerTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertyQueueChangeTranspilerTemplate.txt" />
-      <EmbeddedResource Include="DynamicSync\Templates\Patches\PropertySetPrefixTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\**\*.txt" />
     </ItemGroup>
   <ItemGroup>
     <Publicize Include="SandBox" />

@@ -10,18 +10,16 @@ using {{ library }};
 namespace DynamicSync
 {
     [ProtoContract(SkipConstructor = true)]
-    public record {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage : ICommand
+    public record {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage : GenericNetworkReferenceEvent<{{ MemberDeclaringType}}, {{ MemberType }}>
     {
         [ProtoMember(1)]
-        public string InstanceId { get; set; }
+        public override string InstanceId { get; set; }
 
         [ProtoMember(2)]
-        public string ValueId { get; set; }
+        public override string ValueId { get; set; }
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(string instanceId, string valueId)
+        public {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(string instanceId, string valueId) : base(instanceId, valueId)
         {
-            InstanceId = instanceId;
-            ValueId = valueId;
         }
     }
 }
