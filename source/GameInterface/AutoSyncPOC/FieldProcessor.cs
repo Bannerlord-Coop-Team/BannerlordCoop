@@ -24,9 +24,9 @@ internal class FieldProcessor : IFieldProcessor
 
     public FieldProcessor(
         ILogger logger,
+        INetwork network,
         IFieldRegistry fieldRegistry,
         IAutoSyncFieldMapper fieldMapper,
-        INetwork network,
         INetworkIdRegistry networkIdRegistry)
     {
         this.logger = logger;

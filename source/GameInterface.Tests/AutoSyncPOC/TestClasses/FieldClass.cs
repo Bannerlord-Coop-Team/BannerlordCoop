@@ -10,13 +10,16 @@ internal class FieldClass
 {
     private int MyField;
     private int? MyNullableField;
+    private RefClass? MyRefField;
 
-    public FieldClass(int fieldValue, int? nullableField = null)
+    public FieldClass(int fieldValue, int? nullableField = null, RefClass? refField = null)
     {
         MyField = fieldValue;
         MyNullableField = nullableField;
+        MyRefField = refField;
     }
 
     public int GetField() => MyField;
     public int? GetNullableField() => MyNullableField;
+    public RefClass? GetRefField() => MyRefField;
 }
