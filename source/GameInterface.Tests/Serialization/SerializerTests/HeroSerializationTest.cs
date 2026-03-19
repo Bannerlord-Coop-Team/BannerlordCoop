@@ -54,7 +54,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
 
             foreach(FieldInfo field in typeof(Hero).GetAllInstanceFields(HeroBinaryPackage.Excludes))
             {
-                object value = field.GetValue(hero);
+                object? value = field.GetValue(hero);
                 if(value == null)
                 {
                     output.WriteLine($"{field.Name} was null.");
@@ -236,6 +236,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             hero.IsFemale = ReflectionExtensions.Random<bool>();
             hero._battleEquipment = (Equipment)FormatterServices.GetUninitializedObject(typeof(Equipment));
             hero._civilianEquipment = (Equipment)FormatterServices.GetUninitializedObject(typeof(Equipment));
+            hero._stealthEquipment = (Equipment)FormatterServices.GetUninitializedObject(typeof(Equipment));
             hero.CaptivityStartTime = new CampaignTime();
             hero.PreferredUpgradeFormation = ReflectionExtensions.Random<FormationClass>();
             hero._heroState = ReflectionExtensions.Random<Hero.CharacterStates>();
@@ -277,6 +278,10 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Hero_children.SetValue(hero, heroData.Children);
             hero.IsPregnant = ReflectionExtensions.Random<bool>();
             hero._heroDeveloper = heroData.HeroDeveloper;
+            hero._heroSkills = new PropertyOwner<SkillObject>();
+            hero._heroTraits = new PropertyOwner<TraitObject>();
+            hero._heroPerks = new PropertyOwner<PerkObject>();
+            hero._characterAttributes = new PropertyOwner<CharacterAttribute>();
             hero.LastKnownClosestSettlement = heroData.LastKnownClosestSettlement;
             #endregion
 

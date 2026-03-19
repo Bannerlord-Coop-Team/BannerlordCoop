@@ -2,6 +2,7 @@
 using ManagedCallbacks;
 using Microsoft.Extensions.Options;
 using SandBox;
+using SandBox.View;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -89,8 +90,9 @@ namespace GameInterface.Tests.Bootstrap
             TaleWorlds.MountAndBlade.Module.CurrentModule = new TaleWorlds.MountAndBlade.Module();
             SandBoxGameManager gameManager = new SandBoxGameManager(new LoadResult());
 
-            string[] modules = { "Native", "SandBoxCore", "SandBox", "StoryMode", "Coop" };
-            ModuleHelper.InitializeModules(modules);
+            var modules = ModuleHelper.GetOfficialModuleIds().Append("Coop");
+
+            ModuleHelper.InitializeModules(modules.ToArray());
 
             Campaign campaign = new Campaign(CampaignGameMode.Campaign);
             Campaign.Current = campaign;

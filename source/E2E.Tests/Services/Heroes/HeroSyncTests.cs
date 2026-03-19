@@ -63,6 +63,7 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertProperty<Hero, bool>(nameof(Hero.IsFemale), true);
             TestEnvironment.AssertReferenceProperty<Hero, Equipment>(nameof(Hero._battleEquipment));
             TestEnvironment.AssertReferenceProperty<Hero, Equipment>(nameof(Hero._civilianEquipment));
+            TestEnvironment.AssertReferenceProperty<Hero, Equipment>(nameof(Hero._stealthEquipment));
             TestEnvironment.AssertProperty<Hero, CampaignTime>(nameof(Hero.CaptivityStartTime), new CampaignTime(111));
             TestEnvironment.AssertProperty<Hero, FormationClass>(nameof(Hero.PreferredUpgradeFormation), FormationClass.Infantry);
             TestEnvironment.AssertProperty<Hero, Hero.CharacterStates>(nameof(Hero.HeroState), Hero.CharacterStates.Prisoner);

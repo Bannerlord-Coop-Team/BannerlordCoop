@@ -54,6 +54,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.dll</HintPath>
     </Reference>
+    <Reference Include="SandBox.View">
+      <HintPath>..\..\mb2\Modules\SandBox\bin\Win64_Shipping_Client\SandBox.View.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.CampaignSystem, Version=1.0.0.0, Culture=neutral, processorArchitecture=AMD64">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
