@@ -16,8 +16,6 @@ public sealed class BatchLogger : IDisposable
 	private static readonly ILogger Logger = LogManager.GetLogger<BatchLogger>();
 	// A task to poll for messages to log.
 	private readonly Poller poller;
-	// The number of milliseconds to wait between polls.
-	private readonly TimeSpan pollInterval;
 
 	private readonly ConcurrentDictionary<string, int> LogMap = new ConcurrentDictionary<string, int>();
 
@@ -28,7 +26,6 @@ public sealed class BatchLogger : IDisposable
 	/// <param name="waitMilliseconds">The number of milliseconds to wait between polls (optional, default is 1000).</param>
 	public BatchLogger(TimeSpan pollInterval)
 	{
-        this.pollInterval = pollInterval;
         poller = new Poller(Poll, pollInterval);
         poller.Start();
     }
@@ -38,9 +35,30 @@ public sealed class BatchLogger : IDisposable
 	/// </summary>
 	public void LogOne(Type messageType)
 	{
-		var messageName = messageType.Name;
+		var messageName = GetFriendlyTypeName(messageType);
 
-        LogMap.AddOrUpdate(messageName, 1, (name, value) => Interlocked.Increment(ref value));
+        LogMap.AddOrUpdate(messageName, 1, (_, value) => value + 1);
+    }
+
+    private static string GetFriendlyTypeName(Type type)
+    {
+        if (!type.IsGenericType)
+            return type.Name;
+
+        var name = type.Name;
+        var tickIndex = name.IndexOf('`');
+        if (tickIndex > 0)
+            name = name.Substring(0, tickIndex);
+
+        var genericArgs = type.GetGenericArguments();
+        var argNames = new string[genericArgs.Length];
+
+        for (int i = 0; i < genericArgs.Length; i++)
+        {
+            argNames[i] = GetFriendlyTypeName(genericArgs[i]);
+        }
+
+        return $"{name}<{string.Join(", ", argNames)}>";
     }
 
     // A method to poll for messages to log.

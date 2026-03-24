@@ -1,5 +1,4 @@
 ﻿using Common.Util;
-using GameInterface.Services.Modules.Handlers;
 using HarmonyLib;
 using SandBox;
 using TaleWorlds.CampaignSystem;
@@ -7,10 +6,9 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using TaleWorlds.Engine;
-using TaleWorlds.ModuleManager;
 using TaleWorlds.MountAndBlade;
 using TaleWorlds.ObjectSystem;
+using TaleWorlds.ModuleManager;
 
 namespace E2E.Tests.Environment.Instance;
 public class GameInstance
@@ -34,8 +32,8 @@ public class GameInstance
             using(new AllowedThread())
             {
                 Module = (Module)AccessTools.Constructor(typeof(Module)).Invoke(null);
-                string[] modules = { "Native", "SandBoxCore", "SandBox", "StoryMode", "Coop" };
-                ModuleHelper.InitializeModules(modules);
+                var modules = ModuleHelper.GetOfficialModuleIds().Append("Coop");
+                ModuleHelper.InitializeModules(modules.ToArray());
                 GameManager = new SandBoxGameManager(() => new Campaign(CampaignGameMode.Campaign));
                 Campaign = new Campaign(CampaignGameMode.Campaign);
                 Game = Game.CreateGame(Campaign, GameManager);

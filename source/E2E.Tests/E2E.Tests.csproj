@@ -54,7 +54,7 @@
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Engine">
-      <HintPath>..\GameInterface.Tests\obj\x64\Debug\net6.0\PublicizedAssemblies\TaleWorlds.Engine.D3C9CD80C9F0F4C5A47E805D1AA5C0BE\TaleWorlds.Engine.dll</HintPath>
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
     </Reference>
     <Reference Include="TaleWorlds.Library">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
@@ -62,12 +62,12 @@
     <Reference Include="TaleWorlds.Localization">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Localization.dll</HintPath>
     </Reference>
-    <Reference Include="TaleWorlds.ModuleManager">
-      <HintPath>..\GameInterface.Tests\obj\x64\Debug\net6.0\PublicizedAssemblies\TaleWorlds.ModuleManager.A3A0E9C62FEA44E0E41F71C2CFB302CA\TaleWorlds.ModuleManager.dll</HintPath>
-    </Reference>
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
+	  <Reference Include="TaleWorlds.ModuleManager">
+		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
+	  </Reference>
     <Reference Include="TaleWorlds.ObjectSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
     </Reference>

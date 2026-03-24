@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using Common.Logging;
 using Common.Messaging;
@@ -21,6 +22,12 @@ public record NetworkModuleVersionsValidate : ICommand
 
     public NetworkModuleVersionsValidate(IEnumerable<ModuleInfo> modules)
     {
+        if (modules is null)
+        {
+            Modules = Array.Empty<NetworkModuleInfo>();
+            return;
+        }
+
         Modules = modules.Select(m => new NetworkModuleInfo(m.Id, m.IsOfficial, m.Version)).ToArray();
     }
 }

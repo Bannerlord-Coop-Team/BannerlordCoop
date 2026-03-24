@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Connections.Messages;
+using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -23,30 +24,29 @@ public class ResolveCharacterState : ConnectionStateBase
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IModuleValidator moduleValidator;
+    private readonly IHeroInterface heroInterface;
     private readonly IModuleInfoProvider moduleInfoProvider;
     public ResolveCharacterState(IConnectionLogic connectionLogic,
         IMessageBroker messageBroker,
         INetwork network,
         IModuleValidator moduleValidator,
+        IHeroInterface heroInterface,
         IModuleInfoProvider moduleInfoProvider) 
         : base(connectionLogic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.moduleValidator = moduleValidator;
+        this.heroInterface = heroInterface;
         this.moduleInfoProvider = moduleInfoProvider;
 
         messageBroker.Subscribe<NetworkClientValidate>(ClientValidateHandler);
-        messageBroker.Subscribe<HeroResolved>(ResolveHeroHandler);
-        messageBroker.Subscribe<ResolveHeroNotFound>(HeroNotFoundHandler);
         messageBroker.Subscribe<NetworkModuleVersionsValidate>(ModuleVersionsValidateHandler);
     }
 
     public override void Dispose()
     {
         messageBroker.Unsubscribe<NetworkClientValidate>(ClientValidateHandler);
-        messageBroker.Unsubscribe<HeroResolved>(ResolveHeroHandler);
-        messageBroker.Unsubscribe<ResolveHeroNotFound>(HeroNotFoundHandler);
         messageBroker.Unsubscribe<NetworkModuleVersionsValidate>(ModuleVersionsValidateHandler);
     }
 
@@ -67,23 +67,16 @@ public class ResolveCharacterState : ConnectionStateBase
         var peer = obj.Who as NetPeer;
         if (peer != ConnectionLogic.Peer) return;
 
-        messageBroker.Publish(this, new ResolveHero(obj.What.PlayerId));
-    }
-
-    internal void ResolveHeroHandler(MessagePayload<HeroResolved> obj)
-    {
-        var validateMessage = new NetworkClientValidated(true, obj.What.HeroId);
-        var playerPeer = ConnectionLogic.Peer;
-        network.Send(playerPeer, validateMessage);
-        ConnectionLogic.TransferSave();
-    }
-
-    internal void HeroNotFoundHandler(MessagePayload<ResolveHeroNotFound> obj)
-    {
-        var validateMessage = new NetworkClientValidated(false, string.Empty);
-        var playerPeer = ConnectionLogic.Peer;
-        network.Send(playerPeer, validateMessage);
-        ConnectionLogic.CreateCharacter();
+        if (heroInterface.TryResolveHero(obj.What.PlayerId, out string heroId))
+        {
+            network.Send(peer, new NetworkClientValidated(true, heroId));
+            ConnectionLogic.TransferSave();
+        }
+        else
+        {
+            network.Send(peer, new NetworkClientValidated(false, string.Empty));
+            ConnectionLogic.CreateCharacter();
+        }
     }
 
     public override void CreateCharacter()

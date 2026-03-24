@@ -46,6 +46,8 @@ namespace GameInterface.Serialization.External
             "<Surgeon>k__BackingField",
             "_targetParty",
             "_targetSettlement",
+            "<Anchor>k__BackingField",
+            "Path",
             // These are ignored as there is no way to resolve if
             // they already exist
             "_besiegerCamp",

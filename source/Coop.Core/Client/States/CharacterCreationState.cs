@@ -3,15 +3,13 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common;
-using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server.Connections.Messages;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Messages;
-using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
-using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Heroes.Interfaces;
 
 namespace Coop.Core.Client.States;
 
@@ -22,21 +20,23 @@ public class CharacterCreationState : ClientStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IHeroInterface heroInterface;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ICoopFinalizer coopFinalizer;
 
     public CharacterCreationState(
         IClientLogic logic,
         IMessageBroker messageBroker,
-        INetwork network, 
+        INetwork network,
+        IHeroInterface heroInterface,
         IControllerIdProvider controllerIdProvider,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
+        this.heroInterface = heroInterface;
         this.controllerIdProvider = controllerIdProvider;
         this.coopFinalizer = coopFinalizer;
-        messageBroker.Subscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectRegistered);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -45,7 +45,6 @@ public class CharacterCreationState : ClientStateBase
 
     public override void Dispose()
     {
-        messageBroker.Unsubscribe<NewHeroPackaged>(Handle_NewHeroPackaged);
         messageBroker.Unsubscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectRegistered);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
@@ -59,13 +58,8 @@ public class CharacterCreationState : ClientStateBase
 
     internal void Handle_AllGameObjectRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
-        messageBroker.Publish(this, new PackageMainHero());
-    }
-
-    internal void Handle_NewHeroPackaged(MessagePayload<NewHeroPackaged> obj)
-    {
         var playerId = controllerIdProvider.ControllerId;
-        var data = obj.What.Package;
+        var data = heroInterface.PackageMainHero();
 
         // Clear all registries so next time the game is loaded, it re-registers loaded save objects
         messageBroker.Publish(this, new ClearAllRegistries());

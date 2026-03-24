@@ -114,7 +114,7 @@ internal class HeroInterface : IHeroInterface
 
         if (entityRegistry.TryGetControlledEntities(controllerId, out var entities) == false)
         {
-            Logger.Error("Unable to resolve hero for {controllerId}", controllerId);
+            Logger.Warning("Unable to resolve hero for {controllerId}", controllerId);
             return false;
         }
 
@@ -123,7 +123,7 @@ internal class HeroInterface : IHeroInterface
 
         if (resolvedEntity == null)
         {
-            Logger.Error("No hero was registered for {controllerId}", controllerId);
+            Logger.Warning("No hero was registered for {controllerId}", controllerId);
             return false;
         }
 

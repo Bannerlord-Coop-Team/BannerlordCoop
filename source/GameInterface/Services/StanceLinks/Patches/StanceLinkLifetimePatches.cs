@@ -21,26 +21,26 @@ internal class StanceLinkPatches
 {
     private static ILogger Logger = LogManager.GetLogger<Kingdom>();
 
-    [HarmonyPatch(typeof(StanceLink), MethodType.Constructor, typeof(StanceType), typeof(IFaction), typeof(IFaction))]
-    [HarmonyPrefix]
-    private static bool CreateStanceLinkPrefix(ref StanceLink __instance, StanceType stanceType, IFaction faction1, IFaction faction2)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+    //[HarmonyPatch(typeof(StanceLink), MethodType.Constructor, typeof(StanceType), typeof(IFaction), typeof(IFaction))]
+    //[HarmonyPrefix]
+    //private static bool CreateStanceLinkPrefix(ref StanceLink __instance, StanceType stanceType, IFaction faction1, IFaction faction2)
+    //{
+    //    // Call original if we call this function
+    //    if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(StanceLink), Environment.StackTrace);
-            return true;
-        }
-
-
-        var message = new StanceLinkCreated(__instance, stanceType, faction1, faction2);
-
-        MessageBroker.Instance.Publish(__instance, message);
+    //    if (ModInformation.IsClient)
+    //    {
+    //        Logger.Error("Client created unmanaged {name}\n"
+    //            + "Callstack: {callstack}", typeof(StanceLink), Environment.StackTrace);
+    //        return true;
+    //    }
 
 
-        return true;
-    }
+    //    var message = new StanceLinkCreated(__instance, stanceType, faction1, faction2);
+
+    //    MessageBroker.Instance.Publish(__instance, message);
+
+
+    //    return true;
+    //}
 }
