@@ -1,14 +1,13 @@
-﻿using GameInterface.AutoSync;
+using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.Equipments;
 
-class EquipmentSync : IAutoSync
+class EquipmentSync : IDynamicSync
 {
-    public EquipmentSync(IAutoSyncBuilder autoSyncBuilder)
+    public EquipmentSync(DynamicSyncRegistry autoSyncBuilder)
     {
         autoSyncBuilder.AddField(AccessTools.Field(typeof(Equipment), nameof(Equipment._equipmentType)));
 

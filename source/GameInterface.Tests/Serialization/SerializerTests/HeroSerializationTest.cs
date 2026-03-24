@@ -409,7 +409,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             }
 
             private static readonly FieldInfo Workshop_Settlement = typeof(Workshop).GetField("_settlement", BindingFlags.NonPublic | BindingFlags.Instance);
-            private static readonly FieldInfo Workshop_tag = typeof(Workshop).GetField("_tag", BindingFlags.NonPublic | BindingFlags.Instance);
             private void CreateOwnedParties()
             {
                 Town town = (Town)FormatterServices.GetUninitializedObject(typeof(Town));
@@ -436,7 +435,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
                 foreach (var workshop in OwnedWorkshops)
                 {
                     Workshop_Settlement.SetValue(workshop, HomeSettlement);
-                    Workshop_tag.SetValue(workshop, "My Tag");
                 }
 
                 Settlement settlement = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));

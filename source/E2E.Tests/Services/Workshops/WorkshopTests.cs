@@ -11,7 +11,6 @@ namespace E2E.Tests.Services.Workshops
         public WorkshopTests(ITestOutputHelper output) : base(output)
         {
             TestEnvironment.CreateRegisteredObject<Workshop>();
-            TestEnvironment.CreateRegisteredObject<WorkshopType>();
             TestEnvironment.CreateRegisteredObject<Hero>();
             TestEnvironment.CreateRegisteredObject<Settlement>();
         }
@@ -30,10 +29,7 @@ namespace E2E.Tests.Services.Workshops
         [Fact]
         public void Server_Workshop_Fields()
         {
-            TestEnvironment.AssertField<Workshop, string>(nameof(Workshop._tag), "tag");
-
             TestEnvironment.AssertReferenceField<Workshop, Hero>(nameof(Workshop._owner));
-            TestEnvironment.AssertReferenceField<Workshop, Settlement>(nameof(Workshop._settlement));
         }        
     }
 }

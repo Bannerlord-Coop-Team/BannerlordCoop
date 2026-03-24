@@ -47,11 +47,10 @@ namespace E2E.Tests.Services.Settlements
             //TestEnvironment.AssertField<Settlement, Vec2>(nameof(Settlement._gatePosition), new Vec2(0, 1));
             TestEnvironment.AssertField<Settlement, bool>(nameof(Settlement._isVisible), false, defaultValue: true);
             TestEnvironment.AssertReferenceField<Settlement, MobileParty>(nameof(Settlement._lastAttackerParty));
-            TestEnvironment.AssertField<Settlement, int>(nameof(Settlement._locatorNodeIndex), 5);
             TestEnvironment.AssertField<Settlement, TextObject>(nameof(Settlement._name),new TextObject("test text")); //TEXTOBJECT
             TestEnvironment.AssertReferenceField<Settlement, Settlement>(nameof(Settlement._nextLocatable));
             TestEnvironment.AssertField<Settlement, int>(nameof(Settlement._numberOfLordPartiesAt), 7);
-            TestEnvironment.AssertField<Settlement, Vec2>(nameof(Settlement._position), new Vec2(1,2));
+            TestEnvironment.AssertField<Settlement, CampaignVec2>(nameof(Settlement._position), new CampaignVec2(new Vec2(1,2), false));
             TestEnvironment.AssertField<Settlement, float>(nameof(Settlement._readyMilitia), 5f);
         }
     }

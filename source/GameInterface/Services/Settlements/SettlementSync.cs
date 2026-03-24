@@ -26,7 +26,6 @@ internal class SettlementSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Village)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._isVisible)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._lastAttackerParty)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._locatorNodeIndex)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._name)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._nextLocatable)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._numberOfLordPartiesAt)));

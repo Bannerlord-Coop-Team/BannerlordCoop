@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
@@ -57,6 +59,9 @@ internal class HeroRegistry : IAutoRegistry<Hero>
             //obj.Init();
             AccessTools.Field(typeof(Hero), nameof(Hero._children)).SetValue(obj, new MBList<Hero>());
             AccessTools.Field(typeof(Hero), nameof(Hero._ownedWorkshops)).SetValue(obj, new MBList<Workshop>());
+            AccessTools.Property(typeof(Hero), nameof(Hero.OwnedAlleys)).SetValue(obj, new MBList<Alley>());
+            AccessTools.Property(typeof(Hero), nameof(Hero.OwnedCaravans)).SetValue(obj, new MBList<CaravanPartyComponent>());
+            AccessTools.Field(typeof(Hero), nameof(Hero.VolunteerTypes)).SetValue(obj, new CharacterObject[6]);
         }
 
         MBObjectManager.Instance?.RegisterPresumedObject(obj);
