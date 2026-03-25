@@ -20,7 +20,12 @@ namespace E2E.Tests.Services.BesiegerCamps
                     AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
                 });
             TestEnvironment.CreateRegisteredObject<MobileParty>();
-            TestEnvironment.CreateRegisteredObject<BesiegerCamp>();
+            TestEnvironment.CreateRegisteredObject<BesiegerCamp>(new List<MethodBase>
+            {
+                    AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+                    AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+                    AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
+            });
             TestEnvironment.CreateRegisteredObject<SiegeEnginesContainer>();
             TestEnvironment.CreateRegisteredObject<SiegeStrategy>();
         }

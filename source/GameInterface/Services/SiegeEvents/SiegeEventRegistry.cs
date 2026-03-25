@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.SiegeEvents;
 internal class SiegeEventRegistry : IAutoRegistry<SiegeEvent>
@@ -37,6 +38,7 @@ internal class SiegeEventRegistry : IAutoRegistry<SiegeEvent>
 
     public void OnClientCreated(SiegeEvent obj, string id)
     {
+
     }
 
     public void OnClientDestroyed(SiegeEvent obj, string id)

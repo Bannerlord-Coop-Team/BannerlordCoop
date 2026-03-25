@@ -22,15 +22,17 @@ public class SiegeEventTests : SyncTestBase
             AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
         });
         TestEnvironment.CreateRegisteredObject<Settlement>();
-        TestEnvironment.CreateRegisteredObject<BesiegerCamp>();
+        TestEnvironment.CreateRegisteredObject<BesiegerCamp>(new List<MethodBase>
+        {
+                AccessTools.Method(typeof(MobileParty), nameof(MobileParty.OnPartyJoinedSiegeInternal)),
+                AccessTools.Method(typeof(BesiegerCamp), nameof(BesiegerCamp.InitializeSiegeEventSide)),
+                AccessTools.Method(typeof(Settlement), nameof(Settlement.InitializeSiegeEventSide)),
+        });
     }
 
     [Fact]
     public void Server_SiegeEvent_Fields()
     {
-        //READ ONLY?????
-        //TestEnvironment.AssertReferenceField<SiegeEvent, Settlement>(nameof(SiegeEvent.BesiegedSettlement));
-        //TestEnvironment.AssertReferenceField<SiegeEvent, BesiegerCamp>(nameof(SiegeEvent.BesiegerCamp));
         TestEnvironment.AssertField<SiegeEvent, bool>(nameof(SiegeEvent._isBesiegerDefeated), true);
     }
 

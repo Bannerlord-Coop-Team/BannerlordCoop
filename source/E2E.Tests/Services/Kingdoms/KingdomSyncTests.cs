@@ -25,7 +25,7 @@ public class KingdomSyncTests : SyncTestBase
     {
         //TestEnvironment.AssertReferenceField<Kingdom, Settlement>(nameof(Kingdom._kingdomMidSettlement));
         TestEnvironment.AssertReferenceField<Kingdom, Clan>(nameof(Kingdom._rulingClan));
-        TestEnvironment.AssertField<Kingdom, int>(nameof(Kingdom.PoliticalStagnation), 5);
+        TestEnvironment.AssertField<Kingdom, int>(nameof(Kingdom.PoliticalStagnation), 5); //being set randomly in constructor; PoliticalStagnation = 10 + (int)(randomFloat * randomFloat2 * 100f);
         TestEnvironment.AssertField<Kingdom, float>(nameof(Kingdom._aggressiveness), 5f);
         TestEnvironment.AssertField<Kingdom, bool>(nameof(Kingdom._isEliminated), true);
         TestEnvironment.AssertField<Kingdom, int>(nameof(Kingdom._kingdomBudgetWallet), 5);
