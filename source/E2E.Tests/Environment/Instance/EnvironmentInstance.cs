@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Messaging;
 using Common.PacketHandlers;
 using Common.Serialization;
@@ -6,7 +7,6 @@ using Common.Tests.Utils;
 using Common.Util;
 using Coop.Core;
 using E2E.Tests.Environment.Mock;
-using GameInterface;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using LiteNetLib;

@@ -8,6 +8,7 @@ using TaleWorlds.Core;
 using GameInterface.Services.Equipments.Messages.Events;
 using GameInterface.Services.Heroes.Messages;
 using TaleWorlds.CampaignSystem;
+using Common;
 
 
 namespace GameInterface.Services.Equipments.Patches;

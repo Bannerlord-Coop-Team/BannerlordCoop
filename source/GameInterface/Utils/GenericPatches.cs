@@ -10,10 +10,10 @@ using Common.Logging;
 using TaleWorlds.Library;
 using System.Linq;
 using GameInterface.Utils.LocalEvents;
-using GameInterface;
 using Newtonsoft.Json.Linq;
 using TaleWorlds.Diamond;
 using System.Collections.Concurrent;
+using Common;
 
 namespace GameInterface.Utils
 {

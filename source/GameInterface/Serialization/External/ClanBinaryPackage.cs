@@ -23,20 +23,21 @@ namespace GameInterface.Serialization.External
         {
         }
 
-        private static HashSet<string> excludes = new HashSet<string>
+        public static HashSet<string> Excludes = new HashSet<string>
         {
             "_supporterNotablesCache",
             "_aliveLordsCache",
             "_deadLordsCache",
             "_heroesCache",
             "_companionsCache",
+            "_defaultPartyTemplate",
         };
 
         protected override void PackInternal()
         {
             stringId = ResolveId(Object);
 
-            base.PackFields();
+            base.PackFields(Excludes);
             
             supporterNotablesIds = ResolveIds(Object._supporterNotablesCache);
             deadLordsIds = ResolveIds(Object._deadLordsCache);

@@ -1,24 +1,32 @@
 ﻿using Autofac;
+using Common.Extensions;
+using Common.Serialization;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using GameInterface.Tests.Bootstrap.Modules;
+using GameInterface.Tests.Serialization.Helpers;
+using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit;
-using Common.Serialization;
-using System.Reflection;
+using Xunit.Abstractions;
 
 namespace GameInterface.Tests.Serialization.SerializerTests
 {
     public class MobilePartySerializationTest
     {
         IContainer container;
-        public MobilePartySerializationTest()
+        ITestOutputHelper outputHelper;
+        public MobilePartySerializationTest(ITestOutputHelper outputHelper)
         {
+            this.outputHelper = outputHelper;
+
             GameBootStrap.Initialize();
 
             ContainerBuilder builder = new ContainerBuilder();
@@ -28,13 +36,36 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             container = builder.Build();
         }
 
+        private void EnsureAllMemberCoverage<T>(T obj, HashSet<string> excludes)
+        {
+            var nullValueCount = 0;
+            foreach (FieldInfo field in typeof(T).GetAllInstanceFields(excludes))
+            {
+                object? value = field.GetValue(obj);
+                if (value == null)
+                {
+                    outputHelper.WriteLine($"{field.Name} requires a value.");
+                    nullValueCount++;
+                }
+            }
+
+
+            Assert.Equal(0, nullValueCount);
+        }
+
         [Fact]
         public void MobileParty_Serialize()
         {
-            MobileParty mobilePartyObject = (MobileParty)FormatterServices.GetUninitializedObject(typeof(MobileParty));           
+            var objectManager = container.Resolve<IObjectManager>();
+            HeroHelper.RandomHeroWithData heroData = HeroHelper.CreateRandomHero(objectManager);
+
+            var mobileParty = heroData.HeroParty;
+
+            EnsureAllMemberCoverage(mobileParty, MobilePartyBinaryPackage.Excludes);
+            EnsureAllMemberCoverage(mobileParty.Party, PartyBaseBinaryPackage.Excludes);
 
             var factory = container.Resolve<IBinaryPackageFactory>();
-            MobilePartyBinaryPackage package = new MobilePartyBinaryPackage(mobilePartyObject, factory);
+            MobilePartyBinaryPackage package = new MobilePartyBinaryPackage(mobileParty, factory);
 
             package.Pack();
 

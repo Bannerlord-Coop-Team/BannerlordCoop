@@ -9,11 +9,13 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Registry;
+using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Naval;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -148,8 +150,8 @@ internal class HeroInterface : IHeroInterface
 
     private void SetupNewHero(Hero hero)
     {
-        SetupHeroWithObjectManagers(hero);
         SetupNewParty(hero);
+        SetupHeroWithObjectManagers(hero);
     }
 
     private void SetupHeroWithObjectManagers(Hero hero)
@@ -182,13 +184,17 @@ internal class HeroInterface : IHeroInterface
     private void SetupNewParty(Hero hero)
     {
         var party = hero.PartyBelongedTo;
+
+        using (new AllowedThread())
+        {
+            party.Anchor = new AnchorPoint(party);
+        }
+        
         party.IsVisible = true;
         party.Party.SetVisualAsDirty();
 
         party.CheckPositionsForMapChangeAndUpdateIfNeeded();
-
-        //party.Ai.OnGameInitialized();
-
+        MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
     }
 }

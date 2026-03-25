@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Network;
 using GameInterface.AutoSync;
 using GameInterface.AutoSync.Fields;

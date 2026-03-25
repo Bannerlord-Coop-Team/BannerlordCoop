@@ -2,6 +2,8 @@
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Handlers;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Messages.Behavior;
@@ -13,12 +15,16 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 [BatchLogMessage]
 internal record PartyBehaviorChangeAttempted : IEvent
 {
-    public MobileParty Party { get; }
-    public PartyBehaviorUpdateData BehaviorUpdateData { get; }
+    public MobilePartyAi Ai { get; }
+    public AiBehavior NewAiBehavior { get; }
+    public IInteractablePoint InteractablePoint { get; }
+    public CampaignVec2 BestTargetPoint { get; }
 
-    public PartyBehaviorChangeAttempted(MobileParty party, PartyBehaviorUpdateData behaviorUpdateData)
+    public PartyBehaviorChangeAttempted(MobilePartyAi ai, AiBehavior newAiBehavior, IInteractablePoint interactablePoint, CampaignVec2 bestTargetPoint)
     {
-        Party = party;
-        BehaviorUpdateData = behaviorUpdateData;
+        Ai = ai;
+        NewAiBehavior = newAiBehavior;
+        InteractablePoint = interactablePoint;
+        BestTargetPoint = bestTargetPoint;
     }
 }

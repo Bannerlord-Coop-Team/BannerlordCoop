@@ -34,6 +34,14 @@ internal class PartyBaseRegistry : IAutoRegistry<PartyBase>
             if (registry.RegisterExistingObject(networkId, party.Party) == false)
                 Logger.Error("Unable to register PartyBase from Party with the object manager");
         }
+
+        foreach (var settlement in Settlement.All)
+        {
+            var networkId = $"{nameof(Settlement)}_{settlement.StringId}";
+
+            if (registry.RegisterExistingObject(networkId, settlement.Party) == false)
+                Logger.Error("Unable to register PartyBase from Party with the object manager");
+        }
     }
 
     public void OnClientCreated(PartyBase obj, string id)

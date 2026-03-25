@@ -26,7 +26,7 @@ namespace GameInterface.Serialization.External
         {
         }
 
-        private static HashSet<string> excludes = new HashSet<string>
+        public static readonly HashSet<string> Excludes = new HashSet<string>
         {
             "<TaleWorlds.CampaignSystem.Map.ILocatable<TaleWorlds.CampaignSystem.Party.MobileParty>.NextLocatable>k__BackingField",
             "_partySizeRatioLastCheckVersion",
@@ -53,6 +53,11 @@ namespace GameInterface.Serialization.External
             "_besiegerCamp",
             "_army",
             "<ThinkParamsCache>k__BackingField",
+
+            // Transfering should only be a single party
+            "_attachedParties",
+            "_attachedTo",
+            "MoveTargetParty"
         };
 
         protected override void PackInternal()
@@ -62,7 +67,7 @@ namespace GameInterface.Serialization.External
 
             stringId = ResolveId(Object);
 
-            base.PackFields(excludes);
+            base.PackFields(Excludes);
 
             scoutId = ResolveId(Object.EffectiveScout);
             engineerId = ResolveId(Object.EffectiveEngineer);

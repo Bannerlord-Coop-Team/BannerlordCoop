@@ -1,9 +1,13 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases;
 using HarmonyLib;
 using SandBox.View.Map;
 using Serilog;
@@ -53,31 +57,15 @@ static class PartyBehaviorPatch
         ref IInteractablePoint interactablePoint,
         ref CampaignVec2 bestTargetPoint)
     {
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+
         if (__instance._mobileParty != Campaign.Current.MainParty && BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
 
         if (__instance._mobileParty.IsPartyControlled() == false) return false;
 
-        MobileParty party = __instance._mobileParty;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return true;
 
-        bool hasTargetEntity = false;
-        string targetEntityId = string.Empty;
-
-        if (interactablePoint != null)
-        {
-            hasTargetEntity = true;
-
-            if (interactablePoint is AnchorPoint anchorPoint)
-            {
-                targetEntityId = anchorPoint.Owner?.StringId;
-            }
-            else if (interactablePoint is PartyBase targetParty)
-            {
-                targetEntityId = targetParty.MobileParty?.StringId;
-            }
-        }
-
-        var data = new PartyBehaviorUpdateData(party.StringId, newAiBehavior, hasTargetEntity, targetEntityId, bestTargetPoint, party.Position);
-        var message = new PartyBehaviorChangeAttempted(party, data);
+        var message = new PartyBehaviorChangeAttempted(__instance, newAiBehavior, interactablePoint, bestTargetPoint);
         MessageBroker.Instance.Publish(__instance, message);
 
         return false;
@@ -109,41 +97,6 @@ static class PartyBehaviorPatch
             __instance.BehaviorTarget == bestTargetPoint;
 
     }
-
-    public static void SetAiBehavior(
-        MobilePartyAi partyAi, AiBehavior newBehavior, IInteractablePoint targetMapEntity, CampaignVec2 targetPoint)
-    {
-        if (partyAi == null)
-        {
-            var callStack = Environment.StackTrace;
-
-            Logger.Error("PartyAI was null\n{stacktrace}", callStack);
-            return;
-        }
-
-        partyAi._mobileParty.ShortTermBehavior = newBehavior;
-
-        var mobileParty = partyAi._mobileParty;
-
-        //if (typeof(Settlement).IsAssignableFrom(targetMapEntity?.GetType()))
-        //{
-        //    mobileParty._targetSettlement = (Settlement)targetMapEntity;
-        //    mobileParty.TargetParty = null;
-        //}
-
-        if (typeof(PartyBase).IsAssignableFrom(targetMapEntity?.GetType()))
-        {
-            mobileParty._targetSettlement = null;
-            mobileParty.TargetParty = (targetMapEntity as PartyBase).MobileParty;
-        }
-
-        mobileParty.TargetPosition = targetPoint;
-
-        partyAi._mobileParty.SetShortTermBehavior(newBehavior, targetMapEntity);
-        partyAi.BehaviorTarget = targetPoint;
-        partyAi.UpdateBehavior();
-    }
-
 }
 
 

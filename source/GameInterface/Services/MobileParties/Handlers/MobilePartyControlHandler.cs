@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Data;

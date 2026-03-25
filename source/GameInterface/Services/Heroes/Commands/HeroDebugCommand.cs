@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.Heroes.Audit;
+﻿using Common;
+using GameInterface.Services.Heroes.Audit;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using System.Collections.Generic;

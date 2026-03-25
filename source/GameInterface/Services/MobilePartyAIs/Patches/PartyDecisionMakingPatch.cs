@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;

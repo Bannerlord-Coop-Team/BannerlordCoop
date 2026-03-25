@@ -25,24 +25,13 @@ public class ServerMobilePartyBehaviorHandler : IHandler
     {
         this.messageBroker = messageBroker;
         this.network = network;
-        messageBroker.Subscribe<ControlledPartyBehaviorUpdated>(Handle);
         messageBroker.Subscribe<NetworkChangeWagePaymentLimitRequest>(HandleWagePaymentLimitRequest);
 
     }
     public void Dispose()
     {
-        messageBroker.Unsubscribe<ControlledPartyBehaviorUpdated>(Handle);
         messageBroker.Unsubscribe<NetworkChangeWagePaymentLimitRequest>(HandleWagePaymentLimitRequest);
 
-    }
-
-    private void Handle(MessagePayload<ControlledPartyBehaviorUpdated> obj)
-    {
-        var data = obj.What.BehaviorUpdateData;
-
-        network.SendAll(new UpdatePartyBehaviorPacket(ref data));
-
-        messageBroker.Publish(this, new UpdatePartyBehavior(ref data));
     }
 
     private void HandleWagePaymentLimitRequest(MessagePayload<NetworkChangeWagePaymentLimitRequest> payload)

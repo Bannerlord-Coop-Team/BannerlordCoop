@@ -1,4 +1,5 @@
-﻿using Common.Audit;
+﻿using Common;
+using Common.Audit;
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;

@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.MobileParties.Extensions;
+﻿using Common;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
 

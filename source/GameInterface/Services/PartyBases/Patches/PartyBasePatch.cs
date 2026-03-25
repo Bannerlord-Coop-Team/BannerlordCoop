@@ -1,4 +1,5 @@
-﻿using GameInterface.Services.ItemRosters;
+﻿using Common;
+using GameInterface.Services.ItemRosters;
 using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;

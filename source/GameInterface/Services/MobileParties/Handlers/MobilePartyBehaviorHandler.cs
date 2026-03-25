@@ -1,5 +1,8 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Network;
+using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -12,6 +15,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
@@ -31,6 +35,7 @@ internal class MobilePartyBehaviorHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyBehaviorHandler>();
 
     private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IMobilePartyInterface mobilePartyInterface;
@@ -38,12 +43,14 @@ internal class MobilePartyBehaviorHandler : IHandler
 
     public MobilePartyBehaviorHandler(
         IMessageBroker messageBroker,
+        INetwork network,
         IControlledEntityRegistry controlledEntityRegistry,
         IControllerIdProvider controllerIdProvider,
         IMobilePartyInterface mobilePartyInterface,
         IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
+        this.network = network;
         this.controlledEntityRegistry = controlledEntityRegistry;
         this.controllerIdProvider = controllerIdProvider;
         this.mobilePartyInterface = mobilePartyInterface;
@@ -61,62 +68,90 @@ internal class MobilePartyBehaviorHandler : IHandler
 
     public void Handle_PartyBehaviorChanged(MessagePayload<PartyBehaviorChangeAttempted> obj)
     {
-        var party = obj.What.Party;
+        var payload = obj.What;
 
         var controllerId = controllerIdProvider.ControllerId;
+        var partyId = payload.Ai._mobileParty.StringId;
 
-        if (controlledEntityRegistry.IsControlledBy(controllerId, party.StringId) == false)
+        if (!controlledEntityRegistry.IsControlledBy(controllerId, partyId))
+        {
+            Logger.Warning(
+                "Client attempted to move non-controlled party {PartyId}. ControllerId={ControllerId}, NewBehavior={NewBehavior}",
+                partyId,
+                controllerId,
+                payload.NewAiBehavior);
             return;
+        }
 
-        PartyBehaviorUpdateData data = obj.What.BehaviorUpdateData;
+        if (!objectManager.TryGetId(payload.Ai, out var mobilePartyAiId))
+        {
+            Logger.Error(
+                "Failed to resolve object id for MobilePartyAi while handling behavior change. PartyId={PartyId}, ControllerId={ControllerId}, Ai={@Ai}",
+                partyId,
+                controllerId,
+                payload.Ai);
+            return;
+        }
 
-        messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
+        if (payload.InteractablePoint is PartyBase partyBase)
+        {
+            if (!objectManager.TryGetId(partyBase, out var partyBaseId))
+            {
+                return;
+            }
+            var message = new UpdatePartyBehavior(partyId, payload.NewAiBehavior, partyBaseId, payload.BestTargetPoint, true);
+            network.SendAll(message);
+        }
+        else if (payload.InteractablePoint is null)
+        {
+            var message = new UpdatePartyBehavior(partyId, payload.NewAiBehavior, null, payload.BestTargetPoint, false);
+            network.SendAll(message);
+        }
+        else
+        {
+            Logger.Error(
+                "Unsupported interactable point type during behavior change. PartyId={PartyId}, MobilePartyAiId={MobilePartyAiId}, NewBehavior={NewBehavior}, InteractablePointType={InteractablePointType}, InteractablePoint={@InteractablePoint}",
+                partyId,
+                mobilePartyAiId,
+                payload.NewAiBehavior,
+                payload.InteractablePoint.GetType().FullName,
+                payload.InteractablePoint);
+            return;
+        }
+
+        using (new AllowedThread())
+        {
+            payload.Ai.SetAiBehavior(payload.NewAiBehavior, payload.InteractablePoint, payload.BestTargetPoint);
+        }
     }
 
     public void Handle_UpdatePartyBehavior(MessagePayload<UpdatePartyBehavior> obj)
     {
-        var data = obj.What.BehaviorUpdateData;
+        var payload = obj.What;
 
-        MobileParty targetParty = null;
-        Settlement targetSettlement = null;
-        if (data.HasTarget && 
-            !objectManager.TryGetObject(data.TargetId, out targetParty) &&
-            !objectManager.TryGetObject(data.TargetId, out targetSettlement))
-            return;
-
-        if (!objectManager.TryGetObject(data.PartyId, out MobileParty party))
-            return;
-
-        if (party.Ai == null) return;
-
-        CampaignVec2 targetPoint = new CampaignVec2(new Vec2(data.TargetPointX, data.TargetPointY), true);
-
-        IInteractablePoint targetMapEntity = null;
-        if (data.HasTarget && targetParty != null)
+        PartyBase targetPartyBase = null;
+        if (payload.HasTarget)
         {
-            targetMapEntity = targetParty.Party;
+            if (!objectManager.TryGetObject(payload.InteractablePointId, out targetPartyBase))
+            {
+                return;
+            }
         }
-        //else if (data.HasTarget && targetSettlement != null)
-        //{
-        //    targetMapEntity = targetSettlement;
-        //}
 
-        PartyBehaviorPatch.SetAiBehavior(
-            party.Ai,
-            data.Behavior,
-            targetMapEntity,
-            targetPoint
-        );
-
-        if (ModInformation.IsClient)
+        if (!objectManager.TryGetObject(payload.MobilePartyAiId, out MobilePartyAi mobilePartyAi))
         {
-            party.Position = new CampaignVec2(new Vec2(data.PartyPositionX, data.PartyPositionY), true);
+            Logger.Error(
+                "Failed to resolve MobilePartyAi from behavior update. MobilePartyAiId={MobilePartyAiId}, NewBehavior={NewBehavior}, HasTarget={HasTarget}, InteractablePointId={InteractablePointId}",
+                payload.MobilePartyAiId,
+                payload.NewAiBehavior,
+                payload.HasTarget,
+                payload.InteractablePointId);
+            return;
         }
-        else
+
+        using (new AllowedThread())
         {
-            data.PartyPositionX = party.Position._position.x;
-            data.PartyPositionY = party.Position._position.y;
-            messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+            mobilePartyAi.SetAiBehavior(payload.NewAiBehavior, targetPartyBase, payload.BestTargetPoint);
         }
     }
 }

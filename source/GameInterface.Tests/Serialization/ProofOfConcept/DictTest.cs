@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using Xunit;
 using Xunit.Abstractions;
 
-namespace GameInterface.Tests.Serialization
+namespace GameInterface.Tests.Serialization.SerializerTests.ProofOfConcept
 {
     public class DictTest
     {
