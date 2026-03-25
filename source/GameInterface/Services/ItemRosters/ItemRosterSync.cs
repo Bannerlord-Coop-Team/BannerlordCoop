@@ -9,7 +9,9 @@ namespace GameInterface.Services.ItemRosters
     {
         public ItemRosterSync(DynamicSyncRegistry autoSyncBuilder)
         {
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(ItemRoster), nameof(ItemRoster._count)));
+            // Re-enable this when we sync the actual ItemRoster data. Currently this is event synced.
+
+            //autoSyncBuilder.AddField(AccessTools.Field(typeof(ItemRoster), nameof(ItemRoster._count)));
         }
     }
 }
