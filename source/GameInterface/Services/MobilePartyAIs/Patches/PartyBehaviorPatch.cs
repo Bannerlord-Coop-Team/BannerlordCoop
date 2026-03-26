@@ -63,8 +63,6 @@ static class PartyBehaviorPatch
 
         if (__instance._mobileParty.IsPartyControlled() == false) return false;
 
-        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager)) return true;
-
         var message = new PartyBehaviorChangeAttempted(__instance, newAiBehavior, interactablePoint, bestTargetPoint);
         MessageBroker.Instance.Publish(__instance, message);
 
