@@ -28,6 +28,12 @@ class Enricher : ILogEventEnricher
         var property = ModInformation.IsServer ? "Server" : "Client";
         var logProperty = propertyFactory.CreateProperty("InstanceType", property);
 
+		if (logEvent.Level >= LogEventLevel.Error)
+		{
+			var stacktraceProperty = propertyFactory.CreateProperty("StackTrace", Environment.StackTrace);
+			logEvent.AddPropertyIfAbsent(stacktraceProperty);
+		}
+
         logEvent.AddPropertyIfAbsent(logProperty);
     }
 }

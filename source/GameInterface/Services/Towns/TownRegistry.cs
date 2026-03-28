@@ -27,7 +27,7 @@ internal class TownRegistry : IAutoRegistry<Town>
 
     public void RegisterAllObjects(IRegistry<Town> registry)
     {
-        foreach (var town in Town.AllTowns)
+        foreach (var town in Town.AllFiefs)
         {
             var networkId = $"{nameof(Town)}_{town.StringId}";
             registry.RegisterExistingObject(networkId, town);
