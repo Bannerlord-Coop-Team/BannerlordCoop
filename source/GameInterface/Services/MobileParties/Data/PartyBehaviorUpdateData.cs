@@ -1,8 +1,7 @@
-﻿using ProtoBuf;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Library;
-using GameInterface.Services.MobileParties.Handlers;
+﻿using GameInterface.Services.MobileParties.Handlers;
+using ProtoBuf;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Data
 {
@@ -14,39 +13,37 @@ namespace GameInterface.Services.MobileParties.Data
     public struct PartyBehaviorUpdateData
     {
         [ProtoMember(1)]
-        public string PartyId { get; }
+        public readonly string MobilePartyId;
 
         [ProtoMember(2)]
-        public AiBehavior Behavior { get; }
+        public readonly AiBehavior NewAiBehavior;
 
         [ProtoMember(3)]
-        public bool HasTarget { get; }
+        public readonly string InteractablePointId;
 
         [ProtoMember(4)]
-        public string TargetId { get; }
+        public readonly CampaignVec2 BestTargetPoint;
 
         [ProtoMember(5)]
-        public float TargetPointX { get; }
-
-        [ProtoMember(6)]
-        public float TargetPointY { get; }
-
-        [ProtoMember(7)]
-        public float PartyPositionX { get; set; }
+        public readonly bool HasTarget;
 
         [ProtoMember(8)]
-        public float PartyPositionY { get; set; }
+        public CampaignVec2 PartyPosition { get; set; }
 
-        public PartyBehaviorUpdateData(string partyId, AiBehavior aiBehavior, bool hasTarget, string targetId, CampaignVec2 targetPoint, CampaignVec2 partyPosition)
+        public PartyBehaviorUpdateData(
+            string mobilePartyId,
+            AiBehavior newAiBehavior,
+            string interactablePointId,
+            CampaignVec2 bestTargetPoint,
+            bool hasTarget,
+            CampaignVec2 partyPosition)
         {
-            PartyId = partyId;
-            Behavior = aiBehavior;
+            MobilePartyId = mobilePartyId;
+            NewAiBehavior = newAiBehavior;
+            InteractablePointId = interactablePointId;
+            BestTargetPoint = bestTargetPoint;
             HasTarget = hasTarget;
-            TargetId = targetId;
-            TargetPointX = targetPoint.X;
-            TargetPointY = targetPoint.Y;
-            PartyPositionX = partyPosition.X;
-            PartyPositionY = partyPosition.Y;
+            PartyPosition = partyPosition;
         }
     }
 }

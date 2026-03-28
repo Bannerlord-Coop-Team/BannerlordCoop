@@ -86,7 +86,6 @@ internal class HeroInterface : IHeroInterface
             hero.CharacterObject.StringId = characterObjectId;
             hero.Clan.StringId = clanId;
         }
-        
 
         entityRegistry.RegisterAsControlled(controllerId, heroId);
 

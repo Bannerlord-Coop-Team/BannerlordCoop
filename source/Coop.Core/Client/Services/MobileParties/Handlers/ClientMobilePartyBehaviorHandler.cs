@@ -26,6 +26,7 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         {
             this.messageBroker = messageBroker;
             this.network = network;
+            messageBroker.Subscribe<ControlledPartyBehaviorUpdated>(Handle);
 
             // client who requests it
             messageBroker.Subscribe<ChangedWagePaymentLimit>(HandleChangedWagePaymentLimit);
@@ -42,6 +43,15 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
             messageBroker.Publish(this, message);
         }
 
+
+        internal void Handle(MessagePayload<ControlledPartyBehaviorUpdated> obj)
+        {
+            var position = obj.What.BehaviorUpdateData.PartyPosition;
+            Logger.Debug($"Attempting to update party movement X:{position.X} Y:{position.Y}");
+
+            network.SendAll(new RequestMobilePartyBehaviorPacket(obj.What.BehaviorUpdateData));
+        }
+
         private void HandleChangedWagePaymentLimit(MessagePayload<ChangedWagePaymentLimit> payload)
         {
             var obj = payload.What;
@@ -51,6 +61,8 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
 
         public void Dispose()
         {
+            messageBroker.Unsubscribe<ControlledPartyBehaviorUpdated>(Handle);
+
             messageBroker.Unsubscribe<ChangedWagePaymentLimit>(HandleChangedWagePaymentLimit);
 
             //Transpiler

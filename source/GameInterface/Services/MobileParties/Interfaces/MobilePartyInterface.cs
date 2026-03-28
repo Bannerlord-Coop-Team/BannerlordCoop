@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -17,7 +18,7 @@ namespace GameInterface.Services.MobileParties.Interfaces;
 /// <summary>
 /// Abstracts interacting with the MobileParty class in game
 /// </summary>
-internal interface IMobilePartyInterface : IGameAbstraction
+public interface IMobilePartyInterface : IGameAbstraction
 {
     /// <summary>
     /// Handles the initialization of a newly transfered party

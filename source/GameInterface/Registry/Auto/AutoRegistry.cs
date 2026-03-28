@@ -44,4 +44,16 @@ public class AutoRegistry<T> : RegistryBase<T> where T : class
     {
         return $"{InstanceId}_{Interlocked.Increment(ref InstanceCounter)}";
     }
+
+    public override bool RegisterExistingObject(string id, object obj)
+    {
+        Interlocked.Increment(ref InstanceCounter);
+        return base.RegisterExistingObject(id, obj);
+    }
+
+    public override bool RegisterNewObject(object obj, out string id)
+    {
+        Interlocked.Increment(ref InstanceCounter);
+        return base.RegisterNewObject(obj, out id);
+    }
 }

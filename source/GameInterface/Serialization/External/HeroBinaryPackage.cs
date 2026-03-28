@@ -40,7 +40,6 @@ namespace GameInterface.Serialization.External
 
         protected override void PackInternal()
         {
-            // TODO this might give the new player hero an id and the server will try to resolve it
             stringId = ResolveId(Object);
 
             PackFields(Excludes);

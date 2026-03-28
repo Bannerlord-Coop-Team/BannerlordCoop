@@ -31,22 +31,19 @@ internal class HeroRegistry : IAutoRegistry<Hero>
     }
 
     public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(Hero), new Type[] { })
+        AccessTools.Constructor(typeof(Hero), Array.Empty<Type>())
     };
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
     public void RegisterAllObjects(IRegistry<Hero> registry)
     {
-        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (campaignObjectManager == null)
+        foreach (var hero in Hero.AllAliveHeroes)
         {
-            Logger.Error("Unable to register objects when CampaignObjectManager is null");
-            return;
+            registry.RegisterExistingObject(hero.StringId, hero);
         }
 
-        foreach (var hero in campaignObjectManager.GetAllHeroes())
+        foreach (var hero in Hero.DeadOrDisabledHeroes)
         {
             registry.RegisterExistingObject(hero.StringId, hero);
         }
