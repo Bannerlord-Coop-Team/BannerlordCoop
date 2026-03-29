@@ -88,6 +88,11 @@ namespace Coop
         
         public override void NoHarmonyLoad()
         {
+            // Apply boot-time UI fix before any application ticks run.
+            // Prevents intermittent TextWidget NullRef on GauntletDefaultLoadingWindowManager.Initialize()
+            // caused by UIContext being created with a null FontFactory on Bannerlord v1.3.15.
+            BootPatches.Apply();
+
             Coop = new CoopartiveMultiplayerExperience();
 
             Updateables.Add(GameLoopRunner.Instance);
