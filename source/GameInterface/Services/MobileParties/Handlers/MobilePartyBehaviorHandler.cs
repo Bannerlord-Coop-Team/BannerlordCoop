@@ -101,6 +101,8 @@ internal class MobilePartyBehaviorHandler : IHandler
         {
             party._targetSettlement = partyBase.Settlement;
             party._targetParty = null;
+
+            party.Ai.AiBehaviorInteractable = partyBase;
         }
         else if (data.HasTarget && partyBase.IsMobile)
         {

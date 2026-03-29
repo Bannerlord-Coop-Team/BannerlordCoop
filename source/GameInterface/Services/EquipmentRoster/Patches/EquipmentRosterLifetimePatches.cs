@@ -27,8 +27,7 @@ namespace GameInterface.Services.EquipmentRoster.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(MBEquipmentRoster), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(MBEquipmentRoster));
                 return false;
             }
 

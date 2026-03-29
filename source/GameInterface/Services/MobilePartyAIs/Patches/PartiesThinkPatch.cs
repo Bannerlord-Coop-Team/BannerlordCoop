@@ -241,7 +241,8 @@ internal class PartiesThinkPatch
 
         if (bestAiBehavior == AiBehavior.GoToSettlement || bestAiBehavior == AiBehavior.RaidSettlement || bestAiBehavior == AiBehavior.AssaultSettlement || bestAiBehavior == AiBehavior.BesiegeSettlement || (bestAiBehavior == AiBehavior.DefendSettlement && mobileParty == null))
         {
-            behaviorObject = ((shortTermTargetSettlement != null) ? shortTermTargetSettlement.Party : ai._mobileParty.TargetSettlement.Party);
+            // Added null check for target settlement
+            behaviorObject = ((shortTermTargetSettlement != null) ? shortTermTargetSettlement.Party : ai._mobileParty.TargetSettlement?.Party);
         }
         else if (bestAiBehavior == AiBehavior.EngageParty || bestAiBehavior == AiBehavior.FleeToParty || bestAiBehavior == AiBehavior.GoAroundParty || bestAiBehavior == AiBehavior.EscortParty || bestAiBehavior == AiBehavior.JoinParty || bestAiBehavior == AiBehavior.FleeToPoint || (bestAiBehavior == AiBehavior.DefendSettlement && mobileParty != null))
         {

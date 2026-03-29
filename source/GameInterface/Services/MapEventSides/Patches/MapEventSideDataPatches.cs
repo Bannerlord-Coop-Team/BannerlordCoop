@@ -55,7 +55,7 @@ internal class MapEventSideDataPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client tried to update MapFaction: {callstack}", Environment.StackTrace);
+            Logger.Error("Client tried to update MapFaction");
             return;
         }
 

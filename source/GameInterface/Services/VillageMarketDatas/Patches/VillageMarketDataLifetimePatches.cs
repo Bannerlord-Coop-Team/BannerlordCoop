@@ -29,8 +29,7 @@ internal class VillageMarketDataLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(VillageMarketData), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(VillageMarketData));
             return true;
         }
 

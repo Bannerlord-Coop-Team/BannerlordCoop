@@ -3,14 +3,14 @@ public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : Gene
 {
     [HarmonyPatch(nameof({{ MemberDeclaringType }}.{{ MemberName }}), MethodType.Setter)]
     [HarmonyPrefix]
-    private static void {{ MemberName }}Prefix({{ MemberDeclaringType }} __instance, {{ MemberType }} value)
+    private static void {{ MemberName }}Prefix(ref {{ MemberDeclaringType }} __instance, ref {{ MemberType }} value)
     {
         if (CallOriginalPolicy.IsOriginalAllowed())
             return;
         
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", "{{ MemberName }}");
             return;
         }
         

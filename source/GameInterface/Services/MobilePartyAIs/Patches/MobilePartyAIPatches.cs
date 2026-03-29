@@ -12,11 +12,17 @@ namespace GameInterface.Services.MobilePartyAIs.Patches
         [HarmonyPrefix]
         static void Prefix(ref MobilePartyAi __instance)
         {
+            // Default path on server
             if (ModInformation.IsServer) return;
 
-            if (__instance._mobileParty != MobileParty.MainParty) return;
+            if (__instance._mobileParty != MobileParty.MainParty)
+            {
+                // Disable all parties that are not the player
+                __instance.DefaultBehaviorNeedsUpdate = false;
+                return;
+            }
 
-            EncounterManager.HandleEncounterForMobileParty(__instance._mobileParty, 0f);
+            __instance.DefaultBehaviorNeedsUpdate = true;
         }
     }
 }

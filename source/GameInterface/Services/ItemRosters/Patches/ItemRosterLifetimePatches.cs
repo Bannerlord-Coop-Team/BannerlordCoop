@@ -24,8 +24,7 @@ internal class ItemRosterLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(ItemRoster), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(ItemRoster));
             return true;
         }
 

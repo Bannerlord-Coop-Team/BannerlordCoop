@@ -24,8 +24,7 @@ namespace GameInterface.Services.CraftingTemplates.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(CraftingTemplate), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(CraftingTemplate));
 
                 return true;
             }

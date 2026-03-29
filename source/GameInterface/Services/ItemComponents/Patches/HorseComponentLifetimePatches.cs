@@ -29,8 +29,7 @@ internal class HorseComponentLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(HorseComponent), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(HorseComponent));
             return true;
         }
 

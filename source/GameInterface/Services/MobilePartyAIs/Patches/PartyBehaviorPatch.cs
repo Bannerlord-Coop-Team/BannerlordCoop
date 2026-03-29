@@ -56,7 +56,7 @@ static class PartyBehaviorPatch
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
+        //if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
 
         if (__instance._mobileParty.IsPartyControlled() == false) return false;
 

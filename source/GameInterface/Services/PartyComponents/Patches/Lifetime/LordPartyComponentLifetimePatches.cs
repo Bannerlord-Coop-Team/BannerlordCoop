@@ -31,8 +31,7 @@ internal class LordPartyComponentLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(LordPartyComponent), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(LordPartyComponent));
             return true;
         }
 

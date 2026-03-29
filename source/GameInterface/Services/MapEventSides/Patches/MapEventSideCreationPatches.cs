@@ -28,8 +28,7 @@ internal class MapEventSideCreationPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MapEventSide), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(MapEventSide));
             return true;
         }
 

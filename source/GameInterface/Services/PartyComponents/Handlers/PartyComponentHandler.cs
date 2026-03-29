@@ -51,21 +51,29 @@ internal class PartyComponentHandler : IHandler
 
     private void Handle(MessagePayload<PartyComponentCreated> payload)
     {
+        if (payload.What.SettlementId == null)
+        {
+            Logger.Error("SettlementId was null");
+            return;
+        }
+
+
         objectManager.AddNewObject(payload.What.Instance, out var id);
 
         var typeIndex = partyTypes.IndexOf(payload.What.Instance.GetType());
         var data = new PartyComponentData(typeIndex, id);
         
         network.SendAll(new NetworkCreatePartyComponent(data));
-        
+
         // This is needed to enforce calling MilitiaPartyComponent settlement patch since otherwise the patch is never called
-        if (payload.What.SettlementId != null)
+        MilitiaPartyComponent militiaParty = payload.What.Instance as MilitiaPartyComponent;
+        if (!objectManager.TryGetObject<Settlement>(payload.What.SettlementId, out var settlement))
         {
-            MilitiaPartyComponent militiaParty = payload.What.Instance as MilitiaPartyComponent;
-            if (objectManager.TryGetObject<Settlement>(payload.What.SettlementId, out var settlement)) militiaParty.Settlement = settlement;
-            else Logger.Error("Could not find Settlement with id {settlementId} \n"
-                + "Callstack: {callstack}", payload.What.SettlementId, Environment.StackTrace);
+            Logger.Error("Could not find Settlement with id {settlementId}", payload.What.SettlementId);
+            return;
         }
+
+        militiaParty.Settlement = settlement;
     }
 
     private void Handle(MessagePayload<NetworkCreatePartyComponent> payload)

@@ -61,7 +61,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._name));
             return;
         }
 
@@ -102,7 +102,7 @@ public class CustomPartyComponentPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._homeSettlement));
             return;
         }
 
@@ -143,7 +143,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._owner));
             return;
         }
 
@@ -184,7 +184,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._customPartyBaseSpeed));
             return;
         }
 
@@ -222,7 +222,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._partyMountStringId));
             return;
         }
 
@@ -260,7 +260,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._partyHarnessStringId));
             return;
         }
 
@@ -298,7 +298,7 @@ public class CustomPartyComponentPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed {type}", nameof(instance._avoidHostileActions));
             return;
         }
 

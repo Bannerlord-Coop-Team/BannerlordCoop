@@ -32,8 +32,7 @@ internal class WorkshopLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Workshop), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Workshop));
 
 
             return true;

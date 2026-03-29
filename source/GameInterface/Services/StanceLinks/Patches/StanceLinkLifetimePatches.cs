@@ -30,8 +30,7 @@ internal class StanceLinkPatches
 
     //    if (ModInformation.IsClient)
     //    {
-    //        Logger.Error("Client created unmanaged {name}\n"
-    //            + "Callstack: {callstack}", typeof(StanceLink), Environment.StackTrace);
+    //        Logger.Error("Client created managed {name}", typeof(StanceLink));
     //        return true;
     //    }
 

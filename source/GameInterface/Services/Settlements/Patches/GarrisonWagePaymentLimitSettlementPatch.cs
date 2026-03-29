@@ -31,8 +31,7 @@ public class GarrisonWagePaymentLimitSettlementPatch
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Army), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Army));
             return true;
         }
 

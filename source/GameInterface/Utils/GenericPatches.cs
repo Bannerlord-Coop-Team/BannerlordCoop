@@ -148,7 +148,7 @@ namespace GameInterface.Utils
             // Skip method if called from client and allow origin
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
                 list.Add(item);
                 return;
             }
@@ -184,7 +184,7 @@ namespace GameInterface.Utils
             // Skip method if called from client and allow origin
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
                 return list.Remove(item);
             }
 
@@ -311,7 +311,7 @@ namespace GameInterface.Utils
             // Skip method if called from client and allow origin
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
                 list.Add(item);
                 return;
             }
@@ -348,7 +348,7 @@ namespace GameInterface.Utils
             // Skip method if called from client and allow origin
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
                 return items.Remove(item);
             }
 
@@ -474,7 +474,7 @@ namespace GameInterface.Utils
             // Skip method if called from client and allow origin
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
                 queue.Enqueue(item);
                 return;
             }
@@ -511,7 +511,7 @@ namespace GameInterface.Utils
             // Skip method if called from client and allow origin
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
                 return queue.Dequeue();
             }
             var item = queue.Dequeue();
@@ -655,8 +655,7 @@ namespace GameInterface.Utils
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(TInstance), Environment.StackTrace);
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
                 return;
             }
             var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, item, index);
@@ -714,7 +713,7 @@ namespace GameInterface.Utils
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
                 fieldInfo.SetValue(instance, item);
                 return;
             }
@@ -773,7 +772,7 @@ namespace GameInterface.Utils
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
                 propertyInfo.SetValue(instance, item);
                 return;
             }
@@ -835,7 +834,7 @@ namespace GameInterface.Utils
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
                 return;
             }
 

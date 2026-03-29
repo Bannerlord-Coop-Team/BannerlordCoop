@@ -40,7 +40,7 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
 
     if (ModInformation.IsClient)
     {
-        Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+        Logger.Error("Client updated managed {type}", "{{MemberName}}");
         instance.{{MemberName}} = newValue;
         return;
     }

@@ -65,7 +65,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed item");
                 instance.LastTimeStampForActivity = newTimestamp;
                 return;
             }
@@ -102,7 +102,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed item");
                 instance._characterObject = newCharacterObject;
                 return;
             }
@@ -139,7 +139,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed item");
                 instance._firstName = newName;
                 return;
             }
@@ -176,7 +176,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed item");
                 instance._name = newName;
                 return;
             }
@@ -215,7 +215,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed item");
                 instance._heroState = newState;
                 return;
             }
@@ -254,7 +254,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed item");
                 instance._defaultAge = age;
                 return;
             }
@@ -291,7 +291,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed item");
                 instance._birthDay = birthDay;
                 return;
             }
@@ -328,7 +328,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed item");
                 instance._power = power;
                 return;
             }
@@ -366,7 +366,7 @@ namespace GameInterface.Services.Heroes.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed item");
                 instance._homeSettlement = settlement;
                 return;
             }
@@ -403,7 +403,7 @@ namespace GameInterface.Services.Heroes.Patches
             }
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+                Logger.Error("Client updated managed item");
                 instance.IsPregnant = isPregnant;
                 return;
             }

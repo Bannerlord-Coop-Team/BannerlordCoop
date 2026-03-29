@@ -6,6 +6,7 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 using GameInterface.DynamicSync;
+using Common.Util;
 {{~ for library in Libraries ~}}
 using {{ library }};
 {{~ end ~}}

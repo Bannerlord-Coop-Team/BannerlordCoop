@@ -93,6 +93,8 @@ internal class E2ETestEnvironment : IDisposable
     }
     private void SetupDynamicSync()
     {
+        if (!DynamicSyncConfiguration.Enabled) return;
+
         var serverPatcher = Server.Resolve<DynamicSyncPatcher>();
         // Required as Harmony patches are not rebound per test so we need to explicitly rebind only the handlers
         serverPatcher.BindHandlers(DynamicSyncPatcher.Assembly);

@@ -38,8 +38,7 @@ internal class ArmyLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Army), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Army));
             return true;
         }
 
@@ -59,8 +58,7 @@ internal class ArmyLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Army), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Army));
             return false;
         }
 
@@ -76,8 +74,7 @@ internal class ArmyLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(MapEvent));
             return;
         }
 

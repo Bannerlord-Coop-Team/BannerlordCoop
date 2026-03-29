@@ -19,8 +19,7 @@ internal class LifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(BesiegerCamp), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(BesiegerCamp));
             return true;
         }
 
@@ -38,8 +37,7 @@ internal class LifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client destroyed unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(BesiegerCamp), Environment.StackTrace);
+            Logger.Error("Client destroyed unmanaged {name}", typeof(BesiegerCamp));
             return true;
         }
 

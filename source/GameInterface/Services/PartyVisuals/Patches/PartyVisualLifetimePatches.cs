@@ -42,8 +42,7 @@ namespace GameInterface.Services.PartyVisuals.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client destroyed unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(MobilePartyVisual), Environment.StackTrace);
+                Logger.Error("Client destroyed unmanaged {name}", typeof(MobilePartyVisual));
                 return;
             }
 

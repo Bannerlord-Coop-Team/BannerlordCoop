@@ -26,8 +26,7 @@ internal class HideoutLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Hideout), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Hideout));
             return true;
         }
 

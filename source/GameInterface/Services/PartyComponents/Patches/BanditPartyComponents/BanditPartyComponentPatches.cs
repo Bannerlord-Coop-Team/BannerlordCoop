@@ -32,8 +32,7 @@ public class BanditPartyComponentPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client changed unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(BanditPartyComponent), Environment.StackTrace);
+            Logger.Error("Client changed unmanaged {name}", typeof(BanditPartyComponent));
             return false;
         }
 
@@ -53,8 +52,7 @@ public class BanditPartyComponentPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client changed unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(BanditPartyComponent), Environment.StackTrace);
+            Logger.Error("Client changed unmanaged {name}", typeof(BanditPartyComponent));
             return false;
         }
 

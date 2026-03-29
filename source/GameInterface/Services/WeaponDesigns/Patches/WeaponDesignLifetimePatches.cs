@@ -28,8 +28,7 @@ namespace GameInterface.Services.WeaponDesigns.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(WeaponDesign), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(WeaponDesign));
                 return true;
             }
 

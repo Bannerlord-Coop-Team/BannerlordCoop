@@ -27,8 +27,7 @@ namespace GameInterface.Services.CraftingService.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(Crafting), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(Crafting));
 
                 return true;
             }
@@ -54,8 +53,7 @@ namespace GameInterface.Services.CraftingService.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(CraftingState), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(CraftingState));
                 return false;
             }
 

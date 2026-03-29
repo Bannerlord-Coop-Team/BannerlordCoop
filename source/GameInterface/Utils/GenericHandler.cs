@@ -99,7 +99,7 @@ namespace GameInterface.Utils
 
             if (!objectManager.TryGetId(value, out id))
             {
-                Logger.Error("Unable to get ID for instance of type {type}\nCallstack: {callstack}", value.GetType(), Environment.StackTrace);
+                Logger.Error("Unable to get ID for instance of type {type}", value.GetType());
                 return false;
             }
             return true;

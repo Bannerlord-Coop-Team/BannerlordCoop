@@ -25,8 +25,7 @@ class MobilePartyAiLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(MobileParty));
 
             return;
         }
@@ -45,8 +44,7 @@ class MobilePartyAiLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client destroyed unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
+            Logger.Error("Client destroyed unmanaged {name}", typeof(MobileParty));
             return;
         }
 

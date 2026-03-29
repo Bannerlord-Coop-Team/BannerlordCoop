@@ -39,8 +39,7 @@ class TemplateServerControlledPatch
         // Prevent clients from modifying server-controlled values
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to change a server-controlled value: {name}\n"
-                + "Callstack: {callstack}", nameof(Campaign.AverageWage), Environment.StackTrace);
+            Logger.Error("Client attempted to change a server-controlled value: {name}", nameof(Campaign.AverageWage));
             return;
         }
 

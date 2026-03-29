@@ -7,7 +7,10 @@ SubscribeNetworkReference<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName
     {{
     else
     }}
-	    instance.{{MemberName}} = value;
+        using (new AllowedThread())
+	    {
+	        instance.{{MemberName}} = value;
+        }
     {{
     end
     }}

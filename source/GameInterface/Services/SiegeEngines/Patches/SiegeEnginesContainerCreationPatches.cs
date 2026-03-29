@@ -23,8 +23,7 @@ internal class SiegeEnginesContainerCreationPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(SiegeEnginesContainer), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(SiegeEnginesContainer));
             return true;
         }
 

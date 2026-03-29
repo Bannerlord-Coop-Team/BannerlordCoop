@@ -31,8 +31,7 @@ internal class GarrisonPartyComponentLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(GarrisonPartyComponent), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(GarrisonPartyComponent));
             return true;
         }
 

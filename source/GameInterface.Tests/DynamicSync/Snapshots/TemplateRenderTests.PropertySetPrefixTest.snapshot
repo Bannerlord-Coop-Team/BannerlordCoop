@@ -13,7 +13,7 @@ public class TestType_TestProperty_PropertySetPrefix
         
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated managed");
             return;
         }
         

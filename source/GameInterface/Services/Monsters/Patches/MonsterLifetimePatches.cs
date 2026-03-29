@@ -28,8 +28,7 @@ namespace GameInterface.Services.Monsters.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(Monster), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(Monster));
                 return false;
             }
 
