@@ -2,8 +2,10 @@
 using GameInterface.Registry;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices.ComTypes;
 
 namespace GameInterface.Services.ObjectManager;
 
@@ -175,13 +177,10 @@ internal class ObjectManager : IObjectManager
 
         var objectType = registerObject.GetType();
         var className = nameof(ObjectManager);
-        var stackTrace = Environment.StackTrace;
 
-        logger.Error("Unable to register {name} with {objectManager}\n" +
-                     "StackTrace: {stackTrace}",
+        logger.Error("Unable to register {name} with {objectManager}",
                      objectType,
-                     className,
-                     stackTrace);
+                     className);
 
         return false;
     }

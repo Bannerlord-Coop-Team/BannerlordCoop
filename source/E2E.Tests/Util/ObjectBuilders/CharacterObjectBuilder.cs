@@ -21,11 +21,11 @@ internal class CharacterObjectBuilder : IObjectBuilder
 
         for (int i = 0; i < 12; i++)
         {
-            ItemObject battleItem = new ItemObject();
+            ItemObject battleItem = new ItemObject($"BattleItem_{i}");
             //battleItem.Effectiveness = i;
             battleEquipment[i] = new EquipmentElement(battleItem);
 
-            ItemObject civItem = new ItemObject();
+            ItemObject civItem = new ItemObject($"CivItem_{i}");
             //battleItem.Difficulty = i;
             civilianEquipment[i] = new EquipmentElement(civItem);
         }

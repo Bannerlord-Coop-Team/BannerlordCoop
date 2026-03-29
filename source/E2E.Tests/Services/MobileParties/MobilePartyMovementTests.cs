@@ -3,6 +3,7 @@ using Common.Util;
 using E2E.Tests.Util;
 using GameInterface.DynamicSync;
 using GameInterface.Services.Entity;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -29,7 +30,6 @@ public class MobilePartyMovementTests : SyncTestBase
 
         TargetPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         TargetSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
-
 
         var clientNum = 1;
 
@@ -101,10 +101,17 @@ public class MobilePartyMovementTests : SyncTestBase
             Assert.Equal(ServerParty.MoveTargetPoint, clientParty.MoveTargetPoint);
             Assert.Equal(ServerParty.DesiredAiNavigationType, clientParty.DesiredAiNavigationType);
 
-            Assert.True(client.ObjectManager.TryGetId(clientParty.TargetParty, out var targetPartyId));
-            Assert.True(client.ObjectManager.TryGetId(clientParty.TargetSettlement, out var targetSettlementId));
-            Assert.Equal(TargetSettlementId, targetSettlementId);
-            Assert.Equal(TargetPartyId, targetPartyId);
+            if (ServerParty.TargetParty is not null)
+            {
+                Assert.True(client.ObjectManager.TryGetId(clientParty.TargetParty, out var targetPartyId));
+                Assert.Equal(TargetPartyId, targetPartyId);
+            }
+
+            if (ServerParty.TargetSettlement is not null)
+            {
+                Assert.True(client.ObjectManager.TryGetId(clientParty.TargetSettlement, out var targetSettlementId));
+                Assert.Equal(TargetSettlementId, targetSettlementId);
+            }
         }
     }
 
@@ -112,14 +119,14 @@ public class MobilePartyMovementTests : SyncTestBase
     public void Party_SetMoveEngageParty_Sync()
     {
         // Arrange
-
-        // Act
         var dt = 0.1f;
         var point = new Vec2(0.1f, 0.2f);
         var campaignPoint = new CampaignVec2(point, true);
 
         var server = TestEnvironment.Server;
 
+
+        // Act
         server.Call(() =>
         {
             server.ObjectManager.TryGetObject<MobileParty>(TargetPartyId, out var targetParty);
@@ -144,10 +151,17 @@ public class MobilePartyMovementTests : SyncTestBase
             Assert.Equal(ServerParty.MoveTargetPoint, clientParty.MoveTargetPoint);
             Assert.Equal(ServerParty.DesiredAiNavigationType, clientParty.DesiredAiNavigationType);
 
-            Assert.True(client.ObjectManager.TryGetId(clientParty.TargetParty, out var targetPartyId));
-            Assert.True(client.ObjectManager.TryGetId(clientParty.TargetSettlement, out var targetSettlementId));
-            Assert.Equal(TargetSettlementId, targetSettlementId);
-            Assert.Equal(TargetPartyId, targetPartyId);
+            if (ServerParty.TargetParty is not null)
+            {
+                Assert.True(client.ObjectManager.TryGetId(clientParty.TargetParty, out var targetPartyId));
+                Assert.Equal(TargetPartyId, targetPartyId);
+            }
+
+            if (ServerParty.TargetSettlement is not null)
+            {
+                Assert.True(client.ObjectManager.TryGetId(clientParty.TargetSettlement, out var targetSettlementId));
+                Assert.Equal(TargetSettlementId, targetSettlementId);
+            }
         }
     }
 

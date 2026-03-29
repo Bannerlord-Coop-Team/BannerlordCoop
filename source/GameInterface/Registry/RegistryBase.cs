@@ -13,14 +13,14 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 {
     protected readonly ILogger Logger = LogManager.GetLogger<RegistryBase<T>>();
 
-    public IReadOnlyDictionary<string, T> Objects => objIds.GetReadOnlyDictionary();
+    public IReadOnlyDictionary<string, T> Objects => idObjs.GetReadOnlyDictionary();
 
     /// <inheritdoc cref="IRegistry.Count"/>
     public int Count => Objects.Count;
 
     //protected readonly Dictionary<string, WeakReference<T>> objIds = new Dictionary<string, WeakReference<T>>();
-    protected readonly Dictionary<string, T> objIds = new Dictionary<string, T>();
-    protected ConditionalWeakTable<T, string> idObjs = new ConditionalWeakTable<T, string>();
+    protected readonly Dictionary<string, T> idObjs = new Dictionary<string, T>();
+    protected ConditionalWeakTable<T, string> objsIds = new ConditionalWeakTable<T, string>();
     private readonly IRegistryCollection collection;
 
     protected RegistryBase(IRegistryCollection collection)
@@ -55,14 +55,14 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     {
         if (TryCast(obj, out var castedObj) == false) return false;
 
-        if (objIds.ContainsKey(id))
+        if (idObjs.ContainsKey(id))
         {
             Logger.Warning("{id} already exists in {type} Registry", id, typeof(T));
             return false;
         }
 
-        objIds.Add(id, castedObj);
-        idObjs.Add(castedObj, id);
+        idObjs.Add(id, castedObj);
+        objsIds.Add(castedObj, id);
 
         return true;
     }
@@ -71,15 +71,28 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     {
         id = null;
 
-        if (TryCast(obj, out T castedObj) == false) return false;
+        if (TryCast(obj, out T castedObj) == false)
+        {
+            Logger.Warning("Failed to cast {type} to {castType}", obj.GetType(), typeof(T));
+            return false;
+        }
 
         var newId = GetNewId(castedObj);
 
-        if (objIds.ContainsKey(newId)) return false;
-        if (idObjs.TryGetValue(castedObj, out var outvar)) return false;
+        if (idObjs.ContainsKey(newId))
+        {
+            Logger.Warning("id ({newId}): was already registered for type ({type})", newId, obj.GetType());
+            return false;
+        }
 
-        objIds.Add(newId, castedObj);
-        idObjs.Add(castedObj, newId);
+        if (objsIds.TryGetValue(castedObj, out var outvar))
+        {
+            Logger.Warning("object was already registered for type ({type})", newId, obj.GetType());
+            return false;
+        }
+
+        idObjs.Add(newId, castedObj);
+        objsIds.Add(castedObj, newId);
 
         id = newId;
 
@@ -90,16 +103,16 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     {
         if (TryCast(obj, out var castedObj) == false) return false;
 
-        if (idObjs.TryGetValue(castedObj, out var id) == false) return false;
+        if (objsIds.TryGetValue(castedObj, out var id) == false) return false;
 
-        return objIds.Remove(id) && idObjs.Remove(castedObj);
+        return idObjs.Remove(id) && objsIds.Remove(castedObj);
     }
 
     public virtual bool Remove(string id)
     {
-        if (objIds.TryGetValue(id, out var obj) == false) return false;
+        if (idObjs.TryGetValue(id, out var obj) == false) return false;
 
-        return objIds.Remove(id) && idObjs.Remove(obj);
+        return idObjs.Remove(id) && objsIds.Remove(obj);
     }
 
     public virtual bool TryGetId(object obj, out string id)
@@ -108,13 +121,13 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 
         if (TryCast(obj, out var castedObj) == false) return false;
 
-        return idObjs.TryGetValue(castedObj, out id);
+        return objsIds.TryGetValue(castedObj, out id);
     }
 
     public virtual bool TryGetValue<T1>(string id, out T1 obj) where T1 : class
     {
         obj = null;
-        if (objIds.TryGetValue(id, out var internalobj) == false) return false;
+        if (idObjs.TryGetValue(id, out var internalobj) == false) return false;
 
         obj = internalobj as T1;
         return obj != null;
@@ -135,7 +148,7 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     /// <inheritdoc />
     public void Clear()
     {
-        objIds.Clear();
-        idObjs = new ConditionalWeakTable<T, string>();
+        idObjs.Clear();
+        objsIds = new ConditionalWeakTable<T, string>();
     }
 }
