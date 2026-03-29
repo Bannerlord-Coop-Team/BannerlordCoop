@@ -4,6 +4,8 @@ using Serilog;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.Library;
 
@@ -53,6 +55,8 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     /// <inheritdoc cref="IRegistry"/>
     public virtual bool RegisterExistingObject(string id, object obj)
     {
+        LogObjectRegistration(obj);
+
         if (TryCast(obj, out var castedObj) == false) return false;
 
         if (idObjs.ContainsKey(id))
@@ -69,6 +73,8 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 
     public virtual bool RegisterNewObject(object obj, out string id)
     {
+        LogObjectRegistration(obj);
+
         id = null;
 
         if (TryCast(obj, out T castedObj) == false)
@@ -150,5 +156,20 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     {
         idObjs.Clear();
         objsIds = new ConditionalWeakTable<T, string>();
+    }
+
+    // Log which function called either RegisterNewObject or RegisterExistingObject method and the class it belongs to
+    private void LogObjectRegistration(object obj, [CallerMemberName] string registrar = "")
+    {
+        MethodBase method = new StackFrame(3, false).GetMethod();
+
+        string callingMethod = "Unknown";
+        string callingClass = "Unknown";
+        if (callingMethod != null)
+        {
+            callingMethod = method.Name;
+            callingClass = method.DeclaringType.Name;
+        }
+        Logger.Debug("{Registrar} called by: {CallingMethod} of class: {CallingClass} for object: {Object}", registrar, callingMethod, callingClass, obj.ToString());
     }
 }

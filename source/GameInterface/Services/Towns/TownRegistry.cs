@@ -29,7 +29,7 @@ internal class TownRegistry : IAutoRegistry<Town>
     {
         foreach (var town in Town.AllFiefs)
         {
-            var networkId = $"{nameof(Town)}_{town.StringId}";
+            var networkId = town.StringId;
             registry.RegisterExistingObject(networkId, town);
         }
     }
