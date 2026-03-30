@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.ItemRosters.Messages;
@@ -23,8 +24,7 @@ internal class ItemRosterLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(ItemRoster), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(ItemRoster));
             return true;
         }
 

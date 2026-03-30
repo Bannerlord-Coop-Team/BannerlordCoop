@@ -53,8 +53,7 @@ namespace GameInterface.Services.Equipments.Handlers
 
             if (objectManager.TryGetId(payload.What.Data, out string newEquipmentId) )
             {                
-                Logger.Error("Server already has {name} in object manager\n"
-                    + "Callstack: {callstack}", typeof(Equipment), Environment.StackTrace);
+                Logger.Error("Server already has {name} in object manager", typeof(Equipment));
                     
                 return;
             }

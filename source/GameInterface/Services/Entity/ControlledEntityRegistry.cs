@@ -137,7 +137,20 @@ internal class ControlledEntityRegistry : IControlledEntityRegistry
 
     public bool IsControlledBy(string ownerId, string entityId)
     {
-        if(controllerIdLookup.TryGetValue(entityId, out var entity) == false) return false;
+        if (ownerId == null)
+        {
+            Logger.Error("{parameterName} was null", nameof(ownerId));
+            return false;
+        }
+
+        if (entityId == null)
+        {
+            Logger.Error("{parameterName} was null", nameof(entityId));
+            return false;
+        }
+
+
+        if (controllerIdLookup.TryGetValue(entityId, out var entity) == false) return false;
 
         return entity.OwnerId == ownerId;
     }

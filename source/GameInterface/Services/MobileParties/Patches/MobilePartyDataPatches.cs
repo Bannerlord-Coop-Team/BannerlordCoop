@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Heroes.Patches;
@@ -54,7 +55,7 @@ internal class MobilePartyDataPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client added unmanaged item: {callstack}", Environment.StackTrace);
+            Logger.Error("Client updated unmanaged {type}", value.GetType());
             instance._partyComponent = value;
             return;
         }
@@ -63,7 +64,7 @@ internal class MobilePartyDataPatches
 
         if (partyComponentRegistry.TryGetId(value, out string componentId) == false)
         {
-            Logger.Error("Component was not registered with PartyComponentRegistry");
+            Logger.Error("Component was not registered with {registry}", nameof(PartyComponentRegistry));
             return;
         }
 

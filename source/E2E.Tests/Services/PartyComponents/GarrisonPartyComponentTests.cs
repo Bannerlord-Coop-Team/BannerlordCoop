@@ -7,17 +7,22 @@ using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
-public class GarrisonPartyComponentTests : IDisposable
+public class GarrisonPartyComponentTests : SyncTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-    public GarrisonPartyComponentTests(ITestOutputHelper output)
+    string ComponentId;
+    public GarrisonPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        ComponentId = TestEnvironment.CreateRegisteredObject<GarrisonPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Settlement>();
+
     }
 
-    public void Dispose()
+    [Fact]
+    public void Server_GarrisonPartyComponent_Properties()
     {
-        TestEnvironment.Dispose();
+        Server.ObjectManager.TryGetObject(ComponentId, out GarrisonPartyComponent component);
+        component.Settlement = null;
+        TestEnvironment.AssertReferenceProperty<GarrisonPartyComponent, Settlement>(nameof(GarrisonPartyComponent.Settlement));
     }
 
     [Fact]
@@ -37,7 +42,7 @@ public class GarrisonPartyComponentTests : IDisposable
 
             var newSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
 
-            var newParty = GarrisonPartyComponent.CreateGarrisonParty("TestId", settlement, true);
+            var newParty = GarrisonPartyComponent.CreateGarrisonParty("TestId", settlement);
             GarrisonPartyComponent garrison = (GarrisonPartyComponent)newParty.PartyComponent;
             garrison.Settlement = newSettlement;
 
@@ -75,7 +80,7 @@ public class GarrisonPartyComponentTests : IDisposable
         PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            partyComponent = new GarrisonPartyComponent(settlement);
+            partyComponent = new GarrisonPartyComponent(settlement, new GarrisonPartyComponent.InitializationArgs());
         });
 
         Assert.NotNull(partyComponent);

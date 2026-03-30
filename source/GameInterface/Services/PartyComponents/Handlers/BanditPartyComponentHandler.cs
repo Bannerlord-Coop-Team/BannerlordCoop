@@ -42,8 +42,7 @@ internal class BanditPartyComponentHandler : IHandler
 
         if(objectManager.TryGetId(obj.Component, out string componentId) == false)
         {
-            Logger.Error("Could not find {component} in registry \n"
-                + "Callstack: {callstack}", obj.Component, Environment.StackTrace);
+            Logger.Error("Could not find {component} in registry", obj.Component);
             return;
         }
 
@@ -58,8 +57,7 @@ internal class BanditPartyComponentHandler : IHandler
 
         if (objectManager.TryGetObject<BanditPartyComponent>(obj.ComponentId, out var component) == false)
         {
-            Logger.Error("Could not find {component} in registry \n"
-                + "Callstack: {callstack}", obj.ComponentId, Environment.StackTrace);
+            Logger.Error("Could not find {component} in registry", obj.ComponentId);
             return;
         }
 

@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.EquipmentRoster.Messages;
@@ -26,8 +27,7 @@ namespace GameInterface.Services.EquipmentRoster.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(MBEquipmentRoster), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(MBEquipmentRoster));
                 return false;
             }
 

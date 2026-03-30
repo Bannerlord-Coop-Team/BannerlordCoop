@@ -7,7 +7,6 @@ using Common.Tests.Utils;
 using Common.Util;
 using Coop.Core;
 using Coop.IntegrationTests.Environment.Mock;
-using GameInterface;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using LiteNetLib;

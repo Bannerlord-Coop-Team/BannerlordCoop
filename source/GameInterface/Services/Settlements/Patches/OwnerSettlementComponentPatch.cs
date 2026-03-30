@@ -28,8 +28,7 @@ namespace GameInterface.Services.Settlements.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(SettlementComponent), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(SettlementComponent));
                 return false;
             }
 

@@ -46,7 +46,8 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
 
         internal void Handle(MessagePayload<ControlledPartyBehaviorUpdated> obj)
         {
-            Logger.Debug($"Attempting to update party movement X:{obj.What.BehaviorUpdateData.TargetPointX} Y:{obj.What.BehaviorUpdateData.TargetPointY}");
+            var position = obj.What.BehaviorUpdateData.PartyPosition;
+            Logger.Debug($"Attempting to update party movement X:{position.X} Y:{position.Y}");
 
             network.SendAll(new RequestMobilePartyBehaviorPacket(obj.What.BehaviorUpdateData));
         }

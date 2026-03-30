@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.Towns.Messages;
+using GameInterface.Utils;
 using HarmonyLib;
 using System.Collections.Generic;
 using System.Reflection;

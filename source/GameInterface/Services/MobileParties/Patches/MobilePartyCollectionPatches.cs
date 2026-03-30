@@ -8,7 +8,7 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.MobileParties.Patches;
 
 [HarmonyPatch]
-internal class MobilePartyCollectionPatches : GenericCollectionPatches<MobilePartyCollectionPatches, MobileParty>
+internal class MobilePartyCollectionPatches : GenericPatches<MobilePartyCollectionPatches, MobileParty>
 {
     static IEnumerable<MethodBase> TargetMethods()
     {
@@ -17,5 +17,5 @@ internal class MobilePartyCollectionPatches : GenericCollectionPatches<MobilePar
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        => ListFieldTranspiler<MobileParty, AttachedPartyAdded, AttachedPartyRemoved>(instructions, nameof(MobileParty._attachedParties));
+        => ListFieldChangeTranspiler<MobileParty, AttachedPartyAdded, AttachedPartyRemoved>(instructions, nameof(MobileParty._attachedParties));
 }

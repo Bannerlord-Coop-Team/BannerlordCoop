@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.PartyComponents.Messages;
@@ -29,8 +30,7 @@ internal class CaravanPartyComponentLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(CaravanPartyComponent), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(CaravanPartyComponent));
             return true;
         }
 

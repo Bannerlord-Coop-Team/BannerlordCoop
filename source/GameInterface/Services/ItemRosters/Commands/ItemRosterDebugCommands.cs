@@ -12,6 +12,7 @@ using System.Security.Cryptography;
 using System;
 using System.Text;
 using System.IO;
+using Common;
 
 namespace GameInterface.Services.ItemRosters.Commands
 {

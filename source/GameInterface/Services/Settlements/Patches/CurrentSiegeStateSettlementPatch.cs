@@ -31,8 +31,7 @@ public class CurrentSiegeStateSettlementPatch
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Settlement), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Settlement));
             return true;
         }
 

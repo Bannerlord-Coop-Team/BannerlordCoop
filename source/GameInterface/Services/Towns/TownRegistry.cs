@@ -12,12 +12,10 @@ namespace GameInterface.Services.Towns;
 internal class TownRegistry : IAutoRegistry<Town>
 {
     ILogger Logger { get; }
-    IObjectManager ObjectManager { get; }
 
-    public TownRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+    public TownRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
         Logger = logger;
-        ObjectManager = objectManager;
         autoRegistryFactory.RegisterType(this);
     }
 
@@ -29,17 +27,15 @@ internal class TownRegistry : IAutoRegistry<Town>
 
     public void RegisterAllObjects(IRegistry<Town> registry)
     {
-        foreach (var town in Town.AllTowns)
+        foreach (var town in Town.AllFiefs)
         {
-            var networkId = $"{nameof(Town)}_{town.StringId}";
-            registry.RegisterExistingObject(networkId, town.StringId);
+            var networkId = town.StringId;
+            registry.RegisterExistingObject(networkId, town);
         }
     }
 
     public void OnClientCreated(Town obj, string id)
     {
-        var networkId = $"{nameof(Fief)}_{id}";
-        ObjectManager.AddExisting<Fief>(networkId, obj);
     }
 
     public void OnClientDestroyed(Town obj, string id)
@@ -48,9 +44,6 @@ internal class TownRegistry : IAutoRegistry<Town>
 
     public void OnServerCreated(Town obj, string id)
     {
-
-        var networkId = $"{nameof(Fief)}_{id}";
-        ObjectManager.AddExisting<Fief>(networkId, obj);
     }
 
     public void OnServerDestroyed(Town obj, string id)

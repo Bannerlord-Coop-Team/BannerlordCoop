@@ -57,24 +57,43 @@ internal class PartyComponentHandler : IHandler
         var data = new PartyComponentData(typeIndex, id);
         
         network.SendAll(new NetworkCreatePartyComponent(data));
-        
-        // This is needed to enforce calling MilitiaPartyComponent settlement patch since otherwise the patch is never called
-        if (payload.What.SettlementId != null)
-        {
-            MilitiaPartyComponent militiaParty = payload.What.Instance as MilitiaPartyComponent;
-            if (objectManager.TryGetObject<Settlement>(payload.What.SettlementId, out var settlement)) militiaParty.Settlement = settlement;
-            else Logger.Error("Could not find Settlement with id {settlementId} \n"
-                + "Callstack: {callstack}", payload.What.SettlementId, Environment.StackTrace);
-        }
     }
 
     private void Handle(MessagePayload<NetworkCreatePartyComponent> payload)
     {
         var data = payload.What.Data;
-        var typeIdx = data.TypeIndex;
+        var obj = ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
 
-        var obj = ObjectHelper.SkipConstructor(partyTypes[typeIdx]);
-
-        objectManager.AddExisting(data.Id, (PartyComponent)obj);
+        switch (data.TypeIndex)
+        {
+            case 0:
+                objectManager.AddExisting(data.Id, (BanditPartyComponent)obj);
+                break;
+            case 1:
+                objectManager.AddExisting(data.Id, (CaravanPartyComponent)obj);
+                break;
+            case 2:
+                objectManager.AddExisting(data.Id, (CustomPartyComponent)obj);
+                break;
+            case 3:
+                objectManager.AddExisting(data.Id, (GarrisonPartyComponent)obj);
+                break;
+            case 4:
+                objectManager.AddExisting(data.Id, (LordPartyComponent)obj);
+                break;
+            case 5:
+                objectManager.AddExisting(data.Id, (MilitiaPartyComponent)obj);
+                break;
+            case 6:
+                objectManager.AddExisting(data.Id, (VillagerPartyComponent)obj);
+                break;
+            default:
+                Logger.Error(
+                    "Invalid TypeIndex {TypeIndex}. Valid range: [0..{MaxIndex}]. PacketId: {Id}",
+                    data.TypeIndex,
+                    partyTypes.Length - 1,
+                    data.Id);
+                break;
+        }
     }
 }

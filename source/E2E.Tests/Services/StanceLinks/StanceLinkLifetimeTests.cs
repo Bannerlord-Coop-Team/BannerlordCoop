@@ -28,7 +28,7 @@ public class StaceLinkLifetimeTests : IDisposable
         server.Call(() =>
         {
             var kingdom1 = new Kingdom();
-            var stanceLink = new StanceLink(StanceType.War, kingdom1, kingdom1, true);
+            var stanceLink = new StanceLink(StanceType.War, kingdom1, kingdom1);
 
             Assert.True(server.ObjectManager.TryGetId(stanceLink, out stanceId));
         });
@@ -54,7 +54,7 @@ public class StaceLinkLifetimeTests : IDisposable
         {
             var kingdom1 = new Kingdom();
             var kingdom2 = new Kingdom();
-            var stanceLink = new StanceLink(StanceType.War, kingdom1, kingdom2, true);
+            var stanceLink = new StanceLink(StanceType.War, kingdom1, kingdom2);
 
             Assert.False(client1.ObjectManager.TryGetId(stanceLink, out StanceId));
         });

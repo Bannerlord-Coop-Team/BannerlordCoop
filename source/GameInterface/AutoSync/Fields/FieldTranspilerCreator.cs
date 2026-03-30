@@ -15,6 +15,7 @@ using ProtoBuf;
 using ProtoBuf.Meta;
 using System.Diagnostics;
 using Common.Util;
+using Common;
 
 namespace GameInterface.AutoSync.Fields;
 public class FieldTranspilerCreator

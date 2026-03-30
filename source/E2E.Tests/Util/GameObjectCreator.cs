@@ -53,7 +53,12 @@ internal class GameObjectCreator
         { typeof(BasicCultureObject), new DefaultBuilder<BasicCultureObject>() },
         { typeof(MBCharacterSkills), new DefaultBuilder<MBCharacterSkills>() },
         { typeof(MBEquipmentRoster), new DefaultBuilder<MBEquipmentRoster>() },
-        { typeof(MobilePartyAi), new MobilePartyAiBuilder() }
+        { typeof(MobilePartyAi), new MobilePartyAiBuilder() },
+        { typeof(VillageMarketData), new VillageMarketDataBuilder() },
+        { typeof(PartyBase), new PartyBaseBuilder() },
+        { typeof(CaravanPartyComponent), new CaravanPartyComponentBuilder() },
+        { typeof(GarrisonPartyComponent), new GarrisonPartyComponentBuilder() },
+        { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
     };
 
     public static T CreateInitializedObject<T>()

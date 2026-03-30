@@ -1,26 +1,21 @@
-﻿using Common.Logging;
-using GameInterface.AutoSync;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.DynamicSync;
 using HarmonyLib;
-using Serilog;
-using System;
-using System.Reflection;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Alleys;
 
-public class AlleySync : IAutoSync
+public class AlleySync : IDynamicSync
 {
-    ILogger Logger { get; } = LogManager.GetLogger<AlleySync>();
-    static int callCount = 0;
-    public AlleySync(IAutoSyncBuilder autoSyncBuilder) 
+    public AlleySync(DynamicSyncRegistry registry) 
     {
         // Fields
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._name)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._settlement)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._tag)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._owner)));
+        registry.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._name)));
+        registry.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._settlement)));
+        registry.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._tag)));
+        registry.AddField(AccessTools.Field(typeof(Alley), nameof(Alley._owner)));
+
+        // Properties
+
+        // Targetmethods
     }
 }

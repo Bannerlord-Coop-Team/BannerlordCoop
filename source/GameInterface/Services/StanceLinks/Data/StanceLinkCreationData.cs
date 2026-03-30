@@ -9,13 +9,12 @@ namespace GameInterface.Services.Stances.Data;
 [ProtoContract(SkipConstructor = true)]
 public record StanceLinkCreationData
 {
-    public StanceLinkCreationData(string _StringId, short _StanceType, string _Faction1Id, string _Faction2Id, bool _IsAtConstantWar)
+    public StanceLinkCreationData(string _StringId, short _StanceType, string _Faction1Id, string _Faction2Id)
     {
         StringId = _StringId;
         StanceType = _StanceType;
         Faction1Id = _Faction1Id;
         Faction2Id = _Faction2Id;
-        IsAtConstantWar = _IsAtConstantWar;
     }
 
     [ProtoMember(1)]
@@ -26,6 +25,4 @@ public record StanceLinkCreationData
     public string Faction1Id { get; }
     [ProtoMember(4)]
     public string Faction2Id { get; }
-    [ProtoMember(5)]
-    public bool IsAtConstantWar { get; }
 }

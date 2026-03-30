@@ -17,10 +17,10 @@ internal class MobilePartyBuilder : IObjectBuilder
         leaderHero.Clan = clan;
         clan.SetLeader(leaderHero);
 
-        var party = LordPartyComponent.CreateLordParty("TestParty", leaderHero, Vec2.Zero, 0, spawnSettlement, leaderHero);
+        var party = LordPartyComponent.CreateLordParty("TestParty", leaderHero, new CampaignVec2(Vec2.Zero, true), 0, spawnSettlement, leaderHero);
 
         party.PartyComponent.MobileParty = party;
-        party.LordPartyComponent.SetMobilePartyInternal(party);
+        //party.LordPartyComponent.SetMobilePartyInternal(party);
 
         party.Initialize();
 
@@ -37,14 +37,6 @@ internal class MobilePartyBuilder : IObjectBuilder
 
         var partyComponent = componentBuilder.BuildWithHero(hero);
 
-        return MobileParty.CreateParty("This should not set", partyComponent, (party) =>
-        {
-            using (new AllowedThread())
-            {
-                party.ActualClan = clan;
-            }
-
-            partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null); 
-        });
+        return MobileParty.CreateParty("This should not set", partyComponent);
     }
 }

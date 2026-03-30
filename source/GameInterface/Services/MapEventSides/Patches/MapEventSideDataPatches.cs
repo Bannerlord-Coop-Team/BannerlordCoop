@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
@@ -54,7 +55,7 @@ internal class MapEventSideDataPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client tried to update MapFaction: {callstack}", Environment.StackTrace);
+            Logger.Error("Client tried to update MapFaction");
             return;
         }
 

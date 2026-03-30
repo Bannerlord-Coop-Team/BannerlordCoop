@@ -1,45 +1,46 @@
-﻿using GameInterface.AutoSync;
+﻿using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Clans;
 
-internal class ClanSync : IAutoSync
+internal class ClanSync : IDynamicSync
 {
-    public ClanSync(IAutoSyncBuilder autoSyncBuilder)
+    public ClanSync(DynamicSyncRegistry dynamicSyncRegistry)
     {
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Name)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InformalName)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Culture)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LastFactionChangeTime)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.AutoRecruitmentExpenses)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsNoble)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.TotalStrength)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.MercenaryAwardMultiplier)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LabelColor)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InitialPosition)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsRebelClan)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsUnderMercenaryService)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Color)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Color2)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerBackgroundColorPrimary)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerBackgroundColorSecondary)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerIconColor)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan._midPointCalculated)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Renown)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.NotAttackableByPlayerUntilTime)));
+        // Fields
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._isEliminated)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._kingdom)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._influence)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._midSettlement)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._basicTroop)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._leader)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._banner)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._tier)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._aggressiveness)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._tributeWallet)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._home)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanDebtToKingdom)));
 
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._isEliminated)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._kingdom)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._influence)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanMidSettlement)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._basicTroop)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._leader)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._banner)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._tier)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._aggressiveness)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._tributeWallet)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._home)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Clan), nameof(Clan._clanDebtToKingdom)));
+        // Properties
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Name)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InformalName)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Culture)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LastFactionChangeTime)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.AutoRecruitmentExpenses)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsNoble)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.CurrentTotalStrength)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.MercenaryAwardMultiplier)));
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LabelColor)));
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InitialPosition)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsRebelClan)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsUnderMercenaryService)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Color)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Color2)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerBackgroundColorPrimary)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerBackgroundColorSecondary)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.BannerIconColor)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.Renown)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.NotAttackableByPlayerUntilTime)));
     }
 }

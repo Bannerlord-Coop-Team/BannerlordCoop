@@ -1,0 +1,2 @@
+        [HarmonyTranspiler]
+        static IEnumerable<CodeInstruction> TestFieldMBListChangeTranspiler(IEnumerable<CodeInstruction> instructions) => ListFieldChangeTranspiler<double, AddMBListFieldMessage, RemoveMBListFieldMessage>(instructions, "TestFieldMBList");

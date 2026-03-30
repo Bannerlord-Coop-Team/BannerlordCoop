@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Monsters.Messages;
@@ -27,8 +28,7 @@ namespace GameInterface.Services.Monsters.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(Monster), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(Monster));
                 return false;
             }
 

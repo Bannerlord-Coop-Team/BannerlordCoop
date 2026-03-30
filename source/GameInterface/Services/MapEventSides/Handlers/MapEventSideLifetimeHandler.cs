@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MapEventSides.Handlers;
+
 internal class MapEventSideLifetimeHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventHandler>();

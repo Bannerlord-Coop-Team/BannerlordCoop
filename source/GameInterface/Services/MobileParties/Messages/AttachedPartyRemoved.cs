@@ -1,6 +1,5 @@
-﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages.Data;
-using GameInterface.Utils;
+﻿using GameInterface.Services.MobileParties.Messages.Data;
+using GameInterface.Utils.LocalEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Messages;
@@ -8,14 +7,12 @@ namespace GameInterface.Services.MobileParties.Messages;
 /// <summary>
 /// Event when a party is removed from the attached party list
 /// </summary>
-public record AttachedPartyRemoved : GenericListEvent<MobileParty, MobileParty>
+public record AttachedPartyRemoved : GenericEvent<MobileParty, MobileParty>
 {
     public AttachedPartyData AttachedPartyData { get; }
 
-    /// <summary>
-    /// Default ctor used for testing
-    /// </summary>
-    public AttachedPartyRemoved()
+    // Only used for testing
+    public AttachedPartyRemoved() : base()
     {
     }
 

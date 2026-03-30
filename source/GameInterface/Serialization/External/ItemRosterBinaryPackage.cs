@@ -13,7 +13,6 @@ namespace GameInterface.Serialization.External
 
         static readonly HashSet<string> excludes = new HashSet<string>
         {
-            "<TotalWeight>k__BackingField",
             "<VersionNo>k__BackingField",
             "<TotalValue>k__BackingField",
             "<TotalFood>k__BackingField",

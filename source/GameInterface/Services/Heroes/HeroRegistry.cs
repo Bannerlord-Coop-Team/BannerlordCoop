@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Workshops;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
@@ -29,22 +31,19 @@ internal class HeroRegistry : IAutoRegistry<Hero>
     }
 
     public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(Hero), new Type[] { typeof(string) })
+        AccessTools.Constructor(typeof(Hero), Array.Empty<Type>())
     };
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
     public void RegisterAllObjects(IRegistry<Hero> registry)
     {
-        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (campaignObjectManager == null)
+        foreach (var hero in Hero.AllAliveHeroes)
         {
-            Logger.Error("Unable to register objects when CampaignObjectManager is null");
-            return;
+            registry.RegisterExistingObject(hero.StringId, hero);
         }
 
-        foreach (var hero in campaignObjectManager.GetAllHeroes())
+        foreach (var hero in Hero.DeadOrDisabledHeroes)
         {
             registry.RegisterExistingObject(hero.StringId, hero);
         }
@@ -54,9 +53,12 @@ internal class HeroRegistry : IAutoRegistry<Hero>
     {
         using(new AllowedThread())
         {
-            obj.Init();
+            //obj.Init();
             AccessTools.Field(typeof(Hero), nameof(Hero._children)).SetValue(obj, new MBList<Hero>());
             AccessTools.Field(typeof(Hero), nameof(Hero._ownedWorkshops)).SetValue(obj, new MBList<Workshop>());
+            AccessTools.Property(typeof(Hero), nameof(Hero.OwnedAlleys)).SetValue(obj, new MBList<Alley>());
+            AccessTools.Property(typeof(Hero), nameof(Hero.OwnedCaravans)).SetValue(obj, new MBList<CaravanPartyComponent>());
+            AccessTools.Field(typeof(Hero), nameof(Hero.VolunteerTypes)).SetValue(obj, new CharacterObject[6]);
         }
 
         MBObjectManager.Instance?.RegisterPresumedObject(obj);

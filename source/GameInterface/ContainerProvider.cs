@@ -43,10 +43,7 @@ public class ContainerProvider
         if (container.TryResolve(out instance) == false)
         {
             var callStack = Environment.StackTrace;
-            Logger.Error("Unable to reslove {name}\n" + 
-                "CallStack: {callStack}",
-                typeof(T).Name,
-                callStack);
+            Logger.Error("Unable to reslove {name}", typeof(T).Name);
             return false;
         }
 

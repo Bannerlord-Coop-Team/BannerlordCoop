@@ -1,4 +1,5 @@
 using Autofac;
+using Common;
 using Common.Extensions;
 using Common.Messaging;
 using GameInterface.Services.GameDebug.Commands;

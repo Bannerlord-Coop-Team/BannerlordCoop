@@ -120,7 +120,7 @@ namespace Coop
                             Coop.StartAsClient();
                         }
                     },
-                    () => { return (false, new TextObject()); }
+                    () => { return (false, new TextObject("")); }
                 );
 #else
             CoopCampaign = new InitialStateOption(

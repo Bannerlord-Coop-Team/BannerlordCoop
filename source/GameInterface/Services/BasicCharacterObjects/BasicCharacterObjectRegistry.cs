@@ -21,7 +21,7 @@ internal class BasicCharacterObjectRegistry : IAutoRegistry<BasicCharacterObject
     }
 
     public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(BasicCharacterObject))
+        //AccessTools.Constructor(typeof(BasicCharacterObject))
     };
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();

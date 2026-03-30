@@ -1,9 +1,11 @@
 ﻿using Autofac;
+using Autofac.Features.OwnedInstances;
 using Common.Extensions;
 using GameInterface.Services.GameDebug.Commands;
 using GameInterface.Services.Heroes.Commands;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Patches;
+using Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,6 +14,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -516,5 +519,59 @@ public class TownDebugCommand
 
         town.TradeTaxAccumulated = tradeTaxAccumulated;
         return $"Town TradeTaxAccumulated has changed to: {town.TradeTaxAccumulated}.";
+    }
+
+    // coop.debug.town.set_trade_tax_acc town_comp_V1 100
+    /// <summary>
+    /// sets the tradetaxaccumulated value for a town.
+    /// </summary>
+    /// <param name="args">the town and tradetaxaccumulated value float</param>
+    /// <returns>string output if success</returns>
+    [CommandLineArgumentFunction("change_current_building", "coop.debug.town")]
+    public static string ChangeCurrentBuilding(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.town.change_current_building <townId>";
+        }
+        string townId = args[0];
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (objectManager.TryGetObject(townId, out Town town) == false)
+        {
+            return $"{nameof(Town)} with ID: '{townId}' not found";
+        }
+        //BuildingHelper.ChangeCurrentBuilding(town.Buildings.Last().BuildingType, town);
+        return "success";
+    }
+
+    // coop.debug.town.set_trade_tax_acc town_comp_V1 100
+    /// <summary>
+    /// sets the tradetaxaccumulated value for a town.
+    /// </summary>
+    /// <param name="args">the town and tradetaxaccumulated value float</param>
+    /// <returns>string output if success</returns>
+    [CommandLineArgumentFunction("change_current_building_queue", "coop.debug.town")]
+    public static string ChangeCurrentBuildingQueue(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.town.change_current_building_queue <townId>";
+        }
+        string townId = args[0];
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+
+        if (objectManager.TryGetObject(townId, out Town town) == false)
+        {
+            return $"{nameof(Town)} with ID: '{townId}' not found";
+        }
+        BuildingHelper.ChangeCurrentBuildingQueue(town.Buildings, town);
+        return "success";
     }
 }

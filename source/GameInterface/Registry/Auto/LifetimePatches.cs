@@ -1,10 +1,13 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using Serilog;
 using System;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
 
 namespace GameInterface.Registry.Auto;
 internal class LifetimePatches
@@ -18,8 +21,7 @@ internal class LifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(BesiegerCamp), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", __instance.GetType());
             return true;
         }
 
@@ -37,8 +39,7 @@ internal class LifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client destroyed unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(BesiegerCamp), Environment.StackTrace);
+            Logger.Error("Client destroyed managed {name}", __instance.GetType());
             return true;
         }
 

@@ -8,13 +8,12 @@ namespace GameInterface.Services.Stances.Messages.Lifetime
     /// </summary>
     public record StanceLinkCreated : IEvent
     {
-        public StanceLinkCreated(StanceLink _StanceLink, StanceType _StanceType, IFaction _Faction1, IFaction _Faction2, bool _IsAtConstantWar)
+        public StanceLinkCreated(StanceLink _StanceLink, StanceType _StanceType, IFaction _Faction1, IFaction _Faction2)
         {
             StanceLink = _StanceLink;
             StanceType = _StanceType;
             Faction1 = _Faction1;
             Faction2 = _Faction2;
-            IsAtConstantWar = _IsAtConstantWar;
         }
 
         public StanceLink StanceLink { get; }
@@ -24,7 +23,5 @@ namespace GameInterface.Services.Stances.Messages.Lifetime
         public IFaction Faction1 { get; }
 
         public IFaction Faction2 { get; }
-
-        public bool IsAtConstantWar { get; }
     }
 }

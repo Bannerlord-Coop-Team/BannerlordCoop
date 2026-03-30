@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using GameInterface.Policies;
 using HarmonyLib;
 using Serilog;
@@ -21,8 +22,7 @@ internal class MapEventDisablePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MapEvent), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(MapEvent));
             return false;
         }
 

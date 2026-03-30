@@ -3,9 +3,9 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors.AiBehaviors;
 
 namespace GameInterface.Services.Bandits.Patches;
 
-[HarmonyPatch(typeof(AiBanditPatrollingBehavior))]
+[HarmonyPatch(typeof(AiLandBanditPatrollingBehavior))]
 internal class DisableAiBanditPatrollingBehavior
 {
-    [HarmonyPatch(nameof(AiBanditPatrollingBehavior.RegisterEvents))]
+    [HarmonyPatch(nameof(AiLandBanditPatrollingBehavior.RegisterEvents))]
     static bool Prefix() => false;
 }

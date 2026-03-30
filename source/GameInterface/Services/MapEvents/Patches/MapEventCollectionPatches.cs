@@ -8,11 +8,11 @@ using TaleWorlds.CampaignSystem.MapEvents;
 namespace GameInterface.Services.MapEvents.Patches;
 
 [HarmonyPatch]
-internal class MapEventCollectionPatches : GenericCollectionPatches<MapEventCollectionPatches, MapEvent>
+internal class MapEventCollectionPatches : GenericPatches<MapEventCollectionPatches, MapEvent>
 {
     static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(MapEvent));
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        => ArrayTranspiler<MapEventSide, MapEventSidesArrayUpdated>(instructions, nameof(MapEvent._sides));
+        => ArrayFieldChangeTranspiler<MapEventSide, MapEventSidesArrayUpdated>(instructions, nameof(MapEvent._sides));
 }

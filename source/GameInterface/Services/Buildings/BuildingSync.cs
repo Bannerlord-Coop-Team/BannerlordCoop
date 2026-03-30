@@ -1,4 +1,5 @@
 ﻿using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
@@ -7,22 +8,22 @@ using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace GameInterface.Services.Buildings
 {
-    internal class BuildingSync : IAutoSync
+    internal class BuildingSync : IDynamicSync
     {
-        public BuildingSync(IAutoSyncBuilder autoSyncBuilder)
+        public BuildingSync(DynamicSyncRegistry dynamicSyncRegistry)
         {
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(Building), nameof(Building._hitpoints)));
+            // Fields
+            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Building), nameof(Building._hitpoints)));
+            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Building), nameof(Building._currentLevel)));
+            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Building), nameof(Building.IsCurrentlyDefault)));
+            dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Building), nameof(Building.BuildingProgress)));
 
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(Building), nameof(Building._currentLevel)));
+            // Properties
+            dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Building), nameof(Building.Town)));
 
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(Building), nameof(Building.IsCurrentlyDefault)));
-            autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeDefaultBuilding)));
-            autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.BuildDevelopmentsAtGameStart)));
-
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(Building), nameof(Building.BuildingProgress)));
-            autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(Town), nameof(Town.TickCurrentBuilding)));
-
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Building), nameof(Building.Town)));
+            // Targetmethods
+            dynamicSyncRegistry.AddTargetMethod(typeof(Building), AccessTools.Method(typeof(BuildingHelper), nameof(BuildingHelper.ChangeDefaultBuilding)));
+            dynamicSyncRegistry.AddTargetMethod(typeof(Building), AccessTools.Method(typeof(BuildingsCampaignBehavior), nameof(BuildingsCampaignBehavior.BuildDevelopmentsAtGameStart)));
         }
     }
 }

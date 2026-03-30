@@ -1,5 +1,4 @@
-﻿using GameInterface.AutoSync;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -8,43 +7,42 @@ using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements;
-internal class SettlementSync : IAutoSync
+internal class SettlementSync : IDynamicSync
 {
-    public SettlementSync(IAutoSyncBuilder autoSyncBuilder)
+    public SettlementSync(DynamicSyncRegistry dynamicSyncRegistry)
     {
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.CanBeClaimed)));
-        autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(SettlementClaimantCampaignBehavior), nameof(SettlementClaimantCampaignBehavior.OnSettlementOwnerChanged)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.CanBeClaimed)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.ClaimedBy)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.ClaimValue)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Culture)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.HasVisited)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Hideout)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.LastVisitTimeOfOwner)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.MilitiaPartyComponent)));
 
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.ClaimedBy)));
-        autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(LordConversationsCampaignBehavior), nameof(LordConversationsCampaignBehavior.conversation_player_ask_to_claim_land_answer_on_consequence)));
+        // maybe not needed???
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
 
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.ClaimValue)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Culture)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.HasVisited)));
-        autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(PlayerTownVisitCampaignBehavior), nameof(PlayerTownVisitCampaignBehavior.OnSettlementEntered)));
+        // readonly
+        // dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Town)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Village)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._isVisible)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._lastAttackerParty)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._name)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._nextLocatable)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._numberOfLordPartiesAt)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._position)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._readyMilitia)));
 
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Hideout)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.LastVisitTimeOfOwner)));
-        autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(EnterSettlementAction), nameof(EnterSettlementAction.ApplyInternal)));
+        dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(SettlementClaimantCampaignBehavior), nameof(SettlementClaimantCampaignBehavior.OnSettlementOwnerChanged)));
+        dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(KingdomManager), nameof(KingdomManager.UpdateLordPartyVariablesRelatedToSettlements)));
+        dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(MilitiaPartyComponent), nameof(MilitiaPartyComponent.OnInitialize)));
+        dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(MilitiaPartyComponent), nameof(MilitiaPartyComponent.OnFinalize)));
+        dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(EnterSettlementAction), nameof(EnterSettlementAction.ApplyInternal)));
+        //dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(LordConversationsCampaignBehavior), nameof(LordConversationsCampaignBehavior.conversation_player_ask_to_claim_land_answer_on_consequence)));
+        dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(PlayerTownVisitCampaignBehavior), nameof(PlayerTownVisitCampaignBehavior.OnSettlementEntered)));
 
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.MilitiaPartyComponent)));
-        autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(MilitiaPartyComponent), nameof(MilitiaPartyComponent.OnInitialize)));
-        autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(MilitiaPartyComponent), nameof(MilitiaPartyComponent.OnFinalize)));
 
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
-        autoSyncBuilder.AddFieldChangeMethod(AccessTools.Method(typeof(KingdomManager), nameof(KingdomManager.UpdateLordPartyVariablesRelatedToSettlements)));
-
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Town)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Village)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._gatePosition)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._isVisible)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._lastAttackerParty)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._locatorNodeIndex)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._name)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._nextLocatable)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._numberOfLordPartiesAt)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._position)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._readyMilitia)));
     }
 }

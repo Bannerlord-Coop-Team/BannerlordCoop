@@ -6,11 +6,10 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Handlers;
+
 internal class MapEventHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventHandler>();
@@ -29,7 +28,7 @@ internal class MapEventHandler : IHandler
 
         messageBroker.Subscribe<MapEventSidesArrayUpdated>(Handle);
         messageBroker.Subscribe<NetworkUpdateMapSidesArray>(Handle);
-        
+
 
         messageBroker.Subscribe<MapEventDestroyed>(Handle);
         messageBroker.Subscribe<NetworkDestroyMapEvent>(Handle);

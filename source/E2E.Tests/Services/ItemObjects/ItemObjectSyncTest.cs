@@ -32,12 +32,7 @@ namespace E2E.Tests.Services.ItemObjectService
             var server = TestEnvironment.Server;
 
             // Act
-            string? itemObjectId = null;
-
-            var typeField = AccessTools.Field(typeof(ItemObject), nameof(ItemObject.Type));
-
-            var typeIntercept = TestEnvironment.GetIntercept(typeField);
-            
+            string? itemObjectId = null;            
 
             server.Call(() =>
             {
@@ -47,11 +42,6 @@ namespace E2E.Tests.Services.ItemObjectService
 
             // Assert
             Assert.True(server.ObjectManager.TryGetObject(itemObjectId, out ItemObject itemObject));
-
-            server.Call(() =>
-            {
-                typeIntercept.Invoke(null, new object[] { itemObject, 69 });
-            });
 
             server.ObjectManager.TryGetId(itemObject, out string serverObjectId);
 

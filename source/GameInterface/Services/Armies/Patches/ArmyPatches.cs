@@ -66,8 +66,7 @@ public class ArmyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(MobileParty));
             return true;
         }
 

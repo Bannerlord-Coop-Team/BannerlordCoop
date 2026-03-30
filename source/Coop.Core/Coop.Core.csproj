@@ -65,6 +65,7 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
     <PackageReference Include="System.Collections.Immutable" Version="9.0.2" />
+    <PackageReference Include="System.Reflection.Primitives" Version="4.3.0" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Common\Common.csproj">
@@ -95,6 +96,9 @@
     <Compile Include="Server\Services\Kingdoms\Messages\NetworkRemoveDecision.cs" />
   </ItemGroup>
   <ItemGroup>
+	  <Reference Include="TaleWorlds.CampaignSystem">
+	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
+	  </Reference>
 	  <Reference Include="TaleWorlds.Library">
 		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
 	  </Reference>

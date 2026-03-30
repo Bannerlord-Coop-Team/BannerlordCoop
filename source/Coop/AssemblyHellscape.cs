@@ -19,7 +19,8 @@ namespace Coop
             "System.Memory",
             "System.Buffers",
             "System.Numerics.Vectors",
-            "Autofac"
+            "System.Threading.Channels",
+            "Autofac",
         };
 
         private static readonly Dictionary<string, Assembly> LoadedRedirects = RedirectedAssemblies

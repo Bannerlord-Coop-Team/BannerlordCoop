@@ -19,7 +19,7 @@ internal class CharacterCreationIntroPatch
     private static void OnActivate(ref TaleworldGameState __instance)
     {
         Logger.Information("Game State is changing to {state}", __instance.GetType().Name);
-        
+
         MessageBroker.Instance.Publish(__instance, new CharacterCreationStarted());
 
 #if DEBUG

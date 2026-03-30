@@ -25,12 +25,12 @@ public class TestTemplate
 
         // Assert
         // Verify the server sends a single message to it's game interface
-        Assert.Equal(1, server.InternalMessages.GetMessageCount<TemplateCommandMessage>());
+        Assert.Equal(1, server.InternalMessages.GetMessageCount<TemplateNetworkMessage>());
 
         // Verify the all clients send a single message to their game interfaces
         foreach (EnvironmentInstance client in TestEnvironment.Clients)
         {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<TemplateCommandMessage>());
+            Assert.Equal(1, client.InternalMessages.GetMessageCount<TemplateNetworkMessage>());
         }
     }
 
@@ -52,12 +52,12 @@ public class TestTemplate
 
         // Assert
         // Verify the server sends a single message to it's game interface
-        Assert.Equal(1, server.InternalMessages.GetMessageCount<TemplateCommandMessage>());
+        Assert.Equal(1, server.InternalMessages.GetMessageCount<TemplateNetworkMessage>());
 
         // Verify the all clients send a single message to their game interfaces
         foreach (EnvironmentInstance client in TestEnvironment.Clients)
         {
-            Assert.Equal(1, client.InternalMessages.GetMessageCount<TemplateCommandMessage>());
+            Assert.Equal(1, client.InternalMessages.GetMessageCount<TemplateNetworkMessage>());
         }
     }
 }

@@ -1,14 +1,15 @@
-﻿using System.Collections.Generic;
-using Autofac;
+﻿using Autofac;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Tests.Mocks;
+using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
 using Moq;
+using System.Collections.Generic;
 using Xunit.Abstractions;
 
 namespace Coop.Tests;
@@ -20,6 +21,10 @@ internal abstract class TestComponentBase
     public TestMessageBroker TestMessageBroker { get; protected set; }
     public TestNetwork TestNetwork { get; protected set; }
     public IContainer Container { get; protected set; }
+
+    public readonly Mock<IHeroInterface> HeroInterfaceMock = new();
+
+    public readonly Mock<IModuleInfoProvider> ModuleInfoProviderMock = new();
 
     protected TestComponentBase(ITestOutputHelper output)
     {
@@ -57,8 +62,18 @@ internal abstract class TestComponentBase
         builder.RegisterType<TestMessageBroker>().AsSelf().As<IMessageBroker>().InstancePerLifetimeScope();
         builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TestNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
-        builder.RegisterInstance(moduleInfoProviderMock.Object).As<IModuleInfoProvider>().SingleInstance();
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
+
+        RegisterMocks(builder);
+
+        return builder;
+    }
+
+    private ContainerBuilder RegisterMocks(ContainerBuilder builder)
+    {
+        builder.RegisterInstance(ModuleInfoProviderMock.Object).SingleInstance();
+        builder.RegisterInstance(HeroInterfaceMock.Object).SingleInstance();
+
         return builder;
     }
 

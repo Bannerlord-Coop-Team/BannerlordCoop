@@ -9,11 +9,13 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Registry;
+using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Naval;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -84,7 +86,6 @@ internal class HeroInterface : IHeroInterface
             hero.CharacterObject.StringId = characterObjectId;
             hero.Clan.StringId = clanId;
         }
-        
 
         entityRegistry.RegisterAsControlled(controllerId, heroId);
 
@@ -114,7 +115,7 @@ internal class HeroInterface : IHeroInterface
 
         if (entityRegistry.TryGetControlledEntities(controllerId, out var entities) == false)
         {
-            Logger.Error("Unable to resolve hero for {controllerId}", controllerId);
+            Logger.Warning("Unable to resolve hero for {controllerId}", controllerId);
             return false;
         }
 
@@ -123,7 +124,7 @@ internal class HeroInterface : IHeroInterface
 
         if (resolvedEntity == null)
         {
-            Logger.Error("No hero was registered for {controllerId}", controllerId);
+            Logger.Warning("No hero was registered for {controllerId}", controllerId);
             return false;
         }
 
@@ -148,8 +149,8 @@ internal class HeroInterface : IHeroInterface
 
     private void SetupNewHero(Hero hero)
     {
-        SetupHeroWithObjectManagers(hero);
         SetupNewParty(hero);
+        SetupHeroWithObjectManagers(hero);
     }
 
     private void SetupHeroWithObjectManagers(Hero hero)
@@ -182,14 +183,17 @@ internal class HeroInterface : IHeroInterface
     private void SetupNewParty(Hero hero)
     {
         var party = hero.PartyBelongedTo;
+
+        using (new AllowedThread())
+        {
+            party.Anchor = new AnchorPoint(party);
+        }
+        
         party.IsVisible = true;
         party.Party.SetVisualAsDirty();
 
-        party.RecoverPositionsForNavMeshUpdate();
-        party.CurrentNavigationFace = Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D);
-
-        party.Ai.OnGameInitialized();
-
+        party.CheckPositionsForMapChangeAndUpdateIfNeeded();
+        MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
     }
 }

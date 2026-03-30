@@ -15,27 +15,29 @@ public class PartyBaseBinaryPackage : BinaryPackageBase<PartyBase>
     {
     }
 
-    private static HashSet<string> excludes = new HashSet<string>
+    public static HashSet<string> Excludes = new HashSet<string>
     {
-        "_lastMemberRosterVersionNo",
         "_partyMemberSizeLastCheckVersion",
         "_cachedPartyMemberSizeLimit",
         "_prisonerSizeLastCheckVersion",
         "_cachedPrisonerSizeLimit",
         "_lastNumberOfMenWithHorseVersionNo",
         "_lastNumberOfMenPerTierVersionNo",
-        "_cachedTotalStrength",
+        "_customOwner",
+        "_mapEventSide",
+        "_numberOfHealthyMenPerTier",
+        "_ships",
     };
 
     protected override void PackInternal()
     {
-        base.PackFields(excludes);
+        base.PackFields(Excludes);
     }
 
     protected override void UnpackInternal()
     {
         base.UnpackFields();
 
-        Object.CreateNewPartyVisual();
+        Object.MobileParty.CreateNewPartyVisual();
     }
 }
