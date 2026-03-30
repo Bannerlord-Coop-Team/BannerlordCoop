@@ -30,5 +30,7 @@ internal class MapEventSync : IDynamicSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._mapEventStartTime)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._mapEventType)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._mapEventResultsApplied)));
+        // Collection of sides for the MapEvent
+        autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), "_sides"));
     }
 }
