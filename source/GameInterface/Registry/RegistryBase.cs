@@ -170,6 +170,6 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
             callingMethod = method.Name;
             callingClass = method.DeclaringType.Name;
         }
-        Logger.Debug("{Registrar} called by: {CallingMethod} of class: {CallingClass} for object: {Object}", registrar, callingMethod, callingClass, obj.ToString());
+        Logger.Debug("{Registrar} called by: {CallingMethod} of class: {CallingClass} for object: {ObjectType}", registrar, callingMethod, callingClass, obj.GetType());
     }
 }
