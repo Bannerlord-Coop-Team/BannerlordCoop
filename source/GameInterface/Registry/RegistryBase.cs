@@ -55,12 +55,15 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     /// <inheritdoc cref="IRegistry"/>
     public virtual bool RegisterExistingObject(string id, object obj)
     {
-        LogObjectRegistration(obj);
-
-        if (TryCast(obj, out var castedObj) == false) return false;
+        if (TryCast(obj, out var castedObj) == false) {
+            LogObjectRegistration(obj);
+            Logger.Warning("Failed to cast {type} to {castType}", obj.GetType(), typeof(T));
+            return false;
+        }
 
         if (idObjs.ContainsKey(id))
         {
+            LogObjectRegistration(obj);
             Logger.Warning("{id} already exists in {type} Registry", id, typeof(T));
             return false;
         }
@@ -73,12 +76,11 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 
     public virtual bool RegisterNewObject(object obj, out string id)
     {
-        LogObjectRegistration(obj);
-
         id = null;
 
         if (TryCast(obj, out T castedObj) == false)
         {
+            LogObjectRegistration(obj);
             Logger.Warning("Failed to cast {type} to {castType}", obj.GetType(), typeof(T));
             return false;
         }
@@ -87,12 +89,14 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 
         if (idObjs.ContainsKey(newId))
         {
+            LogObjectRegistration(obj);
             Logger.Warning("id ({newId}): was already registered for type ({type})", newId, obj.GetType());
             return false;
         }
 
         if (objsIds.TryGetValue(castedObj, out var outvar))
         {
+            LogObjectRegistration(obj);
             Logger.Warning("object was already registered for type ({type})", newId, obj.GetType());
             return false;
         }
@@ -170,6 +174,6 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
             callingMethod = method.Name;
             callingClass = method.DeclaringType.Name;
         }
-        Logger.Debug("{Registrar} called by: {CallingMethod} of class: {CallingClass} for object: {Object}", registrar, callingMethod, callingClass, obj.ToString());
+        Logger.Debug("{Registrar} called by: {CallingMethod} of class: {CallingClass} for object: {ObjectType}", registrar, callingMethod, callingClass, obj.GetType());
     }
 }

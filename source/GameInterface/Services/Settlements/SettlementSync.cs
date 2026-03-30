@@ -19,7 +19,10 @@ internal class SettlementSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Hideout)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.LastVisitTimeOfOwner)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.MilitiaPartyComponent)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
+
+        // maybe not needed???
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
+
         // readonly
         // dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Town)));

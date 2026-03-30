@@ -1,6 +1,12 @@
 ﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using GameInterface.Policies;
+using GameInterface.Services.MobilePartyAIs.Messages;
 using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches
@@ -8,6 +14,8 @@ namespace GameInterface.Services.MobilePartyAIs.Patches
     [HarmonyPatch(typeof(MobilePartyAi))]
     internal class MobilePartyAIPatches
     {
+        private static readonly ILogger Logger = LogManager.GetLogger<ILogger>();
+
         [HarmonyPatch(nameof(MobilePartyAi.CheckPartyNeedsUpdate))]
         [HarmonyPrefix]
         static void Prefix(ref MobilePartyAi __instance)
@@ -23,6 +31,22 @@ namespace GameInterface.Services.MobilePartyAIs.Patches
             }
 
             __instance.DefaultBehaviorNeedsUpdate = true;
+        }
+
+        [HarmonyPatch(nameof(MobilePartyAi.AiBehaviorInteractable), MethodType.Setter)]
+        [HarmonyPrefix]
+        static void AiBehaviorInteractable_Prefix(ref MobilePartyAi __instance, ref IInteractablePoint value)
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+                return;
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated managed {type}", nameof(MobilePartyAi.AiBehaviorInteractable));
+                return;
+            }
+
+            MessageBroker.Instance.Publish(__instance, new AiBehaviorInteractablePointUpdated(__instance, value));
         }
     }
 }

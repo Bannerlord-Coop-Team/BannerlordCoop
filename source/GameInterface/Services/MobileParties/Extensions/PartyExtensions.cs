@@ -19,6 +19,12 @@ internal static class PartyExtensions
     /// <returns>true if is controlled otherwise false.</returns>
     public static bool IsPartyControlled(this MobileParty party)
     {
+        if (party is null)
+        {
+            Logger.Error("{parameterName} was null", nameof(party));
+            return false;
+        }
+
         // Allow method if container or registry cannot be resolved
         if (ContainerProvider.TryResolve<IControlledEntityRegistry>(out var entityRegistry) == false)
         {

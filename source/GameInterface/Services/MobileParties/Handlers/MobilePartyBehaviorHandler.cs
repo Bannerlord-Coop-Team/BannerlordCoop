@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem.Party;
@@ -79,7 +80,10 @@ internal class MobilePartyBehaviorHandler : IHandler
             interactablePointId,
             obj.What.BestTargetPoint,
             interactablePoint is not null,
-            party.Position
+            party.Position,
+            party.DefaultBehavior,
+            party.TargetPosition,
+            party.DesiredAiNavigationType
          );
 
         messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
@@ -97,37 +101,28 @@ internal class MobilePartyBehaviorHandler : IHandler
             return;
 
 
-        if (data.HasTarget && partyBase.IsSettlement)
-        {
-            party._targetSettlement = partyBase.Settlement;
-            party._targetParty = null;
-
-            party.Ai.AiBehaviorInteractable = partyBase;
-        }
-        else if (data.HasTarget && partyBase.IsMobile)
-        {
-            party._targetSettlement = null;
-            party._targetParty = partyBase.MobileParty;
-        }
-        else
-        {
-            party._targetSettlement = null;
-            party._targetParty = null;
-        }
-
         using (new AllowedThread())
         {
-            party.Ai.SetAiBehavior(data.NewAiBehavior, partyBase, data.BestTargetPoint);
-        }
+            PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
 
-        if (ModInformation.IsClient)
-        {
-            party.Ai._mobileParty.Position = data.PartyPosition;
-        }
-        else
-        {
-            data.PartyPosition = party.Position;
-            messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+            Logger.Debug(
+                "Setting AI behavior. PartyId: {PartyId}, Behavior: {Behavior}, TargetParty: {TargetParty}, BestTargetPoint: {BestTargetPoint}",
+                data.MobilePartyId,
+                data.NewAiBehavior,
+                partyBase,
+                data.BestTargetPoint
+            );
+            party.Ai.SetAiBehavior(data.NewAiBehavior, partyBase, data.BestTargetPoint);
+
+            if (ModInformation.IsClient)
+            {
+                party.Ai._mobileParty.Position = data.PartyPosition;
+            }
+            else
+            {
+                data.PartyPosition = party.Position;
+                messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+            }
         }
     }
 }
