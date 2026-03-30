@@ -29,8 +29,10 @@ public class PartyBehaviorPatchTests : IDisposable
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         party.StringId = "TestEntityId";
 
+        var dt = 0.1f;
+
         // Act
-        var runMethod = EncounterManagerPatches.HandleEncounterForMobilePartyPatch(ref party);
+        var runMethod = EncounterManagerPatches.HandleEncounterForMobilePartyPatch(ref party, ref dt);
 
         // Assert
         Assert.False(runMethod);
@@ -50,8 +52,10 @@ public class PartyBehaviorPatchTests : IDisposable
         idProvider.SetControllerId(controllerId);
         entityRegistry.RegisterAsControlled(controllerId, party.StringId);
 
+        var dt = 0.1f;
+
         // Act
-        var runMethod = EncounterManagerPatches.HandleEncounterForMobilePartyPatch(ref party);
+        var runMethod = EncounterManagerPatches.HandleEncounterForMobilePartyPatch(ref party, ref dt);
 
         // Assert
         Assert.True(runMethod);

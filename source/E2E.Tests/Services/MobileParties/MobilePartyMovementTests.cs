@@ -15,17 +15,24 @@ namespace E2E.Tests.Services.MobileParties;
 
 public class MobilePartyMovementTests : SyncTestBase
 {
+    private readonly string ServerId = "TestServer";
+
     private readonly string MobilePartyId = "TestParty";
     private readonly string TargetPartyId = "TargetParty";
     private readonly string TargetSettlementId = "TargetSettlement";
 
     public MobilePartyMovementTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment.Server.Container.Resolve<IControllerIdProvider>().SetControllerId($"TestServer");
+        TestEnvironment.Server.Container.Resolve<IControllerIdProvider>().SetControllerId(ServerId);
+
+
 
         MobilePartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         TargetPartyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         TargetSettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+
+        var controller = TestEnvironment.Server.Container.Resolve<IControlledEntityRegistry>();
+        controller.RegisterAsControlled(ServerId, MobilePartyId);
 
         var clientNum = 1;
 
@@ -232,6 +239,7 @@ public class MobilePartyMovementTests : SyncTestBase
         server.Call(() =>
         {
             serverParty.SetMoveToNearestLand(targetSettlement);
+            serverParty.ShortTermBehavior = AiBehavior.AssaultSettlement;
             serverParty.Ai.Tick(dt);
         }, disabledMethods: new MethodBase[] { 
             AccessTools.Method(typeof(MapScene), nameof(MapScene.GetNearestFaceCenterForPositionWithPath))
@@ -296,6 +304,13 @@ public class MobilePartyMovementTests : SyncTestBase
             {
                 Assert.True(client.ObjectManager.TryGetId(clientParty.Ai, out var aiId));
                 Assert.True(client.ObjectManager.TryGetId((PartyBase)clientParty.Ai.AiBehaviorInteractable, out var targetSettlementId));
+                Assert.Equal(TargetSettlementId, targetSettlementId);
+            }
+
+            if (serverParty.Ai.AiBehaviorPartyBase is not null)
+            {
+                Assert.True(client.ObjectManager.TryGetId(clientParty.Ai, out var aiId));
+                Assert.True(client.ObjectManager.TryGetId(clientParty.Ai.AiBehaviorPartyBase, out var targetSettlementId));
                 Assert.Equal(TargetSettlementId, targetSettlementId);
             }
         }
@@ -550,6 +565,11 @@ public class MobilePartyMovementTests : SyncTestBase
         {
             Assert.True(client.ObjectManager.TryGetId(clientParty.TargetSettlement, out var targetSettlementId));
             Assert.Equal(TargetSettlementId, targetSettlementId);
+        }
+
+        if (serverParty.Ai.AiBehaviorPartyBase is null)
+        {
+            Assert.Null(clientParty.Ai.AiBehaviorPartyBase);
         }
 
         if (serverParty.Ai.AiBehaviorInteractable is null)

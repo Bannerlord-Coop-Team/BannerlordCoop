@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
@@ -40,10 +41,11 @@ static class PartyBehaviorPatch
     [HarmonyPatch("Tick")]
     private static bool TickPrefix(ref MobilePartyAi __instance)
     {
-        if (ModInformation.DISABLE_AI == false) return true;
+        if (!ModInformation.DISABLE_AI) return true;
+            
 
         // This disables AI
-        return __instance.DefaultBehaviorNeedsUpdate;
+        return __instance._mobileParty == MobileParty.MainParty;
     }
 
     [HarmonyPrefix]
@@ -56,12 +58,26 @@ static class PartyBehaviorPatch
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        //if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
+        if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
 
         if (__instance._mobileParty.IsPartyControlled() == false) return false;
 
         var message = new PartyBehaviorChangeAttempted(__instance, newAiBehavior, interactablePoint, bestTargetPoint);
         MessageBroker.Instance.Publish(__instance, message);
+
+        if (ModInformation.IsServer)
+        {
+            if (interactablePoint is null)
+            {
+                Logger.Debug("Pre-update. PartyId: {partyId}, Behavior: {behavior}, Target: {target}", __instance._mobileParty.StringId, newAiBehavior, null);
+            }
+
+            if (interactablePoint is PartyBase partyBase)
+            {
+                Logger.Debug("Pre-update. PartyId: {partyId}, Behavior: {behavior}, Target: {target}", __instance._mobileParty.StringId, newAiBehavior,
+                    partyBase.IsSettlement ? partyBase.Settlement.StringId : partyBase.MobileParty.StringId);
+            }
+        }
 
         return false;
     }
@@ -81,7 +97,7 @@ static class PartyBehaviorPatch
     }
 
     public static void SetAiBehavior(
-        MobilePartyAi partyAi, AiBehavior newBehavior, IInteractablePoint? interactablePoint, CampaignVec2 targetPoint)
+        MobilePartyAi partyAi, AiBehavior newBehavior, IInteractablePoint interactablePoint, CampaignVec2 targetPoint)
     {
         if (partyAi == null)
         {
@@ -91,30 +107,46 @@ static class PartyBehaviorPatch
             return;
         }
 
-        var mobileParty = partyAi._mobileParty;
-
-        mobileParty.DefaultBehavior = newBehavior;
-
-        if (interactablePoint is PartyBase partyBase)
+        using (new AllowedThread())
         {
-            if (partyBase.IsSettlement)
-            {
-                mobileParty._targetSettlement = partyBase.Settlement;
-                mobileParty._targetParty = null;
-            }
-            else if (partyBase.IsMobile)
+
+            var mobileParty = partyAi._mobileParty;
+
+            mobileParty.DefaultBehavior = newBehavior;
+
+
+            if (interactablePoint is null)
             {
                 mobileParty._targetSettlement = null;
-                mobileParty._targetParty = partyBase.MobileParty;
+                mobileParty._targetParty = null;
+                partyAi.AiBehaviorPartyBase = null;
             }
+
+            if (interactablePoint is PartyBase partyBase)
+            {
+                if (partyBase.IsSettlement)
+                {
+                    mobileParty._targetSettlement = partyBase.Settlement;
+                    mobileParty._targetParty = null;
+                    partyAi.AiBehaviorPartyBase = partyBase;
+                }
+                else if (partyBase.IsMobile)
+                {
+                    mobileParty._targetSettlement = null;
+                    mobileParty._targetParty = partyBase.MobileParty;
+                    partyAi.AiBehaviorPartyBase = partyBase;
+                }
+            }
+
+            mobileParty.TargetPosition = targetPoint;
+            mobileParty.SetShortTermBehavior(newBehavior, interactablePoint);
+
+            partyAi.AiBehaviorInteractable = interactablePoint;
+            partyAi.BehaviorTarget = targetPoint;
+
+            mobileParty.RecalculateShortTermBehavior();
+            partyAi.UpdateBehavior();
         }
-
-        mobileParty.SetShortTermBehavior(newBehavior, interactablePoint);
-        mobileParty.TargetPosition = targetPoint;
-
-        
-        partyAi.BehaviorTarget = targetPoint;
-        partyAi.UpdateBehavior();
     }
 }
 

@@ -42,7 +42,7 @@ namespace GameInterface.Services.MobilePartyAIs.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client updated managed {type}", "{{ MemberName }}");
+                Logger.Error("Client updated managed {type}", nameof(MobilePartyAi.AiBehaviorInteractable));
                 return;
             }
 
