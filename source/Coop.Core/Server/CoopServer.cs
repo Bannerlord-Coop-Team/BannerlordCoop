@@ -93,7 +93,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
     {
-        throw new NotImplementedException();
+        Logger.Warning("Network error from {EndPoint}: {SocketError}", endPoint, socketError);
     }
 
     public override void OnNetworkLatencyUpdate(NetPeer peer, int latency)
@@ -109,7 +109,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
-        throw new NotImplementedException();
+        Logger.Warning("Received unconnected message from {EndPoint}", remoteEndPoint);
     }
 
     public override void OnPeerConnected(NetPeer peer)
