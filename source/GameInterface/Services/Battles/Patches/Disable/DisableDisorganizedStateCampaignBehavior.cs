@@ -1,6 +1,6 @@
 ﻿using HarmonyLib;
 
-namespace GameInterface.Services.Battles.Patches;
+namespace GameInterface.Services.Battles.Patches.Disable;
 
 [HarmonyPatch("DisorganizedStateCampaignBehavior", "RegisterEvents")]
 internal class DisableDisorganizedStateCampaignBehavior

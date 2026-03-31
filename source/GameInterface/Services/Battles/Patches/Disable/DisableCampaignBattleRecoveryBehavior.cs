@@ -1,7 +1,7 @@
 ﻿using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.Battles.Patches;
+namespace GameInterface.Services.Battles.Patches.Disable;
 
 [HarmonyPatch(typeof(CampaignBattleRecoveryBehavior))]
 internal class DisableCampaignBattleRecoveryBehavior

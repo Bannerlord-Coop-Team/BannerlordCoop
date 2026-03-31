@@ -26,7 +26,7 @@ namespace GameInterface.Services.FlattenedTroopRosters.Patches
             if (ModInformation.IsClient)
             {
                 Logger.Error("Client created managed {name}", typeof(TroopRoster));
-                return false;
+                return true;
             }
 
             var message = new FlattenedTroopRosterCreated(__instance, count);

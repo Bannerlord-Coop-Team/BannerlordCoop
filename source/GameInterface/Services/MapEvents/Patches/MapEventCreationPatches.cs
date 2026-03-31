@@ -27,7 +27,7 @@ internal class MapEventCreationPatches
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created managed {name}", typeof(MapEvent));
-            return true;
+            return false;
         }
 
         var message = new MapEventCreated(__instance);

@@ -15,6 +15,6 @@ public class DisablePartyEncounterPatch
     private static bool StartPartyEncounterPrefix()
     {
         InformationManager.DisplayMessage(new InformationMessage("Tried to start encounter"));
-        return false;
+        return true;
     }
 }
