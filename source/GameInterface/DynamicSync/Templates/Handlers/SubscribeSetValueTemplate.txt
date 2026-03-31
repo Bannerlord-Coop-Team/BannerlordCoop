@@ -5,13 +5,13 @@ SubscribeNetwork<byte[], {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMes
 {{ 
 if ReadOnly;
 }}
-	dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{DeserializeMethod}}(data.Value, instance.{{MemberName}}));
+	dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{DeserializeMethod}}(data.Value));
 {{
 else
 }}
 	using (new AllowedThread())
 	{
-		instance.{{MemberName}} = RawSerializer.Deserialize<{{MemberType}}>(data.Value);
+		instance.{{MemberName}} = {{DeserializeMethod}}(data.Value);
 	}
 {{end}}
 }
