@@ -4,9 +4,15 @@ using Common.Util;
 using GameInterface.Services.Battles.Messages;
 using HarmonyLib;
 using Helpers;
+using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches
 {
@@ -41,11 +47,18 @@ namespace GameInterface.Services.MobileParties.Patches
         {
             if (AllowedThread.IsThisThreadAllowed()) return true;
 
+            if (ModInformation.IsClient) return false;
+
             var message = new BattleStarted(engagingParty, __instance);
+
+            if(engagingParty.ActualClan != null && engagingParty.ActualClan.Name.ToString() == "Playerland")
+            {
+                InformationManager.DisplayMessage(new InformationMessage($"Local player is engaging in battle with {__instance.Name}"));
+            }
 
             MessageBroker.Instance.Publish(__instance, message);
 
-            return false;
+            return true;
         }
     }
 }

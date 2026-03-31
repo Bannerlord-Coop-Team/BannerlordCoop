@@ -126,9 +126,11 @@ namespace GameInterface.Services.Battles.Handlers
                     //Get which side player is on
                     MobileParty.MainParty.Party._mapEventSide = playerSide;
 
-                    EncounterGameMenuBehavior menu = Campaign.Current.CampaignBehaviorManager.GetBehavior<EncounterGameMenuBehavior>();
+                    //EncounterGameMenuBehavior menu = Campaign.Current.CampaignBehaviorManager.GetBehavior<EncounterGameMenuBehavior>();
                     Campaign.Current.PlayerEncounter.StartBattleInternal();
                     //menu.game_menu_encounter_leave_on_consequence(default);
+
+                    Logger.Information(Campaign.Current.MapEventManager._mapEvents.ToString());
                 }
             });
         }

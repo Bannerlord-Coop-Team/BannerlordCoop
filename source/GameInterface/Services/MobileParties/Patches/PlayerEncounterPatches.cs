@@ -15,6 +15,7 @@ using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -50,22 +51,22 @@ internal class EncounterManagerPatches
         return ModInformation.IsServer;
     }
 
-    [HarmonyPrefix]
-    [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
-    static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
-    {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+    //[HarmonyPrefix]
+    //[HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
+    //static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
+    //{
+    //    if (AllowedThread.IsThisThreadAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
+    //    if (ModInformation.IsClient) return false;
 
-        //if (lastAttackerPartyId == attackerParty.MobileParty.StringId) return false;
-        //lastAttackerPartyId = attackerParty.MobileParty.StringId;
+    //    //if (lastAttackerPartyId == attackerParty.MobileParty.StringId) return false;
+    //    //lastAttackerPartyId = attackerParty.MobileParty.StringId;
 
-        // Disables interaction between players, this will be handled in a future issue
-        if (!attackerParty.MobileParty.IsPartyControlled() && !defenderParty.MobileParty.IsPartyControlled()) { return false; }
+    //    // Disables interaction between players, this will be handled in a future issue
+    //    if (!attackerParty.MobileParty.IsPartyControlled() && !defenderParty.MobileParty.IsPartyControlled()) { return false; }
 
-        return true;
-    }
+    //    return true;
+    //}
 
     internal static void OverrideOnPartyInteraction(MobileParty attacker, PartyBase defender)
     {
@@ -73,6 +74,10 @@ internal class EncounterManagerPatches
         {
             if (defender.IsMobile)
             {
+                if(attacker.IsPartyControlled() == true)
+                {
+                    InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
+                }
                 defender.MobileParty.OnPartyInteraction(attacker);
                 return;
             }
