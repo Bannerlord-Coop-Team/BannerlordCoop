@@ -41,22 +41,32 @@ namespace Coop
         private static string ClientServerModeMessage = "";
 
         private bool isServer = false;
+        private bool isAutoConnect = false;
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
 
-            var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
+            var fullCommandLine = Utilities.GetFullCommandLineString();
+            var args = fullCommandLine.Split(' ').ToList();
             
-            if (args.Contains("/server"))
+            if (args.Any(a => a.Equals("/server", StringComparison.OrdinalIgnoreCase)))
             {
                 isServer = true;
             }
-            else if (args.Contains("/client"))
+            else if (args.Any(a => a.Equals("/client", StringComparison.OrdinalIgnoreCase)))
             {
                 isServer = false;
             }
 
+            isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
+
             SetupLogging();
+
+            if (isAutoConnect)
+            {
+                Logger.Information("[AutoConnect] Full command line: {CommandLine}", fullCommandLine);
+                Logger.Information("[AutoConnect] isServer={IsServer} isAutoConnect={IsAutoConnect}", isServer, isAutoConnect);
+            }
 
             GameLoopRunner.Instance.SetGameLoopThread();
         }
@@ -88,6 +98,11 @@ namespace Coop
         
         public override void NoHarmonyLoad()
         {
+            // Apply boot-time UI fix before any application ticks run.
+            // Prevents intermittent TextWidget NullRef on GauntletDefaultLoadingWindowManager.Initialize()
+            // caused by UIContext being created with a null FontFactory on Bannerlord v1.3.15.
+            BootPatches.Apply();
+
             Coop = new CoopartiveMultiplayerExperience();
 
             Updateables.Add(GameLoopRunner.Instance);
@@ -170,6 +185,7 @@ namespace Coop
         }
 
         private bool m_IsFirstTick = true;
+        private bool _autoStarted = false;
         protected override void OnApplicationTick(float dt)
         {
             if(m_IsFirstTick)
@@ -180,6 +196,37 @@ namespace Coop
             }    
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             Updateables.UpdateAll(frameTime);
+
+#if DEBUG
+            TryAutoConnect();
+#endif
+        }
+
+        private void TryAutoConnect()
+        {
+            if (isAutoConnect && !_autoStarted && GameStateManager.Current?.ActiveState is InitialState)
+            {
+                _autoStarted = true;
+                try
+                {
+                    if (isServer)
+                    {
+                        Logger.Information("[AutoConnect] InitialState active — auto-starting as server...");
+                        Coop.StartAsServer();
+                        Logger.Information("[AutoConnect] StartAsServer() completed");
+                    }
+                    else
+                    {
+                        Logger.Information("[AutoConnect] InitialState active — auto-starting as client...");
+                        Coop.StartAsClient();
+                        Logger.Information("[AutoConnect] StartAsClient() completed");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "[AutoConnect] Exception during auto-start");
+                }
+            }
         }
 
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
