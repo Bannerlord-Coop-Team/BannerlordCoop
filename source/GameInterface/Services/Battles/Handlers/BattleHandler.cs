@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Battles.Handlers
 {
@@ -48,14 +49,32 @@ namespace GameInterface.Services.Battles.Handlers
         {
             var data = payload.What;
 
-            network.SendAll(new NetworkStartBattle(data.Attacker.StringId, data.Defender.StringId));
+            if(data.Defender.IsSettlement)
+            {
+                network.SendAll(new NetworkStartBattle(data.Attacker.StringId, data.Defender.Settlement.StringId, true));
+            }
+            else
+            {
+                network.SendAll(new NetworkStartBattle(data.Attacker.StringId, data.Defender.MobileParty.StringId, false));
+            }
+
+            
         }
 
         private void Handle(MessagePayload<NetworkStartBattle> payload)
         {
-            objectManager.TryGetObject(payload.What.AttackerId, out MobileParty attacker);
-            objectManager.TryGetObject(payload.What.DefenderId, out MobileParty defender);
-            //EncounterManagerPatches.OverrideOnPartyInteraction(attacker, defender);
+            if(payload.What.IsSettlement)
+            {
+                objectManager.TryGetObject(payload.What.AttackerId, out MobileParty attacker);
+                objectManager.TryGetObject(payload.What.DefenderId, out Settlement defender);
+                EncounterManagerPatches.OverrideOnPartyInteraction(attacker, defender.Party);
+            }
+            else
+            {
+                objectManager.TryGetObject(payload.What.AttackerId, out MobileParty attacker);
+                objectManager.TryGetObject(payload.What.DefenderId, out MobileParty defender);
+                EncounterManagerPatches.OverrideOnPartyInteraction(attacker, defender.Party);
+            }
         }
 
         private void Handle(MessagePayload<PlayerStartBattle> payload)

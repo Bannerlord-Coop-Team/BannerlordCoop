@@ -6,9 +6,9 @@ namespace GameInterface.Services.Battles.Messages
     internal class BattleStarted : IMessage
     {
         public MobileParty Attacker { get; }
-        public MobileParty Defender { get; }
+        public PartyBase Defender { get; }
 
-        public BattleStarted(MobileParty attacker, MobileParty defender)
+        public BattleStarted(MobileParty attacker, PartyBase defender)
         {
             Attacker = attacker;
             Defender = defender;

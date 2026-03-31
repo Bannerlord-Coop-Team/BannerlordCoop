@@ -32,34 +32,20 @@ namespace GameInterface.Services.MobileParties.Patches
         }
     }
 
-    [HarmonyPatch(typeof(EncounterGameMenuBehavior))]
+    [HarmonyPatch(typeof(PartyBase))]
     public class TestPatching2
     {
-        //[HarmonyPatch("game_menu_encounter_leave_on_condition")]
-        //[HarmonyPrefix]
-        //public static bool Prefix(ref bool __result, MenuCallbackArgs args)
-        //{
-        //    //if (AllowedThread.IsThisThreadAllowed()) return true;
+        [HarmonyPatch("TaleWorlds.CampaignSystem.Map.IInteractablePoint.OnPartyInteraction")]
+        [HarmonyPrefix]
+        public static bool Prefix(PartyBase __instance, MobileParty engagingParty)
+        {
+            if (AllowedThread.IsThisThreadAllowed()) return true;
 
-        //    //var message = new PlayerStartBattle();
+            var message = new BattleStarted(engagingParty, __instance);
 
-        //    //MessageBroker.Instance.Publish(null, message);
+            MessageBroker.Instance.Publish(__instance, message);
 
-        //    //return false;
-
-        //    __result = true;
-
-        //    return false;
-        //}
-
-        //    [HarmonyPatch("game_menu_encounter_leave_on_consequence")]
-        //    [HarmonyPrefix]
-        //    public static bool Prefix2(MenuCallbackArgs args)
-        //    {
-        //        if (AllowedThread.IsThisThreadAllowed()) return true;
-
-        //        return false;
-        //    }
-        //}
+            return false;
+        }
     }
 }

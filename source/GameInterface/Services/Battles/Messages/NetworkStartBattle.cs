@@ -10,11 +10,14 @@ namespace GameInterface.Services.Battles.Messages
         public string AttackerId { get; }
         [ProtoMember(2)]
         public string DefenderId { get; }
+        [ProtoMember(3)]
+        public bool IsSettlement { get; }
 
-        public NetworkStartBattle(string attackerId, string defenderId)
+        public NetworkStartBattle(string attackerId, string defenderId, bool isSettlement)
         {
             AttackerId = attackerId;
             DefenderId = defenderId;
+            IsSettlement = isSettlement;
         }
     }
 }
