@@ -1,8 +1,14 @@
 ﻿using Common;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Patches
 {
@@ -14,11 +20,9 @@ namespace GameInterface.Services.MapEvents.Patches
         static bool PrefixUpdate(MapEvent __instance)
         {
             //To keep client "up to date" without running the Update method
-            if (ModInformation.IsClient)
-            {
-                __instance.RecalculateStrengthOfSides();
-                return false;
-            }
+            //__instance.RecalculateStrengthOfSides();
+
+            if (ModInformation.IsClient) return false;
 
             // Don't update if a player is involved
             // Prevents server from instantly finishing the battle and waits for client finish request
