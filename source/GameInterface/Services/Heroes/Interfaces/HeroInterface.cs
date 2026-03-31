@@ -119,14 +119,20 @@ internal class HeroInterface : IHeroInterface
             return false;
         }
 
-        // TODO ensure works
-        var resolvedEntity = entities.SingleOrDefault(entity => entity.EntityId.StartsWith("hero"));
+        var heroEntities = entities.Where(entity => objectManager.TryGetObject<Hero>(entity.EntityId, out _)).ToList();
 
-        if (resolvedEntity == null)
+        if (heroEntities.Count == 0)
         {
             Logger.Warning("No hero was registered for {controllerId}", controllerId);
             return false;
         }
+
+        if (heroEntities.Count > 1)
+        {
+            Logger.Warning("Multiple heroes registered for {controllerId}, using first match", controllerId);
+        }
+
+        var resolvedEntity = heroEntities[0];
 
         heroId = resolvedEntity.EntityId;
 
