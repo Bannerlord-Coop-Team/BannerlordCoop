@@ -53,7 +53,6 @@ public class AutoRegistry<T> : RegistryBase<T> where T : class
 
     public override bool RegisterNewObject(object obj, out string id)
     {
-        Interlocked.Increment(ref InstanceCounter);
         return base.RegisterNewObject(obj, out id);
     }
 }

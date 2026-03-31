@@ -27,6 +27,6 @@ internal class ClientSyncPolicy : ISyncPolicy
     public bool AllowOriginal()
     {
         // Allow original calls if not in map state or mission state
-        return syncStates.Contains(clientLogic.State.GetType()) == false;
+        return !syncStates.Contains(clientLogic.State.GetType());
     }
 }

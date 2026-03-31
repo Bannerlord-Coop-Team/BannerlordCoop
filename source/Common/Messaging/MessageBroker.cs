@@ -44,7 +44,7 @@ namespace Common.Messaging
 
             var msgType = message.GetType();
 
-            messageLogger.LogMessage(source, msgType);
+            messageLogger.LogMessage(source, typeof(T));
 
             if (!subscribers.ContainsKey(typeof(T)))
             {
