@@ -1,6 +1,10 @@
 ﻿using Common;
+using Common.Logging;
+using GameInterface.Services.GameDebug.Handlers;
+using GameInterface.Services.MobileParties.Handlers;
 using SandBox;
 using SandBox.GauntletUI.CharacterCreation;
+using Serilog;
 using System;
 using System.Linq;
 using System.Reflection;
@@ -55,7 +59,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
 
             CharacterCreationState characterCreationState = GameStateManager.Current.ActiveState as CharacterCreationState;
             CharacterCreationStageBase currentStage = characterCreationState._characterCreationManager.CurrentStage;
-
+            
             if (currentStage is CharacterCreationCultureStage)
             {
                 var cultures = characterCreationState._characterCreationManager.CharacterCreationContent.GetCultures();
@@ -64,7 +68,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
                 characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (currentStage is CharacterCreationFaceGeneratorStage)
+            if (characterCreationState._characterCreationManager.CurrentStage is CharacterCreationFaceGeneratorStage)
             {
                 ICharacterCreationStageListener listener = characterCreationState._characterCreationManager.CurrentStage.Listener;
                 BodyGeneratorView bgv = (listener as CharacterCreationFaceGeneratorView)._faceGeneratorView;
@@ -75,7 +79,7 @@ namespace GameInterface.Services.GameDebug.Interfaces
                 characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (currentStage is CharacterCreationNarrativeStage)
+            if (characterCreationState._characterCreationManager.CurrentStage is CharacterCreationNarrativeStage)
             {
                 for (int i = 0; i < characterCreationState._characterCreationManager.CharacterCreationMenuCount; i++)
                 {
@@ -89,24 +93,23 @@ namespace GameInterface.Services.GameDebug.Interfaces
                 characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (currentStage is CharacterCreationBannerEditorStage)
+            if (characterCreationState._characterCreationManager.CurrentStage is CharacterCreationBannerEditorStage)
             {
                 characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (currentStage is CharacterCreationClanNamingStage)
+            if (characterCreationState._characterCreationManager.CurrentStage is CharacterCreationClanNamingStage)
             {
-
                 characterCreationState._characterCreationManager.CharacterCreationContent.MainCharacterName = "RandomPlayer";
                 characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (currentStage is CharacterCreationReviewStage)
+            if (characterCreationState._characterCreationManager.CurrentStage is CharacterCreationReviewStage)
             {
                 characterCreationState._characterCreationManager.NextStage();
             }
 
-            if (currentStage is CharacterCreationOptionsStage)
+            if (characterCreationState._characterCreationManager.CurrentStage is CharacterCreationOptionsStage)
             {
                 characterCreationState._characterCreationManager.NextStage();
             }
