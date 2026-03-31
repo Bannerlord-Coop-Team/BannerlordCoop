@@ -23,6 +23,8 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     private Thread UpdateThread { get; set; }
     private CancellationTokenSource CancellationTokenSource;
+    // Guard against double-dispose: finalizer calls Dispose() after explicit Dispose() on reconnect
+    private bool _disposed = false;
 
     protected readonly NetManager netManager;
 
@@ -50,11 +52,18 @@ public abstract class CoopNetworkBase : INetwork, INetEventListener
 
     public virtual void Dispose()
     {
+        // Prevent ObjectDisposedException if GC finalizer runs after explicit Dispose on reconnect
+        if (_disposed) return;
+        _disposed = true;
+
         netManager.Stop();
 
         CancellationTokenSource.Cancel();
         CancellationTokenSource.Dispose();
         UpdateThread?.Join(Configuration.ObjectCreationTimeout);
+
+        // Tell GC not to run the finalizer — Dispose() already cleaned up, avoids double-call
+        GC.SuppressFinalize(this);
     }
 
     private void UpdateThreadMethod()
