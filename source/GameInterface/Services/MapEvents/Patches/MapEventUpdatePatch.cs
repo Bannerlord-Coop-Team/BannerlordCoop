@@ -20,7 +20,7 @@ namespace GameInterface.Services.MapEvents.Patches
         static bool PrefixUpdate(MapEvent __instance)
         {
             //To keep client "up to date" without running the Update method
-            __instance.RecalculateStrengthOfSides();
+            //__instance.RecalculateStrengthOfSides();
 
             if (ModInformation.IsClient) return false;
 
