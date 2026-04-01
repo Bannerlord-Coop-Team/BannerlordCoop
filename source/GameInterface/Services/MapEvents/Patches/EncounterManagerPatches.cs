@@ -22,7 +22,7 @@ using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
-namespace GameInterface.Services.MobileParties.Patches;
+namespace GameInterface.Services.MapEvents.Patches;
 
 /// <summary>
 /// Patches for player encounters

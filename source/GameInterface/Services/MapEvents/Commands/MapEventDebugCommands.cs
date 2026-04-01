@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Siege;
 using static TaleWorlds.Library.CommandLineFunctionality;
@@ -52,5 +53,25 @@ public class MapEventDebugCammands
 
 
         return $"MapEvent Started";
+    }
+
+    [CommandLineArgumentFunction("test", "coop.debug.mapevent")]
+    public static string Test1(List<string> args)
+    {
+        //if (args.Count != 2)
+        //{
+        //    return "Usage: coop.debug.besiegercamp.set_number_of_troops_killed_on_side <besiegerCampId> <value> ";
+        //}
+
+        if (TryGetObjectManager(out var objectManager) == false)
+        {
+            return "Unable to resolve ObjectManager";
+        }
+        _ = objectManager;
+        _ = PlayerEncounter.Current;
+
+        _ = Campaign.Current.MapEventManager._mapEvents;
+
+        return $"OK";
     }
 }

@@ -4,7 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.Battles.Messages;
-using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;
@@ -103,31 +103,31 @@ namespace GameInterface.Services.Battles.Handlers
 
             MapEventSide playerSide = null;
 
-            if (mapEvent.AttackerSide.LeaderParty == PartyBase.MainParty)
-            {
-                playerSide = mapEvent.AttackerSide;
-            }
-            else if (mapEvent.DefenderSide.LeaderParty == PartyBase.MainParty)
-            {
-                playerSide = mapEvent.DefenderSide;
-            }
-            else
-            {
-                Logger.Error("Player is not a leader party, expected error. Needs to be handled eventually" +
-                    "Loop through sides and find which contains player party");
-            }
+            //if (mapEvent.AttackerSide.LeaderParty == PartyBase.MainParty)
+            //{
+            //    playerSide = mapEvent.AttackerSide;
+            //}
+            //else if (mapEvent.DefenderSide.LeaderParty == PartyBase.MainParty)
+            //{
+            //    playerSide = mapEvent.DefenderSide;
+            //}
+            //else
+            //{
+            //    Logger.Error("Player is not a leader party, expected error. Needs to be handled eventually" +
+            //        "Loop through sides and find which contains player party");
+            //}
 
             GameLoopRunner.RunOnMainThread(() =>
             {
                 using (new AllowedThread())
                 {
-                    Campaign.Current.PlayerEncounter._mapEvent = mapEvent;
+                    //Campaign.Current.PlayerEncounter._mapEvent = mapEvent;
 
                     //Get which side player is on
-                    MobileParty.MainParty.Party._mapEventSide = playerSide;
+                    //MobileParty.MainParty.Party._mapEventSide = playerSide;
 
                     //EncounterGameMenuBehavior menu = Campaign.Current.CampaignBehaviorManager.GetBehavior<EncounterGameMenuBehavior>();
-                    Campaign.Current.PlayerEncounter.StartBattleInternal();
+                    Campaign.Current.PlayerEncounter.JoinBattleInternal(TaleWorlds.Core.BattleSideEnum.Attacker);
                     //menu.game_menu_encounter_leave_on_consequence(default);
 
                     Logger.Information(Campaign.Current.MapEventManager._mapEvents.ToString());
