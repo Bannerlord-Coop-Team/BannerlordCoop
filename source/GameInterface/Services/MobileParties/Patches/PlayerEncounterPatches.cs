@@ -8,12 +8,17 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -50,23 +55,6 @@ internal class EncounterManagerPatches
     {
         return ModInformation.IsServer;
     }
-
-    //[HarmonyPrefix]
-    //[HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
-    //static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
-    //{
-    //    if (AllowedThread.IsThisThreadAllowed()) return true;
-
-    //    if (ModInformation.IsClient) return false;
-
-    //    //if (lastAttackerPartyId == attackerParty.MobileParty.StringId) return false;
-    //    //lastAttackerPartyId = attackerParty.MobileParty.StringId;
-
-    //    // Disables interaction between players, this will be handled in a future issue
-    //    if (!attackerParty.MobileParty.IsPartyControlled() && !defenderParty.MobileParty.IsPartyControlled()) { return false; }
-
-    //    return true;
-    //}
 
     internal static void OverrideOnPartyInteraction(MobileParty attacker, PartyBase defender)
     {
