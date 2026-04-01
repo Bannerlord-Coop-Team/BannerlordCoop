@@ -25,7 +25,13 @@ public class DynamicSyncBuilder
     public Assembly Build()
     {
         if (Directory.Exists($@"{DynamicSyncConfiguration.ExportPath}"))
+        {
+            // Directory.Delete throws UnauthorizedAccessException on read-only files (a .NET
+            // Framework limitation). Strip attributes on all files before deleting.
+            foreach (var file in Directory.GetFiles(DynamicSyncConfiguration.ExportPath, "*", SearchOption.AllDirectories))
+                File.SetAttributes(file, FileAttributes.Normal);
             Directory.Delete($@"{DynamicSyncConfiguration.ExportPath}", true);
+        }
 
         List<Assembly> assemblies = new List<Assembly>
         {
