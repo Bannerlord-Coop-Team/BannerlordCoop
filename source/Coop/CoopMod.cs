@@ -66,6 +66,7 @@ namespace Coop
             {
                 Logger.Information("[AutoConnect] Full command line: {CommandLine}", fullCommandLine);
                 Logger.Information("[AutoConnect] isServer={IsServer} isAutoConnect={IsAutoConnect}", isServer, isAutoConnect);
+                EnsureSafeExitConfig();
             }
 
             GameLoopRunner.Instance.SetGameLoopThread();
@@ -95,7 +96,58 @@ namespace Coop
             Logger.Verbose("Coop Mod Module Started");
         }
 
-        
+        /// <summary>
+        /// Sets safely_exited=1 in engine_config.txt and marks it read-only so Bannerlord never
+        /// shows the safe-mode recovery popup when using DebugAutoConnect (both processes are killed
+        /// hard by the debugger, so safely_exited is never written on normal shutdown).
+        /// </summary>
+        private void EnsureSafeExitConfig()
+        {
+            try
+            {
+                var configPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    "Mount and Blade II Bannerlord",
+                    "Configs",
+                    "engine_config.txt");
+
+                if (!File.Exists(configPath))
+                {
+                    Logger.Warning("[AutoConnect] engine_config.txt not found at {Path} — safe-mode popup suppression skipped", configPath);
+                    return;
+                }
+
+                // Set safely_exited=1 and lock the file read-only.
+                // Both processes are killed hard by the debugger so Bannerlord never gets to write
+                // safely_exited=0 on shutdown — without this the safe-mode popup appears every run.
+                File.SetAttributes(configPath, FileAttributes.Normal);
+
+                var lines = File.ReadAllLines(configPath);
+                bool found = false;
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    if (lines[i].TrimStart().StartsWith("safely_exited", StringComparison.OrdinalIgnoreCase))
+                    {
+                        lines[i] = "safely_exited  = 1";
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                    lines = lines.Concat(new[] { "safely_exited  = 1" }).ToArray();
+
+                File.WriteAllLines(configPath, lines);
+                File.SetAttributes(configPath, FileAttributes.ReadOnly);
+
+                Logger.Information("[AutoConnect] engine_config.txt patched: safely_exited=1 and set read-only");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "[AutoConnect] Failed to patch engine_config.txt — safe-mode popup may still appear");
+            }
+        }
+
         public override void NoHarmonyLoad()
         {
             // Apply boot-time UI fix before any application ticks run.

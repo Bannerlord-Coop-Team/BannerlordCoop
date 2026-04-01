@@ -17,11 +17,21 @@ namespace GameInterface.DynamicSync
             if (!ExportFiles)
                 return;
 
-            var targetDirectory = Path.GetDirectoryName(Path.Combine(ExportPath, targetPath));
+            var fullPath = Path.Combine(ExportPath, targetPath);
+            var targetDirectory = Path.GetDirectoryName(fullPath);
             if (!Directory.Exists(targetDirectory))
                 Directory.CreateDirectory(targetDirectory);
 
-            File.WriteAllText(Path.Combine(ExportPath, targetPath), content);
+            try
+            {
+                File.WriteAllText(fullPath, content);
+            }
+            catch (IOException)
+            {
+                // Another process (e.g. server in DebugAutoConnect) is writing the same file
+                // simultaneously. Both processes generate identical content, so it's safe to
+                // skip — the file will be written by whichever process wins the race.
+            }
         }
     }
 }
