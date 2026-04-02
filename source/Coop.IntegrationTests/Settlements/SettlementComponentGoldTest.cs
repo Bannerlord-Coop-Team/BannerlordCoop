@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.IntegrationTests.Settlements
 {
@@ -21,9 +22,11 @@ namespace Coop.IntegrationTests.Settlements
         public void ServerSettlementComponentGoldChanged_Publishes_AllClients()
         {
             // Arrange
-            string settlementId = "SettlementComponent1";
+            //string settlementId = "SettlementComponent1";
+            Settlement settlement = new();
+            SettlementComponent settlementComponent = settlement.SettlementComponent;
             int newGold = 120;
-            var triggerMessage = new SettlementComponentGoldChanged(settlementId, newGold);
+            var triggerMessage = new SettlementComponentGoldChanged(settlementComponent, newGold);
 
             var server = TestEnvironment.Server;
 
