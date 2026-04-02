@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages
 {
@@ -10,11 +11,11 @@ namespace GameInterface.Services.Settlements.Messages
     /// </summary>
     public record SettlementComponentIsOwnerUnassignedChanged : IEvent
     {
-        public string SettlementComponentId { get; }
+        public SettlementComponent SettlementComponent { get; }
         public bool IsOwnerUnassigned { get; }
-        public SettlementComponentIsOwnerUnassignedChanged(string settlementComponentId, bool isOwnerUnassigned)
+        public SettlementComponentIsOwnerUnassignedChanged(SettlementComponent settlementComponent, bool isOwnerUnassigned)
         {
-            SettlementComponentId = settlementComponentId;
+            SettlementComponent = settlementComponent;
             IsOwnerUnassigned = isOwnerUnassigned;
         }
     }
