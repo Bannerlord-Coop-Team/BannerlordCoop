@@ -23,10 +23,11 @@ internal class SettlementComponentRegistry : RegistryBase<SettlementComponent>
         settlementComponents.AddRange(Town.AllFiefs);
         settlementComponents.AddRange(Village.All);
         settlementComponents.AddRange(Hideout.All);
-
+        
         foreach (var settlementComponent in settlementComponents.DistinctBy(comp => comp.StringId))
         {
-            var networkId = $"{nameof(SettlementComponent)}_{settlementComponent.StringId}";
+            var networkId = settlementComponent.StringId;
+
             RegisterExistingObject(networkId, settlementComponent);
         }
     }
