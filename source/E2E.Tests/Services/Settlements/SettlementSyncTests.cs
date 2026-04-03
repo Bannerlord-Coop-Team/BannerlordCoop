@@ -39,7 +39,8 @@ namespace E2E.Tests.Services.Settlements
             TestEnvironment.AssertReferenceField<Settlement, CultureObject>(nameof(Settlement.Culture));
             TestEnvironment.AssertField<Settlement, float>(nameof(Settlement.LastVisitTimeOfOwner), 20f, defaultValue: settlement.LastVisitTimeOfOwner);
             TestEnvironment.AssertReferenceField<Settlement, MilitiaPartyComponent>(nameof(Settlement.MilitiaPartyComponent));
-            TestEnvironment.AssertField<Settlement, int>(nameof(Settlement.NumberOfLordPartiesTargeting), 2);
+            //Disabled: NumberOfLordPartiesTargeting sync is disabled in SettlementSync.cs
+            //TestEnvironment.AssertField<Settlement, int>(nameof(Settlement.NumberOfLordPartiesTargeting), 2);
             // readonly
             //TestEnvironment.AssertReferenceField<Settlement, ItemRoster>(nameof(Settlement.Stash));
             TestEnvironment.AssertReferenceField<Settlement, Town>(nameof(Settlement.Town));
@@ -50,6 +51,8 @@ namespace E2E.Tests.Services.Settlements
             TestEnvironment.AssertField<Settlement, TextObject>(nameof(Settlement._name),new TextObject("test text")); //TEXTOBJECT
             TestEnvironment.AssertReferenceField<Settlement, Settlement>(nameof(Settlement._nextLocatable));
             TestEnvironment.AssertField<Settlement, int>(nameof(Settlement._numberOfLordPartiesAt), 7);
+            // Settlement._position = NaN,NaN,True from constructor; reset to type default for valid comparison
+            AccessTools.Field(typeof(Settlement), nameof(Settlement._position)).SetValue(settlement, new CampaignVec2(Vec2.Zero, false));
             TestEnvironment.AssertField<Settlement, CampaignVec2>(nameof(Settlement._position), new CampaignVec2(new Vec2(1,2), false));
             TestEnvironment.AssertField<Settlement, float>(nameof(Settlement._readyMilitia), 5f);
         }

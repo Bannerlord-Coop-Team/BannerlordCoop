@@ -1,72 +1,51 @@
-﻿//using Common;
-//using GameInterface.Registry.Auto;
-//using HarmonyLib;
-//using Helpers;
-//using Serilog;
-//using System;
-//using System.Collections.Generic;
-//using System.Linq;
-//using System.Reflection;
-//using TaleWorlds.CampaignSystem;
+﻿using Common;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
 
-//namespace GameInterface.Services.StanceLinks;
+namespace GameInterface.Services.StanceLinks;
 
-///// <summary>
-///// Registry for <see cref="StanceLink"/> type
-///// </summary>
-//internal class StanceLinkRegistry : IAutoRegistry<StanceLink>
-//{
-//    ILogger Logger { get; }
-//    public StanceLinkRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
-//    {
-//        Logger = logger;
+/// <summary>
+/// Registry for <see cref="StanceLink"/> type
+/// </summary>
+internal class StanceLinkRegistry : IAutoRegistry<StanceLink>
+{
+    ILogger Logger { get; }
+    public StanceLinkRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    {
+        Logger = logger;
 
-//        autoRegistryFactory.RegisterType(this);
-//    }
+        autoRegistryFactory.RegisterType(this);
+    }
 
-//    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(StanceLink));
+    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(StanceLink));
 
-//    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-//    public void RegisterAllObjects(IRegistry<StanceLink> registry)
-//    {
-//        IEnumerable<IFaction> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
-//        IEnumerable<IFaction> clans = Campaign.Current?.Clans ?? Enumerable.Empty<Clan>();
+    public void RegisterAllObjects(IRegistry<StanceLink> registry)
+    {
+        // StanceLink instances are created dynamically during gameplay;
+        // existing stances are re-registered via network sync on connection.
+    }
 
-//        var factions = kingdoms.Concat(clans);
+    public void OnClientCreated(StanceLink obj, string id)
+    {
+    }
 
-//        HashSet<StanceLink> visitedStances = new();
+    public void OnClientDestroyed(StanceLink obj, string id)
+    {
+    }
 
-//        foreach (var faction in factions)
-//        {
-            
-//            int counter = 1;
+    public void OnServerCreated(StanceLink obj, string id)
+    {
+    }
 
-//            foreach (var stance in FactionHelper.GetStances(faction))
-//            {
-//                if (visitedStances.Contains(stance)) continue;
-
-//                var networkId = $"{nameof(StanceLink)}_{faction.StringId}_{counter++}";
-//                registry.RegisterExistingObject(networkId, stance);
-
-//                visitedStances.Add(stance);
-//            }
-//        }
-//    }
-
-//    public void OnClientCreated(StanceLink obj, string id)
-//    {
-//    }
-
-//    public void OnClientDestroyed(StanceLink obj, string id)
-//    {
-//    }
-
-//    public void OnServerCreated(StanceLink obj, string id)
-//    {
-//    }
-
-//    public void OnServerDestroyed(StanceLink obj, string id)
-//    {
-//    }
-//}
+    public void OnServerDestroyed(StanceLink obj, string id)
+    {
+    }
+}

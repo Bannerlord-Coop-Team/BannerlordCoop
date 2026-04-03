@@ -25,15 +25,20 @@ public class CustomPartyComponentTests : SyncTestBase
     [Fact]
     public void Server_CustomPartyComponent_Fields()
     {
+        // _homeSettlement and _owner are initialized by the builder; clear them so the pre-check passes
         Server.ObjectManager.TryGetObject(PartyId, out CustomPartyComponent component);
+        HarmonyLib.AccessTools.Field(typeof(CustomPartyComponent), nameof(CustomPartyComponent._homeSettlement)).SetValue(component, null);
+        HarmonyLib.AccessTools.Field(typeof(CustomPartyComponent), nameof(CustomPartyComponent._owner)).SetValue(component, null);
 
-        TestEnvironment.AssertField<CustomPartyComponent, TextObject>(nameof(CustomPartyComponent._name), new TextObject("name"));
-        TestEnvironment.AssertReferenceField<CustomPartyComponent, Settlement>(nameof(CustomPartyComponent._homeSettlement));
-        TestEnvironment.AssertReferenceField<CustomPartyComponent, Hero>(nameof(CustomPartyComponent._owner));
-        TestEnvironment.AssertField<CustomPartyComponent, float>(nameof(CustomPartyComponent._customPartyBaseSpeed), 5f);
-        TestEnvironment.AssertField<CustomPartyComponent, string>(nameof(CustomPartyComponent._partyMountStringId), "testMount", "");
-        TestEnvironment.AssertField<CustomPartyComponent, string>(nameof(CustomPartyComponent._partyHarnessStringId), "testHarness", "");
-        TestEnvironment.AssertField<CustomPartyComponent, bool>(nameof(CustomPartyComponent._avoidHostileActions), true);
+        // _name is initialized to TextObject("") in the CustomPartyComponent constructor
+        TestEnvironment.AssertField<CustomPartyComponent, TextObject>(nameof(CustomPartyComponent._name), new TextObject("name"), PartyId, new TextObject(""));
+        TestEnvironment.AssertReferenceField<CustomPartyComponent, Settlement>(nameof(CustomPartyComponent._homeSettlement), PartyId);
+        TestEnvironment.AssertReferenceField<CustomPartyComponent, Hero>(nameof(CustomPartyComponent._owner), PartyId);
+        TestEnvironment.AssertField<CustomPartyComponent, float>(nameof(CustomPartyComponent._customPartyBaseSpeed), 5f, PartyId, 2f);
+        // builder passes "mount" and "harness" as initial values 
+        TestEnvironment.AssertField<CustomPartyComponent, string>(nameof(CustomPartyComponent._partyMountStringId), "testMount", PartyId, "mount");
+        TestEnvironment.AssertField<CustomPartyComponent, string>(nameof(CustomPartyComponent._partyHarnessStringId), "testHarness", PartyId, "harness");
+        TestEnvironment.AssertField<CustomPartyComponent, bool>(nameof(CustomPartyComponent._avoidHostileActions), true, PartyId);
     }
 
     [Fact]

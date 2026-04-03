@@ -23,9 +23,13 @@ public class KingdomSyncTests : SyncTestBase
     [Fact] 
     public void Server_Kingdom_Fields()
     {
+        // PoliticalStagnation is randomly initialized in the Kingdom constructor
+        Server.ObjectManager.TryGetObject<Kingdom>(KingdomId, out var kingdom);
+        var initialPoliticalStagnation = kingdom.PoliticalStagnation;
+
         //TestEnvironment.AssertReferenceField<Kingdom, Settlement>(nameof(Kingdom._kingdomMidSettlement));
         TestEnvironment.AssertReferenceField<Kingdom, Clan>(nameof(Kingdom._rulingClan));
-        TestEnvironment.AssertField<Kingdom, int>(nameof(Kingdom.PoliticalStagnation), 5); //being set randomly in constructor; PoliticalStagnation = 10 + (int)(randomFloat * randomFloat2 * 100f);
+        TestEnvironment.AssertField<Kingdom, int>(nameof(Kingdom.PoliticalStagnation), 5, defaultValue: initialPoliticalStagnation);
         TestEnvironment.AssertField<Kingdom, float>(nameof(Kingdom._aggressiveness), 5f);
         TestEnvironment.AssertField<Kingdom, bool>(nameof(Kingdom._isEliminated), true);
         TestEnvironment.AssertField<Kingdom, int>(nameof(Kingdom._kingdomBudgetWallet), 5);
