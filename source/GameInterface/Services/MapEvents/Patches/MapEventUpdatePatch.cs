@@ -2,6 +2,7 @@
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEvents.Patches
@@ -23,6 +24,17 @@ namespace GameInterface.Services.MapEvents.Patches
             if (__instance.InvolvedParties.Any(x => x.MobileParty.IsPartyControlled() == false)) return false;
 
             return true;
+        }
+    }
+
+    [HarmonyPatch(typeof(BattleSimulation))]
+    public class BattleSimulationUpdatePatch
+    {
+        [HarmonyPrefix]
+        [HarmonyPatch(nameof(BattleSimulation.SimulateBattle))]
+        static bool PrefixUpdate(BattleSimulation __instance)
+        {
+            return false;
         }
     }
 }
