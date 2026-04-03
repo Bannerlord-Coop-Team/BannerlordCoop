@@ -177,6 +177,14 @@ internal class ParallelRobustnessPatches
                 }
 
                 MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
+                // HasMapEvent is cached before the parallel tick runs; on a multiplayer client the MapEvent
+                // can be cleared by a sync message between cache init and this tick. Without this check,
+                // DoUpdatePosition dereferences Party.MapEvent.Position and crashes when targeting a party
+                // that had an active MapEvent (e.g. "Brighan's Party" at HasMapEvent=true, MapEvent=null).
+                if (localVariables.HasMapEvent && mobileParty.MapEvent == null)
+                {
+                    localVariables.HasMapEvent = false;
+                }
                 mobileParty.TickForStationaryMobileParty(ref localVariables, __instance._currentDt, __instance._currentRealDt);
             }
 
