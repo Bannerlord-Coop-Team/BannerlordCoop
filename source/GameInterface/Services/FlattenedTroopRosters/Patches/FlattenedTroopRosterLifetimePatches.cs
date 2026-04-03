@@ -26,7 +26,10 @@ namespace GameInterface.Services.FlattenedTroopRosters.Patches
             if (ModInformation.IsClient)
             {
                 Logger.Error("Client created managed {name}", typeof(TroopRoster));
-                return false;
+                // The original `return false` skipped the constructor body, leaving _elementDictionary null.
+                // This caused a NullReferenceException in FlattenedTroopRoster.Add when the conversation
+                // UI (MapConversationTableau.FirstTimeInit) tried to render after an encounter started.
+                return true;
             }
 
             var message = new FlattenedTroopRosterCreated(__instance, count);
