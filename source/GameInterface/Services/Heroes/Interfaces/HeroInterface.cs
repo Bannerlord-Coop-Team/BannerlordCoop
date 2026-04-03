@@ -74,17 +74,26 @@ internal class HeroInterface : IHeroInterface
         },
         blocking: true);
 
-        objectManager.TryGetId(hero, out var heroId);
-        objectManager.TryGetId(hero.PartyBelongedTo, out var partyId);
-        objectManager.TryGetId(hero.CharacterObject, out var characterObjectId);
-        objectManager.TryGetId(hero.Clan, out var clanId);
+        // Retrieve the Coop-assigned IDs so they can be written back onto each object's
+        // StringId. If null (due to an ID collision fixed in AutoRegistry.RegisterExistingObject),
+        // log and skip — assigning null would corrupt the object in CampaignObjectManager.
+        if (objectManager.TryGetId(hero, out var heroId) == false)
+            Logger.Error("Failed to retrieve coop ID for hero, StringId will not be updated");
+        if (objectManager.TryGetId(hero.PartyBelongedTo, out var partyId) == false)
+            Logger.Error("Failed to retrieve coop ID for hero's party (StringId={ExistingId}), StringId will not be updated", hero.PartyBelongedTo?.StringId);
+        if (objectManager.TryGetId(hero.CharacterObject, out var characterObjectId) == false)
+            Logger.Error("Failed to retrieve coop ID for hero's CharacterObject, StringId will not be updated");
+        if (objectManager.TryGetId(hero.Clan, out var clanId) == false)
+            Logger.Error("Failed to retrieve coop ID for hero's Clan, StringId will not be updated");
 
         using (new AllowedThread())
         {
-            hero.StringId = heroId;
-            hero.PartyBelongedTo.StringId = partyId;
-            hero.CharacterObject.StringId = characterObjectId;
-            hero.Clan.StringId = clanId;
+            // Guard against null — original code assigned unconditionally which would
+            // leave objects with vanilla StringIds (e.g. "main_hero") and crash on load.
+            if (heroId != null) hero.StringId = heroId;
+            if (partyId != null) hero.PartyBelongedTo.StringId = partyId;
+            if (characterObjectId != null) hero.CharacterObject.StringId = characterObjectId;
+            if (clanId != null) hero.Clan.StringId = clanId;
         }
 
         entityRegistry.RegisterAsControlled(controllerId, heroId);
