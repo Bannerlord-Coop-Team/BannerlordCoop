@@ -25,6 +25,9 @@ public class ServerSettlementExitEnterHandler : IHandler
         messageBroker.Subscribe<NetworkRequestStartSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkRequestEndSettlementEncounter>(Handle);
 
+        // Receive party encounter requests from clients so the server can authorise them.
+        messageBroker.Subscribe<NetworkRequestStartPartyEncounter>(Handle);
+
         messageBroker.Subscribe<PartyEnterSettlementAttempted>(Handle);
         messageBroker.Subscribe<PartyLeaveSettlementAttempted>(Handle);
     }
@@ -35,6 +38,9 @@ public class ServerSettlementExitEnterHandler : IHandler
     {
         messageBroker.Unsubscribe<NetworkRequestStartSettlementEncounter>(Handle);
         messageBroker.Unsubscribe<NetworkRequestEndSettlementEncounter>(Handle);
+
+        // Party encounter request cleanup.
+        messageBroker.Unsubscribe<NetworkRequestStartPartyEncounter>(Handle);
 
         messageBroker.Unsubscribe<PartyEnterSettlementAttempted>(Handle);
         messageBroker.Unsubscribe<PartyLeaveSettlementAttempted>(Handle);
@@ -105,5 +111,15 @@ public class ServerSettlementExitEnterHandler : IHandler
         var partySettlementEnter = new PartyLeaveSettlement(partyId);
 
         messageBroker.Publish(this, partySettlementEnter);
+    }
+
+    // Without this handler the server never received or replied to party encounter requests,
+    // so the encounter was never authorised and the client's conversation attempt was dropped.
+    private void Handle(MessagePayload<NetworkRequestStartPartyEncounter> obj)
+    {
+        var payload = obj.What;
+        var peer = (NetPeer)obj.Who;
+
+        network.Send(peer, new NetworkStartPartyEncounter(payload));
     }
 }

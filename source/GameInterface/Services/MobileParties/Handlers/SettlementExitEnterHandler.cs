@@ -36,6 +36,8 @@ internal class SettlementExitEnterHandler : IHandler
         messageBroker.Subscribe<PartyLeaveSettlement>(Handle);
         messageBroker.Subscribe<StartSettlementEncounter>(Handle);
         messageBroker.Subscribe<EndSettlementEncounter>(Handle);
+        // Execute the server-approved party encounter on the game thread.
+        messageBroker.Subscribe<StartPartyEncounterCommand>(Handle);
     }
 
     public void Dispose()
@@ -44,6 +46,8 @@ internal class SettlementExitEnterHandler : IHandler
         messageBroker.Unsubscribe<PartyLeaveSettlement>(Handle);
         messageBroker.Unsubscribe<StartSettlementEncounter>(Handle);
         messageBroker.Unsubscribe<EndSettlementEncounter>(Handle);
+        // Party encounter command cleanup.
+        messageBroker.Unsubscribe<StartPartyEncounterCommand>(Handle);
     }
 
     private void Handle(MessagePayload<PartyEnterSettlement> obj)
@@ -121,6 +125,51 @@ internal class SettlementExitEnterHandler : IHandler
             {
                 PlayerEncounter.Finish(true);
                 Campaign.Current.SaveHandler.SignalAutoSave();
+            }
+        }, blocking: true);
+    }
+
+    // This is the final step in the client→server→client encounter flow: it takes the server-approved
+    // encounter command and executes PlayerEncounter.Start() locally under AllowedThread so Harmony
+    // patches do not block it. Without this the approved encounter was never applied to the game.
+    private void Handle(MessagePayload<StartPartyEncounterCommand> obj)
+    {
+        var payload = obj.What;
+
+        Logger.Debug(
+            "StartPartyEncounterCommand received: attacker={attacker} defender={defender}",
+            payload.AttackerPartyId, payload.DefenderPartyId);
+
+        if (objectManager.TryGetObject(payload.AttackerPartyId, out MobileParty attackerParty) == false)
+        {
+            Logger.Error("AttackerPartyId not found: {id}", payload.AttackerPartyId);
+            return;
+        }
+
+        if (objectManager.TryGetObject(payload.DefenderPartyId, out MobileParty defenderParty) == false)
+        {
+            Logger.Error("DefenderPartyId not found: {id}", payload.DefenderPartyId);
+            return;
+        }
+
+        if (PlayerEncounter.Current != null)
+        {
+            Logger.Debug(
+                "StartPartyEncounterCommand blocked: encounter already active (attacker={attacker} defender={defender})",
+                payload.AttackerPartyId, payload.DefenderPartyId);
+            return;
+        }
+
+        Logger.Debug(
+            "Executing StartPartyEncounterCommand: attacker={attacker} defender={defender}",
+            payload.AttackerPartyId, payload.DefenderPartyId);
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                PlayerEncounter.Start();
+                PlayerEncounter.Current.Init(attackerParty.Party, defenderParty.Party, null);
             }
         }, blocking: true);
     }

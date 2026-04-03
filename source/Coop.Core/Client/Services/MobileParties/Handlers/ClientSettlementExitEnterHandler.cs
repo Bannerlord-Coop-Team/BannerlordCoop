@@ -25,6 +25,10 @@ public class ClientSettlementExitEnterHandler : IHandler
         messageBroker.Subscribe<NetworkEndSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkStartSettlementEncounter>(Handle);
 
+        // Party encounter flow: forward the local attempt to the server, then apply the server's approval.
+        messageBroker.Subscribe<StartPartyEncounterAttempted>(Handle);
+        messageBroker.Subscribe<NetworkStartPartyEncounter>(Handle);
+
         messageBroker.Subscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Subscribe<NetworkPartyLeaveSettlement>(Handle);
     }
@@ -37,6 +41,10 @@ public class ClientSettlementExitEnterHandler : IHandler
         messageBroker.Unsubscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Unsubscribe<NetworkEndSettlementEncounter>(Handle);
         messageBroker.Unsubscribe<NetworkStartSettlementEncounter>(Handle);
+
+        // Party encounter flow cleanup.
+        messageBroker.Unsubscribe<StartPartyEncounterAttempted>(Handle);
+        messageBroker.Unsubscribe<NetworkStartPartyEncounter>(Handle);
 
         messageBroker.Unsubscribe<NetworkPartyEnterSettlement>(Handle);
         messageBroker.Unsubscribe<NetworkPartyLeaveSettlement>(Handle);
@@ -86,6 +94,26 @@ public class ClientSettlementExitEnterHandler : IHandler
     {
         var payload = obj.What;
         var message = new PartyLeaveSettlement(payload.PartyId);
+
+        messageBroker.Publish(this, message);
+    }
+
+    // Without this handler the client had no way to tell the server to start a party encounter,
+    // so walking up to an NPC showed "Tried to start encounter" in the log but nothing happened.
+    private void Handle(MessagePayload<StartPartyEncounterAttempted> obj)
+    {
+        var payload = obj.What;
+        var message = new NetworkRequestStartPartyEncounter(payload.AttackerPartyId, payload.DefenderPartyId);
+
+        network.SendAll(message);
+    }
+
+    // Without this handler the server's approval had no path back to the game layer,
+    // so the encounter the server authorised was silently discarded on the client.
+    private void Handle(MessagePayload<NetworkStartPartyEncounter> obj)
+    {
+        var payload = obj.What;
+        var message = new StartPartyEncounterCommand(payload.AttackerPartyId, payload.DefenderPartyId);
 
         messageBroker.Publish(this, message);
     }
