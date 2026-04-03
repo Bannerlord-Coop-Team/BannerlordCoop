@@ -33,13 +33,53 @@ namespace Coop
             catch { return false; }
         }
 
+        private static bool _applied = false;
+
         internal static void Apply()
         {
+            if (_applied) return;
+            _applied = true;
             try
             {
                 FileLog("Apply() called");
 
                 var harmony = new Harmony("Coop.BootFix");
+
+                // ROOT CAUSE FIX: postfix on Font.TryLoadFontFromPath.
+                // When both DebugAutoConnect processes race to open the same .bfnt file,
+                // File.Open uses FileShare.None — the losing process gets IOException,
+                // TryLoadFontFromPath returns false, and the font is never added to _bitmapFonts.
+                // Later, GetFont("FiraSansExtraCondensed-Light") falls back to DefaultFont.get(),
+                // CurrentLanguage is null mid-parse → NullReferenceException.
+                // This postfix retries LoadFromPathAux after a brief sleep, by which time the
+                // other process has closed the file.
+                var fontType = typeof(FontFactory)
+                    .GetProperty("DefaultFont", BindingFlags.Public | BindingFlags.Instance)
+                    ?.PropertyType;
+                var tryLoadFontFromPath = fontType?.GetMethod("TryLoadFontFromPath",
+                    BindingFlags.Public | BindingFlags.Instance);
+                FileLog($"Font.TryLoadFontFromPath found: {tryLoadFontFromPath != null}");
+                if (tryLoadFontFromPath != null)
+                {
+                    var tlfpPostfix = typeof(BootPatches).GetMethod(nameof(Font_TryLoadFontFromPath_Postfix), BindingFlags.Static | BindingFlags.NonPublic);
+                    harmony.Patch(tryLoadFontFromPath, postfix: new HarmonyMethod(tlfpPostfix));
+                    FileLog("Patched Font.TryLoadFontFromPath with retry postfix");
+                }
+
+                // DEFENSE IN DEPTH: prefix on FontFactory.DefaultFont.get().
+                // If TryLoadFontFromPath still fails after retries, CurrentLanguage will be null
+                // mid-parse. This prefix returns null instead of crashing, so VS never sees
+                // a first-chance exception. HasValidDefaultFont detects the null downstream.
+                var defaultFontGetter = typeof(FontFactory)
+                    .GetProperty("DefaultFont", BindingFlags.Public | BindingFlags.Instance)
+                    ?.GetGetMethod();
+                FileLog($"FontFactory.DefaultFont.get found: {defaultFontGetter != null}");
+                if (defaultFontGetter != null)
+                {
+                    var dfPrefix = typeof(BootPatches).GetMethod(nameof(FontFactory_DefaultFont_get_Prefix), BindingFlags.Static | BindingFlags.NonPublic);
+                    harmony.Patch(defaultFontGetter, prefix: new HarmonyMethod(dfPrefix));
+                    FileLog("Patched FontFactory.DefaultFont.get with null-guard prefix");
+                }
 
                 // PRIMARY FIX: prefix on the private LoadMovieAux(string, ViewModel) method.
                 //
@@ -81,6 +121,58 @@ namespace Coop
                 FileLog($"Apply() threw: {ex}");
                 Logger.Error(ex, "[BootPatches] Apply() failed");
             }
+        }
+
+        // Prefix on FontFactory.DefaultFont.get() — null-guard.
+        // Returns null (via ref object __result) when CurrentLanguage is null so that
+        // Language.CreateFrom stores null in DefaultFont rather than crashing.
+        private static bool FontFactory_DefaultFont_get_Prefix(FontFactory __instance, ref object __result)
+        {
+            try
+            {
+                var currentLang = typeof(FontFactory)
+                    .GetProperty("CurrentLanguage", BindingFlags.Public | BindingFlags.Instance)
+                    ?.GetValue(__instance);
+                if (currentLang != null) return true; // safe — let original run
+                __result = null;
+                FileLog("FontFactory.DefaultFont.get: CurrentLanguage null — returning null to prevent NPE");
+                return false; // skip original
+            }
+            catch { return true; }
+        }
+
+        // Postfix on Font.TryLoadFontFromPath — retries on failure.
+        private static void Font_TryLoadFontFromPath_Postfix(object __instance, string path, ref bool __result)
+        {
+            if (__result) return;
+            try
+            {
+                var loadAux = __instance.GetType()
+                    .GetMethod("LoadFromPathAux", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (loadAux == null) { FileLog($"Font_TryLoadFontFromPath_Postfix: LoadFromPathAux not found for {path}"); return; }
+
+                var spriteData = typeof(UIResourceManager)
+                    .GetProperty("SpriteData", BindingFlags.Public | BindingFlags.Static)
+                    ?.GetValue(null);
+
+                for (int i = 0; i < 3; i++)
+                {
+                    System.Threading.Thread.Sleep(50 * (i + 1));
+                    try
+                    {
+                        loadAux.Invoke(__instance, new object[] { path, spriteData });
+                        __result = true;
+                        FileLog($"Font_TryLoadFontFromPath: retry {i + 1} succeeded for {System.IO.Path.GetFileName(path)}");
+                        return;
+                    }
+                    catch (TargetInvocationException tie)
+                    {
+                        FileLog($"Font_TryLoadFontFromPath: retry {i + 1} failed for {System.IO.Path.GetFileName(path)}: {tie.InnerException?.GetType().Name}");
+                    }
+                }
+                FileLog($"Font_TryLoadFontFromPath: all retries exhausted for {System.IO.Path.GetFileName(path)}");
+            }
+            catch (Exception ex) { FileLog($"Font_TryLoadFontFromPath_Postfix threw: {ex.GetType().Name}"); }
         }
 
         // Prefix on GauntletLayer.LoadMovieAux(string, ViewModel).

@@ -1,11 +1,12 @@
-﻿using Coop.IntegrationTests.Environment.Instance;
-using Coop.IntegrationTests.Environment;
+﻿using Coop.IntegrationTests.Environment;
+using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.IntegrationTests.Settlements
 {
@@ -20,9 +21,10 @@ namespace Coop.IntegrationTests.Settlements
         public void ServerSettlementComponentIsOwnerUnassignedChanged_Publishes_AllClients()
         {
             // Arrange
-            string settlementId = "SettlementComponent1";
+            Settlement settlement = new();
+            SettlementComponent settlementComponent = settlement.SettlementComponent;
             bool newValue = true;
-            var triggerMessage = new SettlementComponentIsOwnerUnassignedChanged(settlementId, newValue);
+            var triggerMessage = new SettlementComponentIsOwnerUnassignedChanged(settlementComponent, newValue);
 
             var server = TestEnvironment.Server;
 

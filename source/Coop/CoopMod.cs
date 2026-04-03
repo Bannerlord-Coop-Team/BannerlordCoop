@@ -36,6 +36,12 @@ namespace Coop
             MBDebug.DisableLogging = false;
 
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+
+            // Must be called here (constructor), not in NoHarmonyLoad().
+            // Module.LoadSubModules() calls all submodule constructors first, then all
+            // OnSubModuleLoad() in a second pass. GauntletUISubModule.OnSubModuleLoad()
+            // triggers the font race — our patches must be registered before that runs.
+            BootPatches.Apply();
         }
 
         private static string ClientServerModeMessage = "";
@@ -150,11 +156,6 @@ namespace Coop
 
         public override void NoHarmonyLoad()
         {
-            // Apply boot-time UI fix before any application ticks run.
-            // Prevents intermittent TextWidget NullRef on GauntletDefaultLoadingWindowManager.Initialize()
-            // caused by UIContext being created with a null FontFactory on Bannerlord v1.3.15.
-            BootPatches.Apply();
-
             Coop = new CoopartiveMultiplayerExperience();
 
             Updateables.Add(GameLoopRunner.Instance);

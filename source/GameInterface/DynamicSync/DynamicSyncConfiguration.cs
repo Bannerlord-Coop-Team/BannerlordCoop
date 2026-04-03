@@ -7,7 +7,7 @@ namespace GameInterface.DynamicSync
     {
         public static string ExportPath => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + @"\DynamicSyncExport";
 
-        public static bool ExportFiles { get; } = true;
+        public static bool ExportFiles { get; set; } = true;
 
         public static bool Enabled { get; } = true;
 
