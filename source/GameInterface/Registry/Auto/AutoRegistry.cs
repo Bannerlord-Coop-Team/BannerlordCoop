@@ -47,27 +47,7 @@ public class AutoRegistry<T> : RegistryBase<T> where T : class
 
     public override bool RegisterExistingObject(string id, object obj)
     {
-        // Parse the numeric suffix from the Coop ID ("Coop_{Type}_{N}") and advance the
-        // counter to at least N. Without this, a 3rd autoconnect client's GetNewId would
-        // collide with IDs already registered by earlier clients via NetworkCreateInstance.
-        if (id != null)
-        {
-            var lastUnderscore = id.LastIndexOf('_');
-            if (lastUnderscore >= 0 && int.TryParse(id.Substring(lastUnderscore + 1), out var parsedNumber))
-            {
-                int current;
-                do
-                {
-                    current = InstanceCounter;
-                    if (current >= parsedNumber) break;
-                }
-                while (Interlocked.CompareExchange(ref InstanceCounter, parsedNumber, current) != current);
-            }
-            else
-            {
-                Interlocked.Increment(ref InstanceCounter);
-            }
-        }
+        Interlocked.Increment(ref InstanceCounter);
         return base.RegisterExistingObject(id, obj);
     }
 

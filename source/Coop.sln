@@ -180,10 +180,10 @@ Global
 		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Debug|x64.ActiveCfg = Debug|Any CPU
 		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Debug|x64.Build.0 = Debug|Any CPU
-		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.DebugAutoConnect|Any CPU.ActiveCfg = DebugAutoConnect|Any CPU
-		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.DebugAutoConnect|Any CPU.Build.0 = DebugAutoConnect|Any CPU
-		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.DebugAutoConnect|x64.ActiveCfg = DebugAutoConnect|Any CPU
-		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.DebugAutoConnect|x64.Build.0 = DebugAutoConnect|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.DebugAutoConnect|Any CPU.ActiveCfg = Debug|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.DebugAutoConnect|Any CPU.Build.0 = Debug|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.DebugAutoConnect|x64.ActiveCfg = Debug|Any CPU
+		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.DebugAutoConnect|x64.Build.0 = Debug|Any CPU
 		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BCBF501F-2A56-40B7-B328-9C0E15CEDBC1}.Release|x64.ActiveCfg = Release|Any CPU
