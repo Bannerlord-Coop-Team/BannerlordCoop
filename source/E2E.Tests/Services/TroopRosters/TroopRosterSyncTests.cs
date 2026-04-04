@@ -22,8 +22,7 @@ namespace E2E.Tests.Services.TroopRosters
         [Fact]
         public void Server_TroopRoster_Fields()
         {
-            //Disabled: _count sync is disabled in TroopRosterSync.cs
-            //TestEnvironment.AssertField<TroopRoster, int>(nameof(TroopRoster._count), 5);
+            TestEnvironment.AssertField<TroopRoster, int>(nameof(TroopRoster._count), 5);
             TestEnvironment.AssertField<TroopRoster, int>(nameof(TroopRoster._troopRosterElementsVersion), 6);
             //TestEnvironment.AssertField<TroopRoster, bool>(nameof(TroopRoster._isPrisonRoster), true);
         }
