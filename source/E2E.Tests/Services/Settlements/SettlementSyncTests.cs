@@ -39,8 +39,6 @@ namespace E2E.Tests.Services.Settlements
             TestEnvironment.AssertReferenceField<Settlement, CultureObject>(nameof(Settlement.Culture));
             TestEnvironment.AssertField<Settlement, float>(nameof(Settlement.LastVisitTimeOfOwner), 20f, defaultValue: settlement.LastVisitTimeOfOwner);
             TestEnvironment.AssertReferenceField<Settlement, MilitiaPartyComponent>(nameof(Settlement.MilitiaPartyComponent));
-            //Disabled: NumberOfLordPartiesTargeting sync is disabled in SettlementSync.cs
-            //TestEnvironment.AssertField<Settlement, int>(nameof(Settlement.NumberOfLordPartiesTargeting), 2);
             // readonly
             //TestEnvironment.AssertReferenceField<Settlement, ItemRoster>(nameof(Settlement.Stash));
             TestEnvironment.AssertReferenceField<Settlement, Town>(nameof(Settlement.Town));
