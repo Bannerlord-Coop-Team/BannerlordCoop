@@ -22,7 +22,8 @@ public class LordPartyComponentTests : SyncTestBase
         Server.ObjectManager.TryGetObject(ComponentId, out LordPartyComponent component);
         component._leader = null;
         TestEnvironment.AssertReferenceField<LordPartyComponent, Hero>(nameof(LordPartyComponent._leader));
-        TestEnvironment.AssertField<LordPartyComponent, int>(nameof(LordPartyComponent._wagePaymentLimit), 5);
+        // _wagePaymentLimit is initialized to 10000 in the LordPartyComponent constructor
+        TestEnvironment.AssertField<LordPartyComponent, int>(nameof(LordPartyComponent._wagePaymentLimit), 5, defaultValue: 10000);
     }
 
     [Fact]

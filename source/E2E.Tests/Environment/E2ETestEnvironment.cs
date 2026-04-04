@@ -194,8 +194,19 @@ internal class E2ETestEnvironment : IDisposable
     /// <returns>Field intercept as <see cref="MethodInfo"/></returns>
     public MethodInfo GetIntercept(FieldInfo field)
     {
-        Assert.True(GenericPatchHelpers.FieldInterceptCache.TryGetValue(field, out var intercept), $"Failed to find intercept for {field.Name}");
-        return intercept;
+        if (GenericPatchHelpers.FieldInterceptCache.TryGetValue(field, out var intercept))
+            return intercept;
+
+        // Handle ReflectedType mismatch: e.g. Town.GarrisonPartyComponent registered under Fief.GarrisonPartyComponent
+        if (field.DeclaringType != null && field.DeclaringType != field.ReflectedType)
+        {
+            var declaringField = field.DeclaringType.GetField(field.Name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (declaringField != null && GenericPatchHelpers.FieldInterceptCache.TryGetValue(declaringField, out intercept))
+                return intercept;
+        }
+
+        Assert.True(false, $"Failed to find intercept for {field.Name}");
+        return null;
     }
 
     /// <summary>
@@ -341,7 +352,7 @@ internal class E2ETestEnvironment : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
-            setIntercept.Invoke(null, new object[] { serverInstance, collection, fieldName });
+            setIntercept.Invoke(null, new object[] { serverInstance, collection });
             Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
             Assert.Equal(1, collection.Count());
         });
@@ -531,7 +542,7 @@ internal class E2ETestEnvironment : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
-            setIntercept.Invoke(null, new object[] { serverInstance, collection, fieldName });
+            setIntercept.Invoke(null, new object[] { serverInstance, collection });
             Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
             Assert.Equal(1, collection.Count());
         });
@@ -710,7 +721,7 @@ internal class E2ETestEnvironment : IDisposable
         Server.Call(() =>
         {
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
-            setIntercept.Invoke(null, new object[] { serverInstance, collection, fieldName });
+            setIntercept.Invoke(null, new object[] { serverInstance, collection });
             Assert.True(collection.Equals(fieldInfo.GetValue(serverInstance)), $"Expected: {collection} Actual: {fieldInfo.GetValue(serverInstance)}");
             Assert.Equal(1, collection.Count());
         });

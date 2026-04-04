@@ -1,5 +1,7 @@
 ﻿using E2E.Tests.Util;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
@@ -44,6 +46,16 @@ public class PartyComponentTests : SyncTestBase
 
         var partyId = TestEnvironment.CreateRegisteredObject<MobileParty>();
         var party2Id = TestEnvironment.CreateRegisteredObject<MobileParty>();
+
+        // Force sync of MobileParty to clients: it's set during construction before clients have
+        // the party in their ObjectManager, so the DynamicSync message is dropped on clients.
+        // Re-null the backing field and re-set via property to trigger a fresh sync.
+        server.Call(() =>
+        {
+            Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var p));
+            AccessTools.Field(typeof(PartyComponent), "<MobileParty>k__BackingField").SetValue(p.PartyComponent, null);
+            p.PartyComponent.MobileParty = p;
+        });
 
         Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party1));
         Assert.True(server.ObjectManager.TryGetId(party1.PartyComponent.MobileParty, out var serverPartyId));
