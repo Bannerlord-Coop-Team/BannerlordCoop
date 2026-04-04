@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using GameInterface.Services.TroopRosters.Patches;
@@ -36,6 +37,7 @@ public class TroopRosterHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
+        messageBroker.Subscribe<ChangeTroopRostersAddToCountsAtIndex>(HandleAddToCountsAtIndex);
         messageBroker.Subscribe<ProccessRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
         messageBroker.Subscribe<ClientCloseRecruitmentVM>(Handle);
         messageBroker.Subscribe<ApproveChangeOnDoneRecruitmentVM>(Handle);
@@ -140,45 +142,48 @@ public class TroopRosterHandler : IHandler
             return;
         }
 
-        List<(Hero, CharacterObject, int)> herosValidated = new();
-
-        // validate they are all good before recruiting any
-        foreach (var troop in obj.TroopsInCart)
+        using (new AllowedThread())
         {
-            if (objectManager.TryGetObject(troop.Item1, out Hero hero) == false)
+            List<(Hero, CharacterObject, int)> herosValidated = new();
+
+            // validate they are all good before recruiting any
+            foreach (var troop in obj.TroopsInCart)
             {
-                Logger.Error("Unable to find Hero ({HeroId})", troop.Item1);
-                // send decline to them at some point...
-                return;
+                if (objectManager.TryGetObject(troop.Item1, out Hero hero) == false)
+                {
+                    Logger.Error("Unable to find Hero ({HeroId})", troop.Item1);
+                    // send decline to them at some point...
+                    return;
+                }
+
+                if (objectManager.TryGetObject(troop.Item2, out CharacterObject characterObject) == false)
+                {
+                    Logger.Error("Unable to find Hero ({CharacterObjectId})", troop.Item2);
+                    // send decline to them at some point...
+                    return;
+                }
+
+
+                var volunteerTroopAtIndex = hero.VolunteerTypes[troop.Item3];
+
+                if (volunteerTroopAtIndex is null)
+                {
+                    // later send decline for specific reason
+                    return;
+                }
+
+                herosValidated.Add((hero, characterObject, troop.Item3));
             }
 
-            if (objectManager.TryGetObject(troop.Item2, out CharacterObject characterObject) == false)
+            foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
             {
-                Logger.Error("Unable to find Hero ({CharacterObjectId})", troop.Item2);
-                // send decline to them at some point...
-                return;
+                hero.VolunteerTypes[index] = null;
+                mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
+                CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
             }
 
-
-            var volunteerTroopAtIndex = hero.VolunteerTypes[troop.Item3];
-
-            if (volunteerTroopAtIndex is null)
-            {
-                // later send decline for specific reason
-                return;
-            }
-
-            herosValidated.Add((hero, characterObject, troop.Item3));
+            GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, obj.Gold, true);
         }
-
-        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
-        {
-            hero.VolunteerTypes[index] = null;
-            mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
-            CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
-        }
-
-        GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, obj.Gold, true);
     }
 
     private void HandleAddToCounts(MessagePayload<ChangeTroopRostersAddToCounts> payload)
@@ -201,9 +206,22 @@ public class TroopRosterHandler : IHandler
         AddToCountsTroopRosterPatch.RunAddToCounts(party, characterObject, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.xpChanged, obj.RemoveDepleted, obj.Index);
     }
 
+    private void HandleAddToCountsAtIndex(MessagePayload<ChangeTroopRostersAddToCountsAtIndex> payload)
+    {
+        var obj = payload.What;
+        if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty party) == false)
+        {
+            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
+            return;
+        }
+
+        AddToCountsTroopRosterPatch.RunAddToCountsAtIndex(party, obj.Index, obj.Count, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted);
+    }
+
     public void Dispose()
     {
         messageBroker.Unsubscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
+        messageBroker.Unsubscribe<ChangeTroopRostersAddToCountsAtIndex>(HandleAddToCountsAtIndex);
         messageBroker.Unsubscribe<ProccessRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
         messageBroker.Unsubscribe<ClientCloseRecruitmentVM>(Handle);
         messageBroker.Unsubscribe<ApproveChangeOnDoneRecruitmentVM>(Handle);

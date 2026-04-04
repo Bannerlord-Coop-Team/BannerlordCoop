@@ -3,6 +3,7 @@ using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
 using Coop.Core.Server.Services.TroopRosters.Messages;
 using GameInterface.Services.TroopRosters.Messages;
+using System;
 
 namespace Coop.Core.Client.Services.TroopRosters.Handlers;
 public class ClientTroopRosterHandler : IHandler
@@ -16,8 +17,10 @@ public class ClientTroopRosterHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<NetworkChangeTroopRosterAddtoCounts>(HandleAddToCounts);
+        messageBroker.Subscribe<NetworkChangeTroopRosterAddtoCountsAtIndex>(HandleAddToCountsAtIndex);
         messageBroker.Subscribe<OnDoneRecruitmentVMChanged>(HandleOnRecruitmentDone);
     }
+
     private void HandleOnRecruitmentDone(MessagePayload<OnDoneRecruitmentVMChanged> payload)
     {
         var obj = payload.What;
@@ -32,9 +35,17 @@ public class ClientTroopRosterHandler : IHandler
 
         messageBroker.Publish(this, message);
     }
+    private void HandleAddToCountsAtIndex(MessagePayload<NetworkChangeTroopRosterAddtoCountsAtIndex> payload)
+    {
+        var obj = payload.What;
+        var message = new ChangeTroopRostersAddToCountsAtIndex(obj.MobilePartyId, obj.Index, obj.Count, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted);
+
+        messageBroker.Publish(this, message);
+    }
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkChangeTroopRosterAddtoCounts>(HandleAddToCounts);
+        messageBroker.Unsubscribe<NetworkChangeTroopRosterAddtoCountsAtIndex>(HandleAddToCountsAtIndex);
         messageBroker.Unsubscribe<OnDoneRecruitmentVMChanged>(HandleOnRecruitmentDone);
     }
 }

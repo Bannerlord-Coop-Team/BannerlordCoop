@@ -4,6 +4,7 @@ using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Patches
 {

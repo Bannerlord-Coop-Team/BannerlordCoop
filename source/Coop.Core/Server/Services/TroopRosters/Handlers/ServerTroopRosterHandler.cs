@@ -6,6 +6,7 @@ using Coop.Core.Server.Services.TroopRosters.Messages;
 using GameInterface.Services.TroopRosters.Messages;
 using LiteNetLib;
 using Serilog;
+using System;
 
 namespace Coop.Core.Server.Services.TroopRosters.Handlers;
 internal class ServerTroopRosterHandler : IHandler
@@ -20,6 +21,7 @@ internal class ServerTroopRosterHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<TroopRosterAddToCountsChanged>(HandleAddToCounts);
+        messageBroker.Subscribe<TroopRosterAddToCountsAtIndexChanged>(HandleAddToCountsAtIndex);
         messageBroker.Subscribe<ClientRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
     }
 
@@ -36,9 +38,18 @@ internal class ServerTroopRosterHandler : IHandler
         var message = new NetworkChangeTroopRosterAddtoCounts(obj.MobilePartyId, obj.Character, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.xpChanged, obj.RemoveDepleted, obj.Index);
         network.SendAll(message);
     }
+
+    private void HandleAddToCountsAtIndex(MessagePayload<TroopRosterAddToCountsAtIndexChanged> payload)
+    {
+        var obj = payload.What;
+        var message = new NetworkChangeTroopRosterAddtoCountsAtIndex(obj.MobilePartyId, obj.Index, obj.Count, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted);
+        network.SendAll(message);
+    }
+
     public void Dispose()
     {
         messageBroker.Unsubscribe<TroopRosterAddToCountsChanged>(HandleAddToCounts);
+        messageBroker.Unsubscribe<TroopRosterAddToCountsAtIndexChanged>(HandleAddToCountsAtIndex);
         messageBroker.Unsubscribe<ClientRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
     }
 }
