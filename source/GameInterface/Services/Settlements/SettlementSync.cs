@@ -20,11 +20,8 @@ internal class SettlementSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.LastVisitTimeOfOwner)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.MilitiaPartyComponent)));
 
-        // maybe not needed???
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
-
         // readonly
-        // dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Town)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Village)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._isVisible)));
@@ -32,8 +29,16 @@ internal class SettlementSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._name)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._nextLocatable)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._numberOfLordPartiesAt)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._position)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._readyMilitia)));
+
+        // Unsure if these need to be added
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._settlementWallSectionHitPointsRatioList)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._boundVillages)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._lastAttackerParty)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._siegeEngineMissiles)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.GatePosition)));
 
         dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(SettlementClaimantCampaignBehavior), nameof(SettlementClaimantCampaignBehavior.OnSettlementOwnerChanged)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(KingdomManager), nameof(KingdomManager.UpdateLordPartyVariablesRelatedToSettlements)));
