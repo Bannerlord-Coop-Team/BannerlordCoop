@@ -94,7 +94,8 @@ internal class MapEventHandler : IHandler
         {
             using (new AllowedThread())
             {
-                mapEvent.FinalizeEvent();
+                mapEvent.Component?.FinishComponent();
+                mapEvent.FinalizeEventAux();
             }
         });
     }

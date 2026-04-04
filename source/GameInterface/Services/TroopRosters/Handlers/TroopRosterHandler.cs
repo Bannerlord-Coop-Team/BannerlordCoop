@@ -75,60 +75,63 @@ public class TroopRosterHandler : IHandler
             Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
             return;
         }
-
-        var troopsInCartList = obj.TroopsInCart.ToList();
-
-        if (obj.TotalCost > mobileParty.LeaderHero.Gold)
+        using (new AllowedThread())
         {
-            // gold is not good respond to them for future ref reference.
-            return;
-        }
 
-        List<(Hero, CharacterObject, int)> herosValidated = new();
+            var troopsInCartList = obj.TroopsInCart.ToList();
 
-        // validate they are all good before recruiting any
-        foreach (var troop in troopsInCartList)
-        {
-            if (objectManager.TryGetObject(troop.Item1, out Hero hero) == false)
+            if (obj.TotalCost > mobileParty.LeaderHero.Gold)
             {
-                Logger.Error("Unable to find Hero ({HeroId})", troop.Item1);
-                // send decline to them at some point...
+                // gold is not good respond to them for future ref reference.
                 return;
             }
 
-            if (objectManager.TryGetObject(troop.Item2, out CharacterObject characterObject) == false)
+            List<(Hero, CharacterObject, int)> herosValidated = new();
+
+            // validate they are all good before recruiting any
+            foreach (var troop in troopsInCartList)
             {
-                Logger.Error("Unable to find Hero ({CharacterObjectId})", troop.Item2);
-                // send decline to them at some point...
-                return;
+                if (objectManager.TryGetObject(troop.Item1, out Hero hero) == false)
+                {
+                    Logger.Error("Unable to find Hero ({HeroId})", troop.Item1);
+                    // send decline to them at some point...
+                    return;
+                }
+
+                if (objectManager.TryGetObject(troop.Item2, out CharacterObject characterObject) == false)
+                {
+                    Logger.Error("Unable to find Hero ({CharacterObjectId})", troop.Item2);
+                    // send decline to them at some point...
+                    return;
+                }
+
+
+                var volunteerTroopAtIndex = hero.VolunteerTypes[troop.Item3];
+
+                if (volunteerTroopAtIndex is null)
+                {
+                    // later send decline for specific reason
+                    return;
+                }
+
+                herosValidated.Add((hero, characterObject, troop.Item3));
             }
 
-
-            var volunteerTroopAtIndex = hero.VolunteerTypes[troop.Item3];
-
-            if (volunteerTroopAtIndex is null)
+            foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
             {
-                // later send decline for specific reason
-                return;
+                hero.VolunteerTypes[index] = null;
+                mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
+                CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
             }
 
-            herosValidated.Add((hero, characterObject, troop.Item3));
-        }
-
-        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
-        {
-            hero.VolunteerTypes[index] = null;
-            mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
-            CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
-        }
-
-        GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, obj.TotalCost, true);
-
+            GiveGoldAction.ApplyBetweenCharacters(mobileParty.LeaderHero, null, obj.TotalCost, true);
         var message = new ApproveChangeOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, obj.TotalCost);
 
         network.Send(obj.ClientWho, new ClientCloseRecruitmentVM());
 
         network.SendAll(message);
+
+        }
     }
 
     //client process approved recruitment

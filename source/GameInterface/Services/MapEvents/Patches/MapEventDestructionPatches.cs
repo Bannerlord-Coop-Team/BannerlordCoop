@@ -15,35 +15,23 @@ internal class MapEventDestructionPatches
 {
     static readonly ILogger Logger = LogManager.GetLogger<MapEventDestructionPatches>();
 
-    [HarmonyPatch(nameof(MapEvent.FinalizeEvent))]
-    static bool Prefix()
+    [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
+    [HarmonyPrefix]
+    static bool Prefix(MapEvent __instance)
     {
         // Call original if we called it
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created managed {name}", typeof(MapEvent));
+            Logger.Error("Client destroyed managed {name}", typeof(MapEvent));
             return false;
-        }
-
-        return true;
-    }
-
-    [HarmonyPatch(nameof(MapEvent.FinalizeEvent))]
-    static void Postfix(MapEvent __instance)
-    {
-        // Call original if we called it
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client created managed {name}", typeof(MapEvent));
-            return;
         }
 
         var message = new MapEventDestroyed(__instance);
 
         MessageBroker.Instance.Publish(__instance, message);
+
+        return true;
     }
 }
