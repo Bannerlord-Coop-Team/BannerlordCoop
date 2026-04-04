@@ -36,8 +36,6 @@ public class PartyDestructionTests : IDisposable
 
 
             Assert.NotNull(clientParty);
-            // Note: LordPartyComponent.Clan is not synced during party creation in this test context
-            //Assert.NotNull(clientParty.LordPartyComponent.Clan);
         }
 
         // Act
