@@ -57,7 +57,7 @@ namespace GameInterface.Services.MapEventParties.Handlers
             {
                 using (new AllowedThread())
                 {
-                    var newMapEventParty = ObjectHelper.SkipConstructor<MapEventParty>();
+                    MapEventParty newMapEventParty = new MapEventParty(partyBase);
 
                     newMapEventParty._woundedInBattle = new TroopRoster();
                     newMapEventParty._diedInBattle = new TroopRoster();

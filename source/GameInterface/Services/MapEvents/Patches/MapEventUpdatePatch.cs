@@ -1,9 +1,13 @@
 ﻿using Common;
+using Common.Messaging;
+using Common.Util;
+using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Patches
@@ -22,6 +26,21 @@ namespace GameInterface.Services.MapEvents.Patches
             if (__instance.InvolvedParties.Any(x => x.MobileParty.IsPartyControlled() == false)) return false;
 
             return true;
+        }
+    }
+
+    [HarmonyPatch(typeof(MapEvent))]
+    public class MapEventInitPatch
+    {
+        [HarmonyPostfix]
+        [HarmonyPatch(nameof(MapEvent.Initialize))]
+        static void Postfix(MapEvent __instance, PartyBase attackerParty, PartyBase defenderParty, MapEventComponent component, MapEvent.BattleTypes mapEventType)
+        {
+            if (ModInformation.IsClient) return;
+
+            MapEventInitialize message = new MapEventInitialize(__instance, mapEventType);
+
+            MessageBroker.Instance.Publish(__instance, message);
         }
     }
 
