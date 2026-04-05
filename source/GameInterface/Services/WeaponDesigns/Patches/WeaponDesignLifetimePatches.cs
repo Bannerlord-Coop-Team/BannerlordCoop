@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.WeaponDesigns.Messages;
@@ -18,7 +19,7 @@ namespace GameInterface.Services.WeaponDesigns.Patches
     {
         private static ILogger Logger = LogManager.GetLogger<WeaponDesignLifetimePatches>();
 
-        [HarmonyPatch(typeof(WeaponDesign), MethodType.Constructor, new[] { typeof(CraftingTemplate), typeof(TextObject), typeof(WeaponDesignElement[]) })]
+        [HarmonyPatch(typeof(WeaponDesign), MethodType.Constructor, new[] { typeof(CraftingTemplate), typeof(TextObject), typeof(WeaponDesignElement[]), typeof(string) })]
         [HarmonyPrefix]
         private static bool CreateWeaponDesignPrefix(ref WeaponDesign __instance)
         {
@@ -27,8 +28,7 @@ namespace GameInterface.Services.WeaponDesigns.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(WeaponDesign), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(WeaponDesign));
                 return true;
             }
 

@@ -1,0 +1,18 @@
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, RawSerializer.Serialize(data.Value))));
+
+SubscribeNetwork<byte[], {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+{{ 
+if ReadOnly;
+}}
+	dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{DeserializeMethod}}(data.Value, instance.{{MemberName}}));
+{{
+else
+}}
+	using (new AllowedThread())
+	{
+		instance.{{MemberName}} = RawSerializer.Deserialize<{{MemberType}}>(data.Value);
+	}
+{{end}}
+}
+);

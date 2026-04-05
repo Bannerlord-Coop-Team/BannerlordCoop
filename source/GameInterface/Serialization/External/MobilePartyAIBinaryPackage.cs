@@ -17,15 +17,7 @@ namespace GameInterface.Serialization.External
 
         private static readonly HashSet<string> excludes = new HashSet<string>
         {
-            "<MoveTargetParty>k__BackingField",
-            "<Path>k__BackingField",
-            "<ForceAiNoPathMode>k__BackingField",
             "<AiBehaviorPartyBase>k__BackingField",
-            "_targetAiFaceIndex",
-            "_moveTargetAiFaceIndex",
-            "_aiPathLastFace",
-            "_lastTargetedParties",
-            "_aiBehaviorMapEntity",
         };
 
         protected override void PackInternal()
@@ -37,8 +29,8 @@ namespace GameInterface.Serialization.External
         {
             base.UnpackFields();
 
-            Object._lastTargetedParties = new List<MobileParty>();
-            Object.InitCached();
+            //Object._lastTargetedParties = new List<MobileParty>();
+            //Object.InitCached();
         }
     }
 }

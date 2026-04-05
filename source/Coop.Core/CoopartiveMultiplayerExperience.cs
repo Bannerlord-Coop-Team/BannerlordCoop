@@ -8,6 +8,7 @@ using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using GameInterface;
 using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
 using HarmonyLib;
@@ -119,6 +120,10 @@ namespace Coop.Core
 
             containerProvider.SetProvider(container);
             GameInterface.ContainerProvider.SetContainer(container);
+
+            // Client process does not own the export directory — only the server writes
+            // debug export files. This prevents DebugAutoConnect races on that directory.
+            DynamicSyncConfiguration.ExportFiles = false;
 
             // Create harmony patches
             container.Resolve<IGameInterface>().PatchAll();

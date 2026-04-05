@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
 using HarmonyLib;
 using TaleWorlds.Core;

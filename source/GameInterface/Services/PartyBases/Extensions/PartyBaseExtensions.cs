@@ -1,5 +1,7 @@
 ﻿using Common.Extensions;
 using SandBox.View.Map;
+using SandBox.View.Map.Managers;
+using SandBox.View.Map.Visuals;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -9,12 +11,12 @@ namespace GameInterface.Services.PartyBases.Extensions;
 
 public static class PartyBaseExtensions
 {
-    public static PartyVisual GetPartyVisual(this PartyBase partyBase)
+    public static MobilePartyVisual GetPartyVisual(this PartyBase partyBase)
     {
         if (partyBase == null) return null;
 
-        if (PartyVisualManager.Current == null) return null;
+        if (MobilePartyVisualManager.Current == null) return null;
 
-        return PartyVisualManager.Current._partiesAndVisuals.TryGetValue(partyBase, out var partyVisual) ? partyVisual : null;
+        return MobilePartyVisualManager.Current._partiesAndVisuals.TryGetValue(partyBase, out var partyVisual) ? partyVisual : null;
     }
 }

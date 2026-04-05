@@ -14,7 +14,7 @@ using GameInterface.Utils;
 namespace GameInterface.Services.Heroes.Patches;
 
 [HarmonyPatch]
-internal class HeroCollectionPatches : GenericCollectionPatches<HeroCollectionPatches, Hero>
+internal class HeroCollectionPatches : GenericPatches<HeroCollectionPatches, Hero>
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
@@ -26,7 +26,6 @@ internal class HeroCollectionPatches : GenericCollectionPatches<HeroCollectionPa
         yield return AccessTools.Method(typeof(RecruitmentCampaignBehavior), nameof(RecruitmentCampaignBehavior.RecruitVolunteersFromNotable));
         yield return AccessTools.Method(typeof(RecruitmentCampaignBehavior), nameof(RecruitmentCampaignBehavior.UpdateVolunteersOfNotablesInSettlement));
         yield return AccessTools.Method(typeof(RecruitmentCampaignBehavior), nameof(RecruitmentCampaignBehavior.ApplyInternal));
-        yield return AccessTools.Method(typeof(Town), nameof(Town.DailyGarrisonAdjustment));
         // Carvans
         yield return AccessTools.Method(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.OnFinalize));
         yield return AccessTools.Method(typeof(CaravanPartyComponent), nameof(CaravanPartyComponent.OnInitialize));
@@ -93,19 +92,19 @@ internal class HeroCollectionPatches : GenericCollectionPatches<HeroCollectionPa
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> ChildrenTranspiler(IEnumerable<CodeInstruction> instructions) 
-        => MBListPropertyTranspiler<Hero, ChildrenListUpdated, ChildrenListRemoved>(instructions, nameof(Hero.Children));
+        => MBListPropertyChangeTranspiler<Hero, ChildrenListUpdated, ChildrenListRemoved>(instructions, nameof(Hero.Children));
     
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> CaravanTranspiler(IEnumerable<CodeInstruction> instructions) 
-        => ListPropertyTranspiler<CaravanPartyComponent, CaravanListUpdated, CaravanListRemoved>(instructions, nameof(Hero.OwnedCaravans));
+        => ListPropertyChangeTranspiler<CaravanPartyComponent, CaravanListUpdated, CaravanListRemoved>(instructions, nameof(Hero.OwnedCaravans));
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> AlleyTranspiler(IEnumerable<CodeInstruction> instructions)
-        => ListPropertyTranspiler<Alley, AlleyListUpdated, AlleyListRemoved>(instructions, nameof(Hero.OwnedAlleys));
+        => ListPropertyChangeTranspiler<Alley, AlleyListUpdated, AlleyListRemoved>(instructions, nameof(Hero.OwnedAlleys));
 
     [HarmonyTranspiler]
     static IEnumerable<CodeInstruction> WorkshopTranspiler(IEnumerable<CodeInstruction> instructions)
-        => MBListFieldTranspiler<Workshop, WorkshopListUpdated, WorkshopListRemoved>(instructions, nameof(Hero._ownedWorkshops));
+        => MBListFieldChangeTranspiler<Workshop, WorkshopListUpdated, WorkshopListRemoved>(instructions, nameof(Hero._ownedWorkshops));
 }
 
 

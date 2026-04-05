@@ -1,0 +1,2 @@
+﻿[HarmonyTranspiler]
+static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => MBListFieldChangeTranspiler<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMessage, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveLocalMessage>(instructions, "{{MemberName}}");

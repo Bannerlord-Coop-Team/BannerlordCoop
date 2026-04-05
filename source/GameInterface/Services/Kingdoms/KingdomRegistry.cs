@@ -55,10 +55,9 @@ internal class KingdomRegistry : IAutoRegistry<Kingdom>
             obj._activePolicies = new MBList<PolicyObject>();
             obj._armies = new MBList<Army>();
             obj.InitializeCachedLists();
-            obj.EncyclopediaText = TextObject.Empty;
-            obj.EncyclopediaTitle = TextObject.Empty;
-            obj.EncyclopediaRulerTitle = TextObject.Empty;
-            obj._midPointCalculated = false;
+            obj.EncyclopediaText = TextObject.GetEmpty();
+            obj.EncyclopediaTitle = TextObject.GetEmpty();
+            obj.EncyclopediaRulerTitle = TextObject.GetEmpty();
             obj._distanceToClosestNonAllyFortificationCacheDirty = true;
             obj._isEliminated = false;
             obj.NotAttackableByPlayerUntilTime = CampaignTime.Zero;

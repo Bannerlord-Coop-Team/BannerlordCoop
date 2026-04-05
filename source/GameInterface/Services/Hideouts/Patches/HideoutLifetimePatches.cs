@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Hideouts.Messages;
@@ -25,8 +26,7 @@ internal class HideoutLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(Hideout), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(Hideout));
             return true;
         }
 

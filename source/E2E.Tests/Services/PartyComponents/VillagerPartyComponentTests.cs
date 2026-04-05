@@ -1,23 +1,25 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Util;
-using TaleWorlds.CampaignSystem;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
-public class VillagerPartyComponentTests : IDisposable
+public class VillagerPartyComponentTests : SyncTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-    public VillagerPartyComponentTests(ITestOutputHelper output)
+    string ComponentId;
+    public VillagerPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        ComponentId = TestEnvironment.CreateRegisteredObject<VillagerPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Village>();
     }
 
-    public void Dispose()
+    [Fact]
+    public void Server_VillagerPartyComponent_Properties()
     {
-        TestEnvironment.Dispose();
+        Server.ObjectManager.TryGetObject(ComponentId, out VillagerPartyComponent component);
+        component.Village = null;
+        TestEnvironment.AssertReferenceProperty<VillagerPartyComponent, Village>(nameof(VillagerPartyComponent.Village));
     }
 
     [Fact]
@@ -36,7 +38,7 @@ public class VillagerPartyComponentTests : IDisposable
 
             var newVillage = GameObjectCreator.CreateInitializedObject<Village>();
 
-            var newParty = VillagerPartyComponent.CreateVillagerParty("TestId", village, 5);
+            var newParty = VillagerPartyComponent.CreateVillagerParty("TestId", village);
             VillagerPartyComponent villagers = (VillagerPartyComponent)newParty.PartyComponent;
             villagers.Village = newVillage;
 
@@ -74,7 +76,7 @@ public class VillagerPartyComponentTests : IDisposable
         PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
-            partyComponent = new VillagerPartyComponent(village);
+            partyComponent = new VillagerPartyComponent(village, new VillagerPartyComponent.InitializationArgs());
         });
 
         Assert.NotNull(partyComponent);

@@ -1,4 +1,5 @@
-﻿using Common.Extensions;
+﻿using Common;
+using Common.Extensions;
 using Common.Messaging;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Armies.Messages;

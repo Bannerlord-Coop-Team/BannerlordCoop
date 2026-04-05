@@ -21,9 +21,13 @@ internal class ParallelRobustnessPatches
         {
             MobileParty mobileParty = Campaign.Current.MobileParties[index];
 
-            if (mobileParty.Party == null) continue;
+            if (mobileParty.Party == null)
+            {
+                Logger.Error("{var} was null for {stringId}", nameof(MobileParty.Party), mobileParty.StringId);
+                continue;
+            }
 
-            mobileParty.CheckExitingSettlementParallel(ref __instance._exitingSettlementCount, ref __instance._exitingSettlementMobilePartyList);
+            mobileParty.CheckExitingSettlementParallel(ref __instance._exitingSettlementCount, ref __instance._exitingSettlementMobilePartyList, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
         }
 
         return false;
@@ -37,7 +41,11 @@ internal class ParallelRobustnessPatches
         {
             MobileParty mobileParty = Campaign.Current.MobileParties[index];
 
-            if (mobileParty.Party == null) continue;
+            if (mobileParty.Party == null)
+            {
+                Logger.Error("{var} was null for {stringId}", nameof(MobileParty.Party), mobileParty.StringId);
+                continue;
+            }
 
             __instance._cacheData[index].MobileParty = mobileParty;
             mobileParty.InitializeCachedPartyVariables(ref __instance._cacheData[index].LocalVariables);
@@ -52,17 +60,21 @@ internal class ParallelRobustnessPatches
     {
         for (int i = startInclusive; i < endExclusive; i++)
         {
-            var party = __instance._cacheData[i].MobileParty;
+            var mobileParty = __instance._cacheData[i].MobileParty;
 
-            if (party == null) continue;
-
-            if (party.Ai == null)
+            if (mobileParty.Party == null)
             {
-                Logger.Error("MobileParty with id {id} AI was null", party.StringId);
+                Logger.Error("{var} was null for {stringId}", nameof(MobileParty.Party), mobileParty.StringId);
                 continue;
             }
 
-            party.Ai.CacheTargetPartyVariablesAtFrameStart(ref __instance._cacheData[i].LocalVariables);
+            if (mobileParty.Ai == null)
+            {
+                Logger.Error("{var} was null for {stringId}", nameof(MobileParty.Ai), mobileParty.StringId);
+                continue;
+            }
+
+            mobileParty.CacheTargetPartyVariablesAtFrameStart(ref __instance._cacheData[i].LocalVariables);
         }
 
         return false;
@@ -89,7 +101,7 @@ internal class ParallelRobustnessPatches
         return false;
     }
 
-    [HarmonyPatch(nameof(CampaignTickCacheDataStore.ParallelTickArmies))]
+    [HarmonyPatch(nameof(CampaignTickCacheDataStore.ParallelTickMovingArmies))]
     [HarmonyPrefix]
     static bool ParallelTickArmies(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
     {
@@ -98,12 +110,21 @@ internal class ParallelRobustnessPatches
             CampaignTickCacheDataStore.PartyTickCachePerParty tickCachePerParty = __instance._cacheData[__instance._movingArmyLeaderPartyIndices[index]];
             MobileParty mobileParty = tickCachePerParty.MobileParty;
 
-            if (mobileParty.Party == null) continue;
-            if (mobileParty.AttachedTo == null) continue;
+            if (mobileParty.Party == null)
+            {
+                Logger.Error("{var} was null for {stringId}", nameof(MobileParty.Party), mobileParty.StringId);
+                continue;
+            }
+
+            if (mobileParty.AttachedTo == null)
+            {
+                Logger.Error("{var} was null for {stringId}", nameof(MobileParty.AttachedTo), mobileParty.StringId);
+                continue;
+            }
 
             MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
-            mobileParty.TickForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
-            mobileParty.TickForMobileParty2(ref localVariables, __instance._currentRealDt, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
+            mobileParty.FillCurrentTickMoveDataForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
+            mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
             mobileParty.ValidateSpeed();
         }
 
@@ -119,33 +140,47 @@ internal class ParallelRobustnessPatches
             CampaignTickCacheDataStore.PartyTickCachePerParty tickCachePerParty = __instance._cacheData[__instance._movingPartyIndices[index]];
             MobileParty mobileParty = tickCachePerParty.MobileParty;
 
-            if (mobileParty.Party == null) continue;
+            if (mobileParty.Party == null)
+            {
+                Logger.Error("{var} was null for {stringId}", nameof(MobileParty.Party), mobileParty.StringId);
+                continue;
+            }
 
             MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
-            mobileParty.TickForMovingMobileParty(ref localVariables, __instance._currentDt, __instance._currentRealDt);
-            mobileParty.TickForMobileParty2(ref localVariables, __instance._currentRealDt, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
+            mobileParty.FillCurrentTickMoveDataForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
+            mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
         }
 
         return false;
-    }
+        //}
 
 
-    [HarmonyPatch(nameof(CampaignTickCacheDataStore.ParallelTickStationaryParties))]
-    [HarmonyPrefix]
-    static bool ParallelTickStationaryParties(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
-    {
-        for (int index = startInclusive; index < endExclusive; ++index)
+        [HarmonyPatch(nameof(CampaignTickCacheDataStore.ParallelTickStationaryParties))]
+        [HarmonyPrefix]
+        static bool ParallelTickStationaryParties(CampaignTickCacheDataStore __instance, int startInclusive, int endExclusive)
         {
-            CampaignTickCacheDataStore.PartyTickCachePerParty tickCachePerParty = __instance._cacheData[__instance._stationaryPartyIndices[index]];
-            MobileParty mobileParty = tickCachePerParty.MobileParty;
+            for (int index = startInclusive; index < endExclusive; ++index)
+            {
+                CampaignTickCacheDataStore.PartyTickCachePerParty tickCachePerParty = __instance._cacheData[__instance._stationaryPartyIndices[index]];
+                MobileParty mobileParty = tickCachePerParty.MobileParty;
 
-            if (mobileParty?.Party == null) continue;
+                if (mobileParty is null)
+                {
+                    Logger.Error("{var} was null", nameof(MobileParty));
+                    continue;
+                }
 
-            MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
-            mobileParty.TickForStationaryMobileParty(ref localVariables, __instance._currentDt, __instance._currentRealDt);
-            mobileParty.TickForMobileParty2(ref localVariables, __instance._currentRealDt, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
+                if (mobileParty.Party == null)
+                {
+                    Logger.Error("{var} was null for {stringId}", nameof(MobileParty.Party), mobileParty.StringId);
+                    continue;
+                }
+
+                MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
+                mobileParty.TickForStationaryMobileParty(ref localVariables, __instance._currentDt, __instance._currentRealDt);
+            }
+
+            return false;
         }
-
-        return false;
     }
 }

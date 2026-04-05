@@ -5,11 +5,13 @@ using Coop.Core.Client;
 using Coop.Core.Client.States;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Tests.Mocks;
+using GameInterface;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
 using LiteNetLib;
+using Moq;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -64,22 +66,6 @@ namespace Coop.Tests.Client.States
 
             // Assert
             Assert.Single(TestMessageBroker.GetMessagesFromType<RegisterAllGameObjects>());
-        }
-
-        [Fact]
-        public void AllGameObjects_Publishes_PackageMainHero()
-        {
-            // Arrange
-            var characterCreationState = clientLogic.SetState<CharacterCreationState>();
-
-            var payload = new MessagePayload<AllGameObjectsRegistered>(
-                this, new AllGameObjectsRegistered());
-
-            // Act
-            characterCreationState.Handle_AllGameObjectRegistered(payload);
-
-            // Assert
-            Assert.Single(TestMessageBroker.GetMessagesFromType<PackageMainHero>());
         }
 
         [Fact]

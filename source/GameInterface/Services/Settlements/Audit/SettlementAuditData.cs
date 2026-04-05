@@ -57,8 +57,8 @@ public record SettlementAuditData
     {
         StringId = settlement.StringId;
 
-        NumberOfEnemiesSpottedAround = settlement.NumberOfEnemiesSpottedAround;
-        NumberOfAlliesSpottedAround = settlement.NumberOfAlliesSpottedAround;
+        NumberOfEnemiesSpottedAround = settlement.NearbyLandAllyIntensity;
+        NumberOfAlliesSpottedAround = settlement.NearbyLandThreatIntensity;
         BribePaid = settlement.BribePaid;
         SettlementHitPoints = settlement.SettlementHitPoints;
         GarrisonWagePaymentLimit = settlement.GarrisonWagePaymentLimit;
@@ -75,9 +75,9 @@ public record SettlementAuditData
 
         LastVisitTimeOfOwner = settlement.LastVisitTimeOfOwner;
 
-        ClaimedBy = settlement.ClaimedBy?.StringId ?? "";
-        ClaimValue = settlement.ClaimValue;
-        CanBeClaimed = settlement.CanBeClaimed;
+        //ClaimedBy = settlement.ClaimedBy?.StringId ?? "";
+        //ClaimValue = settlement.ClaimValue;
+        //CanBeClaimed = settlement.CanBeClaimed;
 
 
         WallSectionHitPointsRatioList = settlement._settlementWallSectionHitPointsRatioList.ToArray();

@@ -5,6 +5,7 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map;
+using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Handlers
@@ -38,7 +39,7 @@ namespace GameInterface.Services.PartyVisuals.Handlers
 
         private void Handle(MessagePayload<PartyVisualCreated> payload)
         {
-            objectManager.AddNewObject(payload.What.PartyVisual, out var visualId);
+            objectManager.AddNewObject(payload.What.MobilePartyVisual, out var visualId);
             objectManager.TryGetId(payload.What.PartyBase, out string partyBaseId);
 
             network.SendAll(new NetworkCreatePartyVisual(visualId, partyBaseId));
@@ -50,22 +51,22 @@ namespace GameInterface.Services.PartyVisuals.Handlers
 
             using(new AllowedThread())
             {
-                PartyVisual newVisual = new PartyVisual(partyBase);
+                MobilePartyVisual newVisual = new MobilePartyVisual(partyBase);
                 objectManager.AddExisting(payload.What.PartyVisualId, newVisual);
             }
         }
 
         private void Handle(MessagePayload<PartyVisualDestroyed> payload)
         {
-            objectManager.TryGetId(payload.What.PartyVisual, out string visualId);
-            objectManager.Remove(payload.What.PartyVisual);
+            objectManager.TryGetId(payload.What.MobilePartyVisual, out string visualId);
+            objectManager.Remove(payload.What.MobilePartyVisual);
 
             network.SendAll(new NetworkDestroyPartyVisual(visualId));
         }
 
         private void Handle(MessagePayload<NetworkDestroyPartyVisual> payload)
         {
-            objectManager.TryGetObject(payload.What.PartyVisualId, out PartyVisual partyVisual);
+            objectManager.TryGetObject(payload.What.PartyVisualId, out MobilePartyVisual partyVisual);
             objectManager.Remove(partyVisual);
         }
     }

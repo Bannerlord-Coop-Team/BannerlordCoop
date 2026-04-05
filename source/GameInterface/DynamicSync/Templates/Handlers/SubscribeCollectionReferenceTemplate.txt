@@ -1,0 +1,52 @@
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+{
+    var valueIds = new List<string>();
+    for (int i = 0; i < data.Value.Count; i++)
+    {
+        if (data.Value[i] == null) continue;
+        if (!objectManager.TryGetId(data.Value[i], out string id)) continue;
+        valueIds.Add(id);
+    }
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueIds));
+});
+SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+    var newValue = new {{MemberType}}();
+    for (int i = 0; i < data.Value.Count; i++)
+    {
+        if (!objectManager.TryGetObject<{{ElementType}}>(data.Value[i], out {{ElementType}} element)) continue;
+        newValue.Add(element);
+    }
+    {{ 
+    if ReadOnly;
+    }}
+	    dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue));
+    {{
+    else
+    }}
+	    instance.{{MemberName}} = newValue;
+    {{
+    end
+    }}
+});
+
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMessage>((instanceId, data) => 
+{
+    if (!objectManager.TryGetId(data.Value, out string id)) return;
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_AddNetworkMessage(instanceId, id));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddNetworkMessage>((instance, data) => 
+{
+    if (!objectManager.TryGetObject<{{ElementType}}>(data.ValueId, out {{ElementType}} element)) return;
+    instance.{{ MemberName }}.Add(element);
+});
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveLocalMessage>((instanceId, data) => 
+{
+    if (!objectManager.TryGetId(data.Value, out string id)) return;
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_RemoveNetworkMessage(instanceId, id));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveNetworkMessage>((instance, data) => 
+{
+    if (!objectManager.TryGetObject<{{ElementType}}>(data.ValueId, out {{ElementType}} element)) return;
+    instance.{{ MemberName }}.Remove(element);
+});

@@ -1,6 +1,4 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Util;
-using HarmonyLib;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -9,17 +7,23 @@ using TaleWorlds.Library;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.PartyComponents;
-public class LordPartyComponentTests : IDisposable
+public class LordPartyComponentTests : SyncTestBase
 {
-    E2ETestEnvironment TestEnvironment { get; }
-    public LordPartyComponentTests(ITestOutputHelper output)
+    string ComponentId;
+    public LordPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        TestEnvironment = new E2ETestEnvironment(output);
+        ComponentId = TestEnvironment.CreateRegisteredObject<LordPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Hero>();
     }
 
-    public void Dispose()
+    [Fact]
+    public void Server_LordPartyComponent_Fields()
     {
-        TestEnvironment.Dispose();
+        Server.ObjectManager.TryGetObject(ComponentId, out LordPartyComponent component);
+        component._leader = null;
+        TestEnvironment.AssertReferenceField<LordPartyComponent, Hero>(nameof(LordPartyComponent._leader));
+        // _wagePaymentLimit is initialized to 10000 in the LordPartyComponent constructor
+        TestEnvironment.AssertField<LordPartyComponent, int>(nameof(LordPartyComponent._wagePaymentLimit), 5, defaultValue: 10000);
     }
 
     [Fact]
@@ -27,12 +31,6 @@ public class LordPartyComponentTests : IDisposable
     {
         // Arrange
         var server = TestEnvironment.Server;
-
-        var leaderField = AccessTools.Field(typeof(LordPartyComponent), nameof(LordPartyComponent._leader));
-        var wageLimitField = AccessTools.Field(typeof(LordPartyComponent), nameof(LordPartyComponent._wagePaymentLimit));
-
-        var leaderIntercept = TestEnvironment.GetIntercept(leaderField);
-        var wageLimitIntercept = TestEnvironment.GetIntercept(wageLimitField);
 
         // Act
         string? partyId = null;
@@ -46,11 +44,8 @@ public class LordPartyComponentTests : IDisposable
 
             leaderhero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-            var newParty = LordPartyComponent.CreateLordParty(null, leaderhero, new Vec2(5, 5), 5, spawnSettlement, leaderhero);
+            var newParty = LordPartyComponent.CreateLordParty(null, leaderhero, new CampaignVec2(new Vec2(5, 5), true), 5, spawnSettlement, leaderhero);
             partyId = newParty.StringId;
-
-            leaderIntercept.Invoke(null, new object[] { newParty.LordPartyComponent, newLeaderHero });
-            wageLimitIntercept.Invoke(null, new object[] { newParty.LordPartyComponent, 5 });
         });
 
         // Assert
@@ -61,9 +56,6 @@ public class LordPartyComponentTests : IDisposable
             Assert.NotNull(newLeaderHero);
             Assert.True(client.ObjectManager.TryGetObject<MobileParty>(partyId, out var newParty));
             Assert.IsType<LordPartyComponent>(newParty.PartyComponent);
-
-            Assert.Equal(newLeaderHero.StringId, newParty.LordPartyComponent._leader.StringId);
-            Assert.Equal(5, newParty.LordPartyComponent._wagePaymentLimit);
         }
     }
 
@@ -83,9 +75,10 @@ public class LordPartyComponentTests : IDisposable
 
         // Act
         PartyComponent? partyComponent = null;
+        Settlement setlement = new Settlement();
         client1.Call(() =>
         {
-            partyComponent = new LordPartyComponent(leaderHero, leaderHero);
+            partyComponent = new LordPartyComponent(leaderHero, leaderHero, new LordPartyComponent.InitializationArgs(new CampaignVec2(new Vec2(2, 2), true), 2f, setlement));
         });
 
         Assert.NotNull(partyComponent);

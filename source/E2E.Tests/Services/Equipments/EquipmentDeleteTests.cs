@@ -76,14 +76,17 @@ public class EquipmentDeleteTests : IDisposable
         Hero killHero = null;
         string? battleEquipmentId = null;
         string? civilEquipmentId = null;
-        
+        string? stealthEquipmentId = null;
+
         server.Call(() =>
         {
             killHero = GameObjectCreator.CreateInitializedObject<Hero>();
             killHero._battleEquipment = new Equipment();
             killHero._civilianEquipment = new Equipment();
+            killHero._stealthEquipment = new Equipment();
             Assert.True(server.ObjectManager.TryGetId(killHero.BattleEquipment, out battleEquipmentId));
             Assert.True(server.ObjectManager.TryGetId(killHero.CivilianEquipment, out civilEquipmentId));
+            Assert.True(server.ObjectManager.TryGetId(killHero.StealthEquipment, out stealthEquipmentId));
         });
         
         // Act
@@ -92,6 +95,7 @@ public class EquipmentDeleteTests : IDisposable
         {
             Assert.True(client1.ObjectManager.TryGetObject<Equipment>(battleEquipmentId, out var _));
             Assert.True(client1.ObjectManager.TryGetObject<Equipment>(civilEquipmentId, out var _));
+            Assert.True(client1.ObjectManager.TryGetObject<Equipment>(stealthEquipmentId, out var _));
             killHero.OnDeath();
 
         });
@@ -99,11 +103,13 @@ public class EquipmentDeleteTests : IDisposable
         // Assert
         Assert.True(server.ObjectManager.TryGetObject<Equipment>(battleEquipmentId, out var _));
         Assert.True(server.ObjectManager.TryGetObject<Equipment>(civilEquipmentId, out var _));
+        Assert.True(server.ObjectManager.TryGetObject<Equipment>(stealthEquipmentId, out var _));
 
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<Equipment>(battleEquipmentId, out var _));
             Assert.True(client.ObjectManager.TryGetObject<Equipment>(civilEquipmentId, out var _));
+            Assert.True(client.ObjectManager.TryGetObject<Equipment>(stealthEquipmentId, out var _));
 
         }
     }

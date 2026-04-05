@@ -1,17 +1,18 @@
 ﻿using Common.Messaging;
 using SandBox.View.Map;
+using SandBox.View.Map.Visuals;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Messages
 {
     internal record PartyVisualCreated : IEvent
     {
-        public PartyVisual PartyVisual { get; }
+        public MobilePartyVisual MobilePartyVisual { get; }
         public PartyBase PartyBase { get; }
 
-        public PartyVisualCreated(PartyVisual partyVisual, PartyBase partyBase)
+        public PartyVisualCreated(MobilePartyVisual partyVisual, PartyBase partyBase)
         {
-            PartyVisual = partyVisual;
+            MobilePartyVisual = partyVisual;
             PartyBase = partyBase;
         }
     }

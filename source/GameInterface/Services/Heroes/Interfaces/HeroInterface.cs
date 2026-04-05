@@ -9,11 +9,13 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Registry;
+using SandBox.View.Map.Managers;
 using Serilog;
 using System;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Naval;
 
 namespace GameInterface.Services.Heroes.Interfaces;
 
@@ -72,19 +74,27 @@ internal class HeroInterface : IHeroInterface
         },
         blocking: true);
 
-        objectManager.TryGetId(hero, out var heroId);
-        objectManager.TryGetId(hero.PartyBelongedTo, out var partyId);
-        objectManager.TryGetId(hero.CharacterObject, out var characterObjectId);
-        objectManager.TryGetId(hero.Clan, out var clanId);
+        // Retrieve the Coop-assigned IDs so they can be written back onto each object's
+        // StringId. If null (due to an ID collision fixed in AutoRegistry.RegisterExistingObject),
+        // log and skip — assigning null would corrupt the object in CampaignObjectManager.
+        if (objectManager.TryGetId(hero, out var heroId) == false)
+            Logger.Error("Failed to retrieve coop ID for hero, StringId will not be updated");
+        if (objectManager.TryGetId(hero.PartyBelongedTo, out var partyId) == false)
+            Logger.Error("Failed to retrieve coop ID for hero's party (StringId={ExistingId}), StringId will not be updated", hero.PartyBelongedTo?.StringId);
+        if (objectManager.TryGetId(hero.CharacterObject, out var characterObjectId) == false)
+            Logger.Error("Failed to retrieve coop ID for hero's CharacterObject, StringId will not be updated");
+        if (objectManager.TryGetId(hero.Clan, out var clanId) == false)
+            Logger.Error("Failed to retrieve coop ID for hero's Clan, StringId will not be updated");
 
         using (new AllowedThread())
         {
-            hero.StringId = heroId;
-            hero.PartyBelongedTo.StringId = partyId;
-            hero.CharacterObject.StringId = characterObjectId;
-            hero.Clan.StringId = clanId;
+            // Guard against null — original code assigned unconditionally which would
+            // leave objects with vanilla StringIds (e.g. "main_hero") and crash on load.
+            if (heroId != null) hero.StringId = heroId;
+            if (partyId != null) hero.PartyBelongedTo.StringId = partyId;
+            if (characterObjectId != null) hero.CharacterObject.StringId = characterObjectId;
+            if (clanId != null) hero.Clan.StringId = clanId;
         }
-        
 
         entityRegistry.RegisterAsControlled(controllerId, heroId);
 
@@ -114,18 +124,24 @@ internal class HeroInterface : IHeroInterface
 
         if (entityRegistry.TryGetControlledEntities(controllerId, out var entities) == false)
         {
-            Logger.Error("Unable to resolve hero for {controllerId}", controllerId);
+            Logger.Warning("Unable to resolve hero for {controllerId}", controllerId);
             return false;
         }
 
-        // TODO ensure works
-        var resolvedEntity = entities.SingleOrDefault(entity => entity.EntityId.StartsWith("hero"));
+        var heroEntities = entities.Where(entity => objectManager.TryGetObject<Hero>(entity.EntityId, out _)).ToList();
 
-        if (resolvedEntity == null)
+        if (heroEntities.Count == 0)
         {
-            Logger.Error("No hero was registered for {controllerId}", controllerId);
+            Logger.Warning("No hero was registered for {controllerId}", controllerId);
             return false;
         }
+
+        if (heroEntities.Count > 1)
+        {
+            Logger.Warning("Multiple heroes registered for {controllerId}, using first match", controllerId);
+        }
+
+        var resolvedEntity = heroEntities[0];
 
         heroId = resolvedEntity.EntityId;
 
@@ -148,8 +164,8 @@ internal class HeroInterface : IHeroInterface
 
     private void SetupNewHero(Hero hero)
     {
-        SetupHeroWithObjectManagers(hero);
         SetupNewParty(hero);
+        SetupHeroWithObjectManagers(hero);
     }
 
     private void SetupHeroWithObjectManagers(Hero hero)
@@ -182,14 +198,17 @@ internal class HeroInterface : IHeroInterface
     private void SetupNewParty(Hero hero)
     {
         var party = hero.PartyBelongedTo;
+
+        using (new AllowedThread())
+        {
+            party.Anchor = new AnchorPoint(party);
+        }
+        
         party.IsVisible = true;
         party.Party.SetVisualAsDirty();
 
-        party.RecoverPositionsForNavMeshUpdate();
-        party.CurrentNavigationFace = Campaign.Current.MapSceneWrapper.GetFaceIndex(party.Position2D);
-
-        party.Ai.OnGameInitialized();
-
+        party.CheckPositionsForMapChangeAndUpdateIfNeeded();
+        MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
         CampaignEventDispatcher.Instance.OnPartyVisibilityChanged(party.Party);
     }
 }

@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.PacketHandlers;
@@ -6,7 +7,6 @@ using Common.Serialization;
 using Coop.Core.Common.Network;
 using Coop.Core.Server.Connections.Messages;
 using Coop.Core.Server.Services.Time.Messages;
-using GameInterface;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
 using LiteNetLib;
@@ -93,7 +93,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkError(IPEndPoint endPoint, SocketError socketError)
     {
-        throw new NotImplementedException();
+        Logger.Warning("Network error from {EndPoint}: {SocketError}", endPoint, socketError);
     }
 
     public override void OnNetworkLatencyUpdate(NetPeer peer, int latency)
@@ -109,7 +109,7 @@ public class CoopServer : CoopNetworkBase, ICoopServer
 
     public override void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
-        throw new NotImplementedException();
+        Logger.Warning("Received unconnected message from {EndPoint}", remoteEndPoint);
     }
 
     public override void OnPeerConnected(NetPeer peer)

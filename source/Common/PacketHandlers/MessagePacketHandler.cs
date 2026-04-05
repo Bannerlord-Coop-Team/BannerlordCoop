@@ -48,19 +48,29 @@ namespace Common.PacketHandlers
 
             PublishEvent(peer, networkEvent);
         }
-        private Dictionary<string, Action<IMessageBroker, object, object>> publishFunctionCache = new Dictionary<string, Action<IMessageBroker, object, object>>();
+        private Dictionary<Type, Action<IMessageBroker, object, object>> publishFunctionCache = new Dictionary<Type, Action<IMessageBroker, object, object>>();
         internal virtual void PublishEvent(NetPeer peer, IMessage message)
         {
             var msgType = message.GetType();
-            if (publishFunctionCache.TryGetValue(msgType.FullName, out var action))
+            if (publishFunctionCache.TryGetValue(msgType, out var action))
             {
-                action.Invoke(messageBroker, peer, message);
+                try
+                {
+                    action.Invoke(messageBroker, peer, message);
+                }
+                catch (TargetInvocationException ex)
+                {
+                    Logger.Error(ex.InnerException, "PublishEvent failed for {MessageType}", message?.GetType());
+                    throw;
+                }
+
             }
             else
             {
                 var castedPublish = Publish.MakeGenericMethod(message.GetType());
-                publishFunctionCache.Add(msgType.FullName, 
+                publishFunctionCache.Add(msgType, 
                     (messageBrokerParam, peerParam, messageParam) => castedPublish.Invoke(messageBrokerParam, new object[] { peerParam, messageParam }));
+
                 castedPublish.Invoke(messageBroker, new object[] { peer, message });
             }
         }

@@ -1,0 +1,52 @@
+﻿[HarmonyTranspiler]
+private static IEnumerable<CodeInstruction> {{MemberName}}_SetTranspiler(IEnumerable<CodeInstruction> instructions)
+{
+    var fieldIntercept = typeof({{MemberDeclaringType}}_DynamicPatches).GetMethod(nameof({{MemberName}}_Intercept));
+
+    var fieldInfo = AccessTools.Field(typeof({{MemberDeclaringType}}), nameof({{MemberDeclaringType}}.{{MemberName}}));
+
+    GenericPatchHelpers.FieldInterceptCache.TryAdd(fieldInfo, fieldIntercept);
+
+    foreach (var instruction in instructions)
+    {
+        if (instruction.StoresField(fieldInfo))
+        {
+            var loadInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
+            if (instruction.labels.Any())
+                loadInst.labels = instruction.labels.ToList();
+
+            yield return loadInst;
+
+        }
+        else
+        {
+            yield return instruction;
+        }
+    }
+}
+
+public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{MemberType}} newValue)
+{
+    var currentValue = instance.{{MemberName}};
+
+    // Skip if value hasn´t changed
+    if (currentValue != null && currentValue.Equals(newValue)) return;
+
+    if (CallOriginalPolicy.IsOriginalAllowed())
+    {
+        instance.{{MemberName}} = newValue;
+        return;
+    }
+
+    if (ModInformation.IsClient)
+    {
+        Logger.Error("Client updated managed {type}", "{{MemberName}}");
+        instance.{{MemberName}} = newValue;
+        return;
+    }
+
+    var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(instance, newValue);
+    MessageBroker.Instance.Publish(instance, message);
+
+    instance.{{MemberName}} = newValue;
+}

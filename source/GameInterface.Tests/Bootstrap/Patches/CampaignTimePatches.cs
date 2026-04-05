@@ -7,23 +7,31 @@ using System.Text;
 using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Tests.Bootstrap.Patches
-{
-    [HarmonyPatch(typeof(CampaignTime))]
-    internal class CampaignTimePatches
-    {
-        [HarmonyPatch(nameof(CampaignTime.HoursFromNow))]
-        [HarmonyPrefix]
-        private static bool AddEventHandlersPrefix()
-        {
-            return false;
-        }
+namespace GameInterface.Tests.Bootstrap.Patches;
 
-        [HarmonyPatch(nameof(CampaignTime.HoursFromNow))]
-        [HarmonyPostfix]
-        private static void AddEventHandlersPostfix(ref CampaignTime __result)
-        {
-            __result = CampaignTime.Zero;
-        }
+[HarmonyPatch(typeof(CampaignTime))]
+internal class CampaignTimePatches
+{
+    [HarmonyPatch(nameof(CampaignTime.HoursFromNow))]
+    [HarmonyPrefix]
+    private static bool AddEventHandlersPrefix()
+    {
+        return false;
+    }
+
+    [HarmonyPatch(nameof(CampaignTime.HoursFromNow))]
+    [HarmonyPostfix]
+    private static void AddEventHandlersPostfix(ref CampaignTime __result)
+    {
+        __result = CampaignTime.Zero;
+    }
+
+    [HarmonyPatch(nameof(CampaignTime.Now), MethodType.Getter)]
+    [HarmonyPrefix]
+    private static bool get_NowPrefix(ref CampaignTime __result)
+    {
+        __result = CampaignTime.Zero;
+
+        return false;
     }
 }

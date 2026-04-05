@@ -1,3 +1,4 @@
+using Common;
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
@@ -30,8 +31,7 @@ internal class KingdomLifetimePatches
 
 		if (ModInformation.IsClient)
 		{
-			Logger.Error("Client created unmanaged {name}\n"
-			+ "Callstack: {callstack}", typeof(Kingdom), Environment.StackTrace);
+			Logger.Error("Client created managed {name}", typeof(Kingdom));
 			return true;
 		}
 

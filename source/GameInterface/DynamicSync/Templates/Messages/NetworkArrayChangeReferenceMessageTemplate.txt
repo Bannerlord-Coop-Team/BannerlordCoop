@@ -1,0 +1,29 @@
+﻿using Common.Messaging;
+using GameInterface.Utils.NetworkEvents;
+using ProtoBuf;
+using System.Collections.Generic;
+using System.Reflection;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace DynamicSync
+{
+    [ProtoContract(SkipConstructor = true)]
+    public record {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage : GenericNetworkReferenceEvent<{{ MemberDeclaringType}}, {{ ElementType }}>
+    {
+        [ProtoMember(1)]
+        public override string InstanceId { get; set; }
+
+        [ProtoMember(2)]
+        public override string ValueId { get; set; }
+        
+        [ProtoMember(3)]
+        public int Index { get; set; }
+
+        public {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(string instanceId, string valueId, int index) : base(instanceId, valueId)
+        {
+            Index = index;
+        }
+    }
+}

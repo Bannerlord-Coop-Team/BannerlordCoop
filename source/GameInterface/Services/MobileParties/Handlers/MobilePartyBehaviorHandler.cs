@@ -1,5 +1,7 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -7,12 +9,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
-using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
@@ -60,14 +57,34 @@ internal class MobilePartyBehaviorHandler : IHandler
 
     public void Handle_PartyBehaviorChanged(MessagePayload<PartyBehaviorChangeAttempted> obj)
     {
-        var party = obj.What.Party;
+        var partyAi = obj.What.PartyAi;
+        var party = obj.What.PartyAi._mobileParty;
+        var interactablePoint = obj.What.InteractablePoint;
 
         var controllerId = controllerIdProvider.ControllerId;
 
-        if (controlledEntityRegistry.IsControlledBy(controllerId, party.StringId) == false)
+        if (!controlledEntityRegistry.IsControlledBy(controllerId, party.StringId))
             return;
 
-        PartyBehaviorUpdateData data = obj.What.BehaviorUpdateData;
+        if (!objectManager.TryGetId(partyAi._mobileParty, out var partyId))
+            return;
+
+        string interactablePointId = null;
+        if (interactablePoint is PartyBase partyBase &&
+            !objectManager.TryGetId(partyBase, out interactablePointId))
+            return;
+
+        PartyBehaviorUpdateData data = new PartyBehaviorUpdateData(
+            partyId,
+            obj.What.NewAiBehavior,
+            interactablePointId,
+            obj.What.BestTargetPoint,
+            interactablePoint is not null,
+            party.Position,
+            party.DefaultBehavior,
+            party.TargetPosition,
+            party.DesiredAiNavigationType
+         );
 
         messageBroker.Publish(this, new ControlledPartyBehaviorUpdated(data));
     }
@@ -76,46 +93,36 @@ internal class MobilePartyBehaviorHandler : IHandler
     {
         var data = obj.What.BehaviorUpdateData;
 
-        MobileParty targetParty = null;
-        Settlement targetSettlement = null;
-        if (data.HasTarget && 
-            !objectManager.TryGetObject(data.TargetId, out targetParty) &&
-            !objectManager.TryGetObject(data.TargetId, out targetSettlement))
+        PartyBase partyBase = null;
+        if (data.HasTarget && !objectManager.TryGetObject(data.InteractablePointId, out partyBase))
             return;
 
-        if (!objectManager.TryGetObject(data.PartyId, out MobileParty party))
+        if (!objectManager.TryGetObject(data.MobilePartyId, out MobileParty party))
             return;
 
-        if (party.Ai == null) return;
 
-        Vec2 targetPoint = new Vec2(data.TargetPointX, data.TargetPointY);
+        using (new AllowedThread())
+        {
+            PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
 
-        IMapEntity targetMapEntity = null;
-        if (data.HasTarget && targetParty != null)
-        {
-            targetMapEntity = targetParty;
-        }
-        else if (data.HasTarget && targetSettlement != null)
-        {
-            targetMapEntity = targetSettlement;
-        }
+            Logger.Debug(
+                "Setting AI behavior. PartyId: {PartyId}, Behavior: {Behavior}, TargetParty: {TargetParty}, BestTargetPoint: {BestTargetPoint}",
+                data.MobilePartyId,
+                data.NewAiBehavior,
+                partyBase,
+                data.BestTargetPoint
+            );
+            party.Ai.SetAiBehavior(data.NewAiBehavior, partyBase, data.BestTargetPoint);
 
-        PartyBehaviorPatch.SetAiBehavior(
-            party.Ai,
-            data.Behavior,
-            targetMapEntity,
-            targetPoint
-        );
-
-        if (ModInformation.IsClient)
-        {
-            party.Position2D = new Vec2(data.PartyPositionX, data.PartyPositionY);
-        }
-        else
-        {
-            data.PartyPositionX = party.Position2D.x;
-            data.PartyPositionY = party.Position2D.y;
-            messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+            if (ModInformation.IsClient)
+            {
+                party.Ai._mobileParty.Position = data.PartyPosition;
+            }
+            else
+            {
+                data.PartyPosition = party.Position;
+                messageBroker.Publish(this, new PartyBehaviorUpdated(ref data));
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -8,29 +9,28 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Fiefs;
-
-class FiefRegistry : IAutoRegistry<Fief>
+internal class FiefRegistry : IAutoRegistry<Fief>
 {
     ILogger Logger { get; }
+
     public FiefRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
         Logger = logger;
-
         autoRegistryFactory.RegisterType(this);
     }
 
     public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(Town))
+        AccessTools.Constructor(typeof(Fief))
     };
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
-
+    
     public void RegisterAllObjects(IRegistry<Fief> registry)
     {
-        foreach (var fief in Town.AllTowns)
+        foreach (Fief fief in Town.AllFiefs)
         {
-            var networkId = $"{nameof(Fief)}_{fief.StringId}";
-            registry.RegisterExistingObject(networkId, fief.StringId);
+            var networkId = fief.StringId;
+            registry.RegisterExistingObject(networkId, fief);
         }
     }
 

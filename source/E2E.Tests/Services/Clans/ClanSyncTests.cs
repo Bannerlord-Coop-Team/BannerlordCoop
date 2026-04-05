@@ -1,23 +1,15 @@
-﻿using E2E.Tests.Environment;
-using E2E.Tests.Environment.Instance;
-using E2E.Tests.Util;
-using GameInterface.Services.ObjectManager;
-using HarmonyLib;
+﻿using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Services.Clans
 {
-    public class ClanSyncTests : IDisposable
+    public class ClanSyncTests : SyncTestBase
     {
-        E2ETestEnvironment TestEnvironment { get; }
-
-        EnvironmentInstance Server => TestEnvironment.Server;
-
-        IEnumerable<EnvironmentInstance> Clients => TestEnvironment.Clients;
 
         private string KingdomId;
         private string SettlementId;
@@ -26,164 +18,62 @@ namespace E2E.Tests.Services.Clans
         private string CultureId;
         private string ClanId;
 
-        public ClanSyncTests(ITestOutputHelper output)
+        public ClanSyncTests(ITestOutputHelper output) : base(output)
         {
-            TestEnvironment = new E2ETestEnvironment(output);
-        }
-
-        public void Dispose()
-        {
-            TestEnvironment.Dispose();
+            ClanId = TestEnvironment.CreateRegisteredObject<Clan>();
+            KingdomId = TestEnvironment.CreateRegisteredObject<Kingdom>();
+            SettlementId = TestEnvironment.CreateRegisteredObject<Settlement>();
+            CharacterObjectId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
+            HeroId = TestEnvironment.CreateRegisteredObject<Hero>();
+            CultureId = TestEnvironment.CreateRegisteredObject<CultureObject>();
         }
 
         [Fact]
-        public void ServerUpdateClan_SyncAllClients()
+        public void Server_Clan_Fields()
         {
-            // Arrange
-            var server = TestEnvironment.Server;
-
-            // Act
-            server.Call(() =>
-            {
-                var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
-                var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
-                var settlement = GameObjectCreator.CreateInitializedObject<Settlement>();
-                var hero = GameObjectCreator.CreateInitializedObject<Hero>();
-                var culture = GameObjectCreator.CreateInitializedObject<CultureObject>();
-                var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-
-                Assert.True(server.ObjectManager.TryGetId(kingdom, out KingdomId));
-                Assert.True(server.ObjectManager.TryGetId(settlement, out SettlementId));
-                Assert.True(server.ObjectManager.TryGetId(characterObject, out CharacterObjectId));
-                Assert.True(server.ObjectManager.TryGetId(hero, out HeroId));
-                Assert.True(server.ObjectManager.TryGetId(culture, out CultureId));
-                Assert.True(server.ObjectManager.TryGetId(clan, out ClanId));
-
-                clan.Name = new TextObject("testName");
-                clan.InformalName = new TextObject("testInformal");
-                clan.LastFactionChangeTime = new CampaignTime(100);
-                clan.AutoRecruitmentExpenses = 10;
-                clan.IsNoble = true;
-                clan.TotalStrength = 199;
-                clan.MercenaryAwardMultiplier = 5;
-                clan.LabelColor = 2;
-                clan.InitialPosition = new TaleWorlds.Library.Vec2(1, 2);
-                clan.IsRebelClan = true;
-                clan.IsUnderMercenaryService = true;
-                clan.Color = 3;
-                clan.Color2 = 4;
-                clan.BannerBackgroundColorPrimary = 5;
-                clan.BannerBackgroundColorSecondary = 6;
-                clan.BannerIconColor = 7;
-                clan._midPointCalculated = true;
-                clan.Renown = 55f;
-                clan.NotAttackableByPlayerUntilTime = new CampaignTime(300);
-                clan.Culture = culture;
-            });
-
-            var isEliminatedField = AccessTools.Field(typeof(Clan), nameof(Clan._isEliminated));
-            var kingdomField = AccessTools.Field(typeof(Clan), nameof(Clan._kingdom));
-            var influenceField = AccessTools.Field(typeof(Clan), nameof(Clan._influence));
-            var clanMidSettlementField = AccessTools.Field(typeof(Clan), nameof(Clan._clanMidSettlement));
-            var basicTroopField = AccessTools.Field(typeof(Clan), nameof(Clan._basicTroop));
-            var leaderField = AccessTools.Field(typeof(Clan), nameof(Clan._leader));
-            var bannerField = AccessTools.Field(typeof(Clan), nameof(Clan._banner));
-            var tierField = AccessTools.Field(typeof(Clan), nameof(Clan._tier));
-            var aggressivenessField = AccessTools.Field(typeof(Clan), nameof(Clan._aggressiveness));
-            var tributeWalletField = AccessTools.Field(typeof(Clan), nameof(Clan._tributeWallet));
-            var homeField = AccessTools.Field(typeof(Clan), nameof(Clan._home));
-            var clanDebtToKingdomField = AccessTools.Field(typeof(Clan), nameof(Clan._clanDebtToKingdom));
-
-            // Get field intercept to use on the server to simulate the field changing
-            var isEliminatedIntercept = TestEnvironment.GetIntercept(isEliminatedField);
-            var kingdomIntercept = TestEnvironment.GetIntercept(kingdomField);
-            var influenceIntercept = TestEnvironment.GetIntercept(influenceField);
-            var clanMidSettlementIntercept = TestEnvironment.GetIntercept(clanMidSettlementField);
-            var basicTroopIntercept = TestEnvironment.GetIntercept(basicTroopField);
-            var leaderIntercept = TestEnvironment.GetIntercept(leaderField);
-            var bannerIntercept = TestEnvironment.GetIntercept(bannerField);
-            var tierIntercept = TestEnvironment.GetIntercept(tierField);
-            var aggressivenessIntercept = TestEnvironment.GetIntercept(aggressivenessField);
-            var tributeWalletIntercept = TestEnvironment.GetIntercept(tributeWalletField);
-            var homeIntercept = TestEnvironment.GetIntercept(homeField);
-            var clanDebtToKingdomIntercept = TestEnvironment.GetIntercept(clanDebtToKingdomField);
-
-            // Assert
-            Assert.True(server.ObjectManager.TryGetObject(ClanId, out Clan serverClan));
-
-            server.Call(() =>
-            {
-                Assert.True(server.ObjectManager.TryGetObject<Kingdom>(KingdomId, out var serverKingdom));
-                Assert.True(server.ObjectManager.TryGetObject<Settlement>(SettlementId, out var serverSettlement));
-                Assert.True(server.ObjectManager.TryGetObject<CharacterObject>(CharacterObjectId, out var serverCharacter));
-                Assert.True(server.ObjectManager.TryGetObject<Hero>(HeroId, out var serverHero));
-                Banner banner = new Banner();
-
-                isEliminatedIntercept.Invoke(null, new object[] { serverClan, true });
-                kingdomIntercept.Invoke(null, new object[] { serverClan, serverKingdom });
-                influenceIntercept.Invoke(null, new object[] { serverClan, 500f });
-                clanMidSettlementIntercept.Invoke(null, new object[] { serverClan, serverSettlement });
-                basicTroopIntercept.Invoke(null, new object[] { serverClan, serverCharacter });
-                leaderIntercept.Invoke(null, new object[] { serverClan, serverHero });
-                bannerIntercept.Invoke(null, new object[] { serverClan, banner });
-                tierIntercept.Invoke(null, new object[] { serverClan, 5 });
-                aggressivenessIntercept.Invoke(null, new object[] { serverClan, 60f });
-                tributeWalletIntercept.Invoke(null, new object[] { serverClan, 30 });
-                homeIntercept.Invoke(null, new object[] { serverClan, serverSettlement });
-                clanDebtToKingdomIntercept.Invoke(null, new object[] { serverClan, 25 });
-            });
-
-            foreach (var client in TestEnvironment.Clients)
-            {
-                Assert.True(client.ObjectManager.TryGetObject(ClanId, out Clan clientClan));
-                Assert.Equal(serverClan.Name.Value, clientClan.Name.Value);
-                Assert.Equal(serverClan.InformalName.Value, clientClan.InformalName.Value);
-
-                Assert.Equal(serverClan.LastFactionChangeTime, clientClan.LastFactionChangeTime);
-                Assert.Equal(serverClan.AutoRecruitmentExpenses, clientClan.AutoRecruitmentExpenses);
-                Assert.Equal(serverClan.IsNoble, clientClan.IsNoble);
-                Assert.Equal(serverClan.TotalStrength, clientClan.TotalStrength);
-                Assert.Equal(serverClan.MercenaryAwardMultiplier, clientClan.MercenaryAwardMultiplier);
-                Assert.Equal(serverClan.LabelColor, clientClan.LabelColor);
-                Assert.Equal(serverClan.InitialPosition, clientClan.InitialPosition);
-                Assert.Equal(serverClan.IsRebelClan, clientClan.IsRebelClan);
-                Assert.Equal(serverClan.IsUnderMercenaryService, clientClan.IsUnderMercenaryService);
-                Assert.Equal(serverClan.Color, clientClan.Color);
-                Assert.Equal(serverClan.Color2, clientClan.Color2);
-                Assert.Equal(serverClan.BannerBackgroundColorPrimary, clientClan.BannerBackgroundColorPrimary);
-                Assert.Equal(serverClan.BannerBackgroundColorSecondary, clientClan.BannerBackgroundColorSecondary);
-                Assert.Equal(serverClan.BannerIconColor, clientClan.BannerIconColor);
-                Assert.Equal(serverClan._midPointCalculated, clientClan._midPointCalculated);
-                Assert.Equal(serverClan.Renown, clientClan.Renown);
-                Assert.Equal(serverClan.NotAttackableByPlayerUntilTime, clientClan.NotAttackableByPlayerUntilTime);
-
-                Assert.Equal(serverClan._isEliminated, clientClan._isEliminated);
-                
-                Assert.Equal(serverClan._influence, clientClan._influence);
-                
-                Assert.Equal(serverClan._banner._bannerVisual, clientClan._banner._bannerVisual);
-                Assert.Equal(serverClan._banner._bannerDataList, clientClan._banner._bannerDataList);
-                Assert.Equal(serverClan._tier, clientClan._tier);
-                Assert.Equal(serverClan._aggressiveness, clientClan._aggressiveness);
-                Assert.Equal(serverClan._tributeWallet, clientClan._tributeWallet);
-                Assert.Equal(serverClan._clanDebtToKingdom, clientClan._clanDebtToKingdom);
-
-                // Network
-                NetworkIdsEqual(Server.ObjectManager, serverClan.Culture, client.ObjectManager, clientClan.Culture);
-                NetworkIdsEqual(Server.ObjectManager, serverClan._kingdom, client.ObjectManager, clientClan._kingdom);
-                NetworkIdsEqual(Server.ObjectManager, serverClan._clanMidSettlement, client.ObjectManager, clientClan._clanMidSettlement);
-                NetworkIdsEqual(Server.ObjectManager, serverClan._basicTroop, client.ObjectManager, clientClan._basicTroop);
-                NetworkIdsEqual(Server.ObjectManager, serverClan._leader, client.ObjectManager, clientClan._leader);
-                NetworkIdsEqual(Server.ObjectManager, serverClan._home, client.ObjectManager, clientClan._home);
-            }
+            var banner = new Banner();
+            banner.BannerDataList.Add(new BannerData(1, 2, 3, Vec2.One, Vec2.Zero, true, true, 0f));
+            TestEnvironment.AssertField<Clan, bool>(nameof(Clan._isEliminated), true);
+            TestEnvironment.AssertReferenceField<Clan, Kingdom>(nameof(Clan._kingdom));
+            TestEnvironment.AssertField<Clan, float>(nameof(Clan._influence), 0.5f);
+            //TestEnvironment.AssertReferenceField<Clan,Settlement>(nameof(Clan._clanMidSettlement));
+            TestEnvironment.AssertReferenceField<Clan, CharacterObject>(nameof(Clan._basicTroop));
+            TestEnvironment.AssertReferenceField<Clan, Hero>(nameof(Clan._leader));
+            TestEnvironment.AssertField<Clan, Banner>(nameof(Clan._banner), banner);
+            TestEnvironment.AssertField<Clan, int>(nameof(Clan._tier), 2);
+            TestEnvironment.AssertField<Clan, float>(nameof(Clan._aggressiveness), 0.8f);
+            TestEnvironment.AssertField<Clan, int>(nameof(Clan._tributeWallet), 20000);
+            TestEnvironment.AssertReferenceField<Clan, Settlement>(nameof(Clan._home));
+            TestEnvironment.AssertField<Clan, int>(nameof(Clan._clanDebtToKingdom), 5000);
         }
 
-        void NetworkIdsEqual<T>(IObjectManager objManager1, T obj1, IObjectManager objManager2, T obj2)
+        [Fact]
+        public void Server_Clan_Properties()
         {
-            Assert.True(objManager1.TryGetId(obj1, out var obj1Id));
-            Assert.True(objManager2.TryGetId(obj2, out var obj2Id));
+            // Arrange
 
-            Assert.Equal(obj2Id, obj1Id);
+            // Assert
+            Server.ObjectManager.TryGetObject(ClanId, out Clan clan);
+            TestEnvironment.AssertProperty<Clan, TextObject>(nameof(Clan.Name), new TextObject("new clan"), clan.Name);
+            TestEnvironment.AssertProperty<Clan, TextObject>(nameof(Clan.InformalName), new TextObject("new clan informational"), clan.InformalName);
+            TestEnvironment.AssertReferenceProperty<Clan, CultureObject>(nameof(Clan.Culture));
+            TestEnvironment.AssertProperty<Clan, CampaignTime>(nameof(Clan.LastFactionChangeTime), new CampaignTime(12341));
+            TestEnvironment.AssertProperty<Clan, int>(nameof(Clan.AutoRecruitmentExpenses), 20);
+            TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan.IsNoble), true);
+            //TestEnvironment.AssertProperty<Clan, float>(nameof(Clan.TotalStrength), 200f);
+            TestEnvironment.AssertProperty<Clan, int>(nameof(Clan.MercenaryAwardMultiplier), 20);
+            //TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.LabelColor), 123);
+            //TestEnvironment.AssertProperty<Clan, Vec2>(nameof(Clan.InitialPosition),new Vec2(2f,4f));
+            TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan.IsRebelClan), true);
+            TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan.IsUnderMercenaryService), true);
+            TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.Color),321);
+            TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.Color2),432);
+            TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.BannerBackgroundColorPrimary),543);
+            TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.BannerBackgroundColorSecondary), 654);
+            TestEnvironment.AssertProperty<Clan, uint>(nameof(Clan.BannerIconColor),765);
+            //TestEnvironment.AssertProperty<Clan, bool>(nameof(Clan._midPointCalculated), true);
+            TestEnvironment.AssertProperty<Clan, float>(nameof(Clan.Renown), 20f);
+            TestEnvironment.AssertProperty<Clan, CampaignTime>(nameof(Clan.NotAttackableByPlayerUntilTime), new CampaignTime(7644567));
         }
     }
 }

@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
@@ -12,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -42,7 +44,7 @@ internal class EncounterManagerPatches
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
-    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty)
+    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
     {
         // Skip this method if party is not controlled
         if (mobileParty.IsPartyControlled() == false) return false;

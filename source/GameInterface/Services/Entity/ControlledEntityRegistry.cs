@@ -137,7 +137,20 @@ internal class ControlledEntityRegistry : IControlledEntityRegistry
 
     public bool IsControlledBy(string ownerId, string entityId)
     {
-        if(controllerIdLookup.TryGetValue(entityId, out var entity) == false) return false;
+        if (ownerId == null)
+        {
+            Logger.Error("{parameterName} was null", nameof(ownerId));
+            return false;
+        }
+
+        if (entityId == null)
+        {
+            Logger.Error("{parameterName} was null", nameof(entityId));
+            return false;
+        }
+
+
+        if (controllerIdLookup.TryGetValue(entityId, out var entity) == false) return false;
 
         return entity.OwnerId == ownerId;
     }
@@ -146,6 +159,18 @@ internal class ControlledEntityRegistry : IControlledEntityRegistry
     public bool RegisterAsControlled(string ownerId, string entityId, out ControlledEntity newEntity)
     {
         newEntity = null;
+
+        if (ownerId is null)
+        {
+            Logger.Error("{var} was null", nameof(ownerId));
+            return false;
+        }
+
+        if (entityId is null)
+        {
+            Logger.Error("{var} was null", nameof(entityId));
+            return false;
+        }
 
         if (controllerIdLookup.ContainsKey(entityId)) return false;
 

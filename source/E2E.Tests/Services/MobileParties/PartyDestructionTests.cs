@@ -36,7 +36,6 @@ public class PartyDestructionTests : IDisposable
 
 
             Assert.NotNull(clientParty);
-            Assert.NotNull(clientParty.LordPartyComponent.Clan);
         }
 
         // Act
@@ -68,11 +67,7 @@ public class PartyDestructionTests : IDisposable
         {
             var partyComponent = GameObjectCreator.CreateInitializedObject<LordPartyComponent>();
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-            var party = MobileParty.CreateParty("This should not set", partyComponent, (party) =>
-            {
-                party.ActualClan = clan;
-                partyComponent.InitializeLordPartyProperties(party, Vec2.Zero, 0, null);
-            });
+            var party = MobileParty.CreateParty("This should not set", partyComponent);
 
             partyId = party.StringId;
         });

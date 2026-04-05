@@ -18,6 +18,7 @@
     <PackageReference Include="MonoMod.RuntimeDetour" Version="25.2.3" />
     <PackageReference Include="MonoMod.Utils" Version="25.0.8" />
     <PackageReference Include="Serilog.Sinks.XUnit" Version="3.0.19" />
+    <PackageReference Include="System.Reflection.Primitives" Version="4.3.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.0.2">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -30,6 +31,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Coop.IntegrationTests\Coop.IntegrationTests.csproj" />
+    <ProjectReference Include="..\Coop.Tests\Coop.Tests.csproj" />
     <ProjectReference Include="..\GameInterface.Tests\GameInterface.Tests.csproj" />
     <ProjectReference Include="..\GameInterface\GameInterface.csproj" />
   </ItemGroup>
@@ -50,6 +53,9 @@
     <Reference Include="TaleWorlds.Core">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
     </Reference>
+    <Reference Include="TaleWorlds.Engine">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Engine.dll</HintPath>
+    </Reference>
     <Reference Include="TaleWorlds.Library">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Library.dll</HintPath>
     </Reference>
@@ -59,8 +65,14 @@
     <Reference Include="TaleWorlds.MountAndBlade">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.MountAndBlade.dll</HintPath>
     </Reference>
+	  <Reference Include="TaleWorlds.ModuleManager">
+		  <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ModuleManager.dll</HintPath>
+	  </Reference>
     <Reference Include="TaleWorlds.ObjectSystem">
       <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.ObjectSystem.dll</HintPath>
+    </Reference>
+    <Reference Include="TaleWorlds.SaveSystem">
+      <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.SaveSystem.dll</HintPath>
     </Reference>
   </ItemGroup>
   <ItemGroup>
@@ -81,5 +93,8 @@
 	<Publicize Include="TaleWorlds.MountAndBlade.Launcher.Library" />
 	<Publicize Include="TaleWorlds.ObjectSystem" />
 	<Publicize Include="TaleWorlds.SaveSystem" />
+</ItemGroup>
+<ItemGroup>
+  <Folder Include="AutoSync\TestClasses\" />
 </ItemGroup>
 </Project>

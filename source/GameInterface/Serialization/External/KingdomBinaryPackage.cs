@@ -18,7 +18,8 @@ namespace GameInterface.Serialization.External
         private string[] clanIds;
         private string[] fiefIds;
         private string[] heroIds;
-        private string[] lordIds;
+        private string[] deadLordIds;
+        private string[] aliveLordIds;
         private string[] settlementIds;
         private string[] villageIds;
 
@@ -32,7 +33,8 @@ namespace GameInterface.Serialization.External
             "_distanceToClosestNonAllyFortificationCache",
             "_clans",
             "_warPartyComponentsCache",
-            "_lordsCache",
+            "_deadLordsCache",
+            "_aliveLordsCache",
             "_heroesCache",
             "_settlementsCache",
             "_villagesCache",
@@ -48,7 +50,9 @@ namespace GameInterface.Serialization.External
             clanIds = ResolveIds(Object.Clans);
             fiefIds = ResolveIds(Object.Fiefs);
             heroIds = ResolveIds(Object.Heroes);
-            lordIds = ResolveIds(Object.Lords);
+            deadLordIds = ResolveIds(Object.DeadLords);
+            aliveLordIds = ResolveIds(Object.AliveLords);
+
             settlementIds = ResolveIds(Object.Settlements);
             villageIds = ResolveIds(Object.Villages);
         }
@@ -74,7 +78,8 @@ namespace GameInterface.Serialization.External
             Object._clans = ResolveObjects<Clan>(clanIds).ToMBList();
             Object._fiefsCache = ResolveObjects<Town>(fiefIds).ToMBList();
             Object._heroesCache = ResolveObjects<Hero>(heroIds).ToMBList();
-            Object._lordsCache = ResolveObjects<Hero>(lordIds).ToMBList();
+            Object._aliveLordsCache = ResolveObjects<Hero>(aliveLordIds).ToMBList();
+            Object._deadLordsCache = ResolveObjects<Hero>(deadLordIds).ToMBList();
             Object._settlementsCache = ResolveObjects<Settlement>(settlementIds).ToMBList();
             Object._villagesCache = ResolveObjects<Village>(villageIds).ToMBList();
         }

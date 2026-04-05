@@ -1,0 +1,25 @@
+﻿using Common.Messaging;
+using Common.Network;
+using GameInterface.Services.ObjectManager;
+using GameInterface.Utils;
+using System;
+using System.Linq;
+using System.Collections.Generic;
+using GameInterface.DynamicSync;
+using Common.Util;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+namespace DynamicSync
+{
+    public class {{DeclaringType}}_Handler : GenericHandler<{{DeclaringType}}_Handler, {{DeclaringType}}>
+    {
+        public {{DeclaringType}}_Handler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network, DynamicSyncRegistry dynamicSyncRegistry) : base(messageBroker, objectManager, network)
+        {
+            {{~ for subscription in Subscriptions ~}}
+            {{ subscription }}
+            {{~ end ~}}
+        }
+    }
+}

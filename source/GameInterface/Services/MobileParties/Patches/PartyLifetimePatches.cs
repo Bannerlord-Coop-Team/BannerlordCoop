@@ -37,8 +37,7 @@ internal class PartyLifetimePatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client destroyed unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MobileParty), Environment.StackTrace);
+            Logger.Error("Client destroyed unmanaged {name}", typeof(MobileParty));
             return false;
         }
 

@@ -7,6 +7,7 @@ using GameInterface.Services.MapEventSides.Messages;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.MobilePartyAIs.Messages;
 using GameInterface.Services.ObjectManager;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -65,6 +66,8 @@ internal class MobilePartyAiLifetimeHandler : IHandler
         if (objectManager.TryGetObject<MobileParty>(partyId, out var party) == false) return;
 
         var newAi = ObjectHelper.SkipConstructor<MobilePartyAi>();
+
+        AccessTools.Field(typeof(MobilePartyAi), nameof(MobilePartyAi._mobileParty)).SetValue(newAi, party);
 
         objectManager.AddExisting(aiId, newAi);
     }

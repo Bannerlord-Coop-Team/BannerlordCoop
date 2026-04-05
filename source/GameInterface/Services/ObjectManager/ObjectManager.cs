@@ -1,12 +1,11 @@
 ﻿using Common;
 using GameInterface.Registry;
-using HarmonyLib;
 using Serilog;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using TaleWorlds.ObjectSystem;
+using System.Runtime.InteropServices.ComTypes;
 
 namespace GameInterface.Services.ObjectManager;
 
@@ -93,7 +92,8 @@ internal class ObjectManager : IObjectManager
 
         return LogIfRegistrationError(
             registry.RegisterExistingObject(id, obj),
-            obj);
+            obj,
+            id);
     }
 
     public bool AddNewObject<T>(T obj, out string newId )
@@ -105,7 +105,8 @@ internal class ObjectManager : IObjectManager
 
         return LogIfRegistrationError(
             registry.RegisterNewObject(obj, out newId),
-            obj);
+            obj,
+            newId);
     }
 
     public bool Contains<T>(T obj)
@@ -172,19 +173,24 @@ internal class ObjectManager : IObjectManager
     }
 
     #region LogHelpers
-    private bool LogIfRegistrationError(bool result, object registerObject)
+    private bool LogIfRegistrationError(bool result, object registerObject, object registerId)
     {
         if (result) return true;
 
         var objectType = registerObject.GetType();
-        var className = nameof(ObjectManager);
-        var stackTrace = Environment.StackTrace;
 
-        logger.Error("Unable to register {name} with {objectManager}\n" +
-                     "StackTrace: {stackTrace}",
+        string objectId = "Unknown";
+        if (registerId != null)
+        {
+            objectId = registerId.ToString();
+        }
+
+        var className = nameof(ObjectManager);
+
+        logger.Error("Unable to register {name} with id: {id} in {objectManager}",
                      objectType,
-                     className,
-                     stackTrace);
+                     objectId,
+                     className);
 
         return false;
     }

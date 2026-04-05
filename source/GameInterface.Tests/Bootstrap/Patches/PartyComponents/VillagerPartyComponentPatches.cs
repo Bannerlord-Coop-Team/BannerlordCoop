@@ -1,12 +1,10 @@
 ﻿using HarmonyLib;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
-using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Tests.Bootstrap.Patches.PartyComponents;
 
@@ -15,13 +13,13 @@ internal class VillagerPartyComponentPatches
 {
     public static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach (var method in AccessTools.GetDeclaredMethods(typeof(VillagerPartyComponent)))
+        var methods = new MethodBase[]
         {
-            if (method.Name == nameof(VillagerPartyComponent.InitializeVillagerPartyProperties))
-            {
-                yield return method;
-            }
-        }
+            AccessTools.Method(typeof(VillagerPartyComponent.InitializationArgs), nameof(VillagerPartyComponent.InitializationArgs.InitializeVillagerPartyProperties),
+            new Type[] { typeof(MobileParty), typeof(Village) }),
+        };
+
+        return methods;
     }
 
     [HarmonyPrefix]

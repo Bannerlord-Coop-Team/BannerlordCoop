@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
@@ -32,8 +33,7 @@ namespace GameInterface.Services.Workshops.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client tried to set {name}\n"
-                    + "Callstack: {callstack}", nameof(Workshop.Capital), Environment.StackTrace);
+                Logger.Error("Client tried to set {name}", nameof(Workshop.Capital));
                 return false;
             }
 
@@ -51,8 +51,7 @@ namespace GameInterface.Services.Workshops.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client tried to set {name}\n"
-                    + "Callstack: {callstack}", nameof(Workshop.LastRunCampaignTime), Environment.StackTrace);
+                Logger.Error("Client tried to set {name}", nameof(Workshop.LastRunCampaignTime));
                 return false;
             }
 
@@ -70,8 +69,7 @@ namespace GameInterface.Services.Workshops.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client tried to set {name}\n"
-                    + "Callstack: {callstack}", nameof(Workshop.WorkshopType), Environment.StackTrace);
+                Logger.Error("Client tried to set {name}", nameof(Workshop.WorkshopType));
                 return false;
             }
 
@@ -97,8 +95,7 @@ namespace GameInterface.Services.Workshops.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client tried to set {name}\n"
-                    + "Callstack: {callstack}", nameof(Workshop.InitialCapital), Environment.StackTrace);
+                Logger.Error("Client tried to set {name}", nameof(Workshop.InitialCapital));
                 return false;
             }
 

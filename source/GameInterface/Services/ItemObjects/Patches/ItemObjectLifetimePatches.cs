@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.ItemObjects.Messages;
@@ -29,8 +30,7 @@ namespace GameInterface.Services.ItemObjects.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(ItemObject), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(ItemObject));
                 return false;
             }
 

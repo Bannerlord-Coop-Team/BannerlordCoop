@@ -1,0 +1,41 @@
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+{
+    var valueIds = new List<(int Index, string Id)>();
+    for (int i = 0; i < data.Value.Length; i++)
+    {
+        if (data.Value[i] == null) continue;
+        if (!objectManager.TryGetId(data.Value[i], out string id)) continue;
+        valueIds.Add(new(i, id));
+    }
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueIds, data.Value.Length));
+});
+SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+    var newValue = new {{ElementType}}[data.Length];
+    for (int i = 0; i < data.Value.Count; i++)
+    {
+        if (!objectManager.TryGetObject<{{ElementType}}>(data.Value[i].Id, out {{ElementType}} element)) continue;
+        newValue[data.Value[i].Index] = element;
+    }
+    {{ 
+    if ReadOnly;
+    }}
+	    dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue));
+    {{
+    else
+    }}
+	    instance.{{MemberName}} = newValue;
+    {{
+    end
+    }}
+});
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeLocalMessage>((instanceId, data) => 
+{
+    if (!objectManager.TryGetId(data.Value, out string id) && data.Value != null) return;
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(instanceId, id, data.Index));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage>((instance, data) => 
+{
+    if (!objectManager.TryGetObject<{{ElementType}}>(data.ValueId, out {{ElementType}} element) && data.ValueId != null) return;
+    instance.{{ MemberName }}[data.Index] = element;
+});

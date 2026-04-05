@@ -1,0 +1,46 @@
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+{
+    var temp = data.Value.ToList();
+    var valueIds = new List<{{ElementType}}>();
+    for (int i = 0; i < temp.Count; i++)
+    {
+        valueIds.Add({{SerializeMethod}}(temp[i]));
+    }
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueIds));
+});
+SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+    var newValue = new Queue<{{ElementType}}>();
+    for (int i = 0; i < data.Value.Count; i++)
+    {
+        newValue.Enqueue({{DeserializeMethod}}(data.Value[i], default({{ElementType}}));
+    }
+    {{ 
+    if ReadOnly;
+    }}
+	    dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue));
+    {{
+    else
+    }}
+	    instance.{{MemberName}} = newValue;
+    {{
+    end
+    }}
+});
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMessage>((instanceId, data) => 
+{
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_AddNetworkMessage(instanceId,{{SerializeMethod}}(data)));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddNetworkMessage>((instance, data) => 
+{
+    instance.{{ MemberName }}.Enqueue({{DeserializeMethod}}(data, default({{ElementType}})));
+});
+Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveLocalMessage>((instanceId, data) => 
+{
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_RemoveNetworkMessage(instanceId, data.Value));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveNetworkMessage>((instance, data) => 
+{
+    var elem = instance.{{ MemberName }}.Dequeue();
+    if (elem != data.Value) return; // TODO: Stuff
+});

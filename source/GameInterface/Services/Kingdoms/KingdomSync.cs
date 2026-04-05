@@ -1,19 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-using GameInterface.AutoSync;
+﻿using GameInterface.DynamicSync;
 using HarmonyLib;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Kingdoms
 {
-    internal class KingdomSync : IAutoSync
+    internal class KingdomSync : IDynamicSync
     {
-        public KingdomSync(IAutoSyncBuilder autoSyncBuilder) 
+        public KingdomSync(DynamicSyncRegistry autoSyncBuilder) 
         {
             // Props
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.AlternativeColor)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.AlternativeColor2)));
+            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.AlternativeColor)));
+            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.AlternativeColor2)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.Banner)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.Color)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.Color2)));
@@ -22,8 +21,8 @@ namespace GameInterface.Services.Kingdoms
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.EncyclopediaText)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.EncyclopediaTitle)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.InformalName)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.InitialHomeLand)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.LabelColor)));
+            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.InitialHomeLand)));
+            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.LabelColor)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.LastArmyCreationDay)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.LastKingdomDecisionConclusionDate)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.LastMercenaryOfferTime)));
@@ -39,7 +38,7 @@ namespace GameInterface.Services.Kingdoms
 			autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._aggressiveness)));
 			autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._isEliminated)));
 			autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._kingdomBudgetWallet)));
-			autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._kingdomMidSettlement)));
+			//autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._kingdomMidSettlement)));
 			autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._rulingClan)));
 			autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._tributeWallet)));
 			autoSyncBuilder.AddField(AccessTools.Field(typeof(Kingdom), nameof(Kingdom._distanceToClosestNonAllyFortificationCacheDirty)));

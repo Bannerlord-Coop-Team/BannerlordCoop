@@ -1,0 +1,23 @@
+﻿[HarmonyPatch(typeof({{ MemberDeclaringType }}))]
+public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : GenericPatches<{{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix, {{ MemberDeclaringType }}>
+{
+    [HarmonyPatch(nameof({{ MemberDeclaringType }}.{{ MemberName }}), MethodType.Setter)]
+    [HarmonyPrefix]
+    private static void {{ MemberName }}Prefix(ref {{ MemberDeclaringType }} __instance, ref {{ MemberType }} value)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+            return;
+        
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client updated managed {type}", "{{ MemberName }}");
+            return;
+        }
+        
+        if(__instance.{{MemberName}} == value)
+            return;
+
+        var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(__instance, value);
+        MessageBroker.Instance.Publish(__instance, message);
+    }
+}

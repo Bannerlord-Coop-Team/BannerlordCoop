@@ -4,7 +4,7 @@ using System.Reflection.Emit;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
 using static HarmonyLib.Code;
-using GameInterface;
+using Common;
 
 
 [HarmonyPatch(typeof(Town), "DailyTick")]

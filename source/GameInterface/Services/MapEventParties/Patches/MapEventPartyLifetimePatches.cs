@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEventParties.Messages;
@@ -27,8 +28,7 @@ namespace GameInterface.Services.MapEventParties.Patches
 
             if (ModInformation.IsClient)
             {
-                Logger.Error("Client created unmanaged {name}\n"
-                    + "Callstack: {callstack}", typeof(MapEventParty), Environment.StackTrace);
+                Logger.Error("Client created managed {name}", typeof(MapEventParty));
                 return false;
             }
 

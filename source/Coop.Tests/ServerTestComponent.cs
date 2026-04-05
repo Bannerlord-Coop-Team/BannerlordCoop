@@ -1,7 +1,8 @@
 ﻿using Autofac;
 using Coop.Core.Server;
-using GameInterface;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Interfaces;
+using Moq;
 using Xunit.Abstractions;
 
 namespace Coop.Tests;

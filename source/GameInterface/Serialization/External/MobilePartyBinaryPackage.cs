@@ -26,7 +26,7 @@ namespace GameInterface.Serialization.External
         {
         }
 
-        private static HashSet<string> excludes = new HashSet<string>
+        public static readonly HashSet<string> Excludes = new HashSet<string>
         {
             "<TaleWorlds.CampaignSystem.Map.ILocatable<TaleWorlds.CampaignSystem.Party.MobileParty>.NextLocatable>k__BackingField",
             "_partySizeRatioLastCheckVersion",
@@ -36,11 +36,8 @@ namespace GameInterface.Serialization.External
             "_partyLastCheckIsPrisoner",
             "_lastCalculatedSpeed",
             "_partyPureSpeedLastCheckVersion",
-            "_cachedPartySizeLimit",
             "_cachedPartySizeRatio",
-            "_latestUsedPaymentRatio",
             "<VersionNo>k__BackingField",
-            "_currentNavigationFace",
             "_lastNavigationFace",
             "_locatorNodeIndex",
             "<Scout>k__BackingField",
@@ -49,11 +46,18 @@ namespace GameInterface.Serialization.External
             "<Surgeon>k__BackingField",
             "_targetParty",
             "_targetSettlement",
+            "<Anchor>k__BackingField",
+            "Path",
             // These are ignored as there is no way to resolve if
             // they already exist
             "_besiegerCamp",
             "_army",
             "<ThinkParamsCache>k__BackingField",
+
+            // Transfering should only be a single party
+            "_attachedParties",
+            "_attachedTo",
+            "MoveTargetParty"
         };
 
         protected override void PackInternal()
@@ -63,7 +67,7 @@ namespace GameInterface.Serialization.External
 
             stringId = ResolveId(Object);
 
-            base.PackFields(excludes);
+            base.PackFields(Excludes);
 
             scoutId = ResolveId(Object.EffectiveScout);
             engineerId = ResolveId(Object.EffectiveEngineer);

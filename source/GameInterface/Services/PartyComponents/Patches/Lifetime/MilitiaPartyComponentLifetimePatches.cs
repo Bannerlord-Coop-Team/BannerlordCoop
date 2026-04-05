@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.PartyComponents.Messages;
@@ -22,18 +23,16 @@ internal class MilitiaPartyComponentLifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MilitiaPartyComponentLifetimePatches>();
 
-
-    [HarmonyPatch(typeof(MilitiaPartyComponent), MethodType.Constructor, typeof(Settlement))]
+    [HarmonyPatch(typeof(MilitiaPartyComponent), MethodType.Constructor, typeof(Settlement), typeof(MilitiaPartyComponent.InitializationArgs))]
     [HarmonyPrefix]
-    private static bool Prefix(MilitiaPartyComponent __instance, Settlement settlement)
+    private static bool Prefix(MilitiaPartyComponent __instance, Settlement settlement, MilitiaPartyComponent.InitializationArgs args)
     {
         // Call original if we call this function
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created unmanaged {name}\n"
-                + "Callstack: {callstack}", typeof(MilitiaPartyComponent), Environment.StackTrace);
+            Logger.Error("Client created managed {name}", typeof(MilitiaPartyComponent));
             return true;
         }
 

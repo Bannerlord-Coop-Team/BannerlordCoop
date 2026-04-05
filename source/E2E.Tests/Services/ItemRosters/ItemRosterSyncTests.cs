@@ -33,7 +33,7 @@ namespace E2E.Tests.Services.ItemRosters
             }
         }
 
-        [Fact]
+        [Fact(Skip = "_count sync is disabled in ItemRosterSync.cs")]
         public void Server_ItemRoster__count()
         {
             // Arrange

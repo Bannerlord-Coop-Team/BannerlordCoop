@@ -1,9 +1,9 @@
-﻿using GameInterface.Utils;
+﻿using GameInterface.Utils.LocalEvents;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Messages
 {
-    internal record TroopRosterDataUpdated : GenericArrayEvent<TroopRoster, TroopRosterElement>
+    internal record TroopRosterDataUpdated : GenericArrayChangedEvent<TroopRoster, TroopRosterElement>
     {
         public TroopRosterDataUpdated(TroopRoster instance, TroopRosterElement value, int index) : base(instance, value, index)
         {
