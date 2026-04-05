@@ -8,6 +8,6 @@ internal class StanceLinkBuilder : IObjectBuilder
     { 
         var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
         var clan = GameObjectCreator.CreateInitializedObject<Clan>();
-        return new StanceLink(StanceType.Neutral, kingdom, clan, false);
+        return new StanceLink(StanceType.Neutral, kingdom, clan);
     }
 }

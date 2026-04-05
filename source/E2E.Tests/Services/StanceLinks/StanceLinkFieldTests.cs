@@ -31,19 +31,17 @@ public class StanceLinkFieldsTests : SyncTestBase
     public void ServerStanceLink_SyncAll_Fields()
     {
         // Arrange
-        TestEnvironment.AssertField<StanceLink, StanceType>(nameof(StanceLink._stanceType), StanceType.Alliance);
+        TestEnvironment.AssertField<StanceLink, StanceType>(nameof(StanceLink._stanceType), StanceType.War);
         TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink.BehaviorPriority), 3);
-        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._casualties1), 69);
-        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._casualties2), 42);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._troopCasualties1), 69);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._troopCasualties2), 42);
         TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._dailyTributeFrom1To2), 666);
-        TestEnvironment.AssertField<StanceLink, bool>(nameof(StanceLink._isAtConstantWar), true);
         TestEnvironment.AssertField<StanceLink, CampaignTime>(nameof(StanceLink._peaceDeclarationDate), new CampaignTime(999L));
         TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._successfulRaids1), 123);
         TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._successfulRaids2), 456);
         TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._successfulSieges1), 789);
         TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._successfulSieges2), 12);
-        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._totalTributePaidby1), 421);
-        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._totalTributePaidby2), 1);
+        TestEnvironment.AssertField<StanceLink, int>(nameof(StanceLink._totalTributePaidFrom1To2), 421);
         TestEnvironment.AssertField<StanceLink, CampaignTime>(nameof(StanceLink._warStartDate), new CampaignTime(456789L));
     }
 

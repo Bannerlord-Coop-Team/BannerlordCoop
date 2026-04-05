@@ -1,21 +1,7 @@
-﻿using Common.Extensions;
-using Common.Messaging;
-using GameInterface.Services.Armies.Messages;
-using GameInterface.Services.Armies.Messages.Lifetime;
+﻿using Common;
 using GameInterface.Services.ObjectManager;
-using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Net;
-using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.ObjectSystem;
-using static TaleWorlds.CampaignSystem.Army;
-using static TaleWorlds.CampaignSystem.StanceLink;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Armies.Commands;
@@ -62,48 +48,8 @@ public class StanceLinkDebugCommand
             return $"Unable to get Kingdom or Clan with {faction2Id}";
         }
 
-        FactionManager.DeclareWar(faction1, faction2, isAtConstantWar);
+        FactionManager.DeclareWar(faction1, faction2);
         return $"War declared between {faction1Id} and {faction2Id}";
-    }
-
-    // coop.debug.stancelink.declare_alliance
-    /// <summary>
-    /// Declares alliance between two factions
-    /// </summary>
-    [CommandLineArgumentFunction("declare_alliance", "coop.debug.stancelink")]
-    public static string DeclareAlliance(List<string> args)
-    {
-        if (ModInformation.IsClient)
-        {
-            return $"Command is only available to run on the server";
-        }
-
-        if (args.Count != 2)
-        {
-            return $"Usage: coop.debug.stancelink.declare_alliance <kingdom1Id | clan1Id> <kingdom2Id | clan2Id>";
-        }
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-        {
-            return $"Unable to get ObjectManager";
-        }
-
-        var faction1Id = args[0];
-        var faction2Id = args[1];
-
-        IFaction faction1 = getFactionFromID(faction1Id, objectManager);
-        if (faction1 == null)
-        {
-            return $"Unable to get Kingdom or Clan with {faction1Id}";
-        }
-        IFaction faction2 = getFactionFromID(faction2Id, objectManager);
-        if (faction2 == null)
-        {
-            return $"Unable to get Kingdom or Clan with {faction2Id}";
-        }
-
-        FactionManager.DeclareAlliance(faction1, faction2);
-        return $"Alliance declared between {faction1Id} and {faction2Id}";
     }
 
 
@@ -181,10 +127,6 @@ public class StanceLinkDebugCommand
         if(FactionManager.IsNeutralWithFaction(faction1, faction2))
         {
             return $"Relations between {faction1Id} and {faction2Id} : Neutral";
-        }
-        else if (FactionManager.IsAlliedWithFaction(faction1, faction2))
-        {
-            return $"Relations between {faction1Id} and {faction2Id} : Allied";
         }
         else if (FactionManager.IsAtWarAgainstFaction(faction1, faction2))
         {

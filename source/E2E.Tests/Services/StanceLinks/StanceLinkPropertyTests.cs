@@ -39,7 +39,7 @@ public class StanceLinkPropertyTests : IDisposable
         {
             var kingdom = new Kingdom();
             var clan = new Clan();
-            var stanceLink = new StanceLink(StanceType.Neutral, kingdom, clan, true);
+            var stanceLink = new StanceLink(StanceType.Neutral, kingdom, clan);
 
             Assert.True(server.ObjectManager.TryGetId(kingdom, out kingdomId));
             Assert.True(server.ObjectManager.TryGetId(clan, out clanId));
