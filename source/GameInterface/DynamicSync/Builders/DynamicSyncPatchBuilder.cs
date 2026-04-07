@@ -23,6 +23,7 @@ namespace GameInterface.DynamicSync.Builders
         private readonly DynamicSyncFieldListBuilder dynamicSyncFieldListBuilder;
         private readonly DynamicSyncPropertyQueueBuilder dynamicSyncPropertyQueueBuilder;
         private readonly DynamicSyncFieldQueueBuilder dynamicSyncFieldQueueBuilder;
+        private readonly DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder;
         private readonly DynamicSyncPropertyListBuilder dynamicSyncPropertyListBuilder;
 
         public DynamicSyncPatchBuilder(IObjectManager objectManager,
@@ -35,7 +36,8 @@ namespace GameInterface.DynamicSync.Builders
             DynamicSyncPropertyListBuilder dynamicSyncPropertyListBuilder,
             DynamicSyncFieldListBuilder dynamicSyncFieldListBuilder,
             DynamicSyncPropertyQueueBuilder dynamicSyncPropertyQueueBuilder,
-            DynamicSyncFieldQueueBuilder dynamicSyncFieldQueueBuilder
+            DynamicSyncFieldQueueBuilder dynamicSyncFieldQueueBuilder,
+            DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder
             )
         {
             this.objectManager = objectManager;
@@ -49,6 +51,7 @@ namespace GameInterface.DynamicSync.Builders
             this.dynamicSyncFieldListBuilder = dynamicSyncFieldListBuilder;
             this.dynamicSyncPropertyQueueBuilder = dynamicSyncPropertyQueueBuilder;
             this.dynamicSyncFieldQueueBuilder = dynamicSyncFieldQueueBuilder;
+            this.dynamicSyncConstantsBuilder = dynamicSyncConstantsBuilder;
         }
 
         public List<SyntaxTree> Build(Type declaringType, DynamicSyncRegistryItem dynamicRegistryItem)
@@ -185,8 +188,32 @@ namespace GameInterface.DynamicSync.Builders
                 typeToVerify = type.GetElementType();
             else
                 typeToVerify = type;
+
+            if(typeToVerify.IsInterface)
+            {
+                var types = AppDomain.CurrentDomain.GetAssemblies()
+                .SelectMany(a =>
+                {
+                    try { return a.GetTypes(); }
+                    catch (ReflectionTypeLoadException e) { return e.Types.Where(t => t != null); }
+                })
+                .Where(t => typeToVerify.IsAssignableFrom(t)
+                && t.IsClass
+                && !t.IsAbstract);
+
+                foreach (var assignableType in types)
+                {
+                    if (!objectManager.IsTypeManaged(assignableType))
+                    {
+                        throw new NotSupportedException(
+                            $"{assignableType.Name} is not serializable and not managed by the object manager. " +
+                            $"Either manage the type using the object manager or make this type serializable");
+                    }
+                    dynamicSyncConstantsBuilder.InterfaceTypes.Add(assignableType);
+                }
+            }
             // Prevent unsupported types
-            if (!objectManager.IsTypeManaged(typeToVerify) && !RuntimeTypeModel.Default.CanSerialize(typeToVerify))
+            else if(!objectManager.IsTypeManaged(typeToVerify) && !RuntimeTypeModel.Default.CanSerialize(typeToVerify))
             {
                 throw new NotSupportedException(
                     $"{typeToVerify.Name} is not serializable and not managed by the object manager. " +

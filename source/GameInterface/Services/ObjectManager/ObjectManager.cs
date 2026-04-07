@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.ObjectManager;
 
@@ -34,6 +35,14 @@ public interface IObjectManager
     bool TryGetId<T>(T obj, out string id);
 
     /// <summary>
+    /// Attempts to get an object's StringId from the object itself
+    /// </summary>
+    /// <param name="obj">Object to get StringId from</param>
+    /// <param name="id">Out parameter for string id (null if not found)</param>
+    /// <returns>True if successful, false if failed</returns>
+    bool TryGetId(Type type, object obj, out string id);
+
+    /// <summary>
     /// Attempts to get an object using a StringId and object type
     /// </summary>
     /// <typeparam name="T">Type of object</typeparam>
@@ -41,6 +50,15 @@ public interface IObjectManager
     /// <param name="obj">Out parameter for the object (null if not found)</param>
     /// <returns>True if successful, false if failed</returns>
     bool TryGetObject<T>(string id, out T obj) where T : class;
+
+    /// <summary>
+    /// Attempts to get an object using a StringId and object type
+    /// </summary>
+    /// <typeparam name="T">Type of object</typeparam>
+    /// <param name="id">StringId used to lookup object</param>
+    /// <param name="obj">Out parameter for the object (null if not found)</param>
+    /// <returns>True if successful, false if failed</returns>
+    bool TryGetObject(Type type, string id, out object obj);
 
     /// <summary>
     /// Add an object with already existing StringId
@@ -135,6 +153,16 @@ internal class ObjectManager : IObjectManager
         return registry.TryGetId(obj, out id);
     }
 
+    public bool TryGetId(Type type, object obj, out string id)
+    {
+        id = null;
+        if (obj == null) return false;
+
+        if (TryGetRegistry(type, out IRegistry registry) == false) return false;
+
+        return registry.TryGetId(obj, out id);
+    }
+
     private readonly IRegistryCollection registryCollection;
 
     public bool TryGetObject<T>(string id, out T obj) where T : class
@@ -144,6 +172,16 @@ internal class ObjectManager : IObjectManager
         if (string.IsNullOrEmpty(id)) return false;
 
         if (TryGetRegistry(typeof(T), out IRegistry registry) == false) return false;
+
+        return registry.TryGetValue(id, out obj);
+    }
+    public bool TryGetObject(Type type, string id, out object obj)
+    {
+        obj = default;
+
+        if (string.IsNullOrEmpty(id)) return false;
+
+        if (TryGetRegistry(type, out IRegistry registry) == false) return false;
 
         return registry.TryGetValue(id, out obj);
     }

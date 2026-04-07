@@ -14,12 +14,14 @@ public class DynamicSyncBuilder
     private readonly DynamicSyncRegistry dynamicSyncRegistry;
     private readonly DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder;
     private readonly DynamicSyncPatchBuilder dynamicSyncPatchBuilder;
+    private readonly DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder;
 
-    public DynamicSyncBuilder(DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder, DynamicSyncPatchBuilder dynamicSyncPatchBuilder)
+    public DynamicSyncBuilder(DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder, DynamicSyncPatchBuilder dynamicSyncPatchBuilder, DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder)
     {
         this.dynamicSyncRegistry = dynamicSyncRegistry;
         this.dynamicSyncAssemblyInfoBuilder = dynamicSyncAssemblyInfoBuilder;
         this.dynamicSyncPatchBuilder = dynamicSyncPatchBuilder;
+        this.dynamicSyncConstantsBuilder = dynamicSyncConstantsBuilder;
     }
 
     public Assembly Build()
@@ -70,7 +72,8 @@ public class DynamicSyncBuilder
 
         var syntaxTrees = dynamicSyncRegistry.Registrations
             .SelectMany(registration => dynamicSyncPatchBuilder.Build(registration.Key, registration.Value))
-            .Append(dynamicSyncAssemblyInfoBuilder.Build(assemblies.Select(a => a.GetName().Name)));
+            .Append(dynamicSyncAssemblyInfoBuilder.Build(assemblies.Select(a => a.GetName().Name))).ToList();
+        syntaxTrees = syntaxTrees.Append(dynamicSyncConstantsBuilder.Build()).ToList();
 
         // https://www.strathweb.com/2018/10/no-internalvisibleto-no-problem-bypassing-c-visibility-rules-with-roslyn/
         // Allow IgnoresAccessChecksTo for dynamic compilation

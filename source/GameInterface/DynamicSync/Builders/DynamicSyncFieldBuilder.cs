@@ -25,7 +25,12 @@ namespace GameInterface.DynamicSync.Builders
             var templateData = GetTemplateData(fieldInfo);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(fieldInfo);
             string networkMessage;
-            if (objectManager.IsTypeManaged(fieldInfo.FieldType))
+
+            if(fieldInfo.FieldType.IsInterface)
+            {
+                networkMessage = TemplateParser.Parse("Messages.NetworkSetInterfaceReferenceMessageTemplate", templateData);
+            }
+            else if (objectManager.IsTypeManaged(fieldInfo.FieldType))
             {
                 networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate", templateData);
             }
@@ -44,7 +49,7 @@ namespace GameInterface.DynamicSync.Builders
         public string GetSubscription(FieldInfo fieldInfo)
         {
             var templateData = GetTemplateData(fieldInfo);
-            if (objectManager.IsTypeManaged(fieldInfo.FieldType))
+            if (objectManager.IsTypeManaged(fieldInfo.FieldType) || fieldInfo.FieldType.IsInterface)
                 return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
             else
                 return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
@@ -62,7 +67,8 @@ namespace GameInterface.DynamicSync.Builders
                 SerializeMethod = serializerNames.serialize,
                 DeserializeMethod = serializerNames.deserialize,
                 ReadOnly = fieldInfo.IsInitOnly,
-                ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null
+                ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null,
+                Interface = fieldInfo.FieldType.IsInterface
             };
         }
     }

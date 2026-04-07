@@ -76,6 +76,11 @@ namespace GameInterface.Tests.Stubs
             throw new NotImplementedException();
         }
 
+        public bool TryGetId(Type type, object obj, out string id)
+        {
+            throw new NotImplementedException();
+        }
+
         public bool TryGetObject<T>(string id, out T obj) where T : class
         {
             obj = default;
@@ -85,6 +90,18 @@ namespace GameInterface.Tests.Stubs
             
             obj = castedObj;
             
+            return true;
+        }
+
+        public bool TryGetObject(Type type, string id, out object obj)
+        {
+            obj = default;
+
+            if (TryGetObject(id, out object resolvedObject) == false) return false;
+            if (resolvedObject.GetType() != type) return false;
+
+            obj = resolvedObject;
+
             return true;
         }
     }
