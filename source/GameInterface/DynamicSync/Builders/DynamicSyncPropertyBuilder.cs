@@ -11,7 +11,7 @@ namespace GameInterface.DynamicSync.Builders
     {
         private readonly IObjectManager objectManager;
 
-        public DynamicSyncPropertyBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry) : base(dynamicSyncRegistry)
+        public DynamicSyncPropertyBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder) : base(dynamicSyncRegistry, dynamicSyncConstantsBuilder)
         {
             this.objectManager = objectManager;
         }

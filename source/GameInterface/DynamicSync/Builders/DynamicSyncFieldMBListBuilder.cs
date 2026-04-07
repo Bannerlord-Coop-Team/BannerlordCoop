@@ -10,14 +10,14 @@ namespace GameInterface.DynamicSync.Builders
     {
         private readonly IObjectManager objectManager;
 
-        public DynamicSyncFieldMBListBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry) : base(dynamicSyncRegistry)
+        public DynamicSyncFieldMBListBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder) : base(dynamicSyncRegistry, dynamicSyncConstantsBuilder)
         {
             this.objectManager = objectManager;
         }
 
         public string GetTranspiler(FieldInfo fieldInfo)
         {
-            string setTemplate = DynamicSyncUtils.GetSetTranspiler(fieldInfo);
+            string setTemplate = GetSetTranspiler(fieldInfo);
             string changeTemplate = TemplateParser.Parse("Patches.FieldMBListChangeTranspilerTemplate", GetTemplateData(fieldInfo));
             return string.Join(Environment.NewLine, setTemplate, changeTemplate);
         }

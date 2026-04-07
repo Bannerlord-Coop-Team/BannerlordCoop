@@ -5,7 +5,7 @@ SubscribeNetwork<byte[], {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMes
 {{ 
 if ReadOnly;
 }}
-	dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{DeserializeMethod}}(data.Value, instance.{{MemberName}}));
+	DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{DeserializeMethod}}(data.Value, instance.{{MemberName}}));
 {{
 else
 }}

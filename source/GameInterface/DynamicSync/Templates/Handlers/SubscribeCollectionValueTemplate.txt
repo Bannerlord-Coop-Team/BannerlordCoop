@@ -17,7 +17,7 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNe
     {{ 
     if ReadOnly;
     }}
-	    dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
+	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
     {{
     else
     }}
