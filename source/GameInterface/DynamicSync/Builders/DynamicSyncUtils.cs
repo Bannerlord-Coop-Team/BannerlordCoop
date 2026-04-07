@@ -8,16 +8,6 @@ namespace GameInterface.DynamicSync.Builders
 {
     public static class DynamicSyncUtils
     {
-        public static string GetSetTranspiler(FieldInfo fieldInfo)
-        {
-            return TemplateParser.Parse("Patches.FieldSetTranspilerTemplate",
-            new
-            {
-                    MemberDeclaringType = fieldInfo.DeclaringType.Name,
-                    MemberName = fieldInfo.Name,
-                    MemberType = GetMemberTypeName(fieldInfo.FieldType)
-            });
-        }
         public static string GetPrefix(PropertyInfo propertyInfo)
         {
             return TemplateParser.Parse("Patches.PropertySetPrefixTemplate",

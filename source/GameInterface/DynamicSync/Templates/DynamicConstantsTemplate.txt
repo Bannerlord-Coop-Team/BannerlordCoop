@@ -1,0 +1,62 @@
+﻿using System;
+using System.Collections.Generic;
+using HarmonyLib;
+using System.Reflection;
+using System.Reflection.Emit;
+{{~ for library in Libraries ~}}
+using {{ library }};
+{{~ end ~}}
+
+
+namespace DynamicSync
+{
+	public static class Constants
+	{
+		public static readonly Dictionary<Type, int> TypeMap = new Dictionary<Type, int>
+		{
+			
+            {{~ for item in Types ~}}
+            { typeof({{ item.Type }}), {{ item.Index }}  },
+            {{~ end ~}}
+		};
+		
+		public static readonly Dictionary<int, Type> TypeMapReverse = new Dictionary<int, Type>
+		{
+            {{~ for item in Types ~}}
+            { {{ item.Index }}, typeof({{ item.Type }}) },
+            {{~ end ~}}
+		};
+
+		public static List<Action<object, object>> ReadonlySetters = new List<Action<object, object>>
+		{
+            {{~ for field in ReadOnlyFields ~}}
+			BuildReadOnlySetter(AccessTools.Field(typeof({{field.DeclaringType.FullName}}), "{{field.Name}}")),
+            {{~ end ~}}
+		};
+
+
+		private static Action<object, object> BuildReadOnlySetter(FieldInfo info)
+		{
+		
+            var method = new DynamicMethod(
+              name: info.DeclaringType.Name + info.Name + "Setter",
+              returnType: null,
+              parameterTypes: new[] { info.DeclaringType, info.FieldType },
+              restrictedSkipVisibility: true
+            );
+
+            var gen = method.GetILGenerator();
+            gen.Emit(OpCodes.Ldarg_0);
+            gen.Emit(OpCodes.Ldarg_1);
+            gen.Emit(OpCodes.Stfld, info);
+            gen.Emit(OpCodes.Ret);
+
+            var actionType = typeof(Action<,>).MakeGenericType(info.DeclaringType, info.FieldType);
+
+            // TODO: find a way to store the delegate without needing the DynamicInvoke if performance is an issue
+            var del = method.CreateDelegate(actionType);
+            var action = (object a, object b) => { del.DynamicInvoke(a, b); };
+            return action;
+		}
+	}
+}

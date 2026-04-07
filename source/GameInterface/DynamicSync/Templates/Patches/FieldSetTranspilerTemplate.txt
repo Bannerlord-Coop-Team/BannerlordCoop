@@ -34,19 +34,42 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
 
     if (CallOriginalPolicy.IsOriginalAllowed())
     {
-        instance.{{MemberName}} = newValue;
+{{ 
+if ReadOnly;
+}}
+	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
+{{
+else
+}}
+		instance.{{MemberName}} = newValue;
+{{end}}
         return;
     }
 
     if (ModInformation.IsClient)
     {
         Logger.Error("Client updated managed {type}", "{{MemberName}}");
-        instance.{{MemberName}} = newValue;
+{{        
+if ReadOnly;
+}}
+	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
+{{
+else
+}}
+		instance.{{MemberName}} = newValue;
+{{end}}
         return;
     }
 
     var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(instance, newValue);
     MessageBroker.Instance.Publish(instance, message);
-
-    instance.{{MemberName}} = newValue;
+{{
+    if ReadOnly;
+}}
+	DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
+{{
+else
+}}
+	instance.{{MemberName}} = newValue;
+{{end}}
 }

@@ -16,14 +16,12 @@ namespace GameInterface.DynamicSync
             Serialize = AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Serialize)),
             Deserialize = AccessTools.Method(typeof(RawSerializer), nameof(RawSerializer.Deserialize))
         };
+        
         public readonly List<Action<object, object>> ReadonlySetters = new List<Action<object, object>>();
 
         public void AddField(FieldInfo field)
         {
             if (field == null) throw new ArgumentNullException(nameof(field));
-
-            // TODO: verify interface support
-            if (field.FieldType.IsInterface) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Field: Interfaces are currently not supported");
 
             if (!AddMember(field.DeclaringType, field)) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Field: {field.Name} has already been registered as a synced field");
         }
@@ -34,9 +32,6 @@ namespace GameInterface.DynamicSync
 
             // only prevent properties from being added if they are no collection like type
             if (property.CanWrite == false) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Property: {property.Name} does not have a set method");
-
-            // TODO: verify interface support
-            if (property.PropertyType.IsInterface) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Property: Interfaces are currently not supported");
 
             if (!AddMember(property.DeclaringType, property)) throw new ArgumentException($"{nameof(DynamicSyncBuilder)} Property: {property.Name} has already been registered as a synced property");
         }

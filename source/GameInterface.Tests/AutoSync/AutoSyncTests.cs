@@ -195,6 +195,22 @@ public class AutoSyncTests
             return false;
         }
 
+        public bool TryGetId(Type type, object obj, out string? id)
+        {
+            id = null;
+
+            foreach (var kvp in idMap)
+            {
+                if (kvp.Value.GetType() == type)
+                {
+                    id = kvp.Key;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public bool TryGetObject<T>(string id, out T? obj) where T : class
         {
             obj = null;
@@ -204,6 +220,18 @@ public class AutoSyncTests
             if (idMap.TryGetValue(id, out var value) == false) return false;
 
             obj = value as T;
+            return true;
+        }
+
+        public bool TryGetObject(Type type, string id, out object? obj)
+        {
+            obj = null;
+
+            if (string.IsNullOrEmpty(id)) return false;
+
+            if (idMap.TryGetValue(id, out var value) == false) return false;
+            if(value.GetType() == type)
+                obj = value;
             return true;
         }
     }

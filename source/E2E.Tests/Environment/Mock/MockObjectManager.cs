@@ -64,11 +64,22 @@ namespace E2E.Tests.Environment.Mock
         {
             throw new NotImplementedException();
         }
+        public bool TryGetId(Type type, object obj, out string id)
+        {
+            throw new NotImplementedException();
+        }
 
         public bool TryGetObject<T>(string id, out T obj) where T : class
         {
             obj = default;
             return false;
         }
+
+        public bool TryGetObject(Type type, string id, out object obj)
+        {
+            obj = default;
+            return false;
+        }
+
     }
 }

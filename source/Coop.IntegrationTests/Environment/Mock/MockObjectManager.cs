@@ -47,7 +47,18 @@ namespace Coop.IntegrationTests.Environment.Mock
             return false;
         }
 
+        public bool TryGetId(Type type, object obj, out string id)
+        {
+            id = default;
+            return false;
+        }
+
         public bool TryGetObject<T>(string id, out T obj) where T : class
+        {
+            obj = default;
+            return false;
+        }
+        public bool TryGetObject(Type type, string id, out object obj)
         {
             obj = default;
             return false;

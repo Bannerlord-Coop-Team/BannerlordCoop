@@ -1,9 +1,41 @@
-﻿SubscribeGenericReference<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>();
+﻿{{
+if Interface;
+}}
+Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+{
+    int index = DynamicSync.Constants.TypeMap[data.GetType()];
+    if (!this.objectManager.TryGetId(data.GetType(), data.Value, out string valueId) && data.Value != null) return;
+                
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueId, index));
+});
+
+SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+    var type = DynamicSync.Constants.TypeMapReverse[data.ValueTypeIndex];
+    if (!objectManager.TryGetObject(type, data.ValueId, out object value) && data.ValueId != null) return;
+{{ 
+if ReadOnly;
+}}
+	DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{MemberType}} value);
+{{
+else
+}}
+	using (new AllowedThread())
+	{
+		instance.{{MemberName}} = ({{MemberType}}) value;
+	}
+{{end}}
+});
+{{
+else
+}}
+SubscribeGenericReference<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>();
+
 SubscribeNetworkReference<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage >((instance, value, _) => { 
 {{ 
     if ReadOnly;
     }}
-	    dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, value);
+	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, value);
     {{
     else
     }}
@@ -15,3 +47,6 @@ SubscribeNetworkReference<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName
     end
     }}
 });
+{{
+end
+}}

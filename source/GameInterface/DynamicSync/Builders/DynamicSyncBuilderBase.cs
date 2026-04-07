@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GameInterface.DynamicSync.Templates;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -9,10 +10,12 @@ namespace GameInterface.DynamicSync.Builders
     public class DynamicSyncBuilderBase
     {
         private readonly DynamicSyncRegistry dynamicSyncRegistry;
+        private readonly DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder;
 
-        public DynamicSyncBuilderBase(DynamicSyncRegistry dynamicSyncRegistry)
+        public DynamicSyncBuilderBase(DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder)
         {
             this.dynamicSyncRegistry = dynamicSyncRegistry;
+            this.dynamicSyncConstantsBuilder = dynamicSyncConstantsBuilder;
         }
 
         protected (string serialize,string deserialize) GetSerializerMethodNames(Type type)
@@ -26,27 +29,22 @@ namespace GameInterface.DynamicSync.Builders
                 $"{serializer.Deserialize.DeclaringType.Namespace}.{serializer.Deserialize.DeclaringType.Name}.{serializer.Deserialize.Name}<{type.Name}>");
         }
 
+        protected string GetSetTranspiler(FieldInfo fieldInfo)
+        {
+            return TemplateParser.Parse("Patches.FieldSetTranspilerTemplate",
+            new
+            {
+                MemberDeclaringType = fieldInfo.DeclaringType.Name,
+                MemberName = fieldInfo.Name,
+                MemberType = DynamicSyncUtils.GetMemberTypeName(fieldInfo.FieldType),
+                ReadOnly = fieldInfo.IsInitOnly,
+                ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null,
+            });
+        }
+
         protected int GetReadOnlyFieldSetter(FieldInfo info)
         {
-            var method = new DynamicMethod(
-              name: info.DeclaringType.Name + info.Name + "Setter",
-              returnType: null,
-              parameterTypes: new[] { info.DeclaringType, info.FieldType },
-              restrictedSkipVisibility: true
-            );
-
-            var gen = method.GetILGenerator();
-            gen.Emit(OpCodes.Ldarg_0);
-            gen.Emit(OpCodes.Ldarg_1);
-            gen.Emit(OpCodes.Stfld, info);
-            gen.Emit(OpCodes.Ret);
-
-            var actionType = typeof(Action<,>).MakeGenericType(info.DeclaringType, info.FieldType);
-
-            // TODO: find a way to store the delegate without needing the DynamicInvoke if performance is an issue
-            var del = method.CreateDelegate(actionType);
-            var action = (object a, object b) => { del.DynamicInvoke(a, b); };
-            return dynamicSyncRegistry.AddReadOnlySetter(action);
+            return dynamicSyncConstantsBuilder.AddReadonlyField(info);
         }
     }
 }
