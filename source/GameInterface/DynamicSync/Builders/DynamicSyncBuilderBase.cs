@@ -23,7 +23,7 @@ namespace GameInterface.DynamicSync.Builders
                 serializer = dynamicSyncRegistry.Serializers[type];
             }
             return ($"{serializer.Serialize.DeclaringType.Namespace}.{serializer.Serialize.DeclaringType.Name}.{serializer.Serialize.Name}",
-                $"{serializer.Deserialize.DeclaringType.Namespace}.{serializer.Deserialize.DeclaringType.Name}.{serializer.Deserialize.Name}");
+                $"{serializer.Deserialize.DeclaringType.Namespace}.{serializer.Deserialize.DeclaringType.Name}.{serializer.Deserialize.Name}<{type.Name}>");
         }
 
         protected int GetReadOnlyFieldSetter(FieldInfo info)

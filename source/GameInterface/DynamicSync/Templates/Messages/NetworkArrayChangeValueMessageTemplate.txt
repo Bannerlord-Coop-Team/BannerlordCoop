@@ -13,7 +13,7 @@ namespace DynamicSync
     public record {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage : GenericNetworkEvent<{{ MemberDeclaringType}}, {{ ElementType }}>
     {
         [ProtoMember(1)]
-        public string InstanceId { get; set; }
+        public override string InstanceId { get; set; }
 
         [ProtoMember(2)]
         public byte[] Value { get; set; }
@@ -21,7 +21,7 @@ namespace DynamicSync
         [ProtoMember(3)]
         public int Index { get; set; }
 
-        public {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(string instanceId, byte[] value, int index) : base(instanceId, valueId)
+        public {{ MemberDeclaringType}}_{{ MemberName }}_ChangeNetworkMessage(string instanceId, byte[] value, int index) : base(instanceId)
         {
             Index = index;
         }

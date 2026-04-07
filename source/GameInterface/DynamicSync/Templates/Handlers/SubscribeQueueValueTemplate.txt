@@ -13,12 +13,12 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNe
     var newValue = new Queue<{{ElementType}}>();
     for (int i = 0; i < data.Value.Count; i++)
     {
-        newValue.Enqueue({{DeserializeMethod}}(data.Value[i], default({{ElementType}}));
+        newValue.Enqueue({{DeserializeMethod}}(data.Value[i]));
     }
     {{ 
     if ReadOnly;
     }}
-	    dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue));
+	    dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
     {{
     else
     }}
@@ -33,7 +33,7 @@ Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMes
 });
 SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddNetworkMessage>((instance, data) => 
 {
-    instance.{{ MemberName }}.Enqueue({{DeserializeMethod}}(data, default({{ElementType}})));
+    instance.{{ MemberName }}.Enqueue({{DeserializeMethod}}(data));
 });
 Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_RemoveLocalMessage>((instanceId, data) => 
 {
