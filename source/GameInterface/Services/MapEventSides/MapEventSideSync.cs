@@ -24,9 +24,8 @@ namespace GameInterface.Services.MapEventSides
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._requiresTroopCacheUpdate)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroop)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroopIndex)));
-            
-            // Not supported
-            // autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapFaction)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapFaction)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._battleParties)));
         }
     }
 }
