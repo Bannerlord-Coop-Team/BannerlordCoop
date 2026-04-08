@@ -9,6 +9,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using static TaleWorlds.CampaignSystem.MapEvents.MapEvent;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -61,37 +62,49 @@ internal class MapEventHandler : IHandler
             Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), payload.What.MapEventId);
             return;
         }
-        using (new AllowedThread())
+        if (objectManager.TryGetObject<PartyBase>(payload.What.AttackerPartyId, out var attackerParty) == false)
         {
-            MapEventComponent component;
-
-            switch ((MapEvent.BattleTypes)payload.What.BattleType)
-            {
-                case MapEvent.BattleTypes.FieldBattle:
-                    component = new FieldBattleEventComponent(mapEvent);
-                    mapEvent.Component = component;
-                    break;
-                case MapEvent.BattleTypes.Raid:
-                    component = new RaidEventComponent(mapEvent);
-                    mapEvent.Component = component;
-                    break;
-                case MapEvent.BattleTypes.Siege:
-                    break;
-                case MapEvent.BattleTypes.Hideout:
-                    component = new HideoutEventComponent(mapEvent, false);
-                    mapEvent.Component = component;
-                    break;
-                case MapEvent.BattleTypes.SallyOut:
-                    break;
-                case MapEvent.BattleTypes.SiegeOutside:
-                    break;
-                case MapEvent.BattleTypes.BlockadeSallyOutBattle:
-                case MapEvent.BattleTypes.BlockadeBattle:
-                    component = new BlockadeBattleMapEvent(mapEvent);
-                    mapEvent.Component = component;
-                    break;
-            }
+            Logger.Error("Unable to get {type} if from {obj}", nameof(PartyBase), payload.What.AttackerPartyId);
+            return;
         }
+        if (objectManager.TryGetObject<PartyBase>(payload.What.DefenderPartyId, out var defenderParty) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(PartyBase), payload.What.DefenderPartyId);
+            return;
+        }
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                MapEventComponent component = null;
+
+                switch ((MapEvent.BattleTypes)payload.What.BattleType)
+                {
+                    case MapEvent.BattleTypes.FieldBattle:
+                        component = new FieldBattleEventComponent(mapEvent);
+                        break;
+                    case MapEvent.BattleTypes.Raid:
+                        component = new RaidEventComponent(mapEvent);
+                        break;
+                    case MapEvent.BattleTypes.Siege:
+                        break;
+                    case MapEvent.BattleTypes.Hideout:
+                        component = new HideoutEventComponent(mapEvent, false);
+                        break;
+                    case MapEvent.BattleTypes.SallyOut:
+                        break;
+                    case MapEvent.BattleTypes.SiegeOutside:
+                        break;
+                    case MapEvent.BattleTypes.BlockadeSallyOutBattle:
+                    case MapEvent.BattleTypes.BlockadeBattle:
+                        component = new BlockadeBattleMapEvent(mapEvent);
+                        break;
+                }
+
+                mapEvent.Initialize(attackerParty, defenderParty, component, (MapEvent.BattleTypes)payload.What.BattleType);
+            }
+        });
     }
 
     private void Handle(MessagePayload<MapEventInitialize> payload)
@@ -100,11 +113,24 @@ internal class MapEventHandler : IHandler
 
         if (objectManager.TryGetId(obj.MapEvent, out var mapEventId) == false)
         {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEventId);
+            Logger.Error("Unable to get {type} id from {obj}", nameof(MapEvent), mapEventId);
             return;
         }
 
-        network.SendAll(new NetworkMapEventInitialize(mapEventId, (int)obj.BattleType));
+        if (objectManager.TryGetId(obj.AttackerParty, out var attackerPartyId) == false)
+        {
+            Logger.Error("Unable to get {type} id from {obj}", nameof(PartyBase), attackerPartyId);
+            return;
+        }
+
+
+        if (objectManager.TryGetId(obj.DefenderParty, out var defenderPartyId) == false)
+        {
+            Logger.Error("Unable to get {type} id from {obj}", nameof(PartyBase), defenderPartyId);
+            return;
+        }
+
+        network.SendAll(new NetworkMapEventInitialize(mapEventId, (int)obj.BattleType, attackerPartyId, defenderPartyId));
     }
 
     private void Handle(MessagePayload<MapEventCreated> payload)
@@ -117,14 +143,12 @@ internal class MapEventHandler : IHandler
 
     private void Handle(MessagePayload<NetworkCreateMapEvent> payload)
     {
-        //var newMapEvent = new MapEvent();
-        var newMapEvent = ObjectHelper.SkipConstructor<MapEvent>();
+        using (new AllowedThread())
+        {
+            MapEvent mapEvent = new MapEvent();
 
-        // TODO find better way of doing this
-        newMapEvent._sides = new MapEventSide[2];
-        newMapEvent.StrengthOfSide = new float[2];
-
-        objectManager.AddExisting(payload.What.MapEventId, newMapEvent);
+            objectManager.AddExisting(payload.What.MapEventId, mapEvent);
+        }
     }
 
     private void Handle(MessagePayload<MapEventDestroyed> payload)
@@ -155,9 +179,6 @@ internal class MapEventHandler : IHandler
         {
             using (new AllowedThread())
             {
-                if (mapEvent._sides[0] == null) mapEvent._sides[0] = ObjectHelper.SkipConstructor(typeof(MapEventSide)) as MapEventSide;
-                if (mapEvent._sides[1] == null) mapEvent._sides[1] = ObjectHelper.SkipConstructor(typeof(MapEventSide)) as MapEventSide;
-
                 mapEvent.Component?.FinishComponent();
                 mapEvent.FinalizeEventAux();
             }

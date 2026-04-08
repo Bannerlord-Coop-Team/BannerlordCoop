@@ -10,10 +10,16 @@ internal record NetworkMapEventInitialize : ICommand
     public string MapEventId { get; }
     [ProtoMember(2)]
     public int BattleType { get; }
+    [ProtoMember(3)]
+    public string AttackerPartyId { get; }
+    [ProtoMember(4)]
+    public string DefenderPartyId { get; }
 
-    public NetworkMapEventInitialize(string mapEventId, int battleType)
+    public NetworkMapEventInitialize(string mapEventId, int battleType, string attackerPartyId, string defenderPartyId)
     {
         MapEventId = mapEventId;
         BattleType = battleType;
+        AttackerPartyId = attackerPartyId;
+        DefenderPartyId = defenderPartyId;
     }
 }

@@ -38,7 +38,7 @@ namespace GameInterface.Services.MapEvents.Patches
         {
             if (ModInformation.IsClient) return;
 
-            MapEventInitialize message = new MapEventInitialize(__instance, mapEventType);
+            MapEventInitialize message = new MapEventInitialize(__instance, mapEventType, attackerParty, defenderParty);
 
             MessageBroker.Instance.Publish(__instance, message);
         }
