@@ -39,44 +39,44 @@ namespace GameInterface.Services.MobileParties.Patches
     }
 
     //It crashes without this, WTF!? it changes NOTHING!?
-    [HarmonyPatch(typeof(PartyBase))]
-    public class PlayerEncounterPatch151
-    {
-        [HarmonyPatch(nameof(PartyBase.MapEventSide), MethodType.Setter)]
-        [HarmonyPrefix]
-        public static bool Prefix(ref PartyBase __instance, ref MapEventSide value)
-        {
-            if (__instance._mapEventSide != value)
-            {
-                if (value != null && __instance.IsMobile && __instance.MapEvent != null && __instance.MapEvent.DefenderSide.LeaderParty == __instance)
-                {
-                    Debug.FailedAssert(string.Format("Double MapEvent For {0}", __instance.Name), "C:\\BuildAgent\\work\\mb3\\Source\\Bannerlord\\TaleWorlds.CampaignSystem\\Party\\PartyBase.cs", "MapEventSide", 257);
-                }
-                if (__instance._mapEventSide != null)
-                {
-                    __instance._mapEventSide.RemovePartyInternal(__instance);
-                }
-                __instance._mapEventSide = value;
-                if (__instance._mapEventSide != null)
-                {
-                    __instance._mapEventSide.AddPartyInternal(__instance);
-                }
-                if (__instance.MobileParty != null)
-                {
-                    if (__instance.IsActive)
-                    {
-                        __instance.MobileParty.CancelNavigationTransition();
-                    }
-                    foreach (MobileParty mobileParty in __instance.MobileParty.AttachedParties)
-                    {
-                        mobileParty.Party.MapEventSide = __instance._mapEventSide;
-                    }
-                }
-            }
+    //[HarmonyPatch(typeof(PartyBase))]
+    //public class PlayerEncounterPatch151
+    //{
+    //    [HarmonyPatch(nameof(PartyBase.MapEventSide), MethodType.Setter)]
+    //    [HarmonyPrefix]
+    //    public static bool Prefix(ref PartyBase __instance, ref MapEventSide value)
+    //    {
+    //        if (__instance._mapEventSide != value)
+    //        {
+    //            if (value != null && __instance.IsMobile && __instance.MapEvent != null && __instance.MapEvent.DefenderSide.LeaderParty == __instance)
+    //            {
+    //                Debug.FailedAssert(string.Format("Double MapEvent For {0}", __instance.Name), "C:\\BuildAgent\\work\\mb3\\Source\\Bannerlord\\TaleWorlds.CampaignSystem\\Party\\PartyBase.cs", "MapEventSide", 257);
+    //            }
+    //            if (__instance._mapEventSide != null)
+    //            {
+    //                __instance._mapEventSide.RemovePartyInternal(__instance);
+    //            }
+    //            __instance._mapEventSide = value;
+    //            if (__instance._mapEventSide != null)
+    //            {
+    //                __instance._mapEventSide.AddPartyInternal(__instance);
+    //            }
+    //            if (__instance.MobileParty != null)
+    //            {
+    //                if (__instance.IsActive)
+    //                {
+    //                    __instance.MobileParty.CancelNavigationTransition();
+    //                }
+    //                foreach (MobileParty mobileParty in __instance.MobileParty.AttachedParties)
+    //                {
+    //                    mobileParty.Party.MapEventSide = __instance._mapEventSide;
+    //                }
+    //            }
+    //        }
 
-            return false;
-        }
-    }
+    //        return false;
+    //    }
+    //}
 
     [HarmonyPatch(typeof(PartyBase))]
     public class TestPatching2

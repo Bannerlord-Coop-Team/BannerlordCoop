@@ -74,6 +74,7 @@ internal class PartyLifetimeHandler : IHandler
             {
                 try
                 {
+                    if (party.ActualClan == null) return;
                     party.RemoveParty();
                 }
                 catch (Exception e)

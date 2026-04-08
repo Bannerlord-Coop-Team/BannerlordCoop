@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
@@ -32,15 +33,19 @@ namespace GameInterface.Services.MapEvents.Patches
     [HarmonyPatch(typeof(MapEvent))]
     public class MapEventInitPatch
     {
-        [HarmonyPostfix]
+        [HarmonyPrefix]
         [HarmonyPatch(nameof(MapEvent.Initialize))]
-        static void Postfix(MapEvent __instance, PartyBase attackerParty, PartyBase defenderParty, MapEventComponent component, MapEvent.BattleTypes mapEventType)
+        static bool Prefix(MapEvent __instance, PartyBase attackerParty, PartyBase defenderParty, MapEventComponent component, MapEvent.BattleTypes mapEventType)
         {
-            if (ModInformation.IsClient) return;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+            if (ModInformation.IsClient) return false;
 
             MapEventInitialize message = new MapEventInitialize(__instance, mapEventType, attackerParty, defenderParty);
 
             MessageBroker.Instance.Publish(__instance, message);
+
+            return true;
         }
     }
 
