@@ -12,7 +12,7 @@ internal class MapEventCollectionPatches : GenericPatches<MapEventCollectionPatc
 {
     static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(MapEvent));
 
-    [HarmonyTranspiler]
-    static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        => ArrayFieldChangeTranspiler<MapEventSide, MapEventSidesArrayUpdated>(instructions, nameof(MapEvent._sides));
+    //[HarmonyTranspiler]
+    //static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+    //    => ArrayFieldChangeTranspiler<MapEventSide, MapEventSidesArrayUpdated>(instructions, nameof(MapEvent._sides));
 }

@@ -30,8 +30,8 @@ internal class MapEventHandler : IHandler
         messageBroker.Subscribe<MapEventCreated>(Handle);
         messageBroker.Subscribe<NetworkCreateMapEvent>(Handle);
 
-        messageBroker.Subscribe<MapEventSidesArrayUpdated>(Handle);
-        messageBroker.Subscribe<NetworkUpdateMapSidesArray>(Handle);
+        //messageBroker.Subscribe<MapEventSidesArrayUpdated>(Handle);
+        //messageBroker.Subscribe<NetworkUpdateMapSidesArray>(Handle);
 
         messageBroker.Subscribe<MapEventDestroyed>(Handle);
         messageBroker.Subscribe<NetworkDestroyMapEvent>(Handle);
@@ -45,8 +45,8 @@ internal class MapEventHandler : IHandler
         messageBroker.Unsubscribe<MapEventCreated>(Handle);
         messageBroker.Unsubscribe<NetworkCreateMapEvent>(Handle);
 
-        messageBroker.Unsubscribe<MapEventSidesArrayUpdated>(Handle);
-        messageBroker.Unsubscribe<NetworkUpdateMapSidesArray>(Handle);
+        //messageBroker.Unsubscribe<MapEventSidesArrayUpdated>(Handle);
+        //messageBroker.Unsubscribe<NetworkUpdateMapSidesArray>(Handle);
 
         messageBroker.Unsubscribe<MapEventDestroyed>(Handle);
         messageBroker.Unsubscribe<NetworkDestroyMapEvent>(Handle);
@@ -185,44 +185,44 @@ internal class MapEventHandler : IHandler
         });
     }
 
-    private void Handle(MessagePayload<MapEventSidesArrayUpdated> payload)
-    {
-        var mapEvent = payload.What.Instance;
-        if (objectManager.TryGetId(mapEvent, out var instanceId) == false)
-        {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEvent);
-            return;
-        }
+    //private void Handle(MessagePayload<MapEventSidesArrayUpdated> payload)
+    //{
+    //    var mapEvent = payload.What.Instance;
+    //    if (objectManager.TryGetId(mapEvent, out var instanceId) == false)
+    //    {
+    //        Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEvent);
+    //        return;
+    //    }
 
-        var value = payload.What.Value;
-        if (objectManager.TryGetId(value, out var valueId) == false)
-        {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEventSide), value);
-            return;
-        }
+    //    var value = payload.What.Value;
+    //    if (objectManager.TryGetId(value, out var valueId) == false)
+    //    {
+    //        Logger.Error("Unable to get {type} if from {obj}", nameof(MapEventSide), value);
+    //        return;
+    //    }
 
 
-        network.SendAll(new NetworkUpdateMapSidesArray(instanceId, valueId, payload.What.Index));
-    }
+    //    network.SendAll(new NetworkUpdateMapSidesArray(instanceId, valueId, payload.What.Index));
+    //}
 
-    private void Handle(MessagePayload<NetworkUpdateMapSidesArray> payload)
-    {
-        var instanceId = payload.What.InstanceId;
-        var valueId = payload.What.ValueId;
-        var index = payload.What.Index;
+    //private void Handle(MessagePayload<NetworkUpdateMapSidesArray> payload)
+    //{
+    //    var instanceId = payload.What.InstanceId;
+    //    var valueId = payload.What.ValueId;
+    //    var index = payload.What.Index;
 
-        if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) == false)
-        {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), instanceId);
-            return;
-        }
+    //    if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) == false)
+    //    {
+    //        Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), instanceId);
+    //        return;
+    //    }
 
-        if (objectManager.TryGetObject<MapEventSide>(valueId, out var mapEventSide) == false)
-        {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEventSide), valueId);
-            return;
-        }
+    //    if (objectManager.TryGetObject<MapEventSide>(valueId, out var mapEventSide) == false)
+    //    {
+    //        Logger.Error("Unable to get {type} if from {obj}", nameof(MapEventSide), valueId);
+    //        return;
+    //    }
 
-        mapEvent._sides[index] = mapEventSide;
-    }
+    //    mapEvent._sides[index] = mapEventSide;
+    //}
 }

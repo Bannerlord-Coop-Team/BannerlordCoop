@@ -3,8 +3,8 @@ if Interface;
 }}
 Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
 {
-    int index = DynamicSync.Constants.TypeMap[data.GetType()];
-    if (!this.objectManager.TryGetId(data.GetType(), data.Value, out string valueId) && data.Value != null) return;
+    int index = DynamicSync.Constants.TypeMap[data.Value.GetType()];
+    if (!this.objectManager.TryGetId(data.Value.GetType(), data.Value, out string valueId) && data.Value != null) return;
                 
     network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, valueId, index));
 });
