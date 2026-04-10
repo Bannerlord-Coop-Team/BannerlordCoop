@@ -146,6 +146,13 @@ internal class ParallelRobustnessPatches
                 continue;
             }
 
+            if (mobileParty.IsMilitia && mobileParty.HomeSettlement == null)
+            {
+                Logger.Warning("Skipping militia party {stringId} in ParallelTickMovingParties: HomeSettlement is null (Settlement not yet synced)",
+                    mobileParty.StringId);
+                continue;
+            }
+
             MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
             mobileParty.FillCurrentTickMoveDataForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
             mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
