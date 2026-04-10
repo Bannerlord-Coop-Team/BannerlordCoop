@@ -3,6 +3,7 @@ using Common.Messaging;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Recruitment;
 
@@ -24,9 +25,10 @@ public class RecruitmentVMPatches
         
         foreach(RecruitVolunteerTroopVM recruitVolunteerTroopVM in __instance.TroopsInCart)
         {
-            //totalCost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(recruitVolunteerTroopVM.Character, Hero.MainHero, false);
+            totalCost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(recruitVolunteerTroopVM.Character, Hero.MainHero).RoundedResultNumber;
             troopsInCart.Add((recruitVolunteerTroopVM.Owner.OwnerHero.StringId, recruitVolunteerTroopVM.Character.StringId, recruitVolunteerTroopVM.Index));
         }
+
         var message = new OnDoneRecruitmentVMChanged(mobilePartyId, troopsInCart.ToArray(), totalCost);
 
         MessageBroker.Instance.Publish(__instance, message);

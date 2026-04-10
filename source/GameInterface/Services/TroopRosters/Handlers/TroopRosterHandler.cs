@@ -72,14 +72,14 @@ public class TroopRosterHandler : IHandler
             {
                 Logger.Error("Unable to find Hero ({HeroId})", troop.Item1);
                 // send decline to them at some point...
-                return;
+                continue;
             }
 
             if (objectManager.TryGetObject(troop.Item2, out CharacterObject characterObject) == false)
             {
                 Logger.Error("Unable to find Hero ({CharacterObjectId})", troop.Item2);
                 // send decline to them at some point...
-                return;
+                continue;
             }
 
 
@@ -88,7 +88,7 @@ public class TroopRosterHandler : IHandler
             if (volunteerTroopAtIndex is null)
             {
                 // later send decline for specific reason
-                return;
+                continue;
             }
 
             herosValidated.Add((hero, characterObject, troop.Item3));

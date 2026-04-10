@@ -38,31 +38,31 @@ internal class CharacterObjectRegistry : IAutoRegistry<CharacterObject>
 
     public void OnClientCreated(CharacterObject obj, string id)
     {
-        var networkId = $"{nameof(BasicCharacterObject)}_{id}";
-        ObjectManager.AddExisting<BasicCharacterObject>(networkId, obj);
+        //var networkId = $"{nameof(BasicCharacterObject)}_{id}";
+        //ObjectManager.AddExisting<BasicCharacterObject>(networkId, obj);
     }
 
     public void OnClientDestroyed(CharacterObject obj, string id)
     {
-        var networkId = $"{nameof(BasicCharacterObject)}_{id}";
+        //var networkId = $"{nameof(BasicCharacterObject)}_{id}";
 
-        if (ObjectManager.TryGetObject<BasicCharacterObject>(networkId, out var resolvedObj) == false) return;
+        //if (ObjectManager.TryGetObject<BasicCharacterObject>(networkId, out var resolvedObj) == false) return;
 
-        ObjectManager.Remove(resolvedObj);
+        //ObjectManager.Remove(resolvedObj);
     }
 
     public void OnServerCreated(CharacterObject obj, string id)
     {
-        var networkId = $"{nameof(BasicCharacterObject)}_{id}";
-        ObjectManager.AddExisting<BasicCharacterObject>(networkId, obj);
+        //var networkId = $"{nameof(BasicCharacterObject)}_{id}";
+        //ObjectManager.AddExisting<BasicCharacterObject>(networkId, obj);
     }
 
     public void OnServerDestroyed(CharacterObject obj, string id)
     {
-        var networkId = $"{nameof(BasicCharacterObject)}_{id}";
+        //var networkId = $"{nameof(BasicCharacterObject)}_{id}";
 
-        if (ObjectManager.TryGetObject<BasicCharacterObject>(networkId, out var resolvedObj) == false) return;
+        //if (ObjectManager.TryGetObject<BasicCharacterObject>(networkId, out var resolvedObj) == false) return;
 
-        ObjectManager.Remove(resolvedObj);
+        //ObjectManager.Remove(resolvedObj);
     }
 }
