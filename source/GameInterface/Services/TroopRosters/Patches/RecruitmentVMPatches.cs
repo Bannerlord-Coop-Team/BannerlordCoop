@@ -2,16 +2,14 @@
 using Common.Messaging;
 using GameInterface.Services.TroopRosters.Messages;
 using HarmonyLib;
-using System;
 using System.Collections.Generic;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Recruitment;
 
 namespace GameInterface.Services.TroopRosters.Patches;
 
 [HarmonyPatch(typeof(RecruitmentVM))]
-public class OnDoneRecruitmentVMPatch
+public class RecruitmentVMPatches
 {
     [HarmonyPatch("OnDone")]
     [HarmonyPrefix]
@@ -32,6 +30,8 @@ public class OnDoneRecruitmentVMPatch
         var message = new OnDoneRecruitmentVMChanged(mobilePartyId, troopsInCart.ToArray(), totalCost);
 
         MessageBroker.Instance.Publish(__instance, message);
+
+        __instance.Deactivate();
 
         return false;
     }

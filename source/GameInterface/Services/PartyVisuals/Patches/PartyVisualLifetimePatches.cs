@@ -24,7 +24,6 @@ namespace GameInterface.Services.PartyVisuals.Patches
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            // TODO Maybe make this client side
             if (ModInformation.IsClient) return true;
 
             var message = new PartyVisualCreated(__instance, partyBase);
