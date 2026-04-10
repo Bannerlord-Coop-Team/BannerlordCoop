@@ -54,7 +54,8 @@ namespace E2E.Tests.Services.Settlements
             TestEnvironment.AssertField<Settlement, TextObject>(nameof(Settlement._name), new TextObject("test text")); //TEXTOBJECT
             TestEnvironment.AssertReferenceField<Settlement, Settlement>(nameof(Settlement._nextLocatable));
             TestEnvironment.AssertField<Settlement, int>(nameof(Settlement._numberOfLordPartiesAt), 7);
-            TestEnvironment.AssertField<Settlement, int>(nameof(Settlement.NumberOfLordPartiesTargeting), 2);
+            // NumberOfLordPartiesTargeting is not synced - it's server-only AI data recomputed each tick
+            //TestEnvironment.AssertField<Settlement, int>(nameof(Settlement.NumberOfLordPartiesTargeting), 2);
             TestEnvironment.AssertField<Settlement, CampaignVec2>(nameof(Settlement._position), new CampaignVec2(new Vec2(1,2), false), settlementId, new CampaignVec2(new Vec2(0, 0), true));
             TestEnvironment.AssertField<Settlement, float>(nameof(Settlement._readyMilitia), 5f);
             //TestEnvironment.AssertField<Settlement, Vec2>(nameof(Settlement._gatePosition), new Vec2(0, 1));
