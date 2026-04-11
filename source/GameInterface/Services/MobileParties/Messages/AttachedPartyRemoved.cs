@@ -11,11 +11,6 @@ public record AttachedPartyRemoved : GenericEvent<MobileParty, MobileParty>
 {
     public AttachedPartyData AttachedPartyData { get; }
 
-    // Only used for testing
-    public AttachedPartyRemoved() : base()
-    {
-    }
-
     public AttachedPartyRemoved(MobileParty instance, MobileParty value) : base(instance, value)
     {
         AttachedPartyData = new AttachedPartyData(instance.StringId, value.StringId);

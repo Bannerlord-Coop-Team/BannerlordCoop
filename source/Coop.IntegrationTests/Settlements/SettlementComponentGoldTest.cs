@@ -1,4 +1,5 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+﻿using Common.Util;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
@@ -23,8 +24,13 @@ namespace Coop.IntegrationTests.Settlements
         {
             // Arrange
             //string settlementId = "SettlementComponent1";
-            Settlement settlement = new();
-            SettlementComponent settlementComponent = settlement.SettlementComponent;
+            var settlementId = "MySettlement";
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(settlement, settlementId);
+
+            var settlementComponent = ObjectHelper.SkipConstructor<Hideout>();
+            TestEnvironment.RegisterObjectInNetwork<SettlementComponent>(settlementComponent);
+
             int newGold = 120;
             var triggerMessage = new SettlementComponentGoldChanged(settlementComponent, newGold);
 

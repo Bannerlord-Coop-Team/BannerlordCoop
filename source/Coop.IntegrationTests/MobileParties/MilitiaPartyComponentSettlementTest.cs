@@ -1,4 +1,5 @@
-﻿using Coop.IntegrationTests.Environment;
+﻿using Common.Util;
+using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 using System;
@@ -6,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.IntegrationTests.Settlements
@@ -21,10 +23,14 @@ namespace Coop.IntegrationTests.Settlements
         public void ServerSettlementComponentOwnerChanged_Publishes_AllClients()
         {
             // Arrange
-            Settlement settlement = new();
-            SettlementComponent settlementComponent = settlement.SettlementComponent;
-            string newOwner = "Owner1";
-            var triggerMessage = new SettlementComponentOwnerChanged(settlementComponent, newOwner);
+            var settlementId = "MySettlement";
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(settlement, settlementId);
+
+            var settlementComponent = ObjectHelper.SkipConstructor<Hideout>();
+            TestEnvironment.RegisterObjectInNetwork<SettlementComponent>(settlementComponent);
+
+            var triggerMessage = new SettlementComponentOwnerChanged(settlementComponent, settlementId);
 
             var server = TestEnvironment.Server;
 

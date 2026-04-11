@@ -138,11 +138,11 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Assert.Same(heroData.HomeSettlement, newHero.HomeSettlement);
             Assert.Same(heroData.Mother, newHero.Mother);
             Assert.Same(heroData.Spouse, newHero.Spouse);
+            Assert.Same(heroData.PartyBelongedToAsPrisoner, newHero.PartyBelongedToAsPrisoner);
 
             // Verify data types are equal
             Assert.Equal(heroData.HeroDeveloper.ToString(), newHero.HeroDeveloper?.ToString());
             Assert.Equal(heroData.StaticBodyProperties, newHero.BodyProperties.StaticProperties);
-            Assert.Equal(heroData.PartyBelongedToAsPrisoner.ToString(), newHero.PartyBelongedToAsPrisoner?.ToString());
             AssertValuesEqual(heroData.VolunteerTypes, newHero.VolunteerTypes);
         }
 

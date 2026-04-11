@@ -1,4 +1,5 @@
-﻿using Coop.IntegrationTests.Environment;
+﻿using Common;
+using Coop.IntegrationTests.Environment;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 
 namespace Coop.IntegrationTests.MobileParties
