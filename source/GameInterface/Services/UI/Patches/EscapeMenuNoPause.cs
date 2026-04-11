@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using SandBox.View.Map;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,27 +15,31 @@ namespace GameInterface.Services.UI.Patches
     {
         [HarmonyPatch("OnEscapeMenuToggled")]
         [HarmonyPrefix]
-        static bool OnEscapeMenuToggled(ref MapScreen __instance, ref bool isOpened)
+        static bool OnEscapeMenuToggled(MapScreen __instance, bool isOpened)
         {
-            __instance.MapCameraView.OnEscapeMenuToggled(isOpened);
-            if (__instance.IsEscapeMenuOpened == isOpened)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                return false;
-            }
-            __instance.IsEscapeMenuOpened = isOpened;
-            if (isOpened)
-            {
-                List<EscapeMenuItemVM> escapeMenuItems = __instance.GetEscapeMenuItems();
-                //Game.Current.GameStateManager.RegisterActiveStateDisableRequest(this);
-                __instance._escapeMenuView = __instance.AddMapView<MapEscapeMenuView>(new object[]
+                __instance.MapCameraView.OnEscapeMenuToggled(isOpened);
+                if (__instance.IsEscapeMenuOpened == isOpened)
                 {
+                    return;
+                }
+                __instance.IsEscapeMenuOpened = isOpened;
+                if (isOpened)
+                {
+                    List<EscapeMenuItemVM> escapeMenuItems = __instance.GetEscapeMenuItems();
+                    //Game.Current.GameStateManager.RegisterActiveStateDisableRequest(this);
+                    __instance._escapeMenuView = __instance.AddMapView<MapEscapeMenuView>(new object[]
+                    {
                     escapeMenuItems
-                });
-                return false;
-            }
-            __instance.RemoveMapView(__instance._escapeMenuView);
-            __instance._escapeMenuView = null;
-            //Game.Current.GameStateManager.UnregisterActiveStateDisableRequest(this);
+                    });
+                    return;
+                }
+                __instance.RemoveMapView(__instance._escapeMenuView);
+                __instance._escapeMenuView = null;
+                //Game.Current.GameStateManager.UnregisterActiveStateDisableRequest(this);
+
+            }, blocking: true);
 
             return false;
         }
