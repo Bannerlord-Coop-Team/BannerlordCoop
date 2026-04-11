@@ -22,13 +22,13 @@ public class ClientTroopRosterHandler : IHandler
         this.network = network;
         this.objectManager = objectManager;
         messageBroker.Subscribe<NetworkChangeTroopRosterAddtoCounts>(HandleAddToCounts);
-        messageBroker.Subscribe<OnDoneRecruitmentVMChanged>(HandleOnRecruitmentDone);
+        messageBroker.Subscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
     }
 
-    private void HandleOnRecruitmentDone(MessagePayload<OnDoneRecruitmentVMChanged> payload)
+    private void HandleOnRecruitmentDone(MessagePayload<RecruitmentAttempted> payload)
     {
         var obj = payload.What;
-        var message = new ClientRequestOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, obj.TotalCost);
+        var message = new ClientRequestRecruitment(obj.MobilePartyId, obj.TroopsInCart);
 
         network.SendAll(message);
     }
@@ -42,6 +42,6 @@ public class ClientTroopRosterHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkChangeTroopRosterAddtoCounts>(HandleAddToCounts);
-        messageBroker.Unsubscribe<OnDoneRecruitmentVMChanged>(HandleOnRecruitmentDone);
+        messageBroker.Unsubscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
     }
 }

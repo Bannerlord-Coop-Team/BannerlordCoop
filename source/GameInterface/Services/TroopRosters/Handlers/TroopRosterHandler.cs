@@ -1,24 +1,14 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using GameInterface.Services.TroopRosters.Patches;
-using SandBox.View.Map;
 using Serilog;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.ViewModelCollection.GameMenu.Recruitment;
-using TaleWorlds.Engine.GauntletUI;
-using TaleWorlds.GauntletUI.Data;
-using TaleWorlds.Library;
-using TaleWorlds.MountAndBlade;
-using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
 
@@ -36,18 +26,12 @@ public class TroopRosterHandler : IHandler
         this.network = network;
 
         messageBroker.Subscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
-        messageBroker.Subscribe<ProccessRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
+        messageBroker.Subscribe<RecruitTroops>(HandleOnRecruitmentDone);
     }
 
-    public void HandleOnRecruitmentDone(MessagePayload<ProccessRequestOnDoneRecruitmentVM> payload)
+    public void HandleOnRecruitmentDone(MessagePayload<RecruitTroops> payload)
     {
         var obj = payload.What;
-
-        if (obj.TroopsInCart == null)
-        {
-            network.Send(obj.ClientWho, new ClientCloseRecruitmentVM());
-            return;
-        }
 
         if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
         {
@@ -55,35 +39,25 @@ public class TroopRosterHandler : IHandler
             return;
         }
 
-        var troopsInCartList = obj.TroopsInCart.ToList();
-
-        if (obj.TotalCost > mobileParty.LeaderHero.Gold)
-        {
-            // gold is not good respond to them for future ref reference.
-            return;
-        }
-
         List<(Hero, CharacterObject, int)> herosValidated = new();
 
         // validate they are all good before recruiting any
-        foreach (var troop in troopsInCartList)
+        foreach (var troop in obj.TroopsInCart)
         {
-            if (objectManager.TryGetObject(troop.Item1, out Hero hero) == false)
+            if (objectManager.TryGetObject(troop.RecruiterHeroId, out Hero hero) == false)
             {
-                Logger.Error("Unable to find Hero ({HeroId})", troop.Item1);
-                // send decline to them at some point...
+                Logger.Error("Unable to find Hero ({HeroId})", troop.RecruiterHeroId);
                 continue;
             }
 
-            if (objectManager.TryGetObject(troop.Item2, out CharacterObject characterObject) == false)
+            if (objectManager.TryGetObject(troop.CharacterObjectId, out CharacterObject characterObject) == false)
             {
-                Logger.Error("Unable to find Hero ({CharacterObjectId})", troop.Item2);
-                // send decline to them at some point...
+                Logger.Error("Unable to find CharacterObject ({CharacterObjectId})", troop.CharacterObjectId);
                 continue;
             }
 
 
-            var volunteerTroopAtIndex = hero.VolunteerTypes[troop.Item3];
+            var volunteerTroopAtIndex = hero.VolunteerTypes[troop.TroopIndex];
 
             if (volunteerTroopAtIndex is null)
             {
@@ -91,23 +65,34 @@ public class TroopRosterHandler : IHandler
                 continue;
             }
 
-            herosValidated.Add((hero, characterObject, troop.Item3));
+            herosValidated.Add((hero, characterObject, troop.TroopIndex));
         }
 
+        // Calculate cost before changing any data
+        var cost = 0;
+        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
+        {
+            cost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(characterObject, mobileParty.LeaderHero).RoundedResultNumber;
+        }
+
+        // Do not apply recruitment if the player does not have enough gold
+        if (cost > mobileParty.LeaderHero.Gold)
+        {
+            Logger.Warning("Attempted to recruit troops that cost more than the player had");
+            return;
+        }
+
+        // Commit recruitment
         foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
         {
             hero.VolunteerTypes[index] = null;
+            messageBroker.Publish(this, new VolunteerTypesArrayUpdated(hero, null, index));
+
             mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
             CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
         }
 
-        mobileParty.LeaderHero.Gold -= obj.TotalCost;
-
-        var message = new ApproveChangeOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, obj.TotalCost);
-
-        network.Send(obj.ClientWho, new ClientCloseRecruitmentVM());
-
-        network.SendAll(message);
+        mobileParty.LeaderHero.Gold -= cost;
     }
 
     private void HandleAddToCounts(MessagePayload<ChangeTroopRostersAddToCounts> payload)
@@ -139,6 +124,6 @@ public class TroopRosterHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
-        messageBroker.Unsubscribe<ProccessRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
+        messageBroker.Unsubscribe<RecruitTroops>(HandleOnRecruitmentDone);
     }
 }
