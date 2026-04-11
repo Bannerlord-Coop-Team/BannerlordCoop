@@ -10,7 +10,7 @@ public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : Gene
         
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client updated managed {type}", "{{ MemberName }}");
+            Logger.Error("Client updated managed {member}", "{{MemberDeclaringType}}.{{MemberName}}");
             return;
         }
         

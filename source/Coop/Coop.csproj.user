@@ -12,4 +12,10 @@
     <StartWorkingDirectory>..\..\..\..\mb2\bin\Win64_Shipping_Client\</StartWorkingDirectory>
     <StartArguments>/singleplayer /server _MODULES_%2aNative%2aSandBoxCore%2aCustomBattle%2aSandBox%2aStoryMode%2aCoop%2a_MODULES_</StartArguments>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'DebugAutoConnect|AnyCPU'">
+    <StartAction>Program</StartAction>
+    <StartProgram>..\mb2\bin\Win64_Shipping_Client\Bannerlord.exe</StartProgram>
+    <StartArguments>/singleplayer /server /autoconnect _MODULES_%2aNative%2aSandBoxCore%2aSandBox%2aStoryMode%2aCoop%2a_MODULES_</StartArguments>
+    <StartWorkingDirectory>..\..\..\..\mb2\bin\Win64_Shipping_Client\</StartWorkingDirectory>
+  </PropertyGroup>
 </Project>

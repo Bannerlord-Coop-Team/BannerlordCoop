@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
 using Coop.Core.Server.Services.TroopRosters.Messages;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using LiteNetLib;
 using Serilog;
@@ -13,20 +14,21 @@ internal class ServerTroopRosterHandler : IHandler
     private static readonly ILogger Logger = LogManager.GetLogger<ServerTroopRosterHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IObjectManager objectManager;
 
-    public ServerTroopRosterHandler(IMessageBroker messageBroker, INetwork network)
+    public ServerTroopRosterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-
+        this.objectManager = objectManager;
         messageBroker.Subscribe<TroopRosterAddToCountsChanged>(HandleAddToCounts);
-        messageBroker.Subscribe<ClientRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
+        messageBroker.Subscribe<ClientRequestRecruitment>(HandleOnRecruitmentDone);
     }
 
-    private void HandleOnRecruitmentDone(MessagePayload<ClientRequestOnDoneRecruitmentVM> payload)
+    private void HandleOnRecruitmentDone(MessagePayload<ClientRequestRecruitment> payload)
     {
         var obj = payload.What;
-        var message = new ProccessRequestOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, payload.Who as NetPeer, obj.TotalCost);
+        var message = new RecruitTroops(obj.MobilePartyId, obj.TroopsInCart);
         messageBroker.Publish(this, message);
     }
 
@@ -39,6 +41,6 @@ internal class ServerTroopRosterHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<TroopRosterAddToCountsChanged>(HandleAddToCounts);
-        messageBroker.Unsubscribe<ClientRequestOnDoneRecruitmentVM>(HandleOnRecruitmentDone);
+        messageBroker.Unsubscribe<ClientRequestRecruitment>(HandleOnRecruitmentDone);
     }
 }

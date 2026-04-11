@@ -21,7 +21,8 @@ namespace E2E.Tests.Services.MobilePartyAis
         {
             // Required as mobileParty Ai comes with a predefined mobile party
             var mobilePartyAi = TestEnvironment.Server.GetRegisteredObject<MobilePartyAi>(_aiId);
-            TestEnvironment.AssertReferenceField<MobilePartyAi, MobileParty>(nameof(MobilePartyAi._mobileParty), referenceStringId: _secondPartyId, defaultValue: mobilePartyAi._mobileParty);
+            //Disabled: _mobileParty sync is disabled in MobilePartyAiSync.cs (readonly, done in lifetime handler)
+            //TestEnvironment.AssertReferenceField<MobilePartyAi, MobileParty>(nameof(MobilePartyAi._mobileParty), referenceStringId: _secondPartyId, defaultValue: mobilePartyAi._mobileParty);
             TestEnvironment.AssertField<MobilePartyAi, bool>(nameof(MobilePartyAi._isDisabled), true);
         }
 

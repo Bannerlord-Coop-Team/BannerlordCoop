@@ -1,4 +1,5 @@
-﻿using Coop.Core.Server.Services.Settlements.Messages;
+﻿using Common.Util;
+using Coop.Core.Server.Services.Settlements.Messages;
 using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
@@ -7,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace Coop.IntegrationTests.Settlements
 {
@@ -21,9 +23,16 @@ namespace Coop.IntegrationTests.Settlements
         public void ServerSettlementComponentGoldChanged_Publishes_AllClients()
         {
             // Arrange
-            string settlementId = "SettlementComponent1";
+            //string settlementId = "SettlementComponent1";
+            var settlementId = "MySettlement";
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(settlement, settlementId);
+
+            var settlementComponent = ObjectHelper.SkipConstructor<Hideout>();
+            TestEnvironment.RegisterObjectInNetwork<SettlementComponent>(settlementComponent);
+
             int newGold = 120;
-            var triggerMessage = new SettlementComponentGoldChanged(settlementId, newGold);
+            var triggerMessage = new SettlementComponentGoldChanged(settlementComponent, newGold);
 
             var server = TestEnvironment.Server;
 

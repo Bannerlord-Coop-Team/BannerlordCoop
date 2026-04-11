@@ -43,7 +43,6 @@ internal class PartyComponentRegistry : RegistryBase<PartyComponent>
     protected override string GetNewId(PartyComponent party)
     {
         return $"{PartyComponentIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-
     }
 }
 

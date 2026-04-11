@@ -1,6 +1,8 @@
-﻿using Coop.IntegrationTests.Environment;
+﻿using Common.Util;
+using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Template.Messages;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace Coop.IntegrationTests.Template;
 
@@ -12,11 +14,17 @@ public class TestTemplate
     /// <summary>
     /// Use for server controlled functionality
     /// </summary>
-    [Fact]
+    [Fact(Skip = "Example Test")]
     public void ServerReceivesTemplateEventMessage_PublishesTemplateCommandMessage_AllClients()
     {
         // Arrange
-        var triggerMessage = new TemplateEventMessage();
+        var party1Id = "Party1";
+        var party1 = ObjectHelper.SkipConstructor<MobileParty>();
+        party1.StringId = party1Id;
+        party1._attachedParties = new TaleWorlds.Library.MBList<MobileParty>();
+        TestEnvironment.RegisterObjectInNetwork(party1, party1Id);
+
+        var triggerMessage = new TemplateEventMessage(party1, 1.0f);
 
         var server = TestEnvironment.Server;
 
@@ -38,11 +46,17 @@ public class TestTemplate
     /// <summary>
     /// Use for client controlled functionality
     /// </summary>
-    [Fact]
+    [Fact(Skip = "Example Test")]
     public void ClientReceivesTemplateEventMessage_PublishesTemplateCommandMessage_AllClients()
     {
         // Arrange
-        var triggerMessage = new TemplateEventMessage();
+        var party1Id = "Party1";
+        var party1 = ObjectHelper.SkipConstructor<MobileParty>();
+        party1.StringId = party1Id;
+        party1._attachedParties = new TaleWorlds.Library.MBList<MobileParty>();
+        TestEnvironment.RegisterObjectInNetwork(party1, party1Id);
+
+        var triggerMessage = new TemplateEventMessage(party1, 1.0f);
 
         var client1 = TestEnvironment.Clients.First();
         var server = TestEnvironment.Server;

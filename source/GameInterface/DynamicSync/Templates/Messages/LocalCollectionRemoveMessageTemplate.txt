@@ -7,10 +7,6 @@ namespace DynamicSync
 {
     public record {{ MemberDeclaringType}}_{{ MemberName }}_RemoveLocalMessage : GenericEvent<{{ MemberDeclaringType }}, {{ ElementType }}>
     {
-        public {{ MemberDeclaringType}}_{{ MemberName }}_RemoveLocalMessage()
-        {
-        }
-
         public {{ MemberDeclaringType}}_{{ MemberName }}_RemoveLocalMessage({{ MemberDeclaringType }} instance, {{ ElementType }} value) : base(instance, value)
         {
         }

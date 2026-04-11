@@ -20,7 +20,9 @@ internal class SettlementSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.LastVisitTimeOfOwner)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.MilitiaPartyComponent)));
 
-        // maybe not needed???
+        // NOT synced - causes severe performance regression: KingdomManager.UpdateLordPartyVariablesRelatedToSettlements
+        // zeroes and recomputes this field on EVERY settlement EVERY campaign tick, generating hundreds of network
+        // messages per tick. Clients don't run AI so they don't need this value.
         //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
 
         // readonly

@@ -22,10 +22,10 @@ internal class MobilePartyDataPatches
 
     private static readonly ILogger Logger = LogManager.GetLogger<HeroFieldPatches>();
 
-    private static IEnumerable<MethodBase> TargetMethods()
+    private static IEnumerable<MethodBase> TargetMethods() => new MethodBase[]
     {
-        yield return AccessTools.Method(typeof(MobileParty), nameof(MobileParty.CreateParty));
-    }
+        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.CreateParty))
+    };
 
     [HarmonyTranspiler]
     private static IEnumerable<CodeInstruction> PartyComponentTranspiler(IEnumerable<CodeInstruction> instructions)
@@ -55,7 +55,7 @@ internal class MobilePartyDataPatches
         }
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client updated unmanaged {type}", value.GetType());
+            Logger.Error("Client updated managed {type}", value.GetType());
             instance._partyComponent = value;
             return;
         }

@@ -70,7 +70,7 @@ public interface IObjectManager
 /// <summary>
 /// Ground truth for storing and retreiving object and ids
 /// </summary>
-internal class ObjectManager : IObjectManager
+public class ObjectManager : IObjectManager
 {
     private readonly ILogger logger;
 
@@ -92,10 +92,11 @@ internal class ObjectManager : IObjectManager
 
         return LogIfRegistrationError(
             registry.RegisterExistingObject(id, obj),
-            obj);
+            obj,
+            id);
     }
 
-    public bool AddNewObject<T>(T obj, out string newId )
+    public bool AddNewObject<T>(T obj, out string newId)
     {
         newId = null;
         if (obj == null) return false;
@@ -104,7 +105,8 @@ internal class ObjectManager : IObjectManager
 
         return LogIfRegistrationError(
             registry.RegisterNewObject(obj, out newId),
-            obj);
+            obj,
+            newId);
     }
 
     public bool Contains<T>(T obj)
@@ -171,15 +173,23 @@ internal class ObjectManager : IObjectManager
     }
 
     #region LogHelpers
-    private bool LogIfRegistrationError(bool result, object registerObject)
+    private bool LogIfRegistrationError(bool result, object registerObject, object registerId)
     {
         if (result) return true;
 
         var objectType = registerObject.GetType();
+
+        string objectId = "Unknown";
+        if (registerId != null)
+        {
+            objectId = registerId.ToString();
+        }
+
         var className = nameof(ObjectManager);
 
-        logger.Error("Unable to register {name} with {objectManager}",
+        logger.Error("Unable to register {name} with id: {id} in {objectManager}",
                      objectType,
+                     objectId,
                      className);
 
         return false;

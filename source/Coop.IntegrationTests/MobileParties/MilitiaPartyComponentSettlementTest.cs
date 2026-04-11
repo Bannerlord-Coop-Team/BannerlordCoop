@@ -1,13 +1,16 @@
-﻿using Coop.IntegrationTests.Environment.Instance;
+﻿using Common.Util;
 using Coop.IntegrationTests.Environment;
+using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using TaleWorlds.CampaignSystem.Party.PartyComponents;
+using TaleWorlds.CampaignSystem.Settlements;
 
-namespace Coop.IntegrationTests.Settlement
+namespace Coop.IntegrationTests.Settlements
 {
     /// <summary>
     /// Test syncs for <see cref="TaleWorlds.CampaignSystem.Settlements.SettlementComponent.Owner"/>
@@ -20,9 +23,14 @@ namespace Coop.IntegrationTests.Settlement
         public void ServerSettlementComponentOwnerChanged_Publishes_AllClients()
         {
             // Arrange
-            string settlementId = "SettlementComponent1";
-            string newOwner = "Owner1";
-            var triggerMessage = new SettlementComponentOwnerChanged(settlementId, newOwner);
+            var settlementId = "MySettlement";
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(settlement, settlementId);
+
+            var settlementComponent = ObjectHelper.SkipConstructor<Hideout>();
+            TestEnvironment.RegisterObjectInNetwork<SettlementComponent>(settlementComponent);
+
+            var triggerMessage = new SettlementComponentOwnerChanged(settlementComponent, settlementId);
 
             var server = TestEnvironment.Server;
 

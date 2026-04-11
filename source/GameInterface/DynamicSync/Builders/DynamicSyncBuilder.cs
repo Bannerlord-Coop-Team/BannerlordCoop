@@ -1,5 +1,7 @@
-﻿using Microsoft.CodeAnalysis;
+﻿using Common.Logging;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -11,6 +13,8 @@ namespace GameInterface.DynamicSync.Builders;
 
 public class DynamicSyncBuilder
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<DynamicSyncBuilder>();
+
     private readonly DynamicSyncRegistry dynamicSyncRegistry;
     private readonly DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder;
     private readonly DynamicSyncPatchBuilder dynamicSyncPatchBuilder;
@@ -24,8 +28,43 @@ public class DynamicSyncBuilder
 
     public Assembly Build()
     {
-        if (Directory.Exists($@"{DynamicSyncConfiguration.ExportPath}"))
-            Directory.Delete($@"{DynamicSyncConfiguration.ExportPath}", true);
+        // Only the server/host process manages the export directory (ExportFiles=true by
+        // default; the client sets it to false in StartAsClient before calling PatchAll).
+        //
+        // Why it is safe for the client never to delete or write the export directory:
+        //
+        //   - Same-machine (DebugAutoConnect): both processes share the same physical
+        //     directory. Without this guard they raced on Directory.Delete, causing
+        //     "directory is not empty" IOException. Since both processes generate identical
+        //     output, the server's deletion and export is sufficient — the client gains
+        //     nothing by also doing it.
+        //
+        //   - Separate machines (normal multiplayer): ExportPath is derived from
+        //     Assembly.GetExecutingAssembly().Location, which is a local path on whichever
+        //     machine the process runs on. Server and client therefore have completely
+        //     independent directories on different disks — no race is possible regardless.
+        //     The client skipping its own local export is a minor debug inconvenience at
+        //     most; the server's exported sources are always available for inspection, and
+        //     both sides generate identical code anyway.
+        if (DynamicSyncConfiguration.ExportFiles && Directory.Exists(DynamicSyncConfiguration.ExportPath))
+        {
+            // Directory.Delete throws UnauthorizedAccessException on read-only files
+            // (.NET Framework limitation). Strip attributes on all files before deleting.
+            foreach (var file in Directory.GetFiles(DynamicSyncConfiguration.ExportPath, "*", SearchOption.AllDirectories))
+            {
+                try { File.SetAttributes(file, FileAttributes.Normal); }
+                catch (FileNotFoundException ex)
+                {
+                    Logger.Warning("[DynamicSync] SetAttributes: file not found (race?): {File} — {Message}", file, ex.Message);
+                }
+                catch (IOException ex)
+                {
+                    Logger.Warning("[DynamicSync] SetAttributes IOException: {File} — {Message}", file, ex.Message);
+                }
+            }
+
+            Directory.Delete(DynamicSyncConfiguration.ExportPath, true);
+        }
 
         List<Assembly> assemblies = new List<Assembly>
         {
@@ -95,7 +134,15 @@ public class DynamicSyncBuilder
             var result = dynamicAssembly.Emit(assemblyStream, pdbStream);
 
             if (!result.Success)
-                throw new InvalidOperationException(string.Join("\n", result.Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error).Select(d => $"{d.Location.ToString()} {d.GetMessage()}")));
+            {
+                var errors = result.Diagnostics
+                    .Where(d => d.Severity == DiagnosticSeverity.Error)
+                    .Select(d => $"{d.Location} {d.GetMessage()}")
+                    .ToList();
+                Logger.Error("[DynamicSync] Compilation failed with {ErrorCount} error(s):\n{Errors}",
+                    errors.Count, string.Join("\n", errors));
+                throw new InvalidOperationException(string.Join("\n", errors));
+            }
 
             return Assembly.Load(assemblyStream.GetBuffer());
         };

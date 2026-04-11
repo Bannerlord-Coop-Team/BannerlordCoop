@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
@@ -45,7 +46,13 @@ internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
     {
         using (new AllowedThread())
         {
+            obj._isVisible = false;
+            obj.IsActive = true;
+            obj._isCurrentlyUsedByAQuest = false;
+            obj.Party = new PartyBase(obj);
+            obj.Anchor = new AnchorPoint(obj);
             obj.InitMembers();
+            obj.InitCached();
             obj.Initialize();
         }
 

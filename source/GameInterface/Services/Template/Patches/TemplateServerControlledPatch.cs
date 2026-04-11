@@ -6,6 +6,7 @@ using GameInterface.Services.Template.Messages;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Template.Patches;
 
@@ -14,7 +15,7 @@ namespace GameInterface.Services.Template.Patches;
 /// Patches modify game behavior at runtime and are useful for enforcing server-side rules.
 /// Uncomment the HarmonyPatch attributes when applying this patch.
 /// </summary>
-//[HarmonyPatch(typeof(Campaign))]
+//[HarmonyPatch(typeof(MobileParty))]
 class TemplateServerControlledPatch
 {
     private static ILogger Logger { get; } = LogManager.GetLogger<TemplateServerControlledPatch>();
@@ -28,10 +29,10 @@ class TemplateServerControlledPatch
     /// <remarks>
     /// See https://harmony.pardeike.net/articles/intro.html on how to use harmony patches
     /// </remarks>
-    //[HarmonyPatch(nameof(Campaign.AverageWage))]
+    //[HarmonyPatch(nameof(MobileParty.Scout))]
     //[HarmonyPatch(MethodType.Setter)]
     //[HarmonyPrefix]
-    private static void Prefix(ref Campaign __instance, float value)
+    private static void Prefix(ref MobileParty __instance, float value)
     {
         // Allow the original method call if it is triggered by OverrideTemplateFn
         if (CallOriginalPolicy.IsOriginalAllowed()) return;

@@ -18,6 +18,7 @@ namespace GameInterface.Services.UI.Patches
                 CharacterDeveloperState => false,
                 PartyState => false,
                 InventoryState => false,
+                ClanState => false,
                 _ => true,
             };
         }

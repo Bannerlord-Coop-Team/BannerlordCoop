@@ -36,27 +36,44 @@ namespace Coop
             MBDebug.DisableLogging = false;
 
             AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
+
+            // Must be called here (constructor), not in NoHarmonyLoad().
+            // Module.LoadSubModules() calls all submodule constructors first, then all
+            // OnSubModuleLoad() in a second pass. GauntletUISubModule.OnSubModuleLoad()
+            // triggers the font race — our patches must be registered before that runs.
+            BootPatches.Apply();
         }
 
         private static string ClientServerModeMessage = "";
 
         private bool isServer = false;
+        private bool isAutoConnect = false;
         public override void NoHarmonyInit() 
         {
             AssemblyHellscape.CreateAssemblyBindingRedirects();
 
-            var args = Utilities.GetFullCommandLineString().Split(' ').ToList();
+            var fullCommandLine = Utilities.GetFullCommandLineString();
+            var args = fullCommandLine.Split(' ').ToList();
             
-            if (args.Contains("/server"))
+            if (args.Any(a => a.Equals("/server", StringComparison.OrdinalIgnoreCase)))
             {
                 isServer = true;
             }
-            else if (args.Contains("/client"))
+            else if (args.Any(a => a.Equals("/client", StringComparison.OrdinalIgnoreCase)))
             {
                 isServer = false;
             }
 
+            isAutoConnect = args.Any(a => a.Equals("/autoconnect", StringComparison.OrdinalIgnoreCase));
+
             SetupLogging();
+
+            if (isAutoConnect)
+            {
+                Logger.Information("[AutoConnect] Full command line: {CommandLine}", fullCommandLine);
+                Logger.Information("[AutoConnect] isServer={IsServer} isAutoConnect={IsAutoConnect}", isServer, isAutoConnect);
+                EnsureSafeExitConfig();
+            }
 
             GameLoopRunner.Instance.SetGameLoopThread();
         }
@@ -85,7 +102,58 @@ namespace Coop
             Logger.Verbose("Coop Mod Module Started");
         }
 
-        
+        /// <summary>
+        /// Sets safely_exited=1 in engine_config.txt and marks it read-only so Bannerlord never
+        /// shows the safe-mode recovery popup when using DebugAutoConnect (both processes are killed
+        /// hard by the debugger, so safely_exited is never written on normal shutdown).
+        /// </summary>
+        private void EnsureSafeExitConfig()
+        {
+            try
+            {
+                var configPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    "Mount and Blade II Bannerlord",
+                    "Configs",
+                    "engine_config.txt");
+
+                if (!File.Exists(configPath))
+                {
+                    Logger.Warning("[AutoConnect] engine_config.txt not found at {Path} — safe-mode popup suppression skipped", configPath);
+                    return;
+                }
+
+                // Set safely_exited=1 and lock the file read-only.
+                // Both processes are killed hard by the debugger so Bannerlord never gets to write
+                // safely_exited=0 on shutdown — without this the safe-mode popup appears every run.
+                File.SetAttributes(configPath, FileAttributes.Normal);
+
+                var lines = File.ReadAllLines(configPath);
+                bool found = false;
+                for (int i = 0; i < lines.Length; i++)
+                {
+                    if (lines[i].TrimStart().StartsWith("safely_exited", StringComparison.OrdinalIgnoreCase))
+                    {
+                        lines[i] = "safely_exited  = 1";
+                        found = true;
+                        break;
+                    }
+                }
+
+                if (!found)
+                    lines = lines.Concat(new[] { "safely_exited  = 1" }).ToArray();
+
+                File.WriteAllLines(configPath, lines);
+                File.SetAttributes(configPath, FileAttributes.ReadOnly);
+
+                Logger.Information("[AutoConnect] engine_config.txt patched: safely_exited=1 and set read-only");
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "[AutoConnect] Failed to patch engine_config.txt — safe-mode popup may still appear");
+            }
+        }
+
         public override void NoHarmonyLoad()
         {
             Coop = new CoopartiveMultiplayerExperience();
@@ -170,6 +238,7 @@ namespace Coop
         }
 
         private bool m_IsFirstTick = true;
+        private bool _autoStarted = false;
         protected override void OnApplicationTick(float dt)
         {
             if(m_IsFirstTick)
@@ -180,6 +249,37 @@ namespace Coop
             }    
             TimeSpan frameTime = TimeSpan.FromSeconds(dt);
             Updateables.UpdateAll(frameTime);
+
+#if DEBUG
+            TryAutoConnect();
+#endif
+        }
+
+        private void TryAutoConnect()
+        {
+            if (isAutoConnect && !_autoStarted && GameStateManager.Current?.ActiveState is InitialState)
+            {
+                _autoStarted = true;
+                try
+                {
+                    if (isServer)
+                    {
+                        Logger.Information("[AutoConnect] InitialState active — auto-starting as server...");
+                        Coop.StartAsServer();
+                        Logger.Information("[AutoConnect] StartAsServer() completed");
+                    }
+                    else
+                    {
+                        Logger.Information("[AutoConnect] InitialState active — auto-starting as client...");
+                        Coop.StartAsClient();
+                        Logger.Information("[AutoConnect] StartAsClient() completed");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "[AutoConnect] Exception during auto-start");
+                }
+            }
         }
 
         private static void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)

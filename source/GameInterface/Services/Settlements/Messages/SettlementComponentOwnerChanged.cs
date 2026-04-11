@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages
 {
@@ -10,11 +11,11 @@ namespace GameInterface.Services.Settlements.Messages
     /// </summary>
     public record SettlementComponentOwnerChanged : IEvent
     {
-        public string SettlementComponentId { get; }
+        public SettlementComponent SettlementComponent { get; }
         public string OwnerId { get; }
-        public SettlementComponentOwnerChanged(string settlementComponentId, string ownerId)
+        public SettlementComponentOwnerChanged(SettlementComponent settlementComponent, string ownerId)
         {
-            SettlementComponentId = settlementComponentId;
+            SettlementComponent = settlementComponent;
             OwnerId = ownerId;
         }
     }

@@ -18,6 +18,7 @@ namespace Coop.Tests.Autofac
 
             ContainerBuilder builder = new ContainerBuilder();
             builder.RegisterModule<ClientModule>();
+            builder.RegisterModule<GameInterfaceModule>();
             builder.RegisterInstance(containerProvider).As<IContainerProvider>().SingleInstance();
             var container = builder.Build();
 

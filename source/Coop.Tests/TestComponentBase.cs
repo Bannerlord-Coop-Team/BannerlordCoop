@@ -5,10 +5,13 @@ using Common.Serialization;
 using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Tests.Mocks;
+using GameInterface.Registry;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.ObjectManager;
 using Moq;
+using Serilog;
 using System.Collections.Generic;
 using Xunit.Abstractions;
 
@@ -63,6 +66,11 @@ internal abstract class TestComponentBase
         builder.RegisterType<ContainerProvider>().As<IContainerProvider>().InstancePerLifetimeScope();
         builder.RegisterType<TestNetwork>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
         builder.RegisterType<ModuleValidator>().As<IModuleValidator>().SingleInstance();
+
+
+        builder.RegisterType<ObjectManager>().As<IObjectManager>().InstancePerLifetimeScope();
+        builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
+        builder.RegisterInstance(new Mock<ILogger>().Object).As<ILogger>().SingleInstance();
 
         RegisterMocks(builder);
 

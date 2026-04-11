@@ -7,10 +7,6 @@ namespace GameInterface.Utils.LocalEvents
         public TInstance Instance { get; }
         public TValue Value { get; }
 
-        public GenericEvent()
-        {
-        }
-
         public GenericEvent(TInstance instance, TValue value)
         {
             Instance = instance;

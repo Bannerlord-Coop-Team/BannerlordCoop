@@ -2,17 +2,18 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using TaleWorlds.CampaignSystem.Siege;
-using TaleWorlds.Core;
 
 namespace GameInterface.Registry.Auto;
 internal class LifetimePatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LifetimePatches>();
+
+    private static readonly MethodInfo Publish = AccessTools.Method(typeof(MessageBroker), nameof(MessageBroker.Publish));
 
     internal static bool CreatePrefix(ref object __instance)
     {
@@ -25,9 +26,11 @@ internal class LifetimePatches
             return true;
         }
 
-        var message = CreateInstanceCreatedEventFast(__instance);
+        var message = CreateInstanceCreatedEvent(__instance);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        Publish.MakeGenericMethod(
+            typeof(InstanceCreated<>).MakeGenericType(__instance.GetType()))
+            .Invoke(MessageBroker.Instance, new object[] { __instance, message });
 
         return true;
     }
@@ -43,39 +46,27 @@ internal class LifetimePatches
             return true;
         }
 
-        var message = CreateInstanceDestroyedEventFast(__instance);
+        var message = CreateInstanceDestroyedEvent(__instance);
 
-        MessageBroker.Instance.Publish(__instance, message);
+        Publish.MakeGenericMethod(
+            typeof(InstanceCreated<>).MakeGenericType(__instance.GetType()))
+            .Invoke(MessageBroker.Instance, new object[] { __instance, message });
 
         return true;
     }
 
-    private static ConditionalWeakTable<object, Type> TypeWeakDictionary = new ConditionalWeakTable<object, Type>();
-    public static IEvent CreateInstanceCreatedEventFast(object obj)
+    public static IEvent CreateInstanceCreatedEvent(object obj)
     {
         var type = obj.GetType();
-        Type genericTypeDefinition;
-        if (TypeWeakDictionary.TryGetValue(type, out genericTypeDefinition) == false)
-        {
-            genericTypeDefinition = typeof(InstanceCreated<>).MakeGenericType(type);
-            TypeWeakDictionary.Add(type, genericTypeDefinition);
-
-        }
+        Type genericTypeDefinition = typeof(InstanceCreated<>).MakeGenericType(type);
 
         return (IEvent)Activator.CreateInstance(genericTypeDefinition, obj);
     }
 
-
-    public static IEvent CreateInstanceDestroyedEventFast(object obj)
+    public static IEvent CreateInstanceDestroyedEvent(object obj)
     {
         var type = obj.GetType();
-        Type genericTypeDefinition;
-        if (TypeWeakDictionary.TryGetValue(type, out genericTypeDefinition) == false)
-        {
-            genericTypeDefinition = typeof(InstanceDestroyed<>).MakeGenericType(type);
-            TypeWeakDictionary.Add(type, genericTypeDefinition);
-
-        }
+        Type genericTypeDefinition = typeof(InstanceDestroyed<>).MakeGenericType(type);
 
         return (IEvent)Activator.CreateInstance(genericTypeDefinition, obj);
     }

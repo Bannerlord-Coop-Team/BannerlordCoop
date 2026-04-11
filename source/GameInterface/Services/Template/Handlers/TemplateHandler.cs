@@ -65,7 +65,7 @@ public class TemplateHandler : IHandler
         // If the instance has no network ID, log an error and return.
         if (!objectManager.TryGetId(instance, out var networkId))
         {
-            Logger.Error("Unable to get network ID for instance of type {type}", instance.GetType());
+            Logger.Error("Unable to get network ID for instance of type {type}", instance?.GetType());
             return;
         }
 
@@ -91,6 +91,6 @@ public class TemplateHandler : IHandler
             {
                 // Implement instance-specific logic here.
             }
-        }, blocking: true);
+        });
     }
 }

@@ -31,7 +31,7 @@ namespace GameInterface.Services.Settlements.Patches
                 return false;
             }
 
-            var message = new SettlementComponentGoldChanged(__instance.StringId, value);
+            var message = new SettlementComponentGoldChanged(__instance, value);
 
             MessageBroker.Instance.Publish(__instance, message);
             return true;
