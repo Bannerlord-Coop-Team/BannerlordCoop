@@ -6,11 +6,8 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using static TaleWorlds.CampaignSystem.MapEvents.MapEvent;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 

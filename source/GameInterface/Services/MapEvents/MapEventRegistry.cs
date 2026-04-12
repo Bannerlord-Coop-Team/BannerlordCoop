@@ -1,36 +1,66 @@
-﻿using GameInterface.Registry;
-using System.Threading;
+﻿using Common;
+using Common.Logging;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics.Metrics;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents;
 
 /// <summary>
 /// Registry for <see cref="MapEvent"/> objects
 /// </summary>
-internal class MapEventRegistry : RegistryBase<MapEvent>
+internal class MapEventRegistry : IAutoRegistry<MapEvent>
 {
-    private const string MapEventIdPrefix = "CoopMapEvent";
-    private int InstanceCounter = 0;
+    public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    {
+        Logger = logger;
 
-    public MapEventRegistry(IRegistryCollection collection) : base(collection) { }
+        autoRegistryFactory.RegisterType(this);
+    }
 
-    public override void RegisterAll()
+    private static ILogger Logger = LogManager.GetLogger<MapEvent>();
+
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] { AccessTools.Constructor(typeof(MapEvent)) };
+
+    public IEnumerable<MethodBase> DestroyMethods => new MethodBase[] { };
+
+    public void OnClientCreated(MapEvent obj, string id)
+    {
+    }
+
+    public void OnClientDestroyed(MapEvent obj, string id)
+    {
+    }
+
+    public void OnServerCreated(MapEvent obj, string id)
+    {
+        ;
+    }
+
+    public void OnServerDestroyed(MapEvent obj, string id)
+    {
+    }
+
+    public void RegisterAllObjects(IRegistry<MapEvent> registry)
     {
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (mapEvent.StringId == null) return;
+            int counter = 1;
 
-            if (RegisterExistingObject(mapEvent.StringId, mapEvent) == false)
+            var networkId = nameof(mapEvent) + "_" + mapEvent.StringId + "_" + counter++;
+
+            if (!registry.RegisterExistingObject(networkId, mapEvent))
             {
-                Logger.Error($"Unable to register {mapEvent}");
+                Logger.Error("Unable to register {type}", typeof(MapEvent));
+                continue;
             }
         }
     }
-
-    protected override string GetNewId(MapEvent party)
-    {
-        return $"{MapEventIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-    }
 }
-

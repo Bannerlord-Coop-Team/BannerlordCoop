@@ -1,24 +1,57 @@
-﻿using GameInterface.Registry;
-using System.Threading;
+﻿using Common;
+using Common.Logging;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEventParties;
-internal class MapEventPartyRegistry : RegistryBase<MapEventParty>
-{
-    private const string MapEventPartyIdPrefix = "CoopPartyBase";
-    private static int InstanceCounter = 0;
 
-    public MapEventPartyRegistry(IRegistryCollection collection) : base(collection)
+/// <summary>
+/// Registry for <see cref="MapEventParty"/> objects
+/// </summary>
+internal class MapEventPartyRegistry : IAutoRegistry<MapEventParty>
+{
+    public MapEventPartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    {
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
+    }
+
+    private static ILogger Logger = LogManager.GetLogger<MapEventParty>();
+
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] { AccessTools.Constructor(typeof(MapEventParty), new Type[] { typeof(PartyBase) }) };
+
+    public IEnumerable<MethodBase> DestroyMethods => new MethodBase[] { };
+
+    public void OnClientCreated(MapEventParty obj, string id)
     {
     }
 
-    public override void RegisterAll()
+    public void OnClientDestroyed(MapEventParty obj, string id)
+    {
+    }
+
+    public void OnServerCreated(MapEventParty obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(MapEventParty obj, string id)
+    {
+    }
+
+    public void RegisterAllObjects(IRegistry<MapEventParty> registry)
     {
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
             int counter = 1;
-            
+
             foreach (var side in mapEvent._sides)
             {
                 if (side == null) continue;
@@ -29,15 +62,10 @@ internal class MapEventPartyRegistry : RegistryBase<MapEventParty>
 
                     var networkId = nameof(MapEventParty) + "_" + mapEvent.StringId + "_" + counter++;
 
-                    if (RegisterExistingObject(networkId, party) == false)
+                    if (registry.RegisterExistingObject(networkId, party) == false)
                         Logger.Error("Unable to register MapEventParty {id} in the object manager", party.ToString());
                 }
             }
         }
-    }
-
-    protected override string GetNewId(MapEventParty obj)
-    {
-        return $"{MapEventPartyIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
     }
 }

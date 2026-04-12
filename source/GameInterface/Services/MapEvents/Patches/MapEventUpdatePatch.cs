@@ -5,10 +5,14 @@ using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
+using Helpers;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Patches
@@ -27,6 +31,25 @@ namespace GameInterface.Services.MapEvents.Patches
             if (__instance.InvolvedParties.Any(x => x.MobileParty.IsPartyControlled() == false)) return false;
 
             return true;
+        }
+    }
+
+    [HarmonyPatch(typeof(MapEvent))]
+    public class MapEventUpdatePatch2
+    {
+        [HarmonyPrefix]
+        [HarmonyPatch(nameof(MapEvent.RecalculateRenownAndInfluenceValues))]
+        static bool PrefixUpdate(MapEvent __instance, PartyBase party)
+        {
+            __instance.StrengthOfSide[(int)party.Side] += party.GetCustomStrength(party.Side, __instance.SimulationContext);
+            MapEventSide[] sides = __instance._sides;
+            for (int i = 0; i < sides.Length; i++)
+            {
+                if (sides[i] == null) continue;
+                sides[i].CalculateRenownAndInfluenceValues(__instance.StrengthOfSide);
+            }
+
+            return false;
         }
     }
 

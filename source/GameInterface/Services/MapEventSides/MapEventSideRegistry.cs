@@ -1,22 +1,54 @@
-﻿using GameInterface.Registry;
-using System.Linq;
-using System.Threading;
+﻿using Common;
+using Common.Logging;
+using GameInterface.Registry.Auto;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
-namespace GameInterface.Services.MapEvents;
+namespace GameInterface.Services.MapEventSides;
 
 /// <summary>
 /// Registry for <see cref="MapEventSide"/> objects
 /// </summary>
-internal class MapEventSideRegistry : RegistryBase<MapEventSide>
+internal class MapEventSideRegistry : IAutoRegistry<MapEventSide>
 {
-    private const string MapEventSideIdPrefix = "CoopMapEventSide";
-    private int InstanceCounter = 0;
+    public MapEventSideRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    {
+        Logger = logger;
 
-    public MapEventSideRegistry(IRegistryCollection collection) : base(collection) { }
+        autoRegistryFactory.RegisterType(this);
+    }
 
-    public override void RegisterAll()
+    private static ILogger Logger = LogManager.GetLogger<MapEventSide>();
+
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] { AccessTools.Constructor(typeof(MapEventSide), new Type[] { typeof(MapEvent), typeof(BattleSideEnum), typeof(PartyBase) }) };
+
+    public IEnumerable<MethodBase> DestroyMethods => new MethodBase[] { };
+
+    public void OnClientCreated(MapEventSide obj, string id)
+    {
+    }
+
+    public void OnClientDestroyed(MapEventSide obj, string id)
+    {
+    }
+
+    public void OnServerCreated(MapEventSide obj, string id)
+    {
+        ;
+    }
+
+    public void OnServerDestroyed(MapEventSide obj, string id)
+    {
+    }
+
+    public void RegisterAllObjects(IRegistry<MapEventSide> registry)
     {
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
@@ -28,15 +60,9 @@ internal class MapEventSideRegistry : RegistryBase<MapEventSide>
 
                 var networkId = nameof(MapEventSide) + "_" + mapEvent.StringId + "_" + counter++;
 
-                if (RegisterExistingObject(networkId, side) == false)
+                if (registry.RegisterExistingObject(networkId, side) == false)
                     Logger.Error("Unable to register MapEventSide {id} in the object manager", side.ToString());
             }
         }
     }
-
-    protected override string GetNewId(MapEventSide mapEventSide)
-    {
-        return $"{MapEventSideIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-    }
 }
-
