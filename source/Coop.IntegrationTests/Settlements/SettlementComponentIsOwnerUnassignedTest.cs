@@ -1,4 +1,5 @@
-﻿using Coop.IntegrationTests.Environment;
+﻿using Common.Util;
+using Coop.IntegrationTests.Environment;
 using Coop.IntegrationTests.Environment.Instance;
 using GameInterface.Services.Settlements.Messages;
 using System;
@@ -21,8 +22,13 @@ namespace Coop.IntegrationTests.Settlements
         public void ServerSettlementComponentIsOwnerUnassignedChanged_Publishes_AllClients()
         {
             // Arrange
-            Settlement settlement = new();
-            SettlementComponent settlementComponent = settlement.SettlementComponent;
+            var settlementId = "MySettlement";
+            var settlement = ObjectHelper.SkipConstructor<Settlement>();
+            TestEnvironment.RegisterObjectInNetwork(settlement, settlementId);
+
+            var settlementComponent = ObjectHelper.SkipConstructor<Hideout>();
+            TestEnvironment.RegisterObjectInNetwork<SettlementComponent>(settlementComponent);
+
             bool newValue = true;
             var triggerMessage = new SettlementComponentIsOwnerUnassignedChanged(settlementComponent, newValue);
 

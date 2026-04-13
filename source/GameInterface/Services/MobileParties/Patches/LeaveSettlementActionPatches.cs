@@ -40,6 +40,6 @@ public class LeaveSettlementActionPatches
             {
                 if (party.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(party);
             }
-        }, blocking: true);
+        });
     }
 }

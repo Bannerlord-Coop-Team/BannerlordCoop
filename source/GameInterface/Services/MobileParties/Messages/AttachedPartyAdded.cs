@@ -10,10 +10,6 @@ namespace GameInterface.Services.MobileParties.Messages;
 public record AttachedPartyAdded : GenericEvent<MobileParty, MobileParty>
 {
     public AttachedPartyData AttachedPartyData { get; }
-    
-    // Only used for testing
-    public AttachedPartyAdded() : base()
-    {}
 
     public AttachedPartyAdded(MobileParty instance, MobileParty value) : base(instance, value)
     {

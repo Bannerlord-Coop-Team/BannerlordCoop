@@ -2,7 +2,6 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
@@ -11,7 +10,6 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
@@ -110,7 +108,7 @@ internal class SettlementExitEnterHandler : IHandler
                 PlayerEncounter.Start();
                 PlayerEncounter.Current.Init(mobileParty.Party, settlementParty, settlement);
             }
-        }, blocking: true);
+        });
     }
 
     private void Handle(MessagePayload<EndSettlementEncounter> obj)
@@ -122,6 +120,6 @@ internal class SettlementExitEnterHandler : IHandler
                 PlayerEncounter.Finish(true);
                 Campaign.Current.SaveHandler.SignalAutoSave();
             }
-        }, blocking: true);
+        });
     }
 }

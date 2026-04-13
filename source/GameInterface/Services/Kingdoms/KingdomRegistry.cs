@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -22,7 +23,6 @@ internal class KingdomRegistry : IAutoRegistry<Kingdom>
     public KingdomRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
         Logger = logger;
-
         autoRegistryFactory.RegisterType(this);
     }
 
@@ -34,15 +34,15 @@ internal class KingdomRegistry : IAutoRegistry<Kingdom>
 
     public void RegisterAllObjects(IRegistry<Kingdom> registry)
     {
-        var objectManager = Campaign.Current?.CampaignObjectManager;
+        var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
 
-        if (objectManager == null)
+        if (campaignObjectManager == null)
         {
             Logger.Error("Unable to register objects when CampaignObjectManager is null");
             return;
         }
 
-        foreach (var kingdom in objectManager.Kingdoms)
+        foreach (var kingdom in campaignObjectManager.Kingdoms)
         {
             registry.RegisterExistingObject(kingdom.StringId, kingdom);
         }

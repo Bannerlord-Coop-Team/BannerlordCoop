@@ -70,7 +70,7 @@ public interface IObjectManager
 /// <summary>
 /// Ground truth for storing and retreiving object and ids
 /// </summary>
-internal class ObjectManager : IObjectManager
+public class ObjectManager : IObjectManager
 {
     private readonly ILogger logger;
 
@@ -96,7 +96,7 @@ internal class ObjectManager : IObjectManager
             id);
     }
 
-    public bool AddNewObject<T>(T obj, out string newId )
+    public bool AddNewObject<T>(T obj, out string newId)
     {
         newId = null;
         if (obj == null) return false;

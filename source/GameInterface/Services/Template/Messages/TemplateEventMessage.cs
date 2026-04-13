@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.Template.Messages;
 
@@ -10,19 +11,15 @@ namespace GameInterface.Services.Template.Messages;
 /// </summary>
 public record TemplateEventMessage : IEvent
 {
-    public TemplateEventMessage()
-    {
-        
-    }
     // This data can be anything you need
-    public TemplateEventMessage(Campaign instance, float value)
+    public TemplateEventMessage(MobileParty instance, float value)
     {
         Instance = instance;
         Value = value;
     }
 
     // Example instance
-    public Campaign Instance { get; }
+    public MobileParty Instance { get; }
 
     // Example value
     public float Value { get; }

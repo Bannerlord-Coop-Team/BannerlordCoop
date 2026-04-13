@@ -55,17 +55,36 @@ internal class TimePatches
     }
 }
 
-[HarmonyPatch(typeof(MapTimeControlVM), "ExecuteTimeControlChange")]
+[HarmonyPatch(typeof(MapTimeControlVM))]
 internal class AllowTimeControlFromControlsPatches
 {
-    private static void Prefix()
+    [HarmonyPatch(nameof(MapTimeControlVM.ExecuteTimeControlChange))]
+    [HarmonyPrefix]
+    private static bool ExecuteTimeControlChangePrefix(ref MapTimeControlVM __instance, int selectedTimeSpeed)
     {
-        AllowedThread.AllowThisThread();
-    }
+        using (new AllowedThread())
+        {
+            int num = selectedTimeSpeed;
+            if (__instance._timeFlowState == 3 && num == 2)
+            {
+                num = 4;
+            }
+            else if (__instance._timeFlowState == 4 && num == 1)
+            {
+                num = 3;
+            }
+            else if (__instance._timeFlowState == 2 && num == 0)
+            {
+                num = 6;
+            }
+            if (num != __instance._timeFlowState)
+            {
+                __instance.TimeFlowState = num;
+                __instance.SetTimeSpeed(selectedTimeSpeed);
+            }
 
-    private static void Postfix()
-    {
-        AllowedThread.RevokeThisThread();
+            return false;
+        }
     }
 }
 
