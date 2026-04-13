@@ -1,10 +1,8 @@
 ﻿using Common;
 using Common.Messaging;
-using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Data;
 using GameInterface.Services.MobileParties.Interfaces;
-using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Control;
 using GameInterface.Services.MobileParties.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;

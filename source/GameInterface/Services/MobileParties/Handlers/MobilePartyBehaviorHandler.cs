@@ -104,6 +104,18 @@ internal class MobilePartyBehaviorHandler : IHandler
         using (new AllowedThread())
         {
             PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
+
+            if (PartyBehaviorPatch.DEBUG_LOGGING)
+            {
+                Logger.Debug(
+                    "Setting AI behavior. PartyId: {PartyId}, Behavior: {Behavior}, TargetParty: {TargetParty}, BestTargetPoint: {BestTargetPoint}",
+                    data.MobilePartyId,
+                    data.NewAiBehavior,
+                    partyBase,
+                    data.BestTargetPoint
+                );
+            }
+
             party.Ai.SetAiBehavior(data.NewAiBehavior, partyBase, data.BestTargetPoint);
 
             if (ModInformation.IsClient)

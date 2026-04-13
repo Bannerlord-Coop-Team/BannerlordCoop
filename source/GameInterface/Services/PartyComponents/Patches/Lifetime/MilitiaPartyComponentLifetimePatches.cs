@@ -62,14 +62,14 @@ internal class MilitiaPartyComponentLifetimePatches
                 __instance.MobileParty?.StringId ?? "null",
                 ModInformation.IsClient);
         }
-        else if (current != value)
-        {
-            Logger.Information("MilitiaPartyComponent.Settlement changed: {Previous} -> {Next} (MobileParty: {Party}, IsClient: {IsClient})",
-                current?.StringId ?? "null",
-                value.StringId,
-                __instance.MobileParty?.StringId ?? "null",
-                ModInformation.IsClient);
-        }
+        //else if (current != value)
+        //{
+        //    Logger.Debug("MilitiaPartyComponent.Settlement changed: {Previous} -> {Next} (MobileParty: {Party}, IsClient: {IsClient})",
+        //        current?.StringId ?? "null",
+        //        value.StringId,
+        //        __instance.MobileParty?.StringId ?? "null",
+        //        ModInformation.IsClient);
+        //}
     }
 
     /// <summary>
