@@ -47,21 +47,24 @@ internal class EncounterManagerPatches
 
     internal static void OverrideOnPartyInteraction(MobileParty attacker, PartyBase defender)
     {
-        using(new AllowedThread())
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            if (defender.IsMobile)
+            using (new AllowedThread())
             {
-                if(attacker.IsPartyControlled() == true)
+                if (defender.IsMobile)
                 {
-                    InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
+                    if (attacker.IsPartyControlled() == true)
+                    {
+                        InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
+                    }
+                    defender.MobileParty.OnPartyInteraction(attacker);
+                    return;
                 }
-                defender.MobileParty.OnPartyInteraction(attacker);
-                return;
+                if (defender.IsSettlement)
+                {
+                    defender.Settlement.OnPartyInteraction(attacker);
+                }
             }
-            if (defender.IsSettlement)
-            {
-                defender.Settlement.OnPartyInteraction(attacker);
-            }
-        }
+        });
     }
 }
