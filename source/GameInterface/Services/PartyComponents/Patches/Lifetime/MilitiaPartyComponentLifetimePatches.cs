@@ -83,7 +83,7 @@ internal class MilitiaPartyComponentLifetimePatches
     {
         if (__instance.Settlement == null || __instance.Settlement.OwnerClan == null)
         {
-            Logger.Warning("MilitiaPartyComponent.PartyOwner accessed with null Settlement/OwnerClan (MobileParty: {Party}, Settlement: {Settlement}, IsClient: {IsClient})",
+            Logger.Debug("MilitiaPartyComponent.PartyOwner accessed with null Settlement/OwnerClan (MobileParty: {Party}, Settlement: {Settlement}, IsClient: {IsClient})",
                 __instance.MobileParty?.StringId ?? "null",
                 __instance.Settlement?.StringId ?? "null",
                 ModInformation.IsClient);
@@ -103,7 +103,7 @@ internal class MilitiaPartyComponentLifetimePatches
     {
         if (__instance.Settlement == null)
         {
-            Logger.Warning("MilitiaPartyComponent.Name accessed with null Settlement (MobileParty: {Party}, IsClient: {IsClient})",
+            Logger.Debug("MilitiaPartyComponent.Name accessed with null Settlement (MobileParty: {Party}, IsClient: {IsClient})",
                 __instance.MobileParty?.StringId ?? "null",
                 ModInformation.IsClient);
             __result = new TextObject("{=!}Militia");
@@ -122,7 +122,7 @@ internal class MilitiaPartyComponentLifetimePatches
     {
         if (__instance.Settlement == null)
         {
-            Logger.Warning("MilitiaPartyComponent.GetDefaultComponentBanner accessed with null Settlement (MobileParty: {Party}, IsClient: {IsClient})",
+            Logger.Debug("MilitiaPartyComponent.GetDefaultComponentBanner accessed with null Settlement (MobileParty: {Party}, IsClient: {IsClient})",
                 __instance.MobileParty?.StringId ?? "null",
                 ModInformation.IsClient);
             __result = null;

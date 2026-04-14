@@ -115,7 +115,7 @@ internal class MobilePartyBehaviorHandler : IHandler
                     data.BestTargetPoint
                 );
             }
-            
+
             party.Ai.SetAiBehavior(data.NewAiBehavior, partyBase, data.BestTargetPoint);
 
             if (ModInformation.IsClient)

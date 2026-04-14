@@ -29,7 +29,11 @@ internal class ClanSync : IDynamicSync
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LastFactionChangeTime)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.AutoRecruitmentExpenses)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.IsNoble)));
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.CurrentTotalStrength)));
+        // CurrentTotalStrength is excluded: KingdomManager.HourlyTickClan calls UpdateCurrentStrength() on every
+        // clan which zeroes then rebuilds the value with += per war party. Each assignment fires the DynamicSync
+        // setter, generating 250+ messages/sec. This is a derived/cached value recomputed server-side every hour;
+        // clients have no AI or election logic that consumes it and do not need live sync.
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.CurrentTotalStrength)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.MercenaryAwardMultiplier)));
         //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.LabelColor)));
         //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Clan), nameof(Clan.InitialPosition)));
