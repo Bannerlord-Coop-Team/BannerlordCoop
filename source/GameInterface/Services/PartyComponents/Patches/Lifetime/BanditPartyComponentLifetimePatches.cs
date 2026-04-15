@@ -32,7 +32,7 @@ internal class BanditPartyComponentLifetimePatches
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created managed {name}", typeof(BanditPartyComponent));
-            return true;
+            return false;
         }
 
         var message = new PartyComponentCreated(__instance);

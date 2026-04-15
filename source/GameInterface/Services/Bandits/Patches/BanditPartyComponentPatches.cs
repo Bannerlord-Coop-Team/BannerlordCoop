@@ -23,7 +23,7 @@ namespace GameInterface.Services.Bandits.Patches
         [HarmonyPrefix]
         static bool NameGetter(BanditPartyComponent __instance, ref TextObject __result)
         {
-            if (__instance.MobileParty.MapFaction == null)
+            if (__instance.MobileParty?.MapFaction == null)
             {
                 TextObject textObject = new TextObject("NameFailed - BanditPartyPatch");
                 textObject.SetTextVariable("IS_BANDIT", 1);

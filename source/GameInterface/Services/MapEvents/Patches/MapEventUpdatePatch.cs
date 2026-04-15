@@ -9,6 +9,7 @@ using Helpers;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -24,7 +25,7 @@ namespace GameInterface.Services.MapEvents.Patches
         [HarmonyPatch("Update")]
         static bool PrefixUpdate(MapEvent __instance)
         {
-            if(CallOriginalPolicy.IsOriginalAllowed()) return true;
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
             if (ModInformation.IsClient) return false;
 
