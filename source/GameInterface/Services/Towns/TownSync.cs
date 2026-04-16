@@ -12,25 +12,31 @@ internal class TownSync : IDynamicSync
         // Fields
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._prosperity)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._isCastle)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.GarrisonAutoRecruitmentIsEnabled)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._ownerClan)));
+
         //// Not synced fields
-        //// autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._security)));
-        //// autoSyncBuilder.AddField(AccessTools.Field(typeof(Town), nameof(Town._loyalty)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._security)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._loyalty)));
+
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeBoundVillagesCache)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.Buildings)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.BuildingsInProgress)));
+
         //// Remove Prop or auto sync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.BoostBuildingProcess)));
+
         //// Remove Prop or auto sync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeTax)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.InRebelliousState)));
-        
-        // Already handled via property
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._governor)));
 
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.Buildings)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town.BuildingsInProgress)));
-        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._tradeBoundVillagesCache)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._marketData))); // readonly
+
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Town), nameof(Town._governor))); // Already handled via property
 
         // Properties
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Governor)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.TradeTaxAccumulated)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Security)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.Loyalty)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Town), nameof(Town.LastCapturedBy)));

@@ -28,12 +28,13 @@ public class VillageSyncTests : SyncTestBase
     {
         Server.ObjectManager.TryGetObject(villageId, out Village village);
 
-        //TestEnvironment.AssertReferenceField<Village, VillageType>(nameof(Village.VillageType)); // VillageType needs to be managed or serialised
+        //TestEnvironment.AssertReferenceField<Village, VillageType>(nameof(Village.VillageType)); // VillageType not present in dictionary?
         TestEnvironment.AssertReferenceField<Village, VillageMarketData>(nameof(Village._marketData), null, null, village.MarketData);
         TestEnvironment.AssertField<Village, Village.VillageStates>(nameof(Village._villageState), Village.VillageStates.Looted);
         TestEnvironment.AssertReferenceField<Village, VillagerPartyComponent>(nameof(Village.VillagerPartyComponent));
         //TestEnvironment.AssertReferenceField<Village, PartyBase>(nameof(Village._owner)); // Uses abstract method PartyBase which can't be prepared. Not sure what to do about this
         TestEnvironment.AssertReferenceField<Village, Settlement>(nameof(Village._bound));
+        TestEnvironment.AssertReferenceField<Village, Settlement>(nameof(Village._tradeBound));
     }
 
     [Fact]

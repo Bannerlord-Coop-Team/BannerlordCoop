@@ -20,13 +20,6 @@ internal class SettlementSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.LastVisitTimeOfOwner)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.MilitiaPartyComponent)));
 
-        // NOT synced - causes severe performance regression: KingdomManager.UpdateLordPartyVariablesRelatedToSettlements
-        // zeroes and recomputes this field on EVERY settlement EVERY campaign tick, generating hundreds of network
-        // messages per tick. Clients don't run AI so they don't need this value.
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
-
-        // readonly
-        // dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Town)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Village)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._isVisible)));
@@ -34,8 +27,37 @@ internal class SettlementSync : IDynamicSync
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._name)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._nextLocatable)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._numberOfLordPartiesAt)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.NumberOfLordPartiesTargeting)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._position)));
         dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._readyMilitia)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._boundVillages)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._heroesWithoutPartyCache)));
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._locatorNodeIndex)));
+
+        // Certain MBLists aren't being registered correctly, waiting on a fix for certain collections with dynamic sync
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._notablesCache)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._partiesCache)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._settlementWallSectionHitPointsRatioList)));
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement._siegeEngineMissiles)));
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.Alleys)));
+
+        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(Settlement), nameof(Settlement.Stash))); // readonly
+
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.Party))); // Uses abstract method PartyBase which can't be prepared. Not sure what to do about this
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.BribePaid)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.SiegeEvent)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.IsActive)));
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.Owner))); // No set method
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.Banner))); // No set method
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.IsVisible)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.CurrentSiegeState)));
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.OwnerClan))); // No set method
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.GatePosition)));
+
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyLandThreatIntensity)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyNavalThreatIntensity)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyLandAllyIntensity)));
+        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.NearbyNavalAllyIntensity)));
 
         dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(SettlementClaimantCampaignBehavior), nameof(SettlementClaimantCampaignBehavior.OnSettlementOwnerChanged)));
         dynamicSyncRegistry.AddTargetMethod(typeof(Settlement), AccessTools.Method(typeof(KingdomManager), nameof(KingdomManager.UpdateLordPartyVariablesRelatedToSettlements)));

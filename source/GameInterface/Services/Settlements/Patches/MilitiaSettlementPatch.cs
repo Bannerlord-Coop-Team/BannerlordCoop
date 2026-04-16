@@ -37,7 +37,7 @@ public class MilitiaSettlementPatch
         return true;
     }
 
-    internal static void RunMiltiiaChange(Settlement settlement, float militia)
+    internal static void RunMiltiaChange(Settlement settlement, float militia)
     {
         GameLoopRunner.RunOnMainThread(() =>
         {

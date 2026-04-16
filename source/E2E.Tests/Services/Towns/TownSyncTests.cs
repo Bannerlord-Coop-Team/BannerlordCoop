@@ -23,17 +23,20 @@ public class TownSyncTests : SyncTestBase
 
         TestEnvironment.AssertField<Town, float>(nameof(Town._prosperity), 500f);
         TestEnvironment.AssertField<Town, bool>(nameof(Town._isCastle), true);
+        //TestEnvironment.AssertField<Town, bool>(nameof(Town.GarrisonAutoRecruitmentIsEnabled), true); // Expected: False Actual: True
         TestEnvironment.AssertReferenceField<Town, Clan>(nameof(Town._ownerClan));
 
-        //TestEnvironment.AssertField<Town, float>(nameof(Town._security), 50f);
-        //TestEnvironment.AssertField<Town, float>(nameof(Town._loyalty), 60f);
+        TestEnvironment.AssertField<Town, float>(nameof(Town._security), 50f);
+        TestEnvironment.AssertField<Town, float>(nameof(Town._loyalty), 60f);
 
-        TestEnvironment.AssertField<Town, int>(nameof(Town.BoostBuildingProcess), 200);
-        TestEnvironment.AssertField<Town, int>(nameof(Town._tradeTax), 70);
-        TestEnvironment.AssertField<Town, bool>(nameof(Town.InRebelliousState), true);
+        TestEnvironment.AssertCollectionReferenceField<Town, Village>(nameof(Town._tradeBoundVillagesCache));
         TestEnvironment.AssertCollectionReferenceField<Town, Building>(nameof(Town.Buildings), townId);
         TestEnvironment.AssertQueueReferenceField<Town, Building>(nameof(Town.BuildingsInProgress));
-        TestEnvironment.AssertCollectionReferenceField<Town, Village>(nameof(Town._tradeBoundVillagesCache));
+
+        TestEnvironment.AssertField<Town, int>(nameof(Town.BoostBuildingProcess), 200);
+
+        TestEnvironment.AssertField<Town, int>(nameof(Town._tradeTax), 70);
+        TestEnvironment.AssertField<Town, bool>(nameof(Town.InRebelliousState), true);
 
         //TestEnvironment.AssertField<Town, int>(nameof(Town._wallLevel), 1);
     }
@@ -42,6 +45,7 @@ public class TownSyncTests : SyncTestBase
     public void Server_Town_Properties()
     {
         TestEnvironment.AssertReferenceProperty<Town, Hero>(nameof(Town.Governor));
+        TestEnvironment.AssertProperty<Town, int>(nameof(Town.TradeTaxAccumulated), 200);
         TestEnvironment.AssertProperty<Town, float>(nameof(Town.Security), 50f);
         TestEnvironment.AssertProperty<Town, float>(nameof(Town.Loyalty), 60f);
         TestEnvironment.AssertReferenceProperty<Town, Clan>(nameof(Town.LastCapturedBy));
