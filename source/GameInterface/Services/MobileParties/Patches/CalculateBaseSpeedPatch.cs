@@ -1,5 +1,7 @@
-﻿using GameInterface.Services.MobileParties.Extensions;
+﻿using Common.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.Party;
@@ -50,5 +52,29 @@ internal class GameTextsPatches
             gameTextManager.LoadGameTexts();
             GameTexts.Initialize(gameTextManager);
         }
+    }
+}
+
+/// <summary>
+/// Guards against NullReferenceException in <see cref="DefaultPartyMoraleModel.GetEffectivePartyMorale"/>
+/// when a Militia party's <see cref="TaleWorlds.CampaignSystem.Party.MobileParty.HomeSettlement"/> is null
+/// during a multiplayer sync transition on the client.
+/// </summary>
+[HarmonyPatch(typeof(DefaultPartyMoraleModel), nameof(DefaultPartyMoraleModel.GetEffectivePartyMorale))]
+internal class PartyMoraleModelRobustnessPatch
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<PartyMoraleModelRobustnessPatch>();
+
+    [HarmonyPrefix]
+    private static bool Prefix(MobileParty mobileParty, bool includeDescription, ref ExplainedNumber __result)
+    {
+        if (mobileParty.IsMilitia && mobileParty.HomeSettlement == null)
+        {
+            Logger.Debug("DefaultPartyMoraleModel.GetEffectivePartyMorale: skipping militia party {Party} with null HomeSettlement",
+                mobileParty.StringId ?? "null");
+            __result = new ExplainedNumber(50f, includeDescription, null);
+            return false;
+        }
+        return true;
     }
 }
