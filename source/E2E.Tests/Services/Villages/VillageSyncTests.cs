@@ -1,4 +1,5 @@
 ﻿using E2E.Tests.Util;
+using Microsoft.Win32;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -17,8 +18,8 @@ public class VillageSyncTests : SyncTestBase
         TestEnvironment.CreateRegisteredObject<Hero>();
         TestEnvironment.CreateRegisteredObject<Clan>();
         TestEnvironment.CreateRegisteredObject<VillageMarketData>();
-        //TestEnvironment.CreateRegisteredObject<Village.VillageStates>();
         TestEnvironment.CreateRegisteredObject<VillagerPartyComponent>();
+        //TestEnvironment.CreateRegisteredObject<VillageType>(); // Server object manager failed to register new object VillageType
         TestEnvironment.CreateRegisteredObject<PartyBase>();
         TestEnvironment.CreateRegisteredObject<Settlement>();
     }
@@ -28,11 +29,11 @@ public class VillageSyncTests : SyncTestBase
     {
         Server.ObjectManager.TryGetObject(villageId, out Village village);
 
-        //TestEnvironment.AssertReferenceField<Village, VillageType>(nameof(Village.VillageType)); // VillageType not present in dictionary?
+        //TestEnvironment.AssertReferenceField<Village, VillageType>(nameof(Village.VillageType), defaultValue: village.VillageType); // Need VillageType in constructor
         TestEnvironment.AssertReferenceField<Village, VillageMarketData>(nameof(Village._marketData), null, null, village.MarketData);
         TestEnvironment.AssertField<Village, Village.VillageStates>(nameof(Village._villageState), Village.VillageStates.Looted);
         TestEnvironment.AssertReferenceField<Village, VillagerPartyComponent>(nameof(Village.VillagerPartyComponent));
-        //TestEnvironment.AssertReferenceField<Village, PartyBase>(nameof(Village._owner)); // Uses abstract method PartyBase which can't be prepared. Not sure what to do about this
+        //TestEnvironment.AssertReferenceField<Village, PartyBase>(nameof(Village._owner)); // Failed to find intercept for _owner
         TestEnvironment.AssertReferenceField<Village, Settlement>(nameof(Village._bound));
         TestEnvironment.AssertReferenceField<Village, Settlement>(nameof(Village._tradeBound));
     }
@@ -40,8 +41,10 @@ public class VillageSyncTests : SyncTestBase
     [Fact]
     public void Server_Village_Properties()
     {
+        Server.ObjectManager.TryGetObject(villageId, out Village village);
+
         TestEnvironment.AssertProperty<Village, float>(nameof(Village.Hearth), 650f);
-        TestEnvironment.AssertProperty<Village, float>(nameof(Village.LastDemandSatisfiedTime), 30, -1); // Taleworlds constructor defaults to -1
+        TestEnvironment.AssertProperty<Village, float>(nameof(Village.LastDemandSatisfiedTime), 30, defaultValue: village.LastDemandSatisfiedTime);
         TestEnvironment.AssertProperty<Village, int>(nameof(Village.TradeTaxAccumulated), 450);
     }
 }

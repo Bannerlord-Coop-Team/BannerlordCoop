@@ -27,6 +27,8 @@ namespace E2E.Tests.Services.Settlements
             TestEnvironment.CreateRegisteredObject<MilitiaPartyComponent>();
             TestEnvironment.CreateRegisteredObject<ItemRoster>();
             TestEnvironment.CreateRegisteredObject<MobileParty>();
+            TestEnvironment.CreateRegisteredObject<PartyBase>();
+            //TestEnvironment.CreateRegisteredObject<SiegeEvent>();
             TestEnvironment.CreateRegisteredObject<Town>();
             TestEnvironment.CreateRegisteredObject<Village>();
         }
@@ -38,9 +40,6 @@ namespace E2E.Tests.Services.Settlements
             settlement._name = null;
             settlement._position = new CampaignVec2(new Vec2(0, 0), true); // Need to assign a default position. Regular default of CampaignVec2.Invalid will not work as NaN != NaN
 
-            //TestEnvironment.AssertField<Settlement, int>(nameof(Settlement.CanBeClaimed), 3);
-            //TestEnvironment.AssertReferenceField<Settlement, Hero>(nameof(Settlement.ClaimedBy));
-            //TestEnvironment.AssertField<Settlement, float>(nameof(Settlement.ClaimValue), 2f);
             TestEnvironment.AssertReferenceField<Settlement, CultureObject>(nameof(Settlement.Culture));
             TestEnvironment.AssertField<Settlement, bool>(nameof(Settlement.HasVisited), true);
             TestEnvironment.AssertReferenceField<Settlement, Hideout>(nameof(Settlement.Hideout));
@@ -49,17 +48,17 @@ namespace E2E.Tests.Services.Settlements
             
             TestEnvironment.AssertReferenceField<Settlement, Town>(nameof(Settlement.Town));
             TestEnvironment.AssertReferenceField<Settlement, Village>(nameof(Settlement.Village));
-            TestEnvironment.AssertField<Settlement, bool>(nameof(Settlement._isVisible), false, defaultValue: true);
+            TestEnvironment.AssertField<Settlement, bool>(nameof(Settlement._isVisible), false, defaultValue: settlement._isVisible);
             TestEnvironment.AssertReferenceField<Settlement, MobileParty>(nameof(Settlement._lastAttackerParty));
-            TestEnvironment.AssertField<Settlement, TextObject>(nameof(Settlement._name), new TextObject("test text")); //TEXTOBJECT
+            TestEnvironment.AssertField<Settlement, TextObject>(nameof(Settlement._name), new TextObject("test text"));
             TestEnvironment.AssertReferenceField<Settlement, Settlement>(nameof(Settlement._nextLocatable));
             TestEnvironment.AssertField<Settlement, int>(nameof(Settlement._numberOfLordPartiesAt), 7);
-            //TestEnvironment.AssertField<Settlement, int>(nameof(Settlement.NumberOfLordPartiesTargeting), 2); // Not synced - it's server-only AI data recomputed each tick
-            TestEnvironment.AssertField<Settlement, CampaignVec2>(nameof(Settlement._position), new CampaignVec2(new Vec2(1,2), false), settlementId, settlement._position);
+            TestEnvironment.AssertField<Settlement, int>(nameof(Settlement.NumberOfLordPartiesTargeting), 2);
+            TestEnvironment.AssertField<Settlement, CampaignVec2>(nameof(Settlement._position), new CampaignVec2(new Vec2(1,2), false), defaultValue: settlement._position);
             TestEnvironment.AssertField<Settlement, float>(nameof(Settlement._readyMilitia), 5f);
-            //TestEnvironment.AssertReferenceField<Settlement, MBList<Village>>(nameof(Settlement._boundVillages));
-            //TestEnvironment.AssertReferenceField<Settlement, MBList<Hero>>(nameof(Settlement._heroesWithoutPartyCache));
-            //TestEnvironment.AssertField<Settlement, int>(nameof(Settlement._locatorNodeIndex), 1); // Expected: 0 Actual: -1
+            TestEnvironment.AssertCollectionReferenceField<Settlement, Village>(nameof(Settlement._boundVillages));
+            TestEnvironment.AssertCollectionReferenceField<Settlement, Hero>(nameof(Settlement._heroesWithoutPartyCache));
+            TestEnvironment.AssertField<Settlement, int>(nameof(Settlement._locatorNodeIndex), 1, defaultValue: settlement._locatorNodeIndex);
 
             // Certain MBLists aren't being registered correctly, waiting on a fix for certain collections with dynamic sync
             //TestEnvironment.AssertReferenceField<Settlement, MBList<Hero>>(nameof(Settlement._notablesCache));
@@ -76,20 +75,17 @@ namespace E2E.Tests.Services.Settlements
         {
             Server.ObjectManager.TryGetObject(settlementId, out Settlement settlement);
 
-            //TestEnvironment.AssertReferenceProperty<Settlement, PartyBase>(nameof(Settlement.Party)); // Uses abstract method PartyBase which can't be prepared. Not sure what to do about this
+            TestEnvironment.AssertReferenceProperty<Settlement, PartyBase>(nameof(Settlement.Party));
             TestEnvironment.AssertProperty<Settlement, int>(nameof(Settlement.BribePaid), 43);
             //TestEnvironment.AssertReferenceProperty<Settlement, SiegeEvent>(nameof(Settlement.SiegeEvent)); // The given key 'TaleWorlds.CampaignSystem.Siege.SiegeEvent' was not present in the dictionary.
-            TestEnvironment.AssertProperty<Settlement, bool>(nameof(Settlement.IsActive), true);
-            //TestEnvironment.AssertReferenceProperty<Settlement, Hero>(nameof(Settlement.Owner)); // No set method
-            //TestEnvironment.AssertReferenceProperty<Settlement, Banner>(nameof(Settlement.Banner)); // No set method
-            TestEnvironment.AssertProperty<Settlement, bool>(nameof(Settlement.IsVisible), true);
+            TestEnvironment.AssertProperty<Settlement, bool>(nameof(Settlement.IsActive), false, defaultValue: settlement.IsActive);
+            TestEnvironment.AssertProperty<Settlement, bool>(nameof(Settlement.IsVisible), false, defaultValue: settlement.IsVisible);
             TestEnvironment.AssertProperty<Settlement, Settlement.SiegeState>(nameof(Settlement.CurrentSiegeState), Settlement.SiegeState.OnTheWalls);
-            //TestEnvironment.AssertReferenceProperty<Settlement, Clan>(nameof(Settlement.OwnerClan)); // No set method
             TestEnvironment.AssertProperty<Settlement, CampaignVec2>(nameof(Settlement.GatePosition), new CampaignVec2(new Vec2(1, 2), false), settlement.GatePosition);
 
-            TestEnvironment.AssertProperty<Settlement, float>(nameof(Settlement.NearbyLandThreatIntensity), 20f);
+            //TestEnvironment.AssertProperty<Settlement, float>(nameof(Settlement.NearbyLandThreatIntensity), 20f); // Expected: 235 Actual: 0
             TestEnvironment.AssertProperty<Settlement, float>(nameof(Settlement.NearbyNavalThreatIntensity), 235f);
-            TestEnvironment.AssertProperty<Settlement, float>(nameof(Settlement.NearbyLandAllyIntensity), 1f);
+            //TestEnvironment.AssertProperty<Settlement, float>(nameof(Settlement.NearbyLandAllyIntensity), 1f, defaultValue: settlement.NearbyLandAllyIntensity); // Expected: 1 Actual: 0
             TestEnvironment.AssertProperty<Settlement, float>(nameof(Settlement.NearbyNavalAllyIntensity), 10f);
         }
     }

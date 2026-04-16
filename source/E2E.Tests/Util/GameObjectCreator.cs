@@ -58,6 +58,7 @@ internal class GameObjectCreator
         { typeof(PartyBase), new PartyBaseBuilder() },
         { typeof(CaravanPartyComponent), new CaravanPartyComponentBuilder() },
         { typeof(GarrisonPartyComponent), new GarrisonPartyComponentBuilder() },
+        { typeof(VillageType), new VillageTypeBuilder() },
         { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
     };
 
