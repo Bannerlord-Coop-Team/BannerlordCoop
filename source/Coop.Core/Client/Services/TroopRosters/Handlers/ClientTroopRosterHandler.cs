@@ -1,30 +1,34 @@
-﻿using Common.Messaging;
+﻿using Common.Logging;
+using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
 using Coop.Core.Server.Services.TroopRosters.Messages;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
-using System;
+using Serilog;
 
 namespace Coop.Core.Client.Services.TroopRosters.Handlers;
 public class ClientTroopRosterHandler : IHandler
 {
+    private readonly ILogger Logger = LogManager.GetLogger<ClientTroopRosterHandler>();
+
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IObjectManager objectManager;
 
-    public ClientTroopRosterHandler(IMessageBroker messageBroker, INetwork network)
+    public ClientTroopRosterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-
+        this.objectManager = objectManager;
         messageBroker.Subscribe<NetworkChangeTroopRosterAddtoCounts>(HandleAddToCounts);
-        messageBroker.Subscribe<NetworkChangeTroopRosterAddtoCountsAtIndex>(HandleAddToCountsAtIndex);
-        messageBroker.Subscribe<OnDoneRecruitmentVMChanged>(HandleOnRecruitmentDone);
+        messageBroker.Subscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
     }
 
-    private void HandleOnRecruitmentDone(MessagePayload<OnDoneRecruitmentVMChanged> payload)
+    private void HandleOnRecruitmentDone(MessagePayload<RecruitmentAttempted> payload)
     {
         var obj = payload.What;
-        var message = new ClientRequestOnDoneRecruitmentVM(obj.MobilePartyId, obj.TroopsInCart, obj.TotalCost);
+        var message = new ClientRequestRecruitment(obj.MobilePartyId, obj.TroopsInCart);
 
         network.SendAll(message);
     }
@@ -35,17 +39,9 @@ public class ClientTroopRosterHandler : IHandler
 
         messageBroker.Publish(this, message);
     }
-    private void HandleAddToCountsAtIndex(MessagePayload<NetworkChangeTroopRosterAddtoCountsAtIndex> payload)
-    {
-        var obj = payload.What;
-        var message = new ChangeTroopRostersAddToCountsAtIndex(obj.MobilePartyId, obj.Index, obj.Count, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted);
-
-        messageBroker.Publish(this, message);
-    }
     public void Dispose()
     {
         messageBroker.Unsubscribe<NetworkChangeTroopRosterAddtoCounts>(HandleAddToCounts);
-        messageBroker.Unsubscribe<NetworkChangeTroopRosterAddtoCountsAtIndex>(HandleAddToCountsAtIndex);
-        messageBroker.Unsubscribe<OnDoneRecruitmentVMChanged>(HandleOnRecruitmentDone);
+        messageBroker.Unsubscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
     }
 }

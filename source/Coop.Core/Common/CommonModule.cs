@@ -11,6 +11,7 @@ using GameInterface;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
+using GameInterface.Services.ObjectManager;
 
 namespace Coop.Core.Common;
 

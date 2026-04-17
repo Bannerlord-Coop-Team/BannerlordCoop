@@ -1,22 +1,20 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.TroopRosters.Messages;
 using ProtoBuf;
 
 namespace Coop.Core.Client.Services.TroopRosters.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public record ClientRequestOnDoneRecruitmentVM : IEvent
+public readonly struct ClientRequestRecruitment : IEvent
 {
     [ProtoMember(1)]
     public string MobilePartyId { get; }
     [ProtoMember(2)]
-    public (string, string, int)[] TroopsInCart { get; }
-    [ProtoMember(3)]
-    public int TotalCost { get; }
+    public TroopInfo[] TroopsInCart { get; }
 
-    public ClientRequestOnDoneRecruitmentVM(string mobilePartyId, (string, string, int)[] troopsInCart, int totalCost)
+    public ClientRequestRecruitment(string mobilePartyId, TroopInfo[] troopsInCart)
     {
         MobilePartyId = mobilePartyId;
         TroopsInCart = troopsInCart;
-        TotalCost = totalCost;
     }
 }

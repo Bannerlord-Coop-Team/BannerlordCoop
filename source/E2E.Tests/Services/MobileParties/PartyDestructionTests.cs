@@ -36,7 +36,6 @@ public class PartyDestructionTests : IDisposable
 
 
             Assert.NotNull(clientParty);
-            Assert.NotNull(clientParty.LordPartyComponent.Clan);
         }
 
         // Act

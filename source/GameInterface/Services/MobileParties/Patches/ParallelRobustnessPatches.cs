@@ -146,6 +146,13 @@ internal class ParallelRobustnessPatches
                 continue;
             }
 
+            if (mobileParty.IsMilitia && mobileParty.HomeSettlement == null)
+            {
+                Logger.Warning("Skipping militia party {stringId} in ParallelTickMovingParties: HomeSettlement is null (Settlement not yet synced)",
+                    mobileParty.StringId);
+                continue;
+            }
+
             MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
             mobileParty.FillCurrentTickMoveDataForMovingArmyLeader(ref localVariables, __instance._currentDt, __instance._currentRealDt);
             mobileParty.TryToMoveThePartyWithCurrentTickMoveData(ref localVariables, ref __instance._gridChangeCount, ref __instance._gridChangeMobilePartyList);
@@ -177,6 +184,18 @@ internal class ParallelRobustnessPatches
                 }
 
                 MobileParty.CachedPartyVariables localVariables = tickCachePerParty.LocalVariables;
+
+                // HasMapEvent may be stale: it was cached as true but MapEvent can become null
+                // on the client during a sync transition, causing DoUpdatePosition to NRE on
+                // this.Party.MapEvent.Position.ToVec2(). Reset the flag so the tick uses
+                // NextTargetPosition instead.
+                if (localVariables.HasMapEvent && mobileParty.Party.MapEvent == null)
+                {
+                    Logger.Warning("Resetting stale HasMapEvent for party {stringId} in ParallelTickStationaryParties: MapEvent is null",
+                        mobileParty.StringId ?? "null");
+                    localVariables.HasMapEvent = false;
+                }
+
                 mobileParty.TickForStationaryMobileParty(ref localVariables, __instance._currentDt, __instance._currentRealDt);
             }
 

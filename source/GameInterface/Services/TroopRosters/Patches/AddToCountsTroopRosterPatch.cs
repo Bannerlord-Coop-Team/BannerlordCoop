@@ -29,11 +29,9 @@ public class AddToCountsTroopRosterPatch
 
         MobileParty mobileParty = __instance.OwnerParty.MobileParty;
 
-
         var message = new TroopRosterAddToCountsChanged(mobileParty.StringId, character.StringId, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
 
         MessageBroker.Instance.Publish(__instance, message);
-
 
         return true;
     }

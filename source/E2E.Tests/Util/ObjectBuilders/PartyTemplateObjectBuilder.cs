@@ -16,6 +16,7 @@ internal class PartyTemplateObjectBuilder : IObjectBuilder
         var partyTemplate = ObjectHelper.SkipConstructor<PartyTemplateObject>();
 
         partyTemplate.Stacks = new MBList<PartyTemplateStack>();
+        partyTemplate.ShipHulls = new MBList<ShipTemplateStack>();
 
         var templateCharacter = new CharacterObject();
 

@@ -94,9 +94,13 @@ namespace Coop
 
             LogManager.Configuration
                 .Enrich.WithProcessId()
-                .WriteTo.Debug(outputTemplate: outputTemplate)
+                //.WriteTo.Debug(outputTemplate: outputTemplate) // Disabled: floods VS Output window causing frame hitching when debugger is attached
                 .WriteTo.File(filePath, outputTemplate: outputTemplate)
-                .MinimumLevel.Verbose();
+#if DEBUG
+                .MinimumLevel.Debug();
+#else
+                .MinimumLevel.Information();
+#endif
 
             Logger = LogManager.GetLogger<CoopMod>();
             Logger.Verbose("Coop Mod Module Started");

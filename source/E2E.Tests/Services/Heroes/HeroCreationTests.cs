@@ -2,6 +2,7 @@ using E2E.Tests.Environment;
 using E2E.Tests.Util;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
@@ -34,6 +35,11 @@ public class HeroCreationTests : IDisposable
         server.Call(() =>
         {
             var characterObject = GameObjectCreator.CreateInitializedObject<CharacterObject>();
+
+            // Required: SetupMainHero also initializes these to avoid NullReferenceException in SetInitialValuesFromCharacter
+            characterObject.Culture.DefaultBattleEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            characterObject.Culture.DefaultStealthEquipmentRoster = GameObjectCreator.CreateInitializedObject<MBEquipmentRoster>();
+            characterObject.Culture.DefaultStealthEquipmentRoster.AllEquipments[0]._itemSlots[0].Item = GameObjectCreator.CreateInitializedObject<ItemObject>();
 
             var hero = HeroCreator.CreateSpecialHero(characterObject);
 

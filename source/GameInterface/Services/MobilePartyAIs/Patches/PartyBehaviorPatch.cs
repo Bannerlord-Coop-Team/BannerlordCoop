@@ -3,23 +3,15 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
-using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Handlers;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
-using SandBox.View.Map;
 using Serilog;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobilePartyAIs.Patches;
 
@@ -28,8 +20,9 @@ namespace GameInterface.Services.MobilePartyAIs.Patches;
 /// </summary>
 /// <seealso cref="MobilePartyBehaviorHandler"/>
 [HarmonyPatch(typeof(MobilePartyAi))]
-static class PartyBehaviorPatch
+public static class PartyBehaviorPatch
 {
+    public const bool DEBUG_LOGGING = false;
 
     static readonly ILogger Logger = LogManager.GetLogger<MobilePartyAi>();
 
@@ -65,7 +58,7 @@ static class PartyBehaviorPatch
         var message = new PartyBehaviorChangeAttempted(__instance, newAiBehavior, interactablePoint, bestTargetPoint);
         MessageBroker.Instance.Publish(__instance, message);
 
-        if (ModInformation.IsServer)
+        if (DEBUG_LOGGING && ModInformation.IsServer)
         {
             if (interactablePoint is null)
             {
