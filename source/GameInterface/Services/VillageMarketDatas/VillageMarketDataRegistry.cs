@@ -7,9 +7,8 @@ using TaleWorlds.CampaignSystem.Siege;
 
 namespace GameInterface.Services.VillageMarketDatas;
 
-
 /// <summary>
-/// Registry manager for SiegeEvent
+/// Registry manager for VillageMarketData
 /// </summary>
 internal class VillageMarketRegistry : RegistryBase<VillageMarketData>
 {

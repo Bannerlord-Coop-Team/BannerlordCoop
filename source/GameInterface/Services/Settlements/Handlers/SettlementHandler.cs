@@ -28,7 +28,7 @@ public class SettlementHandler : IHandler
 
         messageBroker.Subscribe<ChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
-        messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
+        //messageBroker.Subscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Subscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Subscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
@@ -251,7 +251,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        MilitiaSettlementPatch.RunMiltiiaChange(settlement, obj.Militia);
+        MilitiaSettlementPatch.RunMiltiaChange(settlement, obj.Militia);
     }
 
     private void HandleCurrentSiegeState(MessagePayload<ChangeSettlementCurrentSiegeState> payload)
@@ -326,7 +326,7 @@ public class SettlementHandler : IHandler
     {
         messageBroker.Unsubscribe<ChangeSettlementBribePaid>(HandleBribePaid);
         messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
-        messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
+        //messageBroker.Unsubscribe<ChangeSettlementHitPoints>(HandleHitPoints);
         messageBroker.Unsubscribe<ChangeSettlementLastAttackerParty>(HandleLastAttackerParty);
         messageBroker.Unsubscribe<ChangeSettlementLastThreatTime>(HandleLastThreatTime);
         messageBroker.Unsubscribe<ChangeSettlementCurrentSiegeState>(HandleCurrentSiegeState);
