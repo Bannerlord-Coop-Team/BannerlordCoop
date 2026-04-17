@@ -28,7 +28,7 @@ namespace E2E.Tests.Services.Settlements
             TestEnvironment.CreateRegisteredObject<ItemRoster>();
             TestEnvironment.CreateRegisteredObject<MobileParty>();
             TestEnvironment.CreateRegisteredObject<PartyBase>();
-            //TestEnvironment.CreateRegisteredObject<SiegeEvent>();
+            //TestEnvironment.CreateRegisteredObject<SiegeEvent>(); // Object reference not set to an instance of an object.
             TestEnvironment.CreateRegisteredObject<Town>();
             TestEnvironment.CreateRegisteredObject<Village>();
         }
@@ -77,7 +77,7 @@ namespace E2E.Tests.Services.Settlements
 
             TestEnvironment.AssertReferenceProperty<Settlement, PartyBase>(nameof(Settlement.Party));
             TestEnvironment.AssertProperty<Settlement, int>(nameof(Settlement.BribePaid), 43);
-            //TestEnvironment.AssertReferenceProperty<Settlement, SiegeEvent>(nameof(Settlement.SiegeEvent)); // The given key 'TaleWorlds.CampaignSystem.Siege.SiegeEvent' was not present in the dictionary.
+            //TestEnvironment.AssertReferenceProperty<Settlement, SiegeEvent>(nameof(Settlement.SiegeEvent)); // Need SiegeEvent from constructor to be successful
             TestEnvironment.AssertProperty<Settlement, bool>(nameof(Settlement.IsActive), false, defaultValue: settlement.IsActive);
             TestEnvironment.AssertProperty<Settlement, bool>(nameof(Settlement.IsVisible), false, defaultValue: settlement.IsVisible);
             TestEnvironment.AssertProperty<Settlement, Settlement.SiegeState>(nameof(Settlement.CurrentSiegeState), Settlement.SiegeState.OnTheWalls);

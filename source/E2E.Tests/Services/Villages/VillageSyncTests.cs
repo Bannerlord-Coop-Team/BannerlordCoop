@@ -19,7 +19,7 @@ public class VillageSyncTests : SyncTestBase
         TestEnvironment.CreateRegisteredObject<Clan>();
         TestEnvironment.CreateRegisteredObject<VillageMarketData>();
         TestEnvironment.CreateRegisteredObject<VillagerPartyComponent>();
-        //TestEnvironment.CreateRegisteredObject<VillageType>(); // Server object manager failed to register new object VillageType
+        TestEnvironment.CreateRegisteredObject<VillageType>();
         TestEnvironment.CreateRegisteredObject<PartyBase>();
         TestEnvironment.CreateRegisteredObject<Settlement>();
     }
@@ -29,7 +29,7 @@ public class VillageSyncTests : SyncTestBase
     {
         Server.ObjectManager.TryGetObject(villageId, out Village village);
 
-        //TestEnvironment.AssertReferenceField<Village, VillageType>(nameof(Village.VillageType), defaultValue: village.VillageType); // Need VillageType in constructor
+        TestEnvironment.AssertReferenceField<Village, VillageType>(nameof(Village.VillageType), defaultValue: village.VillageType);
         TestEnvironment.AssertReferenceField<Village, VillageMarketData>(nameof(Village._marketData), null, null, village.MarketData);
         TestEnvironment.AssertField<Village, Village.VillageStates>(nameof(Village._villageState), Village.VillageStates.Looted);
         TestEnvironment.AssertReferenceField<Village, VillagerPartyComponent>(nameof(Village.VillagerPartyComponent));

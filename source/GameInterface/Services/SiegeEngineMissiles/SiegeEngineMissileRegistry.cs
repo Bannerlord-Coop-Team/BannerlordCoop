@@ -24,7 +24,7 @@ internal class SiegeEngineMissileRegistry : IAutoRegistry<SiegeEvent.SiegeEngine
         autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(SiegeEvent.SiegeEngineMissile));
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 

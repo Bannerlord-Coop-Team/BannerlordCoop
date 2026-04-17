@@ -18,7 +18,7 @@ internal class VillageTypeRegistry : IAutoRegistry<VillageType>
         autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(VillageType));
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
