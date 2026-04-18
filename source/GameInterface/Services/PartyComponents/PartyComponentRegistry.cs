@@ -28,6 +28,7 @@ internal class PartyComponentRegistry : RegistryBase<PartyComponent>
         typeof(GarrisonPartyComponent),
         typeof(LordPartyComponent),
         typeof(MilitiaPartyComponent),
+        typeof(PatrolPartyComponent),
         typeof(VillagerPartyComponent),
     };
 
