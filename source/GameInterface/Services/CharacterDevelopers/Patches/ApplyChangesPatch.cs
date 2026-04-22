@@ -29,8 +29,6 @@ namespace GameInterface.Services.CharacterDevelopers.Patches
         [HarmonyPrefix]
         public static bool ApplyChanges(ref CharacterDeveloperHeroItemVM __instance)
         {
-            Logger.Information("Player pressed apply changes");
-
             // Get data from CharacterDeveloperHeroItemVM
             HeroDeveloper heroDeveloper = __instance.HeroDeveloper;
             PerkSelectionVM perkSelection = __instance.PerkSelection;

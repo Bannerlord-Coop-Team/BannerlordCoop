@@ -64,8 +64,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkApplyChangesServer> obj)
         {
-            Logger.Information("ApplyChanges message received from network. {skills} {attributes} {perks}", obj.What.SkillIds, obj.What.AttributeIds, obj.What.PerkIds);
-
             // Apply on server and send to all clients
             GameLoopRunner.RunOnMainThread(() =>
             {
@@ -85,8 +83,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void SendChanges(ApplyChangesPressed obj)
         {
-            Logger.Information("ApplyChanges message received from client. {skills} {attributes} {perks}", obj.Skills, obj.Attributes, obj.Perks);
-
             // Get heroDeveloper id for transmission over the network
             var heroDeveloper = obj.HeroDeveloper;
             if (!objectManager.TryGetId(heroDeveloper, out var heroDeveloperId))
@@ -94,8 +90,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                 Logger.Error("Unable to get network ID for instance of type {type}", heroDeveloper?.GetType());
                 return;
             }
-
-            Logger.Information("id pack ready: HeroDeveloper");
 
             // Store perk ids in a list for transmission over the network
             var perkIds = new List<string>();
@@ -110,8 +104,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
                 perkIds.Add(currentPerkId);
             }
-
-            Logger.Information("id pack ready: Perks");
 
             // Store attribute ids and levels in lists for transmission over the network
             var attributeIds = new List<string>();
@@ -128,8 +120,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                 attributeIds.Add(currentAttributeId);
                 attributeIncreases.Add(attributeVM.AttributeValue - attributeVM._initialAttValue);
             }
-
-            Logger.Information("id pack ready: Attributes");
 
             // Store skill ids and levels in lists for transmission over the network
             var skillIds = new List<string>();
@@ -149,8 +139,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                 skillOrgFocusAmounts.Add(skillVM._orgFocusAmount);
             }
 
-            Logger.Information("id pack ready: Attributes");
-
             // Send to server from client
             NetworkApplyChangesServer message = new(heroDeveloperId,
                 perkIds,
@@ -160,7 +148,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                 skillFocusLevels,
                 skillOrgFocusAmounts
             );
-            Logger.Information("Network message built: {message}", message);
             network.SendAll(message);
         }
 
@@ -173,8 +160,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                 return;
             }
 
-            Logger.Information("Objects ready: HeroDeveloper");
-
             // Add perks to HeroDeveloper
             if (obj.PerkIds != null)
             {
@@ -186,13 +171,9 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                         Logger.Error("Unable to get object for id {id}", perkId);
                         return;
                     }
-
-                    Logger.Information($"Adding perk {currentPerk.ToString()}");
                     heroDeveloper.AddPerk(currentPerk);
                 }
             }
-
-            Logger.Information("Objects ready: Perks");
 
             // Add attributes to HeroDeveloper
             if (obj.AttributeIds != null)
@@ -210,13 +191,10 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
                     for (int j = 0; j < obj.AttributeIncreases[i]; j++)
                     {
-                        Logger.Information($"Adding 1 level to attribute {currentAttribute.ToString()}");
                         heroDeveloper.AddAttribute(currentAttribute, 1);
                     }
                 }
             }
-
-            Logger.Information("Objects ready: Attributes");
 
             // Add focuses to HeroDeveloper
             if (obj.SkillIds != null)
@@ -234,7 +212,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
                     for (int j = 0; j < obj.SkillFocusLevels[i] - obj.SkillOrgFocusAmounts[i]; j++)
                     {
-                        Logger.Information($"Adding 1 level to skill {currentSkill.ToString()}");
                         heroDeveloper.AddFocus(currentSkill, 1);
                     }
 
@@ -242,8 +219,6 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                     obj.SkillOrgFocusAmounts[i] = obj.SkillFocusLevels[i];
                 }
             }
-
-            Logger.Information("Objects ready: Skills");
         }
     }
 }
