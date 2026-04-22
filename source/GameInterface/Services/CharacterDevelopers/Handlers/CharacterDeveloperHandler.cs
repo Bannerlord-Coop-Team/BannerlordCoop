@@ -3,7 +3,6 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.CharacterDevelopers.Interfaces;
 using GameInterface.Services.CharacterDevelopers.Messages;
 using GameInterface.Services.CharacterDevelopers.Patches;
 using GameInterface.Services.CraftingService.Messages;
@@ -29,19 +28,15 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
     internal class CharacterDeveloperHandler : IHandler
     {
         private static readonly ILogger Logger = LogManager.GetLogger<CharacterDeveloperHandler>();
-
-        private readonly ICharacterDeveloperInterface characterDeveloperInterface;
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
 
         public CharacterDeveloperHandler(
-            ICharacterDeveloperInterface characterDeveloperInterface,
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             INetwork network)
         {
-            this.characterDeveloperInterface = characterDeveloperInterface;
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
