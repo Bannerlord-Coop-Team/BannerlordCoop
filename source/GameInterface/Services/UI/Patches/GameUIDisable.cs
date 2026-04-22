@@ -15,9 +15,9 @@ namespace GameInterface.Services.UI.Patches
             {
                 KingdomState => false,
                 QuestsState => false,
-                CharacterDeveloperState => false,
-                PartyState => false,
-                InventoryState => false,
+                //CharacterDeveloperState => false,
+                //PartyState => false,
+                //InventoryState => false,
                 ClanState => false,
                 _ => true,
             };

@@ -7,7 +7,6 @@ using Coop.Core.Common.Configuration;
 using Coop.Core.Common.Services.Connection.Messages;
 using Coop.Core.Server;
 using GameInterface;
-using GameInterface.AutoSync;
 using GameInterface.DynamicSync;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.UI.Messages;
@@ -92,7 +91,6 @@ namespace Coop.Core
 
             // Create harmony patches
             container.Resolve<IGameInterface>().PatchAll();
-            container.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
             network = container.Resolve<INetwork>();
 
@@ -127,7 +125,6 @@ namespace Coop.Core
 
             // Create harmony patches
             container.Resolve<IGameInterface>().PatchAll();
-            container.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
             network = container.Resolve<INetwork>();
 

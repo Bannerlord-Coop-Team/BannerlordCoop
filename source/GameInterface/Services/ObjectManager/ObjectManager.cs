@@ -4,6 +4,7 @@ using Serilog;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices.ComTypes;
 
@@ -32,6 +33,7 @@ public interface IObjectManager
     /// <param name="id">Out parameter for string id (null if not found)</param>
     /// <returns>True if successful, false if failed</returns>
     bool TryGetId<T>(T obj, out string id);
+    bool TryGetIdWithLogging<T>(T obj, out string id);
 
     /// <summary>
     /// Attempts to get an object using a StringId and object type
@@ -41,6 +43,7 @@ public interface IObjectManager
     /// <param name="obj">Out parameter for the object (null if not found)</param>
     /// <returns>True if successful, false if failed</returns>
     bool TryGetObject<T>(string id, out T obj) where T : class;
+    bool TryGetObjectWithLogging<T>(string id, out T obj) where T : class;
 
     /// <summary>
     /// Add an object with already existing StringId
@@ -195,41 +198,38 @@ public class ObjectManager : IObjectManager
         return false;
     }
 
-    private bool LogIfGetError(bool result, object objToGet)
+    public bool TryGetIdWithLogging<T>(T obj, out string id)
     {
-        if (result) return true;
+        if (!TryGetId(obj, out id))
+        {
+            logger.Error(
+                "Unable to get {name} with {stringId} in {objectManager}",
+                typeof(T),
+                id,
+                nameof(ObjectManager)
+            );
 
-        var objectType = objToGet.GetType();
-        var className = nameof(ObjectManager);
-        var stackTrace = Environment.StackTrace;
+            return false;
+        }
 
-        logger.Error("Unable to get {name} with {objectManager}\n" +
-                     "StackTrace: {stackTrace}",
-                     objectType,
-                     className,
-                     stackTrace);
-
-        return false;
+        return true;
     }
 
-    private bool LogIfGetError<T>(bool result, string id) where T : class
+    public bool TryGetObjectWithLogging<T>(string id, out T obj) where T : class
     {
-        if (result) return true;
+        if (!TryGetObject(id, out obj))
+        {
+            logger.Error(
+                "Unable to get {name} using {id} with {objectManager}",
+                typeof(T),
+                id,
+                nameof(ObjectManager)
+            );
 
-        var objectType = typeof(T);
-        var stringId = id;
-        var className = nameof(ObjectManager);
-        var stackTrace = Environment.StackTrace;
+            return false;
+        }
 
-        logger.Error("Unable to get {name} with {stringId} in {objectManager}\n" +
-                     "StackTrace: {stackTrace}",
-                     objectType,
-                     stringId,
-                     className,
-                     stackTrace);
-
-        return false;
+        return true;
     }
     #endregion
-
 }

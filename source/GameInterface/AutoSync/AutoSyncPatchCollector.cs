@@ -53,8 +53,23 @@ class AutoSyncPatchCollector : IAutoSyncPatchCollector
         }
     }
 
+    private void UnpatchAll()
+    {
+        foreach (var (method, patch) in transpilers)
+        {
+            harmony.Unpatch(method, HarmonyPatchType.Transpiler, harmony.Id);
+        }
+
+        foreach (var (method, patch) in prefixes)
+        {
+            harmony.Unpatch(method, HarmonyPatchType.Prefix, harmony.Id);
+        }
+    }
+
     public void Dispose()
     {
+        UnpatchAll();
+
         transpilers.Clear();
         prefixes.Clear();
     }

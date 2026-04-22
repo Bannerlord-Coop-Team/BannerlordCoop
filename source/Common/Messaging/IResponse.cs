@@ -2,12 +2,11 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Common.Messaging
+namespace Common.Messaging;
+
+/// <summary>
+/// Response to a <see cref="ICommand"/>
+/// </summary>
+public interface IResponse : IMessage
 {
-    /// <summary>
-    /// Response to a <see cref="ICommand"/>
-    /// </summary>
-    public interface IResponse : IMessage
-    {
-    }
 }

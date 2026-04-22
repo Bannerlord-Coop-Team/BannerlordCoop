@@ -205,7 +205,7 @@ internal class E2ETestEnvironment : IDisposable
                 return intercept;
         }
 
-        Assert.True(false, $"Failed to find intercept for {field.Name}");
+        Assert.Fail($"Failed to find intercept for {field.Name}");
         return null;
     }
 

@@ -25,11 +25,14 @@ public class LoadingState : ClientStateBase
         this.deferredHeroRepo = deferredHeroRepo;
         messageBroker.Subscribe<CampaignReady>(Handle_CampaignLoaded);
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+        messageBroker.Subscribe<LifetimesPatched>(Handle_LifetimesPatched);
     }
 
     public override void Dispose()
     {
         messageBroker.Unsubscribe<CampaignReady>(Handle_CampaignLoaded);
+        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectsRegistered);
+        messageBroker.Unsubscribe<LifetimesPatched>(Handle_LifetimesPatched);
     }
 
     public override void EnterMainMenu()
@@ -43,6 +46,11 @@ public class LoadingState : ClientStateBase
     }
 
     internal void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
+    {
+        messageBroker.Publish(this, new PatchLifetimes());
+    }
+
+    private void Handle_LifetimesPatched(MessagePayload<LifetimesPatched> payload)
     {
         InstantiateDeferredHeroes();
 
