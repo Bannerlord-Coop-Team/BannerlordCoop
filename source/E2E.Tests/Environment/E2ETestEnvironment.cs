@@ -13,11 +13,8 @@ using HarmonyLib;
 using Moq;
 using Newtonsoft.Json;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
-using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using Xunit.Abstractions;
 
@@ -60,6 +57,8 @@ internal class E2ETestEnvironment : IDisposable
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
+        Server.Resolve<IAutoSyncPatchCollector>().PatchAll();
+
         SetupDynamicSync();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
