@@ -178,5 +178,15 @@ public class HeroInterfaceTests
         public bool IsTypeManaged(Type type) => throw new NotImplementedException();
         public bool Remove<T>(T obj) => throw new NotImplementedException();
         public bool TryGetId<T>(T obj, out string id) => throw new NotImplementedException();
+
+        public bool TryGetIdWithLogging<T>(T obj, out string id)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryGetObjectWithLogging<T>(string id, out T obj) where T : class
+        {
+            throw new NotImplementedException();
+        }
     }
 }

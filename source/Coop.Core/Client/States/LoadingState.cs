@@ -50,7 +50,7 @@ public class LoadingState : ClientStateBase
         messageBroker.Publish(this, new PatchLifetimes());
     }
 
-    private void Handle_LifetimesPatched(MessagePayload<LifetimesPatched> payload)
+    internal void Handle_LifetimesPatched(MessagePayload<LifetimesPatched> payload)
     {
         InstantiateDeferredHeroes();
 

@@ -206,5 +206,15 @@ public class AutoSyncTests
             obj = value as T;
             return true;
         }
+
+        public bool TryGetIdWithLogging<T>(T obj, out string id)
+        {
+            throw new NotImplementedException();
+        }
+
+        public bool TryGetObjectWithLogging<T>(string id, out T obj) where T : class
+        {
+            throw new NotImplementedException();
+        }
     }
 }

@@ -44,12 +44,12 @@ public class InitialServerState : ServerStateBase
         messageBroker.Publish(this, new RegisterAllGameObjects());
     }
 
-    private void Handle_GameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> payload)
+    internal void Handle_GameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> payload)
     {
         messageBroker.Publish(this, new PatchLifetimes());
     }
 
-    private void Handle_LifetimesPatched(MessagePayload<LifetimesPatched> payload)
+    internal void Handle_LifetimesPatched(MessagePayload<LifetimesPatched> payload)
     {
         // Change to server running state
         Logic.SetState<ServerRunningState>();
