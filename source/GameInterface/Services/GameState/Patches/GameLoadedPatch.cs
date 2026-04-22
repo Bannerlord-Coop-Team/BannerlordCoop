@@ -9,7 +9,6 @@ namespace GameInterface.Services.GameState.Patches;
 [HarmonyPatch]
 internal class GameLoadedPatch
 {
-
     [HarmonyPatch(typeof(MapScreen), nameof(MapScreen.OnInitialize))]
     [HarmonyPostfix]
     static void OnGameLoaded()

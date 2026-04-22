@@ -76,7 +76,6 @@ internal class InventoryLogicPatches
         {
             __instance.Reset(true);
         }
-       
 
         __result = true;
         return false;

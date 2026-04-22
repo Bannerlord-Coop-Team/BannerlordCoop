@@ -7,15 +7,12 @@ using GameInterface.Services.Inventory.Interfaces;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using TaleWorlds.Diamond;
 
 namespace GameInterface.Services.Inventory.Handlers;
 
@@ -38,9 +35,9 @@ internal class TradeHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
+
         messageBroker.Subscribe<TradeAttempted>(Handle_TradeAttempted);
         messageBroker.Subscribe<CompleteTrade>(Handle_CompleteTrade);
-        
     }
 
     public void Dispose()
@@ -58,28 +55,20 @@ internal class TradeHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.Party, out var mobilePartyId)) return;
-        if (!objectManager.TryGetIdWithLogging(what.CurrentSettlementComponent, out var currentSettlementComponentId)) return;
 
-        var boughtItems = what.BoughtItems
-            .Select(data => TryResolveItemRosterId(data.Item1, out var result)
-                ? ((ItemRosterElementData, int)?)(result, data.Item2)
-                : null)
-            .Where(x => x.HasValue)
-            .Select(x => x!.Value)
-            .ToArray();
+        string mobilePartyId = null;
+        if (what.Party is not null && !objectManager.TryGetIdWithLogging(what.Party, out mobilePartyId)) return;
 
-        var soldItems = what.SoldItems
-            .Select(data => TryResolveItemRosterId(data.Item1, out var result)
-                ? ((ItemRosterElementData, int)?)(result, data.Item2)
-                : null)
-            .Where(x => x.HasValue)
-            .Select(x => x!.Value)
-            .ToArray();
+        string currentSettlementComponentId = null;
+        if (what.CurrentSettlementComponent is not null && 
+            !objectManager.TryGetIdWithLogging(what.CurrentSettlementComponent, out currentSettlementComponentId)) return;
+
+        var boughtItems = ResolveTradeItemIds(what.BoughtItems);
+        var soldItems = ResolveTradeItemIds(what.SoldItems);
 
         var message = new CompleteTrade(
             fromRosterId,
-            what.FromRoster is null,
+            fromRosterId is null,
             toRosterId,
             what.IsTrading,
             what.IsDonating,
@@ -87,6 +76,7 @@ internal class TradeHandler : IHandler
             what.TotalAmount,
             what.MerchantGold,
             mobilePartyId,
+            currentSettlementComponentId is null,
             currentSettlementComponentId,
             boughtItems,
             soldItems
@@ -105,27 +95,13 @@ internal class TradeHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<ItemRoster>(message.ToItemRosterId, out var toRoster)) return;
         if (!objectManager.TryGetObjectWithLogging<Hero>(message.HeroId, out var hero)) return;
         if (!objectManager.TryGetObjectWithLogging<MobileParty>(message.PartyId, out var mobileParty)) return;
-        if (!objectManager.TryGetObjectWithLogging<SettlementComponent>(message.CurrentSettlementComponentId, out var currentSettlementComponent)) return;
 
-        var boughtItems = message.BoughtItems?
-            .Select(data => TryResolveItemRosterElement(data.Item1, out var result)
-                ? ((ItemRosterElement, int)?)(result, data.Item2)
-                : null)
-            .Where(x => x.HasValue)
-            .Select(x => x!.Value)
-            .ToList();
+        SettlementComponent currentSettlementComponent = null;
+        if (!message.IsSettlementComponentNull && 
+            !objectManager.TryGetObjectWithLogging<SettlementComponent>(message.CurrentSettlementComponentId, out currentSettlementComponent)) return;
 
-        boughtItems ??= new List<(ItemRosterElement, int)>();
-
-        var soldItems = message.SoldItems?
-            .Select(data => TryResolveItemRosterElement(data.Item1, out var result) 
-                ? ((ItemRosterElement, int)?)(result, data.Item2) 
-                : null)
-            .Where(x => x.HasValue)
-            .Select(x => x!.Value)
-            .ToList();
-
-        soldItems ??= new List<(ItemRosterElement, int)>();
+        var boughtItems = ResolveTradeItems(message.BoughtItems);
+        var soldItems = ResolveTradeItems(message.SoldItems);
 
         inventoryLogicInterface.ApplyDoneLogic(
             fromRoster,
@@ -140,6 +116,41 @@ internal class TradeHandler : IHandler
             boughtItems,
             soldItems
         );
+    }
+
+    private (ItemRosterElementData, int)[] ResolveTradeItemIds(
+        IEnumerable<(ItemRosterElement, int)> items)
+    {
+        var resolvedItems = new List<(ItemRosterElementData, int)>();
+
+        foreach (var (item, count) in items)
+        {
+            if (TryResolveItemRosterId(item, out var resolvedItem))
+            {
+                resolvedItems.Add((resolvedItem, count));
+            }
+        }
+
+        return resolvedItems.ToArray();
+    }
+
+    private List<(ItemRosterElement, int)> ResolveTradeItems(
+        IEnumerable<(ItemRosterElementData, int)> items)
+    {
+        var resolvedItems = new List<(ItemRosterElement, int)>();
+
+        if (items == null)
+            return resolvedItems;
+
+        foreach (var (itemData, count) in items)
+        {
+            if (TryResolveItemRosterElement(itemData, out var item))
+            {
+                resolvedItems.Add((item, count));
+            }
+        }
+
+        return resolvedItems;
     }
 
     private bool TryResolveItemRosterElement(ItemRosterElementData data, out ItemRosterElement result)
@@ -160,7 +171,6 @@ internal class TradeHandler : IHandler
             logger.Error("Failed to get {type} with id: {id}", typeof(ItemModifier), itemObjectData.ItemModifierId);
             return false;
         }
-
 
         using (new AllowedThread())
         {
@@ -186,7 +196,6 @@ internal class TradeHandler : IHandler
             logger.Error("Failed to get id for {type}", nameof(itemRosterElement.EquipmentElement.ItemModifier));
             return false;
         }
-
 
         var itemModifierNull = itemRosterElement.EquipmentElement.ItemModifier is null;
 

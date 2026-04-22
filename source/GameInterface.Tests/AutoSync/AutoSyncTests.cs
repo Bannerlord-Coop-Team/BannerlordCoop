@@ -110,7 +110,6 @@ public class AutoSyncTests
         var refObj = new SomeRefClass();
         objectManager.AddExisting(refObjId, refObj);
 
-
         Assert.Equal("hi", obj.Name);
 
         using (MemoryStream internalStream = new MemoryStream())
@@ -162,7 +161,6 @@ public class AutoSyncTests
         {
             throw new NotImplementedException();
         }
-
 
         private readonly HashSet<Type> managedTypes = new HashSet<Type>
         {

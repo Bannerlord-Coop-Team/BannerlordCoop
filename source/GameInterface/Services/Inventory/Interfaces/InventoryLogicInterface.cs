@@ -134,13 +134,15 @@ namespace GameInterface.Services.Inventory.Interfaces
             // Discarding items
             if (isDiscardDonating)
             {
-                foreach (ItemRosterElement itemObject in soldItems.Select(x => x.Item1))
+                foreach (ItemRosterElement rosterElement in soldItems.Select(x => x.Item1))
                 {
-                    int xpBonusForDiscardingItems = Campaign.Current.Models.ItemDiscardModel.GetXpBonusForDiscardingItem(itemObject.EquipmentElement.Item, itemObject.Amount);
+                    int xpBonusForDiscardingItems = Campaign.Current.Models.ItemDiscardModel.GetXpBonusForDiscardingItem(rosterElement.EquipmentElement.Item, rosterElement.Amount);
                     if ((float)xpBonusForDiscardingItems > 0f)
                     {
                         MobilePartyHelper.PartyAddSharedXp(ownerHero.PartyBelongedTo, (float)xpBonusForDiscardingItems);
                     }
+
+                    toRoster.AddToCounts(rosterElement.EquipmentElement, -rosterElement.Amount);
                 }
             }
 
@@ -164,6 +166,7 @@ namespace GameInterface.Services.Inventory.Interfaces
             }
             else if (((currentMobileParty != null) ? currentMobileParty.Party.LeaderHero : null) != null && isTrading)
             {
+                // TODO
                 GiveGoldAction.ApplyBetweenCharacters(null, currentMobileParty.Party.LeaderHero, totalAmount, false);
                 if (currentMobileParty.Party.LeaderHero.CompanionOf != null)
                 {
@@ -172,10 +175,9 @@ namespace GameInterface.Services.Inventory.Interfaces
             }
             else if (partyBase != null && partyBase.LeaderHero == null && isTrading)
             {
+                // TODO
                 GiveGoldAction.ApplyForCharacterToParty(null, partyBase, totalAmount, false);
             }
-
-
 
             // No idea what this does
             //__instance._partyInitialEquipment = new InventoryLogic.PartyEquipment(__instance.OwnerParty);

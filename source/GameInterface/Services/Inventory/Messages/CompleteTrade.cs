@@ -25,12 +25,14 @@ internal readonly struct CompleteTrade : ICommand
     public readonly int MerchantGold;
     [ProtoMember(9)]
     public readonly string PartyId;
-    [ProtoMember(10)]
+    [ProtoMember(11)]
+    public readonly bool IsSettlementComponentNull;
+    [ProtoMember(12)]
     public readonly string CurrentSettlementComponentId;
 
-    [ProtoMember(11)]
+    [ProtoMember(13)]
     public readonly (ItemRosterElementData, int)[] BoughtItems;
-    [ProtoMember(12)]
+    [ProtoMember(14)]
     public readonly (ItemRosterElementData, int)[] SoldItems;
 
     public CompleteTrade(
@@ -43,6 +45,7 @@ internal readonly struct CompleteTrade : ICommand
         int totalAmount,
         int merchantGold,
         string partyId,
+        bool isSettlementComponentNull,
         string currentSettlementComponentId,
         (ItemRosterElementData, int)[] boughtItems,
         (ItemRosterElementData, int)[] soldItems)
@@ -56,6 +59,7 @@ internal readonly struct CompleteTrade : ICommand
         TotalAmount = totalAmount;
         MerchantGold = merchantGold;
         PartyId = partyId;
+        IsSettlementComponentNull = isSettlementComponentNull;
         CurrentSettlementComponentId = currentSettlementComponentId;
         BoughtItems = boughtItems;
         SoldItems = soldItems;
