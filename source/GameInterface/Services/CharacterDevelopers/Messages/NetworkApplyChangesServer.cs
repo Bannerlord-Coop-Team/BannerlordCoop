@@ -51,15 +51,4 @@ public class NetworkApplyChangesServer : ICommand
         SkillFocusLevels = skillFocusLevels;
         SkillOrgFocusAmounts = skillOrgFocusAmounts;
     }
-
-    public NetworkApplyChangesServer(NetworkApplyChangesServer cloneObject)
-    {
-        HeroDeveloperId = cloneObject.HeroDeveloperId;
-        PerkIds = cloneObject.PerkIds;
-        AttributeIds = cloneObject.AttributeIds;
-        AttributeIncreases = cloneObject.AttributeIncreases;
-        SkillIds = cloneObject.SkillIds;
-        SkillFocusLevels = cloneObject.SkillFocusLevels;
-        SkillOrgFocusAmounts = cloneObject.SkillOrgFocusAmounts;
-    }
 }

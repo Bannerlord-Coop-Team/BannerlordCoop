@@ -28,7 +28,6 @@ internal class CharacterDeveloperCommands
 
         foreach (var hero in Hero.AllAliveHeroes)
         {
-            Logger.Information("Showing hero with the name of: {hero}", hero.Name.ToString());
             if (hero.Name.ToString() == strings[0])
             {
                 string heroData = hero.Name + ":\n";

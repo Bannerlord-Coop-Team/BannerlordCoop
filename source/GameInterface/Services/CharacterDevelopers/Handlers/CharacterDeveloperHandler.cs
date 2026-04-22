@@ -64,7 +64,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void Handle(MessagePayload<NetworkApplyChangesServer> obj)
         {
-            // Apply on server and send to all clients
+            // Send to all clients and apply on server
             GameLoopRunner.RunOnMainThread(() =>
             {
                 using (new AllowedThread())
@@ -153,17 +153,23 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void ApplyChanges(NetworkApplyChangesClients obj)
         {
-            // Get HeroDeveloper
+            string heroDeveloperId = obj.HeroDeveloperId;
             if (!objectManager.TryGetObject(obj.HeroDeveloperId, out HeroDeveloper heroDeveloper))
             {
-                Logger.Error("Unable to get object for id {id}", heroDeveloper);
+                Logger.Error("Unable to get object for id {id}", heroDeveloperId);
                 return;
             }
 
-            // Add perks to HeroDeveloper
-            if (obj.PerkIds != null)
+            addPerks(obj.PerkIds, heroDeveloper);
+            addAttributes(obj.AttributeIds, obj.AttributeIncreases, heroDeveloper);
+            addFocuses(obj.SkillIds, obj.SkillFocusLevels, obj.SkillOrgFocusAmounts, heroDeveloper);
+        }
+
+        private void addPerks(List<string> perkIds, HeroDeveloper heroDeveloper)
+        {
+            if (perkIds != null)
             {
-                foreach (string perkId in obj.PerkIds)
+                foreach (string perkId in perkIds)
                 {
                     PerkObject currentPerk;
                     if (!objectManager.TryGetObject(perkId, out currentPerk))
@@ -174,13 +180,15 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                     heroDeveloper.AddPerk(currentPerk);
                 }
             }
+        }
 
-            // Add attributes to HeroDeveloper
-            if (obj.AttributeIds != null)
+        private void addAttributes(List<string> attributeIds, List<int> attributeIncreases, HeroDeveloper heroDeveloper)
+        {
+            if (attributeIds != null)
             {
-                for (int i = 0; i < obj.AttributeIds.Count; i++)
+                for (int i = 0; i < attributeIds.Count; i++)
                 {
-                    string attributeId = obj.AttributeIds[i];
+                    string attributeId = attributeIds[i];
 
                     CharacterAttribute currentAttribute;
                     if (!objectManager.TryGetObject(attributeId, out currentAttribute))
@@ -189,19 +197,21 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                         return;
                     }
 
-                    for (int j = 0; j < obj.AttributeIncreases[i]; j++)
+                    for (int j = 0; j < attributeIncreases[i]; j++)
                     {
                         heroDeveloper.AddAttribute(currentAttribute, 1);
                     }
                 }
             }
+        }
 
-            // Add focuses to HeroDeveloper
-            if (obj.SkillIds != null)
+        private void addFocuses(List<string> skillIds, List<int> skillFocusLevels, List<int> skillOrgFocusAmounts, HeroDeveloper heroDeveloper)
+        {
+            if (skillIds != null)
             {
-                for (int i = 0; i < obj.SkillIds.Count; i++)
+                for (int i = 0; i < skillIds.Count; i++)
                 {
-                    string skillId = obj.SkillIds[i];
+                    string skillId = skillIds[i];
 
                     SkillObject currentSkill;
                     if (!objectManager.TryGetObject(skillId, out currentSkill))
@@ -210,13 +220,13 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                         return;
                     }
 
-                    for (int j = 0; j < obj.SkillFocusLevels[i] - obj.SkillOrgFocusAmounts[i]; j++)
+                    for (int j = 0; j < skillFocusLevels[i] - skillOrgFocusAmounts[i]; j++)
                     {
                         heroDeveloper.AddFocus(currentSkill, 1);
                     }
 
                     // Needed to calculate remaining skill points correctly
-                    obj.SkillOrgFocusAmounts[i] = obj.SkillFocusLevels[i];
+                    skillOrgFocusAmounts[i] = skillFocusLevels[i];
                 }
             }
         }
