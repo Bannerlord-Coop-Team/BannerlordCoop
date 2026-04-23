@@ -4,6 +4,7 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Messages;
 using GameInterface.Services.Settlements.Patches;
 using Serilog;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -218,7 +219,7 @@ public class SettlementHandler : IHandler
             return;
         }
 
-        foreach (string heroStringId in obj.NotablesCache) {
+        foreach (string heroStringId in obj.NotablesCache ?? Enumerable.Empty<string>()) {
             if (objectManager.TryGetObject<Hero>(heroStringId, out var hero) == false)
             {
                 Logger.Error("Unable to find Hero ({HeroStringId})", heroStringId);
