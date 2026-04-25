@@ -16,6 +16,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Xml.Linq;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Extensions;
 using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
@@ -79,10 +80,10 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
         private void SendChanges(ApplyChangesPressed obj)
         {
             // Get heroDeveloper id for transmission over the network
-            var heroDeveloper = obj.HeroDeveloper;
-            if (!objectManager.TryGetId(heroDeveloper, out var heroDeveloperId))
+            var hero = obj.HeroDeveloper.Hero;
+            if (!objectManager.TryGetId(hero, out var heroId))
             {
-                Logger.Error("Unable to get network ID for instance of type {type}", heroDeveloper?.GetType());
+                Logger.Error("Unable to get network ID for instance of type {type}", hero?.GetType());
                 return;
             }
 
@@ -135,7 +136,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             }
 
             // Send to server from client
-            NetworkApplyChangesServer message = new(heroDeveloperId,
+            NetworkApplyChangesServer message = new(heroId,
                 perkIds,
                 attributeIds,
                 attributeIncreases,
@@ -148,16 +149,16 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void ApplyChanges(NetworkApplyChangesClients obj)
         {
-            string heroDeveloperId = obj.HeroDeveloperId;
-            if (!objectManager.TryGetObject(obj.HeroDeveloperId, out HeroDeveloper heroDeveloper))
+            string heroId = obj.HeroId;
+            if (!objectManager.TryGetObject(obj.HeroId, out Hero hero))
             {
-                Logger.Error("Unable to get object for id {id}", heroDeveloperId);
+                Logger.Error("Unable to get object for id {id}", heroId);
                 return;
             }
 
-            addPerks(obj.PerkIds, heroDeveloper);
-            addAttributes(obj.AttributeIds, obj.AttributeIncreases, heroDeveloper);
-            addFocuses(obj.SkillIds, obj.SkillFocusLevels, obj.SkillOrgFocusAmounts, heroDeveloper);
+            addPerks(obj.PerkIds, hero.HeroDeveloper);
+            addAttributes(obj.AttributeIds, obj.AttributeIncreases, hero.HeroDeveloper);
+            addFocuses(obj.SkillIds, obj.SkillFocusLevels, obj.SkillOrgFocusAmounts, hero.HeroDeveloper);
         }
 
         private void addPerks(List<string> perkIds, HeroDeveloper heroDeveloper)

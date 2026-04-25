@@ -14,7 +14,7 @@ namespace GameInterface.Services.CharacterDevelopers.Messages;
 public class NetworkApplyChangesServer : ICommand
 {
     [ProtoMember(1)]
-    public string HeroDeveloperId;
+    public string HeroId;
 
     [ProtoMember(2)]
     public List<string> PerkIds;
@@ -35,7 +35,7 @@ public class NetworkApplyChangesServer : ICommand
     public List<int> SkillOrgFocusAmounts;
 
     public NetworkApplyChangesServer(
-        string heroDeveloperId,
+        string heroId,
         List<string> perkIds,
         List<string> attributeIds,
         List<int> attributeIncreases,
@@ -43,7 +43,7 @@ public class NetworkApplyChangesServer : ICommand
         List<int> skillFocusLevels,
         List<int> skillOrgFocusAmounts)
     {
-        HeroDeveloperId = heroDeveloperId;
+        HeroId = heroId;
         PerkIds = perkIds;
         AttributeIds = attributeIds;
         AttributeIncreases = attributeIncreases;

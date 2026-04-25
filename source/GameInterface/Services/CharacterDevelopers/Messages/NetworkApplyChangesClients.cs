@@ -14,7 +14,7 @@ namespace GameInterface.Services.CharacterDevelopers.Messages;
 public class NetworkApplyChangesClients : ICommand
 {
     [ProtoMember(1)]
-    public string HeroDeveloperId;
+    public string HeroId;
 
     [ProtoMember(2)]
     public List<string> PerkIds;
@@ -36,7 +36,7 @@ public class NetworkApplyChangesClients : ICommand
 
     public NetworkApplyChangesClients(NetworkApplyChangesServer cloneObject)
     {
-        HeroDeveloperId = cloneObject.HeroDeveloperId;
+        HeroId = cloneObject.HeroId;
         PerkIds = cloneObject.PerkIds;
         AttributeIds = cloneObject.AttributeIds;
         AttributeIncreases = cloneObject.AttributeIncreases;

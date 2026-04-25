@@ -4,6 +4,7 @@ using Serilog;
 using Serilog.Core;
 using System;
 using System.Collections.Generic;
+using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
@@ -26,6 +27,7 @@ internal class CharacterDeveloperCommands
             return "Hero name argument required.";
         }
 
+        StringBuilder stringBuilder = new StringBuilder();
         foreach (var hero in Hero.AllAliveHeroes)
         {
             if (hero.Name.ToString() == strings[0])
@@ -57,9 +59,15 @@ internal class CharacterDeveloperCommands
                 }
                 heroData += "}";
 
-                return heroData;
+                stringBuilder.AppendLine(heroData);
             }
         }
-        return "Hero not found";
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Hero not found.";
     }
 }
