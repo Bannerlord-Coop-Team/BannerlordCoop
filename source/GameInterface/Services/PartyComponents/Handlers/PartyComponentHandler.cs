@@ -5,7 +5,6 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Data;
 using GameInterface.Services.PartyComponents.Messages;
-using GameInterface.Services.PartyComponents.Patches;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -60,8 +59,14 @@ internal class PartyComponentHandler : IHandler
     {
         objectManager.AddNewObject(payload.What.Instance, out var id);
 
+        if (!objectManager.TryGetId(payload.What.Instance.MobileParty, out var mobilePartyId))
+        {
+            Logger.Error("Failed to resolve {var} from registry", nameof(payload.What.Instance.MobileParty));
+            return;
+        }
+
         var typeIndex = partyTypes.IndexOf(payload.What.Instance.GetType());
-        var data = new PartyComponentData(typeIndex, id)
+        var data = new PartyComponentData(typeIndex, id, mobilePartyId)
         {
             HomeSettlementId = payload.What.SettlementId,
             IsNaval = payload.What.IsNaval,
@@ -73,7 +78,7 @@ internal class PartyComponentHandler : IHandler
     private void Handle(MessagePayload<NetworkCreatePartyComponent> payload)
     {
         var data = payload.What.Data;
-        var obj = ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
+        var obj = (PartyComponent)ObjectHelper.SkipConstructor(partyTypes[data.TypeIndex]);
 
         switch (data.TypeIndex)
         {
@@ -130,5 +135,13 @@ internal class PartyComponentHandler : IHandler
                     data.Id);
                 break;
         }
+
+        if (!objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var mobileParty))
+        {
+            Logger.Error("Failed to get mobile party for {id}", data.Id);
+            return;
+        }
+
+        obj.MobileParty = mobileParty;
     }
 }

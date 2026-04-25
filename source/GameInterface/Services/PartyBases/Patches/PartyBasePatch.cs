@@ -1,5 +1,4 @@
 ﻿using Common;
-using DynamicSync;
 using GameInterface.Policies;
 using GameInterface.Services.ItemRosters;
 using HarmonyLib;
@@ -27,43 +26,33 @@ internal class PartyBasePatch
     [HarmonyPrefix]
     public static bool Prefixtest(PartyBase __instance, MapEventSide value)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed())
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        if (__instance._mapEventSide != value)
         {
-            if (__instance._mapEventSide != value)
+            if (__instance._mapEventSide != null)
             {
-                if(__instance._mapEventSide?.LeaderParty != value.LeaderParty)
+                __instance._mapEventSide.RemovePartyInternal(__instance);
+            }
+            __instance._mapEventSide = value;
+            if (__instance._mapEventSide != null)
+            {
+                __instance._mapEventSide.AddPartyInternal(__instance);
+            }
+            if (__instance.MobileParty != null)
+            {
+                if (__instance.IsActive)
                 {
-                    return false;
+                    __instance.MobileParty.CancelNavigationTransition();
                 }
-                if (value != null && __instance.IsMobile && __instance.MapEvent != null && __instance.MapEvent.DefenderSide.LeaderParty == __instance)
+                foreach (MobileParty mobileParty in __instance.MobileParty.AttachedParties)
                 {
-                    //Debug.FailedAssert(string.Format("Double MapEvent For {0}", this.Name), "C:\\BuildAgent\\work\\mb3\\Source\\Bannerlord\\TaleWorlds.CampaignSystem\\Party\\PartyBase.cs", "MapEventSide", 257);
-                }
-                if (__instance._mapEventSide != null)
-                {
-                    __instance._mapEventSide.RemovePartyInternal(__instance);
-                }
-                __instance._mapEventSide = value;
-                if (__instance._mapEventSide != null)
-                {
-                    __instance._mapEventSide.AddPartyInternal(__instance);
-                }
-                if (__instance.MobileParty != null)
-                {
-                    if (__instance.IsActive)
-                    {
-                        __instance.MobileParty.CancelNavigationTransition();
-                    }
-                    foreach (MobileParty mobileParty in __instance.MobileParty.AttachedParties)
-                    {
-                        mobileParty.Party.MapEventSide = __instance._mapEventSide;
-                    }
+                    mobileParty.Party.MapEventSide = __instance._mapEventSide;
                 }
             }
-            return false;
         }
 
-        return true;
+        return false;
     }
 }
 

@@ -1,9 +1,11 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Battles.Messages;
 using HarmonyLib;
 using Helpers;
+using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -106,6 +108,8 @@ namespace GameInterface.Services.MobileParties.Patches
     [HarmonyPatch(typeof(StartBattleAction))]
     public class StartBattleActionPatchFix
     {
+        static readonly ILogger Logger = LogManager.GetLogger<StartBattleActionPatchFix>();
+
         [HarmonyPatch(nameof(StartBattleAction.ApplyInternal))]
         [HarmonyPrefix]
         public static bool Prefix(PartyBase attackerParty, PartyBase defenderParty, object subject, MapEvent.BattleTypes battleType)
@@ -128,6 +132,12 @@ namespace GameInterface.Services.MobileParties.Patches
                 if (defenderParty.Side == BattleSideEnum.Attacker)
                 {
                     side = BattleSideEnum.Defender;
+                }
+
+                if (defenderParty.MapEvent._sides.Any(side => side.Parties is null))
+                {
+                    Logger.Error($"Mapevent side did not have a party.");
+                    return false;
                 }
 
                 // A temporary fix that prevents a crash when the MapEvent has no involved parties, not sure why this happens

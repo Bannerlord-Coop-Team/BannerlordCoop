@@ -45,7 +45,7 @@ internal class SettlementSync : IDynamicSync
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.BribePaid)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.SiegeEvent)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.IsActive)));
-        dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.IsVisible)));
+        //dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.IsVisible)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.CurrentSiegeState)));
         dynamicSyncRegistry.AddProperty(AccessTools.Property(typeof(Settlement), nameof(Settlement.GatePosition)));
 

@@ -21,11 +21,11 @@ namespace GameInterface.Services.MapEventSides
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide.StrengthRatio)));
             //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapEvent)));
             
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._requiresTroopCacheUpdate)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroop)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroopIndex)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapFaction)));
-            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._battleParties)));
+            //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._requiresTroopCacheUpdate)));
+            //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroop)));
+            //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._selectedSimulationTroopIndex)));
+            //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._mapFaction)));
+            //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._battleParties)));
         }
     }
 }

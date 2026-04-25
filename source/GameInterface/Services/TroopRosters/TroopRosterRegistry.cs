@@ -8,6 +8,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.TroopRosters;
 internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
@@ -40,6 +41,10 @@ internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
 
     public void OnClientCreated(TroopRoster obj, string id)
     {
+        obj.data = new TroopRosterElement[4];
+        obj._count = 0;
+        obj._troopRosterElements = new MBList<TroopRosterElement>();
+        obj.InitializeCachedData();
     }
 
     public void OnClientDestroyed(TroopRoster obj, string id)

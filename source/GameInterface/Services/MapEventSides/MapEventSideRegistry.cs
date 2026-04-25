@@ -10,6 +10,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEventSides;
 
@@ -18,34 +19,17 @@ namespace GameInterface.Services.MapEventSides;
 /// </summary>
 internal class MapEventSideRegistry : IAutoRegistry<MapEventSide>
 {
+    private static ILogger Logger = LogManager.GetLogger<MapEventSide>();
+
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] { };
+
+    public IEnumerable<MethodBase> DestroyMethods => new MethodBase[] { };
+
     public MapEventSideRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
         Logger = logger;
 
         autoRegistryFactory.RegisterType(this);
-    }
-
-    private static ILogger Logger = LogManager.GetLogger<MapEventSide>();
-
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] { AccessTools.Constructor(typeof(MapEventSide), new Type[] { typeof(MapEvent), typeof(BattleSideEnum), typeof(PartyBase) }) };
-
-    public IEnumerable<MethodBase> DestroyMethods => new MethodBase[] { };
-
-    public void OnClientCreated(MapEventSide obj, string id)
-    {
-    }
-
-    public void OnClientDestroyed(MapEventSide obj, string id)
-    {
-    }
-
-    public void OnServerCreated(MapEventSide obj, string id)
-    {
-        ;
-    }
-
-    public void OnServerDestroyed(MapEventSide obj, string id)
-    {
     }
 
     public void RegisterAllObjects(IRegistry<MapEventSide> registry)
@@ -64,5 +48,21 @@ internal class MapEventSideRegistry : IAutoRegistry<MapEventSide>
                     Logger.Error("Unable to register MapEventSide {id} in the object manager", side.ToString());
             }
         }
+    }
+
+    public void OnClientCreated(MapEventSide obj, string id)
+    {
+    }
+
+    public void OnClientDestroyed(MapEventSide obj, string id)
+    {
+    }
+
+    public void OnServerCreated(MapEventSide obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(MapEventSide obj, string id)
+    {
     }
 }

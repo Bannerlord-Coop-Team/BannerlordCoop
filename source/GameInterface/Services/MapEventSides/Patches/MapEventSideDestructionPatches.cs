@@ -42,6 +42,13 @@ internal class MapEventSideDestructionPatches
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
             int index = __instance._battleParties.FindIndexQ((MapEventParty p) => p.Party == party);
+
+            if (index == -1)
+            {
+                Logger.Error("Could not find {party} in {var}", party.Name, nameof(MapEventSide._battleParties));
+                return false;
+            }
+
             MapEventParty mapEventParty = __instance._battleParties[index];
             __instance._battleParties.RemoveAt(index);
             __instance._mapEvent.RemoveInvolvedPartyInternal(mapEventParty);

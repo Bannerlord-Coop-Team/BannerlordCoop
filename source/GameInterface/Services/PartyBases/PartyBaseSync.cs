@@ -27,7 +27,6 @@ internal class PartyBaseSync : IDynamicSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(PartyBase), nameof(PartyBase._customOwner)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(PartyBase), nameof(PartyBase._index)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(PartyBase), nameof(PartyBase._lastEatingTime)));
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(PartyBase), nameof(PartyBase._mapEventSide)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(PartyBase), nameof(PartyBase._remainingFoodPercentage)));
 
         // Cached values, does not need sync
