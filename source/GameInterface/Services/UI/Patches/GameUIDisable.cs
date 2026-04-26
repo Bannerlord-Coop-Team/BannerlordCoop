@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using Common;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
 
@@ -15,7 +16,7 @@ namespace GameInterface.Services.UI.Patches
             {
                 KingdomState => false,
                 QuestsState => false,
-                //CharacterDeveloperState => false,
+                CharacterDeveloperState => ModInformation.IsClient,
                 PartyState => false,
                 InventoryState => false,
                 ClanState => false,
