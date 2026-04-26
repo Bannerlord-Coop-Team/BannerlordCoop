@@ -79,7 +79,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
 
         private void SendChanges(ApplyChangesPressed obj)
         {
-            // Get heroDeveloper id for transmission over the network
+            // Get hero id for transmission over the network
             var hero = obj.HeroDeveloper.Hero;
             if (!objectManager.TryGetId(hero, out var heroId))
             {

@@ -34,10 +34,20 @@ internal class CharacterDeveloperCommands
             {
                 string heroData = hero.Name + ":\n";
 
+                heroData += "Level: " + hero.Level + "\n";
+
+                heroData += "Total XP: " + hero.HeroDeveloper.TotalXp + "\n";
+
                 heroData += "Attributes: {";
                 foreach (CharacterAttribute attribute in hero._characterAttributes._attributes.Keys)
                 {
                     heroData += attribute.Name + ": " + hero.GetAttributeValue(attribute) + ",";
+                }
+
+                heroData += "\nSkill XPs: {";
+                foreach (SkillObject skill in hero._heroSkills._attributes.Keys)
+                {
+                    heroData += skill.Name + ": " + hero.HeroDeveloper.GetSkillXp(skill) + ",";
                 }
 
                 heroData += "}\n Focuses: {";
