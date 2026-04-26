@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Services.Battles.Messages;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
@@ -39,13 +40,43 @@ internal class EncounterManagerPatches
     }
 
     [HarmonyPrefix]
+    [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
+    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
+    {
+        // Skip this method if party is not controlled
+        if (mobileParty.IsPartyControlled() == false) return false;
+
+        return true;
+    }
+
+    [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
+    [HarmonyPrefix]
+    public static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
+    {
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+
+        if (ModInformation.IsClient) return true;
+
+        var message = new BattleStarted(attackerParty, defenderParty);
+
+        if (attackerParty.MobileParty?.ActualClan?.Name.ToString() == "Playerland")
+        {
+            InformationManager.DisplayMessage(new InformationMessage($"Local player is engaging in battle with {attackerParty.Name}"));
+        }
+
+        MessageBroker.Instance.Publish(null, message);
+
+        return true;
+    }
+
+    [HarmonyPrefix]
     [HarmonyPatch(nameof(EncounterManager.Tick))]
     internal static bool TickPatch(float dt)
     {
         return ModInformation.IsServer;
     }
 
-    internal static void OverrideOnPartyInteraction(MobileParty attacker, PartyBase defender)
+    internal static void OverrideOnPartyInteraction(PartyBase attacker, PartyBase defender)
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
@@ -53,18 +84,19 @@ internal class EncounterManagerPatches
             {
                 if (defender.IsMobile)
                 {
-                    if (attacker.IsPartyControlled() == true)
+                    if (attacker.MobileParty.IsPartyControlled() == true)
                     {
                         InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
                     }
-                    defender.MobileParty.OnPartyInteraction(attacker);
+                    EncounterManager.StartPartyEncounter(attacker, defender);
                     return;
                 }
                 if (defender.IsSettlement)
                 {
-                    defender.Settlement.OnPartyInteraction(attacker);
+                    EncounterManager.StartSettlementEncounter(attacker.MobileParty, defender.Settlement);
                 }
             }
         });
     }
 }
+

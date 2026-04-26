@@ -38,7 +38,7 @@ internal class LoadingScreenHandler : IHandler
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
-            LoadingWindow.DisableGlobalLoadingWindow();
+           LoadingWindow.DisableGlobalLoadingWindow();
         });
     }
 }

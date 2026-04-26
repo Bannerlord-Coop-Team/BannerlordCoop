@@ -1,8 +1,6 @@
 ﻿using Common;
 using Common.Logging;
-using Common.Messaging;
 using Common.Util;
-using GameInterface.Services.Battles.Messages;
 using HarmonyLib;
 using Helpers;
 using Serilog;
@@ -40,70 +38,6 @@ namespace GameInterface.Services.MobileParties.Patches
         }
     }
 
-    //It crashes without this, WTF!? it changes NOTHING!?
-    //[HarmonyPatch(typeof(PartyBase))]
-    //public class PlayerEncounterPatch151
-    //{
-    //    [HarmonyPatch(nameof(PartyBase.MapEventSide), MethodType.Setter)]
-    //    [HarmonyPrefix]
-    //    public static bool Prefix(ref PartyBase __instance, ref MapEventSide value)
-    //    {
-    //        if (__instance._mapEventSide != value)
-    //        {
-    //            if (value != null && __instance.IsMobile && __instance.MapEvent != null && __instance.MapEvent.DefenderSide.LeaderParty == __instance)
-    //            {
-    //                Debug.FailedAssert(string.Format("Double MapEvent For {0}", __instance.Name), "C:\\BuildAgent\\work\\mb3\\Source\\Bannerlord\\TaleWorlds.CampaignSystem\\Party\\PartyBase.cs", "MapEventSide", 257);
-    //            }
-    //            if (__instance._mapEventSide != null)
-    //            {
-    //                __instance._mapEventSide.RemovePartyInternal(__instance);
-    //            }
-    //            __instance._mapEventSide = value;
-    //            if (__instance._mapEventSide != null)
-    //            {
-    //                __instance._mapEventSide.AddPartyInternal(__instance);
-    //            }
-    //            if (__instance.MobileParty != null)
-    //            {
-    //                if (__instance.IsActive)
-    //                {
-    //                    __instance.MobileParty.CancelNavigationTransition();
-    //                }
-    //                foreach (MobileParty mobileParty in __instance.MobileParty.AttachedParties)
-    //                {
-    //                    mobileParty.Party.MapEventSide = __instance._mapEventSide;
-    //                }
-    //            }
-    //        }
-
-    //        return false;
-    //    }
-    //}
-
-    [HarmonyPatch(typeof(PartyBase))]
-    public class TestPatching2
-    {
-        [HarmonyPatch("TaleWorlds.CampaignSystem.Map.IInteractablePoint.OnPartyInteraction")]
-        [HarmonyPrefix]
-        public static bool Prefix(PartyBase __instance, MobileParty engagingParty)
-        {
-            if (AllowedThread.IsThisThreadAllowed()) return true;
-
-            if (ModInformation.IsClient) return false;
-
-            var message = new BattleStarted(engagingParty, __instance);
-
-            if (engagingParty.ActualClan != null && engagingParty.ActualClan.Name.ToString() == "Playerland")
-            {
-                InformationManager.DisplayMessage(new InformationMessage($"Local player is engaging in battle with {__instance.Name}"));
-            }
-
-            MessageBroker.Instance.Publish(__instance, message);
-
-            return true;
-        }
-    }
-
 
     [HarmonyPatch(typeof(StartBattleAction))]
     public class StartBattleActionPatchFix
@@ -114,7 +48,7 @@ namespace GameInterface.Services.MobileParties.Patches
         [HarmonyPrefix]
         public static bool Prefix(PartyBase attackerParty, PartyBase defenderParty, object subject, MapEvent.BattleTypes battleType)
         {
-            if(attackerParty.MobileParty == MobileParty.MainParty)
+            if (attackerParty.MobileParty == MobileParty.MainParty)
             {
                 ;
             }

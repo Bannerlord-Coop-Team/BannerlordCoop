@@ -24,7 +24,7 @@ internal class StanceLinkRegistry : IAutoRegistry<StanceLink>
         autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(StanceLink));
+    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 

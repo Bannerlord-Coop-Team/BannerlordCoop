@@ -1,27 +1,27 @@
-﻿using Common.Logging;
-using Common.Messaging;
-using GameInterface.Services.MapEvents.Messages;
-using HarmonyLib;
-using Serilog;
-using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
+﻿//using Common.Logging;
+//using Common.Messaging;
+//using GameInterface.Services.MapEvents.Messages;
+//using HarmonyLib;
+//using Helpers;
+//using Serilog;
+//using TaleWorlds.CampaignSystem.Encounters;
+//using TaleWorlds.CampaignSystem.MapEvents;
+//using TaleWorlds.CampaignSystem.Party;
+//using TaleWorlds.Core;
 
-namespace GameInterface.Services.MapEvents.Patches
-{
-    //[HarmonyPatch(typeof(PlayerEncounter))]
-    //public class PlayerEncounterFinalizePatch
-    //{
-    //    private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterFinalizePatch>();
+//namespace GameInterface.Services.MapEvents.Patches;
 
-    //    [HarmonyPrefix]
-    //    [HarmonyPatch(nameof(PlayerEncounter.FinalizeBattle))]
-    //    static bool PrefixFinalizeBattle() //TODO Sync player battle results
-    //    {
-    //        MessageBroker.Instance.Publish(MobileParty.MainParty, new BattleEnded(MobileParty.MainParty.StringId));
+//[HarmonyPatch(typeof(MenuHelper))]
+//public class PlayerEncounterFinalizePatch
+//{
+//    private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterFinalizePatch>();
 
-    //        return true;
-    //    }
-    //}
-}
+//    [HarmonyPrefix]
+//    [HarmonyPatch(nameof(MenuHelper.EncounterLeaveConsequence))]
+//    static bool PrefixLeaveBattle() //TODO Sync player battle results
+//    {
+//        MessageBroker.Instance.Publish(MobileParty.MainParty, new LeaveBattleAttempted(MobileParty.MainParty, MapEvent.PlayerMapEvent));
+
+//        return false;
+//    }
+//}

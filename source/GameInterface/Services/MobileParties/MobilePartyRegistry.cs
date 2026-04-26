@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Entity;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -20,11 +21,13 @@ namespace GameInterface.Services.MobileParties;
 /// </summary>
 internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
 {
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
+
     ILogger Logger { get; }
-    public MobilePartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public MobilePartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IControlledEntityRegistry controlledEntityRegistry)
     {
         Logger = logger;
-
+        this.controlledEntityRegistry = controlledEntityRegistry;
         autoRegistryFactory.RegisterType(this);
     }
 

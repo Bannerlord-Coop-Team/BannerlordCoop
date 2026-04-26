@@ -6,6 +6,7 @@ using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -35,6 +36,9 @@ internal class MapEventHandler : IHandler
 
         messageBroker.Subscribe<MapEventInitialize>(Handle);
         messageBroker.Subscribe<NetworkMapEventInitialize>(Handle);
+
+        messageBroker.Subscribe<LeaveBattleAttempted>(Handle);
+        messageBroker.Subscribe<NetworkLeaveBattle>(Handle);
     }
 
     public void Dispose()
@@ -50,6 +54,9 @@ internal class MapEventHandler : IHandler
 
         messageBroker.Unsubscribe<MapEventInitialize>(Handle);
         messageBroker.Unsubscribe<NetworkMapEventInitialize>(Handle);
+
+        messageBroker.Unsubscribe<LeaveBattleAttempted>(Handle);
+        messageBroker.Unsubscribe<NetworkLeaveBattle>(Handle);
     }
 
     private void Handle(MessagePayload<NetworkMapEventInitialize> payload)
@@ -180,6 +187,36 @@ internal class MapEventHandler : IHandler
                 mapEvent.FinalizeEventAux();
             }
         });
+    }
+
+    private void Handle(MessagePayload<LeaveBattleAttempted> payload)
+    {
+        var what = payload.What;
+        if (!objectManager.TryGetId(what.MobileParty, out var mobilePartyId))
+        {
+            return;
+        }
+
+        if (!objectManager.TryGetId(what.MapEvent, out var mapEventId))
+        {
+            return;
+        }
+
+        network.SendAll(new NetworkLeaveBattle(mobilePartyId, mapEventId));
+    }
+
+    private void Handle(MessagePayload<NetworkLeaveBattle> payload)
+    {
+        var what = payload.What;
+        if (!objectManager.TryGetObject<MapEvent>(what.MapEventId, out var mapEvent))
+        {
+            return;
+        }
+
+        using (new AllowedThread())
+        {
+            mapEvent.FinalizeEvent();
+        }
     }
 
     //private void Handle(MessagePayload<MapEventSidesArrayUpdated> payload)

@@ -13,12 +13,17 @@ internal static class PartyExtensions
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobileParty>();
 
-    private static readonly ConditionalWeakTable<MobileParty, PartyCache> Cache = new();
+    private static readonly ConditionalWeakTable<MobileParty, ControlledCache> _controlledCache = new();
+    private static readonly ConditionalWeakTable<MobileParty, PlayerCache> _playerCache = new();
 
-    private sealed class PartyCache
+    private sealed class ControlledCache
     {
-        public bool? IsPartyControlled;
-        public bool? IsPlayerParty;
+        public bool? IsPartyControlled = null;
+    }
+
+    private sealed class PlayerCache
+    {
+        public bool? IsPlayerParty = null;
     }
 
     /// <summary>
@@ -34,12 +39,12 @@ internal static class PartyExtensions
             return false;
         }
 
-        var cache = Cache.GetOrCreateValue(party);
+        //var cache = _controlledCache.GetOrCreateValue(party);
 
-        if (cache.IsPartyControlled.HasValue)
-        {
-            return cache.IsPartyControlled.Value;
-        }
+        //if (cache.IsPartyControlled.HasValue)
+        //{
+        //    return cache.IsPartyControlled.Value;
+        //}
 
         if (!ContainerProvider.TryResolve<IControlledEntityRegistry>(out var entityRegistry))
         {
@@ -54,7 +59,7 @@ internal static class PartyExtensions
         }
 
         var result = entityRegistry.IsControlledBy(idProvider.ControllerId, party.StringId);
-        cache.IsPartyControlled = result;
+        //cache.IsPartyControlled = result;
 
         return result;
     }
@@ -72,12 +77,12 @@ internal static class PartyExtensions
             return false;
         }
 
-        var cache = Cache.GetOrCreateValue(party);
+        //var cache = _playerCache.GetOrCreateValue(party);
 
-        if (cache.IsPlayerParty.HasValue)
-        {
-            return cache.IsPlayerParty.Value;
-        }
+        //if (cache.IsPlayerParty.HasValue)
+        //{
+        //    return cache.IsPlayerParty.Value;
+        //}
 
         if (!ContainerProvider.TryResolve<IPlayerRegistry>(out var playerRegistry))
         {
@@ -86,7 +91,7 @@ internal static class PartyExtensions
         }
 
         var result = playerRegistry.Contains(party);
-        cache.IsPlayerParty = result;
+        //cache.IsPlayerParty = result;
 
         return result;
     }
@@ -95,7 +100,7 @@ internal static class PartyExtensions
     /// Clears all cached values for a specific party.
     /// Call this when party ownership/player status may have changed.
     /// </summary>
-    public static void InvalidatePartyCache(this MobileParty party)
+    public static void InvalidateCache(this MobileParty party)
     {
         if (party is null)
         {
@@ -103,36 +108,7 @@ internal static class PartyExtensions
             return;
         }
 
-        Cache.Remove(party);
-    }
-
-    /// <summary>
-    /// Clears only the cached controlled-state for a specific party.
-    /// </summary>
-    public static void InvalidateControlledCache(this MobileParty party)
-    {
-        if (party is null)
-        {
-            Logger.Error("{parameterName} was null", nameof(party));
-            return;
-        }
-
-        var cache = Cache.GetOrCreateValue(party);
-        cache.IsPartyControlled = null;
-    }
-
-    /// <summary>
-    /// Clears only the cached player-state for a specific party.
-    /// </summary>
-    public static void InvalidatePlayerPartyCache(this MobileParty party)
-    {
-        if (party is null)
-        {
-            Logger.Error("{parameterName} was null", nameof(party));
-            return;
-        }
-
-        var cache = Cache.GetOrCreateValue(party);
-        cache.IsPlayerParty = null;
+        _playerCache.Remove(party);
+        _controlledCache.Remove(party);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Data;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -38,15 +39,15 @@ internal class MobilePartyControlHandler : IHandler
         this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Subscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
-        messageBroker.Subscribe<PartyCreated>(Handle_MobilePartyCreated);
-        messageBroker.Subscribe<PartyDestroyed>(Handle_MobilePartyDestroyed);
+        messageBroker.Subscribe<InstanceCreated<MobileParty>>(Handle_MobilePartyCreated);
+        messageBroker.Subscribe<InstanceDestroyed<MobileParty>>(Handle_MobilePartyDestroyed);
     }
     public void Dispose()
     {
         messageBroker.Unsubscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Unsubscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
-        messageBroker.Unsubscribe<PartyCreated>(Handle_MobilePartyCreated);
-        messageBroker.Unsubscribe<PartyDestroyed>(Handle_MobilePartyDestroyed);
+        messageBroker.Unsubscribe<InstanceCreated<MobileParty>>(Handle_MobilePartyCreated);
+        messageBroker.Unsubscribe<InstanceDestroyed<MobileParty>>(Handle_MobilePartyDestroyed);
     }
 
     private void Handle_RegisterAllPartiesAsControlled(MessagePayload<RegisterAllPartiesAsControlled> obj)
@@ -79,7 +80,7 @@ internal class MobilePartyControlHandler : IHandler
         }
     }
 
-    private void Handle_MobilePartyCreated(MessagePayload<PartyCreated> obj)
+    private void Handle_MobilePartyCreated(MessagePayload<InstanceCreated<MobileParty>> obj)
     {
         if (!controlPartiesByDefault) return;
 
@@ -88,7 +89,7 @@ internal class MobilePartyControlHandler : IHandler
         controlledEntityRegistry.RegisterAsControlled(ownerId, stringId);
     }
 
-    private void Handle_MobilePartyDestroyed(MessagePayload<PartyDestroyed> obj)
+    private void Handle_MobilePartyDestroyed(MessagePayload<InstanceDestroyed<MobileParty>> obj)
     {
         var stringId = obj.What.Instance.StringId;
 
