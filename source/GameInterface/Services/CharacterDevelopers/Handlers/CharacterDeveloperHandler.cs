@@ -91,8 +91,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             var perkIds = new List<string>();
             foreach (var perk in obj.Perks._selectedPerks)
             {
-                string currentPerkId;
-                if (!objectManager.TryGetId(perk, out currentPerkId))
+                if (!objectManager.TryGetId(perk, out var currentPerkId))
                 {
                     Logger.Error("Unable to get network ID for instance of type {type}", perk?.GetType());
                     return;
@@ -106,8 +105,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             var attributeIncreases = new List<int>();
             foreach (var attributeVM in obj.Attributes)
             {
-                string currentAttributeId;
-                if (!objectManager.TryGetId(attributeVM.AttributeType, out currentAttributeId))
+                if (!objectManager.TryGetId(attributeVM.AttributeType, out var currentAttributeId))
                 {
                     Logger.Error("Unable to get network ID for instance of type {type}", attributeVM.AttributeType?.GetType());
                     return;
@@ -123,8 +121,7 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
             var skillOrgFocusAmounts = new List<int>();
             foreach (var skillVM in obj.Skills)
             {
-                string currentSkillId;
-                if (!objectManager.TryGetId(skillVM.Skill, out currentSkillId))
+                if (!objectManager.TryGetId(skillVM.Skill, out var currentSkillId))
                 {
                     Logger.Error("Unable to get network ID for instance of type {type}", skillVM.Skill?.GetType());
                     return;
@@ -209,11 +206,10 @@ namespace GameInterface.Services.CharacterDevelopers.Handlers
                 {
                     string skillId = skillIds[i];
 
-                    SkillObject currentSkill;
-                    if (!objectManager.TryGetObject(skillId, out currentSkill))
+                    if (!objectManager.TryGetObject<SkillObject>(skillId, out var currentSkill))
                     {
                         Logger.Error("Unable to get object for id {id}", skillId);
-                        return;
+                        continue;
                     }
 
                     for (int j = 0; j < skillFocusLevels[i] - skillOrgFocusAmounts[i]; j++)
