@@ -155,6 +155,8 @@ internal class HeroInterface : IHeroInterface
             Logger.Information("Switching to new hero: {heroName}", resolvedHero.Name.ToString());
 
             ChangePlayerCharacterAction.Apply(resolvedHero);
+
+            Campaign.Current.PlayerDefaultFaction = resolvedHero.Clan;
         }
         else
         {
