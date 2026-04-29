@@ -185,13 +185,6 @@ namespace GameInterface.DynamicSync.Builders
                 typeToVerify = type.GetElementType();
             else
                 typeToVerify = type;
-            // Prevent unsupported types
-            if (!objectManager.IsTypeManaged(typeToVerify) && !RuntimeTypeModel.Default.CanSerialize(typeToVerify))
-            {
-                throw new NotSupportedException(
-                    $"{typeToVerify.Name} is not serializable and not managed by the object manager. " +
-                    $"Either manage the type using the object manager or make this type serializable");
-            }
         }
     }
 }

@@ -1,16 +1,15 @@
-﻿using Common;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.Metrics;
 using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.Localization;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Armies;
 
@@ -27,29 +26,32 @@ internal class ArmyRegistry : IAutoRegistry<Army>
         autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(Army), new Type[] { typeof(Kingdom), typeof(MobileParty), typeof(Army.ArmyTypes) })
+    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(Army));
+
+    public IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
+    {
+        AccessTools.Method(typeof(Army), nameof(Army.DisperseInternal))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
-
-    public void RegisterAllObjects(IRegistry<Army> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         IEnumerable<Kingdom> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
 
+        
         foreach (var kingdom in kingdoms)
         {
             int counter = 1;
             foreach (var army in kingdom.Armies)
             {
                 var networkId = $"{nameof(Army)}_{kingdom.StringId}_{counter++}";
-                registry.RegisterExistingObject(networkId, army);
+                objectManager.AddExisting(networkId, army);
             }
         }
     }
 
     public void OnClientCreated(Army obj, string id)
     {
+        AccessTools.Field(typeof(Army), nameof(Army._parties)).SetValue(obj, new MBList<MobileParty>());
     }
 
     public void OnClientDestroyed(Army obj, string id)

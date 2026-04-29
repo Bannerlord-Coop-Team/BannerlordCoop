@@ -17,13 +17,11 @@ public class PropertyPrefixCreator
     private readonly TypeBuilder typeBuilder;
 
     private readonly FieldBuilder loggerField;
-    private readonly IObjectManager objectManager;
     private readonly int typeId;
     private readonly PropertyInfo[] properties;
 
-    public PropertyPrefixCreator(IObjectManager objectManager, ModuleBuilder moduleBuilder, Type type, int typeId, PropertyInfo[] interceptProperties)
+    public PropertyPrefixCreator(ModuleBuilder moduleBuilder, Type type, int typeId, PropertyInfo[] interceptProperties)
     {
-        this.objectManager = objectManager;
         this.typeId = typeId;
         this.properties = interceptProperties;
 
@@ -194,7 +192,7 @@ public class PropertyPrefixCreator
         il.Emit(OpCodes.Ldloca, idLocal);
 
         // Try resolve instance id
-        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetId)).MakeGenericMethod(objType));
+        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetId)));
         il.Emit(OpCodes.Brtrue, validLabel);
 
         // Log error
@@ -249,12 +247,8 @@ public class PropertyPrefixCreator
             var propType = properties[i].PropertyType;
             if (RuntimeTypeModel.Default.CanSerialize(propType))
                 CreatePropertyByValPrefix(typeId, i, properties[i]);
-            else if (objectManager.IsTypeManaged(propType))
-                CreatePropertyByRefPrefix(typeId, i, properties[i]);
             else
-                throw new NotSupportedException(
-                    $"{propType.Name} is not serializable and not managed by the object manager. " +
-                    $"Either manage the type using the object manager or make this type serializable");
+                CreatePropertyByRefPrefix(typeId, i, properties[i]);
         }
 
         return typeBuilder.CreateTypeInfo();

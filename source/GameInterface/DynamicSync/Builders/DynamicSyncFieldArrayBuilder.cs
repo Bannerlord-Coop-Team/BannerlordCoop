@@ -1,5 +1,6 @@
 ﻿using GameInterface.DynamicSync.Templates;
 using GameInterface.Services.ObjectManager;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -34,15 +35,15 @@ namespace GameInterface.DynamicSync.Builders
 
             string networkMessage;
             string networkChangeMessage;
-            if(objectManager.IsTypeManaged(fieldInfo.FieldType.GetElementType()))
-            {
-                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetReferenceMessageTemplate", templateData);
-                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeReferenceMessageTemplate", templateData);
-            }
-            else
+            if (RuntimeTypeModel.Default.CanSerialize(fieldInfo.FieldType.GetElementType()))
             {
                 networkMessage = TemplateParser.Parse("Messages.NetworkArraySetValueMessageTemplate", templateData);
                 networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeValueMessageTemplate", templateData);
+            }
+            else
+            {
+                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetReferenceMessageTemplate", templateData);
+                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeReferenceMessageTemplate", templateData);
             }
 
             DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -60,10 +61,10 @@ namespace GameInterface.DynamicSync.Builders
         public string GetSubscription(FieldInfo fieldInfo)
         {
             var templateData = GetTemplateData(fieldInfo);
-            if (objectManager.IsTypeManaged(fieldInfo.FieldType.GetElementType()))
-                return TemplateParser.Parse("Handlers.SubscribeArrayReferenceTemplate", templateData);
-            else
+            if (RuntimeTypeModel.Default.CanSerialize(fieldInfo.FieldType.GetElementType()))
                 return TemplateParser.Parse("Handlers.SubscribeArrayValueTemplate", templateData);
+            else
+                return TemplateParser.Parse("Handlers.SubscribeArrayReferenceTemplate", templateData);
         }
         private string GetArrayType(Type type)
         {

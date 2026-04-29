@@ -1,5 +1,6 @@
 ﻿using GameInterface.DynamicSync.Templates;
 using GameInterface.Services.ObjectManager;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -22,13 +23,13 @@ namespace GameInterface.DynamicSync.Builders
             var templateData = GetTemplateData(propertyInfo);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
             string networkMessage;
-            if(objectManager.IsTypeManaged(propertyInfo.PropertyType))
+            if (RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType))
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate", templateData);
+                networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
             }
             else
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
+                networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate", templateData);
             }
 
             DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -41,10 +42,10 @@ namespace GameInterface.DynamicSync.Builders
         public string GetSubscription(PropertyInfo propertyInfo)
         {
             var templateData = GetTemplateData(propertyInfo);
-            if (objectManager.IsTypeManaged(propertyInfo.PropertyType))
-                return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
-            else
+            if (RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType))
                 return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
+            else
+                return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
         }
 
         private object GetTemplateData(PropertyInfo propertyInfo)

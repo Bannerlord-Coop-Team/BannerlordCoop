@@ -1,52 +1,59 @@
-﻿using System;
-using TaleWorlds.Core;
-using TaleWorlds.ObjectSystem;
+﻿using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.ViewModelCollection.CharacterDeveloper;
-using TaleWorlds.CampaignSystem.Siege;
-using System.Threading;
-using GameInterface.Registry;
+using TaleWorlds.Core;
 
 namespace GameInterface.Services.Equipments;
 
 /// <summary>
 /// Registry for <see cref="Equipment"/> objects
 /// </summary>
-internal class EquipmentRegistry : RegistryBase<Equipment> {
+internal class EquipmentRegistry : IAutoRegistry<Equipment> {
 
-    private const string EquipmentPrefix = $"Coop{nameof(Equipment)}_";
-    private int InstanceCounter = 0;
-
-    public EquipmentRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override void RegisterAll()
+    ILogger Logger { get; }
+    public EquipmentRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        var objectManager = MBObjectManager.Instance;
+        Logger = logger;
 
+        autoRegistryFactory.RegisterType(this);
+    }
+    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
-        if (objectManager == null)
-        {
-            Logger.Error("Unable to register objects when CampaignObjectManager is null");
-            return;
-        }
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
+    public void RegisterAllObjects(IObjectManager objectManager)
+    {
         // Not sure if this can be skipped since due constructor patching all equipment will already be registered.
         foreach (var equipmentRoster in Campaign.Current.AllEquipmentRosters)
         {
             if (equipmentRoster == null) continue;
             foreach (Equipment equipment in equipmentRoster.AllEquipments)
             {
-                if (TryGetId(equipment, out _)) {
+                if (objectManager.Contains(equipment)) continue;
 
-                    continue;
-                }
-                RegisterNewObject(equipment, out var _);
+                objectManager.AddNewObject(equipment, out var _);
             }
         }
     }
 
-    protected override string GetNewId(Equipment equipment)
+    public void OnClientCreated(Equipment obj, string id)
     {
-        return EquipmentPrefix + Interlocked.Increment(ref InstanceCounter);
+    }
+
+    public void OnClientDestroyed(Equipment obj, string id)
+    {
+    }
+
+    public void OnServerCreated(Equipment obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(Equipment obj, string id)
+    {
     }
 }

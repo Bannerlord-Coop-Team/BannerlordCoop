@@ -2,6 +2,7 @@
 using GameInterface.AutoSync.Fields;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Moq;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -9,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using Xunit;
@@ -30,8 +32,9 @@ public class AutoSyncTests
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
         var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
 
-        var objectManager = new TestObjManager();
-        var typeSwitchCreator = new FieldTypeSwitchCreator(moduleBuilder, objectManager);
+        var objectManager = new Mock<IObjectManager>();
+
+        var typeSwitchCreator = new FieldTypeSwitchCreator(moduleBuilder);
 
         var typeMap = new Dictionary<Type, List<FieldInfo>>
         {
@@ -40,7 +43,7 @@ public class AutoSyncTests
         };
 
         var typeSwitchType = typeSwitchCreator.Build(typeMap);
-        dynamic typeSwitch = Activator.CreateInstance(typeSwitchType, objectManager)!;
+        dynamic typeSwitch = Activator.CreateInstance(typeSwitchType, objectManager.Object)!;
 
         typeSwitch.TypeSwitch(new FieldAutoSyncPacket(null, 0, 0, null));
     }
@@ -53,21 +56,27 @@ public class AutoSyncTests
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
         var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
 
-        var objectManager = new TestObjManager();
+        var objectManager = new Mock<IObjectManager>();
 
-        var typeSwitchCreator = new FieldSwitchCreator(moduleBuilder, typeof(SwitchTestClass), objectManager);
+        var typeSwitchCreator = new FieldSwitchCreator(moduleBuilder, typeof(SwitchTestClass));
 
         var fields = AccessTools.GetDeclaredFields(typeof(SwitchTestClass));
         var nameField = AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.Name));
 
         var fieldSwitchType = typeSwitchCreator.Build(fields.ToArray());
-        dynamic fieldSwitch = Activator.CreateInstance(fieldSwitchType, objectManager)!;
+        dynamic fieldSwitch = Activator.CreateInstance(fieldSwitchType, objectManager.Object)!;
 
         var objId = "MyObj1";
 
         var obj = new SwitchTestClass();
 
-        objectManager.AddExisting(objId, obj);
+        objectManager
+            .Setup(x => x.TryGetObject<SwitchTestClass>(objId, out obj))
+            .Returns(true);
+
+        objectManager
+            .Setup(x => x.TryGetId(obj, out objId))
+            .Returns(true);
 
         Assert.Equal("hi", obj.Name);
 
@@ -93,22 +102,34 @@ public class AutoSyncTests
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
         var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
 
-        var objectManager = new TestObjManager();
-        var typeSwitchCreator = new FieldSwitchCreator(moduleBuilder, typeof(SwitchTestClass), objectManager);
+        var objectManager = new Mock<IObjectManager>();
+        var typeSwitchCreator = new FieldSwitchCreator(moduleBuilder, typeof(SwitchTestClass));
 
         var fields = AccessTools.GetDeclaredFields(typeof(SwitchTestClass));
         var refField = AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.RefClass));
 
         var fieldSwitchType = typeSwitchCreator.Build(fields.ToArray());
-        dynamic fieldSwitch = Activator.CreateInstance(fieldSwitchType, objectManager)!;
+        dynamic fieldSwitch = Activator.CreateInstance(fieldSwitchType, objectManager.Object)!;
 
         var objId = "MyObj1";
         var obj = new SwitchTestClass();
-        objectManager.AddExisting(objId, obj);
+        objectManager
+            .Setup(x => x.TryGetObject<SwitchTestClass>(objId, out obj))
+            .Returns(true);
+
+        objectManager
+            .Setup(x => x.TryGetId(obj, out objId))
+            .Returns(true);
 
         var refObjId = "RefObjId1";
         var refObj = new SomeRefClass();
-        objectManager.AddExisting(refObjId, refObj);
+        objectManager
+            .Setup(x => x.TryGetObject<SomeRefClass>(refObjId, out refObj))
+            .Returns(true);
+
+        objectManager
+            .Setup(x => x.TryGetId(refObj, out refObjId))
+            .Returns(true);
 
         Assert.Equal("hi", obj.Name);
 
@@ -137,82 +158,4 @@ public class AutoSyncTests
     }
 
     public class SomeRefClass { }
-
-    public class TestObjManager : IObjectManager
-    {
-        private readonly Dictionary<string, object> idMap = new Dictionary<string, object>();
-
-        public bool AddExisting<T>(string id, T obj)
-        {
-            return idMap.TryAdd(id, obj);
-        }
-
-        public bool AddNewObject<T>(T obj, out string newId)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool Contains<T>(T obj)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool Contains(string id)
-        {
-            throw new NotImplementedException();
-        }
-
-        private readonly HashSet<Type> managedTypes = new HashSet<Type>
-        {
-            typeof(SomeRefClass),
-            typeof(SwitchTestClass) 
-        };
-        public bool IsTypeManaged(Type type)
-        {
-            return managedTypes.Contains(type);
-        }
-
-        public bool Remove<T>(T obj)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool TryGetId<T>(T obj, out string? id)
-        {
-            id = null;
-
-            foreach (var kvp in idMap)
-            {
-                if (kvp.Value is T)
-                {
-                    id = kvp.Key;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        public bool TryGetObject<T>(string id, out T? obj) where T : class
-        {
-            obj = null;
-
-            if (string.IsNullOrEmpty(id)) return false;
-
-            if (idMap.TryGetValue(id, out var value) == false) return false;
-
-            obj = value as T;
-            return true;
-        }
-
-        public bool TryGetIdWithLogging<T>(T obj, out string id)
-        {
-            throw new NotImplementedException();
-        }
-
-        public bool TryGetObjectWithLogging<T>(string id, out T obj) where T : class
-        {
-            throw new NotImplementedException();
-        }
-    }
 }

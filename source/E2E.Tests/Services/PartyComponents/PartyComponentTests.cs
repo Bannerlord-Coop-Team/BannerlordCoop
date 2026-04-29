@@ -34,7 +34,9 @@ public class PartyComponentTests : SyncTestBase
         foreach (var client in TestEnvironment.Clients)
         {
             Assert.True(server.ObjectManager.TryGetObject<MobileParty>(partyId, out var party1));
-            Assert.Equal(party1.PartyComponent.MobileParty.StringId, party2Id);
+            Assert.True(server.ObjectManager.TryGetId(party1.PartyComponent.MobileParty, out var clientParty2Id));
+
+            Assert.Equal(clientParty2Id, party2Id);
         }
     }
 

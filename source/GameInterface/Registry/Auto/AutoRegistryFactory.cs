@@ -12,7 +12,7 @@ using System.Reflection;
 namespace GameInterface.Registry.Auto;
 public interface IAutoRegistryFactory : IDisposable
 {
-    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<AutoRegistry<T>> registerAll, AutoRegistryCallbacks<T> callbacks) where T : class;
+    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<IObjectManager> registerAll, AutoRegistryCallbacks<T> callbacks) where T : class;
 
     void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class;
 }
@@ -61,16 +61,16 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     public bool TryRegisterType<T>(
         IEnumerable<MethodBase> ctrosToPatch,
         IEnumerable<MethodBase> destroyMethods,
-        Action<AutoRegistry<T>> registerAll,
+        Action<IObjectManager> registerAll,
         AutoRegistryCallbacks<T> callbacks
     ) where T : class
     {
         ValidateConstructorTypes(ctrosToPatch, typeof(T));
-        ValidateConstructorTypes(destroyMethods, typeof(T));
 
         TypeMapper.AddTypes(new Type[] { typeof(NetworkCreateInstance<T>) });
+        TypeMapper.AddTypes(new Type[] { typeof(NetworkDestroyInstance<T>) });
 
-        var registry = new AutoRegistry<T>(registerAll, Collection);
+        var registry = new AutoRegistry<T>(registerAll, Collection, ObjectManager);
         var handler = new AutoRegistryHandler<T>(
             registry,
             MessageBroker,
@@ -81,14 +81,14 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
 
         foreach (var ctor in ctrosToPatch)
         {
-            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.CreatePrefix));
+            var patch = AccessTools.Method(typeof(LifetimePatches<T>), nameof(LifetimePatches<T>.CreatePrefix));
 
             SyncPatchCollector.AddPrefix(ctor, patch);
         }
 
         foreach (var destroy in destroyMethods)
         {
-            var patch = AccessTools.Method(typeof(LifetimePatches), nameof(LifetimePatches.DestroyPrefix));
+            var patch = AccessTools.Method(typeof(LifetimePatches<T>), nameof(LifetimePatches<T>.DestroyPrefix));
 
             SyncPatchCollector.AddPrefix(destroy, patch);
         }

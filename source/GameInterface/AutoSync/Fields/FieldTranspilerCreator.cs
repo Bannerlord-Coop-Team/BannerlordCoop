@@ -24,14 +24,12 @@ public class FieldTranspilerCreator
 
     private readonly FieldBuilder loggerField;
     private readonly MethodInfo logErrorFn;
-    private readonly IObjectManager objectManager;
     private readonly Dictionary<FieldInfo, MethodInfo> interceptMap;
 
     public TypeInfo NestedEnumeratorType { get; }
 
-    public FieldTranspilerCreator(IObjectManager objectManager, ModuleBuilder moduleBuilder, Type type, int typeId, FieldInfo[] interceptFields, Dictionary<FieldInfo, MethodInfo> interceptMap)
+    public FieldTranspilerCreator(ModuleBuilder moduleBuilder, Type type, int typeId, FieldInfo[] interceptFields, Dictionary<FieldInfo, MethodInfo> interceptMap)
     {
-        this.objectManager = objectManager;
         this.interceptMap = interceptMap;
 
         typeBuilder = moduleBuilder.DefineType($"{type.Name}_Transpilers",
@@ -361,15 +359,9 @@ public class FieldTranspilerCreator
             {
                 fieldIntercept = CreateInterceptByValue(typeId, i, interceptFields[i]);
             }
-            else if (objectManager.IsTypeManaged(interceptFields[i].FieldType))
-            {
-                fieldIntercept = CreateInterceptByRef(typeId, i, interceptFields[i]);
-            }
             else
             {
-                throw new NotSupportedException(
-                    $"{interceptFields[i].FieldType} is not serializable or managed by the {nameof(IObjectManager)}. " +
-                    $"Create a registry for this type or make this type serializable using a surrogate");
+                fieldIntercept = CreateInterceptByRef(typeId, i, interceptFields[i]);
             }
 
             interceptMap.Add(interceptFields[i], fieldIntercept);
@@ -623,7 +615,7 @@ public class FieldTranspilerCreator
         il.Emit(OpCodes.Ldloca, idLocal);
 
         // Try resolve instance id
-        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetId)).MakeGenericMethod(objType));
+        il.Emit(OpCodes.Callvirt, AccessTools.Method(typeof(IObjectManager), nameof(IObjectManager.TryGetId)));
         il.Emit(OpCodes.Brtrue, validLabel);
 
         // Log error

@@ -20,12 +20,10 @@ public class PropertySwitchCreator
     private readonly FieldBuilder objectManagerField;
     private readonly FieldBuilder loggerField;
     private readonly Type instanceType;
-    private readonly IObjectManager objectManager;
 
-    public PropertySwitchCreator(ModuleBuilder moduleBuilder, Type type, IObjectManager objectManager)
+    public PropertySwitchCreator(ModuleBuilder moduleBuilder, Type type)
     {
         instanceType = type;
-        this.objectManager = objectManager;
         typeBuilder = moduleBuilder.DefineType($"PropertySwitcher_{type.Name}",
                 TypeAttributes.Public |
                 TypeAttributes.Class |
@@ -130,12 +128,8 @@ public class PropertySwitchCreator
 
             if (RuntimeTypeModel.Default.CanSerialize(properties[i].PropertyType))
                 CreateByValue(il, properties[i], instanceLocal);
-            else if (objectManager.IsTypeManaged(properties[i].PropertyType))
-                CreateByRef(il, properties[i], instanceLocal);
             else
-                throw new NotSupportedException(
-                    $"{properties[i].PropertyType.Name} is not serializable and not managed by the object manager. " +
-                    $"Either manage the type using the object manager or make this type serializable");
+                CreateByRef(il, properties[i], instanceLocal);
         }
 
         il.MarkLabel(retLabel);

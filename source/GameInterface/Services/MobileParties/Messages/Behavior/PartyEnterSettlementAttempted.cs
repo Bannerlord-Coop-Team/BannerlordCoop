@@ -1,5 +1,7 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Messages.Behavior;
 
@@ -7,14 +9,14 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 /// Triggered when a party attempts to enter a settlement
 /// </summary>
 [BatchLogMessage]
-public record PartyEnterSettlementAttempted : IEvent
+public readonly struct PartyEnterSettlementAttempted : IEvent
 {
-    public string SettlementId { get; }
-    public string PartyId { get; }
+    public readonly Settlement Settlement;
+    public readonly MobileParty MobileParty;
 
-    public PartyEnterSettlementAttempted(string settlementId, string partyId)
+    public PartyEnterSettlementAttempted(Settlement settlement, MobileParty mobileParty)
     {
-        SettlementId = settlementId;
-        PartyId = partyId;
+        Settlement = settlement;
+        MobileParty = mobileParty;
     }
 }

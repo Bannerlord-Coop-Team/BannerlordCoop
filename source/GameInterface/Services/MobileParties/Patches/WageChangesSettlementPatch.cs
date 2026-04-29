@@ -60,7 +60,7 @@ internal class WageChangesSettlementPatch
 
         // This event doesn't exist and should be a IResponse from the server, there will also need to be a network message
 
-        var message = new ChangedWagePaymentLimit(instance.StringId, newValue);
+        var message = new ChangedWagePaymentLimit(instance, newValue);
         MessageBroker.Instance.Publish(instance, message);
 
     }

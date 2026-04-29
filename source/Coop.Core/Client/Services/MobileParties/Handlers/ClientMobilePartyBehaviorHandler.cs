@@ -5,6 +5,7 @@ using Coop.Core.Server.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Packets;
 using GameInterface.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.ObjectManager;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers
 {
@@ -17,11 +18,13 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
+        private readonly IObjectManager objectManager;
 
-        public ClientMobilePartyBehaviorHandler(IMessageBroker messageBroker, INetwork network)
+        public ClientMobilePartyBehaviorHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
             this.network = network;
+            this.objectManager = objectManager;
             messageBroker.Subscribe<ControlledPartyBehaviorUpdated>(Handle);
 
             // client who requests it
@@ -48,7 +51,10 @@ namespace Coop.Core.Client.Services.MobileParties.Handlers
         private void HandleChangedWagePaymentLimit(MessagePayload<ChangedWagePaymentLimit> payload)
         {
             var obj = payload.What;
-            var message = new NetworkChangeWagePaymentLimitRequest(obj.MobilePartyId, obj.WageAmount);
+
+            if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId)) return;
+
+            var message = new NetworkChangeWagePaymentLimitRequest(mobilePartyId, obj.WageAmount);
             network.SendAll(message);
         }
 

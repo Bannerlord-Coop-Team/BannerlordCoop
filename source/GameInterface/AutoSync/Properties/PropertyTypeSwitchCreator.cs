@@ -18,9 +18,8 @@ internal class PropertyTypeSwitchCreator
 {
     private readonly TypeBuilder typeBuilder;
     private readonly ModuleBuilder moduleBuilder;
-    private readonly IObjectManager objectManager;
 
-    public PropertyTypeSwitchCreator(ModuleBuilder moduleBuilder, IObjectManager objectManager)
+    public PropertyTypeSwitchCreator(ModuleBuilder moduleBuilder)
     {
         typeBuilder = moduleBuilder.DefineType("PropertyTypeSwitcher",
                 TypeAttributes.Public |
@@ -33,7 +32,6 @@ internal class PropertyTypeSwitchCreator
                 new Type[] { typeof(IPropertyTypeSwitcher) });
 
         this.moduleBuilder = moduleBuilder;
-        this.objectManager = objectManager;
     }
 
     private MethodBuilder CreateSwitch(Dictionary<Type, List<PropertyInfo>> propertyMap)
@@ -93,7 +91,7 @@ internal class PropertyTypeSwitchCreator
 
         foreach (var type in types)
         {
-            var propertySwitchBuilder = new PropertySwitchCreator(moduleBuilder, type, objectManager);
+            var propertySwitchBuilder = new PropertySwitchCreator(moduleBuilder, type);
             var propertySwitchType = propertySwitchBuilder.Build(propertyMap[type].ToArray());
 
             var propertySwitchField = typeBuilder.DefineField(propertySwitchType.Name, propertySwitchType, FieldAttributes.Private | FieldAttributes.InitOnly);

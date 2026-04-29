@@ -1,8 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.Armies.Data;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 
 namespace GameInterface.Services.Armies.Messages.Lifetime;

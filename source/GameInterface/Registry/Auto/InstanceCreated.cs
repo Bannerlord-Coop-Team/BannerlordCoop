@@ -3,7 +3,7 @@ using System;
 using System.Runtime.CompilerServices;
 
 namespace GameInterface.Registry.Auto;
-class InstanceCreated<T> : IEvent where T : class
+class InstanceCreated<T> : IEvent
 {
     public T Instance { get; }
 

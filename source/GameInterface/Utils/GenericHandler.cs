@@ -36,7 +36,9 @@ namespace GameInterface.Utils
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-                if (!TryGetId<TInstance>(data.Instance, out string instanceId)) return;
+
+                if (!objectManager.TryGetIdWithLogging(data.Instance, out string instanceId)) return;
+
                 messageHandler(instanceId, data);
             };
             messageBroker.Subscribe(payloadHandler);
@@ -52,8 +54,11 @@ namespace GameInterface.Utils
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-                if (!TryGetId<TInstance>(data.Instance, out string instanceId)) return;
-                if (!TryGetId<TValue>(data.Value, out string valueId) && data.Value != null) return;
+                if (!objectManager.TryGetIdWithLogging(data.Instance, out string instanceId)) return;
+
+                string valueId = null;
+                if (data.Value != null && !objectManager.TryGetIdWithLogging(data.Value, out valueId)) return;
+
                 network.SendAll((TNetworkMessage)ctor.Invoke(new object[] { instanceId, valueId }));
             };
             messageBroker.Subscribe(payloadHandler);
@@ -66,7 +71,7 @@ namespace GameInterface.Utils
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-                if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
+                if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
                 AllowedThread.AllowThisThread();
                 messageHandler(instance, data);
                 AllowedThread.RevokeThisThread();
@@ -81,28 +86,18 @@ namespace GameInterface.Utils
             Action<MessagePayload<TMessage>> payloadHandler = (payload) =>
             {
                 var data = payload.What;
-                if (!objectManager.TryGetObject(data.InstanceId, out TInstance instance)) return;
-                if (!objectManager.TryGetObject(data.ValueId, out TValue value) && data.ValueId != null) return;
-                AllowedThread.AllowThisThread();
-                messageHandler(instance, value, data);
-                AllowedThread.RevokeThisThread();
+                if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
+
+                TValue value = null;
+                if (data.ValueId != null && !objectManager.TryGetObjectWithLogging(data.ValueId, out value)) return;
+
+                using (new AllowedThread())
+                {
+                    messageHandler(instance, value, data);
+                }
             };
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
-        }
-
-
-        protected bool TryGetId<T>(T value, out string id)
-        {
-            id = null;
-            if (value == null) return false;
-
-            if (!objectManager.TryGetId(value, out id))
-            {
-                Logger.Error("Unable to get ID for instance of type {type}", value.GetType());
-                return false;
-            }
-            return true;
         }
 
         public void Dispose()

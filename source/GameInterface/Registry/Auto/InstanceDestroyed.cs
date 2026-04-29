@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 
 namespace GameInterface.Registry.Auto;
-class InstanceDestroyed<T> : IEvent where T : class
+class InstanceDestroyed<T> : IEvent
 {
     public T Instance { get; }
 

@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -24,11 +25,11 @@ internal class TraitObjectRegistry : IAutoRegistry<TraitObject>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<TraitObject> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (TraitObject trait in TraitObject.All)
         {
-            registry.RegisterExistingObject(trait.StringId, trait);
+            objectManager.AddExisting(trait.StringId, trait);
         }
     }
 

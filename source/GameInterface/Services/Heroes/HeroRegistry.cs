@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.ObjectManager.Extensions;
 using HarmonyLib;
 using Serilog;
@@ -36,16 +37,16 @@ internal class HeroRegistry : IAutoRegistry<Hero>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<Hero> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var hero in Hero.AllAliveHeroes)
         {
-            registry.RegisterExistingObject(hero.StringId, hero);
+            objectManager.AddExisting(hero.StringId, hero);
         }
 
         foreach (var hero in Hero.DeadOrDisabledHeroes)
         {
-            registry.RegisterExistingObject(hero.StringId, hero);
+            objectManager.AddExisting(hero.StringId, hero);
         }
     }
 

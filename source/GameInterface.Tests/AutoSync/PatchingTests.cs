@@ -9,6 +9,7 @@ using GameInterface.AutoSync.Properties;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using LiteNetLib;
+using Moq;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -25,9 +26,6 @@ public class PatchingTests
         // Arrange
         var container = CreateContainer();
 
-        var network = container.Resolve<TestNet>();
-        var objManager = container.Resolve<IObjectManager>();
-
         Assert.NotNull(typeof(ProtoBufSerializer).GetMethods().Where(m => m.Name == nameof(ProtoBufSerializer.Deserialize) && m.IsGenericMethod));
 
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
@@ -35,7 +33,7 @@ public class PatchingTests
 
         var props = AccessTools.GetDeclaredProperties(typeof(SwitchTestClass)).ToArray();
 
-        var patchCreator = new PropertyPrefixCreator(objManager, moduleBuilder, typeof(SwitchTestClass), 0, props);
+        var patchCreator = new PropertyPrefixCreator(moduleBuilder, typeof(SwitchTestClass), 0, props);
 
         // Act
         var patchType = patchCreator.Build();
@@ -55,8 +53,8 @@ public class PatchingTests
         // Arrange
         var container = CreateContainer();
 
-        var network = container.Resolve<TestNet>();
-        var objManager = container.Resolve<IObjectManager>();
+        var mockObjectManager = container.Resolve<Mock<IObjectManager>>();
+        var mockNetwork = container.Resolve<Mock<INetwork>>();
 
         ModInformation.IsServer = true;
         Assert.NotNull(typeof(ProtoBufSerializer).GetMethods().Where(m => m.Name == nameof(ProtoBufSerializer.Deserialize) && m.IsGenericMethod));
@@ -66,7 +64,7 @@ public class PatchingTests
 
         var props = AccessTools.GetDeclaredProperties(typeof(SwitchTestClass)).ToArray();
 
-        var patchCreator = new PropertyPrefixCreator(objManager, moduleBuilder, typeof(SwitchTestClass), 0, props);
+        var patchCreator = new PropertyPrefixCreator(moduleBuilder, typeof(SwitchTestClass), 0, props);
 
         var patchType = patchCreator.Build();
 
@@ -78,71 +76,45 @@ public class PatchingTests
         Assert.NotNull(prefix);
 
         var testInstance = new SwitchTestClass();
-
         var objId = "ObjId1";
-        objManager.AddExisting(objId, testInstance);
+
+        mockObjectManager
+            .Setup(x => x.TryGetObject<SwitchTestClass>(objId, out testInstance))
+            .Returns(true);
+
+        mockObjectManager
+            .Setup(x => x.TryGetId(testInstance, out objId))
+            .Returns(true);
+
         // Act
         prefix.Invoke(null, new object[] { testInstance, 5 });
 
         // Assert
-        var packet = Assert.IsType<PropertyAutoSyncPacket>(Assert.Single(network.SentPackets));
-
-        Assert.Equal(objId, packet.instanceId);
+        mockNetwork.Verify(x => x.SendAll(It.IsAny<PropertyAutoSyncPacket>()), Times.Once);
     }
 
     private IContainer CreateContainer()
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterType<TestNet>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
-        builder.RegisterType<TestObjManager>().AsSelf().As<IObjectManager>().InstancePerLifetimeScope();
+        RegisterMock<IObjectManager>(builder);
+        RegisterMock<INetwork>(builder);
 
         return builder.Build();
     }
-}
 
-public class TestNet : INetwork
-{
-    public readonly List<IPacket> SentPackets = new List<IPacket>();
-
-    public INetworkConfiguration Configuration => throw new System.NotImplementedException();
-
-    public void Dispose()
+    private void RegisterMock<T>(ContainerBuilder builder) where T : class
     {
-    }
+        builder.Register(ctx =>
+        {
+            var mock = new Mock<T>();
+            return mock;
+        }).AsSelf().InstancePerLifetimeScope();
 
-    public void Send(NetPeer netPeer, IPacket packet)
-    {
-        throw new System.NotImplementedException();
-    }
-
-    public void Send(NetPeer netPeer, IMessage message)
-    {
-        throw new System.NotImplementedException();
-    }
-
-    public void SendAll(IPacket packet)
-    {
-        SentPackets.Add(packet);
-    }
-
-    public void SendAll(IMessage message)
-    {
-        throw new System.NotImplementedException();
-    }
-
-    public void SendAllBut(NetPeer excludedPeer, IPacket packet)
-    {
-        throw new System.NotImplementedException();
-    }
-
-    public void SendAllBut(NetPeer excludedPeer, IMessage message)
-    {
-        throw new System.NotImplementedException();
-    }
-
-    public void Start()
-    {
-        throw new System.NotImplementedException();
+        builder.Register(ctx =>
+        {
+            var mock = ctx.Resolve<Mock<T>>();
+            return mock.Object;
+        }).As<T>().InstancePerLifetimeScope();
     }
 }

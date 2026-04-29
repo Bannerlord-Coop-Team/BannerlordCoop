@@ -53,14 +53,8 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
     IEnumerator IEnumerable.GetEnumerator() => Objects.GetEnumerator();
 
     /// <inheritdoc cref="IRegistry"/>
-    public virtual bool RegisterExistingObject(string id, object obj)
+    public virtual bool RegisterExistingObject(string id, T obj)
     {
-        if (TryCast(obj, out var castedObj) == false) {
-            LogObjectRegistration(obj);
-            Logger.Warning("Failed to cast {type} to {castType}", obj.GetType(), typeof(T));
-            return false;
-        }
-
         if (idObjs.ContainsKey(id))
         {
             LogObjectRegistration(obj);
@@ -68,24 +62,21 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
             return false;
         }
 
-        idObjs.Add(id, castedObj);
-        objsIds.Add(castedObj, id);
+        idObjs.Add(id, obj);
+        objsIds.Add(obj, id);
 
         return true;
     }
 
-    public virtual bool RegisterNewObject(object obj, out string id)
+    public virtual bool RegisterNewObject(T obj, out string id)
     {
         id = null;
 
-        if (TryCast(obj, out T castedObj) == false)
-        {
-            LogObjectRegistration(obj);
-            Logger.Warning("Failed to cast {type} to {castType}", obj.GetType(), typeof(T));
-            return false;
-        }
+        var newId = GetNewId(obj);
 
-        var newId = GetNewId(castedObj);
+        var callstack = Environment.StackTrace;
+
+        ;
 
         if (idObjs.ContainsKey(newId))
         {
@@ -94,15 +85,15 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
             return false;
         }
 
-        if (objsIds.TryGetValue(castedObj, out var outvar))
+        if (objsIds.TryGetValue(obj, out var outvar))
         {
             LogObjectRegistration(obj);
             Logger.Warning("object was already registered for type ({type})", newId, obj.GetType());
             return false;
         }
 
-        idObjs.Add(newId, castedObj);
-        objsIds.Add(castedObj, newId);
+        idObjs.Add(newId, obj);
+        objsIds.Add(obj, newId);
 
         id = newId;
 
@@ -134,12 +125,12 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
         return objsIds.TryGetValue(castedObj, out id);
     }
 
-    public virtual bool TryGetValue<T1>(string id, out T1 obj) where T1 : class
+    public virtual bool TryGetValue(string id, out T obj)
     {
         obj = null;
         if (idObjs.TryGetValue(id, out var internalobj) == false) return false;
 
-        obj = internalobj as T1;
+        obj = internalobj;
         return obj != null;
     }
 

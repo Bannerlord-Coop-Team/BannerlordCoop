@@ -1,72 +1,73 @@
-﻿//using Common;
-//using GameInterface.Registry.Auto;
-//using HarmonyLib;
-//using Helpers;
-//using Serilog;
-//using System;
-//using System.Collections.Generic;
-//using System.Linq;
-//using System.Reflection;
-//using TaleWorlds.CampaignSystem;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Helpers;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using TaleWorlds.CampaignSystem;
 
-//namespace GameInterface.Services.StanceLinks;
+namespace GameInterface.Services.StanceLinks;
 
-///// <summary>
-///// Registry for <see cref="StanceLink"/> type
-///// </summary>
-//internal class StanceLinkRegistry : IAutoRegistry<StanceLink>
-//{
-//    ILogger Logger { get; }
-//    public StanceLinkRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
-//    {
-//        Logger = logger;
-         
-//        autoRegistryFactory.RegisterType(this);
-//    }
+/// <summary>
+/// Registry for <see cref="StanceLink"/> type
+/// </summary>
+internal class StanceLinkRegistry : IAutoRegistry<StanceLink>
+{
+    ILogger Logger { get; }
+    public StanceLinkRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    {
+        Logger = logger;
 
-//    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(StanceLink));
+        autoRegistryFactory.RegisterType(this);
+    }
 
-//    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(StanceLink));
 
-//    public void RegisterAllObjects(IRegistry<StanceLink> registry)
-//    {
-//        IEnumerable<IFaction> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
-//        IEnumerable<IFaction> clans = Campaign.Current?.Clans ?? Enumerable.Empty<Clan>();
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-//        var factions = kingdoms.Concat(clans);
+    public void RegisterAllObjects(IObjectManager objectManager)
+    {
+        IEnumerable<IFaction> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
+        IEnumerable<IFaction> clans = Campaign.Current?.Clans ?? Enumerable.Empty<Clan>();
 
-//        HashSet<StanceLink> visitedStances = new();
+        var factions = kingdoms.Concat(clans);
 
-//        foreach (var faction in factions)
-//        {
+        HashSet<StanceLink> visitedStances = new();
 
-//            int counter = 1;
+        foreach (var faction in factions)
+        {
 
-//            foreach (var stance in FactionHelper.GetStances(faction))
-//            {
-//                if (visitedStances.Contains(stance)) continue;
+            int counter = 1;
 
-//                var networkId = $"{nameof(StanceLink)}_{faction.StringId}_{counter++}";
-//                registry.RegisterExistingObject(networkId, stance);
+            foreach (var stance in FactionHelper.GetStances(faction))
+            {
+                if (visitedStances.Contains(stance)) continue;
 
-//                visitedStances.Add(stance);
-//            }
-//        }
-//    }
+                var networkId = $"{nameof(StanceLink)}_{faction.StringId}_{counter++}";
+                objectManager.AddExisting(networkId, stance);
 
-//    public void OnClientCreated(StanceLink obj, string id)
-//    {
-//    }
+                visitedStances.Add(stance);
+            }
+        }
+    }
 
-//    public void OnClientDestroyed(StanceLink obj, string id)
-//    {
-//    }
+    public void OnClientCreated(StanceLink obj, string id)
+    {
+    }
 
-//    public void OnServerCreated(StanceLink obj, string id)
-//    {
-//    }
+    public void OnClientDestroyed(StanceLink obj, string id)
+    {
+    }
 
-//    public void OnServerDestroyed(StanceLink obj, string id)
-//    {
-//    }
-//}
+    public void OnServerCreated(StanceLink obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(StanceLink obj, string id)
+    {
+    }
+}

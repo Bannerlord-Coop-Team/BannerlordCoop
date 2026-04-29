@@ -98,7 +98,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         ObjectManager.Remove(payload.What.Instance);
 
-        Network.SendAll(new NetworkCreateInstance<T>(id));
+        Network.SendAll(new NetworkDestroyInstance<T>(id));
     }
 
     private void Handle_NetworkDestroyInstance(MessagePayload<NetworkDestroyInstance<T>> payload)

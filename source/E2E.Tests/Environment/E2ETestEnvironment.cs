@@ -35,10 +35,12 @@ internal class E2ETestEnvironment : IDisposable
 
     private Dictionary<Type, List<string>> StringIdListMappings = new();
 
+    private readonly SemaphoreSlim disposeSemiphore = new(1, 1);
+    private bool disposed = false;
+
     public E2ETestEnvironment(ITestOutputHelper output, int numClients = 2)
     {
         TestOutputCallback = (logMessage) => output.WriteLine(logMessage);
-
 
         // Setup logging for tests
         OutputSinkManager.AddLogCallback(TestOutputCallback);
@@ -46,7 +48,6 @@ internal class E2ETestEnvironment : IDisposable
         GameLoopRunner.Instance.SetGameLoopThread();
 
         GameBootStrap.Initialize();
-
 
         IntegrationEnvironment = new TestEnvironment(output, numClients, registerGameInterface: true);
 
@@ -57,7 +58,6 @@ internal class E2ETestEnvironment : IDisposable
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
-        Server.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
         SetupDynamicSync();
 
@@ -65,20 +65,30 @@ internal class E2ETestEnvironment : IDisposable
         {
             Server.ObjectManager.AddExisting(settlement.StringId, settlement);
         }
-
     }
 
     public void Dispose()
     {
-        Server.Dispose();
-
-        foreach (var client in Clients)
+        disposeSemiphore.Wait();
+        try
         {
-            client.Dispose();
-        }
+            if (disposed) return;
+            disposed = true;
 
-        OutputSinkManager.RemoveLogCallback(TestOutputCallback);
-        ContainerProvider.Clear();
+            Server.Dispose();
+
+            foreach (var client in Clients)
+            {
+                client.Dispose();
+            }
+
+            OutputSinkManager.RemoveLogCallback(TestOutputCallback);
+            ContainerProvider.Clear();
+        }
+        finally
+        {
+            disposeSemiphore.Release();
+        }
     }
 
     private void SetupAutoSync()
@@ -199,7 +209,7 @@ internal class E2ETestEnvironment : IDisposable
         // Handle ReflectedType mismatch: e.g. Town.GarrisonPartyComponent registered under Fief.GarrisonPartyComponent
         if (field.DeclaringType != null && field.DeclaringType != field.ReflectedType)
         {
-            var declaringField = field.DeclaringType.GetField(field.Name, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            var declaringField = field.DeclaringType.GetField(field.Name, BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
             if (declaringField != null && GenericPatchHelpers.FieldInterceptCache.TryGetValue(declaringField, out intercept))
                 return intercept;
         }
@@ -897,22 +907,22 @@ internal class E2ETestEnvironment : IDisposable
     /// <typeparam name="TInstance">Type of instance that is tested</typeparam>
     /// <typeparam name="TProperty">Type of the property that is tested</typeparam>
     /// <param name="propertyName">Name of the property to be verified</param>
-    /// <param name="value">Value to use for assertions has to be of type <typeparamref name="TProperty"/></param>
+    /// <param name="serverValue">Value to use for assertions has to be of type <typeparamref name="TProperty"/></param>
     /// <param name="defaultValue">Defaultvalue of the property if its preinitialized by Taleworlds. Has to be of type <typeparamref name="TProperty"/></param>
     /// <param name="instanceStringId">The specific stringId of the instance to be tested defaults to the first registered instance <typeparamref name="TInstance"/></param>
-    public void AssertProperty<TInstance, TProperty>(string propertyName, TProperty value, TProperty? defaultValue = default, string? instanceStringId = null)
+    public void AssertProperty<TInstance, TProperty>(string propertyName, TProperty serverValue, TProperty? defaultValue = default, string? instanceStringId = null)
         where TInstance : class
     {
         bool isTextObject = typeof(TProperty) == typeof(TextObject);
         // Assert.True(typeof(TProperty).IsValueType || typeof(TProperty) == typeof(string) || typeof(TProperty) == typeof(TextObject));
         var propertyInfo = AccessTools.Property(typeof(TInstance), propertyName);
         string instanceId = instanceStringId ?? StringIdListMappings[typeof(TInstance)][0];
-        Server.Call((Action)(() =>
+        Server.Call(() =>
         {
             var defaultVal = (defaultValue ?? propertyInfo.GetUnderlyingType().GetDefaultValue());
             Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
             var serverVal = propertyInfo.GetValue(serverInstance);
-            if(serverVal == null)
+            if (serverVal == null)
             {
                 Assert.Null(defaultVal);
             }
@@ -921,23 +931,25 @@ internal class E2ETestEnvironment : IDisposable
             else if ((typeof(TProperty).IsValueType || typeof(TProperty) == typeof(string)) && typeof(TProperty) != typeof(CampaignTime))
                 Assert.True(serverVal.Equals(defaultVal), $"Expected: {defaultVal} Actual: {serverVal}");
             else
-                Assert.True(JsonConvert.SerializeObject(serverVal).Equals(JsonConvert.SerializeObject(defaultVal)), $"Expected: {JsonConvert.SerializeObject(value)} Actual: {JsonConvert.SerializeObject(defaultVal)}");
-            propertyInfo.SetValue(serverInstance,value);
-        }));
+                Assert.True(JsonConvert.SerializeObject(serverVal).Equals(JsonConvert.SerializeObject(defaultVal)), $"Expected: {JsonConvert.SerializeObject(serverValue)} Actual: {JsonConvert.SerializeObject(defaultVal)}");
+            propertyInfo.SetValue(serverInstance, serverValue);
+        });
 
         // Assert
         foreach (var client in Clients)
         {
             Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
             var clientValue = propertyInfo.GetValue(clientInstance);
-            if (isTextObject && value is TextObject)
-                Assert.True((value as TextObject).Equals(clientValue as TextObject), $"Expected: {value} Actual: {clientValue}");
+            if (serverValue is TextObject serverTextObject && clientValue is TextObject clientTextObject)
+                Assert.Equal(serverTextObject.Value, clientTextObject.Value);
             else if ((typeof(TProperty).IsValueType || typeof(TProperty) == typeof(string)) && typeof(TProperty) != typeof(CampaignTime))
-                Assert.True(value.Equals(clientValue), $"Expected: {value} Actual: {clientValue}");
+                Assert.Equal(serverValue, clientValue);
             else
-                Assert.True(JsonConvert.SerializeObject(value).Equals(JsonConvert.SerializeObject(clientValue)), $"Expected: {JsonConvert.SerializeObject(value)} Actual: {JsonConvert.SerializeObject(clientValue)}");
+                Assert.Equal(JsonConvert.SerializeObject(serverValue), JsonConvert.SerializeObject(clientValue));
         }
     }
+
+
 
     /// <summary>
     /// Assert if the given property with a ReferenceType is properly synced between server and clients
@@ -973,6 +985,131 @@ internal class E2ETestEnvironment : IDisposable
             Assert.True(client.ObjectManager.TryGetObject<TProperty>(referenceId, out var clientPropertyInstance));
             Assert.Same(clientPropertyInstance, propertyInfo.GetValue(clientInstance));
             Assert.NotNull(clientPropertyInstance);
+        }
+    }
+
+    public AssertHelper<TInstance> CreateAssertHelper<TInstance>(string instanceId) where TInstance : class
+    {
+        return new AssertHelper<TInstance>(this, instanceId);
+    }
+
+    public class AssertHelper<TInstance> where TInstance : class
+    {
+        private readonly IEnumerable<EnvironmentInstance> Clients;
+        private readonly EnvironmentInstance Server;
+        private readonly E2ETestEnvironment testEnvironment;
+        private readonly string instanceId;
+
+        internal AssertHelper(E2ETestEnvironment testEnvironment, string instanceId)
+        {
+            Clients = testEnvironment.Clients;
+            Server = testEnvironment.Server;
+            this.testEnvironment = testEnvironment;
+            this.instanceId = instanceId;
+        }
+
+        public void AssertProperty<TDeclaring, TValue>(string propertyName, TValue expectedValue)
+        {
+            var propertyInfo = AccessTools.Property(typeof(TDeclaring), propertyName);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+
+                propertyInfo.SetValue(serverInstance, expectedValue);
+
+                Assert.Equal(expectedValue, propertyInfo.GetValue(serverInstance));
+            });
+
+            // Assert
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                Assert.Equal(expectedValue, propertyInfo.GetValue(clientInstance));
+            }
+        }
+
+        public MethodInfo GetIntercept(FieldInfo fieldInfo)
+        {
+            if (GenericPatchHelpers.FieldInterceptCache.TryGetValue(fieldInfo, out var intercept))
+                return intercept;
+
+            Assert.Fail($"Failed to find intercept for {fieldInfo.Name}");
+            return null;
+        }
+
+        public void AssertField<TDeclaring, TValue>(string fieldName, TValue expectedValue)
+        {
+            var fieldInfo = AccessTools.Field(typeof(TDeclaring), fieldName);
+            var intercept = GetIntercept(fieldInfo);
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+
+                intercept.Invoke(null, new object[] { serverInstance, expectedValue });
+
+                Assert.Equal(expectedValue, fieldInfo.GetValue(serverInstance));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                Assert.Equal(expectedValue, fieldInfo.GetValue(clientInstance));
+            }
+        }
+
+        public void AssertReferenceField<TDeclaring, TReference>(string fieldName) where TReference : class
+        {
+            var expectedId = testEnvironment.CreateRegisteredObject<TReference>();
+
+            var fieldInfo = AccessTools.Field(typeof(TDeclaring), fieldName);
+            var intercept = GetIntercept(fieldInfo);
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+                Assert.True(Server.ObjectManager.TryGetObject<TReference>(expectedId, out var serverValue));
+
+                intercept.Invoke(null, new object[] { serverInstance, serverValue });
+
+                Assert.Same(serverValue, fieldInfo.GetValue(serverInstance));
+                Assert.NotNull(serverInstance);
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                Assert.True(client.ObjectManager.TryGetObject<TReference>(expectedId, out var clientReference));
+
+                Assert.Same(clientReference, fieldInfo.GetValue(clientInstance));
+                Assert.NotNull(clientReference);
+            }
+        }
+
+        public void AssertReferenceProperty<TDeclaring, TReference>(string propertyName) where TReference : class
+        {
+            var expectedId = testEnvironment.CreateRegisteredObject<TReference>();
+
+            var propertyInfo = AccessTools.Property(typeof(TDeclaring), propertyName);
+
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+                Assert.True(Server.ObjectManager.TryGetObject<TReference>(expectedId, out var serverValue));
+
+                propertyInfo.SetValue(serverInstance, serverValue);
+
+                Assert.Same(serverValue, propertyInfo.GetValue(serverInstance));
+                Assert.NotNull(serverInstance);
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                Assert.True(client.ObjectManager.TryGetObject<TReference>(expectedId, out var clientReference));
+
+                Assert.Same(clientReference, propertyInfo.GetValue(clientInstance));
+                Assert.NotNull(clientReference);
+            }
         }
     }
 }

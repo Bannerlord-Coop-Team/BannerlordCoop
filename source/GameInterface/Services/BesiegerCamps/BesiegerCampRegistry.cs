@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -29,11 +30,11 @@ internal class BesiegerCampRegistry : IAutoRegistry<BesiegerCamp>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<BesiegerCamp> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var camp in Campaign.Current.SiegeEventManager.SiegeEvents.Select(siegeEvent => siegeEvent.BesiegerCamp))
         {
-            if (registry.RegisterNewObject(camp, out _) == false) Logger.Error($"Unable to register {camp}");
+            if (objectManager.AddNewObject(camp, out _) == false) Logger.Error($"Unable to register {camp}");
         }
     }
 

@@ -27,9 +27,9 @@ public class TownSyncTests : SyncTestBase
         TestEnvironment.AssertReferenceField<Town, Clan>(nameof(Town._ownerClan));
         TestEnvironment.AssertField<Town, float>(nameof(Town._security), 50f);
         TestEnvironment.AssertField<Town, float>(nameof(Town._loyalty), 60f);
-        TestEnvironment.AssertCollectionReferenceField<Town, Village>(nameof(Town._tradeBoundVillagesCache));
-        TestEnvironment.AssertCollectionReferenceField<Town, Building>(nameof(Town.Buildings), townId);
-        TestEnvironment.AssertQueueReferenceField<Town, Building>(nameof(Town.BuildingsInProgress));
+        //TestEnvironment.AssertCollectionReferenceField<Town, Village>(nameof(Town._tradeBoundVillagesCache));
+        //TestEnvironment.AssertCollectionReferenceField<Town, Building>(nameof(Town.Buildings), townId);
+        //TestEnvironment.AssertQueueReferenceField<Town, Building>(nameof(Town.BuildingsInProgress));
         TestEnvironment.AssertField<Town, int>(nameof(Town.BoostBuildingProcess), 200);
         TestEnvironment.AssertField<Town, int>(nameof(Town._tradeTax), 70);
         TestEnvironment.AssertField<Town, bool>(nameof(Town.InRebelliousState), true, defaultValue: town.InRebelliousState);

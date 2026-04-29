@@ -1,5 +1,6 @@
 ﻿using GameInterface.DynamicSync.Templates;
 using GameInterface.Services.ObjectManager;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -35,17 +36,17 @@ namespace GameInterface.DynamicSync.Builders
             string networkMessage;
             string networkAddMessage;
             string networkRemoveMessage;
-            if (objectManager.IsTypeManaged(GetElementType(propertyInfo.PropertyType)))
-            {
-                networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetReferenceMessageTemplate", templateData);
-                networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddReferenceMessageTemplate", templateData);
-                networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveReferenceMessageTemplate", templateData);
-            }
-            else
+            if (RuntimeTypeModel.Default.CanSerialize(GetElementType(propertyInfo.PropertyType)))
             {
                 networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetValueMessageTemplate", templateData);
                 networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddValueMessageTemplate", templateData);
                 networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveValueMessageTemplate", templateData);
+            }
+            else
+            {
+                networkMessage = TemplateParser.Parse("Messages.NetworkCollectionSetReferenceMessageTemplate", templateData);
+                networkAddMessage = TemplateParser.Parse("Messages.NetworkCollectionAddReferenceMessageTemplate", templateData);
+                networkRemoveMessage = TemplateParser.Parse("Messages.NetworkCollectionRemoveReferenceMessageTemplate", templateData);
             }
 
             DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -68,13 +69,13 @@ namespace GameInterface.DynamicSync.Builders
         public string GetSubscription(PropertyInfo propertyInfo)
         {
             var templateData = GetTemplateData(propertyInfo);
-            if (objectManager.IsTypeManaged(GetElementType(propertyInfo.PropertyType)))
+            if (RuntimeTypeModel.Default.CanSerialize(GetElementType(propertyInfo.PropertyType)))
             {
-                return TemplateParser.Parse("Handlers.SubscribeQueueReferenceTemplate", templateData);
+                return TemplateParser.Parse("Handlers.SubscribeQueueValueTemplate", templateData);
             }
             else
             {
-                return TemplateParser.Parse("Handlers.SubscribeQueueValueTemplate", templateData);
+                return TemplateParser.Parse("Handlers.SubscribeQueueReferenceTemplate", templateData);
             }
         }
 

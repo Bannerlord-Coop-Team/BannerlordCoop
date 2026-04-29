@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -26,12 +27,12 @@ internal class MBBodyPropertyRegistry : IAutoRegistry<MBBodyProperty>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<MBBodyProperty> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (CharacterObject character in CharacterObject.All.DistinctBy(c => c.BodyPropertyRange))
         {
             var networkId = nameof(MBBodyProperty) + "_" + character.StringId;
-            registry.RegisterExistingObject(networkId, character.BodyPropertyRange);
+            objectManager.AddExisting(networkId, character.BodyPropertyRange);
         }
     }
 

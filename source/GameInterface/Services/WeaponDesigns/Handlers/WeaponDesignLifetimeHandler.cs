@@ -2,7 +2,6 @@
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.ItemObjects.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.WeaponDesigns.Messages;
 using Serilog;

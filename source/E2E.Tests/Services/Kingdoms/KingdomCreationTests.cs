@@ -20,7 +20,7 @@ public class ArmyCreationTests : IDisposable
 
     [Fact]
     public void ServerCreateArmy_SyncAllClients()
-    {
+      {
         // Arrange
         var server = TestEnvironment.Server;
 
@@ -65,7 +65,6 @@ public class ArmyCreationTests : IDisposable
         {
             Assert.True(client1.ObjectManager.TryGetObject<Kingdom>(kingdomId, out var kingdom));
             Assert.True(client1.ObjectManager.TryGetObject<MobileParty>(partyId, out var mobileParty));
-
 
             var army = new Army(kingdom, mobileParty, Army.ArmyTypes.Patrolling);
 

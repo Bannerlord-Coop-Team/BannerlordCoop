@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.AutoSync;
 using GameInterface.Registry.Messages;
+using GameInterface.Services.ObjectManager;
 using System;
 
 namespace GameInterface.Registry.Handlers;

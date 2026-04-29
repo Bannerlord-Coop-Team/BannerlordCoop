@@ -5,14 +5,14 @@ using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Armies.Messages;
 
 /// <summary>
-/// Event for when a MobileParty is added to an Army
+/// Event for when a MobileParty is removed from an Army
 /// </summary>
-public readonly struct MobilePartyInArmyAdded : IEvent
+public readonly struct MobilePartyInArmyRemoved : IEvent
 {
     public readonly Army Army;
     public readonly MobileParty MobileParty;
 
-    public MobilePartyInArmyAdded(Army army, MobileParty mobileParty)
+    public MobilePartyInArmyRemoved(Army army, MobileParty mobileParty)
     {
         Army = army;
         MobileParty = mobileParty;

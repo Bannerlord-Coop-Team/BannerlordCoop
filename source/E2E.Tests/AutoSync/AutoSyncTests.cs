@@ -3,6 +3,7 @@ using E2E.Tests.Environment;
 using GameInterface.AutoSync;
 using GameInterface.AutoSync.Builders;
 using GameInterface.Registry;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Xunit.Abstractions;
 
@@ -35,9 +36,9 @@ public class AutoSyncTests : IDisposable
         {
             var testClass = new AutoSyncTestClass();
 
-            var registry = new AutoSyncTestClassRegistry(container.Resolve<IRegistryCollection>());
+            var objectManager = container.Resolve<IObjectManager>();
 
-            registry.RegisterExistingObject(instanceId, testClass);
+            objectManager.AddExisting(instanceId, testClass);
 
             var autosyncBuilder = container.Resolve<IAutoSyncBuilder>();
 

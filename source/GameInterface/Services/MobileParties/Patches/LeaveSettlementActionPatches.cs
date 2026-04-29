@@ -26,7 +26,7 @@ public class LeaveSettlementActionPatches
 
         if (ModInformation.IsClient) return false;
 
-        var message = new PartyLeaveSettlementAttempted(mobileParty.StringId);
+        var message = new PartyLeaveSettlementAttempted(mobileParty);
         MessageBroker.Instance.Publish(mobileParty, message);
 
         return false;

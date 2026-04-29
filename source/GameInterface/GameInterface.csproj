@@ -329,8 +329,6 @@
     <!--<Publicize Include="TaleWorlds.TwoDimension.Standalone"/>                                                             -->
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Services\Fiefs\Messages\" />
-    <Folder Include="Services\Fiefs\Patches\" />
     <Folder Include="Services\Kingdoms\Commands\" />
   </ItemGroup>
 </Project>
