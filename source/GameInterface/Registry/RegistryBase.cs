@@ -74,10 +74,6 @@ public abstract class RegistryBase<T> : IRegistry<T> where T : class
 
         var newId = GetNewId(obj);
 
-        var callstack = Environment.StackTrace;
-
-        ;
-
         if (idObjs.ContainsKey(newId))
         {
             LogObjectRegistration(obj);

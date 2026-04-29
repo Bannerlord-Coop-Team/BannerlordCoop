@@ -14,20 +14,6 @@ public class CaravanPartyComponentTests : SyncTestBase
 {
     public CaravanPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        var ctor = AccessTools.Constructor(
-        typeof(CaravanPartyComponent),
-        new[]
-        {
-            typeof(Settlement),
-            typeof(Hero),
-            typeof(Hero),
-            typeof(bool),
-            typeof(CaravanPartyComponent.InitializationArgs)
-        });
-
-        var patches = Harmony.GetPatchInfo(ctor);
-
-        ;
     }
 
     [Fact]

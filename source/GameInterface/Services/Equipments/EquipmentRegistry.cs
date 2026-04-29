@@ -13,8 +13,8 @@ namespace GameInterface.Services.Equipments;
 /// <summary>
 /// Registry for <see cref="Equipment"/> objects
 /// </summary>
-internal class EquipmentRegistry : IAutoRegistry<Equipment> {
-
+internal class EquipmentRegistry : IAutoRegistry<Equipment>
+{
     ILogger Logger { get; }
     public EquipmentRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
