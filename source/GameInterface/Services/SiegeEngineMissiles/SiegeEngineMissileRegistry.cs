@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -28,7 +29,7 @@ internal class SiegeEngineMissileRegistry : IAutoRegistry<SiegeEvent.SiegeEngine
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<SiegeEvent.SiegeEngineMissile> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
     }
 

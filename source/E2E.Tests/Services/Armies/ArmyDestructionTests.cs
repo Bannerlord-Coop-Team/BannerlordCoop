@@ -85,7 +85,6 @@ public class ArmyDestructionTests : IDisposable
             var kingdom = GameObjectCreator.CreateInitializedObject<Kingdom>();
             var mobileParty = GameObjectCreator.CreateInitializedObject<MobileParty>();
 
-
             var army = new Army(kingdom, mobileParty, Army.ArmyTypes.Patrolling);
 
             Assert.True(server.ObjectManager.TryGetId(army, out armyId));

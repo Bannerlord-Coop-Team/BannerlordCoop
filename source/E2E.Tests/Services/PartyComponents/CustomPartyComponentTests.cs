@@ -59,7 +59,8 @@ public class CustomPartyComponentTests : SyncTestBase
             var partyTemplate = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
 
             var newParty = CustomPartyComponent.CreateCustomPartyWithPartyTemplate(new CampaignVec2(new Vec2(5, 5), true), 5, spawnSettlement, name, clan, partyTemplate, hero);
-            partyId = newParty.StringId;
+
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
         });
 
 

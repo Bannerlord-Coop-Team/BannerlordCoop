@@ -2,6 +2,7 @@
 using Common.Util;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -29,11 +30,11 @@ internal class TownMarketDataRegistry : IAutoRegistry<TownMarketData>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<TownMarketData> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var town in Campaign.Current._towns)
         {
-            registry.RegisterExistingObject(town.StringId, town._marketData);
+            objectManager.AddExisting(town.StringId, town._marketData);
         }
     }
 

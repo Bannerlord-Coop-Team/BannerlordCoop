@@ -101,9 +101,9 @@ public class ArmyDebugCommand
 
         var tcs = new TaskCompletionSource<string>();
 
-        MessageBroker.Instance.Subscribe<ArmyCreated>((msg) =>
+        MessageBroker.Instance.Subscribe<InstanceCreated<Army>>((msg) =>
         {
-            if (objectManager.TryGetId(msg.What.Army, out var armyId) == false)
+            if (objectManager.TryGetId(msg.What.Instance, out var armyId) == false)
             {
                 tcs.SetResult(null);
                 return;

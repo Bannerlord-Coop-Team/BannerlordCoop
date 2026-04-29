@@ -140,7 +140,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
             }
         }
 
-        var typeSwitchCreator = new FieldTypeSwitchCreator(moduleBuilder, objectManager);
+        var typeSwitchCreator = new FieldTypeSwitchCreator(moduleBuilder);
 
         var typeSwitchType = typeSwitchCreator.Build(fieldMap);
 
@@ -171,7 +171,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
             }
         }
 
-        var typeSwitchCreator = new PropertyTypeSwitchCreator(moduleBuilder, objectManager);
+        var typeSwitchCreator = new PropertyTypeSwitchCreator(moduleBuilder);
 
         var typeSwitchType = typeSwitchCreator.Build(propertyMap);
 
@@ -182,7 +182,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
     private Type CreateTranspiler(ModuleBuilder moduleBuilder, Type classType, int typeId, FieldInfo[] fieldsToIntercept)
     {
-        var builder = new FieldTranspilerCreator(objectManager, moduleBuilder, classType, typeId, fieldsToIntercept, interceptMap);
+        var builder = new FieldTranspilerCreator(moduleBuilder, classType, typeId, fieldsToIntercept, interceptMap);
 
         var compiledType = builder.Build();
 
@@ -193,7 +193,7 @@ internal class AutoSyncBuilder : IAutoSyncBuilder
 
     private Type CreatePropertyPrefix(ModuleBuilder moduleBuilder, Type classType, int typeId, PropertyInfo[] propertiesToIntercept)
     {
-        var builder = new PropertyPrefixCreator(objectManager, moduleBuilder, classType, typeId, propertiesToIntercept);
+        var builder = new PropertyPrefixCreator(moduleBuilder, classType, typeId, propertiesToIntercept);
 
         return builder.Build();
     }

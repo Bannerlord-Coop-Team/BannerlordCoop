@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -26,7 +27,7 @@ internal class AlleyRegistry : IAutoRegistry<Alley>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<Alley> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         
         foreach (Settlement settlement in Campaign.Current.Settlements)
@@ -38,7 +39,7 @@ internal class AlleyRegistry : IAutoRegistry<Alley>
             foreach (Alley alley in settlement.Alleys)
             {
                 var networkId = "Alley_" + settlement.StringId + counter++;
-                if (registry.RegisterExistingObject(networkId, alley) == false) 
+                if (!objectManager.AddExisting(networkId, alley))
                     Logger.Error($"Unable to register {alley}");
             }
         }

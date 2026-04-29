@@ -52,7 +52,7 @@ internal class ServiceModule : Module
     }
 
     // Namespace is needed to separate client and server handlers being registered with DI
-    private IEnumerable<Type> GetHandlers() => InterfaceCollector.GetInterfaces<IHandler>(NAMESPACE);
+    private IEnumerable<Type> GetHandlers() => InterfaceCollector.GetInterfaces<IHandler>(NAMESPACE).Concat(InterfaceCollector.GetInterfaces<IHandler>("DynamicSync"));
 
     // Namespace is needed to separate client and server handlers being registered with DI
     private IEnumerable<Type> GetGameAbstractions() => InterfaceCollector.GetInterfaces<IGameAbstraction>(NAMESPACE);

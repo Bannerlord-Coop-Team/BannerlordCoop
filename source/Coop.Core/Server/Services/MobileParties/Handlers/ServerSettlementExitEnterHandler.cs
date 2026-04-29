@@ -4,6 +4,7 @@ using Common.Network;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;
 
@@ -16,12 +17,14 @@ public class ServerSettlementExitEnterHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IObjectManager objectManager;
     private readonly ILogger Logger = LogManager.GetLogger<ServerSettlementExitEnterHandler>();
 
-    public ServerSettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network)
+    public ServerSettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
+        this.objectManager = objectManager;
         messageBroker.Subscribe<NetworkRequestStartSettlementEncounter>(Handle);
         messageBroker.Subscribe<NetworkRequestEndSettlementEncounter>(Handle);
 
@@ -79,13 +82,16 @@ public class ServerSettlementExitEnterHandler : IHandler
     {
         var payload = obj.What;
 
+        if (!objectManager.TryGetIdWithLogging(payload.Settlement, out var settlementId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.MobileParty, out var mobilePartyId)) return;
+
         // The sending client is currently starting a settlement encounter, this is handled
         // slightly differently from ai or other clients parties
-        var networkMessage = new NetworkPartyEnterSettlement(payload.SettlementId, payload.PartyId);
+        var networkMessage = new NetworkPartyEnterSettlement(settlementId, mobilePartyId);
 
         network.SendAll(networkMessage);
 
-        var internalMessage = new PartyEnterSettlement(payload.SettlementId, payload.PartyId);
+        var internalMessage = new PartyEnterSettlement(settlementId, mobilePartyId);
 
         messageBroker.Publish(this, internalMessage);
     }
@@ -93,16 +99,14 @@ public class ServerSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<PartyLeaveSettlementAttempted> obj)
     {
         var payload = obj.What;
-        PartyLeaveSettlement(payload.PartyId);
-    }
 
-    private void PartyLeaveSettlement(string partyId)
-    {
-        var networkMessage = new NetworkPartyLeaveSettlement(partyId);
+        if (!objectManager.TryGetIdWithLogging(payload.MobileParty, out var mobilePartyId)) return;
+
+        var networkMessage = new NetworkPartyLeaveSettlement(mobilePartyId);
 
         network.SendAll(networkMessage);
 
-        var partySettlementEnter = new PartyLeaveSettlement(partyId);
+        var partySettlementEnter = new PartyLeaveSettlement(mobilePartyId);
 
         messageBroker.Publish(this, partySettlementEnter);
     }

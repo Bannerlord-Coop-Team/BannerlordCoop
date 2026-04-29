@@ -3,6 +3,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Data;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.ObjectManager;
+using Moq;
 using System;
 using System.Collections.Generic;
 using System.Runtime.Serialization;
@@ -42,9 +43,15 @@ public class HeroInterfaceTests
     public void TryResolveHero_NoEntitiesForController_ReturnsFalse()
     {
         // Arrange — registry has no entries for this controllerId at all
+        Hero? hero = null;
         var registry = new ControlledEntityRegistry();
-        var objectManager = new TestObjectManager();
-        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManager);
+        var objectManagerMock = new Mock<IObjectManager>();
+
+        objectManagerMock
+        .Setup(x => x.TryGetObject<Hero>(It.IsAny<string>(), out hero))
+        .Returns(false);
+
+        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManagerMock.Object);
 
         // Act
         var result = heroInterface.TryResolveHero(ControllerId, out var heroId);
@@ -58,13 +65,18 @@ public class HeroInterfaceTests
     public void TryResolveHero_EntitiesExistButNoneAreHeroes_ReturnsFalse()
     {
         // Arrange — controllerId has a party entity registered, but no Hero
+        Hero? hero = null;
         var registry = new ControlledEntityRegistry();
         registry.RegisterAsControlled(ControllerId, "Coop_MobileParty_1");
 
         // ObjectManager knows about the party but not any Hero
-        var objectManager = new TestObjectManager();
+        var objectManagerMock = new Mock<IObjectManager>();
 
-        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManager);
+        objectManagerMock
+        .Setup(x => x.TryGetObject<Hero>(It.IsAny<string>(), out hero))
+        .Returns(false);
+
+        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManagerMock.Object);
 
         // Act
         var result = heroInterface.TryResolveHero(ControllerId, out var heroId);
@@ -79,14 +91,18 @@ public class HeroInterfaceTests
     {
         // Arrange — the normal reconnect case: one hero registered under the controllerId
         var registry = new ControlledEntityRegistry();
+        var hero = CreateHeroStub();
         var heroId = "Coop_TaleWorlds.CampaignSystem.Hero_1";
         registry.RegisterAsControlled(ControllerId, heroId);
 
         // ObjectManager returns a Hero for that ID, matching what AutoRegistry<Hero> produces
-        var objectManager = new TestObjectManager();
-        objectManager.RegisterHero(heroId, CreateHeroStub());
+        var objectManagerMock = new Mock<IObjectManager>();
 
-        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManager);
+        objectManagerMock
+        .Setup(x => x.TryGetObject<Hero>(heroId, out hero))
+        .Returns(true);
+
+        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManagerMock.Object);
 
         // Act
         var result = heroInterface.TryResolveHero(ControllerId, out var resolvedId);
@@ -102,16 +118,20 @@ public class HeroInterfaceTests
         // Arrange — realistic case: a client has both a hero entity and a mobile party
         // entity registered under their controllerId. TryResolveHero must return only the hero.
         var registry = new ControlledEntityRegistry();
+        var hero = CreateHeroStub();
         var heroId = "Coop_TaleWorlds.CampaignSystem.Hero_1";
         var partyId = "Coop_MobileParty_1";
         registry.RegisterAsControlled(ControllerId, heroId);
         registry.RegisterAsControlled(ControllerId, partyId);
 
         // ObjectManager only resolves the hero entity as a Hero — the party entity is not a Hero
-        var objectManager = new TestObjectManager();
-        objectManager.RegisterHero(heroId, CreateHeroStub());
+        var objectManagerMock = new Mock<IObjectManager>();
 
-        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManager);
+        objectManagerMock
+        .Setup(x => x.TryGetObject<Hero>(heroId, out hero))
+        .Returns(true);
+
+        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManagerMock.Object);
 
         // Act
         var result = heroInterface.TryResolveHero(ControllerId, out var resolvedId);
@@ -129,16 +149,26 @@ public class HeroInterfaceTests
         // registered under their controllerId), but the registry data model allows it.
         // The method should not throw and should return the first match.
         var registry = new ControlledEntityRegistry();
+
+        var hero1 = CreateHeroStub();
         var heroId1 = "Coop_TaleWorlds.CampaignSystem.Hero_1";
+
+        var hero2 = CreateHeroStub();
         var heroId2 = "Coop_TaleWorlds.CampaignSystem.Hero_2";
         registry.RegisterAsControlled(ControllerId, heroId1);
         registry.RegisterAsControlled(ControllerId, heroId2);
 
-        var objectManager = new TestObjectManager();
-        objectManager.RegisterHero(heroId1, CreateHeroStub());
-        objectManager.RegisterHero(heroId2, CreateHeroStub());
+        var objectManagerMock = new Mock<IObjectManager>();
 
-        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManager);
+        objectManagerMock
+        .Setup(x => x.TryGetObject<Hero>(heroId1, out hero1))
+        .Returns(true);
+
+        objectManagerMock
+        .Setup(x => x.TryGetObject<Hero>(heroId2, out hero2))
+        .Returns(true);
+
+        var heroInterface = new HeroInterface(NullPackageFactory, registry, objectManagerMock.Object);
 
         // Act
         var result = heroInterface.TryResolveHero(ControllerId, out var resolvedId);
@@ -146,37 +176,5 @@ public class HeroInterfaceTests
         // Assert — no exception, first hero returned
         Assert.True(result);
         Assert.Equal(heroId1, resolvedId);
-    }
-
-    /// <summary>
-    /// Minimal IObjectManager stub for hero resolution tests.
-    /// Only implements TryGetObject&lt;T&gt; — the sole method used by TryResolveHero.
-    /// </summary>
-    private class TestObjectManager : IObjectManager
-    {
-        private readonly Dictionary<string, Hero> _heroes = new();
-
-        public void RegisterHero(string id, Hero hero) => _heroes[id] = hero;
-
-        public bool TryGetObject<T>(string id, out T obj) where T : class
-        {
-            if (typeof(T) == typeof(Hero) && _heroes.TryGetValue(id, out var hero))
-            {
-                obj = (hero as T)!;
-                return obj != null;
-            }
-
-            obj = null!;
-            return false;
-        }
-
-        // Remaining interface members are not exercised by TryResolveHero
-        public bool AddExisting<T>(string id, T obj) => throw new NotImplementedException();
-        public bool AddNewObject<T>(T obj, out string newId) => throw new NotImplementedException();
-        public bool Contains<T>(T obj) => throw new NotImplementedException();
-        public bool Contains(string id) => throw new NotImplementedException();
-        public bool IsTypeManaged(Type type) => throw new NotImplementedException();
-        public bool Remove<T>(T obj) => throw new NotImplementedException();
-        public bool TryGetId<T>(T obj, out string id) => throw new NotImplementedException();
     }
 }

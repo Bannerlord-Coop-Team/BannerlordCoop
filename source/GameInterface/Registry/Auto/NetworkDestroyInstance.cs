@@ -2,6 +2,7 @@
 using ProtoBuf;
 
 namespace GameInterface.Registry.Auto;
+
 [ProtoContract(SkipConstructor = true)]
 class NetworkDestroyInstance<T> : ICommand
 {

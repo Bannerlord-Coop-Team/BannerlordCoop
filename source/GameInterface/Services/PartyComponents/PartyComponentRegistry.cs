@@ -1,8 +1,10 @@
-﻿using GameInterface.Registry;
+﻿using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
+using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
@@ -11,39 +13,42 @@ namespace GameInterface.Services.PartyComponents;
 /// <summary>
 /// Registry for <see cref="PartyComponent"/> objects
 /// </summary>
-internal class PartyComponentRegistry : RegistryBase<PartyComponent>
+internal class PartyComponentRegistry : IAutoRegistry<PartyComponent>
 {
-    private const string PartyComponentIdPrefix = "CoopPartyComponent";
-    private int InstanceCounter = 0;
-
-    public PartyComponentRegistry(IRegistryCollection collection) : base(collection) { }
-
-    public override IEnumerable<Type> ManagedTypes { get; } = new Type[]
+    ILogger Logger { get; }
+    public PartyComponentRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
-        typeof(PartyComponent),
-        typeof(WarPartyComponent),
-        typeof(BanditPartyComponent),
-        typeof(CustomPartyComponent),
-        typeof(CaravanPartyComponent),
-        typeof(GarrisonPartyComponent),
-        typeof(LordPartyComponent),
-        typeof(MilitiaPartyComponent),
-        typeof(PatrolPartyComponent),
-        typeof(VillagerPartyComponent),
-    };
+        Logger = logger;
 
-    public override void RegisterAll()
+        autoRegistryFactory.RegisterType(this);
+    }
+    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var party in MobileParty.All)
         {
             var networkId = $"{party.PartyComponent.GetType().Name}_{party.StringId}";
-            RegisterExistingObject(networkId, party.PartyComponent);
+            objectManager.AddExisting(networkId, party.PartyComponent);
         }
     }
 
-    protected override string GetNewId(PartyComponent party)
+    public void OnClientCreated(PartyComponent obj, string id)
     {
-        return $"{PartyComponentIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+    }
+
+    public void OnClientDestroyed(PartyComponent obj, string id)
+    {
+    }
+
+    public void OnServerCreated(PartyComponent obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(PartyComponent obj, string id)
+    {
     }
 }
 

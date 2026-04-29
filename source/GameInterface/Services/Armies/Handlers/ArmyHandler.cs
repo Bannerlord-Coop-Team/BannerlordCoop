@@ -1,12 +1,12 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using Common.Network;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.Armies.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Armies.Handlers;
 
@@ -18,61 +18,68 @@ public class ArmyHandler : IHandler
     
     private static readonly ILogger Logger = LogManager.GetLogger<ArmyHandler>();
     private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
     private readonly IObjectManager objectManager;
 
-    public ArmyHandler(IMessageBroker messageBroker, IObjectManager objectManager)
+    public ArmyHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
+        this.network = network;
         this.objectManager = objectManager;
 
-        messageBroker.Subscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
-        messageBroker.Subscribe<RemovePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+        messageBroker.Subscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
+        messageBroker.Subscribe<NetworkAddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
+        messageBroker.Subscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
+        messageBroker.Subscribe<NetworkRemovePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
     }
 
-
-    private void HandleChangeRemoveMobilePartyInArmy(MessagePayload<RemovePartyInArmy> payload)
-    {
-        var data = payload.What.Data;
-
-        if (objectManager.TryGetObject(data.PartyStringId, out MobileParty mobileParty) == false)
-        {
-            Logger.Error("Unable to find MobileParty ({mobilePartyId})", data.PartyStringId);
-            return;
-        }
-
-        if (objectManager.TryGetObject<Army>(data.ArmyStringId, out var army) == false)
-        {
-            Logger.Error("Unable to find Army ({armyId})", data.ArmyStringId);
-            return;
-        }
-
-        ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army);
-
-    }
-
-    //Generate Handler Methods
-    private void HandleChangeAddMobilePartyInArmy(MessagePayload<AddMobilePartyInArmy> payload)
-    {
-        var obj = payload.What.Data;
-
-        if (objectManager.TryGetObject(obj.PartyStringId, out MobileParty mobileParty) == false)
-        {
-            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.PartyStringId);
-            return;
-        }
-
-        if (objectManager.TryGetObject<Army>(obj.ArmyStringId, out var army) == false)
-        {
-            Logger.Error("Unable to find Army ({armyId})", obj.ArmyStringId);
-            return;
-        }
-
-        ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
-          
-    }
     public void Dispose()
     {
-        messageBroker.Unsubscribe<AddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
-        messageBroker.Unsubscribe<RemovePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+        messageBroker.Unsubscribe<MobilePartyInArmyAdded>(HandleAddMobilePartyInArmy);
+        messageBroker.Unsubscribe<NetworkAddMobilePartyInArmy>(HandleChangeAddMobilePartyInArmy);
+        messageBroker.Unsubscribe<MobilePartyInArmyRemoved>(HandleRemoveMobilePartyInArmy);
+        messageBroker.Unsubscribe<NetworkRemovePartyInArmy>(HandleChangeRemoveMobilePartyInArmy);
+    }
+
+    private void HandleAddMobilePartyInArmy(MessagePayload<MobilePartyInArmyAdded> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+
+        var message = new NetworkAddMobilePartyInArmy(armyId, mobilePartyId);
+
+        // Broadcast to all the clients that the state was changed   
+        network.SendAll(message);
+    }
+
+    private void HandleChangeAddMobilePartyInArmy(MessagePayload<NetworkAddMobilePartyInArmy> payload)
+    {
+        var obj = payload.What;
+
+        if (objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty) == false) return;
+        if (objectManager.TryGetObjectWithLogging<Army>(obj.ArmyId, out var army) == false) return;
+
+        ArmyPatches.AddMobilePartyInArmy(mobileParty, army);
+    }
+
+    private void HandleRemoveMobilePartyInArmy(MessagePayload<MobilePartyInArmyRemoved> obj)
+    {
+        if (!objectManager.TryGetIdWithLogging(obj.What.Army, out var armyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.What.MobileParty, out var mobilePartyId)) return;
+
+        var message = new NetworkRemovePartyInArmy(armyId, mobilePartyId);
+
+        // Broadcast to all the clients that the state was changed
+        network.SendAll(message);
+    }
+
+    private void HandleChangeRemoveMobilePartyInArmy(MessagePayload<NetworkRemovePartyInArmy> payload)
+    {
+        var data = payload.What;
+
+        if (objectManager.TryGetObjectWithLogging(data.MobilePartyId, out MobileParty mobileParty) == false) return;
+        if (objectManager.TryGetObjectWithLogging<Army>(data.ArmyId, out var army) == false) return;
+
+        ArmyPatches.RemoveMobilePartyInArmy(mobileParty, army);
     }
 }

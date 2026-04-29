@@ -22,6 +22,12 @@ public class ObjectHelper
     {
         //Logger.Verbose("{pid}: Creating {type}", Thread.CurrentThread.ManagedThreadId, typeof(T));
 
+        if (typeof(T).IsAbstract)
+        {
+            Logger.Error("Unable to create abstract class {ClassName}", typeof(T));
+            return default;
+        }
+
         return (T)FormatterServices.GetUninitializedObject(typeof(T));
     }
 

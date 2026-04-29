@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -25,7 +26,7 @@ internal class BannerEffectRegistry : IAutoRegistry<BannerEffect>
     // TODO find destructor for banner effects
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<BannerEffect> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
     }
 

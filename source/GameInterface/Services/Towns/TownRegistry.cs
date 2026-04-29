@@ -11,11 +11,14 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.Towns;
 internal class TownRegistry : IAutoRegistry<Town>
 {
+    private readonly IObjectManager objectManager;
+
     ILogger Logger { get; }
 
-    public TownRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public TownRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
     {
         Logger = logger;
+        this.objectManager = objectManager;
         autoRegistryFactory.RegisterType(this);
     }
 
@@ -25,12 +28,11 @@ internal class TownRegistry : IAutoRegistry<Town>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<Town> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var town in Town.AllFiefs)
         {
-            var networkId = town.StringId;
-            registry.RegisterExistingObject(networkId, town);
+            objectManager.AddExisting(town.StringId, town);
         }
     }
 

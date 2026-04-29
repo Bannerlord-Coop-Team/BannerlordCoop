@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -25,21 +26,21 @@ internal class PartyBaseRegistry : IAutoRegistry<PartyBase>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<PartyBase> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var party in MobileParty.All)
         {
-            var networkId = party.StringId;
+            var networkId = $"{nameof(PartyBase)}_{party.StringId}";
 
-            if (registry.RegisterExistingObject(networkId, party.Party) == false)
+            if (objectManager.AddExisting(networkId, party.Party) == false)
                 Logger.Error("Unable to register PartyBase from Party with the object manager");
         }
 
         foreach (var settlement in Settlement.All)
         {
-            var networkId = settlement.StringId;
+            var networkId = $"{nameof(PartyBase)}_{settlement.StringId}";
 
-            if (registry.RegisterExistingObject(networkId, settlement.Party) == false)
+            if (objectManager.AddExisting(networkId, settlement.Party) == false)
                 Logger.Error("Unable to register PartyBase from Party with the object manager");
         }
     }

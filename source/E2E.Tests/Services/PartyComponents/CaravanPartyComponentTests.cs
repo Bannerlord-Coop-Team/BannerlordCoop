@@ -12,18 +12,17 @@ using Xunit.Abstractions;
 namespace E2E.Tests.Services.PartyComponents;
 public class CaravanPartyComponentTests : SyncTestBase
 {
-    string CaravanId;
-
     public CaravanPartyComponentTests(ITestOutputHelper output) : base(output)
     {
-        CaravanId = TestEnvironment.CreateRegisteredObject<CaravanPartyComponent>();
-        TestEnvironment.CreateRegisteredObject<Hero>();
     }
 
     [Fact]
     public void Server_CaravanPartyComponent_Fields()
     {
-        Server.ObjectManager.TryGetObject(CaravanId, out CaravanPartyComponent caravan);
+        var caravanId = TestEnvironment.CreateRegisteredObject<CaravanPartyComponent>();
+        TestEnvironment.CreateRegisteredObject<Hero>();
+
+        Server.ObjectManager.TryGetObject(caravanId, out CaravanPartyComponent caravan);
         caravan._leader = null;
 
         TestEnvironment.AssertReferenceField<CaravanPartyComponent, Hero>(nameof(CaravanPartyComponent._leader));
@@ -48,7 +47,8 @@ public class CaravanPartyComponentTests : SyncTestBase
             var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
             settlement.Culture = culture;
             var newParty = CaravanPartyComponent.CreateCaravanParty(owner, settlement, template, caravanLeader: owner);
-            partyId = newParty.StringId;
+
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
 
         }, new MethodBase[]
         {
@@ -84,8 +84,8 @@ public class CaravanPartyComponentTests : SyncTestBase
             template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
         });
 
-            // Act
-            PartyComponent? partyComponent = null;
+        // Act
+        PartyComponent? partyComponent = null;
         client1.Call(() =>
         {
             var initArgs = new CaravanPartyComponent.InitializationArgs(template);

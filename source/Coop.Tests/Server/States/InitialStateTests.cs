@@ -3,6 +3,7 @@ using Common.Messaging;
 using Coop.Core.Server;
 using Coop.Core.Server.States;
 using Coop.Tests.Mocks;
+using GameInterface.Registry.Messages;
 using GameInterface.Services.GameState.Messages;
 using Xunit;
 using Xunit.Abstractions;
@@ -29,9 +30,9 @@ namespace Coop.Tests.Server.States
             // Act
             serverLogic.State.Start();
 
-            var payload = new MessagePayload<CampaignReady>(null, new CampaignReady());
+            var payload = new MessagePayload<LifetimesPatched>(null, new LifetimesPatched());
             var initialState = Assert.IsType<InitialServerState>(serverLogic.State);
-            initialState.Handle_GameLoaded(payload);
+            initialState.Handle_LifetimesPatched(payload);
 
             // Assert
             Assert.IsType<ServerRunningState>(serverLogic.State);

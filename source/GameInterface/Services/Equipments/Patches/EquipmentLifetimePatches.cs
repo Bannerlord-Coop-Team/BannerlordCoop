@@ -94,6 +94,4 @@ internal class EquipmentLifetimePatches
         MessageBroker.Instance.Publish(__instance, message);
 
     }
-
-
 }

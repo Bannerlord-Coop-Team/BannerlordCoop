@@ -2,15 +2,16 @@
 using Common.Logging;
 using GameInterface.AutoSync;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.CampaignSystem.Settlements.Settlement;
@@ -30,11 +31,11 @@ internal class SiegeStrategyRegistry : IAutoRegistry<SiegeStrategy>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<SiegeStrategy> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var siegeStrategy in MBObjectManager.Instance.GetObjectTypeList<SiegeStrategy>())
         {
-            if (registry.RegisterExistingObject(siegeStrategy.StringId, siegeStrategy) == false) Logger.Error($"Unable to register {nameof(SiegeStrategy)}");
+            if (objectManager.AddExisting(siegeStrategy.StringId, siegeStrategy) == false) Logger.Error($"Unable to register {nameof(SiegeStrategy)}");
         }
     }
 

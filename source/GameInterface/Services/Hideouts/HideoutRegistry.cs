@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -24,11 +25,11 @@ internal class HideoutRegistry : IAutoRegistry<Hideout>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<Hideout> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var hideout in Hideout.All)
         {
-            registry.RegisterExistingObject(hideout.StringId, hideout);
+            objectManager.AddExisting(hideout.StringId, hideout);
         }
     }
 

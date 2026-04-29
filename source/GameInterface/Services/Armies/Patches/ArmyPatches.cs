@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Policies;
@@ -6,13 +7,10 @@ using GameInterface.Services.Armies.Extensions;
 using GameInterface.Services.Armies.Messages;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
-using Common.Logging;
 using Serilog;
-using System.Collections.Generic;
-using GameInterface.Services.Armies.Data;
-using System;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.Party;
 namespace GameInterface.Services.Armies.Patches;
 
 /// <summary>
@@ -23,7 +21,7 @@ public class ArmyPatches
 {
     private static ILogger Logger = LogManager.GetLogger<Kingdom>();
 
-    [HarmonyPatch(typeof(Army), "OnAddPartyInternal")]
+    [HarmonyPatch(nameof(Army.OnAddPartyInternal))]
     [HarmonyPrefix]
     static bool OnAddPartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
     {
@@ -31,33 +29,40 @@ public class ArmyPatches
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (ModInformation.IsClient) return false;
-        
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-        {
-            Logger.Error("Unable to resolve {objectManager}", typeof(IObjectManager));
-            return false;
-        }
-
-        string armyId = __instance.GetStringId();
-        if (armyId == null)
-        {
-            Logger.Error("{army} was not properly registered", mobileParty.Army.Name);
-            return false;
-        }
-
-        // TODO use objectmanager id
-        var partyId = mobileParty.StringId;
-
-        var data = new ArmyAddPartyData(armyId, partyId);
-        var message = new MobilePartyInArmyAdded(data);
+        var message = new MobilePartyInArmyAdded(__instance, mobileParty);
         MessageBroker.Instance.Publish(mobileParty, message);
 
         return true;
     }
 
+    [HarmonyPatch(nameof(Army.OnAddPartyInternal))]
+    [HarmonyPrefix]
+    static bool OnAddPartyInternalDebugPrefix(ref Army __instance, MobileParty mobileParty)
+    {
+        __instance._parties.Add(mobileParty);
+        mobileParty.Ai.RethinkAtNextHourlyTick = true;
+        CampaignEventDispatcher.Instance.OnPartyJoinedArmy(mobileParty);
+        if (__instance == MobileParty.MainParty.Army && __instance.LeaderParty != MobileParty.MainParty)
+        {
+            __instance.StartTrackingTargetSettlement(__instance.AiBehaviorObject);
+            CampaignEventDispatcher.Instance.OnArmyOverlaySetDirty();
+        }
+        if (!mobileParty.IsMainParty)
+        {
+            mobileParty.Ai.RethinkAtNextHourlyTick = true;
+        }
+        if (mobileParty != MobileParty.MainParty && __instance.LeaderParty != MobileParty.MainParty && __instance.LeaderParty.LeaderHero != null)
+        {
+            int num = -Campaign.Current.Models.ArmyManagementCalculationModel.CalculatePartyInfluenceCost(__instance.LeaderParty, mobileParty);
+            ChangeClanInfluenceAction.Apply(__instance.LeaderParty.LeaderHero.Clan, (float)num);
+        }
 
-    [HarmonyPatch(typeof(Army), "OnRemovePartyInternal")]
+        return false;
+    }
+
+
+    [HarmonyPatch(nameof(Army.OnRemovePartyInternal))]
     [HarmonyPrefix]
     static bool OnRemovePartyInternalPrefix(ref Army __instance, MobileParty mobileParty)
     {
@@ -66,34 +71,13 @@ public class ArmyPatches
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client created managed {name}", typeof(MobileParty));
+            Logger.Error("Client removed managed {name} from {VariableName}", typeof(MobileParty), nameof(Army.OnRemovePartyInternal));
             return true;
         }
 
-
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
-        {
-            Logger.Error("Unable to resolve {objectManager}", typeof(IObjectManager));
-            return true;
-        }
-        
-        
-        string armyId = __instance.GetStringId();
-        if (armyId == null)
-        {
-            Logger.Error("{army} was not properly registered", mobileParty.Army.Name);
-            return true;
-        }
-
-        // TODO use objectmanager id
-        var partyId = mobileParty.StringId;
-
-
-        var data = new ArmyRemovePartyData(armyId, partyId);
-        var message = new ArmyPartyRemoved(data);
+        var message = new MobilePartyInArmyRemoved(__instance, mobileParty);
 
         MessageBroker.Instance.Publish(mobileParty, message);
-
 
         return true;
     }
@@ -110,7 +94,6 @@ public class ArmyPatches
                 {
                     mobileParty._army = army;
                 }
-
                 army.OnAddPartyInternal(mobileParty);
             }
         });

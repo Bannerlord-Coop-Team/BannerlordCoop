@@ -29,11 +29,11 @@ namespace Coop.Tests.Client.States
             // Arrange
             var loadingState = clientLogic.SetState<LoadingState>();
 
-            var payload = new MessagePayload<AllGameObjectsRegistered>(
-                this, new AllGameObjectsRegistered());
+            var payload = new MessagePayload<LifetimesPatched>(
+                this, new LifetimesPatched());
 
             // Act
-            loadingState.Handle_AllGameObjectsRegistered(payload);
+            loadingState.Handle_LifetimesPatched(payload);
 
             // Assert
             Assert.IsType<CampaignState>(clientLogic.State);

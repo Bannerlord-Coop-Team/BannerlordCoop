@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -26,11 +27,11 @@ internal class ItemCategoryRegistry : IAutoRegistry<ItemCategory>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<ItemCategory> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (ItemCategory item in MBObjectManager.Instance.GetObjectTypeList<ItemCategory>())
         {
-            registry.RegisterExistingObject(item.StringId, item);
+            objectManager.AddExisting(item.StringId, item);
         }
     }
 

@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -26,11 +27,11 @@ internal class SkillObjectRegistry : IAutoRegistry<SkillObject>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<SkillObject> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (SkillObject skill in MBObjectManager.Instance.GetObjectTypeList<SkillObject>())
         {
-            registry.RegisterExistingObject(skill.StringId, skill);
+            objectManager.AddExisting(skill.StringId, skill);
         }
     }
 
