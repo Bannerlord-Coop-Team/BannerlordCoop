@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -32,7 +33,7 @@ internal class MapEventSideRegistry : IAutoRegistry<MapEventSide>
         autoRegistryFactory.RegisterType(this);
     }
 
-    public void RegisterAllObjects(IRegistry<MapEventSide> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
@@ -44,7 +45,7 @@ internal class MapEventSideRegistry : IAutoRegistry<MapEventSide>
 
                 var networkId = nameof(MapEventSide) + "_" + mapEvent.StringId + "_" + counter++;
 
-                if (registry.RegisterExistingObject(networkId, side) == false)
+                if (objectManager.AddExisting(networkId, side) == false)
                     Logger.Error("Unable to register MapEventSide {id} in the object manager", side.ToString());
             }
         }

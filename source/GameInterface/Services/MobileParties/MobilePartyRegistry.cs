@@ -1,17 +1,15 @@
-﻿using Common;
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.Entity;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Library;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties;
@@ -21,13 +19,10 @@ namespace GameInterface.Services.MobileParties;
 /// </summary>
 internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
 {
-    private readonly IControlledEntityRegistry controlledEntityRegistry;
-
     ILogger Logger { get; }
-    public MobilePartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IControlledEntityRegistry controlledEntityRegistry)
+    public MobilePartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
         Logger = logger;
-        this.controlledEntityRegistry = controlledEntityRegistry;
         autoRegistryFactory.RegisterType(this);
     }
 

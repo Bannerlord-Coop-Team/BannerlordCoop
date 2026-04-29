@@ -25,7 +25,7 @@ namespace GameInterface.DynamicSync.Builders
             Type memberType;
             string memberName;
             if (memberInfo is PropertyInfo property)
-            { 
+            {
                 memberType = property.PropertyType;
                 memberName = property.Name;
             }
@@ -43,7 +43,7 @@ namespace GameInterface.DynamicSync.Builders
                 GetNamespace(memberType)
             };
 
-            if(memberType.IsArray || memberType.IsGenericType)
+            if (memberType.IsArray || memberType.IsGenericType)
                 libraries.Add(GetNamespace(GetElementType(memberType)));
 
             return TemplateParser.Parse("Messages.LocalSetMessageTemplate",
@@ -80,12 +80,12 @@ namespace GameInterface.DynamicSync.Builders
         public static string GetNamespace(Type type)
         {
             string result = null;
-            if(type.DeclaringType != null)
+            if (type.DeclaringType != null)
             {
                 result = $".{GetDeclaringTypeName(type.DeclaringType)}";
             }
 
-            return $"{(result != null ? "static " : "") }{type.Namespace}{result}";
+            return $"{(result != null ? "static " : "")}{type.Namespace}{result}";
         }
 
         public static IEnumerable<string> GetLibraries(MemberInfo memberInfo)
@@ -115,7 +115,7 @@ namespace GameInterface.DynamicSync.Builders
 
         private static string GetDeclaringTypeName(Type type)
         {
-            if(type.DeclaringType != null)
+            if (type.DeclaringType != null)
             {
                 return $"{GetDeclaringTypeName(type.DeclaringType)}.{type.Name}";
             }

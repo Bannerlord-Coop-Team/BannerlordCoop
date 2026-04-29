@@ -78,6 +78,8 @@ public class ObjectManager : IObjectManager
 
     private readonly ConcurrentDictionary<Type, int> objectCounters = new ConcurrentDictionary<Type, int>();
 
+    private readonly object _gate = new();
+
     public ObjectManager(ILogger logger)
     {
         this.logger = logger;
@@ -89,24 +91,27 @@ public class ObjectManager : IObjectManager
 
         if (obj == null) return false;
 
-        if (idObjs.ContainsKey(id))
+        lock(_gate)
         {
-            logger.Warning("Duplicate id: {id}", id);
-            return false;
+            if (idObjs.ContainsKey(id))
+            {
+                logger.Warning("Duplicate id: {id}", id);
+                return false;
+            }
+
+            if (objsIds.TryGetValue(obj, out var outvar))
+            {
+                logger.Warning("Object already registered: {ObjectType}", obj.GetType());
+                return false;
+            }
+
+            IncrementCounter(obj);
+
+            idObjs.Add(id, obj);
+            objsIds.Add(obj, id);
+
+            return true;
         }
-
-        if (objsIds.TryGetValue(obj, out var outvar))
-        {
-            logger.Warning("Object already registered: {ObjectType}", obj.GetType());
-            return false;
-        }
-
-        IncrementCounter(obj);
-
-        idObjs.Add(id, obj);
-        objsIds.Add(obj, id);
-
-        return true;
     }
 
     public bool AddNewObject(object obj, out string newId)
@@ -114,18 +119,21 @@ public class ObjectManager : IObjectManager
         newId = null;
         if (obj == null) return false;
 
-        if (objsIds.TryGetValue(obj, out var _))
+        lock (_gate)
         {
-            logger.Warning("Object already registered: {ObjectType}", obj.GetType());
-            return false;
+            if (objsIds.TryGetValue(obj, out var _))
+            {
+                logger.Warning("Object already registered: {ObjectType}", obj.GetType());
+                return false;
+            }
+
+            newId = GenerateId(obj);
+
+            idObjs.Add(newId, obj);
+            objsIds.Add(obj, newId);
+
+            return true;
         }
-
-        newId = GenerateId(obj);
-
-        idObjs.Add(newId, obj);
-        objsIds.Add(obj, newId);
-
-        return true;
     }
 
     private int IncrementCounter(object obj)

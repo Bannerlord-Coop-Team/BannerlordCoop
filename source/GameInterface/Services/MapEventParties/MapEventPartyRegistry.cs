@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -30,23 +31,7 @@ internal class MapEventPartyRegistry : IAutoRegistry<MapEventParty>
 
     public IEnumerable<MethodBase> DestroyMethods => new MethodBase[] { };
 
-    public void OnClientCreated(MapEventParty obj, string id)
-    {
-    }
-
-    public void OnClientDestroyed(MapEventParty obj, string id)
-    {
-    }
-
-    public void OnServerCreated(MapEventParty obj, string id)
-    {
-    }
-
-    public void OnServerDestroyed(MapEventParty obj, string id)
-    {
-    }
-
-    public void RegisterAllObjects(IRegistry<MapEventParty> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
@@ -62,10 +47,26 @@ internal class MapEventPartyRegistry : IAutoRegistry<MapEventParty>
 
                     var networkId = nameof(MapEventParty) + "_" + mapEvent.StringId + "_" + counter++;
 
-                    if (registry.RegisterExistingObject(networkId, party) == false)
+                    if (objectManager.AddExisting(networkId, party) == false)
                         Logger.Error("Unable to register MapEventParty {id} in the object manager", party.ToString());
                 }
             }
         }
+    }
+
+    public void OnClientCreated(MapEventParty obj, string id)
+    {
+    }
+
+    public void OnClientDestroyed(MapEventParty obj, string id)
+    {
+    }
+
+    public void OnServerCreated(MapEventParty obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(MapEventParty obj, string id)
+    {
     }
 }

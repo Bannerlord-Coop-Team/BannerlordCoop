@@ -12,13 +12,13 @@ namespace GameInterface.DynamicSync.Builders
     {
         private readonly IObjectManager objectManager;
 
-        public DynamicSyncFieldBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry) : base(dynamicSyncRegistry)
+        public DynamicSyncFieldBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder) : base(dynamicSyncRegistry, dynamicSyncConstantsBuilder)
         {
             this.objectManager = objectManager;
         }
         public string GetTranspiler(FieldInfo fieldInfo)
         {
-            return DynamicSyncUtils.GetSetTranspiler(fieldInfo);
+            return GetSetTranspiler(fieldInfo);
         }
 
         public IEnumerable<string> GetMessages(FieldInfo fieldInfo)

@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -31,6 +32,22 @@ internal class MapEventRegistry : IAutoRegistry<MapEvent>
 
     public IEnumerable<MethodBase> DestroyMethods => new MethodBase[] { };
 
+    public void RegisterAllObjects(IObjectManager objectManager)
+    {
+        foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
+        {
+            int counter = 1;
+
+            var networkId = nameof(mapEvent) + "_" + mapEvent.StringId + "_" + counter++;
+
+            if (!objectManager.AddExisting(networkId, mapEvent))
+            {
+                Logger.Error("Unable to register {type}", typeof(MapEvent));
+                continue;
+            }
+        }
+    }
+
     public void OnClientCreated(MapEvent obj, string id)
     {
     }
@@ -41,26 +58,9 @@ internal class MapEventRegistry : IAutoRegistry<MapEvent>
 
     public void OnServerCreated(MapEvent obj, string id)
     {
-        ;
     }
 
     public void OnServerDestroyed(MapEvent obj, string id)
     {
-    }
-
-    public void RegisterAllObjects(IRegistry<MapEvent> registry)
-    {
-        foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
-        {
-            int counter = 1;
-
-            var networkId = nameof(mapEvent) + "_" + mapEvent.StringId + "_" + counter++;
-
-            if (!registry.RegisterExistingObject(networkId, mapEvent))
-            {
-                Logger.Error("Unable to register {type}", typeof(MapEvent));
-                continue;
-            }
-        }
     }
 }

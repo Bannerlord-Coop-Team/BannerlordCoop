@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using HarmonyLib;
 using SandBox.View.Map.Managers;
@@ -29,7 +30,7 @@ internal class MobilePartyVisualRegistry : IAutoRegistry<MobilePartyVisual>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<MobilePartyVisual> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         var visualManager = MobilePartyVisualManager.Current;
 
@@ -46,12 +47,12 @@ internal class MobilePartyVisualRegistry : IAutoRegistry<MobilePartyVisual>
             if (mobilePartyVisual == null) continue;
 
             var networkId = $"{nameof(mobilePartyVisual)}_{party.StringId}";
-            registry.RegisterExistingObject(networkId, mobilePartyVisual);
+            objectManager.AddExisting(networkId, mobilePartyVisual);
         }
 
         foreach (MobilePartyVisual visual in visualManager._visualsFlattened)
         {
-            registry.RegisterNewObject(visual, out var _);
+            objectManager.AddNewObject(visual, out var _);
         }
     }
 
