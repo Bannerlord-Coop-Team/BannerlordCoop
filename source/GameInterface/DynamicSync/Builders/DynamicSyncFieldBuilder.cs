@@ -1,5 +1,6 @@
 ﻿using GameInterface.DynamicSync.Templates;
 using GameInterface.Services.ObjectManager;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -11,13 +12,13 @@ namespace GameInterface.DynamicSync.Builders
     {
         private readonly IObjectManager objectManager;
 
-        public DynamicSyncFieldBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder) : base(dynamicSyncRegistry, dynamicSyncConstantsBuilder)
+        public DynamicSyncFieldBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry) : base(dynamicSyncRegistry)
         {
             this.objectManager = objectManager;
         }
         public string GetTranspiler(FieldInfo fieldInfo)
         {
-            return GetSetTranspiler(fieldInfo);
+            return DynamicSyncUtils.GetSetTranspiler(fieldInfo);
         }
 
         public IEnumerable<string> GetMessages(FieldInfo fieldInfo)
@@ -25,18 +26,13 @@ namespace GameInterface.DynamicSync.Builders
             var templateData = GetTemplateData(fieldInfo);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(fieldInfo);
             string networkMessage;
-
-            if(fieldInfo.FieldType.IsInterface)
+            if (RuntimeTypeModel.Default.CanSerialize(fieldInfo.FieldType))
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetInterfaceReferenceMessageTemplate", templateData);
-            }
-            else if (objectManager.IsTypeManaged(fieldInfo.FieldType))
-            {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate", templateData);
+                networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
             }
             else
             {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
+                networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate", templateData);
             }
 
             DynamicSyncConfiguration.ExportFile($"{fieldInfo.DeclaringType.Name}/{fieldInfo.DeclaringType.Name}_{fieldInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -49,10 +45,10 @@ namespace GameInterface.DynamicSync.Builders
         public string GetSubscription(FieldInfo fieldInfo)
         {
             var templateData = GetTemplateData(fieldInfo);
-            if (objectManager.IsTypeManaged(fieldInfo.FieldType) || fieldInfo.FieldType.IsInterface)
-                return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
-            else
+            if (RuntimeTypeModel.Default.CanSerialize(fieldInfo.FieldType))
                 return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
+            else
+                return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
         }
 
         private object GetTemplateData(FieldInfo fieldInfo)
@@ -67,8 +63,7 @@ namespace GameInterface.DynamicSync.Builders
                 SerializeMethod = serializerNames.serialize,
                 DeserializeMethod = serializerNames.deserialize,
                 ReadOnly = fieldInfo.IsInitOnly,
-                ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null,
-                Interface = fieldInfo.FieldType.IsInterface
+                ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null
             };
         }
     }

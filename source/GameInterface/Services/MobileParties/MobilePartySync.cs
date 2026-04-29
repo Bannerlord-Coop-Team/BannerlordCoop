@@ -24,6 +24,7 @@ internal class MobilePartySync : IDynamicSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._isCurrentlyUsedByAQuest)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._ignoredUntilTime)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._besiegerCampResetStarted)));
+        autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._partyComponent)));
 
         // Movement
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MobileParty), nameof(MobileParty._targetSettlement)));
@@ -43,7 +44,7 @@ internal class MobilePartySync : IDynamicSync
         //new
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Aggressiveness)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Objective)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Army)));
+        //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.Army)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsActive)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsPartyTradeActive)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.PartyTradeGold)));

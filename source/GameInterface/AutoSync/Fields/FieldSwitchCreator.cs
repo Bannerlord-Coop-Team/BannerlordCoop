@@ -18,12 +18,10 @@ public class FieldSwitchCreator
     private readonly FieldBuilder objectManagerField;
     private readonly FieldBuilder loggerField;
     private readonly Type instanceType;
-    private readonly IObjectManager objectManager;
 
-    public FieldSwitchCreator(ModuleBuilder moduleBuilder, Type type, IObjectManager objectManager)
+    public FieldSwitchCreator(ModuleBuilder moduleBuilder, Type type)
     {
         instanceType = type;
-        this.objectManager = objectManager;
         typeBuilder = moduleBuilder.DefineType($"FieldSwitcher_{type.Name}",
                 TypeAttributes.Public |
                 TypeAttributes.Class |
@@ -128,12 +126,8 @@ public class FieldSwitchCreator
 
             if (RuntimeTypeModel.Default.CanSerialize(fields[i].FieldType))
                 CreateByValue(il, fields[i], instanceLocal);
-            else if (objectManager.IsTypeManaged(fields[i].FieldType))
-                CreateByRef(il, fields[i], instanceLocal);
             else
-                throw new NotSupportedException(
-                    $"{fields[i].FieldType.Name} is not serializable and not managed by the object manager. " +
-                    $"Either manage the type using the object manager or make this type serializable");
+                CreateByRef(il, fields[i], instanceLocal);
         }
 
         il.MarkLabel(retLabel);

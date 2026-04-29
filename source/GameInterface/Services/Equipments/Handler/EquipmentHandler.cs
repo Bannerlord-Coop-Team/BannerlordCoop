@@ -51,10 +51,10 @@ namespace GameInterface.Services.Equipments.Handlers
         private void Handle(MessagePayload<EquipmentCreated> payload)
         {
 
-            if (objectManager.TryGetId(payload.What.Data, out string newEquipmentId) )
-            {                
+            if (objectManager.TryGetId(payload.What.Data, out string newEquipmentId))
+            {
                 Logger.Error("Server already has {name} in object manager", typeof(Equipment));
-                    
+
                 return;
             }
             if (objectManager.AddNewObject(payload.What.Data, out newEquipmentId) == false)
@@ -75,12 +75,12 @@ namespace GameInterface.Services.Equipments.Handlers
             Equipment newEquipment = ObjectHelper.SkipConstructor<Equipment>();
             GameLoopRunner.RunOnMainThread(() =>
             {
-                  using (new AllowedThread())
-                  {
-                      Equipment_ctor.Invoke(newEquipment, Array.Empty<object>());
-                  }
-                  objectManager.AddExisting(payload.EquipmentId, newEquipment);
-               
+                using (new AllowedThread())
+                {
+                    Equipment_ctor.Invoke(newEquipment, Array.Empty<object>());
+                }
+                objectManager.AddExisting(payload.EquipmentId, newEquipment);
+
             });
         }
 
@@ -111,8 +111,9 @@ namespace GameInterface.Services.Equipments.Handlers
             network.SendAll(message);
         }
 
-        private void Handle(MessagePayload<NetworkRemoveEquipment> payload) { 
-            
+        private void Handle(MessagePayload<NetworkRemoveEquipment> payload)
+        {
+
             if (objectManager.TryGetObject(payload.What.BattleEquipmentId, out Equipment BattleEquipment) == false)
             {
                 Logger.Error("Failed to get object for {type} with id {id}", typeof(Equipment), payload.What.BattleEquipmentId);
@@ -135,5 +136,5 @@ namespace GameInterface.Services.Equipments.Handlers
             }
         }
     }
-    
+
 }

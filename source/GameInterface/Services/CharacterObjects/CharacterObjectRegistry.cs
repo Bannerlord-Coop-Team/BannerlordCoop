@@ -28,11 +28,11 @@ internal class CharacterObjectRegistry : IAutoRegistry<CharacterObject>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<CharacterObject> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (CharacterObject character in CharacterObject.All)
         {
-            registry.RegisterExistingObject(character.StringId, character);
+            objectManager.AddExisting(character.StringId, character);
         }
     }
 

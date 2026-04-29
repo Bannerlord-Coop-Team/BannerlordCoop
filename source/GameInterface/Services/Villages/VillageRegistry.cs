@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -25,11 +26,11 @@ internal class VillageRegistry : IAutoRegistry<Village>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<Village> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var village in Village.All)
         {
-            registry.RegisterExistingObject(village.StringId, village);
+            objectManager.AddExisting(village.StringId, village);
         }
     }
 

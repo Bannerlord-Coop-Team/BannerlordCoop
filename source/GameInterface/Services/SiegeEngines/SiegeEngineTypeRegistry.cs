@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -23,12 +24,12 @@ internal class SiegeEngineTypeRegistry : IAutoRegistry<SiegeEngineType>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<SiegeEngineType> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var siegeEngine in Campaign.Current.SiegeEventManager.SiegeEvents
                 .Select(siegeEvent => siegeEvent.BesiegerCamp.SiegeEngines.SiegePreparations.SiegeEngine))
         {
-            registry.RegisterNewObject(siegeEngine, out _);
+            objectManager.AddNewObject(siegeEngine, out _);
         }
     }
 

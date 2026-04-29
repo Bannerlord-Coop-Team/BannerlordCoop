@@ -1,4 +1,6 @@
-﻿using Common.Serialization;
+﻿using Autofac;
+using Common.Messaging;
+using Common.Serialization;
 using GameInterface.DynamicSync.Builders;
 using HarmonyLib;
 using ProtoBuf;
@@ -44,7 +46,7 @@ namespace GameInterface.DynamicSync
             }));
 
             var handlers = assembly.GetTypes()
-                .Where(type => type.Name.EndsWith("_Handler"));
+                .Where(type => type.IsAssignableTo<IHandler>());
 
             foreach (var handler in handlers)
             {

@@ -1,21 +1,12 @@
-﻿using System;
-using System.Runtime.Serialization;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.Armies.Data;
-using GameInterface.Services.Armies.Messages.Lifetime;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Stances.Data;
 using GameInterface.Services.Stances.Messages.Lifetime;
-using GameInterface.Services.Template.Messages;
-using GameInterface.Services.Template.Patches;
 using Serilog;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Settlements.Buildings;
-using TaleWorlds.ObjectSystem;
-using static TaleWorlds.Core.ViewModelCollection.CharacterViewModel;
 
 namespace GameInterface.Services.Template.Handlers;
 

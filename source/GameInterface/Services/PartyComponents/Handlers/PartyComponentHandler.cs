@@ -12,9 +12,11 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.GauntletUI;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.PartyComponents.Handlers;
+
 internal class PartyComponentHandler : IHandler
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PartyComponentHandler>();
@@ -83,49 +85,52 @@ internal class PartyComponentHandler : IHandler
         switch (data.TypeIndex)
         {
             case 0:
-                objectManager.AddExisting(data.Id, (BanditPartyComponent)obj);
+                objectManager.AddExisting(data.Id, obj);
                 break;
             case 1:
-                objectManager.AddExisting(data.Id, (CaravanPartyComponent)obj);
+                objectManager.AddExisting(data.Id, obj);
                 break;
             case 2:
-                objectManager.AddExisting(data.Id, (CustomPartyComponent)obj);
+                objectManager.AddExisting(data.Id, obj);
                 break;
             case 3:
-                objectManager.AddExisting(data.Id, (GarrisonPartyComponent)obj);
+                objectManager.AddExisting(data.Id, obj);
                 break;
             case 4:
-                objectManager.AddExisting(data.Id, (LordPartyComponent)obj);
+                objectManager.AddExisting(data.Id, obj);
                 break;
             case 5:
-                objectManager.AddExisting(data.Id, (MilitiaPartyComponent)obj);
+                objectManager.AddExisting(data.Id, obj);
                 break;
             case 6:
+                objectManager.AddExisting(data.Id, obj);
+
                 var patrolComponent = (PatrolPartyComponent)obj;
-                objectManager.AddExisting(data.Id, patrolComponent);
+
+                if (data.HomeSettlementId is null) break;
+
                 // Reconstitute fields that are normally set in the constructor and
                 // InitializePartyComponentProperties. These are bundled in the creation
                 // message to avoid any dependency on DynamicSync field-update ordering.
-                if (data.HomeSettlementId != null &&
-                    objectManager.TryGetObject(data.HomeSettlementId, out Settlement homeSettlement))
-                {
-                    HomeSettlementField.SetValue(patrolComponent, homeSettlement);
-                    // Reflect IsNaval through its private setter so that IsNaval is correct
-                    // before InitializePartyComponentProperties checks it.
-                    AccessTools.Property(typeof(PatrolPartyComponent), nameof(PatrolPartyComponent.IsNaval))
-                        .SetValue(patrolComponent, data.IsNaval);
-                    PatrolInitializeProperties.Invoke(patrolComponent, null);
-                }
-                else if (data.HomeSettlementId != null)
+                if (!objectManager.TryGetObject(data.HomeSettlementId, out Settlement homeSettlement))
                 {
                     Logger.Warning(
                         "PatrolPartyComponent {Id}: could not find Settlement '{SettlementId}' in ObjectManager; " +
                         "Settlement.PatrolParty will not be set on client",
                         data.Id, data.HomeSettlementId);
+                    break;
                 }
+
+                HomeSettlementField.SetValue(patrolComponent, homeSettlement);
+                // Reflect IsNaval through its private setter so that IsNaval is correct
+                // before InitializePartyComponentProperties checks it.
+                AccessTools.Property(typeof(PatrolPartyComponent), nameof(PatrolPartyComponent.IsNaval))
+                    .SetValue(patrolComponent, data.IsNaval);
+                PatrolInitializeProperties.Invoke(patrolComponent, null);
+
                 break;
             case 7:
-                objectManager.AddExisting(data.Id, (VillagerPartyComponent)obj);
+                objectManager.AddExisting(data.Id, obj);
                 break;
             default:
                 Logger.Error(

@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -27,14 +28,14 @@ internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<TroopRoster> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (MobileParty party in Campaign.Current.MobileParties)
         {
 
-            if (registry.RegisterExistingObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster) == false)
+            if (objectManager.AddExisting($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster) == false)
                 Logger.Error($"Unable to register {nameof(MobileParty.MemberRoster)}");
-            if (registry.RegisterExistingObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster) == false)
+            if (objectManager.AddExisting($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster) == false)
                 Logger.Error($"Unable to register {nameof(MobileParty.PrisonRoster)}");
         }
     }

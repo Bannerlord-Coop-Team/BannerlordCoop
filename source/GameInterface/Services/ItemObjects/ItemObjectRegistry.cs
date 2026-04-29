@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements.Buildings;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
+using GameInterface.Services.ObjectManager;
 
 namespace GameInterface.Services.ItemObjects;
 
@@ -29,12 +30,12 @@ public class ItemObjectRegistry : IAutoRegistry<ItemObject>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<ItemObject> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         // Must order by string id as this is not deterministic on load
-        foreach (ItemObject Item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>().OrderBy(i => i.StringId))
+        foreach (ItemObject Item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
         {
-            registry.RegisterExistingObject(Item.StringId, Item);
+            objectManager.AddExisting(Item.StringId, Item);
         }
     }
 

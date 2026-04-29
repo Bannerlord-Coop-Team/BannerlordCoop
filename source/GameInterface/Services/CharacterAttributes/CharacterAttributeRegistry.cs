@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -27,11 +28,11 @@ internal class CharacterAttributeRegistry : IAutoRegistry<CharacterAttribute>
     // TODO find destructor for banner effects
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<CharacterAttribute> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var obj in MBObjectManager.Instance.GetObjectTypeList<CharacterAttribute>())
         {
-            registry.RegisterExistingObject(obj.StringId, obj);
+            objectManager.AddExisting(obj.StringId, obj);
         }
     }
 

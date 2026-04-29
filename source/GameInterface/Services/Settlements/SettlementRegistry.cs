@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -29,11 +30,11 @@ internal class SettlementRegistry : IAutoRegistry<Settlement>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<Settlement> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var settlement in Settlement.All.OrderBy(obj => obj.Id))
         {
-            registry.RegisterExistingObject(settlement.StringId, settlement);
+            objectManager.AddExisting(settlement.StringId, settlement);
         }
     }
 

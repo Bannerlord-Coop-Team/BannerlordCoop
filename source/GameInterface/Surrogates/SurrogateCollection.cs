@@ -1,5 +1,6 @@
 ﻿using ProtoBuf.Meta;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -15,26 +16,21 @@ internal class SurrogateCollection : ISurrogateCollection
     {
         lock (_lock)
         {
-            if (!RuntimeTypeModel.Default.CanSerialize(typeof(Vec2)))
-                RuntimeTypeModel.Default.SetSurrogate<Vec2, Vec2Surrogate>();
-
-            if (!RuntimeTypeModel.Default.CanSerialize(typeof(TextObject)))
-                RuntimeTypeModel.Default.SetSurrogate<TextObject, TextObjectSurrogate>();
-
-            if (!RuntimeTypeModel.Default.CanSerialize(typeof(ItemModifier)))
-                RuntimeTypeModel.Default.SetSurrogate<ItemModifier, ItemModifierSurrogate>();
-
-            if (!RuntimeTypeModel.Default.CanSerialize(typeof(ItemModifierGroup)))
-                RuntimeTypeModel.Default.SetSurrogate<ItemModifierGroup, ItemModifierGroupSurrogate>();
-
-            if (!RuntimeTypeModel.Default.CanSerialize(typeof(CampaignTime)))
-                RuntimeTypeModel.Default.SetSurrogate<CampaignTime, CampaignTimeSurrogate>();
-
-            if (!RuntimeTypeModel.Default.CanSerialize(typeof(Banner)))
-                RuntimeTypeModel.Default.SetSurrogate<Banner, BannerSurrogate>();
-
-            if (!RuntimeTypeModel.Default.CanSerialize(typeof(CampaignVec2)))
-                RuntimeTypeModel.Default.SetSurrogate<CampaignVec2, CampaignVec2Surrogate>();
+            AddSurrogate<Vec2, Vec2Surrogate>();
+            AddSurrogate<CampaignVec2, CampaignVec2Surrogate>();
+            AddSurrogate<Banner, BannerSurrogate>();
+            AddSurrogate<CampaignTime, CampaignTimeSurrogate>();
+            AddSurrogate<ItemModifierGroup, ItemModifierGroupSurrogate>();
+            AddSurrogate<ItemModifier, ItemModifierSurrogate>();
+            AddSurrogate<TextObject, TextObjectSurrogate>();
         }
+    }
+
+    private void AddSurrogate<T, TSurrogate>()
+    {
+        // Already serializable, return
+        if (RuntimeTypeModel.Default.CanSerialize(typeof(T))) return;
+        
+        RuntimeTypeModel.Default.SetSurrogate<T, TSurrogate>();
     }
 }

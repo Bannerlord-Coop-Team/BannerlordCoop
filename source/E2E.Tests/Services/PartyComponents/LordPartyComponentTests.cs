@@ -45,7 +45,8 @@ public class LordPartyComponentTests : SyncTestBase
             leaderhero.Clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var spawnSettlement = GameObjectCreator.CreateInitializedObject<Settlement>();
             var newParty = LordPartyComponent.CreateLordParty(null, leaderhero, new CampaignVec2(new Vec2(5, 5), true), 5, spawnSettlement, leaderhero);
-            partyId = newParty.StringId;
+
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
         });
 
         // Assert

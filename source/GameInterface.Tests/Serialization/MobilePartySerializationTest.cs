@@ -13,6 +13,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using Xunit;
 using Xunit.Abstractions;
@@ -90,7 +91,7 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             surgeon.StringId = "My Surgeon";
             MBObjectManager.Instance.RegisterObject(surgeon);
 
-           mobilePartyObject.Surgeon = surgeon;
+            mobilePartyObject.Surgeon = surgeon;
 
             // Setup serialization for mobilePartyObject
             var factory = container.Resolve<IBinaryPackageFactory>();

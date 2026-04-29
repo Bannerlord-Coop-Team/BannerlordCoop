@@ -29,41 +29,27 @@ internal class CultureObjectRegistry : IAutoRegistry<CultureObject>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<CultureObject> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var culture in MBObjectManager.Instance.GetObjectTypeList<CultureObject>())
         {
-            registry.RegisterExistingObject(culture.StringId, culture);
+            objectManager.AddExisting(culture.StringId, culture);
         }
     }
 
     public void OnClientCreated(CultureObject obj, string id)
     {
-        var networkId = $"{nameof(BasicCultureObject)}_{id}";
-        ObjectManager.AddExisting<BasicCultureObject>(networkId, obj);
     }
 
     public void OnClientDestroyed(CultureObject obj, string id)
     {
-        var networkId = $"{nameof(BasicCultureObject)}_{id}";
-
-        if (ObjectManager.TryGetObject<BasicCultureObject>(networkId, out var resolvedObj) == false) return;
-
-        ObjectManager.Remove(resolvedObj);
     }
 
     public void OnServerCreated(CultureObject obj, string id)
     {
-        var networkId = $"{nameof(BasicCultureObject)}_{id}";
-        ObjectManager.AddExisting<BasicCultureObject>(networkId, obj);
     }
 
     public void OnServerDestroyed(CultureObject obj, string id)
     {
-        var networkId = $"{nameof(BasicCultureObject)}_{id}";
-
-        if (ObjectManager.TryGetObject<BasicCultureObject>(networkId, out var resolvedObj) == false) return;
-
-        ObjectManager.Remove(resolvedObj);
     }
 }

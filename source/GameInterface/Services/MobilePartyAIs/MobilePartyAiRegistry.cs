@@ -1,45 +1,55 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using Common.Util;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobilePartyAIs;
-internal class MobilePartyAiRegistry : RegistryBase<MobilePartyAi>
+internal class MobilePartyAiRegistry : IAutoRegistry<MobilePartyAi>
 {
-    private const string MobilePartyAiIdPrefix = "CoopMobilePartyAi";
-    private int InstanceCounter = 0;
-
-    public MobilePartyAiRegistry(IRegistryCollection collection) : base(collection)
+    ILogger Logger { get; }
+    public MobilePartyAiRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
     }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
-        var objectManager = Campaign.Current?.CampaignObjectManager;
-
-        if (objectManager == null)
+        foreach (var party in MobileParty.All)
         {
-            Logger.Error("Unable to register objects when CampaignObjectManager is null");
-            return;
-        }
-
-        foreach (var party in objectManager.MobileParties)
-        {
-            var partyAi = party.Ai;
-
-            if (partyAi == null)
-            {
-                Logger.Warning("{partyName}'s Ai was null when registering", party.Name);
-                continue;
-            }
-
-            base.RegisterExistingObject(party.StringId, partyAi);
+            objectManager.AddExisting($"{typeof(MobilePartyAi).Name}_{party.StringId}", party.Ai);
         }
     }
 
-    protected override string GetNewId(MobilePartyAi obj)
+    public void OnClientCreated(MobilePartyAi obj, string id)
     {
-        return $"{MobilePartyAiIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+    }
+
+    public void OnClientDestroyed(MobilePartyAi obj, string id)
+    {
+    }
+
+    public void OnServerCreated(MobilePartyAi obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(MobilePartyAi obj, string id)
+    {
     }
 }

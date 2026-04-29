@@ -38,7 +38,8 @@ public class BanditPartyComponentTests : SyncTestBase
             var hideout = GameObjectCreator.CreateInitializedObject<Hideout>();
             var template = GameObjectCreator.CreateInitializedObject<PartyTemplateObject>();
             var newParty = BanditPartyComponent.CreateBanditParty("TestId", clan, hideout, true, template, new CampaignVec2(new Vec2(2, 2), true));
-            partyId = newParty.StringId;
+
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
         });
 
 

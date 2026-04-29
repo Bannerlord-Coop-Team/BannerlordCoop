@@ -36,7 +36,7 @@ public class PartyCreationTests : IDisposable
             var clan = GameObjectCreator.CreateInitializedObject<Clan>();
             var party = MobileParty.CreateParty("This should not set", partyComponent);
 
-            partyId = party.StringId;
+            Assert.True(server.ObjectManager.TryGetId(party, out partyId));
         });
 
         // Assert

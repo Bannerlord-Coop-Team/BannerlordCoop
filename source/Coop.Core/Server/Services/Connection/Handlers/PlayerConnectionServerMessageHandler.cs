@@ -63,7 +63,7 @@ namespace Coop.Core.Server.Services.Connection.Handlers
             {
                 int loadingPeers = clientRegistry.LoadingPeers.Count;
 
-                string loadingMessage = "Pausing disabled, " + loadingPeers + " player(s) are currently joining the game";
+                string loadingMessage = "Time controls disabled, " + loadingPeers + " player(s) are currently joining the game";
 
                 messageBroker.Publish(this, new SendInformationMessage(loadingMessage));
                 network.SendAll(new SendInformationMessage(loadingMessage));

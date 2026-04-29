@@ -2,6 +2,7 @@
 using Common.Util;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -35,19 +36,19 @@ internal class ClanRegistry : IAutoRegistry<Clan>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<Clan> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
-        var objectManager = Campaign.Current?.CampaignObjectManager;
+        var mbObjectManager = Campaign.Current?.CampaignObjectManager;
 
-        if (objectManager == null)
+        if (mbObjectManager == null)
         {
             Logger.Error("Unable to register objects when CampaignObjectManager is null");
             return;
         }
 
-        foreach (var clan in objectManager.Clans)
+        foreach (var clan in mbObjectManager.Clans)
         {
-            registry.RegisterExistingObject(clan.StringId, clan);
+            objectManager.AddExisting(clan.StringId, clan);
         }
     }
 

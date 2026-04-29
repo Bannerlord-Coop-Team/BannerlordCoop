@@ -18,9 +18,8 @@ internal class FieldTypeSwitchCreator
 {
     private readonly TypeBuilder typeBuilder;
     private readonly ModuleBuilder moduleBuilder;
-    private readonly IObjectManager objectManager;
 
-    public FieldTypeSwitchCreator(ModuleBuilder moduleBuilder, IObjectManager objectManager)
+    public FieldTypeSwitchCreator(ModuleBuilder moduleBuilder)
     {
         typeBuilder = moduleBuilder.DefineType("FieldTypeSwitcher",
                 TypeAttributes.Public |
@@ -33,7 +32,6 @@ internal class FieldTypeSwitchCreator
                 new Type[] { typeof(IFieldTypeSwitcher) });
 
         this.moduleBuilder = moduleBuilder;
-        this.objectManager = objectManager;
     }
 
     private MethodBuilder CreateSwitch(Dictionary<Type, List<FieldInfo>> fieldMap)
@@ -94,7 +92,7 @@ internal class FieldTypeSwitchCreator
 
         foreach (var type in types)
         {
-            var fieldSwitchBuilder = new FieldSwitchCreator(moduleBuilder, type, objectManager);
+            var fieldSwitchBuilder = new FieldSwitchCreator(moduleBuilder, type);
             var fieldSwitchType = fieldSwitchBuilder.Build(fieldMap[type].ToArray());
 
             var fieldSwitchField = typeBuilder.DefineField(fieldSwitchType.Name, fieldSwitchType, FieldAttributes.Private | FieldAttributes.InitOnly);

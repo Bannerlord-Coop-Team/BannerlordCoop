@@ -4,6 +4,7 @@ using GameInterface.Registry.Messages;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
+using System;
 
 namespace Coop.Core.Server.States;
 
@@ -20,7 +21,11 @@ public class InitialServerState : ServerStateBase
         this.messageBroker = messageBroker;
         this.network = network;
         messageBroker.Subscribe<CampaignReady>(Handle_GameLoaded);
+        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_GameObjectsRegistered);
+        messageBroker.Subscribe<LifetimesPatched>(Handle_LifetimesPatched);
     }
+
+
 
     public override void Dispose()
     {
@@ -37,7 +42,15 @@ public class InitialServerState : ServerStateBase
 
         // Register all objects after main party is removed to keep order
         messageBroker.Publish(this, new RegisterAllGameObjects());
+    }
 
+    internal void Handle_GameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> payload)
+    {
+        messageBroker.Publish(this, new PatchLifetimes());
+    }
+
+    internal void Handle_LifetimesPatched(MessagePayload<LifetimesPatched> payload)
+    {
         // Change to server running state
         Logic.SetState<ServerRunningState>();
     }

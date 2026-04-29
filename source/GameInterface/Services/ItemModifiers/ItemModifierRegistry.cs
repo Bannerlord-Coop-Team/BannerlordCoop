@@ -33,15 +33,15 @@ internal class ItemModifierRegistry : IAutoRegistry<ItemModifier>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
     
-    public void RegisterAllObjects(IRegistry<ItemModifier> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
-        var objectManager = MBObjectManager.Instance;
-        foreach (var group in objectManager.GetObjectTypeList<ItemModifierGroup>())
+        var mbObjectManager = MBObjectManager.Instance;
+        foreach (var group in mbObjectManager.GetObjectTypeList<ItemModifierGroup>())
         {
             foreach(var itemModifier in group.ItemModifiers)
             {
                 var networkId = itemModifier.StringId;
-                registry.RegisterExistingObject(networkId, itemModifier);
+                objectManager.AddExisting(networkId, itemModifier);
             }
         }
     }

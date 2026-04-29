@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -24,11 +25,11 @@ internal class ItemCategoryRegistry : IAutoRegistry<PerkObject>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<PerkObject> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (PerkObject trait in PerkObject.All)
         {
-            registry.RegisterExistingObject(trait.StringId, trait);
+            objectManager.AddExisting(trait.StringId, trait);
         }
     }
 

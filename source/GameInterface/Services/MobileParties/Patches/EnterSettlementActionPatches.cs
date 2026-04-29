@@ -21,7 +21,7 @@ namespace GameInterface.Services.MobileParties.Patches
 
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            var message = new PartyEnterSettlementAttempted(settlement.StringId, mobileParty.StringId);
+            var message = new PartyEnterSettlementAttempted(settlement, mobileParty);
             MessageBroker.Instance.Publish(mobileParty, message);
 
             return false;

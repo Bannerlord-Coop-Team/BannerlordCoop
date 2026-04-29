@@ -1,5 +1,6 @@
 ﻿using GameInterface.DynamicSync.Templates;
 using GameInterface.Services.ObjectManager;
+using ProtoBuf.Meta;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
@@ -39,15 +40,15 @@ namespace GameInterface.DynamicSync.Builders
 
             string networkMessage;
             string networkChangeMessage;
-            if(objectManager.IsTypeManaged(propertyInfo.PropertyType.GetElementType()))
-            {
-                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetReferenceMessageTemplate", templateData);
-                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeReferenceMessageTemplate", templateData);
-            }
-            else
+            if(RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType.GetElementType()))
             {
                 networkMessage = TemplateParser.Parse("Messages.NetworkArraySetValueMessageTemplate", templateData);
                 networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeValueMessageTemplate", templateData);
+            }
+            else
+            {
+                networkMessage = TemplateParser.Parse("Messages.NetworkArraySetReferenceMessageTemplate", templateData);
+                networkChangeMessage = TemplateParser.Parse("Messages.NetworkArrayChangeReferenceMessageTemplate", templateData);
             }
 
             DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetLocalMessage.cs", localMessage);
@@ -65,13 +66,13 @@ namespace GameInterface.DynamicSync.Builders
         public string GetSubscription(PropertyInfo propertyInfo)
         {
             var templateData = GetTemplateData(propertyInfo);
-            if (objectManager.IsTypeManaged(propertyInfo.PropertyType.GetElementType()))
+            if (RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType.GetElementType()))
             {
-                return TemplateParser.Parse("Handlers.SubscribeArrayReferenceTemplate", templateData);
+                return TemplateParser.Parse("Handlers.SubscribeArrayValueTemplate", templateData);
             }
             else
             {
-                return TemplateParser.Parse("Handlers.SubscribeArrayValueTemplate", templateData);
+                return TemplateParser.Parse("Handlers.SubscribeArrayReferenceTemplate", templateData);
             }
         }
         private string GetArrayType(Type type)

@@ -19,7 +19,7 @@ public class GameInterface : IGameInterface
     private readonly IAutoSyncPatchCollector patchCollector;
     private readonly DynamicSyncPatcher dynamicSyncPatcher;
 
-    public GameInterface(Harmony harmony,IAutoSyncPatchCollector patchCollector, DynamicSyncPatcher dynamicSyncPatcher)
+    public GameInterface(Harmony harmony, IAutoSyncPatchCollector patchCollector, DynamicSyncPatcher dynamicSyncPatcher)
     {
         this.harmony = harmony;
         this.patchCollector = patchCollector;

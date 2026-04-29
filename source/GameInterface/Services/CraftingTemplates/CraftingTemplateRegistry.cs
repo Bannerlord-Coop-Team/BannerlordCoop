@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -24,11 +25,11 @@ internal class CraftingTemplateRegistry : IAutoRegistry<CraftingTemplate>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<CraftingTemplate> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var obj in MBObjectManager.Instance.GetObjectTypeList<CraftingTemplate>())
         {
-            registry.RegisterExistingObject(obj.StringId, obj);
+            objectManager.AddExisting(obj.StringId, obj);
         }
     }
 

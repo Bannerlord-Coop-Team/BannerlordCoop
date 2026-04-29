@@ -32,7 +32,7 @@ internal class KingdomRegistry : IAutoRegistry<Kingdom>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<Kingdom> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -44,7 +44,7 @@ internal class KingdomRegistry : IAutoRegistry<Kingdom>
 
         foreach (var kingdom in campaignObjectManager.Kingdoms)
         {
-            registry.RegisterExistingObject(kingdom.StringId, kingdom);
+            objectManager.AddExisting(kingdom.StringId, kingdom);
         }
     }
 

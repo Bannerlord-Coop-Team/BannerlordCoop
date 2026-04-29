@@ -1,5 +1,6 @@
 ﻿using Common;
 using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;
 using Serilog;
@@ -28,7 +29,7 @@ internal class StanceLinkRegistry : IAutoRegistry<StanceLink>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<StanceLink> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         IEnumerable<IFaction> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
         IEnumerable<IFaction> clans = Campaign.Current?.Clans ?? Enumerable.Empty<Clan>();
@@ -47,7 +48,7 @@ internal class StanceLinkRegistry : IAutoRegistry<StanceLink>
                 if (visitedStances.Contains(stance)) continue;
 
                 var networkId = $"{nameof(StanceLink)}_{faction.StringId}_{counter++}";
-                registry.RegisterExistingObject(networkId, stance);
+                objectManager.AddExisting(networkId, stance);
 
                 visitedStances.Add(stance);
             }

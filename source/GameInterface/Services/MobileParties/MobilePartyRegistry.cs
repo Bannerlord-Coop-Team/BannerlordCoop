@@ -1,7 +1,7 @@
 ﻿using Common;
 using Common.Util;
 using GameInterface.Registry.Auto;
-using GameInterface.Services.Entity;
+using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -37,11 +37,11 @@ internal class MobilePartyRegistry : IAutoRegistry<MobileParty>
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IRegistry<MobileParty> registry)
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (var party in MobileParty.All)
         {
-            registry.RegisterExistingObject(party.StringId, party);
+            objectManager.AddExisting(party.StringId, party);
         }
     }
 

@@ -3,11 +3,10 @@ using Common;
 using Common.Network;
 using GameInterface.AutoSync;
 using GameInterface.AutoSync.Fields;
-using GameInterface.AutoSync.Properties;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Moq;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using Xunit;
@@ -34,7 +33,7 @@ public class TranspilerTests
 
         const int typeId = 0;
 
-        var builder = new FieldTranspilerCreator(container.Resolve<IObjectManager>(), moduleBuilder, typeof(SwitchTestClass), typeId, new FieldInfo[]
+        var builder = new FieldTranspilerCreator(moduleBuilder, typeof(SwitchTestClass), typeId, new FieldInfo[]
         {
             AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.MyInt)),
             AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.RefClass)),
@@ -61,8 +60,8 @@ public class TranspilerTests
     public void InterceptSendsPacket()
     {
         var container = CreateContainer();
-        var network = container.Resolve<TestNet>();
-        var objManager = container.Resolve<IObjectManager>();
+        var mockNetwork = container.Resolve<Mock<INetwork>>();
+        var mockObjectManager = container.Resolve<Mock<IObjectManager>>();
 
         var dynamicAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("TestAutoSyncAsm"), AssemblyBuilderAccess.RunAndCollect);
         var moduleBuilder = dynamicAssembly.DefineDynamicModule("TestAutoSyncAsm");
@@ -75,7 +74,7 @@ public class TranspilerTests
             AccessTools.Field(typeof(SwitchTestClass), nameof(SwitchTestClass.RefClass)),
         };
 
-        var builder = new FieldTranspilerCreator(objManager, moduleBuilder, typeof(SwitchTestClass), classId, syncedFields, new Dictionary<FieldInfo, MethodInfo>());
+        var builder = new FieldTranspilerCreator(moduleBuilder, typeof(SwitchTestClass), classId, syncedFields, new Dictionary<FieldInfo, MethodInfo>());
 
         var transpilerType = builder.Build();
 
@@ -92,11 +91,17 @@ public class TranspilerTests
 
         var testClass = new SwitchTestClass();
 
-        const string instanceId = "MyObj";
+        string instanceId = "MyObj";
         int newValue = 1001;
-        objManager.AddExisting(instanceId, testClass);
 
-        
+        mockObjectManager
+            .Setup(x => x.TryGetObject<SwitchTestClass>(instanceId, out testClass))
+            .Returns(true);
+
+        mockObjectManager
+            .Setup(x => x.TryGetId(testClass, out instanceId))
+            .Returns(true);
+
         using (ContainerProvider.UseContainerThreadSafe(container))
         {
             ModInformation.IsServer = true;
@@ -105,13 +110,16 @@ public class TranspilerTests
 
             Assert.Equal(newValue, testClass.MyInt);
         }
-        var packet = Assert.IsType<FieldAutoSyncPacket>(network.SentPackets.First());
-        Assert.Single(network.SentPackets);
-        Assert.Equal(classId, packet.classId);
-        Assert.Equal(0, packet.fieldId);
-        Assert.Equal(instanceId, packet.instanceId);
-        Assert.Equal(newValue, RawSerializer.Deserialize<int>(packet.value));
-        
+
+        mockNetwork.Verify(x => x.SendAll(
+            It.Is<FieldAutoSyncPacket>(packet =>
+                packet.classId == classId &&
+                packet.fieldId == 0 &&
+                packet.instanceId == instanceId &&
+                RawSerializer.Deserialize<int>(packet.value) == newValue
+            )),
+            Times.Once);
+
 
 
         foreach (var method in patchMethods)
@@ -125,9 +133,24 @@ public class TranspilerTests
     {
         var builder = new ContainerBuilder();
 
-        builder.RegisterType<TestNet>().AsSelf().As<INetwork>().InstancePerLifetimeScope();
-        builder.RegisterType<TestObjManager>().AsSelf().As<IObjectManager>().InstancePerLifetimeScope();
+        RegisterMock<IObjectManager>(builder);
+        RegisterMock<INetwork>(builder);
 
         return builder.Build();
+    }
+
+    private void RegisterMock<T>(ContainerBuilder builder) where T : class
+    {
+        builder.Register(ctx =>
+        {
+            var mock = new Mock<T>();
+            return mock;
+        }).AsSelf().InstancePerLifetimeScope();
+
+        builder.Register(ctx =>
+        {
+            var mock = ctx.Resolve<Mock<T>>();
+            return mock.Object;
+        }).As<T>().InstancePerLifetimeScope();
     }
 }

@@ -43,8 +43,7 @@ public class VillagerPartyComponentTests : SyncTestBase
             villagers.Village = newVillage;
 
             Assert.True(server.ObjectManager.TryGetId(newVillage, out villageId));
-
-            partyId = newParty.StringId;
+            Assert.True(server.ObjectManager.TryGetId(newParty, out partyId));
         });
 
 
