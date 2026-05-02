@@ -46,7 +46,7 @@ internal class HeroRegistryHandler : IHandler
 
         if (objectManager.TryGetIdWithLogging(previousHero, out var previousHeroId) == false) return;
         if (objectManager.TryGetIdWithLogging(newHero, out var newHeroId) == false) return;
-        if (objectManager.TryGetIdWithLogging(newHero.PartyBelongedTo, out var partyId) == false) return;
+        //if (objectManager.TryGetIdWithLogging(newHero.PartyBelongedTo, out var partyId) == false) return;
 
         if (controlledEntityRegistry.TryGetControlledEntity(previousHeroId, out ControlledEntity previousHeroEntity))
         {
@@ -54,6 +54,6 @@ internal class HeroRegistryHandler : IHandler
         }
 
         controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, newHeroId);
-        controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, partyId);
+        //controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, partyId);
     }
 }

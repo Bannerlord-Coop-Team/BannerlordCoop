@@ -1,23 +1,26 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.TroopRosters.Messages;
-public record TroopRosterAddToCountsChanged : ICommand
+public readonly struct TroopRosterAddToCountsChanged : ICommand
 {
-    public string MobilePartyId { get; }
-    public string Character { get; }
+    public readonly MobileParty MobileParty;
+    public readonly CharacterObject CharacterObject;
 
-    public int Count { get; }
+    public readonly int Count;
 
-    public bool InsertAtFront { get; }
-    public int WoundedCount { get; }
-    public int xpChanged { get; }
-    public bool RemoveDepleted { get; }
-    public int Index { get; }
+    public readonly bool InsertAtFront;
+    public readonly int WoundedCount;
+    public readonly int xpChanged;
+    public readonly bool RemoveDepleted;
+    public readonly int Index;
 
-    public TroopRosterAddToCountsChanged(string mobilePartyId, string character, int count, bool insertAtFront, int woundedCount, int xpChanged, bool removeDepleted, int index)
+    public TroopRosterAddToCountsChanged(MobileParty mobileParty, CharacterObject characterObject, int count, bool insertAtFront, int woundedCount, int xpChanged, bool removeDepleted, int index)
     {
-        MobilePartyId = mobilePartyId;
-        Character = character;
+        MobileParty = mobileParty;
+        CharacterObject = characterObject;
         Count = count;
         InsertAtFront = insertAtFront;
         WoundedCount = woundedCount;
