@@ -6,6 +6,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Settlements.Messages;
 using HarmonyLib;
 using System.Collections.Generic;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -38,13 +39,7 @@ public class CollectNotablesToCachePatch
             }
         }
 
-
-        //pub list to server
-        List<string> cacheHeros = new();
-
-        notableCache.ForEach(hero => cacheHeros.Add(hero.StringId));
-
-        var message = new SettlementChangedNotablesCache(__instance, cacheHeros);
+        var message = new SettlementChangedNotablesCache(__instance, notableCache.ToList());
         MessageBroker.Instance.Publish(__instance, message);
         return false;
     }

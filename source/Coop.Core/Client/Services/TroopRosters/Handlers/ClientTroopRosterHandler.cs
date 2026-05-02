@@ -6,6 +6,7 @@ using Coop.Core.Server.Services.TroopRosters.Messages;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
+using System.Collections.Generic;
 
 namespace Coop.Core.Client.Services.TroopRosters.Handlers;
 public class ClientTroopRosterHandler : IHandler
@@ -28,7 +29,25 @@ public class ClientTroopRosterHandler : IHandler
     private void HandleOnRecruitmentDone(MessagePayload<RecruitmentAttempted> payload)
     {
         var obj = payload.What;
-        var message = new ClientRequestRecruitment(obj.MobilePartyId, obj.TroopsInCart);
+
+        if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId)) return;
+
+        List<TroopInfo> troops = new();
+        foreach (var (hero, character, index) in obj.TroopsInCart)
+        {
+            if (!objectManager.TryGetIdWithLogging(hero, out var heroId)) continue;
+            if (!objectManager.TryGetIdWithLogging(character, out var characterId)) continue;
+
+            troops.Add(new TroopInfo(heroId, characterId, index));
+        }
+
+        if (troops.Count <= 0)
+        {
+            Logger.Warning("No troops in card");
+            return;
+        }
+
+        var message = new ClientRequestRecruitment(mobilePartyId, troops.ToArray());
 
         network.SendAll(message);
     }
