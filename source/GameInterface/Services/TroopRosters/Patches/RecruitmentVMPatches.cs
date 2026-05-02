@@ -19,16 +19,9 @@ public class RecruitmentVMPatches
     {
         if (ModInformation.IsServer) return true;
 
-        string mobilePartyId = MobileParty.MainParty.StringId;
+        var troopsInCart = __instance.TroopsInCart.Select(t => (t.Owner.OwnerHero, t.Character, t.Index)).ToArray();
 
-        var troopsInCart = __instance.TroopsInCart.Select(
-            recruitVolunteerTroopVM => new TroopInfo(
-                recruitVolunteerTroopVM.Owner.OwnerHero.StringId,
-                recruitVolunteerTroopVM.Character.StringId,
-                recruitVolunteerTroopVM.Index
-            ));
-
-        var message = new RecruitmentAttempted(mobilePartyId, troopsInCart.ToArray());
+        var message = new RecruitmentAttempted(MobileParty.MainParty, troopsInCart);
 
         MessageBroker.Instance.Publish(__instance, message);
 

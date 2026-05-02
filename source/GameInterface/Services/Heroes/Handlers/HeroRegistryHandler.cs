@@ -44,17 +44,9 @@ internal class HeroRegistryHandler : IHandler
         var previousHero = obj.What.PreviousHero;
         var newHero = obj.What.NewHero;
 
-        if (objectManager.TryGetId(previousHero, out var previousHeroId) == false)
-        {
-            Logger.Error("Unable to find previous hero Id");
-            return;
-        }
-
-        if (objectManager.TryGetId(newHero, out var newHeroId) == false)
-        {
-            Logger.Error("Unable to find new hero Id");
-            return;
-        }
+        if (objectManager.TryGetIdWithLogging(previousHero, out var previousHeroId) == false) return;
+        if (objectManager.TryGetIdWithLogging(newHero, out var newHeroId) == false) return;
+        //if (objectManager.TryGetIdWithLogging(newHero.PartyBelongedTo, out var partyId) == false) return;
 
         if (controlledEntityRegistry.TryGetControlledEntity(previousHeroId, out ControlledEntity previousHeroEntity))
         {
@@ -62,5 +54,6 @@ internal class HeroRegistryHandler : IHandler
         }
 
         controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, newHeroId);
+        //controlledEntityRegistry.RegisterAsControlled(controllerIdProvider.ControllerId, partyId);
     }
 }

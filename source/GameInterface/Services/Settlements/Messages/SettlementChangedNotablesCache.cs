@@ -1,6 +1,7 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
@@ -14,9 +15,9 @@ namespace GameInterface.Services.Settlements.Messages;
 public readonly struct SettlementChangedNotablesCache : IEvent
 {
     public readonly Settlement Settlement;
-    public readonly List<string> NotablesCache;
+    public readonly List<Hero> NotablesCache;
 
-    public SettlementChangedNotablesCache(Settlement settlement, List<string> notablesCache)
+    public SettlementChangedNotablesCache(Settlement settlement, List<Hero> notablesCache)
     {
         Settlement = settlement;
         NotablesCache = notablesCache;

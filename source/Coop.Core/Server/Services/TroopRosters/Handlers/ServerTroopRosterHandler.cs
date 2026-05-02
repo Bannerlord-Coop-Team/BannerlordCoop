@@ -35,7 +35,11 @@ internal class ServerTroopRosterHandler : IHandler
     private void HandleAddToCounts(MessagePayload<TroopRosterAddToCountsChanged> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeTroopRosterAddtoCounts(obj.MobilePartyId, obj.Character, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.xpChanged, obj.RemoveDepleted, obj.Index);
+
+        if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.CharacterObject, out var characterObjectId)) return;
+
+        var message = new NetworkChangeTroopRosterAddtoCounts(mobilePartyId, characterObjectId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.xpChanged, obj.RemoveDepleted, obj.Index);
         network.SendAll(message);
     }
     public void Dispose()

@@ -34,7 +34,7 @@ namespace GameInterface.Services.Workshops.Handlers
         {
             var data = payload.What;
 
-            objectManager.TryGetId(data.workshop, out string workshopId);
+            if (!objectManager.TryGetIdWithLogging(data.workshop, out string workshopId)) return;
 
             NetworkWorkshopChangeProperty message = new(data._propertyType, workshopId, data.mainData, data.extraData);
             network.SendAll(message);

@@ -96,6 +96,9 @@
 	  <Reference Include="TaleWorlds.CampaignSystem">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.dll</HintPath>
 	  </Reference>
+	  <Reference Include="TaleWorlds.CampaignSystem.ViewModelCollection">
+	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.CampaignSystem.ViewModelCollection.dll</HintPath>
+	  </Reference>
 	  <Reference Include="TaleWorlds.Core">
 	    <HintPath>..\..\mb2\bin\Win64_Shipping_Client\TaleWorlds.Core.dll</HintPath>
 	  </Reference>

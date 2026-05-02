@@ -1,19 +1,28 @@
-﻿using GameInterface.Registry;
-using System.Threading;
+﻿using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEventParties;
-internal class MapEventPartyRegistry : RegistryBase<MapEventParty>
+internal class MapEventPartyRegistry : IAutoRegistry<MapEventParty>
 {
-    private const string MapEventPartyIdPrefix = "CoopPartyBase";
-    private static int InstanceCounter = 0;
-
-    public MapEventPartyRegistry(IRegistryCollection collection) : base(collection)
+    ILogger Logger { get; }
+    public MapEventPartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
+        Logger = logger;
+
+        autoRegistryFactory.RegisterType(this);
     }
 
-    public override void RegisterAll()
+    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+
+    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public void RegisterAllObjects(IObjectManager objectManager)
     {
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
@@ -29,15 +38,26 @@ internal class MapEventPartyRegistry : RegistryBase<MapEventParty>
 
                     var networkId = mapEvent.StringId + "_" + counter++;
 
-                    if (RegisterExistingObject(networkId, party) == false)
+                    if (objectManager.AddExisting(networkId, party) == false)
                         Logger.Error("Unable to register MapEventParty {id} in the object manager", party.ToString());
                 }
             }
         }
     }
 
-    protected override string GetNewId(MapEventParty obj)
+    public void OnClientCreated(MapEventParty obj, string id)
     {
-        return $"{MapEventPartyIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
+    }
+
+    public void OnClientDestroyed(MapEventParty obj, string id)
+    {
+    }
+
+    public void OnServerCreated(MapEventParty obj, string id)
+    {
+    }
+
+    public void OnServerDestroyed(MapEventParty obj, string id)
+    {
     }
 }
