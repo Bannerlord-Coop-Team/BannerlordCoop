@@ -34,7 +34,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             if (ModInformation.IsClient) return false;
             float randomNumber = ModifiedAddDecision(__instance, kingdomDecision, ignoreInfluenceCost);
             MessageBroker.Instance.Publish(__instance,
-                new DecisionAdded(__instance.StringId, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost, randomNumber));
+                new DecisionAdded(__instance, kingdomDecision.ToKingdomDecisionData(), ignoreInfluenceCost, randomNumber));
             return false;
         }
 
@@ -91,7 +91,7 @@ namespace GameInterface.Services.Kingdoms.Patches
             var index = __instance._unresolvedDecisions.FindIndex(decision => decision == kingdomDecision);
 
             MessageBroker.Instance.Publish(__instance,
-                new DecisionRemoved(__instance.StringId, index));
+                new DecisionRemoved(__instance, index));
 
             return true;
         }

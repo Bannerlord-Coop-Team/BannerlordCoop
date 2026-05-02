@@ -4,6 +4,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
+using System.Xml.Linq;
 
 namespace GameInterface.Services.ObjectManager;
 
@@ -64,6 +65,14 @@ public interface IObjectManager
     /// <param name="obj">Object to remove</param>
     /// <returns>True if successful, false if failed</returns>
     bool Remove(object obj);
+
+
+    /// <summary>
+    /// Removes all items from the collection.
+    /// </summary>
+    /// <remarks>After calling this method, the collection will be empty. This method does not throw an
+    /// exception if the collection is already empty.</remarks>
+    void Clear();
 }
 
 /// <summary>
@@ -78,6 +87,8 @@ public class ObjectManager : IObjectManager
 
     private readonly ConcurrentDictionary<Type, int> objectCounters = new ConcurrentDictionary<Type, int>();
 
+    private readonly object _gate = new();
+
     public ObjectManager(ILogger logger)
     {
         this.logger = logger;
@@ -89,24 +100,30 @@ public class ObjectManager : IObjectManager
 
         if (obj == null) return false;
 
-        if (idObjs.ContainsKey(id))
+        lock (_gate)
         {
-            logger.Warning("Duplicate id: {id}", id);
-            return false;
+            // Add type as a prefix to prevent collisions
+            id = $"{obj.GetType().Name}_{id}";
+
+            if (idObjs.ContainsKey(id))
+            {
+                logger.Warning("Duplicate id: {id}", id);
+                return false;
+            }
+
+            if (objsIds.TryGetValue(obj, out var outvar))
+            {
+                logger.Warning("Object already registered: {ObjectType}", obj.GetType());
+                return false;
+            }
+
+            IncrementCounter(obj);
+
+            idObjs.Add(id, obj);
+            objsIds.Add(obj, id);
+
+            return true;
         }
-
-        if (objsIds.TryGetValue(obj, out var outvar))
-        {
-            logger.Warning("Object already registered: {ObjectType}", obj.GetType());
-            return false;
-        }
-
-        IncrementCounter(obj);
-
-        idObjs.Add(id, obj);
-        objsIds.Add(obj, id);
-
-        return true;
     }
 
     public bool AddNewObject(object obj, out string newId)
@@ -114,22 +131,35 @@ public class ObjectManager : IObjectManager
         newId = null;
         if (obj == null) return false;
 
-        if (objsIds.TryGetValue(obj, out var _))
+        lock (_gate)
         {
-            logger.Warning("Object already registered: {ObjectType}", obj.GetType());
-            return false;
+            if (objsIds.TryGetValue(obj, out var _))
+            {
+                logger.Warning("Object already registered: {ObjectType}", obj.GetType());
+                return false;
+            }
+
+            newId = GenerateId(obj);
+
+            if (idObjs.ContainsKey(newId))
+            {
+                logger.Error(
+                    "Generated duplicate id {Id} for object type {ObjectType}",
+                    newId,
+                    obj.GetType());
+
+                return false;
+            }
+
+            idObjs.Add(newId, obj);
+            objsIds.Add(obj, newId);
+
+            return true;
         }
-
-        newId = GenerateId(obj);
-
-        idObjs.Add(newId, obj);
-        objsIds.Add(obj, newId);
-
-        return true;
     }
 
     private int IncrementCounter(object obj)
-    { 
+    {
         var type = obj.GetType();
 
         return objectCounters.AddOrUpdate(
@@ -156,7 +186,10 @@ public class ObjectManager : IObjectManager
     {
         if (string.IsNullOrEmpty(id)) return false;
 
-        return idObjs.ContainsKey(id);
+        lock (_gate)
+        {
+            return idObjs.ContainsKey(id);
+        }
     }
 
     public bool TryGetId(object obj, out string id)
@@ -164,9 +197,11 @@ public class ObjectManager : IObjectManager
         id = null;
         if (obj == null) return false;
 
-        return objsIds.TryGetValue(obj, out id);
+        lock (_gate)
+        {
+            return objsIds.TryGetValue(obj, out id);
+        }
     }
-
     public bool TryGetObject<T>(string id, out T obj)
     {
         obj = default;
@@ -192,7 +227,10 @@ public class ObjectManager : IObjectManager
 
         if (objsIds.TryGetValue(obj, out var id) == false) return false;
 
-        return idObjs.Remove(id) && objsIds.Remove(obj);
+        lock (_gate)
+        {
+            return idObjs.Remove(id) && objsIds.Remove(obj);
+        }
     }
 
     #region LogHelpers
@@ -227,6 +265,15 @@ public class ObjectManager : IObjectManager
         }
 
         return true;
+    }
+
+    public void Clear()
+    {
+        lock (_gate)
+        {
+            objsIds = new ConditionalWeakTable<object, string>();
+            idObjs.Clear();
+        }
     }
     #endregion
 }

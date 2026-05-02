@@ -1,16 +1,17 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Messages.Behavior;
 
 /// <summary>
-/// Triggered when a player attempts to leave a settlement
+/// Triggered when a player attempts to leave a settlement.
 /// </summary>
-public record EndSettlementEncounterAttempted : IEvent
+public readonly struct EndSettlementEncounterAttempted : IEvent
 {
-    public string PartyId { get; }
+    public readonly MobileParty Party;
 
-    public EndSettlementEncounterAttempted(string partyId)
+    public EndSettlementEncounterAttempted(MobileParty party)
     {
-        PartyId = partyId;
+        Party = party;
     }
 }

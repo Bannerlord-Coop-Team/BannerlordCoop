@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+/// <summary>
+/// Event from GameInterface for _power.
+/// </summary>
+public readonly struct PowerChanged : IEvent
 {
-    /// <summary>
-    /// Event from GameInterface for _power
-    /// </summary>
-    public record PowerChanged : IEvent
-    {
-        public float Power { get; }
-        public string HeroId { get; }
+    public readonly float Power;
+    public readonly Hero Hero;
 
-        public PowerChanged(float power, string heroId)
-        {
-            Power = power;
-            HeroId = heroId;
-        }
+    public PowerChanged(float power, Hero hero)
+    {
+        Power = power;
+        Hero = hero;
     }
 }

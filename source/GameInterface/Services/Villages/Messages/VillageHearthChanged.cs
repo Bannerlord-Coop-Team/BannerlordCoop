@@ -1,20 +1,21 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Villages.Messages;
 
 /// <summary>
-/// Used when the Hearth changes in a Village.
+/// Used when the hearth changes in a village.
 /// </summary>
-/// 
 [BatchLogMessage]
-public record VillageHearthChanged : ICommand
+public readonly struct VillageHearthChanged : ICommand
 {
-    public string VillageId { get; }
-    public float Hearth { get; }
-    public VillageHearthChanged(string villageID, float hearth)
+    public readonly Village Village;
+    public readonly float Hearth;
+
+    public VillageHearthChanged(Village village, float hearth)
     {
-        VillageId = villageID;
+        Village = village;
         Hearth = hearth;
     }
 }

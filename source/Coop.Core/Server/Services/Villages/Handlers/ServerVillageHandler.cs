@@ -1,86 +1,109 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Services.Villages.Messages;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Villages.Messages;
-using System;
-using System.Runtime.InteropServices;
-namespace Coop.Core.Server.Services.Villages.Handlers
+
+namespace Coop.Core.Server.Services.Villages.Handlers;
+
+/// <summary>
+/// Handles village state changes on the server.
+/// </summary>
+internal class ServerVillageHandler : IHandler
 {
-    /// <summary>
-    /// Handles VillageStates changes on the server.
-    /// </summary>
-    internal class ServerVillageHandler : IHandler
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+    private readonly IObjectManager objectManager;
+
+    public ServerVillageHandler(
+        IMessageBroker messageBroker,
+        INetwork network,
+        IObjectManager objectManager)
     {
-        private readonly IMessageBroker messageBroker;
-        private readonly INetwork network;
+        this.messageBroker = messageBroker;
+        this.network = network;
+        this.objectManager = objectManager;
 
-        public ServerVillageHandler(IMessageBroker messageBroker, INetwork network)
-        {
-            this.messageBroker = messageBroker;
-            this.network = network;
+        // This handles an internal message
+        messageBroker.Subscribe<VillageStateChanged>(HandleVillageState);
+        messageBroker.Subscribe<VillageTradeBoundChanged>(HandleTradeBound);
+        messageBroker.Subscribe<VillageHearthChanged>(HandleHearth);
+        messageBroker.Subscribe<VillageTaxAccumulateChanged>(HandleTradeTaxAccumulated);
+        messageBroker.Subscribe<VillageDemandTimeChanged>(HandleLastDemandSatisfiedTime);
+    }
 
-            // This handles an internal message
-            messageBroker.Subscribe<VillageStateChanged>(HandleVillageState);
-            messageBroker.Subscribe<VillageTradeBoundChanged>(HandleTradeBound);
-            messageBroker.Subscribe<VillageHearthChanged>(HandleHearth);
-            messageBroker.Subscribe<VillageTaxAccumulateChanged>(HandleTradeTaxAccumulated);
-            messageBroker.Subscribe<VillageDemandTimeChanged>(HandleLastDemandSatisifiedTime);
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<VillageStateChanged>(HandleVillageState);
+        messageBroker.Unsubscribe<VillageTradeBoundChanged>(HandleTradeBound);
+        messageBroker.Unsubscribe<VillageHearthChanged>(HandleHearth);
+        messageBroker.Unsubscribe<VillageTaxAccumulateChanged>(HandleTradeTaxAccumulated);
+        messageBroker.Unsubscribe<VillageDemandTimeChanged>(HandleLastDemandSatisfiedTime);
+    }
 
-        }
+    private void HandleLastDemandSatisfiedTime(MessagePayload<VillageDemandTimeChanged> payload)
+    {
+        var obj = payload.What;
 
+        if (!objectManager.TryGetIdWithLogging(obj.Village, out var villageId)) return;
 
-        public void Dispose()
-        {
-            messageBroker.Unsubscribe<VillageStateChanged>(HandleVillageState);
-            messageBroker.Unsubscribe<VillageTradeBoundChanged>(HandleTradeBound);
-            messageBroker.Unsubscribe<VillageHearthChanged>(HandleHearth);
-            messageBroker.Unsubscribe<VillageTaxAccumulateChanged>(HandleTradeTaxAccumulated);
-            messageBroker.Unsubscribe<VillageDemandTimeChanged>(HandleLastDemandSatisifiedTime);
+        var networkMessage = new NetworkChangeVillageDemandTime(
+            villageId,
+            obj.LastDemandSatisfiedTime);
 
-        }
+        network.SendAll(networkMessage);
+    }
 
-        private void HandleLastDemandSatisifiedTime(MessagePayload<VillageDemandTimeChanged> payload)
-        {
-            var obj = payload.What;
+    private void HandleTradeTaxAccumulated(MessagePayload<VillageTaxAccumulateChanged> payload)
+    {
+        var obj = payload.What;
 
-            var networkMessage = new NetworkChangeVillageDemandTime(obj.VillageId, obj.LastDemandSatisfiedTime);
+        if (!objectManager.TryGetIdWithLogging(obj.Village, out var villageId)) return;
 
-            network.SendAll(networkMessage);
-        }
+        var networkMessage = new NetworkChangeVillageTradeTaxAccumulated(
+            villageId,
+            obj.TradeTaxAccumulated);
 
-        private void HandleTradeTaxAccumulated(MessagePayload<VillageTaxAccumulateChanged> payload)
-        {
-            var obj = payload.What;
+        network.SendAll(networkMessage);
+    }
 
-            var networkMessage = new NetworkChangeVillageTradeTaxAccumulated(obj.VilageId, obj.TradeTaxAccumulated);
-            network.SendAll(networkMessage);
-        }
+    private void HandleHearth(MessagePayload<VillageHearthChanged> payload)
+    {
+        var obj = payload.What;
 
-        private void HandleHearth(MessagePayload<VillageHearthChanged> payload)
-        {
-            var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.Village, out var villageId)) return;
 
-            var networkMessage = new NetworkChangeVillageHearth(obj.VillageId, obj.Hearth);
-            network.SendAll(networkMessage);
-        }
+        var networkMessage = new NetworkChangeVillageHearth(
+            villageId,
+            obj.Hearth);
 
-        private void HandleTradeBound(MessagePayload<VillageTradeBoundChanged> payload)
-        {
-            var obj = payload.What;
+        network.SendAll(networkMessage);
+    }
 
-            // Broadcast to all the clients that the state was changed
-            var networkMessage = new NetworkChangeVillageTradeBound(obj.VillageId, obj.TradeBoundId);
-            network.SendAll(networkMessage);
-        }
+    private void HandleTradeBound(MessagePayload<VillageTradeBoundChanged> payload)
+    {
+        var obj = payload.What;
 
-        private void HandleVillageState(MessagePayload<VillageStateChanged> payload)
-        {
-            var obj = payload.What;
+        if (!objectManager.TryGetIdWithLogging(obj.Village, out var villageId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.TradeBound, out var tradeBoundId)) return;
 
-            // Broadcast to all the clients that the state was changed
-            var networkMessage = new NetworkChangeVillageState(obj.SettlementId, obj.State);
-            network.SendAll(networkMessage);
-        }
+        var networkMessage = new NetworkChangeVillageTradeBound(
+            villageId,
+            tradeBoundId);
 
+        network.SendAll(networkMessage);
+    }
+
+    private void HandleVillageState(MessagePayload<VillageStateChanged> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.Village, out var villageId)) return;
+
+        var networkMessage = new NetworkChangeVillageState(
+            villageId,
+            obj.State);
+
+        network.SendAll(networkMessage);
     }
 }

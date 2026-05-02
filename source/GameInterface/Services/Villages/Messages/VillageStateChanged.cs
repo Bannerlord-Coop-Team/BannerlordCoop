@@ -1,18 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Villages.Messages;
 
 /// <summary>
-/// This event is fired when the village state is updated
+/// This event is fired when the village state is updated.
 /// </summary>
-public record VillageStateChanged : ICommand
+public readonly struct VillageStateChanged : ICommand
 {
-    public string SettlementId { get; }
-    public int State { get; }
+    public readonly Village Village;
+    public readonly int State;
 
-    public VillageStateChanged(string settlementId, int state)
+    public VillageStateChanged(Village village, int state)
     {
-        SettlementId = settlementId;
+        Village = village;
         State = state;
     }
 }

@@ -31,8 +31,7 @@ internal class MBBodyPropertyRegistry : IAutoRegistry<MBBodyProperty>
     {
         foreach (CharacterObject character in CharacterObject.All.DistinctBy(c => c.BodyPropertyRange))
         {
-            var networkId = nameof(MBBodyProperty) + "_" + character.StringId;
-            objectManager.AddExisting(networkId, character.BodyPropertyRange);
+            objectManager.AddExisting(character.StringId, character.BodyPropertyRange);
         }
     }
 

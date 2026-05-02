@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+/// <summary>
+/// Event from GameInterface for Culture.
+/// </summary>
+public readonly struct CultureChanged : IEvent
 {
-    /// <summary>
-    /// Event from GameInterface for Culture
-    /// </summary>
-    public record CultureChanged : IEvent
-    {
-        public string CultureStringId { get; }
-        public string HeroId { get; }
+    public readonly CultureObject Culture;
+    public readonly Hero Hero;
 
-        public CultureChanged(string cultureStringId, string heroId)
-        {
-            CultureStringId = cultureStringId;
-            HeroId = heroId;
-        }
+    public CultureChanged(CultureObject culture, Hero hero)
+    {
+        Culture = culture;
+        Hero = hero;
     }
 }

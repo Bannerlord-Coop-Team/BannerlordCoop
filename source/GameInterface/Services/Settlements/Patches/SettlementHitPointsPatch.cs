@@ -25,7 +25,7 @@ internal class SettlementHitPointsPatch
 
         if (ModInformation.IsClient) return false;
 
-        var message = new SettlementChangedSettlementHitPoints(__instance.StringId, value);
+        var message = new SettlementChangedSettlementHitPoints(__instance, value);
 
         MessageBroker.Instance.Publish(__instance, message);
 

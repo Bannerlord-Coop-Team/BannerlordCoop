@@ -36,7 +36,7 @@ public class GarrisonWagePaymentLimitSettlementPatch
         }
 
 
-        var message = new SettlementChangedGarrisonWageLimit(__instance.StringId, value);
+        var message = new SettlementChangedGarrisonWageLimit(__instance, value);
 
         MessageBroker.Instance.Publish(__instance, message);
 

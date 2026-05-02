@@ -47,7 +47,7 @@ public class MobilePartyCachePatch
             // MobilePartyId
             // LordParties Value
             // bool add or remove
-            var message = new SettlementChangedMobileParty(__instance.StringId, mobileParty.StringId, lordParties, true);
+            var message = new SettlementChangedMobileParty(__instance, mobileParty, lordParties, true);
             MessageBroker.Instance.Publish(__instance, message);
         }
 
@@ -77,7 +77,7 @@ public class MobilePartyCachePatch
             // MobilePartyId
             // LordParties Value
             // bool add or remove
-            var message = new SettlementChangedMobileParty(__instance.StringId, mobileParty.StringId, lordParties, false);
+            var message = new SettlementChangedMobileParty(__instance, mobileParty, lordParties, false);
             MessageBroker.Instance.Publish(__instance, message);
 
         }

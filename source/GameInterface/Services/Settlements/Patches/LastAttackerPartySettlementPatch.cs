@@ -41,7 +41,7 @@ public class LastAttackerPartySettlementPatch
             if (__instance.LastAttackerParty.StringId == value.StringId) return false;
         }
 
-        var message = new SettlementChangedLastAttackerParty(__instance.StringId, value.StringId);
+        var message = new SettlementChangedLastAttackerParty(__instance, value);
 
         MessageBroker.Instance.Publish(__instance, message);
 

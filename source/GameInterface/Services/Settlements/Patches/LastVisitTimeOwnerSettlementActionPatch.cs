@@ -76,6 +76,6 @@ public class LastVisitTimeOwnerSettlementActionPatch
 
 
         instance.LastVisitTimeOfOwner = newValue;
-        MessageBroker.Instance.Publish(instance, new SettlementChangedLastVisitTimeOfOwner(instance.StringId, newValue));
+        MessageBroker.Instance.Publish(instance, new SettlementChangedLastVisitTimeOfOwner(instance, newValue));
     }
 }

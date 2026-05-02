@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Client.Services.Settlements.Messages;
 using Coop.Core.Server.Services.Settlements.Messages;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Settlements.Audit;
 using GameInterface.Services.Settlements.Messages;
 using LiteNetLib;
@@ -16,12 +17,13 @@ internal class ServerSettlementHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IObjectManager objectManager;
 
-    public ServerSettlementHandler(IMessageBroker messageBroker, INetwork network)
+    public ServerSettlementHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-
+        this.objectManager = objectManager;
         messageBroker.Subscribe<SettlementChangedBribePaid>(HandleBribePaid);
         messageBroker.Subscribe<SettlementChangedSettlementHitPoints>(HandleHitPoints);
         messageBroker.Subscribe<SettlementChangedLastAttackerParty>(HandleLastAttackerParty);
@@ -45,15 +47,10 @@ internal class ServerSettlementHandler : IHandler
         //Settlement.CanBeClaimed
         messageBroker.Subscribe<SettlementClaimantCanBeClaimedChanged>(HandleSettlementClaimaintCanBeClaimed);
 
-
         // auditor
         messageBroker.Subscribe<RequestSettlementAudit>(Handle_Request);
         // send back to client
         messageBroker.Subscribe<SettlementAuditResponse>(Handle_Respond);
-
-
-
-
     }
 
     private void Handle_Respond(MessagePayload<SettlementAuditResponse> payload)
@@ -73,7 +70,10 @@ internal class ServerSettlementHandler : IHandler
     private void HandleSettlementClaimaintCanBeClaimed(MessagePayload<SettlementClaimantCanBeClaimedChanged> payload)
     {
         var obj = payload.What;
-        network.SendAll(new NetworkChangeSettlementClaimantCanBeClaimed(obj.SettlementId, obj.CanBeClaimed)); 
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        network.SendAll(new NetworkChangeSettlementClaimantCanBeClaimed(settlementId, obj.CanBeClaimed)); 
     }
 
     private void HandleLordConversationCampaignBehaviorPlayerClaimValue(MessagePayload<ClientChangeLordConversationCampaignBehaviorPlayerClaimValue> payload)
@@ -98,27 +98,41 @@ internal class ServerSettlementHandler : IHandler
     private void HandleLastVisitOfOwner(MessagePayload<SettlementChangedLastVisitTimeOfOwner> payload)
     {
         var obj = payload.What;
-        network.SendAll(new NetworkChangeLastVisitTimeOfOwner(obj.SettlementID, obj.CurrentTime));
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        network.SendAll(new NetworkChangeLastVisitTimeOfOwner(settlementId, obj.CurrentTime));
     }
 
     private void HandleWallRatio(MessagePayload<SettlementWallHitPointsRatioChanged> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeWallHitPointsRatio(obj.SettlementId, obj.index, obj.hitPointsRatio);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        var message = new NetworkChangeWallHitPointsRatio(settlementId, obj.Index, obj.HitPointsRatio);
         network.SendAll(message);
     }
 
     private void HandleChangedMobileParty(MessagePayload<SettlementChangedMobileParty> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementMobileParty(obj.SettlementId, obj.MobilePartyId, obj.NumberOfLordParties, obj.AddMobileParty);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId)) return;
+
+        var message = new NetworkChangeSettlementMobileParty(settlementId, mobilePartyId, obj.NumberOfLordParties, obj.AddMobileParty);
         network.SendAll(message);
     }
 
     private void HandleRemoveHeroWithoutParty(MessagePayload<SettlementChangedRemoveHeroWithoutParty> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementRemoveHeroWithoutParty(obj.SettlementId, obj.HeroId);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.Hero, out var heroId)) return;
+
+        var message = new NetworkChangeSettlementRemoveHeroWithoutParty(settlementId, heroId);
 
         network.SendAll(message);
     }
@@ -126,7 +140,11 @@ internal class ServerSettlementHandler : IHandler
     private void HandleAddHeroWithoutParty(MessagePayload<SettlementChangedAddHeroWithoutParty> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementAddHeroWithoutParty(obj.SettlementId, obj.HeroId);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.Hero, out var heroId)) return;
+
+        var message = new NetworkChangeSettlementAddHeroWithoutParty(settlementId, heroId);
 
         network.SendAll(message);
     }
@@ -134,14 +152,20 @@ internal class ServerSettlementHandler : IHandler
     private void HandleCollectNotablesToCache(MessagePayload<SettlementChangedNotablesCache> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementNotablesCache(obj.SettlementId, obj.NotablesCache);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        var message = new NetworkChangeSettlementNotablesCache(settlementId, obj.NotablesCache);
         network.SendAll(message);
     }
 
     private void HandleGarrisonWageLimit(MessagePayload<SettlementChangedGarrisonWageLimit> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementGarrisonWagePaymentLimit(obj.SettlementId, obj.GarrisonWagePaymentLimit);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        var message = new NetworkChangeSettlementGarrisonWagePaymentLimit(settlementId, obj.GarrisonWagePaymentLimit);
         network.SendAll(message);
 
     }
@@ -149,28 +173,41 @@ internal class ServerSettlementHandler : IHandler
     private void HandleMilitia(MessagePayload<SettlementChangedMilitia> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementMilitia(obj.SettlementId, obj.Militia);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        var message = new NetworkChangeSettlementMilitia(settlementId, obj.Militia);
         network.SendAll(message);
     }
 
     private void HandleCurrentSiegeState(MessagePayload<SettlementChangedCurrentSiegeState> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementCurrentSiegeState(obj.SettlementId, obj.CurrentSiegeState);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        var message = new NetworkChangeSettlementCurrentSiegeState(settlementId, obj.CurrentSiegeState);
         network.SendAll(message);
     }
 
     private void HandleLastThreatTime(MessagePayload<SettlementChangedLastThreatTime> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementLastThreatTime(obj.SettlementId, obj.LastThreatTimeTicks);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        var message = new NetworkChangeSettlementLastThreatTime(settlementId, obj.LastThreatTimeTicks);
         network.SendAll(message);
     }
 
     private void HandleLastAttackerParty(MessagePayload<SettlementChangedLastAttackerParty> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementLastAttackerParty(obj.SettlementId, obj.AttackerPartyId);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var attackerPartyId)) return;
+
+        var message = new NetworkChangeSettlementLastAttackerParty(settlementId, attackerPartyId);
 
         network.SendAll(message);   
     }
@@ -178,7 +215,10 @@ internal class ServerSettlementHandler : IHandler
     private void HandleHitPoints(MessagePayload<SettlementChangedSettlementHitPoints> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementHitPoints(obj.SettlementId, obj.SettlementHitPoints);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        var message = new NetworkChangeSettlementHitPoints(settlementId, obj.SettlementHitPoints);
 
         network.SendAll(message);
     }
@@ -186,7 +226,10 @@ internal class ServerSettlementHandler : IHandler
     private void HandleBribePaid(MessagePayload<SettlementChangedBribePaid> payload)
     {
         var obj = payload.What;
-        var message = new NetworkChangeSettlementBribePaid(obj.SettlementId, obj.BribePaid);
+
+        if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
+
+        var message = new NetworkChangeSettlementBribePaid(settlementId, obj.BribePaid);
 
         network.SendAll(message);
     }

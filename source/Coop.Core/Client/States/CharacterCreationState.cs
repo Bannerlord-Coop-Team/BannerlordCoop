@@ -7,7 +7,6 @@ using Coop.Core.Server.Connections.Messages;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
-using GameInterface.Services.Entity.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
 
@@ -22,6 +21,7 @@ public class CharacterCreationState : ClientStateBase
     private readonly INetwork network;
     private readonly IHeroInterface heroInterface;
     private readonly IControllerIdProvider controllerIdProvider;
+    private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly ICoopFinalizer coopFinalizer;
 
     public CharacterCreationState(
@@ -30,12 +30,14 @@ public class CharacterCreationState : ClientStateBase
         INetwork network,
         IHeroInterface heroInterface,
         IControllerIdProvider controllerIdProvider,
+        IControlledEntityRegistry controlledEntityRegistry,
         ICoopFinalizer coopFinalizer) : base(logic)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.heroInterface = heroInterface;
         this.controllerIdProvider = controllerIdProvider;
+        this.controlledEntityRegistry = controlledEntityRegistry;
         this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
         messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectRegistered);
@@ -73,8 +75,8 @@ public class CharacterCreationState : ClientStateBase
 
         var controllerId = controllerIdProvider.ControllerId;
 
-        messageBroker.Publish(this, new AddControlledEntity(controllerId, obj.What.HeroStringId));
-        messageBroker.Publish(this, new AddControlledEntity(controllerId, obj.What.PartyStringId));
+        controlledEntityRegistry.RegisterAsControlled(controllerId, obj.What.HeroStringId);
+        controlledEntityRegistry.RegisterAsControlled(controllerId, obj.What.PartyStringId);
 
         Logic.LoadSavedData();
     }

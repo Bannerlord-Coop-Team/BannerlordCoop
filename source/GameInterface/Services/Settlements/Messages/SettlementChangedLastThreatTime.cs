@@ -1,21 +1,21 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
-using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// When the LastThreatTime has been changed or is elapsed for so long its null.
+/// When the last threat time has been changed or has elapsed for long enough that it is null.
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedLastThreatTime : IEvent
+public readonly struct SettlementChangedLastThreatTime : IEvent
 {
-    public string SettlementId { get; }
-    public long? LastThreatTimeTicks { get; }
+    public readonly Settlement Settlement;
+    public readonly long? LastThreatTimeTicks;
 
-    public SettlementChangedLastThreatTime(string settlementId, long? lastThreatTime)
+    public SettlementChangedLastThreatTime(Settlement settlement, long? lastThreatTimeTicks)
     {
-        SettlementId = settlementId;
-        LastThreatTimeTicks = lastThreatTime;
+        Settlement = settlement;
+        LastThreatTimeTicks = lastThreatTimeTicks;
     }
 }

@@ -38,7 +38,7 @@ internal class AlleyRegistry : IAutoRegistry<Alley>
 
             foreach (Alley alley in settlement.Alleys)
             {
-                var networkId = "Alley_" + settlement.StringId + counter++;
+                var networkId = settlement.StringId + counter++;
                 if (!objectManager.AddExisting(networkId, alley))
                     Logger.Error($"Unable to register {alley}");
             }

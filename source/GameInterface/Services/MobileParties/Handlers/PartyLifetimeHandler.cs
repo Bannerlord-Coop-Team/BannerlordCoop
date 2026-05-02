@@ -54,7 +54,7 @@ internal class PartyLifetimeHandler : IHandler
 
     private void Handle_DestroyParty(MessagePayload<NetworkDestroyParty> payload)
     {
-        var stringId = payload.What.StringId;
+        var stringId = payload.What.PartyId;
 
         var isClient = ModInformation.IsClient ? "Client" : "Server";
 

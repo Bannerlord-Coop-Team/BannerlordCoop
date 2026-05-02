@@ -9,10 +9,7 @@ namespace GameInterface.Services.MobileParties.Messages;
 /// </summary>
 public record AttachedPartyRemoved : GenericEvent<MobileParty, MobileParty>
 {
-    public AttachedPartyData AttachedPartyData { get; }
-
     public AttachedPartyRemoved(MobileParty instance, MobileParty value) : base(instance, value)
     {
-        AttachedPartyData = new AttachedPartyData(instance.StringId, value.StringId);
     }
 }

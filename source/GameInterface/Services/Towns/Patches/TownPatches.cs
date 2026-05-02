@@ -32,7 +32,7 @@ namespace GameInterface.Services.Towns.Patches
             if (__instance.Governor == value) return false;
 
             
-            var message = new TownGovernorChanged(__instance.StringId, value?.StringId);
+            var message = new TownGovernorChanged(__instance, value);
             MessageBroker.Instance.Publish(__instance, message);
             return true;
         }
@@ -58,7 +58,7 @@ namespace GameInterface.Services.Towns.Patches
             if (ModInformation.IsClient) return false;
             if (__instance.LastCapturedBy == value) return false;
 
-            var message = new TownLastCapturedByChanged(__instance.StringId, value.StringId);
+            var message = new TownLastCapturedByChanged(__instance, value);
             MessageBroker.Instance.Publish(__instance, message);
             return true;
         }
@@ -100,7 +100,7 @@ namespace GameInterface.Services.Towns.Patches
             if (ModInformation.IsClient) return false;
             if (__instance.TradeTaxAccumulated == value) return false;
 
-            var message = new TownTradeTaxAccumulatedChanged(__instance.StringId, value);
+            var message = new TownTradeTaxAccumulatedChanged(__instance, value);
             MessageBroker.Instance.Publish(__instance, message);
             return true;
         }
@@ -124,7 +124,7 @@ namespace GameInterface.Services.Towns.Patches
 
             if (ModInformation.IsClient) return false;
 
-            var message = new TownSoldItemsChanged(__instance.StringId, logList);
+            var message = new TownSoldItemsChanged(__instance, logList);
             MessageBroker.Instance.Publish(__instance, message);
             return true;
         }
@@ -180,7 +180,7 @@ namespace GameInterface.Services.Towns.Patches
             if (town.GarrisonAutoRecruitmentIsEnabled == garrisonAutoRecruitmentIsEnabled) return;
 
             town.GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
-            var message = new TownGarrisonAutoRecruitmentIsEnabledChanged(town.StringId, garrisonAutoRecruitmentIsEnabled);
+            var message = new TownGarrisonAutoRecruitmentIsEnabledChanged(town, garrisonAutoRecruitmentIsEnabled);
             MessageBroker.Instance.Publish(town, message);
         }
     }
@@ -224,7 +224,7 @@ namespace GameInterface.Services.Towns.Patches
             if (town.InRebelliousState == rebelliousState) return;
 
             town.InRebelliousState = rebelliousState;
-            var message = new TownInRebelliousStateChanged(town.StringId, rebelliousState);
+            var message = new TownInRebelliousStateChanged(town, rebelliousState);
             MessageBroker.Instance.Publish(town, message);
         }
     }

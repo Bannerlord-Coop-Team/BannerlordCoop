@@ -38,7 +38,7 @@ internal class SetWallHitPointsSettlementPatch
 
         wallSectionHitPointsRatioList[index] = MBMath.ClampFloat(hitPointsRatio, 0f, 1f);
 
-        MessageBroker.Instance.Publish(__instance, new SettlementWallHitPointsRatioChanged(__instance.StringId, index, hitPointsRatio));
+        MessageBroker.Instance.Publish(__instance, new SettlementWallHitPointsRatioChanged(__instance, index, hitPointsRatio));
 
         return true;
     }

@@ -43,7 +43,7 @@ internal class LastThreatTimeSettlementPatch
         // can pass null so always ensure to just set the value
         long? numTicks = (value != null) ? value.NumTicks : null;  
 
-        var message = new SettlementChangedLastThreatTime(__instance.StringId, numTicks);
+        var message = new SettlementChangedLastThreatTime(__instance, numTicks);
 
         MessageBroker.Instance.Publish(__instance, message);
 
