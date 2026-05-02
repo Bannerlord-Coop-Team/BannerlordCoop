@@ -1,7 +1,6 @@
-﻿using Common;
-using Common.Logging;
-using GameInterface;
+﻿using Common.Logging;
 using GameInterface.Services.Entity;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using Serilog;
 using System.Runtime.CompilerServices;
@@ -13,8 +12,7 @@ internal static class PartyExtensions
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobileParty>();
 
-    private static readonly ConditionalWeakTable<MobileParty, ControlledCache> _controlledCache = new();
-    private static readonly ConditionalWeakTable<MobileParty, PlayerCache> _playerCache = new();
+    private static ConditionalWeakTable<MobileParty, PartyCache> Cache = new();
 
     private sealed class ControlledCache
     {
@@ -58,8 +56,20 @@ internal static class PartyExtensions
             return false;
         }
 
-        var result = entityRegistry.IsControlledBy(idProvider.ControllerId, party.StringId);
-        //cache.IsPartyControlled = result;
+        if (!ContainerProvider.TryResolve<IObjectManager>(out var objectManager))
+        {
+            Logger.Error("Unable to resolve {name}", nameof(IObjectManager));
+            return false;
+        }
+
+        if (!objectManager.TryGetId(party, out var partyId))
+        {
+            Logger.Error("Unable to resolve id for {name}", party.Name);
+            return false;
+        }
+
+        var result = entityRegistry.IsControlledBy(idProvider.ControllerId, partyId);
+        cache.IsPartyControlled = result;
 
         return result;
     }
@@ -110,5 +120,10 @@ internal static class PartyExtensions
 
         _playerCache.Remove(party);
         _controlledCache.Remove(party);
+    }
+
+    public static void InvalidateCache()
+    {
+        Cache = new();
     }
 }

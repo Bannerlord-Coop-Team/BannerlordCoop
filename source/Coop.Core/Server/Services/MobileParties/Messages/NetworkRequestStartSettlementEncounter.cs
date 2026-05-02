@@ -4,15 +4,16 @@ using ProtoBuf;
 namespace Coop.Core.Server.Services.MobileParties.Messages;
 
 /// <summary>
-/// Message from the client requesting a settlement encounter to start
+/// Message from the client requesting a settlement encounter to start.
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-internal record NetworkRequestStartSettlementEncounter : ICommand
+internal readonly struct NetworkRequestStartSettlementEncounter : ICommand
 {
     [ProtoMember(1)]
-    public string PartyId { get; }
+    public readonly string PartyId;
+
     [ProtoMember(2)]
-    public string SettlementId { get; }
+    public readonly string SettlementId;
 
     public NetworkRequestStartSettlementEncounter(
         string partyId,

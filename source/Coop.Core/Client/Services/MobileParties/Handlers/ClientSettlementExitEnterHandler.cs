@@ -4,6 +4,7 @@ using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Server.Services.MobileParties.Messages;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Services.ObjectManager;
 
 namespace Coop.Core.Client.Services.MobileParties.Handlers;
 
@@ -14,12 +15,13 @@ public class ClientSettlementExitEnterHandler : IHandler
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IObjectManager objectManager;
 
-    public ClientSettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network)
+    public ClientSettlementExitEnterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-
+        this.objectManager = objectManager;
         messageBroker.Subscribe<StartSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<EndSettlementEncounterAttempted>(Handle);
         messageBroker.Subscribe<NetworkEndSettlementEncounter>(Handle);
@@ -46,7 +48,11 @@ public class ClientSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<StartSettlementEncounterAttempted> obj)
     {
         var payload = obj.What;
-        var message = new NetworkRequestStartSettlementEncounter(payload.PartyId, payload.SettlementId);
+
+        if (!objectManager.TryGetIdWithLogging(payload.Party, out var partyId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.Settlement, out var settlementId)) return;
+
+        var message = new NetworkRequestStartSettlementEncounter(partyId, settlementId);
 
         network.SendAll(message);
     }
@@ -54,7 +60,10 @@ public class ClientSettlementExitEnterHandler : IHandler
     private void Handle(MessagePayload<EndSettlementEncounterAttempted> obj)
     {
         var payload = obj.What;
-        var message = new NetworkRequestEndSettlementEncounter(payload.PartyId);
+
+        if (!objectManager.TryGetIdWithLogging(payload.Party, out var partyId)) return;
+
+        var message = new NetworkRequestEndSettlementEncounter(partyId);
 
         network.SendAll(message);
     }

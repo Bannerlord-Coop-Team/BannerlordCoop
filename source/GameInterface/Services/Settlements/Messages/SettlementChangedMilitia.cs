@@ -1,19 +1,21 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
+
 /// <summary>
-/// Notify server of Militia value change
+/// Notify server of militia value change
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedMilitia : IEvent
+public readonly struct SettlementChangedMilitia : IEvent
 {
-    public string SettlementId { get; }
-    public float Militia { get; }
+    public readonly Settlement Settlement;
+    public readonly float Militia;
 
-    public SettlementChangedMilitia(string settlementId, float militia)
+    public SettlementChangedMilitia(Settlement settlement, float militia)
     {
-        SettlementId = settlementId;
+        Settlement = settlement;
         Militia = militia;
     }
 }

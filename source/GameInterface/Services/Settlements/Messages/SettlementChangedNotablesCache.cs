@@ -1,6 +1,7 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
 using System.Collections.Generic;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 
@@ -10,14 +11,14 @@ namespace GameInterface.Services.Settlements.Messages;
 /// </summary>
 /// 
 [BatchLogMessage]
-public record SettlementChangedNotablesCache : IEvent
+public readonly struct SettlementChangedNotablesCache : IEvent
 {
-    public string SettlementId { get; }
-    public List<string> NotablesCache { get; }
+    public readonly Settlement Settlement;
+    public readonly List<string> NotablesCache;
 
-    public SettlementChangedNotablesCache(string settlementId, List<string> notablesCache)
+    public SettlementChangedNotablesCache(Settlement settlement, List<string> notablesCache)
     {
-        SettlementId = settlementId;
+        Settlement = settlement;
         NotablesCache = notablesCache;
     }
 }

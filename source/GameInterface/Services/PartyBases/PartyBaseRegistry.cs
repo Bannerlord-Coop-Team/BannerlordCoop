@@ -30,7 +30,7 @@ internal class PartyBaseRegistry : IAutoRegistry<PartyBase>
     {
         foreach (var party in MobileParty.All)
         {
-            var networkId = $"{nameof(PartyBase)}_{party.StringId}";
+            var networkId = $"{party.StringId}";
 
             if (objectManager.AddExisting(networkId, party.Party) == false)
                 Logger.Error("Unable to register PartyBase from Party with the object manager");
@@ -38,7 +38,7 @@ internal class PartyBaseRegistry : IAutoRegistry<PartyBase>
 
         foreach (var settlement in Settlement.All)
         {
-            var networkId = $"{nameof(PartyBase)}_{settlement.StringId}";
+            var networkId = $"{settlement.StringId}";
 
             if (objectManager.AddExisting(networkId, settlement.Party) == false)
                 Logger.Error("Unable to register PartyBase from Party with the object manager");

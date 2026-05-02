@@ -38,7 +38,7 @@ internal class BribePaidSettlementPatch
         if (__instance.BribePaid == value) return false;
 
 
-        var message = new SettlementChangedBribePaid(__instance.StringId, value);
+        var message = new SettlementChangedBribePaid(__instance, value);
 
         MessageBroker.Instance.Publish(__instance, message);
 

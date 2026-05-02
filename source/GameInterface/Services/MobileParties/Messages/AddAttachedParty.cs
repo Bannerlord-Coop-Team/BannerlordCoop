@@ -6,12 +6,14 @@ namespace GameInterface.Services.MobileParties.Messages;
 /// <summary>
 /// Command to add an attached party
 /// </summary>
-public record AddAttachedParty : ICommand
+public readonly struct AddAttachedParty : ICommand
 {
-    public AttachedPartyData AttachedPartyData { get; }
+    public readonly string MobilePartyId;
+    public readonly string AttachedPartyId;
 
-    public AddAttachedParty(AttachedPartyData attachedPartyData)
+    public AddAttachedParty(string mobilePartiesId, string attachedPartyId)
     {
-        AttachedPartyData = attachedPartyData;
+        MobilePartyId = mobilePartiesId;
+        AttachedPartyId = attachedPartyId;
     }
 }

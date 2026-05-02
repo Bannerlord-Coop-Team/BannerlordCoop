@@ -51,9 +51,9 @@ namespace GameInterface.Services.ItemRosters.Patches
             }
 
             MessageBroker.Instance.Publish(__instance, new ItemRosterUpdated(
-                        partyBase.Id,
-                        rosterElement.Item.StringId,
-                        rosterElement.ItemModifier?.StringId,
+                        partyBase,
+                        rosterElement.Item,
+                        rosterElement.ItemModifier,
                         number));
         }
 
@@ -75,7 +75,8 @@ namespace GameInterface.Services.ItemRosters.Patches
                 return false;
             }
 
-            MessageBroker.Instance.Publish(__instance, new ItemRosterCleared(partyBase.Id));
+            MessageBroker.Instance.Publish(__instance, new ItemRosterCleared(partyBase));
+
             return true; // Allow on server
         }
 

@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// When the npc pays a BribePaid
+/// When the NPC pays a bribe.
 /// </summary>
-public record SettlementChangedBribePaid : IEvent
+public readonly struct SettlementChangedBribePaid : IEvent
 {
+    public readonly Settlement Settlement;
+    public readonly int BribePaid;
 
-    public string SettlementId { get; }
-    public int BribePaid { get; }
-
-    public SettlementChangedBribePaid(string settlementId, int bribePaid)
+    public SettlementChangedBribePaid(Settlement settlement, int bribePaid)
     {
-        SettlementId = settlementId;
+        Settlement = settlement;
         BribePaid = bribePaid;
     }
 }

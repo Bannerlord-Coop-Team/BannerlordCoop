@@ -4,20 +4,21 @@ using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Towns.Messages
-{
-    /// <summary>
-    /// Used when the SoldItems changes in a Town.
-    /// </summary>
-    public record TownSoldItemsChanged : ICommand
-    {
-        public string TownId { get; }
-        public SellLogData[] LogList { get; }
+namespace GameInterface.Services.Towns.Messages;
 
-        public TownSoldItemsChanged(string townId, IEnumerable<Town.SellLog> logList)
-        {
-            TownId = townId;
-            LogList = logList.Select(sellLog => new SellLogData(sellLog.Number, sellLog.Category.StringId)).ToArray();
-        }
+/// <summary>
+/// Used when the sold items change in a town.
+/// </summary>
+public readonly struct TownSoldItemsChanged : ICommand
+{
+    public readonly Town Town;
+    public readonly SellLogData[] LogList;
+
+    public TownSoldItemsChanged(Town town, IEnumerable<Town.SellLog> logList)
+    {
+        Town = town;
+        LogList = logList
+            .Select(sellLog => new SellLogData(sellLog.Number, sellLog.Category.StringId))
+            .ToArray();
     }
 }

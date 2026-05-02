@@ -1,17 +1,18 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Villages.Messages;
 
 [BatchLogMessage]
-public record VillageTradeBoundChanged : IEvent
+public readonly struct VillageTradeBoundChanged : IEvent
 {
-    public string VillageId { get; }
-    public string TradeBoundId { get; }
+    public readonly Village Village;
+    public readonly Settlement TradeBound;
 
-    public VillageTradeBoundChanged(string villageId, string tradeBoundId)
+    public VillageTradeBoundChanged(Village village, Settlement tradeBound)
     {
-        VillageId = villageId;
-        TradeBoundId = tradeBoundId;
+        Village = village;
+        TradeBound = tradeBound;
     }
 }

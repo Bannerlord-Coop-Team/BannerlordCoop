@@ -33,7 +33,7 @@ internal class VillagePatches
         if (ModInformation.IsClient) return false;
         if (__instance._villageState == value) return false;
         
-        var message = new VillageStateChanged(__instance.StringId, (int)value);
+        var message = new VillageStateChanged(__instance, (int)value);
         MessageBroker.Instance.Publish(__instance, message);    
         return true;
     }
@@ -66,7 +66,7 @@ internal class VillagePatches
 
         if (ModInformation.IsClient) return false;
 
-        var message = new VillageHearthChanged(__instance.StringId, value);
+        var message = new VillageHearthChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
         return true;
     }
@@ -92,7 +92,7 @@ internal class VillagePatches
 
         if (__instance._tradeBound == value) return false;
 
-        var message = new VillageTradeBoundChanged(__instance.StringId, value.StringId);
+        var message = new VillageTradeBoundChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
 
         return true;
@@ -118,7 +118,7 @@ internal class VillagePatches
 
         if (ModInformation.IsClient) return false;
 
-        var message = new VillageTaxAccumulateChanged(__instance.StringId, value);
+        var message = new VillageTaxAccumulateChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
         return true;
     }
@@ -142,7 +142,7 @@ internal class VillagePatches
 
         if (ModInformation.IsClient) return false;
 
-        var message = new VillageDemandTimeChanged(__instance.StringId, value);
+        var message = new VillageDemandTimeChanged(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
         return true;
     }

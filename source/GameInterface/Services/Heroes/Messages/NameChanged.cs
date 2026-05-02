@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+/// <summary>
+/// Event from GameInterface for _name.
+/// </summary>
+public readonly struct NameChanged : IEvent
 {
-    /// <summary>
-    /// Event from GameInterface for _name
-    /// </summary>
-    public record NameChanged : IEvent
-    {
-        public string NewName { get; }
-        public string HeroId { get; }
+    public readonly string NewName;
+    public readonly Hero Hero;
 
-        public NameChanged(string newName, string heroId)
-        {
-            NewName = newName;
-            HeroId = heroId;
-        }
+    public NameChanged(string newName, Hero hero)
+    {
+        NewName = newName;
+        Hero = hero;
     }
 }

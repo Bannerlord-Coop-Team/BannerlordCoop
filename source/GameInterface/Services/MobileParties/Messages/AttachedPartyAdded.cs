@@ -9,11 +9,7 @@ namespace GameInterface.Services.MobileParties.Messages;
 /// </summary>
 public record AttachedPartyAdded : GenericEvent<MobileParty, MobileParty>
 {
-    public AttachedPartyData AttachedPartyData { get; }
-
     public AttachedPartyAdded(MobileParty instance, MobileParty value) : base(instance, value)
     {
-        AttachedPartyData = new AttachedPartyData(instance.StringId, value.StringId);
     }
-
 }

@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Towns.Messages
+namespace GameInterface.Services.Towns.Messages;
+
+/// <summary>
+/// Used when the prosperity changes in a town.
+/// </summary>
+public readonly struct TownProsperityChanged : ICommand
 {
-    /// <summary>
-    /// Used when the Prosperity changes in a Town.
-    /// </summary>
-    public record TownProsperityChanged : ICommand
-    {
-        public string TownId { get; }
-        public float Prosperity { get; }
+    public readonly Town Town;
+    public readonly float Prosperity;
 
-        public TownProsperityChanged(string townId, float prosperity)
-        {
-            TownId = townId;
-            Prosperity = prosperity;
-        }
+    public TownProsperityChanged(Town town, float prosperity)
+    {
+        Town = town;
+        Prosperity = prosperity;
     }
 }

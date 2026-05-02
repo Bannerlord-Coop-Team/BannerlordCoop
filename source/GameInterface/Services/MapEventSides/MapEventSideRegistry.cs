@@ -43,7 +43,7 @@ internal class MapEventSideRegistry : IAutoRegistry<MapEventSide>
             {
                 if (side == null) continue;
 
-                var networkId = nameof(MapEventSide) + "_" + mapEvent.StringId + "_" + counter++;
+                var networkId = mapEvent.StringId + "_" + counter++;
 
                 if (objectManager.AddExisting(networkId, side) == false)
                     Logger.Error("Unable to register MapEventSide {id} in the object manager", side.ToString());

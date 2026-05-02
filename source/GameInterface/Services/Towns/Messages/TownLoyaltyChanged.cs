@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Towns.Messages
+namespace GameInterface.Services.Towns.Messages;
+
+/// <summary>
+/// Used when the loyalty changes in a town.
+/// </summary>
+public readonly struct TownLoyaltyChanged : ICommand
 {
-    /// <summary>
-    /// Used when the Loyalty changes in a Town.
-    /// </summary>
-    public record TownLoyaltyChanged : ICommand
-    {
-        public string TownId { get; }
-        public float Loyalty { get; }
+    public readonly Town Town;
+    public readonly float Loyalty;
 
-        public TownLoyaltyChanged(string townId, float loyalty)
-        {
-            TownId = townId;
-            Loyalty = loyalty;
-        }
+    public TownLoyaltyChanged(Town town, float loyalty)
+    {
+        Town = town;
+        Loyalty = loyalty;
     }
 }

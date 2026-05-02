@@ -15,10 +15,9 @@ public class SettlementClaimantCampaignBehaviorCanBeClaimedTest
     [Fact]
     public void SettlementClaimantCampaignBehaviorCanBeClaimed_Publishes_AllClients()
     {
-        string SettlementId = "SettlementID";
         int CanBeClaimed = 10;
 
-        var triggerMessage = new SettlementClaimantCanBeClaimedChanged(SettlementId, CanBeClaimed);
+        var triggerMessage = new SettlementClaimantCanBeClaimedChanged(null, CanBeClaimed);
 
         var server = TestEnvironment.Server;
 
@@ -32,9 +31,6 @@ public class SettlementClaimantCampaignBehaviorCanBeClaimedTest
         {
             Assert.Equal(1, client.InternalMessages.GetMessageCount<ChangeSettlementClaimantCanBeClaimed>());
         }
-
-
-
     }
 
 }

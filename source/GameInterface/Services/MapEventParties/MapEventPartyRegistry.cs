@@ -45,7 +45,7 @@ internal class MapEventPartyRegistry : IAutoRegistry<MapEventParty>
                 {
                     if (party == null) continue;
 
-                    var networkId = nameof(MapEventParty) + "_" + mapEvent.StringId + "_" + counter++;
+                    var networkId = mapEvent.StringId + "_" + counter++;
 
                     if (objectManager.AddExisting(networkId, party) == false)
                         Logger.Error("Unable to register MapEventParty {id} in the object manager", party.ToString());

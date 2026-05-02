@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+/// <summary>
+/// Event from GameInterface for SpcDaysInLocation.
+/// </summary>
+public readonly struct SpcDaysInLocationChanged : IEvent
 {
-    /// <summary>
-    /// Event from GameInterface for SpcDaysInLocation
-    /// </summary>
-    public record SpcDaysInLocationChanged : IEvent
-    {
-        public int Days { get; }
-        public string HeroId { get; }
+    public readonly int Days;
+    public readonly Hero Hero;
 
-        public SpcDaysInLocationChanged(int days, string heroId)
-        {
-            Days = days;
-            HeroId = heroId;
-        }
+    public SpcDaysInLocationChanged(int days, Hero hero)
+    {
+        Days = days;
+        Hero = hero;
     }
 }

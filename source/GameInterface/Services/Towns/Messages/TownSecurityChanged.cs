@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Towns.Messages
+namespace GameInterface.Services.Towns.Messages;
+
+/// <summary>
+/// Used when the security changes in a town.
+/// </summary>
+public readonly struct TownSecurityChanged : ICommand
 {
-    /// <summary>
-    /// Used when the Security changes in a Town.
-    /// </summary>
-    public record TownSecurityChanged : ICommand
-    {
-        public string TownId { get; }
-        public float Security { get; }
+    public readonly Town Town;
+    public readonly float Security;
 
-        public TownSecurityChanged(string townId, float security)
-        {
-            TownId = townId;
-            Security = security;
-        }
+    public TownSecurityChanged(Town town, float security)
+    {
+        Town = town;
+        Security = security;
     }
 }

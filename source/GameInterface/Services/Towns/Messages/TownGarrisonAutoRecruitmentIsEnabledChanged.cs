@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Towns.Messages
+namespace GameInterface.Services.Towns.Messages;
+
+/// <summary>
+/// Used when the GarrisonAutoRecruitmentIsEnabled changes in a town.
+/// </summary>
+public readonly struct TownGarrisonAutoRecruitmentIsEnabledChanged : ICommand
 {
-    /// <summary>
-    /// Used when the GarrisonAutoRecruitmentIsEnabled changes in a Town.
-    /// </summary>
-    public record TownGarrisonAutoRecruitmentIsEnabledChanged: ICommand
-    {
-        public string TownId { get; }
-        public bool GarrisonAutoRecruitmentIsEnabled { get; }
+    public readonly Town Town;
+    public readonly bool GarrisonAutoRecruitmentIsEnabled;
 
-        public TownGarrisonAutoRecruitmentIsEnabledChanged(string townId, bool garrisonAutoRecruitmentIsEnabled)
-        {
-            TownId = townId;
-            GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
-        }
+    public TownGarrisonAutoRecruitmentIsEnabledChanged(Town town, bool garrisonAutoRecruitmentIsEnabled)
+    {
+        Town = town;
+        GarrisonAutoRecruitmentIsEnabled = garrisonAutoRecruitmentIsEnabled;
     }
 }

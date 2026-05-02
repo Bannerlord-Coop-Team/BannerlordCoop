@@ -12,13 +12,13 @@ namespace Coop.Core.Server.Services.Settlements.Messages;
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
 [BatchLogMessage]
-public record NetworkChangeSettlementRemoveHeroWithoutParty : IEvent
+public readonly struct NetworkChangeSettlementRemoveHeroWithoutParty : IEvent
 {
     [ProtoMember(1)]
-    public string SettlementId { get; }
+    public readonly string SettlementId;
 
     [ProtoMember(2)]
-    public string HeroId { get; }
+    public readonly string HeroId;
 
     public NetworkChangeSettlementRemoveHeroWithoutParty(string settlementId, string heroId)
     {

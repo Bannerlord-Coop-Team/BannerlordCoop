@@ -1,17 +1,18 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.MobileParties.Messages.Data;
 
 namespace GameInterface.Services.MobileParties.Messages;
 
 /// <summary>
 /// Command to remove an attached party
 /// </summary>
-public record RemoveAttachedParty : ICommand
+public readonly struct RemoveAttachedParty : ICommand
 {
-    public AttachedPartyData AttachedPartyData { get; }
+    public readonly string MobilePartyId;
+    public readonly string AttachedPartyId;
 
-    public RemoveAttachedParty(AttachedPartyData attachedPartyData)
+    public RemoveAttachedParty(string mobilePartiesId, string attachedPartyId)
     {
-        AttachedPartyData = attachedPartyData;
+        MobilePartyId = mobilePartiesId;
+        AttachedPartyId = attachedPartyId;
     }
 }

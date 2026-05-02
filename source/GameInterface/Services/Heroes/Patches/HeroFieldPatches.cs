@@ -70,7 +70,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new LastTimeStampChanged(newTimestamp, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new LastTimeStampChanged(newTimestamp, instance));
 
             instance.LastTimeStampForActivity = newTimestamp;
         }
@@ -107,7 +107,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject.StringId, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new CharacterObjectChanged(newCharacterObject, instance));
 
             instance._characterObject = newCharacterObject;
         }
@@ -144,7 +144,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new FirstNameChanged(newName.Value, instance));
 
             instance._firstName = newName;
         }
@@ -181,7 +181,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new NameChanged(newName.Value, instance));
 
             instance._name = newName;
         }
@@ -220,7 +220,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new HeroStateChanged((int)newState, instance));
 
             instance._heroState = newState;
         }
@@ -259,7 +259,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new DefaultAgeChanged(age, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new DefaultAgeChanged(age, instance));
 
             instance._defaultAge = age;
         }
@@ -296,7 +296,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new BirthDayChanged(birthDay.NumTicks, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new BirthDayChanged(birthDay.NumTicks, instance));
 
             instance._birthDay = birthDay;
         }
@@ -333,7 +333,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new PowerChanged(power, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new PowerChanged(power, instance));
 
             instance._power = power;
         }
@@ -371,7 +371,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement?.StringId, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new HomeSettlementChanged(settlement, instance));
 
             instance._homeSettlement = settlement;
         }
@@ -408,7 +408,7 @@ namespace GameInterface.Services.Heroes.Patches
                 return;
             }
 
-            MessageBroker.Instance.Publish(instance, new PregnantChanged(isPregnant, instance.StringId));
+            MessageBroker.Instance.Publish(instance, new PregnantChanged(instance, isPregnant));
 
             instance.IsPregnant = isPregnant;
         }

@@ -1,5 +1,7 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 
@@ -7,14 +9,14 @@ namespace GameInterface.Services.Settlements.Messages;
 /// When a hero is attached to hero cache
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedAddHeroWithoutParty : IEvent
+public readonly struct SettlementChangedAddHeroWithoutParty : IEvent
 {
-    public string SettlementId { get; }
-    public string HeroId {  get; }
+    public readonly Settlement Settlement;
+    public readonly Hero Hero;
 
-    public SettlementChangedAddHeroWithoutParty(string settlementId, string heroId)
+    public SettlementChangedAddHeroWithoutParty(Settlement settlement, Hero hero)
     {
-        SettlementId = settlementId;
-        HeroId = heroId;
+        Settlement = settlement;
+        Hero = hero;
     }
 }

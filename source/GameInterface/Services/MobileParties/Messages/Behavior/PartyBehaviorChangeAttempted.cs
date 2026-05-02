@@ -12,12 +12,12 @@ namespace GameInterface.Services.MobileParties.Messages.Behavior;
 /// </summary>
 /// <seealso cref="MobilePartyBehaviorHandler"/>
 [BatchLogMessage]
-internal record PartyBehaviorChangeAttempted : IEvent
+internal readonly struct PartyBehaviorChangeAttempted : IEvent
 {
-    public MobilePartyAi PartyAi { get; }
-    public AiBehavior NewAiBehavior { get; }
-    public IInteractablePoint InteractablePoint { get; }
-    public CampaignVec2 BestTargetPoint { get; }
+    public readonly MobilePartyAi PartyAi;
+    public readonly AiBehavior NewAiBehavior;
+    public readonly IInteractablePoint InteractablePoint;
+    public readonly CampaignVec2 BestTargetPoint;
 
     public PartyBehaviorChangeAttempted(MobilePartyAi partyAi, AiBehavior newAiBehavior, IInteractablePoint interactablePoint, CampaignVec2 bestTargetPoint)
     {

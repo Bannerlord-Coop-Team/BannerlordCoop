@@ -1,8 +1,7 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 
@@ -11,14 +10,14 @@ namespace GameInterface.Services.Settlements.Messages;
 /// Settlement HeroWithoutParty was removed notify server.
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedRemoveHeroWithoutParty : IEvent
+public readonly struct SettlementChangedRemoveHeroWithoutParty : IEvent
 {
-    public string SettlementId { get; }
-    public string HeroId { get; }
+    public readonly Settlement Settlement;
+    public readonly Hero Hero;
 
-    public SettlementChangedRemoveHeroWithoutParty(string settlementId, string heroId)
+    public SettlementChangedRemoveHeroWithoutParty(Settlement settlement, Hero hero)
     {
-        SettlementId = settlementId;
-        HeroId = heroId;
+        Settlement = settlement;
+        Hero = hero;
     }
 }

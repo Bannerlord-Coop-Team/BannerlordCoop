@@ -8,13 +8,16 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 /// Network message for commanding a removal to the attached parties list
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record NetworkRemoveAttachedParty : ICommand
+public readonly struct NetworkRemoveAttachedParty : ICommand
 {
     [ProtoMember(1)]
-    public AttachedPartyData AttachedPartyData { get; }
+    public readonly string PartyId;
+    [ProtoMember(2)]
+    public readonly string AttachedPartyId;
 
-    public NetworkRemoveAttachedParty(AttachedPartyData attachedPartyData)
+    public NetworkRemoveAttachedParty(string partyId, string attachedPartyId)
     {
-        AttachedPartyData = attachedPartyData;
+        PartyId = partyId;
+        AttachedPartyId = attachedPartyId;
     }
 }

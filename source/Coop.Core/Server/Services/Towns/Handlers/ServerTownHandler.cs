@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Server.Services.Towns.Messages;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Towns.Messages;
 
 namespace Coop.Core.Server.Services.Towns.Handlers
@@ -12,11 +13,13 @@ namespace Coop.Core.Server.Services.Towns.Handlers
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
+        private readonly IObjectManager objectManager;
 
-        public ServerTownHandler(IMessageBroker messageBroker, INetwork network)
+        public ServerTownHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
             this.network = network;
+            this.objectManager = objectManager;
 
             // This handles an internal message
             messageBroker.Subscribe<TownGovernorChanged>(HandleTownGovernor);
@@ -33,90 +36,116 @@ namespace Coop.Core.Server.Services.Towns.Handlers
 
         private void HandleTownAuditorSent(MessagePayload<NetworkChangeTownAuditor> payload)
         {
-            NetworkChangeTownAuditor networkChangeTownAuditor = payload.What;
-            SendTownAuditor message = new SendTownAuditor(networkChangeTownAuditor.Datas);
+            var networkChangeTownAuditor = payload.What;
+            var message = new SendTownAuditor(networkChangeTownAuditor.AuditData);
+
             messageBroker.Publish(this, message);
         }
+
         private void HandleTownSoldItems(MessagePayload<TownSoldItemsChanged> obj)
         {
-            TownSoldItemsChanged townSoldItemsChanged = obj.What;
+            var payload = obj.What;
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeTownSoldItems networkChangeTownSoldItems = new NetworkChangeTownSoldItems(townSoldItemsChanged.TownId, townSoldItemsChanged.LogList);
+            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
+
+            var networkChangeTownSoldItems = new NetworkChangeTownSoldItems(townId, payload.LogList);
             network.SendAll(networkChangeTownSoldItems);
         }
 
         private void HandleTownGarrisonAutoRecruitmentIsEnabled(MessagePayload<TownGarrisonAutoRecruitmentIsEnabledChanged> obj)
         {
-            TownGarrisonAutoRecruitmentIsEnabledChanged townGarrisonAutoRecruitmentIsEnabledChanged = obj.What;
+            var payload = obj.What;
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeTownGarrisonAutoRecruitmentIsEnabled networkChangeTownGarrisonAutoRecruitmentIsEnabled = new NetworkChangeTownGarrisonAutoRecruitmentIsEnabled(townGarrisonAutoRecruitmentIsEnabledChanged.TownId, townGarrisonAutoRecruitmentIsEnabledChanged.GarrisonAutoRecruitmentIsEnabled);
+            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
+
+            var networkChangeTownGarrisonAutoRecruitmentIsEnabled =
+                new NetworkChangeTownGarrisonAutoRecruitmentIsEnabled(
+                    townId,
+                    payload.GarrisonAutoRecruitmentIsEnabled);
+
             network.SendAll(networkChangeTownGarrisonAutoRecruitmentIsEnabled);
         }
 
         private void HandleTownLastCapturedBy(MessagePayload<TownLastCapturedByChanged> obj)
         {
-            TownLastCapturedByChanged townLastCapturedByChanged = obj.What;
+            var payload = obj.What;
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeTownLastCapturedBy networkChangeTownLastCapturedBy = new NetworkChangeTownLastCapturedBy(townLastCapturedByChanged.TownId, townLastCapturedByChanged.ClanId);
+            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
+            if (!objectManager.TryGetIdWithLogging(payload.Clan, out var clanId)) return;
+
+            var networkChangeTownLastCapturedBy = new NetworkChangeTownLastCapturedBy(townId, clanId);
             network.SendAll(networkChangeTownLastCapturedBy);
         }
 
         private void HandleTownInRebelliousState(MessagePayload<TownInRebelliousStateChanged> obj)
         {
-            TownInRebelliousStateChanged townInRebelliousStateChanged = obj.What;
+            var payload = obj.What;
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeTownInRebelliousState networkChangeTownLastCapturedBy = new NetworkChangeTownInRebelliousState(townInRebelliousStateChanged.TownId, townInRebelliousStateChanged.InRebelliousState);
-            network.SendAll(networkChangeTownLastCapturedBy);
+            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
+
+            var networkChangeTownInRebelliousState =
+                new NetworkChangeTownInRebelliousState(townId, payload.InRebelliousState);
+
+            network.SendAll(networkChangeTownInRebelliousState);
         }
 
         private void HandleTownSecurity(MessagePayload<TownSecurityChanged> obj)
         {
-            TownSecurityChanged townSecurityChanged = obj.What;
+            var payload = obj.What;
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeTownSecurity networkChangeTownSecurity = new NetworkChangeTownSecurity(townSecurityChanged.TownId, townSecurityChanged.Security);
+            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
+
+            var networkChangeTownSecurity = new NetworkChangeTownSecurity(townId, payload.Security);
             network.SendAll(networkChangeTownSecurity);
         }
 
         private void HandleTownProsperity(MessagePayload<TownProsperityChanged> obj)
         {
-            TownProsperityChanged townProsperityChanged = obj.What;
+            var payload = obj.What;
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeTownProsperity networkChangeTownProsperity = new NetworkChangeTownProsperity(townProsperityChanged.TownId, townProsperityChanged.Prosperity);
+            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
+
+            var networkChangeTownProsperity = new NetworkChangeTownProsperity(townId, payload.Prosperity);
             network.SendAll(networkChangeTownProsperity);
         }
 
         private void HandleTownLoyalty(MessagePayload<TownLoyaltyChanged> obj)
         {
-            TownLoyaltyChanged townLoyaltyChanged = obj.What;
+            var payload = obj.What;
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeTownLoyalty networkChangeTownLoyalty = new NetworkChangeTownLoyalty(townLoyaltyChanged.TownId, townLoyaltyChanged.Loyalty);
+            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
+
+            var networkChangeTownLoyalty = new NetworkChangeTownLoyalty(townId, payload.Loyalty);
             network.SendAll(networkChangeTownLoyalty);
         }
 
         private void HandleTownTradeTaxAccumulated(MessagePayload<TownTradeTaxAccumulatedChanged> obj)
         {
-            TownTradeTaxAccumulatedChanged townTradeTaxAccumulatedChanged = obj.What;
+            var payload = obj.What;
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeTownTradeTaxAccumulated networkChangeTownTradeTaxAccumulated = new NetworkChangeTownTradeTaxAccumulated(townTradeTaxAccumulatedChanged.TownId, townTradeTaxAccumulatedChanged.TradeTaxAccumulated);
+            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
+
+            var networkChangeTownTradeTaxAccumulated =
+                new NetworkChangeTownTradeTaxAccumulated(townId, payload.TradeTaxAccumulated);
+
             network.SendAll(networkChangeTownTradeTaxAccumulated);
         }
 
         private void HandleTownGovernor(MessagePayload<TownGovernorChanged> obj)
         {
-            TownGovernorChanged townGovernorChanged = obj.What;
+            var payload = obj.What;
 
-            // Broadcast to all the clients that the state was changed
-            NetworkChangeTownGovernor networkChangeTownGovernor = new NetworkChangeTownGovernor(townGovernorChanged.TownId, townGovernorChanged.GovernorId);
+            if (!objectManager.TryGetIdWithLogging(payload.Town, out var townId)) return;
+
+            string? governorId = null;
+            if (payload.Governor != null &&
+                !objectManager.TryGetIdWithLogging(payload.Governor, out governorId))
+            {
+                return;
+            }
+
+            var networkChangeTownGovernor = new NetworkChangeTownGovernor(townId, governorId);
             network.SendAll(networkChangeTownGovernor);
-
         }
 
         public void Dispose()

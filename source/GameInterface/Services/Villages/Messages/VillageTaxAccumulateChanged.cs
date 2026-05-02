@@ -1,21 +1,21 @@
 using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Villages.Messages;
 
 /// <summary>
-/// When Village Tax has changed
+/// When village tax has changed.
 /// </summary>
 [BatchLogMessage]
-public record VillageTaxAccumulateChanged : ICommand
+public readonly struct VillageTaxAccumulateChanged : ICommand
 {
-    public string VilageId { get; }
+    public readonly Village Village;
+    public readonly int TradeTaxAccumulated;
 
-    public int TradeTaxAccumulated { get; }
-
-    public VillageTaxAccumulateChanged(string vilageId, int tradeTaxAccumulated)
+    public VillageTaxAccumulateChanged(Village village, int tradeTaxAccumulated)
     {
-        VilageId = vilageId;
+        Village = village;
         TradeTaxAccumulated = tradeTaxAccumulated;
     }
 }
