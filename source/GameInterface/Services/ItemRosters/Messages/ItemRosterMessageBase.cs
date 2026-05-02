@@ -1,18 +1,24 @@
-﻿namespace GameInterface.Services.ItemRosters.Messages
-{
-    public class ItemRosterMessageBase
-    {
-        public string PartyBaseID { get; }
-        public string ItemID { get; }
-        public string ItemModifierID { get; }
-        public int Amount { get; }
+﻿using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
 
-        public ItemRosterMessageBase(string partyBaseID, string itemID, string itemModifierID, int amount)
-        {
-            PartyBaseID = partyBaseID;
-            ItemID = itemID;
-            ItemModifierID = itemModifierID;
-            Amount = amount;
-        }
+namespace GameInterface.Services.ItemRosters.Messages;
+
+public readonly struct ItemRosterMessageBase
+{
+    public readonly PartyBase PartyBase;
+    public readonly ItemObject Item;
+    public readonly ItemModifier ItemModifier;
+    public readonly int Amount;
+
+    public ItemRosterMessageBase(
+        PartyBase partyBase,
+        ItemObject item,
+        ItemModifier itemModifier,
+        int amount)
+    {
+        PartyBase = partyBase;
+        Item = item;
+        ItemModifier = itemModifier;
+        Amount = amount;
     }
 }

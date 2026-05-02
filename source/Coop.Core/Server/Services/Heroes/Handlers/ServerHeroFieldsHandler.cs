@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Client.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.ObjectManager;
 
 namespace Coop.Core.Server.Services.Heroes.Handlers
 {
@@ -12,11 +13,13 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
     {
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
+        private readonly IObjectManager objectManager;
 
-        public ServerHeroFieldsHandler(IMessageBroker messageBroker, INetwork network)
+        public ServerHeroFieldsHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
         {
             this.messageBroker = messageBroker;
             this.network = network;
+            this.objectManager = objectManager;
             messageBroker.Subscribe<LastTimeStampChanged>(Handle);
             messageBroker.Subscribe<CharacterObjectChanged>(Handle);
             messageBroker.Subscribe<FirstNameChanged>(Handle);
@@ -38,95 +41,150 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
         private void Handle(MessagePayload<PregnantChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkPregnantChanged(data.IsPregnant, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkPregnantChanged(data.IsPregnant, heroId));
         }
 
         private void Handle(MessagePayload<HomeSettlementChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkHomeSettlementChanged(data.SettlementStringId, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Settlement, out var settlementId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkHomeSettlementChanged(settlementId, heroId));
         }
 
         private void Handle(MessagePayload<CultureChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkCultureChanged(data.CultureStringId, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Culture, out var cultureId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkCultureChanged(cultureId, heroId));
         }
 
         private void Handle(MessagePayload<PowerChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkPowerChanged(data.Power, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkPowerChanged(data.Power, heroId));
         }
 
         private void Handle(MessagePayload<BirthDayChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkBirthDayChanged(data.BirthDay, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkBirthDayChanged(data.BirthDay, heroId));
         }
 
         private void Handle(MessagePayload<DefaultAgeChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkDefaultAgeChanged(data.Age, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkDefaultAgeChanged(data.Age, heroId));
         }
 
         private void Handle(MessagePayload<SpcDaysInLocationChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkSpcDaysInLocationChanged(data.Days, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkSpcDaysInLocationChanged(data.Days, heroId));
         }
 
         private void Handle(MessagePayload<HeroLevelChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkHeroLevelChanged(data.HeroLevel, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkHeroLevelChanged(data.HeroLevel, heroId));
         }
 
         private void Handle(MessagePayload<HeroStateChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkHeroStateChanged(data.HeroState, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkHeroStateChanged(data.HeroState, heroId));
         }
 
         private void Handle(MessagePayload<TattooTagsChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkTattooTagsChanged(data.TattooTags, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkTattooTagsChanged(data.TattooTags, heroId));
         }
 
         private void Handle(MessagePayload<BeardTagsChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkBeardTagsChanged(data.BeardTags, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkBeardTagsChanged(data.BeardTags, heroId));
         }
 
         private void Handle(MessagePayload<HairTagsChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkHairTagsChanged(data.HairTags, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkHairTagsChanged(data.HairTags, heroId));
         }
 
         private void Handle(MessagePayload<NameChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkNameChanged(data.NewName, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkNameChanged(data.NewName, heroId));
         }
+
         private void Handle(MessagePayload<FirstNameChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkFirstNameChanged(data.NewName, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkFirstNameChanged(data.NewName, heroId));
         }
+
         private void Handle(MessagePayload<CharacterObjectChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkCharacterObjectChanged(data.CharacterObjectId, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.CharacterObject, out var characterObjectId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkCharacterObjectChanged(characterObjectId, heroId));
         }
+
         private void Handle(MessagePayload<LastTimeStampChanged> payload)
         {
             var data = payload.What;
-            network.SendAll(new NetworkLastTimeStampChanged(data.LastTimeStampForActivity, data.HeroId));
+
+            if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
+
+            network.SendAll(new NetworkLastTimeStampChanged(data.LastTimeStampForActivity, heroId));
         }
+
         public void Dispose()
         {
             messageBroker.Unsubscribe<LastTimeStampChanged>(Handle);

@@ -31,7 +31,7 @@ public class MilitiaSettlementPatch
             return true;
         }
 
-        var message = new SettlementChangedMilitia(__instance.StringId, value);
+        var message = new SettlementChangedMilitia(__instance, value);
 
         MessageBroker.Instance.Publish(__instance, message);
         return true;

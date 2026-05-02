@@ -43,7 +43,7 @@ internal class ArmyRegistry : IAutoRegistry<Army>
             int counter = 1;
             foreach (var army in kingdom.Armies)
             {
-                var networkId = $"{nameof(Army)}_{kingdom.StringId}_{counter++}";
+                var networkId = $"{kingdom.StringId}_{counter++}";
                 objectManager.AddExisting(networkId, army);
             }
         }

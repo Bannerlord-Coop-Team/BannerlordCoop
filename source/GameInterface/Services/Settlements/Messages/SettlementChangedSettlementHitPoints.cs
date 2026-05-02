@@ -1,21 +1,21 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Settlements.Messages;
 
 /// <summary>
-/// When the Settlement Hit points changes.
+/// When the settlement hit points change.
 /// </summary>
 [BatchLogMessage]
-public record SettlementChangedSettlementHitPoints : IEvent
+public readonly struct SettlementChangedSettlementHitPoints : IEvent
 {
+    public readonly Settlement Settlement;
+    public readonly float SettlementHitPoints;
 
-    public string SettlementId { get; }
-    public float SettlementHitPoints { get; }
-
-    public SettlementChangedSettlementHitPoints(string settlementId, float settlementHitPoints)
+    public SettlementChangedSettlementHitPoints(Settlement settlement, float settlementHitPoints)
     {
-        SettlementId = settlementId;
+        Settlement = settlement;
         SettlementHitPoints = settlementHitPoints;
     }
 }

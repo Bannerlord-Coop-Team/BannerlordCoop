@@ -1,16 +1,16 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
+using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.ItemRosters.Messages
+namespace GameInterface.Services.ItemRosters.Messages;
+
+[BatchLogMessage]
+public readonly struct ItemRosterCleared : ICommand
 {
-    [BatchLogMessage]
-    public class ItemRosterCleared : ICommand
-    {
-        public string PartyBaseID { get; }
+    public readonly PartyBase PartyBase;
 
-        public ItemRosterCleared(string partyBaseID)
-        {
-            PartyBaseID = partyBaseID;
-        }
+    public ItemRosterCleared(PartyBase partyBase)
+    {
+        PartyBase = partyBase;
     }
 }

@@ -33,7 +33,7 @@ public class HeroWithoutPartyPatch
         if(!heroCache.Contains(individual))
         {
 
-            var message = new SettlementChangedAddHeroWithoutParty(__instance.StringId, individual.StringId);
+            var message = new SettlementChangedAddHeroWithoutParty(__instance, individual);
 
             MessageBroker.Instance.Publish(__instance, message);
 
@@ -77,7 +77,7 @@ public class HeroWithoutPartyPatch
         if (heroCache.Contains(individual))
         {
 
-            var message = new SettlementChangedRemoveHeroWithoutParty(__instance.StringId, individual.StringId);
+            var message = new SettlementChangedRemoveHeroWithoutParty(__instance, individual);
 
             MessageBroker.Instance.Publish(__instance, message);
         }

@@ -22,6 +22,7 @@ namespace GameInterface.Services.Clans.Patches
 
             if(Campaign.Current.MainParty.ActualClan == __instance)
             {
+                // TODO use network ID
                 MessageBroker.Instance.Publish(null, new ClanNameChanged(Campaign.Current.MainParty.ActualClan.StringId, name.ToString(), informalName.ToString()));
                 return false;
             }

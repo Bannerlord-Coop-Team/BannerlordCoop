@@ -1,20 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Kingdoms.Messages
+namespace GameInterface.Services.Kingdoms.Messages;
+
+/// <summary>
+/// Event that is handled on server side when Kingdom.RemoveDecision method is called.
+/// </summary>
+public readonly struct DecisionRemoved : IEvent
 {
-    /// <summary>
-    /// Event that is handled on server side, when Kingdom.RemoveDecision method is called.
-    /// </summary>
-    public record DecisionRemoved : IEvent
+    public readonly Kingdom Kingdom;
+    public readonly int Index;
+
+    public DecisionRemoved(Kingdom kingdom, int index)
     {
-        public string KingdomId { get; }
-
-        public int Index { get; }
-
-        public DecisionRemoved(string kingdomId, int index)
-        {
-            KingdomId = kingdomId;
-            Index = index;
-        }
+        Kingdom = kingdom;
+        Index = index;
     }
 }

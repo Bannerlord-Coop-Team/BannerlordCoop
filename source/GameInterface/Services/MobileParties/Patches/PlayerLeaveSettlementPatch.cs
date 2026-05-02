@@ -29,7 +29,7 @@ internal class PlayerLeaveSettlementPatch
     {
         var party = MobileParty.MainParty;
 
-        var message = new EndSettlementEncounterAttempted(party.StringId);
+        var message = new EndSettlementEncounterAttempted(party);
 
         MessageBroker.Instance.Publish(party, message);
 

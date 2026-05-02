@@ -1,19 +1,20 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+/// <summary>
+/// Event from GameInterface for _homeSettlement.
+/// </summary>
+public readonly struct HomeSettlementChanged : IEvent
 {
-    /// <summary>
-    /// Event from GameInterface for _homeSettlement
-    /// </summary>
-    public record HomeSettlementChanged : IEvent
-    {
-        public string SettlementStringId { get; }
-        public string HeroId { get; }
+    public readonly Hero Hero;
+    public readonly Settlement Settlement;
 
-        public HomeSettlementChanged(string settlementStringId, string heroId)
-        {
-            SettlementStringId = settlementStringId;
-            HeroId = heroId;
-        }
+    public HomeSettlementChanged(Settlement settlement, Hero hero)
+    {
+        Settlement = settlement;
+        Hero = hero;
     }
 }

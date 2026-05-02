@@ -7,7 +7,7 @@ namespace Coop.Core.Client.Services.Settlements.Messages;
 /// Notify Server that client is attempting to change Settlement.ClaimValue
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record ClientChangeLordConversationCampaignBehaviorPlayerClaimValue : IEvent
+public readonly struct ClientChangeLordConversationCampaignBehaviorPlayerClaimValue : IEvent
 {
     [ProtoMember(1)]
     public string SettlementId { get; }

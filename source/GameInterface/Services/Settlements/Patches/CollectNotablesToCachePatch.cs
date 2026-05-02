@@ -44,7 +44,7 @@ public class CollectNotablesToCachePatch
 
         notableCache.ForEach(hero => cacheHeros.Add(hero.StringId));
 
-        var message = new SettlementChangedNotablesCache(__instance.StringId, cacheHeros);
+        var message = new SettlementChangedNotablesCache(__instance, cacheHeros);
         MessageBroker.Instance.Publish(__instance, message);
         return false;
     }

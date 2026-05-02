@@ -1,20 +1,22 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MobileParties.Messages.Behavior;
 
 /// <summary>
-/// Triggered when a player attempts to enter a settlement
+/// Triggered when a player attempts to enter a settlement.
 /// </summary>
-public record StartSettlementEncounterAttempted : IEvent
+public readonly struct StartSettlementEncounterAttempted : IEvent
 {
-    public string PartyId { get; }
-    public string SettlementId { get; }
+    public readonly MobileParty Party;
+    public readonly Settlement Settlement;
 
     public StartSettlementEncounterAttempted(
-        string partyId,
-        string settlementId)
+        MobileParty party,
+        Settlement settlement)
     {
-        PartyId = partyId;
-        SettlementId = settlementId;
+        Party = party;
+        Settlement = settlement;
     }
 }

@@ -28,18 +28,14 @@ namespace GameInterface.Services.ItemRosters
             {
                 if (party.ItemRoster == null) continue;
 
-                var networkId = nameof(ItemRoster) + "_" + party.StringId;
-
-                RegisterExistingObject(networkId, party.ItemRoster);
+                RegisterExistingObject(party.StringId, party.ItemRoster);
             }
 
             foreach(Settlement settlement in objectManager.Settlements)
             {
                 if (settlement.ItemRoster == null) continue;
 
-                var networkId = nameof(ItemRoster) + "_" + settlement.StringId;
-
-                RegisterExistingObject(networkId, settlement.ItemRoster);
+                RegisterExistingObject(settlement.StringId, settlement.ItemRoster);
             }
         }
 

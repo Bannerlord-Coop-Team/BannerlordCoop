@@ -8,13 +8,16 @@ namespace Coop.Core.Client.Services.MobileParties.Messages;
 /// Network message for commanding an add to the attached parties list
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record NetworkAddAttachedParty : ICommand
+public readonly struct NetworkAddAttachedParty : ICommand
 {
     [ProtoMember(1)]
-    public AttachedPartyData AttachedPartyData { get; }
+    public readonly string PartyId;
+    [ProtoMember(2)]
+    public readonly string AttachedPartyId;
 
-    public NetworkAddAttachedParty(AttachedPartyData attachedPartyData)
+    public NetworkAddAttachedParty(string partyId, string attachedPartyId)
     {
-        AttachedPartyData = attachedPartyData;
+        PartyId = partyId;
+        AttachedPartyId = attachedPartyId;
     }
 }

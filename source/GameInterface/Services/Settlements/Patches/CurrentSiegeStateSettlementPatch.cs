@@ -35,7 +35,7 @@ public class CurrentSiegeStateSettlementPatch
             return true;
         }
 
-        var message = new SettlementChangedCurrentSiegeState(__instance.StringId, (short)value);
+        var message = new SettlementChangedCurrentSiegeState(__instance, (short)value);
 
         MessageBroker.Instance.Publish(__instance, message);
         return true;

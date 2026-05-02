@@ -1,24 +1,21 @@
 ﻿using Common.Logging.Attributes;
 using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Villages.Messages;
 
 /// <summary>
-/// Message used when LastDemandTimeSatifisfied Changes.
+/// Message used when LastDemandTimeSatisfied changes.
 /// </summary>
-/// 
 [BatchLogMessage]
-public record VillageDemandTimeChanged : ICommand
+public readonly struct VillageDemandTimeChanged : ICommand
 {
-    public string VillageId { get; }
-    public float LastDemandSatisfiedTime { get; }
+    public readonly Village Village;
+    public readonly float LastDemandSatisfiedTime;
 
-    public VillageDemandTimeChanged(string villageId, float lastDemandSatisfiedTime)
+    public VillageDemandTimeChanged(Village village, float lastDemandSatisfiedTime)
     {
-        VillageId = villageId;
+        Village = village;
         LastDemandSatisfiedTime = lastDemandSatisfiedTime;
     }
 }

@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
+using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.Heroes.Messages
+namespace GameInterface.Services.Heroes.Messages;
+
+/// <summary>
+/// Event from GameInterface for _birthDay.
+/// </summary>
+public readonly struct BirthDayChanged : IEvent
 {
-    /// <summary>
-    /// Event from GameInterface for _birthDay
-    /// </summary>
-    public record BirthDayChanged : IEvent
-    {
-        public long BirthDay { get; }
-        public string HeroId { get; }
+    public readonly long BirthDay;
+    public readonly Hero Hero;
 
-        public BirthDayChanged(long birthDay, string heroId)
-        {
-            BirthDay = birthDay;
-            HeroId = heroId;
-        }
+    public BirthDayChanged(long birthDay, Hero hero)
+    {
+        BirthDay = birthDay;
+        Hero = hero;
     }
 }
