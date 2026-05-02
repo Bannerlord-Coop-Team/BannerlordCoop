@@ -63,10 +63,10 @@ internal class MobilePartyBehaviorHandler : IHandler
 
         var controllerId = controllerIdProvider.ControllerId;
 
-        if (!controlledEntityRegistry.IsControlledBy(controllerId, party.StringId))
+        if (!objectManager.TryGetId(partyAi._mobileParty, out var partyId))
             return;
 
-        if (!objectManager.TryGetId(partyAi._mobileParty, out var partyId))
+        if (!controlledEntityRegistry.IsControlledBy(controllerId, partyId))
             return;
 
         string interactablePointId = null;

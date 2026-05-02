@@ -1,8 +1,7 @@
-﻿using Common;
+﻿using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
-using HarmonyLib;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using Serilog;
@@ -10,23 +9,20 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.PartyVisuals;
 
-internal class MobilePartyVisualRegistry : IAutoRegistry<MobilePartyVisual>
+internal class PartyVisualRegistry : IAutoRegistry<MobilePartyVisual>
 {
     ILogger Logger { get; }
-    public MobilePartyVisualRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public PartyVisualRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
     {
         Logger = logger;
 
         autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(MobilePartyVisual), new Type[] { typeof(PartyBase) })
-    };
+    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
@@ -40,19 +36,19 @@ internal class MobilePartyVisualRegistry : IAutoRegistry<MobilePartyVisual>
             return;
         }
 
-        foreach (var party in MobileParty.All)
-        {
-            var mobilePartyVisual = party.Party.GetPartyVisual();
+        //foreach (var party in MobileParty.All)
+        //{
+        //    var mobilePartyVisual = party.Party.GetPartyVisual();
 
-            if (mobilePartyVisual == null) continue;
+        //    if (mobilePartyVisual == null) continue;
 
-            var networkId = $"{nameof(mobilePartyVisual)}_{party.StringId}";
-            objectManager.AddExisting(networkId, mobilePartyVisual);
-        }
+        //    objectManager.AddExisting(party.StringId, mobilePartyVisual);
+        //}
 
         foreach (MobilePartyVisual visual in visualManager._visualsFlattened)
         {
-            objectManager.AddNewObject(visual, out var _);
+            var party = visual.MapEntity.MobileParty;
+            objectManager.AddExisting(party.StringId, visual);
         }
     }
 
@@ -72,4 +68,3 @@ internal class MobilePartyVisualRegistry : IAutoRegistry<MobilePartyVisual>
     {
     }
 }
-

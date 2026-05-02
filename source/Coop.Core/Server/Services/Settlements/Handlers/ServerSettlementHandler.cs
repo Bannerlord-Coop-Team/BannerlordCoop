@@ -7,6 +7,7 @@ using GameInterface.Services.Settlements.Audit;
 using GameInterface.Services.Settlements.Messages;
 using LiteNetLib;
 using System;
+using System.Collections.Generic;
 
 namespace Coop.Core.Server.Services.Settlements.Handlers;
 
@@ -155,7 +156,15 @@ internal class ServerSettlementHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
 
-        var message = new NetworkChangeSettlementNotablesCache(settlementId, obj.NotablesCache);
+        List<string> notableHeroIds = new();
+        foreach (var notable in obj.NotablesCache)
+        {
+            if (!objectManager.TryGetIdWithLogging(notable, out var heroId)) continue;
+
+            notableHeroIds.Add(heroId);
+        }
+
+        var message = new NetworkChangeSettlementNotablesCache(settlementId, notableHeroIds);
         network.SendAll(message);
     }
 

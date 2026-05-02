@@ -191,9 +191,9 @@ public class ObjectManager : IObjectManager
 
         lock (_gate)
         {
-            if (objsIds.TryGetValue(obj, out var _))
+            if (objsIds.TryGetValue(obj, out var existingId))
             {
-                logger.Warning("Object already registered: {ObjectType}", obj.GetType());
+                logger.Warning("Object already registered with id {Id}: {ObjectType}", existingId, obj.GetType());
                 return false;
             }
 
@@ -270,7 +270,7 @@ public class ObjectManager : IObjectManager
 
         if (storedObj is not T castedObject)
         {
-            logger.Warning("Could not cast ({ActualType}) object to type {ObjectType}", storedObj.GetType(), typeof(T));
+            logger.Error("Could not cast ({ActualType}) object to type {ObjectType}", storedObj.GetType(), typeof(T));
             return false;
         }
 
