@@ -208,7 +208,10 @@ public class ObjectManager : IObjectManager
 
         if (string.IsNullOrEmpty(id)) return false;
 
-        if (!idObjs.TryGetValue(id, out var storedObj)) return false;
+        if (!idObjs.TryGetValue(id, out var storedObj) 
+            && !idObjs.TryGetValue($"{typeof(T).Name}_{id}", out storedObj)) { // If object not found also attempt with prefixed type name
+            return false;
+        }
 
         if (storedObj is not T castedObject)
         {

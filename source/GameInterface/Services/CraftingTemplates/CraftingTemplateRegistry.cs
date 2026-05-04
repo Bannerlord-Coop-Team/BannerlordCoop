@@ -21,7 +21,9 @@ internal class CraftingTemplateRegistry : IAutoRegistry<CraftingTemplate>
         autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(CraftingTemplate))
+    };
 
     public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
