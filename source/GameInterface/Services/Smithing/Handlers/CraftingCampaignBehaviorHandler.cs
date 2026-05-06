@@ -17,6 +17,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Smithing.Handlers
@@ -46,6 +47,8 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Subscribe<CraftedWeaponInternallyCreated>(Handle);
             messageBroker.Subscribe<NetworkCreateCraftedWeaponInternalServer>(Handle);
             messageBroker.Subscribe<NetworkCreateCraftedWeaponInternalClients>(Handle);
+
+            messageBroker.Subscribe<NetworkSetHeroCraftingStamina>(Handle);
         }
 
         public void Dispose()
@@ -57,6 +60,8 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Unsubscribe<CraftedWeaponInternallyCreated>(Handle);
             messageBroker.Unsubscribe<NetworkCreateCraftedWeaponInternalServer>(Handle);
             messageBroker.Unsubscribe<NetworkCreateCraftedWeaponInternalClients>(Handle);
+
+            messageBroker.Unsubscribe<NetworkSetHeroCraftingStamina>(Handle);
         }
 
         private void Handle(MessagePayload<SmeltingDone> obj)
@@ -96,6 +101,11 @@ namespace GameInterface.Services.Smithing.Handlers
         private void Handle(MessagePayload<NetworkCreateCraftedWeaponInternalClients> obj)
         {
             CreateCraftedWeaponInternalClients(obj.What);
+        }
+
+        private void Handle(MessagePayload<NetworkSetHeroCraftingStamina> obj)
+        {
+            SetHeroCraftingStaminaClients(obj.What);
         }
 
         private void SendSmeltingDone(SmeltingDone obj)
@@ -185,9 +195,11 @@ namespace GameInterface.Services.Smithing.Handlers
             }
             itemRoster.AddToCounts(equipmentElement, -1);
 
-            // Not currently synced, should be synced with dynamic sync for dictionaries of CraftingCampaignBehavior
             int energyCostForSmelting = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmelting(item, craftingHero);
-            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmelting);
+            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmelting); // Run on server
+            network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, energyCostForSmelting)); // Run on clients
+
+            // Need to separately manage research points. Existing dictionary in CraftingCampaignBehavior won't work for multiple players
             craftingCampaignBehavior.AddResearchPoints(item.WeaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(item, craftingHero));
 
             CampaignEventDispatcher.Instance.OnEquipmentSmeltedByHero(craftingHero, equipmentElement);
@@ -271,10 +283,10 @@ namespace GameInterface.Services.Smithing.Handlers
                 itemRoster.AddToCounts(craftingMaterialItem4, formula.Output2Count);
             }
 
-            // Not currently synced, should be synced with dynamic sync for dictionaries of CraftingCampaignBehavior
             int energyCostForRefining = Campaign.Current.Models.SmithingModel.GetEnergyCostForRefining(ref formula, craftingHero);
-            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForRefining);
-            
+            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForRefining); // Run on server
+            network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, energyCostForRefining)); // Run on clients
+
             CampaignEventDispatcher.Instance.OnItemsRefined(craftingHero, formula);
 
             network.SendAll(new NetworkRefreshRefinement(obj.CraftingHeroId)); // Refresh for client(s)
@@ -433,7 +445,10 @@ namespace GameInterface.Services.Smithing.Handlers
 
             // Not currently synced, should be synced with dynamic sync for dictionaries of CraftingCampaignBehavior
             int energyCostForSmithing = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(craftedItemObject, craftingHero);
-            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing);
+            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing); // Run on server
+            network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, energyCostForSmithing)); // Run on clients
+
+            // Need to separately manage research points. Existing dictionary in CraftingCampaignBehavior won't work for multiple players
             craftingCampaignBehavior.AddResearchPoints(weaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, craftingHero, obj.IsFreeMode));
 
             CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !obj.IsFreeMode);
@@ -464,6 +479,24 @@ namespace GameInterface.Services.Smithing.Handlers
             {
                 craftingCampaignBehavior.GetNextCraftedItemId();
             }
+        }
+
+        private void SetHeroCraftingStaminaClients(NetworkSetHeroCraftingStamina obj)
+        {
+            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
+            {
+                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
+                return;
+            }
+            if (!objectManager.TryGetObject(obj.CraftingHeroId, out Hero craftingHero))
+            {
+                Logger.Error("Unable to get object for craftingHeroId {id}", obj.CraftingHeroId);
+                return;
+            }
+
+            craftingCampaignBehavior.GetRecordForCompanion(craftingHero).CraftingStamina = MathF.Max(0, obj.Value);
+
+            Logger.Information("CraftingCampaignBehaviorHandler successfully set crafting stamina for clients.");
         }
     }
 }
