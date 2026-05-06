@@ -2,7 +2,7 @@
 using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.CraftingService;
+namespace GameInterface.Services.Smithing;
 internal class CraftingCampaignBehaviorSync : IDynamicSync
 {
     public CraftingCampaignBehaviorSync(DynamicSyncRegistry dynamicSyncRegistry)

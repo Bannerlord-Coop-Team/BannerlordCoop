@@ -22,10 +22,14 @@ namespace GameInterface.Services.Smithing.Patches
         public static bool CreateCraftedWeaponInternal(ref CraftingCampaignBehavior __instance, ref ItemObject __result, bool isFreeMode, Hero crafterHero, WeaponDesign weaponDesign, ItemModifier weaponModifier = null)
         {
             string nextCraftedItemId = __instance.GetNextCraftedItemId();
-            ItemObject craftedItemObject = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic.GetCurrentCraftedItemObject(true, nextCraftedItemId);
+
+            ItemObject craftedItemObject;
             using (new AllowedThread())
             {
+                craftedItemObject = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic.GetCurrentCraftedItemObject(true, nextCraftedItemId);
                 craftedItemObject.StringId = nextCraftedItemId;
+                ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
+                CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !isFreeMode);
             }
 
             // Publish message with data
@@ -37,6 +41,13 @@ namespace GameInterface.Services.Smithing.Patches
 
             // Skip original to override original client saving
             return false;
+        }
+
+        [HarmonyPatch("CreateCraftedWeaponInternal")]
+        [HarmonyPostfix]
+        public static void Postfix()
+        {
+            //AllowedThread.RevokeThisThread();
         }
     }
 }

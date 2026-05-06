@@ -191,6 +191,8 @@ namespace GameInterface.Services.Smithing.Handlers
             craftingCampaignBehavior.AddResearchPoints(item.WeaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(item, craftingHero));
 
             CampaignEventDispatcher.Instance.OnEquipmentSmeltedByHero(craftingHero, equipmentElement);
+
+            network.SendAll(new NetworkRefreshSmelting()); // Refresh for client(s)
         }
 
         private void SendRefinementDone(RefinementDone obj)
@@ -274,6 +276,8 @@ namespace GameInterface.Services.Smithing.Handlers
             craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForRefining);
             
             CampaignEventDispatcher.Instance.OnItemsRefined(craftingHero, formula);
+
+            network.SendAll(new NetworkRefreshRefinement(obj.CraftingHeroId)); // Refresh for client(s)
         }
 
         private void SendInternallyCreatedWeapon(CraftedWeaponInternallyCreated obj)

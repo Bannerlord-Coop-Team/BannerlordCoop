@@ -9,7 +9,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
-namespace GameInterface.Services.CraftingService;
+namespace GameInterface.Services.Smithing;
 internal class CraftingCampaignBehaviorRegistry : IAutoRegistry<CraftingCampaignBehavior>
 {
     ILogger Logger { get; }
