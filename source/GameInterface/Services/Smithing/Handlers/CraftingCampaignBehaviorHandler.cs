@@ -19,6 +19,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Smithing.Handlers
 {
@@ -92,7 +93,7 @@ namespace GameInterface.Services.Smithing.Handlers
         private void Handle(MessagePayload<NetworkCreateCraftedWeaponInternalServer> obj)
         {
             // Send required data to all clients
-            NetworkCreateCraftedWeaponInternalClients message = new(obj.What.CraftingCampaignBehaviorId, obj.What.CraftedItemObjectData, obj.What.NextCraftedItemId);
+            NetworkCreateCraftedWeaponInternalClients message = new(obj.What.CraftingCampaignBehaviorId, obj.What.CraftedItemObjectData, obj.What.NextCraftedItemId, obj.What.WeaponModifierId, obj.What.IsFreeMode);
             network.SendAll(message);
 
             CreateCraftedWeaponInternalServer(obj.What);
@@ -430,6 +431,10 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
+            MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
+            ItemObject registeredObject = MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
+            Logger.Information("Server registered object with MBObjectManager with id: {id}", registeredObject.Id);
+
             if (obj.IsFreeMode)
             {
                 if (weaponModifier == null)
@@ -443,7 +448,6 @@ namespace GameInterface.Services.Smithing.Handlers
                 }
             }
 
-            // Not currently synced, should be synced with dynamic sync for dictionaries of CraftingCampaignBehavior
             int energyCostForSmithing = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(craftedItemObject, craftingHero);
             craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing); // Run on server
             network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, energyCostForSmithing)); // Run on clients
@@ -463,7 +467,6 @@ namespace GameInterface.Services.Smithing.Handlers
             {
                 craftedItemObject.StringId = nextCraftedItemId;
             }
-            objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
 
             if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
             {
@@ -471,14 +474,27 @@ namespace GameInterface.Services.Smithing.Handlers
                 return;
             }
 
+            ItemModifier weaponModifier = null;
+            if (obj.WeaponModifierId != "" && !objectManager.TryGetObject(obj.WeaponModifierId, out weaponModifier))
+            {
+                Logger.Error("Unable to get object for weaponModifierId {id}", obj.WeaponModifierId);
+                return;
+            }
+
             if (GameStateManager.Current.ActiveState is CraftingState currentState && currentState.CraftingLogic._craftedItemObject.StringId == nextCraftedItemId) // Only run on associated client with matching id
             {
+                // This line is adding duplicating the elements of craftedItemObject.Weapons, unsure if this causes any issues
                 currentState.CraftingLogic.SetItemObject(craftedItemObject, nextCraftedItemId);
             }
             else // Need to update craftingCampaignBehavior._craftedItemCount for every other client. Manage with DynamicSync instead?
             {
                 craftingCampaignBehavior.GetNextCraftedItemId();
+                CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !obj.IsFreeMode);
+                ItemObject registeredObject = MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
+                Logger.Information("Other client registered object with MBObjectManager with id: {id}", registeredObject.Id);
             }
+
+            objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
         }
 
         private void SetHeroCraftingStaminaClients(NetworkSetHeroCraftingStamina obj)
@@ -495,8 +511,6 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             craftingCampaignBehavior.GetRecordForCompanion(craftingHero).CraftingStamina = MathF.Max(0, obj.Value);
-
-            Logger.Information("CraftingCampaignBehaviorHandler successfully set crafting stamina for clients.");
         }
     }
 }

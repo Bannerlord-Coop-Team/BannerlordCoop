@@ -74,13 +74,23 @@ public class NetworkCreateCraftedWeaponInternalClients : ICommand
     [ProtoMember(3)]
     public string NextCraftedItemId;
 
+    [ProtoMember(4)]
+    public string WeaponModifierId;
+
+    [ProtoMember(5)]
+    public bool IsFreeMode;
+
     public NetworkCreateCraftedWeaponInternalClients(
         string craftingCampaignBehaviorId,
         byte[] craftedItemObjectData,
-        string nextCraftedItemId)
+        string nextCraftedItemId,
+        string weaponModifierId,
+        bool isFreeMode)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         CraftedItemObjectData = craftedItemObjectData;
         NextCraftedItemId = nextCraftedItemId;
+        WeaponModifierId = weaponModifierId;
+        IsFreeMode = isFreeMode;
     }
 }

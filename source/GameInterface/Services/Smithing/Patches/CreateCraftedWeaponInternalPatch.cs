@@ -9,6 +9,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameState;
 using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Smithing.Patches
 {
@@ -22,13 +23,16 @@ namespace GameInterface.Services.Smithing.Patches
         public static bool CreateCraftedWeaponInternal(ref CraftingCampaignBehavior __instance, ref ItemObject __result, bool isFreeMode, Hero crafterHero, WeaponDesign weaponDesign, ItemModifier weaponModifier = null)
         {
             string nextCraftedItemId = __instance.GetNextCraftedItemId();
-
             ItemObject craftedItemObject;
             using (new AllowedThread())
             {
                 craftedItemObject = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic.GetCurrentCraftedItemObject(true, nextCraftedItemId);
-                craftedItemObject.StringId = nextCraftedItemId;
                 ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
+
+                // May need to replace this, uses MBObjectManager
+                ItemObject registeredObject = MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
+                Logger.Information("Crafting client registered object with MBObjectManager with id: {id}", registeredObject.Id);
+
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !isFreeMode);
             }
 
@@ -41,13 +45,6 @@ namespace GameInterface.Services.Smithing.Patches
 
             // Skip original to override original client saving
             return false;
-        }
-
-        [HarmonyPatch("CreateCraftedWeaponInternal")]
-        [HarmonyPostfix]
-        public static void Postfix()
-        {
-            //AllowedThread.RevokeThisThread();
         }
     }
 }

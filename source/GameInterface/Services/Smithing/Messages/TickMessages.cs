@@ -1,9 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
-using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
-using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
 
 namespace GameInterface.Services.Smithing.Messages;
 

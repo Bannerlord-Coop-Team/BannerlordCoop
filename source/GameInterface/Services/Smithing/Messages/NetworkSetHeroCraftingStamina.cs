@@ -1,6 +1,5 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Smithing.Messages;
 
