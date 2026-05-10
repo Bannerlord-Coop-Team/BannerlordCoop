@@ -206,6 +206,7 @@ namespace GameInterface.Services.Smithing.Handlers
             CampaignEventDispatcher.Instance.OnEquipmentSmeltedByHero(craftingHero, equipmentElement);
 
             network.SendAll(new NetworkRefreshSmelting()); // Refresh for client(s)
+            network.SendAll(new NetworkRefreshCraftingVM());
         }
 
         private void SendRefinementDone(RefinementDone obj)
@@ -291,6 +292,7 @@ namespace GameInterface.Services.Smithing.Handlers
             CampaignEventDispatcher.Instance.OnItemsRefined(craftingHero, formula);
 
             network.SendAll(new NetworkRefreshRefinement(obj.CraftingHeroId)); // Refresh for client(s)
+            network.SendAll(new NetworkRefreshCraftingVM());
         }
 
         private void SendInternallyCreatedWeapon(CraftedWeaponInternallyCreated obj)

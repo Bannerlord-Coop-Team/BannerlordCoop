@@ -35,6 +35,7 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Subscribe<CraftingVMCreated>(Handle);
             messageBroker.Subscribe<NetworkRefreshSmelting>(Handle);
             messageBroker.Subscribe<NetworkRefreshRefinement>(Handle);
+            messageBroker.Subscribe<NetworkRefreshCraftingVM>(Handle);
 
             currentSmeltingVM = null;
             currentRefinementVM = null;
@@ -48,6 +49,7 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Unsubscribe<CraftingVMCreated>(Handle);
             messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle);
             messageBroker.Unsubscribe<NetworkRefreshRefinement>(Handle);
+            messageBroker.Subscribe<NetworkRefreshCraftingVM>(Handle);
         }
 
         private void Handle(MessagePayload<SmeltingVMCreated> obj)
@@ -101,6 +103,10 @@ namespace GameInterface.Services.Smithing.Handlers
 
             currentRefinementVM?.RefreshRefinementActionsList(craftingHero);
             currentCraftingVM?.OnRefinementSelectionChange();
+        }
+
+        private void Handle(MessagePayload<NetworkRefreshCraftingVM> obj)
+        {
             currentCraftingVM?.UpdateAll();
         }
     }

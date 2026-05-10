@@ -55,3 +55,11 @@ public class NetworkRefreshRefinement : ICommand
         CraftingHeroId = craftingHeroId;
     }
 }
+
+[ProtoContract(SkipConstructor = true)]
+public class NetworkRefreshCraftingVM : ICommand
+{
+    public NetworkRefreshCraftingVM()
+    {
+    }
+}

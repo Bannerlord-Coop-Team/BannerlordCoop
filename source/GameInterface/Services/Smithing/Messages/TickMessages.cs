@@ -15,25 +15,13 @@ public record HourTicked : IEvent
 }
 
 [ProtoContract(SkipConstructor = true)]
-public class NetworkHourlyTickServer : ICommand
+public class NetworkHourlyTick : ICommand
 {
     [ProtoMember(1)]
     public string CraftingCampaignBehaviorId;
 
-    public NetworkHourlyTickServer(string craftingCampaignBehaviorId)
+    public NetworkHourlyTick(string craftingCampaignBehaviorId)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-public class NetworkHourlyTickClients : ICommand
-{
-    [ProtoMember(1)]
-    public string CraftingCampaignBehaviorId;
-
-    public NetworkHourlyTickClients(NetworkHourlyTickServer cloneObject)
-    {
-        CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
     }
 }

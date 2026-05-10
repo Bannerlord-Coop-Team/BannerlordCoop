@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Smithing.Messages;
@@ -6,7 +7,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.Core;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Smithing.Patches
 {
@@ -19,12 +20,37 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPrefix]
         public static bool HourlyTick(ref CraftingCampaignBehavior __instance)
         {
-            // Publish message with data
+            // Only let server handle ticks
+            if (ModInformation.IsClient) return false;
+
+            // Update on all clients with message
             var message = new HourTicked(__instance);
             MessageBroker.Instance.Publish(__instance, message);
 
-            // Skip original to override original client saving
-            return false;
+            // Run on server
+            return true;
+        }
+
+        [HarmonyPatch("DailyTickSettlement")]
+        [HarmonyPrefix]
+        public static bool DailyTickSettlement(ref CraftingCampaignBehavior __instance, Settlement settlement)
+        {
+            // Only let server handle ticks
+            if (ModInformation.IsClient) return false;
+
+            // Run on server
+            return true;
+        }
+
+        [HarmonyPatch("DailyTick")]
+        [HarmonyPrefix]
+        public static bool DailyTick(ref CraftingCampaignBehavior __instance)
+        {
+            // Only let server handle ticks
+            if (ModInformation.IsClient) return false;
+
+            // Run on server
+            return true;
         }
     }
 }

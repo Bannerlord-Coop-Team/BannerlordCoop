@@ -2,21 +2,13 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
-using GameInterface.Serialization;
-using GameInterface.Services.ItemObjects.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Messages;
-using HarmonyLib;
 using Serilog;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.Core;
 using TaleWorlds.Library;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Smithing.Handlers
 {
@@ -36,46 +28,35 @@ namespace GameInterface.Services.Smithing.Handlers
             this.objectManager = objectManager;
             this.network = network;
             messageBroker.Subscribe<HourTicked>(Handle);
-            messageBroker.Subscribe<NetworkHourlyTickServer>(Handle);
-            messageBroker.Subscribe<NetworkHourlyTickClients>(Handle);
+            messageBroker.Subscribe<NetworkHourlyTick>(Handle);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<HourTicked>(Handle);
-            messageBroker.Unsubscribe<NetworkHourlyTickServer>(Handle);
-            messageBroker.Unsubscribe<NetworkHourlyTickClients>(Handle);
+            messageBroker.Unsubscribe<NetworkHourlyTick>(Handle);
         }
 
         private void Handle(MessagePayload<HourTicked> obj)
         {
-            SendHourlyTick(obj.What);
+            if (!objectManager.TryGetId(obj.What.CraftingCampaignBehavior, out var craftingCampaignBehaviorId))
+            {
+                Logger.Error("Unable to get network ID for instance of type {type}", obj.What.CraftingCampaignBehavior?.GetType());
+                return;
+            }
+
+            network.SendAll(new NetworkHourlyTick(craftingCampaignBehaviorId));
+
+            // Needed because crafting stamina recovers as time passes while a client is in the crafting menu (unlike vanilla)
+            network.SendAll(new NetworkRefreshCraftingVM());
         }
 
-        private void Handle(MessagePayload<NetworkHourlyTickServer> obj)
-        {
-            NetworkHourlyTickClients message = new(obj.What);
-            network.SendAll(message);
-
-            HourlyTick(message);
-        }
-
-        private void Handle(MessagePayload<NetworkHourlyTickClients> obj)
+        private void Handle(MessagePayload<NetworkHourlyTick> obj)
         {
             HourlyTick(obj.What);
         }
 
-        private void SendHourlyTick(HourTicked obj)
-        {
-            if (!objectManager.TryGetId(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId))
-            {
-                Logger.Error("Unable to get network ID for Behavior instance of type {type}", obj.CraftingCampaignBehavior?.GetType());
-                return;
-            }
-            network.SendAll(new NetworkHourlyTickServer(craftingCampaignBehaviorId));
-        }
-
-        private void HourlyTick(NetworkHourlyTickClients obj)
+        private void HourlyTick(NetworkHourlyTick obj)
         {
             if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
             {
@@ -83,7 +64,6 @@ namespace GameInterface.Services.Smithing.Handlers
                 return;
             }
 
-            // Replace TaleWorlds implementation
             foreach (KeyValuePair<Hero, CraftingCampaignBehavior.HeroCraftingRecord> keyValuePair in craftingCampaignBehavior._heroCraftingRecords)
             {
                 if (keyValuePair.Key.CurrentSettlement != null)
