@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 
 namespace GameInterface.Services.Smithing.Handlers
 {
@@ -25,6 +26,7 @@ namespace GameInterface.Services.Smithing.Handlers
         private SmeltingVM currentSmeltingVM;
         private RefinementVM currentRefinementVM;
         private CraftingVM currentCraftingVM;
+        private WeaponDesignVM currentWeaponDesignVM;
 
         public SmithingRefreshHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
@@ -33,13 +35,16 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Subscribe<SmeltingVMCreated>(Handle);
             messageBroker.Subscribe<RefinementVMCreated>(Handle);
             messageBroker.Subscribe<CraftingVMCreated>(Handle);
+            messageBroker.Subscribe<WeaponDesignVMCreated>(Handle);
             messageBroker.Subscribe<NetworkRefreshSmelting>(Handle);
             messageBroker.Subscribe<NetworkRefreshRefinement>(Handle);
             messageBroker.Subscribe<NetworkRefreshCraftingVM>(Handle);
+            messageBroker.Subscribe<NetworkRefreshWeaponDesignVM>(Handle);
 
             currentSmeltingVM = null;
             currentRefinementVM = null;
             currentCraftingVM = null;
+            currentWeaponDesignVM = null;
         }
 
         public void Dispose()
@@ -47,59 +52,50 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Unsubscribe<SmeltingVMCreated>(Handle);
             messageBroker.Unsubscribe<RefinementVMCreated>(Handle);
             messageBroker.Unsubscribe<CraftingVMCreated>(Handle);
+            messageBroker.Unsubscribe<WeaponDesignVMCreated>(Handle);
             messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle);
             messageBroker.Unsubscribe<NetworkRefreshRefinement>(Handle);
-            messageBroker.Subscribe<NetworkRefreshCraftingVM>(Handle);
+            messageBroker.Unsubscribe<NetworkRefreshCraftingVM>(Handle);
+            messageBroker.Unsubscribe<NetworkRefreshWeaponDesignVM>(Handle);
         }
 
         private void Handle(MessagePayload<SmeltingVMCreated> obj)
         {
-            Logger.Information("SmithingRefreshHandler SmeltingVMCreated");
             currentSmeltingVM = obj.What.SmeltingVM;
         }
 
         private void Handle(MessagePayload<RefinementVMCreated> obj)
         {
-            Logger.Information("SmithingRefreshHandler RefinementVMCreated");
             currentRefinementVM = obj.What.RefinementVM;
         }
 
         private void Handle(MessagePayload<CraftingVMCreated> obj)
         {
-            Logger.Information("SmithingRefreshHandler CraftingVMCreated");
             currentCraftingVM = obj.What.CraftingVM;
+        }
+
+        private void Handle(MessagePayload<WeaponDesignVMCreated> obj)
+        {
+            currentWeaponDesignVM = obj.What.WeaponDesignVM;
         }
 
         private void Handle(MessagePayload<NetworkRefreshSmelting> obj)
         {
-            Logger.Information("SmithingRefreshHandler NetworkRefreshSmelting");
-
-            if (currentRefinementVM == null)
-            {
-                Logger.Warning("SmithingRefreshHandler currentSmithingVM was null");
-            }
+            if (currentRefinementVM == null) Logger.Warning("SmithingRefreshHandler currentSmithingVM was null");
 
             currentSmeltingVM?.RefreshList();
         }
 
         private void Handle(MessagePayload<NetworkRefreshRefinement> obj)
         {
-            Logger.Information("SmithingRefreshHandler NetworkRefreshRefinement");
             if (!objectManager.TryGetObject(obj.What.CraftingHeroId, out Hero craftingHero))
             {
                 Logger.Error("Unable to get object for craftingHeroId {id}", obj.What.CraftingHeroId);
                 return;
             }
 
-            if (currentRefinementVM == null)
-            {
-                Logger.Warning("SmithingRefreshHandler currentRefinementVM was null");
-            }
-
-            if (currentCraftingVM == null)
-            {
-                Logger.Warning("SmithingRefreshHandler currentCraftingVM was null");
-            }
+            if (currentRefinementVM == null) Logger.Warning("SmithingRefreshHandler currentRefinementVM was null");
+            if (currentCraftingVM == null) Logger.Warning("SmithingRefreshHandler currentCraftingVM was null");
 
             currentRefinementVM?.RefreshRefinementActionsList(craftingHero);
             currentCraftingVM?.OnRefinementSelectionChange();
@@ -108,6 +104,11 @@ namespace GameInterface.Services.Smithing.Handlers
         private void Handle(MessagePayload<NetworkRefreshCraftingVM> obj)
         {
             currentCraftingVM?.UpdateAll();
+        }
+
+        private void Handle(MessagePayload<NetworkRefreshWeaponDesignVM> obj)
+        {
+            currentWeaponDesignVM?.RefreshWeaponDesignMode(null);
         }
     }
 }

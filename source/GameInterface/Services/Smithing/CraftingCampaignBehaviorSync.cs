@@ -8,7 +8,7 @@ internal class CraftingCampaignBehaviorSync : IDynamicSync
     public CraftingCampaignBehaviorSync(DynamicSyncRegistry dynamicSyncRegistry)
     {
         //// Fields
-        //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(CraftingCampaignBehavior), nameof(CraftingCampaignBehavior._townOrderCount))); // Should already be managed
+        dynamicSyncRegistry.AddField(AccessTools.Field(typeof(CraftingCampaignBehavior), nameof(CraftingCampaignBehavior._townOrderCount)));
 
         // Dictionaries (not yet able to be synced)
         //dynamicSyncRegistry.AddField(AccessTools.Field(typeof(CraftingCampaignBehavior), nameof(CraftingCampaignBehavior._craftingOrders)));

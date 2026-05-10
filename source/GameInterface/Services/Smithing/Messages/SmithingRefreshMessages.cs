@@ -3,6 +3,7 @@ using ProtoBuf;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 
 namespace GameInterface.Services.Smithing.Messages;
 
@@ -36,6 +37,16 @@ public record CraftingVMCreated : IEvent
     }
 }
 
+public record WeaponDesignVMCreated : IEvent
+{
+    public WeaponDesignVM WeaponDesignVM;
+
+    public WeaponDesignVMCreated(WeaponDesignVM weaponDesignVM)
+    {
+        WeaponDesignVM = weaponDesignVM;
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 public class NetworkRefreshSmelting : ICommand
 {
@@ -60,6 +71,14 @@ public class NetworkRefreshRefinement : ICommand
 public class NetworkRefreshCraftingVM : ICommand
 {
     public NetworkRefreshCraftingVM()
+    {
+    }
+}
+
+[ProtoContract(SkipConstructor = true)]
+public class NetworkRefreshWeaponDesignVM : ICommand
+{
+    public NetworkRefreshWeaponDesignVM()
     {
     }
 }

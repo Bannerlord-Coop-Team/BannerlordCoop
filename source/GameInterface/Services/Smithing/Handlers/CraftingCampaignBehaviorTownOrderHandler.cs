@@ -124,9 +124,13 @@ namespace GameInterface.Services.Smithing.Handlers
                 obj.PieceTier,
                 randomElementId,
                 orderOwnerId,
-                obj.OrderSlot
+                obj.OrderSlot,
+                obj.NextTownOrderId
             );
             network.SendAll(message);
+
+            // Need to refresh client weapon designs for potential new orders while in CraftingState
+            network.SendAll(new NetworkRefreshWeaponDesignVM());
         }
 
         private void CreateTownOrder(NetworkCreateTownOrder obj)
@@ -148,9 +152,8 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             // Replace TaleWorlds implementation
-            string nextTownOrderId = craftingCampaignBehavior.GetNextTownOrderId();
-            WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), nextTownOrderId);
-            craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(new CraftingOrder(orderOwner, obj.TownOrderDifficulty, weaponDesignTemplate, randomElement, obj.OrderSlot, nextTownOrderId));
+            WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
+            craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(new CraftingOrder(orderOwner, obj.TownOrderDifficulty, weaponDesignTemplate, randomElement, obj.OrderSlot, obj.NextTownOrderId));
         }
 
         private void SendCraftingOrderReplaced(CraftingOrderReplaced obj)
@@ -277,6 +280,7 @@ namespace GameInterface.Services.Smithing.Handlers
             {
                 if (craftingOrder.IsLordOrder)
                 {
+                    // Manage Hero.BattleEquipment with dynamic sync
                     craftingCampaignBehavior.ChangeCraftedOrderWithTheNoblesWeaponIfItIsBetter(craftedItem, craftingOrder);
                     if (orderOwner.PartyBelongedTo != null)
                     {
@@ -291,6 +295,7 @@ namespace GameInterface.Services.Smithing.Handlers
                 }
                 else
                 {
+                    // Manage Hero.Power with dynamic sync
                     orderOwner.AddPower((float)(craftedItem.Tier + 1));
                     if (obj.Flag && completerHero.GetPerkValue(DefaultPerks.Crafting.ExperiencedSmith))
                     {
@@ -302,6 +307,8 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
+
+            network.SendAll(new NetworkRefreshWeaponDesignVM());
         }
 
         private void CompleteOrderClients(NetworkCompleteOrderClients obj)
@@ -328,21 +335,12 @@ namespace GameInterface.Services.Smithing.Handlers
             ItemObject craftedItem = itemObjectInterface.UnpackItemObject(obj.CraftedItemData);
 
             // Replace TaleWorlds implementation for clients
-            Hero orderOwner = craftingOrder.OrderOwner;
             if (craftingCampaignBehavior._craftingOrders[town].CustomOrders.Contains(craftingOrder))
             {
                 craftingCampaignBehavior._craftingOrders[town].RemoveCustomOrder(craftingOrder);
             }
             else
             {
-                if (craftingOrder.IsLordOrder)
-                {
-                    craftingCampaignBehavior.ChangeCraftedOrderWithTheNoblesWeaponIfItIsBetter(craftedItem, craftingOrder);
-                }
-                else
-                {
-                    orderOwner.AddPower((float)(craftedItem.Tier + 1));
-                }
                 craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(craftingOrder);
             }
 

@@ -41,7 +41,7 @@ namespace GameInterface.Services.Smithing.Patches
             __instance._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(new CraftingOrder(orderOwner, townOrderDifficulty, weaponDesignTemplate, randomElement, orderSlot, nextTownOrderId));
 
             // Publish message with data for clients
-            var message = new TownOrderCreated(__instance, townOrderDifficulty, pieceTier, randomElement, orderOwner, orderSlot);
+            var message = new TownOrderCreated(__instance, townOrderDifficulty, pieceTier, randomElement, orderOwner, orderSlot, nextTownOrderId);
             MessageBroker.Instance.Publish(__instance, message);
 
             // Skip original

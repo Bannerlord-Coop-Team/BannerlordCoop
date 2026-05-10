@@ -93,6 +93,7 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Father));
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Mother));
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Spouse));
+            TestEnvironment.AssertProperty<Hero, float>(nameof(Hero.Power), 4.4f, defaultValue: hero.Power);
         }
 
         [Fact]

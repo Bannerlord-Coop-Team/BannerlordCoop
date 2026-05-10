@@ -1,4 +1,5 @@
 ﻿using Autofac;
+using Common;
 using Common.Logging;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -36,6 +37,8 @@ internal class SmithingCommands
     [CommandLineArgumentFunction("givesupplies", "coop.debug.crafting")]
     public static string SmithingSuppliesCommand(List<string> strings)
     {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+
         if (strings.Count == 0)
         {
             return "Hero name argument required.";
@@ -91,15 +94,9 @@ internal class SmithingCommands
     [CommandLineArgumentFunction("townorders", "coop.debug.crafting")]
     public static string ViewTownOrdersCommand(List<string> strings)
     {
-        if (strings.Count == 0)
-        {
-            return "Town name argument required.";
-        }
+        if (strings.Count == 0) return "Town name argument required.";
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager.";
-        }
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
 
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var town in Town.AllTowns)
@@ -126,6 +123,8 @@ internal class SmithingCommands
     [CommandLineArgumentFunction("addtownorder", "coop.debug.crafting")]
     public static string AddTestingTownOrderCommand(List<string> strings)
     {
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
+
         var testingHeroName = "Vaminesa the Minter"; // Random hero in Danustica, primary testing town
 
         StringBuilder stringBuilder = new StringBuilder();
@@ -153,15 +152,11 @@ internal class SmithingCommands
     [CommandLineArgumentFunction("addcrafteditems", "coop.debug.crafting")]
     public static string AddCraftedItemCommand(List<string> strings)
     {
-        if (strings.Count == 0)
-        {
-            return "Hero name argument required.";
-        }
+        if (ModInformation.IsClient) return "Command can only be run on the server.";
 
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager.";
-        }
+        if (strings.Count == 0) return "Hero name argument required.";
+
+        if (TryGetObjectManager(out var objectManager) == false) return "Unable to resolve ObjectManager.";
 
         var craftedItemPrefix = "crafted_item_";
 

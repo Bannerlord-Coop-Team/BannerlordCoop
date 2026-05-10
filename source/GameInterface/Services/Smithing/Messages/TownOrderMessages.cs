@@ -16,8 +16,9 @@ public record TownOrderCreated : IEvent
     public CraftingTemplate RandomElement;
     public Hero OrderOwner;
     public int OrderSlot;
+    public string NextTownOrderId;
 
-    public TownOrderCreated(CraftingCampaignBehavior craftingCampaignBehavior, float townOrderDifficulty, int pieceTier, CraftingTemplate randomElement, Hero orderOwner, int orderSlot)
+    public TownOrderCreated(CraftingCampaignBehavior craftingCampaignBehavior, float townOrderDifficulty, int pieceTier, CraftingTemplate randomElement, Hero orderOwner, int orderSlot, string nextTownOrderId)
     {
         CraftingCampaignBehavior = craftingCampaignBehavior;
         TownOrderDifficulty = townOrderDifficulty;
@@ -25,6 +26,7 @@ public record TownOrderCreated : IEvent
         RandomElement = randomElement;
         OrderOwner = orderOwner;
         OrderSlot = orderSlot;
+        NextTownOrderId = nextTownOrderId;
     }
 }
 
@@ -85,7 +87,10 @@ public class NetworkCreateTownOrder : ICommand
     [ProtoMember(6)]
     public int OrderSlot;
 
-    public NetworkCreateTownOrder(string craftingCampaignBehaviorId, float townOrderDifficulty, int pieceTier, string randomElementId, string orderOwnerId, int orderSlot)
+    [ProtoMember(7)]
+    public string NextTownOrderId;
+
+    public NetworkCreateTownOrder(string craftingCampaignBehaviorId, float townOrderDifficulty, int pieceTier, string randomElementId, string orderOwnerId, int orderSlot, string nextTownOrderId)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         TownOrderDifficulty = townOrderDifficulty;
@@ -93,6 +98,7 @@ public class NetworkCreateTownOrder : ICommand
         RandomElementId = randomElementId;
         OrderOwnerId = orderOwnerId;
         OrderSlot = orderSlot;
+        NextTownOrderId = nextTownOrderId;
     }
 }
 
