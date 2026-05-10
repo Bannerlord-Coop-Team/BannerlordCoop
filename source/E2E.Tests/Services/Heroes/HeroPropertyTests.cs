@@ -14,6 +14,8 @@ using TaleWorlds.CampaignSystem;
 using Xunit.Abstractions;
 using Autofac;
 using TaleWorlds.Core;
+using TaleWorlds.CampaignSystem.Issues;
+using Common.Util;
 
 namespace E2E.Tests.Services.Heroes
 {
@@ -216,6 +218,258 @@ namespace E2E.Tests.Services.Heroes
             foreach (var clientHero in clientHeroes)
             {
                 Assert.Equal(oldProperty, clientHero.Weight);
+            }
+        }
+        /// <summary>
+        /// Test method to verify that the server sets HitPoints and syncs all clients.
+        /// </summary>
+        [Fact]
+        public void ServerSetHitPoints_SyncAllClients()
+        {
+            // Arrange
+            var server = TestEnvironment.Server;
+
+            var networkId = "CoopHero_1";
+            var serverHero = TestEnvironment.Server.CreateRegisteredObject<Hero>(networkId);
+
+            var autoSync = server.Container.Resolve<IAutoSync>();
+            var heroProperty = AccessTools.Property(typeof(Hero), nameof(Hero.HitPoints));
+            var syncResults = autoSync.SyncProperty<Hero>(heroProperty, GetHeroId);
+
+            var disposables = new List<IDisposable>();
+            var clientHeroes = new List<Hero>();
+            foreach (var client in TestEnvironment.Clients)
+            {
+                clientHeroes.Add(client.CreateRegisteredObject<Hero>(networkId));
+                disposables.Add(SetupClient(client.Container, syncResults, heroProperty));
+            }
+
+            var newProperty = 50;
+
+            // Act
+            server.Call(() =>
+            {
+                serverHero.HitPoints = newProperty;
+            });
+
+            // Assert
+            Assert.Equal(newProperty, serverHero.HitPoints);
+
+            foreach (var clientHero in clientHeroes)
+            {
+                Assert.Equal(newProperty, clientHero.HitPoints);
+            }
+        }
+
+        /// <summary>
+        /// Test method to verify that the client setting HitPoints does nothing.
+        /// </summary>
+        [Fact]
+        public void ClientSetHitPoints_DoesNothing()
+        {
+            // Arrange
+            var server = TestEnvironment.Server;
+
+            var networkId = "CoopHero_1";
+            var serverHero = TestEnvironment.Server.CreateRegisteredObject<Hero>(networkId);
+
+            var autoSync = server.Container.Resolve<IAutoSync>();
+            var heroProperty = AccessTools.Property(typeof(Hero), nameof(Hero.HitPoints));
+            var syncResults = autoSync.SyncProperty<Hero>(heroProperty, GetHeroId);
+
+            var disposables = new List<IDisposable>();
+            var clientHeroes = new List<Hero>();
+            foreach (var client in TestEnvironment.Clients)
+            {
+                clientHeroes.Add(client.CreateRegisteredObject<Hero>(networkId));
+                disposables.Add(SetupClient(client.Container, syncResults, heroProperty));
+            }
+
+            var oldProperty = serverHero.HitPoints;
+            var newProperty = 0;
+
+            var client1 = TestEnvironment.Clients.First();
+
+            // Act
+            client1.Call(() =>
+            {
+                serverHero.HitPoints = newProperty;
+            });
+
+            // Assert
+            Assert.Equal(oldProperty, serverHero.HitPoints);
+
+            foreach (var clientHero in clientHeroes)
+            {
+                Assert.Equal(oldProperty, clientHero.HitPoints);
+            }
+        }
+        /// <summary>
+        /// Test method to verify that the server sets BannerItem and syncs all clients.
+        /// </summary>
+        [Fact]
+        public void ServerSetBannerItem_SyncAllClients()
+        {
+            // Arrange
+            var server = TestEnvironment.Server;
+
+            var networkId = "CoopHero_1";
+            var serverHero = TestEnvironment.Server.CreateRegisteredObject<Hero>(networkId);
+
+            var autoSync = server.Container.Resolve<IAutoSync>();
+            var heroProperty = AccessTools.Property(typeof(Hero), nameof(Hero.BannerItem));
+            var syncResults = autoSync.SyncProperty<Hero>(heroProperty, GetHeroId);
+
+            var disposables = new List<IDisposable>();
+            var clientHeroes = new List<Hero>();
+            foreach (var client in TestEnvironment.Clients)
+            {
+                clientHeroes.Add(client.CreateRegisteredObject<Hero>(networkId));
+                disposables.Add(SetupClient(client.Container, syncResults, heroProperty));
+            }
+
+            var newProperty = new EquipmentElement(new ItemObject());
+
+            // Act
+            server.Call(() =>
+            {
+                serverHero.BannerItem = newProperty;
+            });
+
+            // Assert
+            Assert.Equal(newProperty, serverHero.BannerItem);
+
+            foreach (var clientHero in clientHeroes)
+            {
+                Assert.Equal(newProperty, clientHero.BannerItem);
+            }
+        }
+        /// <summary>
+        /// Test method to verify that the client setting BannerItem does nothing.
+        /// </summary>
+        [Fact]
+        public void ClientSetBannerItem_DoesNothing()
+        {
+            // Arrange
+            var server = TestEnvironment.Server;
+
+            var networkId = "CoopHero_1";
+            var serverHero = TestEnvironment.Server.CreateRegisteredObject<Hero>(networkId);
+
+            var autoSync = server.Container.Resolve<IAutoSync>();
+            var heroProperty = AccessTools.Property(typeof(Hero), nameof(Hero.BannerItem));
+            var syncResults = autoSync.SyncProperty<Hero>(heroProperty, GetHeroId);
+
+            var disposables = new List<IDisposable>();
+            var clientHeroes = new List<Hero>();
+            foreach (var client in TestEnvironment.Clients)
+            {
+                clientHeroes.Add(client.CreateRegisteredObject<Hero>(networkId));
+                disposables.Add(SetupClient(client.Container, syncResults, heroProperty));
+            }
+
+            var oldProperty = serverHero.BannerItem;
+            var newProperty = new EquipmentElement(new ItemObject());
+
+            var client1 = TestEnvironment.Clients.First();
+
+            // Act
+            client1.Call(() =>
+            {
+                serverHero.BannerItem = newProperty;
+            });
+
+            // Assert
+            Assert.Equal(oldProperty, serverHero.BannerItem);
+
+            foreach (var clientHero in clientHeroes)
+            {
+                Assert.Equal(oldProperty, clientHero.BannerItem);
+            }
+        }
+
+        /// <summary>
+        /// Test method to verify that the server issue and syncs all clients. (using a different way to set it, since issue is a private setter)
+        /// </summary>
+        [Fact]
+        public void ServerSetIssue_SyncAllClients()
+        {
+            // Arrange
+            var server = TestEnvironment.Server;
+
+            var networkId = "CoopHero_1";
+            var serverHero = TestEnvironment.Server.CreateRegisteredObject<Hero>(networkId);
+
+            var autoSync = server.Container.Resolve<IAutoSync>();
+            var heroProperty = AccessTools.Property(typeof(Hero), nameof(Hero.Issue));
+            var syncResults = autoSync.SyncProperty<Hero>(heroProperty, GetHeroId);
+
+            var disposables = new List<IDisposable>();
+            var clientHeroes = new List<Hero>();
+            foreach (var client in TestEnvironment.Clients)
+            {
+                clientHeroes.Add(client.CreateRegisteredObject<Hero>(networkId));
+                disposables.Add(SetupClient(client.Container, syncResults, heroProperty));
+            }
+
+            var issue = ObjectHelper.SkipConstructor<IssueBase>();
+
+            // Act
+            server.Call(() =>
+            {
+                serverHero.OnIssueCreatedForHero(issue);
+            });
+
+            // Assert
+            Assert.Equal(issue, serverHero.Issue);
+
+            foreach (var clientHero in clientHeroes)
+            {
+                Assert.Equal(issue, clientHero.Issue);
+            }
+        }
+
+        /// <summary>
+        /// Test method to verify that the client setting Issue does nothing. ( using a different way to set it, since issue is a private setter)
+        /// </summary>
+        [Fact]
+        public void ClientSetIssue_DoesNothing()
+        {
+            // Arrange
+            var server = TestEnvironment.Server;
+
+            var networkId = "CoopHero_1";
+            var serverHero = TestEnvironment.Server.CreateRegisteredObject<Hero>(networkId);
+
+            var autoSync = server.Container.Resolve<IAutoSync>();
+            var heroProperty = AccessTools.Property(typeof(Hero), nameof(Hero.Issue));
+            var syncResults = autoSync.SyncProperty<Hero>(heroProperty, GetHeroId);
+
+            var disposables = new List<IDisposable>();
+            var clientHeroes = new List<Hero>();
+            foreach (var client in TestEnvironment.Clients)
+            {
+                clientHeroes.Add(client.CreateRegisteredObject<Hero>(networkId));
+                disposables.Add(SetupClient(client.Container, syncResults, heroProperty));
+            }
+
+            var oldProperty = serverHero.Issue;
+            var issue = ObjectHelper.SkipConstructor<IssueBase>();
+
+            var client1 = TestEnvironment.Clients.First();
+
+            // Act
+            client1.Call(() =>
+            {
+                serverHero.OnIssueCreatedForHero(issue);
+            });
+
+            // Assert
+            Assert.Equal(oldProperty, serverHero.Issue);
+
+            foreach (var clientHero in clientHeroes)
+            {
+                Assert.Equal(oldProperty, clientHero.Issue);
             }
         }
 

@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Heroes.Commands;
@@ -75,7 +76,7 @@ public class HeroDebugCommand
             return "Usage: coop.debug.hero.createHero <CharacterObject.StringId> <optional age>";
         }
 
-        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false) 
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
         {
             return $"Unable to get {nameof(IObjectManager)}";
         }
@@ -106,7 +107,7 @@ public class HeroDebugCommand
         {
             return $"Unable to get {nameof(HeroAuditor)}";
         }
-        
+
         return auditor.Audit();
     }
 
@@ -126,5 +127,95 @@ public class HeroDebugCommand
         Hero hero = Hero.FindFirst(x => x._power == 66);
 
         return hero.Name.Value;
+    }
+
+    // coop.debug.hero.set_hitpoints
+    /// <summary>
+    /// Sets the hitpoints of a hero
+    /// </summary>
+    /// <param name="args">heroId and hitPoints value to set </param>
+    /// <returns>information if it changed</returns>
+    [CommandLineArgumentFunction("set_hitpoints", "coop.debug.hero")]
+    public static string SetHeroHitPoints(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.hero.set_hitpoints <heroId> <hitPoints>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        { 
+        return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+
+        if (int.TryParse(args[1], out int hitPoints) == false)
+        {
+            return $"{args[1]} is not a valid integer";
+        }
+
+        hero.HitPoints = hitPoints;
+
+        return $"Hero HitPoints changed to: {hero.HitPoints}";
+    }
+    // coop.debug.hero.set_banneritem
+    /// <summary>
+    /// Sets the banneritem of a hero
+    /// </summary>
+    /// <param name="args">heroId and BannerItem value to set </param>
+    /// <returns>information if it changed</returns>
+    [CommandLineArgumentFunction("set_banneritem", "coop.debug.hero")]
+    public static string SetHeroBannerItem(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.hero.set_banneritem <heroId> <bannerItem>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+
+        if (objectManager.TryGetObject<ItemObject>(args[0], out var bannerItem) == false)
+        {
+            return $"Unable to find item with id: {args[1]}";
+        }
+        hero.BannerItem = new EquipmentElement(bannerItem);
+
+        return $"Hero BannerItem changed to: {hero.BannerItem.Item?.StringId}";
+    }
+    // coop.debug.hero.set_issue
+    /// <summary>
+    /// Clears the issue of a hero since issue is private
+    /// </summary>
+    /// <param name="args">heroId </param>
+    /// <returns>information if it changed</returns>
+    [CommandLineArgumentFunction("clear_issue", "coop.debug.hero")]
+    public static string SetHeroIssue(List<string> args)
+    {
+        if (args.Count != 1)
+            return "Usage: coop.debug.hero.set_issue <heroId>";
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+            return $"Unable to get {nameof(IObjectManager)}";
+
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+            return $"Unable to find hero with id: {args[0]}";
+
+        if (int.TryParse(args[1], out int issue) == false)
+            return $"{args[1]} is not a valid integer";
+
+        hero.OnIssueDeactivatedForHero(); //only way to change issue is by setting it to null
+
+        return $"Hero Issue cleared";
     }
 }
