@@ -130,7 +130,7 @@ namespace GameInterface.Services.Smithing.Handlers
             network.SendAll(message);
 
             // Need to refresh client weapon designs for potential new orders while in CraftingState
-            network.SendAll(new NetworkRefreshWeaponDesignVM());
+            //network.SendAll(new NetworkRefreshWeaponDesignVM()); // This is causing other errors
         }
 
         private void CreateTownOrder(NetworkCreateTownOrder obj)

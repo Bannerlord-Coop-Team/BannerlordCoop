@@ -84,6 +84,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (currentRefinementVM == null) Logger.Warning("SmithingRefreshHandler currentSmithingVM was null");
 
             currentSmeltingVM?.RefreshList();
+            currentSmeltingVM?.RefreshValues();
         }
 
         private void Handle(MessagePayload<NetworkRefreshRefinement> obj)
@@ -104,10 +105,12 @@ namespace GameInterface.Services.Smithing.Handlers
         private void Handle(MessagePayload<NetworkRefreshCraftingVM> obj)
         {
             currentCraftingVM?.UpdateAll();
+            currentCraftingVM?.RefreshValues();
         }
 
         private void Handle(MessagePayload<NetworkRefreshWeaponDesignVM> obj)
         {
+            // Error, object reference not set to instance of object. Happens when another client also has a WeaponDesignVM open?
             currentWeaponDesignVM?.RefreshWeaponDesignMode(null);
         }
     }

@@ -197,8 +197,9 @@ namespace GameInterface.Services.Smithing.Handlers
             itemRoster.AddToCounts(equipmentElement, -1);
 
             int energyCostForSmelting = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmelting(item, craftingHero);
-            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmelting); // Run on server
-            network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, energyCostForSmelting)); // Run on clients
+            int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmelting;
+            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina); // Run on server
+            network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
 
             // Need to separately manage research points. Existing dictionary in CraftingCampaignBehavior won't work for multiple players
             craftingCampaignBehavior.AddResearchPoints(item.WeaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(item, craftingHero));
@@ -286,8 +287,9 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             int energyCostForRefining = Campaign.Current.Models.SmithingModel.GetEnergyCostForRefining(ref formula, craftingHero);
-            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForRefining); // Run on server
-            network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, energyCostForRefining)); // Run on clients
+            int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForRefining;
+            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina); // Run on server
+            network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
 
             CampaignEventDispatcher.Instance.OnItemsRefined(craftingHero, formula);
 
@@ -435,7 +437,6 @@ namespace GameInterface.Services.Smithing.Handlers
             objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
             MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
             ItemObject registeredObject = MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
-            Logger.Information("Server registered object with MBObjectManager with id: {id}", registeredObject.Id);
 
             if (obj.IsFreeMode)
             {
@@ -451,8 +452,9 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             int energyCostForSmithing = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmithing(craftedItemObject, craftingHero);
-            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing); // Run on server
-            network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, energyCostForSmithing)); // Run on clients
+            int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmithing;
+            craftingCampaignBehavior.SetHeroCraftingStamina(craftingHero, newHeroCraftingStamina); // Run on server
+            network.SendAll(new NetworkSetHeroCraftingStamina(obj.CraftingCampaignBehaviorId, obj.CraftingHeroId, newHeroCraftingStamina)); // Run on clients
 
             // Need to separately manage research points. Existing dictionary in CraftingCampaignBehavior won't work for multiple players
             craftingCampaignBehavior.AddResearchPoints(weaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, craftingHero, obj.IsFreeMode));

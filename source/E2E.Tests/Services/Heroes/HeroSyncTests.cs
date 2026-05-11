@@ -93,7 +93,6 @@ namespace E2E.Tests.Services.Heroes
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Father));
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Mother));
             TestEnvironment.AssertReferenceProperty<Hero, Hero>(nameof(Hero.Spouse));
-            TestEnvironment.AssertProperty<Hero, float>(nameof(Hero.Power), 4.4f, defaultValue: hero.Power);
         }
 
         [Fact]
@@ -105,6 +104,7 @@ namespace E2E.Tests.Services.Heroes
             Server.ObjectManager.TryGetObject<Hero>(HeroId, out var hero);
             HarmonyLib.AccessTools.Field(typeof(Hero), nameof(Hero.Culture)).SetValue(hero, null);
             TestEnvironment.AssertReferenceField<Hero, CultureObject>(nameof(Hero.Culture));
+            TestEnvironment.AssertField<Hero, float>(nameof(Hero._power), 4.4f, defaultValue: hero._power);
         }
     }
 }
