@@ -146,19 +146,37 @@ public class HeroDebugCommand
         return hero.Name.Value;
     }
 
-    // coop.debug.hero.set_hitpoints
-    /// <summary>
-    /// Sets the hitpoints of a hero
-    /// </summary>
-    /// <param name="args">heroId and hitPoints value to set </param>
-    /// <returns>information if it changed</returns>
-    [CommandLineArgumentFunction("set_hitpoints", "coop.debug.hero")]
-    public static string SetHeroHitPoints(List<string> args)
+    [CommandLineArgumentFunction("setGold", "coop.debug.hero")]
+    public static string SetGold(List<string> args)
     {
-        if (ModInformation.IsClient)
+        if (args.Count != 2)
         {
-            return "Set HitPoints is only to be called on the server";
+            return "Usage: coop.debug.hero.set_hitpoints <heroId> <hitPoints>";
         }
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+        if (int.TryParse(args[1], out int gold) == false)
+        {
+            return $"{args[1]} is not a valid integer";
+        }
+        hero.Gold = gold;
+        return $"Hero Gold changed to{hero.Gold}";
+    }
+        // coop.debug.hero.set_hitpoints
+        /// <summary>
+        /// Sets the hitpoints of a hero
+        /// </summary>
+        /// <param name="args">heroId and hitPoints value to set </param>
+        /// <returns>information if it changed</returns>
+        [CommandLineArgumentFunction("set_hitpoints", "coop.debug.hero")]
+        public static string SetHeroHitPoints(List<string> args)
+        {
         if (args.Count != 2)
         {
             return "Usage: coop.debug.hero.set_hitpoints <heroId> <hitPoints>";

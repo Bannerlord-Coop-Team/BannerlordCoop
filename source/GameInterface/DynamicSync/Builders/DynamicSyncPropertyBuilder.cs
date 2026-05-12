@@ -70,7 +70,9 @@ namespace GameInterface.DynamicSync.Builders
                 MemberType = propertyInfo.PropertyType.Name,
                 Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
                 SerializeMethod = serializerNames.serialize,
-                DeserializeMethod = serializerNames.deserialize
+                DeserializeMethod = serializerNames.deserialize,
+                // Used by the template (SubscribeSetValueTemplate.txt) to choose between generic and non-generic deserialize syntax
+                IsCustomSerializer = dynamicSyncRegistry.Serializers.ContainsKey(propertyInfo.PropertyType)
             };
         }
     }

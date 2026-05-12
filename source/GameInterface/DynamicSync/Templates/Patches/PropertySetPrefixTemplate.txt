@@ -14,7 +14,7 @@ public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : Gene
             return;
         }
         
-        if(__instance.{{MemberName}} == value)
+        if (EqualityComparer<{{MemberType}}>.Default.Equals(__instance.{{MemberName}}, value))
             return;
 
         var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(__instance, value);
