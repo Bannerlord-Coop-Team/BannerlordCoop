@@ -11,10 +11,12 @@ namespace GameInterface.DynamicSync.Builders
     public class DynamicSyncPropertyBuilder : DynamicSyncBuilderBase
     {
         private readonly IObjectManager objectManager;
+        private readonly DynamicSyncRegistry dynamicSyncRegistry;
 
         public DynamicSyncPropertyBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry) : base(dynamicSyncRegistry)
         {
             this.objectManager = objectManager;
+            this.dynamicSyncRegistry = dynamicSyncRegistry;
         }
         public string GetPrefix(PropertyInfo propertyInfo) => DynamicSyncUtils.GetPrefix(propertyInfo);
 
@@ -23,7 +25,12 @@ namespace GameInterface.DynamicSync.Builders
             var templateData = GetTemplateData(propertyInfo);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
             string networkMessage;
-            if (RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType))
+            var type = propertyInfo.PropertyType;
+            if (
+                RuntimeTypeModel.Default.CanSerialize(type)
+                || dynamicSyncRegistry.Serializers.ContainsKey(type)
+                || (type.IsValueType && !type.IsGenericType)
+                )
             {
                 networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
             }
@@ -42,7 +49,12 @@ namespace GameInterface.DynamicSync.Builders
         public string GetSubscription(PropertyInfo propertyInfo)
         {
             var templateData = GetTemplateData(propertyInfo);
-            if (RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType))
+            var type = propertyInfo.PropertyType;
+            if (
+                RuntimeTypeModel.Default.CanSerialize(type)
+                || dynamicSyncRegistry.Serializers.ContainsKey(type)
+                || (type.IsValueType && !type.IsGenericType)
+                )
                 return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
             else
                 return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
@@ -58,7 +70,9 @@ namespace GameInterface.DynamicSync.Builders
                 MemberType = propertyInfo.PropertyType.Name,
                 Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
                 SerializeMethod = serializerNames.serialize,
-                DeserializeMethod = serializerNames.deserialize
+                DeserializeMethod = serializerNames.deserialize,
+                // Used by the template (SubscribeSetValueTemplate.txt) to choose between generic and non-generic deserialize syntax
+                IsCustomSerializer = dynamicSyncRegistry.Serializers.ContainsKey(propertyInfo.PropertyType)
             };
         }
     }

@@ -10,6 +10,8 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using TaleWorlds.Core;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes
 {
@@ -33,7 +35,12 @@ namespace GameInterface.Services.Heroes
                 //ISSUES WITH THIS
                 //autoSyncBuilder.AddTargetMethod(typeof(Hero), method);
             }
-
+            // Custom serializer for EquipmentElement that registers
+            // only the ItemObject's StringId instead of the full struct
+            autoSyncBuilder.AddSerializer<EquipmentElement>(
+                EquipmentElementSerializer.Serialize,
+                EquipmentElementSerializer.Deserialize
+            );
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.StaticBodyProperties)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Weight)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Build)));
@@ -53,7 +60,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathMark)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathMarkKillerHero)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastKnownClosestSettlement)));
-            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HitPoints)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HitPoints)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathDay)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.LastExaminedLogEntryID)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Clan)));
@@ -68,7 +75,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.BornSettlement)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Gold)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.RandomValue)));
-            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.BannerItem)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.BannerItem)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Father)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Mother)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Spouse)));
