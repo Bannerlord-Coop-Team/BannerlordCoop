@@ -1,63 +1,53 @@
-﻿using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEventParties;
-internal class MapEventPartyRegistry : IAutoRegistry<MapEventParty>
+internal class MapEventPartyRegistry : AutoRegistryBase<MapEventParty>
 {
-    ILogger Logger { get; }
-    public MapEventPartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public MapEventPartyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            int counter = 1;
-            
-            foreach (var side in mapEvent._sides)
+            foreach (var side in mapEvent._sides.Where(x => x != null))
             {
-                if (side == null) continue;
-
-                foreach (var party in side.Parties)
+                foreach (var party in side.Parties.Where(x => x != null))
                 {
-                    if (party == null) continue;
-
-                    var networkId = mapEvent.StringId + "_" + counter++;
-
-                    if (objectManager.AddExisting(networkId, party) == false)
-                        Logger.Error("Unable to register MapEventParty {id} in the object manager", party.ToString());
+                    RegisterExistingObject(mapEvent.StringId, party);
                 }
             }
         }
     }
 
-    public void OnClientCreated(MapEventParty obj, string id)
+    public override void OnClientCreated(MapEventParty obj, string id)
     {
     }
 
-    public void OnClientDestroyed(MapEventParty obj, string id)
+    public override void OnClientDestroyed(MapEventParty obj, string id)
     {
     }
 
-    public void OnServerCreated(MapEventParty obj, string id)
+    public override void OnServerCreated(MapEventParty obj, string id)
     {
     }
 
-    public void OnServerDestroyed(MapEventParty obj, string id)
+    public override void OnServerDestroyed(MapEventParty obj, string id)
     {
     }
 }

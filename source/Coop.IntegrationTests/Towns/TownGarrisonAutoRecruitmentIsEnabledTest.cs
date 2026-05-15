@@ -17,9 +17,7 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownGarrisonAutoRecruitmentIsEnabledChanged_Publishes_AllClients()
         {
             // Arrange
-            string townId = "Settlement1";
-            bool garrisonAutoRecruitmentIsEnabled = false;
-            var triggerMessage = new TownGarrisonAutoRecruitmentIsEnabledChanged(townId, garrisonAutoRecruitmentIsEnabled);
+            var triggerMessage = new TownGarrisonAutoRecruitmentIsEnabledChanged();
 
             var server = TestEnvironment.Server;
 

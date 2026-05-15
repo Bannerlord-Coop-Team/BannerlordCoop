@@ -13,15 +13,6 @@ namespace GameInterface.Services.PartyBases.Patches;
 [HarmonyPatch(typeof(PartyBase))]
 internal class PartyBasePatch
 {
-    [HarmonyPatch(nameof(PartyBase.ItemRoster), MethodType.Setter)]
-    [HarmonyPostfix]
-    public static void ItemRosterSetterPostfix(PartyBase __instance)
-    {
-        if (ModInformation.IsClient) return;
-
-        ItemRosterLookup.Set(__instance.ItemRoster, __instance);
-    }
-
     [HarmonyPatch(nameof(PartyBase.MapEventSide), MethodType.Setter)]
     [HarmonyPrefix]
     public static bool Prefixtest(PartyBase __instance, MapEventSide value)

@@ -1,11 +1,11 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
@@ -18,52 +18,56 @@ namespace GameInterface.Services.MapEventSides;
 /// <summary>
 /// Registry for <see cref="MapEventSide"/> objects
 /// </summary>
-internal class MapEventSideRegistry : IAutoRegistry<MapEventSide>
+internal class MapEventSideRegistry : AutoRegistryBase<MapEventSide>
 {
-    private static ILogger Logger = LogManager.GetLogger<MapEventSide>();
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(MapEventSide), new Type[]
+        {
+            typeof(MapEvent), 
+            typeof(BattleSideEnum), 
+            typeof(PartyBase)
+        })
+    };
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] { };
+    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[] { 
+        AccessTools.Method(typeof(MapEventSide), nameof(MapEventSide.HandleMapEventEnd))
+    };
 
-    public IEnumerable<MethodBase> DestroyMethods => new MethodBase[] { };
-
-    public MapEventSideRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public MapEventSideRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (MapEvent mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
             int counter = 1;
 
-            foreach (var side in mapEvent._sides)
+            foreach (var side in mapEvent._sides.Where(side => side != null))
             {
-                if (side == null) continue;
-
                 var networkId = mapEvent.StringId + "_" + counter++;
 
-                if (objectManager.AddExisting(networkId, side) == false)
-                    Logger.Error("Unable to register MapEventSide {id} in the object manager", side.ToString());
+                RegisterExistingObject(networkId, side);
             }
         }
     }
 
-    public void OnClientCreated(MapEventSide obj, string id)
+    public override void OnClientCreated(MapEventSide obj, string id)
+    {
+        AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._battleParties))
+            .SetValue(obj, new MBList<MapEventParty>());
+    }
+
+    public override void OnClientDestroyed(MapEventSide obj, string id)
     {
     }
 
-    public void OnClientDestroyed(MapEventSide obj, string id)
+    public override void OnServerCreated(MapEventSide obj, string id)
     {
     }
 
-    public void OnServerCreated(MapEventSide obj, string id)
-    {
-    }
-
-    public void OnServerDestroyed(MapEventSide obj, string id)
+    public override void OnServerDestroyed(MapEventSide obj, string id)
     {
     }
 }

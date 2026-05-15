@@ -9,10 +9,8 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.GauntletUI;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.PartyComponents.Handlers;
@@ -61,14 +59,8 @@ internal class PartyComponentHandler : IHandler
     {
         objectManager.AddNewObject(payload.What.Instance, out var id);
 
-        if (!objectManager.TryGetId(payload.What.Instance.MobileParty, out var mobilePartyId))
-        {
-            Logger.Error("Failed to resolve {var} from registry", nameof(payload.What.Instance.MobileParty));
-            return;
-        }
-
         var typeIndex = partyTypes.IndexOf(payload.What.Instance.GetType());
-        var data = new PartyComponentData(typeIndex, id, mobilePartyId)
+        var data = new PartyComponentData(typeIndex, id)
         {
             HomeSettlementId = payload.What.SettlementId,
             IsNaval = payload.What.IsNaval,
@@ -140,13 +132,5 @@ internal class PartyComponentHandler : IHandler
                     data.Id);
                 break;
         }
-
-        if (!objectManager.TryGetObject<MobileParty>(data.MobilePartyId, out var mobileParty))
-        {
-            Logger.Error("Failed to get mobile party for {id}", data.Id);
-            return;
-        }
-
-        obj.MobileParty = mobileParty;
     }
 }

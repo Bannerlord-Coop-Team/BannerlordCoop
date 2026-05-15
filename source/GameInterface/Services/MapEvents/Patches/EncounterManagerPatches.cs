@@ -31,9 +31,7 @@ internal class EncounterManagerPatches
 
         if (attackerParty.IsPartyControlled() == false) return false;
 
-        var message = new StartSettlementEncounterAttempted(
-            attackerParty.StringId,
-            settlement.StringId);
+        var message = new StartSettlementEncounterAttempted(attackerParty, settlement);
         MessageBroker.Instance.Publish(attackerParty, message);
 
         return false;

@@ -12,9 +12,9 @@ using System.Reflection;
 namespace GameInterface.Registry.Auto;
 public interface IAutoRegistryFactory : IDisposable
 {
-    bool TryRegisterType<T>(IEnumerable<MethodBase> ctrosToPatch, IEnumerable<MethodBase> destroyMethods, Action<IObjectManager> registerAll, AutoRegistryCallbacks<T> callbacks) where T : class;
+    void AddRegistry<T>(AutoRegistryBase<T> autoRegistry) where T : class;
 
-    void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class;
+    void RegisterAll();
 }
 
 internal class AutoRegistryFactory : IAutoRegistryFactory
@@ -29,6 +29,8 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
     IObjectManager ObjectManager { get; }
     ISerializableTypeMapper TypeMapper { get; }
     List<IDisposable> Disposables { get; } = new List<IDisposable>();
+
+    List<Action> RegisterAllCallbacks = new List<Action>();
 
     public AutoRegistryFactory(
         IRegistryCollection collection,
@@ -51,52 +53,46 @@ internal class AutoRegistryFactory : IAutoRegistryFactory
         Disposables.ForEach(disposable => disposable.Dispose());
     }
 
-    public void RegisterType<T>(IAutoRegistry<T> autoRegistry) where T : class
+    public void AddRegistry<T>(AutoRegistryBase<T> autoRegistry) where T : class
     {
-        var callbacks = new AutoRegistryCallbacks<T>(autoRegistry);
+        ValidateConstructorTypes(autoRegistry.Constructors, typeof(T));
 
-        TryRegisterType(autoRegistry.Constructors, autoRegistry.DestroyMethods, autoRegistry.RegisterAllObjects, callbacks);
-    }
+        TypeMapper.AddTypes(new Type[] { 
+            typeof(NetworkCreateInstance<T>),
+            typeof(NetworkDestroyInstance<T>)
+        });
 
-    public bool TryRegisterType<T>(
-        IEnumerable<MethodBase> ctrosToPatch,
-        IEnumerable<MethodBase> destroyMethods,
-        Action<IObjectManager> registerAll,
-        AutoRegistryCallbacks<T> callbacks
-    ) where T : class
-    {
-        ValidateConstructorTypes(ctrosToPatch, typeof(T));
-
-        TypeMapper.AddTypes(new Type[] { typeof(NetworkCreateInstance<T>) });
-        TypeMapper.AddTypes(new Type[] { typeof(NetworkDestroyInstance<T>) });
-
-        var registry = new AutoRegistry<T>(registerAll, Collection, ObjectManager);
         var handler = new AutoRegistryHandler<T>(
-            registry,
+            autoRegistry,
             MessageBroker,
             Network,
-            ObjectManager,
-            callbacks
+            ObjectManager
         );
 
-        foreach (var ctor in ctrosToPatch)
+        foreach (var ctor in autoRegistry.Constructors)
         {
             var patch = AccessTools.Method(typeof(LifetimePatches<T>), nameof(LifetimePatches<T>.CreatePrefix));
 
             SyncPatchCollector.AddPrefix(ctor, patch);
         }
 
-        foreach (var destroy in destroyMethods)
+        foreach (var destroy in autoRegistry.DestroyMethods)
         {
-            var patch = AccessTools.Method(typeof(LifetimePatches<T>), nameof(LifetimePatches<T>.DestroyPrefix));
+            var patch = AccessTools.Method(typeof(LifetimePatches<T>), nameof(LifetimePatches<T>.DestroyPostfix));
 
-            SyncPatchCollector.AddPrefix(destroy, patch);
+            SyncPatchCollector.AddPostfix(destroy, patch);
         }
 
-        Disposables.Add(registry);
+        RegisterAllCallbacks.Add(autoRegistry.RegisterAllObjects);
         Disposables.Add(handler);
+    }
 
-        return true;
+    public void RegisterAll()
+    {
+        foreach (var callback in RegisterAllCallbacks)
+        {
+            callback();
+        }
     }
 
     private void ValidateConstructorTypes(IEnumerable<MethodBase> ctros, Type expectedType)

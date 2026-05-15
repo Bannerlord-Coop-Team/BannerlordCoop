@@ -155,6 +155,11 @@ internal class MapEventSideDataHandler : IHandler
 
         using (new AllowedThread())
         {
+            Logger.Debug("Adding {PartyId} to side {SideId} in map event ({MapEvent})", 
+                data.PartyId,
+                data.SideId,
+                side.MapEvent.StringId ?? "<null>");
+
             side._battleParties.Add(party);
         }
     }

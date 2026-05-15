@@ -23,7 +23,7 @@ public class {{DeclaringType}}_DynamicPatches : GenericPatches<{{DeclaringType}}
 {
     private static IEnumerable<MethodBase> TargetMethods()
     {
-        foreach (var method in AccessTools.GetDeclaredMethods(typeof({{DeclaringType}})))
+        foreach (var method in AccessTools.GetDeclaredMethods(typeof({{DeclaringType}})).Where(m => !m.IsAbstract))
         {
             yield return method;
         }

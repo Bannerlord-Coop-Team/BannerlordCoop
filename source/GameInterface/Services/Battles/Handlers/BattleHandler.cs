@@ -27,23 +27,23 @@ internal class BattleHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-        messageBroker.Subscribe<BattleStarted>(Handle);
-        messageBroker.Subscribe<NetworkStartBattle>(Handle);
-        messageBroker.Subscribe<PlayerStartBattle>(Handle);
-        messageBroker.Subscribe<NetworkStartPlayerBattle>(Handle);
-        messageBroker.Subscribe<NetworkResponsePlayerBattle>(Handle);
+        messageBroker.Subscribe<BattleStarted>(Handle_BattleStarted);
+        messageBroker.Subscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
+        messageBroker.Subscribe<PlayerStartBattle>(Handle_PlayerStartBattle);
+        messageBroker.Subscribe<NetworkStartPlayerBattle>(Handle_NetworkStartPlayerBattle);
+        messageBroker.Subscribe<NetworkResponsePlayerBattle>(Handle_NetworkResponsePlayerBattle);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<BattleStarted>(Handle);
-        messageBroker.Unsubscribe<NetworkStartBattle>(Handle);
-        messageBroker.Unsubscribe<PlayerStartBattle>(Handle);
-        messageBroker.Unsubscribe<NetworkStartPlayerBattle>(Handle);
-        messageBroker.Unsubscribe<NetworkResponsePlayerBattle>(Handle);
+        messageBroker.Unsubscribe<BattleStarted>(Handle_BattleStarted);
+        messageBroker.Unsubscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
+        messageBroker.Unsubscribe<PlayerStartBattle>(Handle_PlayerStartBattle);
+        messageBroker.Unsubscribe<NetworkStartPlayerBattle>(Handle_NetworkStartPlayerBattle);
+        messageBroker.Unsubscribe<NetworkResponsePlayerBattle>(Handle_NetworkResponsePlayerBattle);
     }
 
-    private void Handle(MessagePayload<BattleStarted> payload)
+    private void Handle_BattleStarted(MessagePayload<BattleStarted> payload)
     {
         var data = payload.What;
 
@@ -62,7 +62,7 @@ internal class BattleHandler : IHandler
         }
     }
 
-    private void Handle(MessagePayload<NetworkStartBattle> payload)
+    private void Handle_NetworkStartBattle(MessagePayload<NetworkStartBattle> payload)
     {
         if (!objectManager.TryGetObject(payload.What.AttackerId, out PartyBase attacker)) {
             Logger.Error("Failed to get {var} with id: {id}", nameof(PartyBase), payload.What.AttackerId);
@@ -78,14 +78,14 @@ internal class BattleHandler : IHandler
         EncounterManagerPatches.OverrideOnPartyInteraction(attacker, defender);
     }
 
-    private void Handle(MessagePayload<PlayerStartBattle> payload)
+    private void Handle_PlayerStartBattle(MessagePayload<PlayerStartBattle> payload)
     {
         var message = new NetworkStartPlayerBattle(MobileParty.MainParty.StringId);
 
         network.SendAll(message);
     }
 
-    private void Handle(MessagePayload<NetworkStartPlayerBattle> payload)
+    private void Handle_NetworkStartPlayerBattle(MessagePayload<NetworkStartPlayerBattle> payload)
     {
         var obj = payload.What;
 
@@ -96,7 +96,7 @@ internal class BattleHandler : IHandler
         network.Send(payload.Who as NetPeer, message);
     }
 
-    private void Handle(MessagePayload<NetworkResponsePlayerBattle> payload)
+    private void Handle_NetworkResponsePlayerBattle(MessagePayload<NetworkResponsePlayerBattle> payload)
     {
         var obj = payload.What;
 

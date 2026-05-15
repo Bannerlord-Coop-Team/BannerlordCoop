@@ -1,5 +1,9 @@
-﻿using GameInterface.Registry.Auto;
+﻿using Common;
+using Common.Util;
+using GameInterface.Registry;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -12,49 +16,57 @@ namespace GameInterface.Services.MapEvents;
 /// <summary>
 /// Registry for <see cref="MapEvent"/> objects
 /// </summary>
-internal class MapEventRegistry : IAutoRegistry<MapEvent>
+internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 {
-    ILogger Logger { get; }
-    public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public override bool Debug => true;
+    public MapEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MapEvent));
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
-
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
     {
-        int counter = 1;
+        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))
+    };
+
+    public override void RegisterAllObjects()
+    {
         foreach (var mapEvent in Campaign.Current.MapEventManager.MapEvents)
         {
-            if (mapEvent.StringId == null) return;
+            if (mapEvent.StringId == null) continue;
 
-            var networkId = mapEvent.StringId + "_" + counter++;
-
-            if (!objectManager.AddExisting(networkId, mapEvent))
-            {
-                Logger.Error($"Unable to register {mapEvent}");
-            }
+            RegisterExistingObject(mapEvent.StringId, mapEvent);
         }
     }
 
-    public void OnClientCreated(MapEvent obj, string id)
+    public override void OnClientCreated(MapEvent obj, string id)
+    {
+        using (new AllowedThread())
+        {
+            obj.StringId = id;
+            obj._sides = new MapEventSide[2];
+        }
+    }
+
+    public override void OnClientDestroyed(MapEvent obj, string id)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                obj.Component?.FinishComponent();
+                obj.FinalizeEventAux();
+            }
+        });
+    }
+
+    public override void OnServerCreated(MapEvent obj, string id)
     {
     }
 
-    public void OnClientDestroyed(MapEvent obj, string id)
-    {
-    }
-
-    public void OnServerCreated(MapEvent obj, string id)
-    {
-    }
-
-    public void OnServerDestroyed(MapEvent obj, string id)
+    public override void OnServerDestroyed(MapEvent obj, string id)
     {
     }
 }

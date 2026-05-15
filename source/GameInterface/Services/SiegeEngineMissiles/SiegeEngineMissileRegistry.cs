@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Util;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -15,37 +16,35 @@ using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.SiegeEngineMissiles;
-internal class SiegeEngineMissileRegistry : IAutoRegistry<SiegeEvent.SiegeEngineMissile>
+internal class SiegeEngineMissileRegistry : AutoRegistryBase<SiegeEvent.SiegeEngineMissile>
 {
-    ILogger Logger { get; }
-    public SiegeEngineMissileRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
-    {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
-    }
-
-    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(SiegeEvent.SiegeEngineMissile));
-
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
-
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public SiegeEngineMissileRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
     }
 
-    public void OnClientCreated(SiegeEvent.SiegeEngineMissile obj, string id)
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(SiegeEvent.SiegeEngineMissile));
+
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public override void RegisterAllObjects()
+    {
+        Logger.Warning("RegisterAllObjects is not implemented for SiegeEngineMissileRegistry");
+    }
+
+    public override void OnClientCreated(SiegeEvent.SiegeEngineMissile obj, string id)
     {
     }
 
-    public void OnClientDestroyed(SiegeEvent.SiegeEngineMissile obj, string id)
+    public override void OnClientDestroyed(SiegeEvent.SiegeEngineMissile obj, string id)
     {
     }
 
-    public void OnServerCreated(SiegeEvent.SiegeEngineMissile obj, string id)
+    public override void OnServerCreated(SiegeEvent.SiegeEngineMissile obj, string id)
     {
     }
 
-    public void OnServerDestroyed(SiegeEvent.SiegeEngineMissile obj, string id)
+    public override void OnServerDestroyed(SiegeEvent.SiegeEngineMissile obj, string id)
     {
     }
 }

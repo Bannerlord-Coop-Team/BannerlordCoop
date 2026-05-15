@@ -6,7 +6,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
 
-    namespace GameInterface.Services.ObjectManager;
+namespace GameInterface.Services.ObjectManager;
 
 public interface IObjectManager
 {
@@ -73,6 +73,16 @@ public interface IObjectManager
     /// <remarks>After calling this method, the collection will be empty. This method does not throw an
     /// exception if the collection is already empty.</remarks>
     void Clear();
+
+    /// <summary>
+    /// Generates a new unique id for the given object using the specified base string.
+    /// </summary>
+    /// <param name="obj">Object to generate a new id for</param>
+    /// <param name="baseId">Base string to use for id generation (e.g. "Hero_looters1_1"). The final id will be in the format "{typeName}_{baseId}_{N}" where N is a unique number.</param>
+    /// <returns>Newly generated unique id</returns>
+    string CreateNewId(object obj, string baseId);
+
+    int GetUniqueTypeId(object obj);
 }
 
 /// <summary>
@@ -91,91 +101,28 @@ public class ObjectManager : IObjectManager
 
     public ObjectManager(ILogger logger)
     {
-        /// <summary>
-        /// Determins if an object is stored in the object manager
-        /// </summary>
-        /// <param name="obj">Object to check if stored</param>
-        /// <returns>True if stored, false if not</returns>
-        bool Contains(object obj);
-
-        /// <summary>
-        /// Determins if an StringId is stored in the object manager
-        /// </summary>
-        /// <param name="id">StringId to check if stored</param>
-        /// <returns>True if stored, false if not</returns>
-        bool Contains(string id);
-
-        /// <summary>
-        /// Attempts to get an object's StringId from the object itself
-        /// </summary>
-        /// <param name="obj">Object to get StringId from</param>
-        /// <param name="id">Out parameter for string id (null if not found)</param>
-        /// <returns>True if successful, false if failed</returns>
-        bool TryGetId(object obj, out string id);
-        bool TryGetIdWithLogging(object obj, out string id);
-
-        /// <summary>
-        /// Attempts to get an object using a StringId and object type
-        /// </summary>
-        /// <typeparam name="T">Type of object</typeparam>
-        /// <param name="id">StringId used to lookup object</param>
-        /// <param name="obj">Out parameter for the object (null if not found)</param>
-        /// <returns>True if successful, false if failed</returns>
-        bool TryGetObject<T>(string id, out T obj);
-        bool TryGetObjectWithLogging<T>(string id, out T obj);
-
-        /// <summary>
-        /// Add an object with already existing StringId
-        /// </summary>
-        /// <param name="id">Id to assosiate with object</param>
-        /// <param name="obj">Object to assosiate with id</param>
-        /// <returns>True if successful, false if failed</returns>
-        bool AddExisting(string id, object obj);
-
-        /// <summary>
-        /// Adds an object without a registered StringId
-        /// </summary>
-        /// <param name="obj">Object to register</param>
-        /// <param name="newId">Newly created StringId</param>
-        /// <returns>True if successful, false if failed</returns>
-        bool AddNewObject(object obj, out string newId);
-
-        /// <summary>
-        /// Removes an object from the <see cref="IObjectManager"/>
-        /// </summary>
-        /// <param name="obj">Object to remove</param>
-        /// <returns>True if successful, false if failed</returns>
-        bool Remove(object obj);
+        this.logger = logger;
     }
 
-    /// <summary>
-    /// Ground truth for storing and retreiving object and ids
-    /// </summary>
-    public class ObjectManager : IObjectManager
+    public bool AddExisting(string id, object obj)
     {
-        private readonly ILogger logger;
+        if (string.IsNullOrEmpty(id)) return false;
 
-        protected readonly Dictionary<string, object> idObjs = new Dictionary<string, object>();
-        protected ConditionalWeakTable<object, string> objsIds = new ConditionalWeakTable<object, string>();
+        if (obj == null) return false;
 
         lock (_gate)
         {
-            // Add type as a prefix to prevent collisions
-            id = $"{obj.GetType().Name}_{id}";
-
             if (idObjs.ContainsKey(id))
             {
                 logger.Warning("Duplicate id: {id}", id);
                 return false;
             }
 
-            if (objsIds.TryGetValue(obj, out var outvar))
+            if (objsIds.TryGetValue(obj, out var _))
             {
                 logger.Warning("Object already registered: {ObjectType}", obj.GetType());
                 return false;
             }
-
-            IncrementCounter(obj);
 
             idObjs.Add(id, obj);
             objsIds.Add(obj, id);
@@ -197,7 +144,7 @@ public class ObjectManager : IObjectManager
                 return false;
             }
 
-            newId = GenerateId(obj);
+            newId = $"{obj.GetType().Name}_{GetUniqueTypeId(obj)}";
 
             if (idObjs.ContainsKey(newId))
             {
@@ -216,7 +163,12 @@ public class ObjectManager : IObjectManager
         }
     }
 
-    private int IncrementCounter(object obj)
+    public string CreateNewId(object obj, string baseId)
+    {
+        return $"{obj.GetType().Name}_{baseId}";
+    }
+
+    public int GetUniqueTypeId(object obj)
     {
         var type = obj.GetType();
 
@@ -225,12 +177,6 @@ public class ObjectManager : IObjectManager
             1,                // initial value if missing
             (_, current) => current + 1
         );
-    }
-
-    private string GenerateId(object obj)
-    {
-        var type = obj.GetType();
-        return $"{type.Name}_{IncrementCounter(obj)}";
     }
 
     public bool Contains(object obj)
@@ -294,19 +240,54 @@ public class ObjectManager : IObjectManager
     #region LogHelpers
     public bool TryGetIdWithLogging(object obj, out string id)
     {
+        id = null;
+
+        if (obj == null)
+        {
+            logger.Error(
+                "[{ClassName}] Failed to get id because object was null",
+                nameof(ObjectManager));
+
+            return false;
+        }
+
+
         if (!TryGetId(obj, out id))
         {
             logger.Error(
-                "[{ClassName}] Failed to get {ObjectType} in {ClassName}",
+                "[{ClassName}] Failed to get id for object of type {ObjectType}",
                 nameof(ObjectManager),
-                obj.GetType()
-            );
+                obj.GetType().FullName);
+
+            return false;
         }
 
-        private string GenerateId(object obj)
+        return true;
+    }
+
+    public bool TryGetObjectWithLogging<T>(string id, out T obj)
+    {
+        obj = default;
+
+        if (id == null)
         {
-            var type = obj.GetType();
-            return $"{type.Name}_{IncrementCounter(obj)}";
+            logger.Error(
+                "[{ClassName}] Failed to get object because id was null",
+                nameof(ObjectManager));
+
+            return false;
+        }
+
+        if (!TryGetObject(id, out obj))
+        {
+            logger.Error(
+                "[{ClassName}] Failed to get {name} using {id}",
+                nameof(ObjectManager),
+                typeof(T),
+                id
+            );
+
+            return false;
         }
 
         return true;

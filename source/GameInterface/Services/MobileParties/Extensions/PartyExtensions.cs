@@ -14,14 +14,10 @@ internal static class PartyExtensions
 
     private static ConditionalWeakTable<MobileParty, PartyCache> Cache = new();
 
-    private sealed class ControlledCache
+    private sealed class PartyCache
     {
-        public bool? IsPartyControlled = null;
-    }
-
-    private sealed class PlayerCache
-    {
-        public bool? IsPlayerParty = null;
+        public bool? IsPartyControlled;
+        public bool? IsPlayerParty;
     }
 
     /// <summary>
@@ -37,12 +33,12 @@ internal static class PartyExtensions
             return false;
         }
 
-        //var cache = _controlledCache.GetOrCreateValue(party);
+        var cache = Cache.GetOrCreateValue(party);
 
-        //if (cache.IsPartyControlled.HasValue)
-        //{
-        //    return cache.IsPartyControlled.Value;
-        //}
+        if (cache.IsPartyControlled.HasValue)
+        {
+            return cache.IsPartyControlled.Value;
+        }
 
         if (!ContainerProvider.TryResolve<IControlledEntityRegistry>(out var entityRegistry))
         {
@@ -87,12 +83,12 @@ internal static class PartyExtensions
             return false;
         }
 
-        //var cache = _playerCache.GetOrCreateValue(party);
+        var cache = Cache.GetOrCreateValue(party);
 
-        //if (cache.IsPlayerParty.HasValue)
-        //{
-        //    return cache.IsPlayerParty.Value;
-        //}
+        if (cache.IsPlayerParty.HasValue)
+        {
+            return cache.IsPlayerParty.Value;
+        }
 
         if (!ContainerProvider.TryResolve<IPlayerRegistry>(out var playerRegistry))
         {
@@ -101,7 +97,7 @@ internal static class PartyExtensions
         }
 
         var result = playerRegistry.Contains(party);
-        //cache.IsPlayerParty = result;
+        cache.IsPlayerParty = result;
 
         return result;
     }
@@ -110,7 +106,7 @@ internal static class PartyExtensions
     /// Clears all cached values for a specific party.
     /// Call this when party ownership/player status may have changed.
     /// </summary>
-    public static void InvalidateCache(this MobileParty party)
+    public static void InvalidatePartyCache(this MobileParty party)
     {
         if (party is null)
         {
@@ -118,8 +114,37 @@ internal static class PartyExtensions
             return;
         }
 
-        _playerCache.Remove(party);
-        _controlledCache.Remove(party);
+        Cache.Remove(party);
+    }
+
+    /// <summary>
+    /// Clears only the cached controlled-state for a specific party.
+    /// </summary>
+    public static void InvalidateControlledCache(this MobileParty party)
+    {
+        if (party is null)
+        {
+            Logger.Error("{parameterName} was null", nameof(party));
+            return;
+        }
+
+        var cache = Cache.GetOrCreateValue(party);
+        cache.IsPartyControlled = null;
+    }
+
+    /// <summary>
+    /// Clears only the cached player-state for a specific party.
+    /// </summary>
+    public static void InvalidatePlayerPartyCache(this MobileParty party)
+    {
+        if (party is null)
+        {
+            Logger.Error("{parameterName} was null", nameof(party));
+            return;
+        }
+
+        var cache = Cache.GetOrCreateValue(party);
+        cache.IsPlayerParty = null;
     }
 
     public static void InvalidateCache()

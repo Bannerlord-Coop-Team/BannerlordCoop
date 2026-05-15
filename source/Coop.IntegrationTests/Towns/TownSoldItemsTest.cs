@@ -18,9 +18,7 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownSoldItemsChanged_Publishes_AllClients()
         {
             // Arrange
-            string townId = "Settlement1";
-            Town.SellLog[] soldItems = new Town.SellLog[] {};
-            var triggerMessage = new TownSoldItemsChanged(townId, soldItems);
+            var triggerMessage = new TownSoldItemsChanged();
 
             var server = TestEnvironment.Server;
 

@@ -5,6 +5,7 @@ using Autofac.Core.Resolving.Pipeline;
 using Common.Logging;
 using Common.PacketHandlers;
 using GameInterface.AutoSync;
+using GameInterface.DynamicSync;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Serialization;

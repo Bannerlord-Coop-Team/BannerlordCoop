@@ -19,9 +19,7 @@ public class SettlementGarrisonWageLimitTest
     public void ServerSettlementGarrisonWageLimitChanged_Publishes_AllClients()
     {
         // Arrange
-        string settlementId = "Settlement1";
-        int wageLimit = 45;
-        var triggerMessage = new SettlementChangedGarrisonWageLimit(settlementId, wageLimit);
+        var triggerMessage = new SettlementChangedGarrisonWageLimit();
 
         var server = TestEnvironment.Server;
 

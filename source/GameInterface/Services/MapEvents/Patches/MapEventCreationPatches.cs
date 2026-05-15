@@ -1,39 +1,39 @@
-﻿using Common;
-using Common.Logging;
-using Common.Messaging;
-using GameInterface.Policies;
-using GameInterface.Services.MapEvents.Messages;
-using HarmonyLib;
-using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Reflection;
-using TaleWorlds.CampaignSystem.MapEvents;
+﻿//using Common;
+//using Common.Logging;
+//using Common.Messaging;
+//using GameInterface.Policies;
+//using GameInterface.Services.MapEvents.Messages;
+//using HarmonyLib;
+//using Serilog;
+//using System;
+//using System.Collections.Generic;
+//using System.Reflection;
+//using TaleWorlds.CampaignSystem.MapEvents;
 
-namespace GameInterface.Services.MapEvents.Patches;
+//namespace GameInterface.Services.MapEvents.Patches;
 
-[HarmonyPatch]
-internal class MapEventCreationPatches
-{
-    static readonly ILogger Logger = LogManager.GetLogger<MapEventCreationPatches>();
+//[HarmonyPatch]
+//internal class MapEventCreationPatches
+//{
+//    static readonly ILogger Logger = LogManager.GetLogger<MapEventCreationPatches>();
 
-    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(MapEvent));
+//    static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(MapEvent));
 
-    static bool Prefix(MapEvent __instance)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+//    static bool Prefix(MapEvent __instance)
+//    {
+//        // Call original if we call this function
+//        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client tried to create {name}", typeof(MapEvent));
-            return false;
-        }
+//        if (ModInformation.IsClient)
+//        {
+//            Logger.Error("Client tried to create {name}", typeof(MapEvent));
+//            return false;
+//        }
 
-        var message = new MapEventCreated(__instance);
+//        var message = new MapEventCreated(__instance);
 
-        MessageBroker.Instance.Publish(__instance, message);
+//        MessageBroker.Instance.Publish(__instance, message);
 
-        return true;
-    }
-}
+//        return true;
+//    }
+//}

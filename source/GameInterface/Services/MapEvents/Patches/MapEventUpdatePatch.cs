@@ -31,7 +31,7 @@ namespace GameInterface.Services.MapEvents.Patches
             if (ModInformation.IsClient) return false;
 
             // Skip if any parties are not set
-            if (__instance.InvolvedParties.Any(x => x is null)) return false;
+            if (__instance.InvolvedParties.Any(x => x?.MobileParty is null)) return false;
 
             // Don't update if a player is involved
             // Prevents server from instantly finishing the battle and waits for client finish request
@@ -138,9 +138,9 @@ namespace GameInterface.Services.MapEvents.Patches
 
             if (ModInformation.IsClient) return false;
 
-            MapEventInitialize message = new MapEventInitialize(__instance, mapEventType, attackerParty, defenderParty);
+            //MapEventInitialize message = new MapEventInitialize(__instance, mapEventType, attackerParty, defenderParty);
 
-            MessageBroker.Instance.Publish(__instance, message);
+            //MessageBroker.Instance.Publish(__instance, message);
 
             return true;
         }

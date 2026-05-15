@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -12,35 +13,52 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.TroopRosters;
-internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
+internal class TroopRosterRegistry : AutoRegistryBase<TroopRoster>
 {
-    ILogger Logger { get; }
-    public TroopRosterRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public TroopRosterRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(TroopRoster))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
-        foreach (MobileParty party in Campaign.Current.MobileParties)
+        var parties = Campaign.Current?.MobileParties;
+        if (parties == null)
+        {
+            Logger.Error("Unable to register {Type} when Campaign.MobileParties is null", nameof(TroopRoster));
+            return;
+        }
+
+        foreach (MobileParty party in parties)
         {
 
-            if (objectManager.AddExisting($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster) == false)
-                Logger.Error($"Unable to register {nameof(MobileParty.MemberRoster)}");
-            if (objectManager.AddExisting($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster) == false)
-                Logger.Error($"Unable to register {nameof(MobileParty.PrisonRoster)}");
+            if (party == null) continue;
+
+            if (party.MemberRoster is null)
+            {
+                Logger.Error("Unable to register {Roster} for party {PartyId}: roster is null", nameof(MobileParty.MemberRoster), party.StringId);
+                continue;
+            }
+
+            RegisterExistingObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster);
+
+            if (party.PrisonRoster is null)
+            {
+                Logger.Error("Unable to register {Roster} for party {PartyId}: roster is null", nameof(MobileParty.PrisonRoster), party.StringId);
+                continue;
+            }
+
+            RegisterExistingObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster);
         }
     }
 
-    public void OnClientCreated(TroopRoster obj, string id)
+    public override void OnClientCreated(TroopRoster obj, string id)
     {
         obj.data = new TroopRosterElement[4];
         obj._count = 0;
@@ -48,15 +66,15 @@ internal class TroopRosterRegistry : IAutoRegistry<TroopRoster>
         obj.InitializeCachedData();
     }
 
-    public void OnClientDestroyed(TroopRoster obj, string id)
+    public override void OnClientDestroyed(TroopRoster obj, string id)
     {
     }
 
-    public void OnServerCreated(TroopRoster obj, string id)
+    public override void OnServerCreated(TroopRoster obj, string id)
     {
     }
 
-    public void OnServerDestroyed(TroopRoster obj, string id)
+    public override void OnServerDestroyed(TroopRoster obj, string id)
     {
     }
 }

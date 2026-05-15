@@ -9,6 +9,7 @@ using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.MountAndBlade;
 
 namespace GameInterface.Services.MapEvents.Handlers;
 
@@ -25,14 +26,9 @@ internal class MapEventHandler : IHandler
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        messageBroker.Subscribe<MapEventCreated>(Handle);
-        messageBroker.Subscribe<NetworkCreateMapEvent>(Handle);
 
-        //messageBroker.Subscribe<MapEventSidesArrayUpdated>(Handle);
-        //messageBroker.Subscribe<NetworkUpdateMapSidesArray>(Handle);
-
-        messageBroker.Subscribe<MapEventDestroyed>(Handle);
-        messageBroker.Subscribe<NetworkDestroyMapEvent>(Handle);
+        messageBroker.Subscribe<MapEventSidesArrayUpdated>(Handle);
+        messageBroker.Subscribe<NetworkUpdateMapSidesArray>(Handle);
 
         messageBroker.Subscribe<MapEventInitialize>(Handle);
         messageBroker.Subscribe<NetworkMapEventInitialize>(Handle);
@@ -43,14 +39,8 @@ internal class MapEventHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<MapEventCreated>(Handle);
-        messageBroker.Unsubscribe<NetworkCreateMapEvent>(Handle);
-
-        //messageBroker.Unsubscribe<MapEventSidesArrayUpdated>(Handle);
-        //messageBroker.Unsubscribe<NetworkUpdateMapSidesArray>(Handle);
-
-        messageBroker.Unsubscribe<MapEventDestroyed>(Handle);
-        messageBroker.Unsubscribe<NetworkDestroyMapEvent>(Handle);
+        messageBroker.Unsubscribe<MapEventSidesArrayUpdated>(Handle);
+        messageBroker.Unsubscribe<NetworkUpdateMapSidesArray>(Handle);
 
         messageBroker.Unsubscribe<MapEventInitialize>(Handle);
         messageBroker.Unsubscribe<NetworkMapEventInitialize>(Handle);
@@ -81,32 +71,35 @@ internal class MapEventHandler : IHandler
         {
             using (new AllowedThread())
             {
-                MapEventComponent component = null;
+                //MapEventComponent component = null;
 
-                switch ((MapEvent.BattleTypes)payload.What.BattleType)
-                {
-                    case MapEvent.BattleTypes.FieldBattle:
-                        component = new FieldBattleEventComponent(mapEvent);
-                        break;
-                    case MapEvent.BattleTypes.Raid:
-                        component = new RaidEventComponent(mapEvent);
-                        break;
-                    case MapEvent.BattleTypes.Siege:
-                        break;
-                    case MapEvent.BattleTypes.Hideout:
-                        component = new HideoutEventComponent(mapEvent, false);
-                        break;
-                    case MapEvent.BattleTypes.SallyOut:
-                        break;
-                    case MapEvent.BattleTypes.SiegeOutside:
-                        break;
-                    case MapEvent.BattleTypes.BlockadeSallyOutBattle:
-                    case MapEvent.BattleTypes.BlockadeBattle:
-                        component = new BlockadeBattleMapEvent(mapEvent);
-                        break;
-                }
+                //switch ((MapEvent.BattleTypes)payload.What.BattleType)
+                //{
+                //    case MapEvent.BattleTypes.FieldBattle:
+                //        component = new FieldBattleEventComponent(mapEvent);
+                //        break;
+                //    case MapEvent.BattleTypes.Raid:
+                //        component = new RaidEventComponent(mapEvent);
+                //        break;
+                //    case MapEvent.BattleTypes.Siege:
+                //        break;
+                //    case MapEvent.BattleTypes.Hideout:
+                //        component = new HideoutEventComponent(mapEvent, false);
+                //        break;
+                //    case MapEvent.BattleTypes.SallyOut:
+                //        break;
+                //    case MapEvent.BattleTypes.SiegeOutside:
+                //        break;
+                //    case MapEvent.BattleTypes.BlockadeSallyOutBattle:
+                //    case MapEvent.BattleTypes.BlockadeBattle:
+                //        component = new BlockadeBattleMapEvent(mapEvent);
+                //        break;
+                //}
 
-                mapEvent.Initialize(attackerParty, defenderParty, component, (MapEvent.BattleTypes)payload.What.BattleType);
+                mapEvent.MapEventVisual.Initialize(mapEvent.Position, mapEvent.GetBattleSizeValue(), mapEvent.IsVisible);
+                mapEvent.Component.InitializeComponent();
+
+                //mapEvent.Initialize(attackerParty, defenderParty, component, (MapEvent.BattleTypes)payload.What.BattleType);
             }
         });
     }
@@ -137,57 +130,60 @@ internal class MapEventHandler : IHandler
         network.SendAll(new NetworkMapEventInitialize(mapEventId, (int)obj.BattleType, attackerPartyId, defenderPartyId));
     }
 
-    private void Handle(MessagePayload<MapEventCreated> payload)
-    {
-        objectManager.AddNewObject(payload.What.Instance, out var id);
+    //private void Handle(MessagePayload<MapEventCreated> payload)
+    //{
+    //    objectManager.AddNewObject(payload.What.Instance, out var id);
 
-        network.SendAll(new NetworkCreateMapEvent(id));
-    }
+    //    network.SendAll(new NetworkCreateMapEvent(id));
+    //}
 
 
-    private void Handle(MessagePayload<NetworkCreateMapEvent> payload)
-    {
-        using (new AllowedThread())
-        {
-            MapEvent mapEvent = new MapEvent();
+    //private void Handle(MessagePayload<NetworkCreateMapEvent> payload)
+    //{
+    //    using (new AllowedThread())
+    //    {
+    //        MapEvent mapEvent = new MapEvent
+    //        {
+    //            StringId = payload.What.MapEventId
+    //        };
 
-            objectManager.AddExisting(payload.What.MapEventId, mapEvent);
-        }
-    }
+    //        objectManager.AddExisting(payload.What.MapEventId, mapEvent);
+    //    }
+    //}
 
-    private void Handle(MessagePayload<MapEventDestroyed> payload)
-    {
-        var mapEvent = payload.What.Instance;
-        if (objectManager.TryGetId(mapEvent, out var mapEventId) == false)
-        {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEventId);
-            return;
-        }
+    //private void Handle(MessagePayload<MapEventDestroyed> payload)
+    //{
+    //    var mapEvent = payload.What.Instance;
+    //    if (objectManager.TryGetId(mapEvent, out var mapEventId) == false)
+    //    {
+    //        Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEventId);
+    //        return;
+    //    }
 
-        objectManager.Remove(payload.What.Instance);
+    //    objectManager.Remove(payload.What.Instance);
 
-        network.SendAll(new NetworkDestroyMapEvent(mapEventId));
-    }
+    //    network.SendAll(new NetworkDestroyMapEvent(mapEventId));
+    //}
 
-    private void Handle(MessagePayload<NetworkDestroyMapEvent> payload)
-    {
-        if (objectManager.TryGetObject<MapEvent>(payload.What.MapEventId, out var mapEvent) == false)
-        {
-            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), payload.What.MapEventId);
-            return;
-        }
+    //private void Handle(MessagePayload<NetworkDestroyMapEvent> payload)
+    //{
+    //    if (objectManager.TryGetObject<MapEvent>(payload.What.MapEventId, out var mapEvent) == false)
+    //    {
+    //        Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), payload.What.MapEventId);
+    //        return;
+    //    }
 
-        objectManager.Remove(mapEvent);
+    //    objectManager.Remove(mapEvent);
 
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            using (new AllowedThread())
-            {
-                mapEvent.Component?.FinishComponent();
-                mapEvent.FinalizeEventAux();
-            }
-        });
-    }
+    //    GameLoopRunner.RunOnMainThread(() =>
+    //    {
+    //        using (new AllowedThread())
+    //        {
+    //            mapEvent.Component?.FinishComponent();
+    //            mapEvent.FinalizeEventAux();
+    //        }
+    //    });
+    //}
 
     private void Handle(MessagePayload<LeaveBattleAttempted> payload)
     {
@@ -219,44 +215,44 @@ internal class MapEventHandler : IHandler
         }
     }
 
-    //private void Handle(MessagePayload<MapEventSidesArrayUpdated> payload)
-    //{
-    //    var mapEvent = payload.What.Instance;
-    //    if (objectManager.TryGetId(mapEvent, out var instanceId) == false)
-    //    {
-    //        Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEvent);
-    //        return;
-    //    }
+    private void Handle(MessagePayload<MapEventSidesArrayUpdated> payload)
+    {
+        var mapEvent = payload.What.Instance;
+        if (objectManager.TryGetId(mapEvent, out var instanceId) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), mapEvent);
+            return;
+        }
 
-    //    var value = payload.What.Value;
-    //    if (objectManager.TryGetId(value, out var valueId) == false)
-    //    {
-    //        Logger.Error("Unable to get {type} if from {obj}", nameof(MapEventSide), value);
-    //        return;
-    //    }
+        var value = payload.What.Value;
+        if (objectManager.TryGetId(value, out var valueId) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEventSide), value);
+            return;
+        }
 
 
-    //    network.SendAll(new NetworkUpdateMapSidesArray(instanceId, valueId, payload.What.Index));
-    //}
+        network.SendAll(new NetworkUpdateMapSidesArray(instanceId, valueId, payload.What.Index));
+    }
 
-    //private void Handle(MessagePayload<NetworkUpdateMapSidesArray> payload)
-    //{
-    //    var instanceId = payload.What.InstanceId;
-    //    var valueId = payload.What.ValueId;
-    //    var index = payload.What.Index;
+    private void Handle(MessagePayload<NetworkUpdateMapSidesArray> payload)
+    {
+        var instanceId = payload.What.InstanceId;
+        var valueId = payload.What.ValueId;
+        var index = payload.What.Index;
 
-    //    if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) == false)
-    //    {
-    //        Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), instanceId);
-    //        return;
-    //    }
+        if (objectManager.TryGetObject<MapEvent>(instanceId, out var mapEvent) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEvent), instanceId);
+            return;
+        }
 
-    //    if (objectManager.TryGetObject<MapEventSide>(valueId, out var mapEventSide) == false)
-    //    {
-    //        Logger.Error("Unable to get {type} if from {obj}", nameof(MapEventSide), valueId);
-    //        return;
-    //    }
+        if (objectManager.TryGetObject<MapEventSide>(valueId, out var mapEventSide) == false)
+        {
+            Logger.Error("Unable to get {type} if from {obj}", nameof(MapEventSide), valueId);
+            return;
+        }
 
-    //    mapEvent._sides[index] = mapEventSide;
-    //}
+        mapEvent._sides[index] = mapEventSide;
+    }
 }
