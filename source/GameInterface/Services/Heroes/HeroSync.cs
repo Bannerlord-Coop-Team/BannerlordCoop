@@ -35,12 +35,6 @@ namespace GameInterface.Services.Heroes
                 //ISSUES WITH THIS
                 //autoSyncBuilder.AddTargetMethod(typeof(Hero), method);
             }
-            // Custom serializer for EquipmentElement that registers
-            // only the ItemObject's StringId instead of the full struct
-            autoSyncBuilder.AddSerializer<EquipmentElement>(
-                EquipmentElementSerializer.Serialize,
-                EquipmentElementSerializer.Deserialize
-            );
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.StaticBodyProperties)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Weight)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Build)));

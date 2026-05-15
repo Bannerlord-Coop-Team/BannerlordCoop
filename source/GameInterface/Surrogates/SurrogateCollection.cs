@@ -23,6 +23,7 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ItemModifierGroup, ItemModifierGroupSurrogate>();
             AddSurrogate<ItemModifier, ItemModifierSurrogate>();
             AddSurrogate<TextObject, TextObjectSurrogate>();
+            AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
         }
     }
 
