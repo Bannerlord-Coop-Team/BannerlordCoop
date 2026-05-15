@@ -1,5 +1,6 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
@@ -24,6 +25,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPostfix]
         public static void SmeltingVMConstructorPostfix(SmeltingVM __instance, Action updateValuesOnSelectItemAction, Action updateValuesOnSmeltItemAction)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
             MessageBroker.Instance.Publish(__instance, new SmeltingVMCreated(__instance));
         }
     }
@@ -52,6 +56,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPostfix]
         public static void CraftingVMConstructorPostfix(CraftingVM __instance, Crafting crafting, Action onClose, Action resetCamera, Action onWeaponCrafted, Func<WeaponComponentData, ItemObject.ItemUsageSetFlags> getItemUsageSetFlags)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
             MessageBroker.Instance.Publish(__instance, new CraftingVMCreated(__instance));
         }
     }
@@ -66,6 +73,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPostfix]
         public static void WeaponDesignVMConstructorPostfix(WeaponDesignVM __instance, Crafting crafting, ICraftingCampaignBehavior craftingBehavior, Action onRefresh, Action onWeaponCrafted, Func<CraftingAvailableHeroItemVM> getCurrentCraftingHero, Action<CraftingOrder> refreshHeroAvailabilities, Func<WeaponComponentData, ItemObject.ItemUsageSetFlags> getItemUsageSetFlags)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
             MessageBroker.Instance.Publish(__instance, new WeaponDesignVMCreated(__instance));
         }
     }

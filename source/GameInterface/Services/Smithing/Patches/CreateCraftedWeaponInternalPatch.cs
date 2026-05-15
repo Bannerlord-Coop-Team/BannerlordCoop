@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
@@ -22,6 +23,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPrefix]
         public static bool CreateCraftedWeaponInternal(ref CraftingCampaignBehavior __instance, ref ItemObject __result, bool isFreeMode, Hero crafterHero, WeaponDesign weaponDesign, ItemModifier weaponModifier = null)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             string nextCraftedItemId = __instance.GetNextCraftedItemId();
             ItemObject craftedItemObject;
             using (new AllowedThread())

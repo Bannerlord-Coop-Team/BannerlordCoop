@@ -1,10 +1,15 @@
 ﻿using Autofac.Features.OwnedInstances;
 using Common;
+using GameInterface.Serialization.External;
 using GameInterface.Services.Entity.Data;
 using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Smithing;
 using ProtoBuf;
+using Serilog.Core;
 using System.Collections.Generic;
 using System.Linq;
+using TaleWorlds.CampaignSystem;
+using TaleWorlds.Core;
 
 namespace Coop.Core.Server.Services.Save.Data;
 
@@ -16,6 +21,7 @@ public interface ICoopSession
 {
     string UniqueGameId { get; }
     Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
+    CraftingPlayerData CraftingPlayerData { get; } // Smithing Sync
 }
 
 /// <inheritdoc cref="ICoopSession"/>
@@ -26,11 +32,16 @@ public class CoopSession : ICoopSession
     public string UniqueGameId { get; }
     [ProtoMember(2)]
     public Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
+    [ProtoMember(3)]
+    public CraftingPlayerData CraftingPlayerData { get; }
 
-    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>>  controlledEntityMap)
+    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>> controlledEntityMap)
     {
         UniqueGameId = uniqueGameId;
         ControlledEntityMap = controlledEntityMap;
+
+        // Need to populate CraftingPlayerData or pass in as argument
+        //CraftingPlayerData = 
     }
 
     public override bool Equals(object obj)

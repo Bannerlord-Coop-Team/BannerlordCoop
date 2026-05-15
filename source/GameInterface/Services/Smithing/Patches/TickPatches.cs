@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
+using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
@@ -20,6 +21,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPrefix]
         public static bool HourlyTick(ref CraftingCampaignBehavior __instance)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             // Only let server handle ticks
             if (ModInformation.IsClient) return false;
 
@@ -35,6 +39,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPrefix]
         public static bool DailyTickSettlement(ref CraftingCampaignBehavior __instance, Settlement settlement)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             // Only let server handle ticks
             if (ModInformation.IsClient) return false;
 
@@ -46,6 +53,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPrefix]
         public static bool DailyTick(ref CraftingCampaignBehavior __instance)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             // Only let server handle ticks
             if (ModInformation.IsClient) return false;
 

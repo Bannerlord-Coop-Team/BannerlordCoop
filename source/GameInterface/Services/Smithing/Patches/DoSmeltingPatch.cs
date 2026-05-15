@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
@@ -19,6 +20,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPrefix]
         public static bool DoSmelting(ref CraftingCampaignBehavior __instance, Hero currentCraftingHero, EquipmentElement equipmentElement)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             // Publish message with data
             var message = new SmeltingDone(__instance, currentCraftingHero, equipmentElement);
             MessageBroker.Instance.Publish(__instance, message);

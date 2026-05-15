@@ -1,11 +1,13 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Security;
 using System.Text;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -15,6 +17,7 @@ using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
@@ -29,6 +32,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPrefix]
         public static bool CreateTownOrder(ref CraftingCampaignBehavior __instance, Hero orderOwner, int orderSlot)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             // Server should create random town orders to be consistent for all clients
             if (ModInformation.IsClient) return false;
 
@@ -52,6 +58,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPrefix]
         public static bool ReplaceCraftingOrder(ref CraftingCampaignBehavior __instance, Town town, CraftingOrder order)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             // Shouldn't ever be true, just in case
             if (ModInformation.IsClient) return false;
 
@@ -86,6 +95,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPrefix]
         public static bool CompleteOrder(ref CraftingCampaignBehavior __instance, Town town, CraftingOrder craftingOrder, ItemObject craftedItem, Hero completerHero)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             __instance.GetOrderResult(craftingOrder, craftedItem, out var flag, out var _, out var _, out var _);
 
             // Publish message with data
@@ -93,6 +105,28 @@ namespace GameInterface.Services.Smithing.Patches
             MessageBroker.Instance.Publish(__instance, message);
 
             // Skip original
+            return false;
+        }
+    }
+
+    [HarmonyPatch(typeof(CampaignBehaviorManager))]
+    internal class LoadBehaviorDataPatch
+    {
+        private static readonly ILogger Logger = LogManager.GetLogger<CampaignBehaviorManager>();
+
+        [HarmonyPatch("LoadBehaviorData")]
+        [HarmonyPrefix]
+        public static bool LoadBehaviorData(ref CampaignBehaviorManager __instance)
+        {
+            if (ModInformation.IsClient) return true;
+
+            foreach (CampaignBehaviorBase campaignBehavior in __instance._campaignBehaviors)
+            {
+                __instance._campaignBehaviorDataStore.LoadBehaviorData(campaignBehavior);
+            }
+            //_instance._campaignBehaviorDataStore.ClearBehaviorData();
+
+            // Skip original on server
             return false;
         }
     }
