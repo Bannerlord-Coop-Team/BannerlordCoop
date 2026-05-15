@@ -11,6 +11,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 using static TaleWorlds.Library.CommandLineFunctionality;
+using TaleWorlds.CampaignSystem.Issues;
 
 namespace GameInterface.Services.Heroes.Commands;
 
@@ -276,5 +277,91 @@ public class HeroDebugCommand
         }
 
         return $"Hero BannerItem: {hero.BannerItem.Item?.StringId ?? "none"}";
+    }
+    // coop.debug.hero.list_issues
+    /// <summary>
+    /// Lists all available issues
+    /// </summary>
+    /// <param name="args">none are used</param>
+    /// <returns>returns all issues available </returns>
+    [CommandLineArgumentFunction("issues", "coop.debug.hero")]
+    public static string ListIssues(List<string> args)
+    {
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+        StringBuilder stringBuilder = new StringBuilder();
+
+        foreach (var hero in Campaign.Current.CampaignObjectManager.GetAllHeroes()
+            .Where(h => h.Issue != null))
+        {
+            stringBuilder.AppendLine($"Name: '{hero.StringId}', Game StringId: '{hero.Issue.StringId}'");
+        }
+
+        if (stringBuilder.Length == 0) return "No heroes with issues found";
+
+        return stringBuilder.ToString();
+    }
+    // coop.debug.hero.set_issue
+    /// <summary>
+    /// Sets the issue of a hero
+    /// </summary>
+    /// <param name="args">heroId and issue value to set </param>
+    /// <returns>information if it changed</returns>
+    [CommandLineArgumentFunction("set_issue", "coop.debug.hero")]
+    public static string SetHeroIssue(List<string> args)
+    {
+        if (args.Count != 2)
+        {
+            return "Usage: coop.debug.hero.set_issue <heroId> <issueId>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+        var issue = Campaign.Current.CampaignObjectManager.GetAllHeroes()
+            .Where(h => h.Issue != null)
+            .Select(h => h.Issue)
+            .FirstOrDefault(i => i.StringId == args[1]);
+        if (issue == null)
+        {
+            return $"Unable to find Issue with StringId: {args[1]}";
+        }
+        // cant use hero.Issue = issue since Issue is a private setter
+        hero.OnIssueCreatedForHero(issue);
+
+        return $"Hero Issue changed to: {issue.StringId}";
+    }
+    // coop.debug.hero.get_issue
+    /// <summary>
+    /// Gets Issue from hero
+    /// </summary>
+    /// <param name="args">HeroId</param>
+    /// <returns>returns Issue info from hero </returns>
+    [CommandLineArgumentFunction("get_issue", "coop.debug.hero")]
+    public static string GetHeroIssue(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.hero.get_issue <heroId>";
+        }
+
+        if (ContainerProvider.TryResolve<IObjectManager>(out var objectManager) == false)
+        {
+            return $"Unable to get {nameof(IObjectManager)}";
+        }
+
+        if (objectManager.TryGetObject<Hero>(args[0], out var hero) == false)
+        {
+            return $"Unable to find hero with id: {args[0]}";
+        }
+
+        return $"Hero Issue: {hero.Issue?.StringId ?? "none"}";
     }
 }
