@@ -47,40 +47,27 @@ internal class BattleHandler : IHandler
     {
         var data = payload.What;
 
-        if (!objectManager.TryGetId(data.Attacker, out var partyId))
-        {
-            return;
-        }
+        if (!objectManager.TryGetIdWithLogging(data.Attacker, out var attackerPartyBaseId)) return;
+        if (!objectManager.TryGetIdWithLogging(data.Defender, out var defenderPartyBaseId)) return;
 
-        if(data.Defender.IsSettlement)
-        {
-            network.SendAll(new NetworkStartBattle(partyId, data.Defender.Settlement.StringId, true));
-        }
-        else
-        {
-            network.SendAll(new NetworkStartBattle(partyId, data.Defender.MobileParty.StringId, false));
-        }
+        var message = new NetworkStartBattle(attackerPartyBaseId, defenderPartyBaseId);
+
+        network.SendAll(message);
     }
 
     private void Handle_NetworkStartBattle(MessagePayload<NetworkStartBattle> payload)
     {
-        if (!objectManager.TryGetObject(payload.What.AttackerId, out PartyBase attacker)) {
-            Logger.Error("Failed to get {var} with id: {id}", nameof(PartyBase), payload.What.AttackerId);
-            return;
-        }
-
-        if (!objectManager.TryGetObject(payload.What.DefenderId, out PartyBase defender))
-        {
-            Logger.Error("Failed to get {var} with id: {id}", nameof(PartyBase), payload.What.DefenderId);
-            return;
-        }
+        if (!objectManager.TryGetObjectWithLogging(payload.What.AttackerId, out PartyBase attacker)) return;
+        if (!objectManager.TryGetObjectWithLogging(payload.What.DefenderId, out PartyBase defender)) return;
 
         EncounterManagerPatches.OverrideOnPartyInteraction(attacker, defender);
     }
 
     private void Handle_PlayerStartBattle(MessagePayload<PlayerStartBattle> payload)
     {
-        var message = new NetworkStartPlayerBattle(MobileParty.MainParty.StringId);
+        if (!objectManager.TryGetIdWithLogging(MobileParty.MainParty, out var playerPartyId)) return;
+        
+        var message = new NetworkStartPlayerBattle(playerPartyId);
 
         network.SendAll(message);
     }

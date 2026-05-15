@@ -1,23 +1,19 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.Battles.Messages
-{
-    [ProtoContract(SkipConstructor = true)]
-    internal class NetworkStartBattle : ICommand
-    {
-        [ProtoMember(1)]
-        public string AttackerId { get; }
-        [ProtoMember(2)]
-        public string DefenderId { get; }
-        [ProtoMember(3)]
-        public bool IsSettlement { get; }
+namespace GameInterface.Services.Battles.Messages;
 
-        public NetworkStartBattle(string attackerId, string defenderId, bool isSettlement)
-        {
-            AttackerId = attackerId;
-            DefenderId = defenderId;
-            IsSettlement = isSettlement;
-        }
+[ProtoContract(SkipConstructor = true)]
+internal readonly struct NetworkStartBattle : ICommand
+{
+    [ProtoMember(1)]
+    public readonly string AttackerId;
+    [ProtoMember(2)]
+    public readonly string DefenderId;
+
+    public NetworkStartBattle(string attackerId, string defenderId)
+    {
+        AttackerId = attackerId;
+        DefenderId = defenderId;
     }
 }
