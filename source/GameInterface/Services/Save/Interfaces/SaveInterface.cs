@@ -27,7 +27,7 @@ internal class SaveInterface : ISaveInterface
         var dataArgs = saveHandler.GetSaveMetaData();
         var metaData = MBSaveLoad.GetSaveMetaData(dataArgs);
 
-        // Required to propertly transfer campaign behaviors
+        // Required to properly transfer campaign behaviors
         CampaignEventDispatcher.Instance.OnBeforeSave();
 
         var saveDriver = new CoopInMemSaveDriver();

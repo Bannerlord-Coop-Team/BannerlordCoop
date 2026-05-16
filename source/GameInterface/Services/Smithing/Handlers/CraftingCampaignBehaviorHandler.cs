@@ -68,6 +68,7 @@ namespace GameInterface.Services.Smithing.Handlers
         private void Handle(MessagePayload<SmeltingDone> obj)
         {
             SendSmeltingDone(obj.What);
+            //messageBroker.Publish(this, new RefreshSmelting());
         }
 
         private void Handle(MessagePayload<NetworkDoSmelting> obj)
@@ -78,6 +79,7 @@ namespace GameInterface.Services.Smithing.Handlers
         private void Handle(MessagePayload<RefinementDone> obj)
         {
             SendRefinementDone(obj.What);
+            //messageBroker.Publish(this, new RefreshRefinement(obj.What.CraftingHero));
         }
 
         private void Handle(MessagePayload<NetworkDoRefinement> obj)
@@ -206,8 +208,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
             CampaignEventDispatcher.Instance.OnEquipmentSmeltedByHero(craftingHero, equipmentElement);
 
-            network.SendAll(new NetworkRefreshSmelting()); // Refresh for client(s)
-            network.SendAll(new NetworkRefreshCraftingVM());
+            network.SendAll(new NetworkRefreshSmelting()); // Refresh client ViewModels
         }
 
         private void SendRefinementDone(RefinementDone obj)
@@ -293,8 +294,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
             CampaignEventDispatcher.Instance.OnItemsRefined(craftingHero, formula);
 
-            network.SendAll(new NetworkRefreshRefinement(obj.CraftingHeroId)); // Refresh for client(s)
-            network.SendAll(new NetworkRefreshCraftingVM());
+            network.SendAll(new NetworkRefreshRefinement(obj.CraftingHeroId)); // Refresh client ViewModels
         }
 
         private void SendInternallyCreatedWeapon(CraftedWeaponInternallyCreated obj)

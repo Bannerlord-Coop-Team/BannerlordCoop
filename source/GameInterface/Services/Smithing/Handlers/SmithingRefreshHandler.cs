@@ -7,8 +7,6 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
-using System.Linq;
-using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
@@ -81,10 +79,12 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkRefreshSmelting> obj)
         {
-            if (currentRefinementVM == null) Logger.Warning("SmithingRefreshHandler currentSmithingVM was null");
+            if (currentSmeltingVM == null) Logger.Warning("SmithingRefreshHandler currentSmeltingVM was null");
 
             currentSmeltingVM?.RefreshList();
             currentSmeltingVM?.RefreshValues();
+
+            RefreshCraftingVM();
         }
 
         private void Handle(MessagePayload<NetworkRefreshRefinement> obj)
@@ -100,18 +100,25 @@ namespace GameInterface.Services.Smithing.Handlers
 
             currentRefinementVM?.RefreshRefinementActionsList(craftingHero);
             currentCraftingVM?.OnRefinementSelectionChange();
+
+            RefreshCraftingVM();
         }
 
         private void Handle(MessagePayload<NetworkRefreshCraftingVM> obj)
         {
-            currentCraftingVM?.UpdateAll();
-            currentCraftingVM?.RefreshValues();
+            RefreshCraftingVM();
         }
 
         private void Handle(MessagePayload<NetworkRefreshWeaponDesignVM> obj)
         {
             // Error, object reference not set to instance of object. Happens when another client also has a WeaponDesignVM open?
             currentWeaponDesignVM?.RefreshWeaponDesignMode(null);
+        }
+
+        private void RefreshCraftingVM()
+        {
+            currentCraftingVM?.UpdateAll();
+            currentCraftingVM?.RefreshValues();
         }
     }
 }
