@@ -60,7 +60,7 @@ internal static class PartyExtensions
 
         if (!objectManager.TryGetId(party, out var partyId))
         {
-            Logger.Error("Unable to resolve id for {name}", party.Name);
+            Logger.Error("Unable to resolve id for party with StringId {stringId}", party.StringId);
             return false;
         }
 
