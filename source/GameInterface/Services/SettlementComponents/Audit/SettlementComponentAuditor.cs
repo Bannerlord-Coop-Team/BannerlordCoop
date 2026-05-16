@@ -116,9 +116,18 @@ internal class SettlementComponentAuditor : IAuditor
         return settlementcomponentRegistry.Objects.Values;
     }
 
-    private SettlementComponentAuditData[] GetAuditData()
+    private IEnumerable<SettlementComponentAuditData> GetAuditData()
     {
-        return GetSettlementComponents().Select(h => new SettlementComponentAuditData(h)).ToArray();
+        return GetSettlementComponents().Select(settlementComponent =>
+        {
+            objectManager.TryGetId(settlementComponent, out var networkId);
+
+            return new SettlementComponentAuditData(
+                networkId,
+                settlementComponent.StringId,
+                settlementComponent.Name?.ToString()
+            );
+        });
     }
 
     private string AuditData(SettlementComponentAuditData[] dataToAudit)

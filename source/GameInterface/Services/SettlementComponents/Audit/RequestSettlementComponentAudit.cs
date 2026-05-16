@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-
+using System.Collections.Generic;
+using System.Linq;
 
 namespace GameInterface.Services.SettlementComponents.Audit;
 
@@ -12,9 +13,8 @@ internal record RequestSettlementComponentAudit : ICommand
 {
     [ProtoMember(1)]
     public SettlementComponentAuditData[] Data { get; }
-
-    public RequestSettlementComponentAudit(SettlementComponentAuditData[] data)
+    public RequestSettlementComponentAudit(IEnumerable<SettlementComponentAuditData> data)
     {
-        Data = data;
+        Data = data.ToArray();
     }
 }

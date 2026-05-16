@@ -10,14 +10,16 @@ namespace GameInterface.Services.SettlementComponents.Audit;
 internal record SettlementComponentAuditData
 {
     [ProtoMember(1)]
-    public string StringId { get; }
+    public string NetworkId { get; }
     [ProtoMember(2)]
+    public string StringId { get; }
+    [ProtoMember(3)]
     public string Name { get; }
 
-
-    public SettlementComponentAuditData(SettlementComponent settlementcomponent)
+    public SettlementComponentAuditData(string networkId, string stringId, string name)
     {
-        StringId = settlementcomponent.StringId;
-        Name = settlementcomponent.Name?.ToString();
+        NetworkId = networkId;
+        StringId = stringId;
+        Name = name;
     }
 }
