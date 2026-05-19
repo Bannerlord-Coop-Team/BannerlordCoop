@@ -23,5 +23,11 @@ namespace GameInterface.Services.ItemObjects.Patches
 
             return false;
         }
+
+        public static void SetCraftedWeaponNameOverride(ref ItemObject __instance, string StringName)
+        {
+            __instance.Name = new TextObject(StringName);
+            __instance.WeaponDesign?.SetWeaponName(__instance.Name);
+        }
     }
 }

@@ -411,7 +411,7 @@ namespace GameInterface.Services.Smithing.Handlers
             {
                 craftingCampaignBehavior.GetNextCraftedItemId();
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !obj.IsFreeMode);
-                ItemObject registeredObject = MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
+                MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
             }
         }
 

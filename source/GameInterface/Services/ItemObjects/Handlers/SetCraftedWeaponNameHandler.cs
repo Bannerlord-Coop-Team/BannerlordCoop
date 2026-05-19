@@ -2,12 +2,12 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using GameInterface.Services.ItemObjects.Interfaces;
 using GameInterface.Services.ItemObjects.Messages;
+using GameInterface.Services.ItemObjects.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.Core;
-using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ItemObjects.Handlers
 {
@@ -40,11 +40,7 @@ namespace GameInterface.Services.ItemObjects.Handlers
 
         private void Handle(MessagePayload<CraftedWeaponNameSet> obj)
         {
-            if (!objectManager.TryGetId(obj.What.Weapon, out var weaponId))
-            {
-                Logger.Error("Unable to get network ID for ItemObject instance of type {type}", obj.What.Weapon);
-                return;
-            }
+            if (!objectManager.TryGetIdWithLogging(obj.What.Weapon, out var weaponId)) return;
 
             // Send to server from client
             NetworkSetCraftedWeaponNameServer message = new(
@@ -68,24 +64,13 @@ namespace GameInterface.Services.ItemObjects.Handlers
         }
 
         private void SetCraftedWeaponName(NetworkSetCraftedWeaponNameClients obj)
-        { 
-            if (!objectManager.TryGetObject(obj.WeaponId, out ItemObject weapon))
-            {
-                Logger.Error("Unable to get Weapon ItemObject for id {id}", obj.WeaponId);
-                return;
-            }
+        {
+            if (!objectManager.TryGetObjectWithLogging(obj.WeaponId, out ItemObject weapon)) return;
+            ItemObject mbCraftedWeapon = MBObjectManager.Instance.GetObject<ItemObject>(weapon.StringId);
 
-            if (weapon.StringId == null) {
-                Logger.Warning("Tried to set crafted weapon name for weapon with null StringId");
-                return;
-            }
-
-            // Replace TaleWorlds implementation
-            weapon.Name = new TextObject(obj.StringName);
-            if (weapon.WeaponDesign != null)
-            {
-                weapon.WeaponDesign.SetWeaponName(weapon.Name);
-            }
+            // Change name on custom and MB object managers
+            SetCraftedWeaponNamePatch.SetCraftedWeaponNameOverride(ref weapon, obj.StringName);
+            SetCraftedWeaponNamePatch.SetCraftedWeaponNameOverride(ref mbCraftedWeapon, obj.StringName);
         }
     }
 }

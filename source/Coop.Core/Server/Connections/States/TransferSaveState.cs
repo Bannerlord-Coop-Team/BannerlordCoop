@@ -37,8 +37,6 @@ public class TransferSaveState : ConnectionStateBase
     {
         messageBroker.Unsubscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
     }
-
-    
     internal void Handle_GameSaveDataPackaged(MessagePayload<GameSaveDataPackaged> obj)
     {
         var payload = obj.What;
