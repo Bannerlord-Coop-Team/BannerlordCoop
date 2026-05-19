@@ -35,6 +35,9 @@ internal class MapEventSideDataHandler : IHandler
         messageBroker.Subscribe<MapEventPartyRemoved>(Handle);
         messageBroker.Subscribe<NetworkAddMapEventParty>(Handle);
         messageBroker.Subscribe<NetworkRemoveMapEventParty>(Handle);
+
+        messageBroker.Subscribe<MapEventSideAssigned>(Handle_MapEventSideAssigned);
+        messageBroker.Subscribe<NetworkAssignMapEventSide>(Handle_NetworkAssignMapEventSide);
     }
 
     public void Dispose()
@@ -161,6 +164,26 @@ internal class MapEventSideDataHandler : IHandler
                 side.MapEvent.StringId ?? "<null>");
 
             side._battleParties.Add(party);
+        }
+    }
+
+    private void Handle_MapEventSideAssigned(MessagePayload<MapEventSideAssigned> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out var mapEventId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEventSide, out var mapEventSideId)) return;
+
+        var message = new NetworkAssignMapEventSide(mapEventId, mapEventSideId, payload.What.Side);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkAssignMapEventSide(MessagePayload<NetworkAssignMapEventSide> payload)
+    {
+        if (!objectManager.TryGetObjectWithLogging<MapEvent>(payload.What.MapEventId, out var mapEvent)) return;
+        if (!objectManager.TryGetObjectWithLogging<MapEventSide>(payload.What.MapEventSideId, out var mapEventSide)) return;
+
+        using (new AllowedThread())
+        {
+            mapEvent._sides[(int)payload.What.Side] = mapEventSide;
         }
     }
 }

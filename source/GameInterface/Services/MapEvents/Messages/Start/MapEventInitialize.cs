@@ -2,14 +2,14 @@
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.MapEvents.Messages;
+namespace GameInterface.Services.MapEvents.Messages.Start;
 
-internal record MapEventInitialize : IEvent
+internal readonly struct MapEventInitialize : IEvent
 {
-    public MapEvent MapEvent { get; }
-    public MapEvent.BattleTypes BattleType { get; }
-    public PartyBase AttackerParty { get;  }
-    public PartyBase DefenderParty { get; }
+    public readonly MapEvent MapEvent;
+    public readonly MapEvent.BattleTypes BattleType;
+    public readonly PartyBase AttackerParty;
+    public readonly PartyBase DefenderParty;
 
     public MapEventInitialize(MapEvent mapEvent, MapEvent.BattleTypes battleType, PartyBase attackerParty, PartyBase defenderParty)
     {

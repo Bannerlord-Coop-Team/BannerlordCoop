@@ -6,7 +6,9 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Text;
 using Common;
+using Common.Logging;
 using Common.Messaging;
+using Serilog;
 using System.Linq;
 using System.Reflection.Emit;
 using GameInterface.Policies;
@@ -21,8 +23,15 @@ namespace DynamicSync;
 [HarmonyPatch]
 public class {{DeclaringType}}_DynamicPatches : GenericPatches<{{DeclaringType}}_DynamicPatches, {{DeclaringType}}>
 {
+    private readonly static ILogger Logger = LogManager.GetLogger<{{DeclaringType}}_DynamicPatches>();
+
     private static IEnumerable<MethodBase> TargetMethods()
     {
+        foreach (var ctor in AccessTools.GetDeclaredConstructors(typeof({{DeclaringType}})))
+        {
+            yield return ctor;
+        }
+
         foreach (var method in AccessTools.GetDeclaredMethods(typeof({{DeclaringType}})).Where(m => !m.IsAbstract))
         {
             yield return method;
@@ -32,11 +41,9 @@ public class {{DeclaringType}}_DynamicPatches : GenericPatches<{{DeclaringType}}
         {{~ end ~}}
     }
     {{~ for transpiler in Transpilers ~}}
-
     {{ transpiler }}
     {{~ end ~}}
 }
 {{~ for prefix in Prefixes ~}}
-
 {{ prefix }}
 {{~ end ~}}

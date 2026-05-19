@@ -50,9 +50,9 @@ internal class MobilePartyAiLifetimeHandler : IHandler
 
     private void Handle_MobilePartyAiCreated(MessagePayload<MobilePartyAiCreated> payload)
     {
-        if (objectManager.AddNewObject(payload.What.Instance, out var partyAiId) == false) return;
+        if (!objectManager.AddNewObject(payload.What.Instance, out var partyAiId)) return;
 
-        var partyId = payload.What.Party.StringId;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Party, out var partyId)) return;
 
         network.SendAll(new NetworkCreateMobilePartyAi(partyAiId, partyId));
     }

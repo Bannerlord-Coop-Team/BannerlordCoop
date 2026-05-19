@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.Battles.Messages;
+namespace GameInterface.Services.MapEvents.Messages.Start;
 
 internal readonly struct BattleStarted : IMessage
 {

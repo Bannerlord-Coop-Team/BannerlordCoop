@@ -4,14 +4,14 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Messages;
 
-public readonly struct LeaveBattleAttempted : IEvent
+public readonly struct PlayerSurrendered : IEvent
 {
-    public readonly MobileParty MobileParty;
     public readonly MapEvent MapEvent;
+    public readonly MobileParty MobileParty;
 
-    public LeaveBattleAttempted(MobileParty mobileParty, MapEvent mapEvent)
+    public PlayerSurrendered(MapEvent mapEvent, MobileParty mobileParty)
     {
-        MobileParty = mobileParty;
         MapEvent = mapEvent;
+        MobileParty = mobileParty;
     }
 }

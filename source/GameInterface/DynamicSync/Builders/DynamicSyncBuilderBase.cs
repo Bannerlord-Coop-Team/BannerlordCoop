@@ -29,8 +29,10 @@ namespace GameInterface.DynamicSync.Builders
                 $"{serializer.Deserialize.DeclaringType.Namespace}.{serializer.Deserialize.DeclaringType.Name}.{serializer.Deserialize.Name}<{type.Name}>");
         }
 
-        protected string GetSetTranspiler(FieldInfo fieldInfo)
+        protected string GetSetTranspiler(Debuggable<FieldInfo> fieldItem)
         {
+            var fieldInfo = fieldItem.Value;
+
             return TemplateParser.Parse("Patches.FieldSetTranspilerTemplate",
             new
             {
@@ -39,6 +41,7 @@ namespace GameInterface.DynamicSync.Builders
                 MemberType = DynamicSyncUtils.GetMemberTypeName(fieldInfo.FieldType),
                 ReadOnly = fieldInfo.IsInitOnly,
                 ReadOnlySetterIndex = fieldInfo.IsInitOnly ? GetReadOnlyFieldSetter(fieldInfo) : (int?)null,
+                Debug = fieldItem.Debug
             });
         }
 

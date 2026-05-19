@@ -332,5 +332,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Services\Kingdoms\Commands\" />
+    <Folder Include="Services\MapEvents\Messages\Join\" />
   </ItemGroup>
 </Project>

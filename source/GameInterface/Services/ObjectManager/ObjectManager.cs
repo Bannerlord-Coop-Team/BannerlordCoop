@@ -112,15 +112,18 @@ public class ObjectManager : IObjectManager
 
         lock (_gate)
         {
+            // Skip to next id
+            GetUniqueTypeId(obj);
+
             if (idObjs.ContainsKey(id))
             {
-                logger.Warning("Duplicate id: {id}", id);
+                logger.Error("Duplicate id: {id}", id);
                 return false;
             }
 
             if (objsIds.TryGetValue(obj, out var _))
             {
-                logger.Warning("Object already registered: {ObjectType}", obj.GetType());
+                logger.Error("Object already registered: {ObjectType}", obj.GetType());
                 return false;
             }
 

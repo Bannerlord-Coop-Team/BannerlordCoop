@@ -60,7 +60,7 @@ internal class E2ETestEnvironment : IDisposable
         Server.Resolve<IGameInterface>().PatchAll();
         Server.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
-        SetupDynamicSync();
+        //SetupDynamicSync();
 
         foreach (var settlement in Campaign.Current.CampaignObjectManager.Settlements)
         {

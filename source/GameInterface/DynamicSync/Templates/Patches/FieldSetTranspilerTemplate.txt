@@ -11,11 +11,13 @@ private static IEnumerable<CodeInstruction> {{MemberName}}_SetTranspiler(IEnumer
     {
         if (instruction.StoresField(fieldInfo))
         {
-            var loadInst = new CodeInstruction(OpCodes.Call, fieldIntercept);
-            if (instruction.labels.Any())
-                loadInst.labels = instruction.labels.ToList();
+            var callInst = new CodeInstruction(OpCodes.Call, fieldIntercept)
+            {
+                labels = instruction.labels.ToList(),
+                blocks = instruction.blocks.ToList()
+            };
 
-            yield return loadInst;
+            yield return callInst;
 
         }
         else
@@ -34,42 +36,34 @@ public static void {{MemberName}}_Intercept({{MemberDeclaringType}} instance, {{
 
     if (CallOriginalPolicy.IsOriginalAllowed())
     {
-{{ 
-if ReadOnly;
-}}
+{{~ if ReadOnly ~}}
 	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
-{{
-else
-}}
+{{~ else ~}}
 		instance.{{MemberName}} = newValue;
-{{end}}
+{{~ end ~}}
         return;
     }
 
     if (ModInformation.IsClient)
     {
         Logger.Error("Client updated managed {type}", "{{MemberName}}");
-{{        
-if ReadOnly;
-}}
+{{~ if ReadOnly ~}}
 	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
-{{
-else
-}}
+{{~ else ~}}
 		instance.{{MemberName}} = newValue;
-{{end}}
+{{~ end ~}}
         return;
     }
 
+{{~ if Debug ~}}
+    Logger.Debug("[Server] Publishing local set message for {type}", "{{MemberName}}");
+{{~ end ~}}
+
     var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(instance, newValue);
     MessageBroker.Instance.Publish(instance, message);
-{{
-    if ReadOnly;
-}}
+{{~ if ReadOnly ~}}
 	DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
-{{
-else
-}}
+{{~ else ~}}
 	instance.{{MemberName}} = newValue;
-{{end}}
+{{~ end ~}}
 }

@@ -9,20 +9,18 @@ internal class LifetimePatches<T>
 {
     private static readonly ILogger Logger = LogManager.GetLogger<LifetimePatches<T>>();
 
-    internal static bool CreatePrefix(ref T __instance)
+    internal static void CreatePrefix(ref T __instance)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created managed {name}", __instance.GetType());
-            return true;
+            return;
         }
 
         MessageBroker.Instance.Publish(__instance, new InstanceCreated<T>(__instance));
-
-        return true;
     }
 
     internal static void DestroyPostfix(ref T __instance)

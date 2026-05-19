@@ -5,6 +5,7 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Utils.LocalEvents;
 using GameInterface.Utils.NetworkEvents;
+using Newtonsoft.Json.Linq;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -72,9 +73,18 @@ namespace GameInterface.Utils
             {
                 var data = payload.What;
                 if (!objectManager.TryGetObjectWithLogging(data.InstanceId, out TInstance instance)) return;
-                AllowedThread.AllowThisThread();
-                messageHandler(instance, data);
-                AllowedThread.RevokeThisThread();
+
+                try
+                {
+                    using (new AllowedThread())
+                    {
+                        messageHandler(instance, data);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to run message handler");
+                }
             };
             messageBroker.Subscribe(payloadHandler);
             disposeFunctions.Add(() => messageBroker.Unsubscribe(payloadHandler));
@@ -91,9 +101,16 @@ namespace GameInterface.Utils
                 TValue value = null;
                 if (data.ValueId != null && !objectManager.TryGetObjectWithLogging(data.ValueId, out value)) return;
 
-                using (new AllowedThread())
+                try
                 {
-                    messageHandler(instance, value, data);
+                    using (new AllowedThread())
+                    {
+                        messageHandler(instance, value, data);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to run message handler");
                 }
             };
             messageBroker.Subscribe(payloadHandler);

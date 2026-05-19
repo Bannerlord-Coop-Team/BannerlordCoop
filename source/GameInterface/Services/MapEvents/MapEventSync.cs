@@ -16,7 +16,7 @@ internal class MapEventSync : IDynamicSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.IsPlayerSimulation)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.IsVisible)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.MapEventSettlement)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.Position)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.Position)), debug: true);
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.State)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.DiplomaticallyFinished)));
@@ -32,6 +32,6 @@ internal class MapEventSync : IDynamicSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._mapEventType)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._mapEventResultsApplied)));
         // Collection of sides for the MapEvent
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), "_sides"));
+        //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), "_sides"));
     }
 }

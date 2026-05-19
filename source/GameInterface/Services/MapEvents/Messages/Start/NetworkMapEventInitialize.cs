@@ -1,19 +1,19 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.MapEvents.Messages;
+namespace GameInterface.Services.MapEvents.Messages.Start;
 
 [ProtoContract(SkipConstructor = true)]
-internal record NetworkMapEventInitialize : ICommand
+internal readonly struct NetworkMapEventInitialize : ICommand
 {
     [ProtoMember(1)]
-    public string MapEventId { get; }
+    public readonly string MapEventId;
     [ProtoMember(2)]
-    public int BattleType { get; }
+    public readonly int BattleType;
     [ProtoMember(3)]
-    public string AttackerPartyId { get; }
+    public readonly string AttackerPartyId;
     [ProtoMember(4)]
-    public string DefenderPartyId { get; }
+    public readonly string DefenderPartyId;
 
     public NetworkMapEventInitialize(string mapEventId, int battleType, string attackerPartyId, string defenderPartyId)
     {

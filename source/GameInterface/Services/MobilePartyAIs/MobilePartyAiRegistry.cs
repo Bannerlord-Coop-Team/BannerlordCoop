@@ -1,6 +1,7 @@
 ﻿using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
+using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -15,7 +16,10 @@ internal class MobilePartyAiRegistry : AutoRegistryBase<MobilePartyAi>
     {
     }
 
-    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[]
+    {
+        AccessTools.Constructor(typeof(MobilePartyAi), new Type[] { typeof(MobileParty) })
+    };
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 

@@ -2,7 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Util;
-using GameInterface.Services.Battles.Messages;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
@@ -57,9 +57,9 @@ internal class EncounterManagerPatches
 
         var message = new BattleStarted(attackerParty, defenderParty);
 
-        if (attackerParty.MobileParty?.ActualClan?.Name.ToString() == "Playerland")
+        if (attackerParty.MobileParty.IsPlayerParty())
         {
-            InformationManager.DisplayMessage(new InformationMessage($"Local player is engaging in battle with {attackerParty.Name}"));
+            InformationManager.DisplayMessage(new InformationMessage($"Player is engaging in battle with {attackerParty.Name}"));
         }
 
         MessageBroker.Instance.Publish(null, message);

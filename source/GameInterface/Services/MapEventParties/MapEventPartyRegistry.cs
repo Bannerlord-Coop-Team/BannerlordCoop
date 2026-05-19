@@ -27,9 +27,10 @@ internal class MapEventPartyRegistry : AutoRegistryBase<MapEventParty>
         {
             foreach (var side in mapEvent._sides.Where(x => x != null))
             {
+                int counter = 1;
                 foreach (var party in side.Parties.Where(x => x != null))
                 {
-                    RegisterExistingObject(mapEvent.StringId, party);
+                    RegisterExistingObject($"{mapEvent.StringId}_{counter++}", party);
                 }
             }
         }

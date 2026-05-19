@@ -3,7 +3,7 @@ using ProtoBuf;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.MapEvents.Messages;
+namespace GameInterface.Services.MapEvents.Messages.Leave;
 
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkLeaveBattle : ICommand

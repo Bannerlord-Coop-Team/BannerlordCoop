@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
 
-namespace GameInterface.Services.Battles.Messages;
+namespace GameInterface.Services.MapEvents.Messages.Start;
 
 internal readonly struct PlayerStartBattle : IEvent
 {

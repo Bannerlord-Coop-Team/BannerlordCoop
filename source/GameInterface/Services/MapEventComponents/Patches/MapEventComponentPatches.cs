@@ -1,0 +1,21 @@
+﻿using HarmonyLib;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Text;
+using TaleWorlds.CampaignSystem.MapEvents;
+
+namespace GameInterface.Services.MapEventComponents.Patches;
+
+[HarmonyPatch(typeof(MapEventComponent))]
+internal class MapEventComponentPatches
+{
+    static MethodBase TargetMethod() => AccessTools.Constructor(typeof(MapEventComponent), new Type[] { typeof(MapEvent) });
+
+    [HarmonyPrefix]
+    private static bool ConstructorPrefix(MapEventComponent __instance, MapEvent mapEvent)
+    {
+        __instance.MapEvent = mapEvent;
+        return false;
+    }
+}

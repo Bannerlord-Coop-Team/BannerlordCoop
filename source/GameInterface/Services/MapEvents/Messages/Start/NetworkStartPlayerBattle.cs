@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.Battles.Messages;
+namespace GameInterface.Services.MapEvents.Messages.Start;
 
 [ProtoContract(SkipConstructor = true)]
 internal readonly struct NetworkStartPlayerBattle : ICommand

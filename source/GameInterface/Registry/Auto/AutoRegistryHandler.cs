@@ -4,6 +4,7 @@ using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Registry.Auto;
@@ -62,10 +63,11 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         if (Registry.Debug)
         {
-            Logger.Debug("[Server][{CallingMethod}] Created new instance of {type} with id {id}",
+            Logger.Debug("[Server][{CallingMethod}] Created new instance of {type} with id {id}. {Callstack}",
                 $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_InstanceCreated)}",
                 typeof(T).Name,
-                id);
+                id,
+                Environment.StackTrace);
         }
 
         // Callback before sent on network
@@ -96,8 +98,8 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         if (Registry.Debug)
         {
-            Logger.Debug("[Client][{CallingMethod}] Created new instance of {type} with id {id}", 
-                $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_NetworkCreateInstance)}", 
+            Logger.Debug("[Client][{CallingMethod}] Created new instance of {type} with id {id}.", 
+                $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_NetworkCreateInstance)}",
                 typeof(T).Name, 
                 payload.What.InstanceId);
         }
@@ -115,10 +117,11 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
         if (Registry.Debug)
         {
-            Logger.Debug("[Server][{CallingMethod}] Destroyed instance of {type} with id {id}",
+            Logger.Debug("[Server][{CallingMethod}] Destroyed instance of {type} with id {id}. {Callstack}",
                 $"{nameof(AutoRegistryHandler<T>)}.{nameof(Handle_InstanceDestroyed)}",
                 typeof(T).Name,
-                id);
+                id,
+                Environment.StackTrace);
         }
 
         ObjectManager.Remove(payload.What.Instance);
