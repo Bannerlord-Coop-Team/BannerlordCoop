@@ -1,7 +1,10 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
+using GameInterface.CoopSessionData;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Players;
+using GameInterface.Services.Players.Data;
 using Serilog;
 using Serilog.Core;
 using System;
@@ -19,6 +22,7 @@ namespace GameInterface.Services.Smithing.Commands;
 internal class SmithingCommands
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SmithingCommands>();
+    private readonly ICoopSessionProvider coopSessionProvider;
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -189,5 +193,107 @@ internal class SmithingCommands
             return result;
         }
         return "Town not found.";
+    }
+
+    [CommandLineArgumentFunction("crafteditemhistory", "coop.debug.crafting")]
+    public static string ViewCraftedItemHistoryCommand(List<string> strings)
+    {
+        if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        if (ModInformation.IsServer)
+        {
+            foreach (KeyValuePair<string, List<string>> craftedItemHistory in coopSessionProvider.CoopSession.CraftingPlayerData.PlayerCraftedItemsHistory)
+            {
+                stringBuilder.AppendLine(craftedItemHistory.Key);
+                foreach (string craftedItemId in craftedItemHistory.Value)
+                {
+                    stringBuilder.AppendLine(craftedItemId);
+                }
+            }
+        }
+        else
+        {
+            CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+            foreach (ItemObject item in craftingCampaignBehavior._cratingItemsHistory)
+            {
+                stringBuilder.AppendLine(item.StringId);
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Error finding crafting player data or no crafted item history";
+    }
+
+    [CommandLineArgumentFunction("craftingpiecesxp", "coop.debug.crafting")]
+    public static string ViewPartsXpCommand(List<string> strings)
+    {
+        if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        if (ModInformation.IsServer)
+        {
+            foreach (KeyValuePair<string, Dictionary<string, float>> playerPartXp in coopSessionProvider.CoopSession.CraftingPlayerData.PlayerOpenNewPartXpDictionary)
+            {
+                stringBuilder.AppendLine(playerPartXp.Key);
+                foreach (KeyValuePair<string, float> partXp in playerPartXp.Value)
+                {
+                    stringBuilder.AppendLine(partXp.Key + ": " + partXp.Value);
+                }
+            }
+        }
+        else
+        {
+            CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+            foreach (KeyValuePair<CraftingTemplate, float> partXp in craftingCampaignBehavior._openNewPartXpDictionary)
+            {
+                stringBuilder.AppendLine(partXp.Key + ": " + partXp.Value);
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Error finding crafting player data or no parts xp data";
+    }
+
+    [CommandLineArgumentFunction("unlockedcraftingpieces", "coop.debug.crafting")]
+    public static string ViewUnlockedCraftingPieces(List<string> strings)
+    {
+        if (!ContainerProvider.TryResolve<ICoopSessionProvider>(out var coopSessionProvider)) return "Unable to resolve CoopSessionProvider";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        if (ModInformation.IsServer)
+        {
+            foreach (KeyValuePair<string, Dictionary<string, List<string>>> playerUnlockedPieces in coopSessionProvider.CoopSession.CraftingPlayerData.PlayerOpenedPartsDictionary)
+            {
+                stringBuilder.AppendLine(playerUnlockedPieces.Key);
+                foreach (KeyValuePair<string, List<string>> templateUnlockedPieces in playerUnlockedPieces.Value)
+                {
+                    stringBuilder.AppendLine(templateUnlockedPieces.Key + ": " + templateUnlockedPieces.Value.Count);
+                }
+            }
+        }
+        else
+        {
+            CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
+            foreach (KeyValuePair<CraftingTemplate, List<CraftingPiece>> templateUnlockedPieces in craftingCampaignBehavior._openedPartsDictionary)
+            {
+                stringBuilder.AppendLine(templateUnlockedPieces.Key + ": " + templateUnlockedPieces.Value.Count);
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Error finding crafting player data or no unlocked parts";
     }
 }

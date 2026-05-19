@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;
@@ -42,6 +43,9 @@ namespace GameInterface.Services.Smithing.Patches
         [HarmonyPostfix]
         public static void RefinementVMConstructorPostfix(RefinementVM __instance, Action onRefinementSelectionChange, Func<CraftingAvailableHeroItemVM> getCurrentHero)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
             MessageBroker.Instance.Publish(__instance, new RefinementVMCreated(__instance));
         }
     }

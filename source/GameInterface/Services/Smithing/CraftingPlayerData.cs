@@ -1,32 +1,38 @@
-﻿using ProtoBuf;
+﻿using GameInterface.Services.Players.Data;
+using ProtoBuf;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
 namespace GameInterface.Services.Smithing;
 
-[ProtoContract]
+/// <summary>
+/// A few dictionaries from CraftingCampaignBehavior assume there is only ever
+/// one player. This data structure is used to save the same data for each player
+/// mapped using their hero ids.
+/// </summary>
+[ProtoContract(SkipConstructor = true)]
 public class CraftingPlayerData
 {
-    // Dictionary<HeroId, Dictionary<CraftingTemplateId, float>>
+    // Dictionary<PlayerHeroId, Dictionary<CraftingTemplateId, float>>
     [ProtoMember(1)]
-    public Dictionary<string, Dictionary<string, float>> HeroOpenNewPartXpDictionary { get; }
+    public Dictionary<string, Dictionary<string, float>> PlayerOpenNewPartXpDictionary { get; }
 
-    // Dictionary<HeroId, Dictionary<CraftingTemplateId, List<CraftingPieceId>>>
+    // Dictionary<PlayerHeroId, Dictionary<CraftingTemplateId, List<CraftingPieceId>>>
     [ProtoMember(2)]
-    public Dictionary<string, Dictionary<string, List<string>>> HeroOpenedPartsDictionary { get; }
+    public Dictionary<string, Dictionary<string, List<string>>> PlayerOpenedPartsDictionary { get; }
 
-    // Dictionary<HeroId, List<ItemObjectId>
+    // Dictionary<PlayerHeroId, List<ItemObjectId>
     [ProtoMember(3)]
-    public Dictionary<string, List<string>> HeroCraftingItemsHistory { get; }
+    public Dictionary<string, List<string>> PlayerCraftedItemsHistory { get; }
 
     public CraftingPlayerData(
-        Dictionary<string, Dictionary<string, float>> heroOpenNewPartXpDictionary,
-        Dictionary<string, Dictionary<string, List<string>>> heroOpenedPartsDictionary,
-        Dictionary<string, List<string>> heroCraftingItemsHistory)
+        Dictionary<string, Dictionary<string, float>> playerOpenNewPartXpDictionary,
+        Dictionary<string, Dictionary<string, List<string>>> playerOpenedPartsDictionary,
+        Dictionary<string, List<string>> playerCraftedItemsHistory)
     {
-        HeroOpenNewPartXpDictionary = heroOpenNewPartXpDictionary;
-        HeroOpenedPartsDictionary = heroOpenedPartsDictionary;
-        HeroCraftingItemsHistory = heroCraftingItemsHistory;
+        PlayerOpenNewPartXpDictionary = playerOpenNewPartXpDictionary;
+        PlayerOpenedPartsDictionary = playerOpenedPartsDictionary;
+        PlayerCraftedItemsHistory = playerCraftedItemsHistory;
     }
 }

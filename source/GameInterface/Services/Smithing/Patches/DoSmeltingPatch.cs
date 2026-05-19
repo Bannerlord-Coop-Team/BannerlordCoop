@@ -30,6 +30,9 @@ namespace GameInterface.Services.Smithing.Patches
             // AddSkillXp already synced, run on client
             currentCraftingHero.AddSkillXp(DefaultSkills.Crafting, (float)Campaign.Current.Models.SmithingModel.GetSkillXpForSmelting(equipmentElement.Item));
 
+            // Patched separately for sending to server
+            __instance.AddResearchPoints(equipmentElement.Item.WeaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmeltingItem(equipmentElement.Item, currentCraftingHero));
+
             // Skip original to override original client saving
             return false;
         }

@@ -6,6 +6,7 @@ using GameInterface.Policies;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameState;
@@ -33,19 +34,21 @@ namespace GameInterface.Services.Smithing.Patches
                 craftedItemObject = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic.GetCurrentCraftedItemObject(true, nextCraftedItemId);
                 ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
 
-                // May need to replace this, uses MBObjectManager
+                // May need to replace this if causes issues, uses MBObjectManager
                 ItemObject registeredObject = MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
-                Logger.Information("Crafting client registered object with MBObjectManager with id: {id}", registeredObject.Id);
 
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !isFreeMode);
             }
 
             // Publish message with data
-            var message = new CraftedWeaponInternallyCreated(__instance, isFreeMode, crafterHero, craftedItemObject, weaponDesign, weaponModifier, nextCraftedItemId);
+            var message = new CraftedWeaponInternallyCreated(__instance, isFreeMode, crafterHero, craftedItemObject, weaponDesign, weaponModifier, nextCraftedItemId, Hero.MainHero);
             MessageBroker.Instance.Publish(__instance, message);
 
             // Need to return the ItemObject for client's CraftingVM
             __result = craftedItemObject;
+
+            // Patched separately for sending to server
+            __instance.AddResearchPoints(weaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, crafterHero, isFreeMode));
 
             // Skip original to override original client saving
             return false;

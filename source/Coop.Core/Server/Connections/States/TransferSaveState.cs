@@ -2,6 +2,7 @@
 using Common.Network;
 using Coop.Core.Client.Messages;
 using Coop.Core.Server.Services.Time.Messages;
+using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
 using GameInterface.Services.Heroes.Messages;
 
@@ -15,12 +16,14 @@ public class TransferSaveState : ConnectionStateBase
 {
     private IMessageBroker messageBroker;
     private INetwork network;
+    private ICoopSessionProvider coopSessionProvider;
 
-    public TransferSaveState(IConnectionLogic connectionLogic, IMessageBroker messageBroker, INetwork network)
+    public TransferSaveState(IConnectionLogic connectionLogic, IMessageBroker messageBroker, INetwork network, ICoopSessionProvider coopSessionProvider)
         : base(connectionLogic)
     {
         this.network = network;
         this.messageBroker = messageBroker;
+        this.coopSessionProvider = coopSessionProvider;
 
         messageBroker.Subscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
 
@@ -43,7 +46,8 @@ public class TransferSaveState : ConnectionStateBase
         var networkEvent = new NetworkGameSaveDataReceived(
             payload.GameSaveData,
             payload.CampaignID,
-            null); // TODO manage controlled objects
+            null, // TODO manage controlled objects
+            coopSessionProvider.CoopSession.CraftingPlayerData);
 
         network.Send(peer, networkEvent);
 

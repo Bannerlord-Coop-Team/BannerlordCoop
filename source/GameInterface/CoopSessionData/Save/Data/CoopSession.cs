@@ -11,7 +11,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
-namespace Coop.Core.Server.Services.Save.Data;
+namespace GameInterface.CoopSessionData.Save.Data;
 
 /// <summary>
 /// Represents the current state of the game that the game transfer
@@ -21,7 +21,7 @@ public interface ICoopSession
 {
     string UniqueGameId { get; }
     Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
-    CraftingPlayerData CraftingPlayerData { get; } // Smithing Sync
+    CraftingPlayerData CraftingPlayerData { get; }
 }
 
 /// <inheritdoc cref="ICoopSession"/>
@@ -35,13 +35,11 @@ public class CoopSession : ICoopSession
     [ProtoMember(3)]
     public CraftingPlayerData CraftingPlayerData { get; }
 
-    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>> controlledEntityMap)
+    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>> controlledEntityMap, CraftingPlayerData craftingPlayerData)
     {
         UniqueGameId = uniqueGameId;
         ControlledEntityMap = controlledEntityMap;
-
-        // Need to populate CraftingPlayerData or pass in as argument
-        //CraftingPlayerData = 
+        CraftingPlayerData = craftingPlayerData;
     }
 
     public override bool Equals(object obj)

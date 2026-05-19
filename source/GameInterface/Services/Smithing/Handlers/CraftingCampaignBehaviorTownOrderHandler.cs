@@ -308,7 +308,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
             CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
 
-            network.SendAll(new NetworkRefreshWeaponDesignVM());
+            //network.SendAll(new NetworkRefreshWeaponDesignVM());
         }
 
         private void CompleteOrderClients(NetworkCompleteOrderClients obj)

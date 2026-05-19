@@ -37,6 +37,9 @@ public class NetworkCreateCraftedWeaponInternalServer : ICommand
     [ProtoMember(10)]
     public string NextCraftedItemId;
 
+    [ProtoMember(11)]
+    public string PlayerHeroId;
+
     public NetworkCreateCraftedWeaponInternalServer(
         string craftingCampaignBehaviorId,
         bool isFreeMode,
@@ -47,7 +50,8 @@ public class NetworkCreateCraftedWeaponInternalServer : ICommand
         List<string> weaponDesignElementCraftingPieceIds,
         List<int> weaponDesignElementScalePercentages,
         string weaponModifierId,
-        string nextCraftedItemId)
+        string nextCraftedItemId,
+        string playerHeroId)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         IsFreeMode = isFreeMode;
@@ -59,6 +63,7 @@ public class NetworkCreateCraftedWeaponInternalServer : ICommand
         WeaponDesignElementScalePercentages = weaponDesignElementScalePercentages;
         WeaponModifierId = weaponModifierId;
         NextCraftedItemId = nextCraftedItemId;
+        PlayerHeroId = playerHeroId;
     }
 }
 

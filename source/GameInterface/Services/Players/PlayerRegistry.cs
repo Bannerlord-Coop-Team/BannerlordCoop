@@ -10,7 +10,7 @@ namespace GameInterface.Services.Players;
 /// <summary>
 /// Keeps track & managers all players on the server/client. 
 /// </summary>
-internal interface IPlayerRegistry: IEnumerable<Player>
+public interface IPlayerRegistry: IEnumerable<Player>
 {
     /// <summary>
     /// Adds a player to the registry
