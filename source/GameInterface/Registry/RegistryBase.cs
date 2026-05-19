@@ -11,6 +11,7 @@ using TaleWorlds.Library;
 
 namespace GameInterface.Registry;
 
+[Obsolete("This class is no longer used and will be removed in a future update. Please use the new AutoRegistryBase class instead.")]
 public abstract class RegistryBase<T> : IRegistry<T> where T : class
 {
     protected readonly ILogger Logger = LogManager.GetLogger<RegistryBase<T>>();

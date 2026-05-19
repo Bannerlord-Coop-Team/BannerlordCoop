@@ -51,7 +51,8 @@ namespace Coop.Core.Server.Services.Heroes.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetIdWithLogging(data.Settlement, out var settlementId)) return;
+            string settlementId = null;
+            if (data.Settlement != null && !objectManager.TryGetIdWithLogging(data.Settlement, out settlementId)) return;
             if (!objectManager.TryGetIdWithLogging(data.Hero, out var heroId)) return;
 
             network.SendAll(new NetworkHomeSettlementChanged(settlementId, heroId));

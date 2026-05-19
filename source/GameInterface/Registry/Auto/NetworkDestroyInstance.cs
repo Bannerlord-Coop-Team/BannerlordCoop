@@ -4,10 +4,10 @@ using ProtoBuf;
 namespace GameInterface.Registry.Auto;
 
 [ProtoContract(SkipConstructor = true)]
-class NetworkDestroyInstance<T> : ICommand
+readonly struct NetworkDestroyInstance<T> : ICommand
 {
     [ProtoMember(1)]
-    public string InstanceId { get; }
+    public readonly string InstanceId;
 
     public NetworkDestroyInstance(string instanceId)
     {

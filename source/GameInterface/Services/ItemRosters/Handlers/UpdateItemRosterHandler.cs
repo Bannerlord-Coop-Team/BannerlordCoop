@@ -45,12 +45,12 @@ internal class UpdateItemRosterHandler : IHandler
             return;
         }
 
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(msg.PartyBaseId, out var partyBase))
+        if (!objectManager.TryGetObjectWithLogging<ItemRoster>(msg.ItemRosterId, out var itemRoster))
         {
             return;
         }
 
-        ItemRosterPatch.AddToCountsOverride(partyBase.ItemRoster, new EquipmentElement(item, modifier), msg.Amount);
+        ItemRosterPatch.AddToCountsOverride(itemRoster, new EquipmentElement(item, modifier), msg.Amount);
     }
 
     public void Dispose()

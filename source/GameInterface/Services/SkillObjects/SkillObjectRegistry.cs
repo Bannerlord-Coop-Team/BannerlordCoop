@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -11,43 +12,40 @@ using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.SkillObjects;
-internal class SkillObjectRegistry : IAutoRegistry<SkillObject>
+internal class SkillObjectRegistry : AutoRegistryBase<SkillObject>
 {
-    ILogger Logger { get; }
-    public SkillObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public SkillObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(SkillObject), new Type[] { typeof(string) })
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (SkillObject skill in MBObjectManager.Instance.GetObjectTypeList<SkillObject>())
         {
-            objectManager.AddExisting(skill.StringId, skill);
+            RegisterExistingObject(skill.StringId, skill);
         }
     }
 
-    public void OnClientCreated(SkillObject obj, string id)
+    public override void OnClientCreated(SkillObject obj, string id)
     {
     }
 
-    public void OnClientDestroyed(SkillObject obj, string id)
+    public override void OnClientDestroyed(SkillObject obj, string id)
     {
     }
 
-    public void OnServerCreated(SkillObject obj, string id)
+    public override void OnServerCreated(SkillObject obj, string id)
     {
     }
 
-    public void OnServerDestroyed(SkillObject obj, string id)
+    public override void OnServerDestroyed(SkillObject obj, string id)
     {
     }
 }

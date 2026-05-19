@@ -18,9 +18,7 @@ public class VillageLastDemandTimeSatisifiedTest
     public void ServerLastDemandTimeChanged_Publishes_AllClients()
     {
         // Arrange
-        string villageId = "Settlement1";
-        float lastDemandSatisifiedTime = 152.9f;
-        var triggerMessage = new VillageDemandTimeChanged(villageId, lastDemandSatisifiedTime);
+        var triggerMessage = new VillageDemandTimeChanged();
 
         var server = TestEnvironment.Server;
 

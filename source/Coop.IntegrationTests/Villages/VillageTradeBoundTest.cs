@@ -22,9 +22,7 @@ namespace Coop.IntegrationTests.Villages
         public void ServerVillageTradeBoundChanged_Publishes_AllClients()
         {
             // Arrange
-            string villageId = "Settlement1";
-            string tradeBoundId = "TradeBound1";
-            var triggerMessage = new VillageTradeBoundChanged(villageId, tradeBoundId);
+            var triggerMessage = new VillageTradeBoundChanged();
 
             var server = TestEnvironment.Server;
 

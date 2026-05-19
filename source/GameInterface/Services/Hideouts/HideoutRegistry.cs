@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -9,43 +10,40 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Hideouts;
-internal class HideoutRegistry : IAutoRegistry<Hideout>
+internal class HideoutRegistry : AutoRegistryBase<Hideout>
 {
-    ILogger Logger { get; }
-    public HideoutRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public HideoutRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(Hideout))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (var hideout in Hideout.All)
         {
-            objectManager.AddExisting(hideout.StringId, hideout);
+            RegisterExistingObject(hideout.StringId, hideout);
         }
     }
 
-    public void OnClientCreated(Hideout obj, string id)
+    public override void OnClientCreated(Hideout obj, string id)
     {
     }
 
-    public void OnClientDestroyed(Hideout obj, string id)
+    public override void OnClientDestroyed(Hideout obj, string id)
     {
     }
 
-    public void OnServerCreated(Hideout obj, string id)
+    public override void OnServerCreated(Hideout obj, string id)
     {
     }
 
-    public void OnServerDestroyed(Hideout obj, string id)
+    public override void OnServerDestroyed(Hideout obj, string id)
     {
     }
 }

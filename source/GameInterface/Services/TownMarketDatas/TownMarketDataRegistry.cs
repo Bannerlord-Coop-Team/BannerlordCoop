@@ -15,42 +15,49 @@ using TaleWorlds.CampaignSystem.Settlements;
 namespace GameInterface.Services.TownMarketDatas;
 
 
-internal class TownMarketDataRegistry : IAutoRegistry<TownMarketData>
+internal class TownMarketDataRegistry : AutoRegistryBase<TownMarketData>
 {
-    ILogger Logger { get; }
-
-    public TownMarketDataRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public TownMarketDataRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
-        foreach (var town in Campaign.Current._towns)
+        var towns = Campaign.Current?._towns;
+        if (towns == null)
         {
-            objectManager.AddExisting(town.StringId, town._marketData);
+            Logger.Error("Unable to register TownMarketData when Campaign towns is null");
+            return;
+        }
+
+        foreach (var town in towns)
+        {
+            if (town == null) continue;
+            if (town._marketData == null) continue;
+            if (string.IsNullOrEmpty(town.StringId)) continue;
+
+            RegisterExistingObject(town.StringId, town._marketData);
         }
     }
 
-    public void OnClientCreated(TownMarketData obj, string id)
+    public override void OnClientCreated(TownMarketData obj, string id)
     {
     }
 
-    public void OnClientDestroyed(TownMarketData obj, string id)
+    public override void OnClientDestroyed(TownMarketData obj, string id)
     {
     }
 
-    public void OnServerCreated(TownMarketData obj, string id)
+    public override void OnServerCreated(TownMarketData obj, string id)
     {
     }
 
-    public void OnServerDestroyed(TownMarketData obj, string id)
+    public override void OnServerDestroyed(TownMarketData obj, string id)
     {
     }
 }

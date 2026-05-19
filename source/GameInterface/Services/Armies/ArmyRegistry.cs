@@ -1,4 +1,5 @@
-﻿using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -16,53 +17,47 @@ namespace GameInterface.Services.Armies;
 /// <summary>
 /// Registry for <see cref="Army"/> type
 /// </summary>
-internal class ArmyRegistry : IAutoRegistry<Army>
+internal class ArmyRegistry : AutoRegistryBase<Army>
 {
-    ILogger Logger { get; }
-    public ArmyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public ArmyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(Army));
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(Army));
 
-    public IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
+    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
     {
         AccessTools.Method(typeof(Army), nameof(Army.DisperseInternal))
     };
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         IEnumerable<Kingdom> kingdoms = Campaign.Current?.Kingdoms ?? Enumerable.Empty<Kingdom>();
 
-        
         foreach (var kingdom in kingdoms)
         {
-            int counter = 1;
             foreach (var army in kingdom.Armies)
             {
-                var networkId = $"{kingdom.StringId}_{counter++}";
-                objectManager.AddExisting(networkId, army);
+                RegisterExistingObject(kingdom.StringId, army);
             }
         }
     }
 
-    public void OnClientCreated(Army obj, string id)
+    public override void OnClientCreated(Army obj, string id)
     {
         AccessTools.Field(typeof(Army), nameof(Army._parties)).SetValue(obj, new MBList<MobileParty>());
     }
 
-    public void OnClientDestroyed(Army obj, string id)
+    public override void OnClientDestroyed(Army obj, string id)
     {
     }
 
-    public void OnServerCreated(Army obj, string id)
+    public override void OnServerCreated(Army obj, string id)
     {
     }
 
-    public void OnServerDestroyed(Army obj, string id)
+    public override void OnServerDestroyed(Army obj, string id)
     {
     }
 }

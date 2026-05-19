@@ -41,7 +41,7 @@ internal class WarPartyComponentBannerRobustnessPatch
     {
         if (__instance.MobileParty == null)
         {
-            Logger.Debug("WarPartyComponent.GetDefaultComponentBanner: MobileParty is null, returning null banner");
+            Logger.Error("WarPartyComponent.GetDefaultComponentBanner: MobileParty is null, returning null banner");
             __result = null;
             return false;
         }

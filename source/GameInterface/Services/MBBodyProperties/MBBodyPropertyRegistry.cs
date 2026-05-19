@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -11,43 +12,40 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.MBBodyProperties;
-internal class MBBodyPropertyRegistry : IAutoRegistry<MBBodyProperty>
+internal class MBBodyPropertyRegistry : AutoRegistryBase<MBBodyProperty>
 {
-    ILogger Logger { get; }
-    public MBBodyPropertyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public MBBodyPropertyRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(MBBodyProperty))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (CharacterObject character in CharacterObject.All.DistinctBy(c => c.BodyPropertyRange))
         {
-            objectManager.AddExisting(character.StringId, character.BodyPropertyRange);
+            RegisterExistingObject(character.StringId, character.BodyPropertyRange);
         }
     }
 
-    public void OnClientCreated(MBBodyProperty obj, string id)
+    public override void OnClientCreated(MBBodyProperty obj, string id)
     {
     }
 
-    public void OnClientDestroyed(MBBodyProperty obj, string id)
+    public override void OnClientDestroyed(MBBodyProperty obj, string id)
     {
     }
 
-    public void OnServerCreated(MBBodyProperty obj, string id)
+    public override void OnServerCreated(MBBodyProperty obj, string id)
     {
     }
 
-    public void OnServerDestroyed(MBBodyProperty obj, string id)
+    public override void OnServerDestroyed(MBBodyProperty obj, string id)
     {
     }
 }

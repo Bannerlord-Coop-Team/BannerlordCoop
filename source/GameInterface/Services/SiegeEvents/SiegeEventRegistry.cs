@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -13,44 +14,53 @@ using TaleWorlds.CampaignSystem.Siege;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.SiegeEvents;
-internal class SiegeEventRegistry : IAutoRegistry<SiegeEvent>
+internal class SiegeEventRegistry : AutoRegistryBase<SiegeEvent>
 {
-    ILogger Logger { get; }
-    public SiegeEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public SiegeEventRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(SiegeEvent), new Type[] { typeof(Settlement), typeof(MobileParty) })
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
-        foreach (var instance in Campaign.Current.SiegeEventManager.SiegeEvents)
+        var siegeEvents = Campaign.Current?.SiegeEventManager?.SiegeEvents;
+        if (siegeEvents == null)
         {
-            if (objectManager.AddNewObject(instance, out var _) == false) Logger.Error($"Unable to register {nameof(SiegeEvent)}");
+            Logger.Error("Unable to register {Type} when SiegeEvents is null", nameof(SiegeEvent));
+            return;
+        }
+
+        foreach (var instance in siegeEvents)
+        {
+            if (instance == null) continue;
+
+            var settlementId = instance.BesiegedSettlement?.StringId;
+            if (settlementId == null) continue;
+
+            RegisterExistingObject(settlementId, instance);
         }
     }
 
-    public void OnClientCreated(SiegeEvent obj, string id)
+    public override void OnClientCreated(SiegeEvent obj, string id)
     {
 
     }
 
-    public void OnClientDestroyed(SiegeEvent obj, string id)
+    public override void OnClientDestroyed(SiegeEvent obj, string id)
     {
     }
 
-    public void OnServerCreated(SiegeEvent obj, string id)
+    public override void OnServerCreated(SiegeEvent obj, string id)
     {
     }
 
-    public void OnServerDestroyed(SiegeEvent obj, string id)
+    public override void OnServerDestroyed(SiegeEvent obj, string id)
     {
     }
 }

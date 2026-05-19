@@ -17,9 +17,7 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownLoyaltyChanged_Publishes_AllClients()
         {
             // Arrange
-            string townId = "Settlement1";
-            float loyalty = 50.0f;
-            var triggerMessage = new TownLoyaltyChanged(townId, loyalty);
+            var triggerMessage = new TownLoyaltyChanged();
 
             var server = TestEnvironment.Server;
 

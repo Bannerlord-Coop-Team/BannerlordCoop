@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -9,41 +10,38 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.VillageTypes;
-internal class VillageTypeRegistry : IAutoRegistry<VillageType>
+internal class VillageTypeRegistry : AutoRegistryBase<VillageType>
 {
-    ILogger Logger { get; }
-    public VillageTypeRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public VillageTypeRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(VillageType));
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(VillageType));
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (var villageType in VillageType.All)
         {
-            objectManager.AddExisting(villageType.StringId, villageType);
+            RegisterExistingObject(villageType.StringId, villageType);
         }
     }
 
-    public void OnClientCreated(VillageType obj, string id)
+    public override void OnClientCreated(VillageType obj, string id)
     {
     }
 
-    public void OnClientDestroyed(VillageType obj, string id)
+    public override void OnClientDestroyed(VillageType obj, string id)
     {
     }
 
-    public void OnServerCreated(VillageType obj, string id)
+    public override void OnServerCreated(VillageType obj, string id)
     {
     }
 
-    public void OnServerDestroyed(VillageType obj, string id)
+    public override void OnServerDestroyed(VillageType obj, string id)
     {
     }
 }

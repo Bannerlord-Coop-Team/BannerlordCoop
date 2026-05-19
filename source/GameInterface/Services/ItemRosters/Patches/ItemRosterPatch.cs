@@ -44,17 +44,13 @@ namespace GameInterface.Services.ItemRosters.Patches
 
             if (ModInformation.IsClient) return;
 
-            if (ItemRosterLookup.TryGetValue(__instance, out var partyBase) == false)
-            {
-                Logger.Error("Unable to find party from item roster");
-                return;
-            }
+            var message = new ItemRosterUpdated(
+                __instance,
+                rosterElement.Item,
+                rosterElement.ItemModifier,
+                number);
 
-            MessageBroker.Instance.Publish(__instance, new ItemRosterUpdated(
-                        partyBase,
-                        rosterElement.Item,
-                        rosterElement.ItemModifier,
-                        number));
+            MessageBroker.Instance.Publish(__instance, message);
         }
 
         [HarmonyPatch(nameof(ItemRoster.Clear))]

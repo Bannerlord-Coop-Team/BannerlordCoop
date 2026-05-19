@@ -21,9 +21,7 @@ public class SettlementBribePaidTest
     public void ServerSettlementBribePaidChanged_Publishes_AllClients()
     {
         // Arrange
-        string settlementId = "Settlement1";
-        int bribePaid = 15;
-        var triggerMessage = new SettlementChangedBribePaid(settlementId, bribePaid);
+        var triggerMessage = new SettlementChangedBribePaid();
 
         var server = TestEnvironment.Server;
 

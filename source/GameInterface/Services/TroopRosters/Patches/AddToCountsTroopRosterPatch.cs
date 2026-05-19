@@ -9,6 +9,8 @@ using GameInterface.Services.TroopRosters.Messages;
 using GameInterface.Policies;
 using Common;
 using Common.Util;
+using Serilog;
+using Common.Logging;
 
 namespace GameInterface.Services.TroopRosters.Patches;
 
@@ -16,24 +18,52 @@ namespace GameInterface.Services.TroopRosters.Patches;
 [HarmonyPatch(typeof(TroopRoster))]
 public class AddToCountsTroopRosterPatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<AddToCountsTroopRosterPatch>();
+
     [HarmonyPatch("AddToCounts")]
     [HarmonyPrefix]
-    private static bool AddToCountsPrefix(ref TroopRoster __instance, CharacterObject character, int count, bool insertAtFront,
+    private static void AddToCountsPrefix(ref TroopRoster __instance, CharacterObject character, int count, bool insertAtFront,
         int woundedCount, int xpChange, bool removeDepleted, int index)
     {
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-        if (ModInformation.IsClient) return false;
-        // Owner Party
-        // TODO: use publicizer later when it comes out
-        if(__instance.OwnerParty == null) return false;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        // Allow dummy rosters as the are only for caching
+        if (AllowDummyTroopRoster.IsDummyRoster(__instance)) return;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client attempted to update managed {type}, {methodName}", typeof(ItemRoster), nameof(ItemRoster.AddToCounts));
+            return;
+        }
+
 
         MobileParty mobileParty = __instance.OwnerParty.MobileParty;
 
         var message = new TroopRosterAddToCountsChanged(mobileParty, character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
 
         MessageBroker.Instance.Publish(__instance, message);
+    }
 
-        return true;
+    [HarmonyPatch("AddToCountsAtIndex")]
+    [HarmonyPrefix]
+    private static void AddToCountsAtIndexPrefix(ref TroopRoster __instance, int index, int countChange, int woundedCountChange, int xpChange, bool removeDepleted)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        // Allow dummy rosters as the are only for caching
+        if (AllowDummyTroopRoster.IsDummyRoster(__instance)) return;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client attempted to update managed {type}, {methodName}", typeof(ItemRoster), "AddToCountsAtIndex");
+            return;
+        }
+
+        MobileParty mobileParty = __instance.OwnerParty.MobileParty;
+
+        var message = new TroopRosterAddToCountsAtIndexChanged(mobileParty.StringId, index, countChange, woundedCountChange, xpChange, removeDepleted);
+
+        MessageBroker.Instance.Publish(__instance, message);
     }
 
     public static void RunAddToCounts(MobileParty party, CharacterObject character, int count, bool insertAtFront, int woundedCount, int xpChange, bool removeDepleted, int index)
@@ -44,6 +74,18 @@ public class AddToCountsTroopRosterPatch
             {
                 if(party.Party == null || party.MemberRoster == null) return;
                 party.MemberRoster.AddToCounts(character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
+            }
+        });
+    }
+
+    public static void RunAddToCountsAtIndex(MobileParty party, int index, int count, int woundedCount, int xpChange, bool removeDepleted)
+    {
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                if (party.Party == null || party.MemberRoster == null) return;
+                party.MemberRoster.AddToCountsAtIndex(index, count, woundedCount, xpChange, removeDepleted);
             }
         });
     }

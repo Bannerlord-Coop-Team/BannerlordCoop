@@ -1,5 +1,4 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.LoadingScreen.Handlers;
 
 namespace GameInterface.Services.LoadingScreen.Messages;
 
