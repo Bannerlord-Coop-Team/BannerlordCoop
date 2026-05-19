@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.PartyComponents.Messages;
+namespace GameInterface.Services.PartyComponents.BanditPartyComponents.Messages;
 
 [ProtoContract(SkipConstructor = true)]
 public record NetworkUpdateBanditPartyComponent(string ComponentId, int BanditPartyComponentType, string Value) : ICommand

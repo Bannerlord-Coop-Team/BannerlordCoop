@@ -239,6 +239,10 @@ internal class BattleHandler : IHandler
         {
             PlayerEncounter.Current._playerSurrender = true;
             payload.What.MobileParty.BesiegerCamp = null;
+
+            GameMenu.ActivateGameMenu("taken_prisoner");
+
+            PlayerEncounter.Current._stateHandled = true;
         }
     }
 
@@ -248,6 +252,7 @@ internal class BattleHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(payload.What.MobilePartyId, out MobileParty mobileParty)) return;
 
         mapEvent.DoSurrender(mobileParty.Party.Side);
+        mapEvent.FinalizeEvent();
     }
 
     private void Handle_PlayerEncounterStarted(MessagePayload<PlayerEncounterStarted> payload)

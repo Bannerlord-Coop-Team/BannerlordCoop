@@ -3,14 +3,17 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyComponents.Messages;
+using GameInterface.Services.PartyComponents.BanditPartyComponents.Messages;
+using GameInterface.Services.PartyComponents.Patches.CustomPartyComponents;
 using HarmonyLib;
 using Serilog;
-using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 
-namespace GameInterface.Services.PartyComponents.Patches.BanditPartyComponents;
+namespace GameInterface.Services.PartyComponents.BanditPartyComponents.Patches;
 
 public enum BanditPartyComponentType
 {
@@ -64,5 +67,53 @@ public class BanditPartyComponentPatches
         MessageBroker.Instance.Publish(__instance, message);
 
         return true;
+    }
+}
+
+[HarmonyPatch(typeof(BanditPartyComponent))]
+public class BanditPartyComponentTranspilers
+{
+    private static readonly ILogger Logger = LogManager.GetLogger<BanditPartyComponentTranspilers>();
+
+    public static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(BanditPartyComponent));
+
+
+    [HarmonyTranspiler]
+    private static IEnumerable<CodeInstruction> InitializationArgsTranspiler(IEnumerable<CodeInstruction> instructions)
+    {
+        var field = AccessTools.Field(typeof(BanditPartyComponent), nameof(BanditPartyComponent._initializationArgs));
+        var fieldIntercept = AccessTools.Method(typeof(BanditPartyComponentTranspilers), nameof(InitializationArgsIntercept));
+
+        foreach (var instruction in instructions)
+        {
+            if (instruction.StoresField(field))
+            {
+                yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+            }
+            else
+            {
+                yield return instruction;
+            }
+        }
+    }
+
+    public static void InitializationArgsIntercept(BanditPartyComponent instance, BanditPartyComponent.InitializationArgs initArgs)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+        {
+            instance._initializationArgs = initArgs;
+            return;
+        }
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("Client updated managed {type}", nameof(instance._initializationArgs));
+            return;
+        }
+
+        var message = new BanditPartyComponentInitArgsUpdated(instance, initArgs);
+        MessageBroker.Instance.Publish(instance, message);
+
+        instance._initializationArgs = initArgs;
     }
 }

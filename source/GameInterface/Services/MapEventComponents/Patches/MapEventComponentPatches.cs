@@ -7,6 +7,10 @@ using TaleWorlds.CampaignSystem.MapEvents;
 
 namespace GameInterface.Services.MapEventComponents.Patches;
 
+
+/// <summary>
+/// This is required as there is some strange optimization happening in the constructor where it is not calling the MapEvent setter
+/// </summary>
 [HarmonyPatch(typeof(MapEventComponent))]
 internal class MapEventComponentPatches
 {

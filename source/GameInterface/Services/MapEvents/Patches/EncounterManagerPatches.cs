@@ -7,6 +7,7 @@ using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -21,6 +22,8 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch(typeof(EncounterManager))]
 internal class EncounterManagerPatches
 {
+    private const bool Enabled = false;
+
     private static ILogger Logger = LogManager.GetLogger<EncounterManagerPatches>();
 
     [HarmonyPrefix]
@@ -29,7 +32,8 @@ internal class EncounterManagerPatches
     {
         if (ModInformation.IsServer) return true;
 
-        if (attackerParty.IsPartyControlled() == false) return false;
+        if (!attackerParty.IsPartyControlled())
+            return false;
 
         var message = new StartSettlementEncounterAttempted(attackerParty, settlement);
         MessageBroker.Instance.Publish(attackerParty, message);
@@ -42,7 +46,8 @@ internal class EncounterManagerPatches
     internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
     {
         // Skip this method if party is not controlled
-        if (mobileParty.IsPartyControlled() == false) return false;
+        if (!mobileParty.IsPartyControlled())
+            return false;
 
         return true;
     }
@@ -51,6 +56,8 @@ internal class EncounterManagerPatches
     [HarmonyPrefix]
     public static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
     {
+        if (!Enabled) return false;
+
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
         if (ModInformation.IsClient) return true;
@@ -78,8 +85,9 @@ internal class EncounterManagerPatches
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
-            using (new AllowedThread())
+            try
             {
+                using var _ = new AllowedThread();
                 if (defender.IsMobile)
                 {
                     if (attacker.MobileParty.IsPartyControlled() == true)
@@ -93,6 +101,10 @@ internal class EncounterManagerPatches
                 {
                     EncounterManager.StartSettlementEncounter(attacker.MobileParty, defender.Settlement);
                 }
+            }
+            catch(Exception ex)
+            {
+                Logger.Error(ex, "Failed to start party encounter");
             }
         });
     }

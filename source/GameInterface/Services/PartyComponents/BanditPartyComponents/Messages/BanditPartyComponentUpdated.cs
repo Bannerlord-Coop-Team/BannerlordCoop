@@ -1,8 +1,8 @@
 ﻿using Common.Messaging;
-using GameInterface.Services.PartyComponents.Patches.BanditPartyComponents;
+using GameInterface.Services.PartyComponents.BanditPartyComponents.Patches;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 
-namespace GameInterface.Services.PartyComponents.Messages
+namespace GameInterface.Services.PartyComponents.BanditPartyComponents.Messages
 {
     internal record BanditPartyComponentUpdated : IEvent
     {

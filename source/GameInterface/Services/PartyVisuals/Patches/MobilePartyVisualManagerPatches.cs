@@ -28,7 +28,7 @@ namespace GameInterface.Services.PartyVisuals.Patches
             {
                 for (int i = startInclusive; i < endExclusive; i++)
                 {
-                    if(i >= __instance._visualsFlattened.Count)
+                    if (i >= __instance._visualsFlattened.Count)
                     {
                         Logger.Warning("Index {index} was out of bounds for visuals flattened list of size {size}", i, __instance._visualsFlattened.Count);
                         continue;

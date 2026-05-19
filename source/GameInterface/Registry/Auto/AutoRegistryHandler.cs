@@ -71,7 +71,7 @@ class AutoRegistryHandler<T> : IHandler where T : class
         }
 
         // Callback before sent on network
-        Registry.OnServerCreated(payload.What.Instance, id);
+        Registry.OnServerCreated(payload.What.Instance, $"{typeof(T).Name}_{id}");
 
         Network.SendAll(new NetworkCreateInstance<T>(id));
     }
