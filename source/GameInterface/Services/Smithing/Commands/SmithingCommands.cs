@@ -22,7 +22,6 @@ namespace GameInterface.Services.Smithing.Commands;
 internal class SmithingCommands
 {
     private static readonly ILogger Logger = LogManager.GetLogger<SmithingCommands>();
-    private readonly ICoopSessionProvider coopSessionProvider;
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -74,7 +73,8 @@ internal class SmithingCommands
 
                 foreach (var itemId in itemsToAdd.Keys)
                 {
-                    if (!objectManager.TryGetObject(itemId, out ItemObject itemObject)) {
+                    if (!objectManager.TryGetObject(itemId, out ItemObject itemObject)) 
+                    {
                         stringBuilder.AppendLine("Failed to retrieve object for ItemObject id: " + itemId);
                     }
                     else

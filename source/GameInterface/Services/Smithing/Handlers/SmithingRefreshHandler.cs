@@ -79,8 +79,6 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkRefreshSmelting> obj)
         {
-            if (currentSmeltingVM == null) Logger.Warning("SmithingRefreshHandler currentSmeltingVM was null");
-
             currentSmeltingVM?.RefreshList();
             currentSmeltingVM?.RefreshValues();
 
@@ -89,14 +87,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkRefreshRefinement> obj)
         {
-            if (!objectManager.TryGetObject(obj.What.CraftingHeroId, out Hero craftingHero))
-            {
-                Logger.Error("Unable to get object for craftingHeroId {id}", obj.What.CraftingHeroId);
-                return;
-            }
-
-            if (currentRefinementVM == null) Logger.Warning("SmithingRefreshHandler currentRefinementVM was null");
-            if (currentCraftingVM == null) Logger.Warning("SmithingRefreshHandler currentCraftingVM was null");
+            if (!objectManager.TryGetObjectWithLogging(obj.What.CraftingHeroId, out Hero craftingHero)) return;
 
             currentRefinementVM?.RefreshRefinementActionsList(craftingHero);
             currentCraftingVM?.OnRefinementSelectionChange();

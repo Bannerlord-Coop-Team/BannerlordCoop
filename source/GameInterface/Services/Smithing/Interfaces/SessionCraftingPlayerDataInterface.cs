@@ -88,13 +88,7 @@ public class SessionCraftingPlayerDataInterface : ISessionCraftingPlayerDataInte
 
     private bool IsPlayerHeroIdValid(string playerHeroId)
     {
-        if (!objectManager.TryGetObject(playerHeroId, out Hero _))
-        {
-            Logger.Error("Unable find playerHero object for id {id}", playerHeroId);
-            return false;
-        }
-
-        return true;
+        return objectManager.TryGetObjectWithLogging(playerHeroId, out Hero _);
     }
 
     // PlayerRegistry doesn't save so when resuming a save with the same players it isn't populated. Until it is, will just have to use hero ids as keys for CraftingPlayerData

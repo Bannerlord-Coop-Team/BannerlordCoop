@@ -39,11 +39,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<HourTicked> obj)
         {
-            if (!objectManager.TryGetId(obj.What.CraftingCampaignBehavior, out var craftingCampaignBehaviorId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.What.CraftingCampaignBehavior?.GetType());
-                return;
-            }
+            if (!objectManager.TryGetIdWithLogging(obj.What.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
 
             network.SendAll(new NetworkHourlyTick(craftingCampaignBehaviorId));
 
@@ -58,11 +54,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void HourlyTick(NetworkHourlyTick obj)
         {
-            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
-            {
-                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
 
             foreach (KeyValuePair<Hero, CraftingCampaignBehavior.HeroCraftingRecord> keyValuePair in craftingCampaignBehavior._heroCraftingRecords)
             {

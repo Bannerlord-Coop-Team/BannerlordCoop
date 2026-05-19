@@ -101,21 +101,9 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void SendTownOrderCreated(TownOrderCreated obj)
         {
-            if (!objectManager.TryGetId(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.CraftingCampaignBehavior?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.RandomElement, out var randomElementId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.RandomElement?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.OrderOwner, out var orderOwnerId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.OrderOwner?.GetType());
-                return;
-            }
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.RandomElement, out var randomElementId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.OrderOwner, out var orderOwnerId)) return;
 
             // Send to clients from server
             NetworkCreateTownOrder message = new(
@@ -135,39 +123,28 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateTownOrder(NetworkCreateTownOrder obj)
         {
-            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
-            {
-                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.RandomElementId, out CraftingTemplate randomElement))
-            {
-                Logger.Error("Unable to get object for randomElementId {id}", obj.RandomElementId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.OrderOwnerId, out Hero orderOwner))
-            {
-                Logger.Error("Unable to get object for orderOwnerId {id}", obj.OrderOwnerId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.RandomElementId, out CraftingTemplate randomElement)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.OrderOwnerId, out Hero orderOwner)) return;
 
             // Replace TaleWorlds implementation
             WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
-            craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(new CraftingOrder(orderOwner, obj.TownOrderDifficulty, weaponDesignTemplate, randomElement, obj.OrderSlot, obj.NextTownOrderId));
+            craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(
+                new CraftingOrder(
+                    orderOwner,
+                    obj.TownOrderDifficulty,
+                    weaponDesignTemplate,
+                    randomElement,
+                    obj.OrderSlot,
+                    obj.NextTownOrderId
+                )
+            );
         }
 
         private void SendCraftingOrderReplaced(CraftingOrderReplaced obj)
         {
-            if (!objectManager.TryGetId(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.CraftingCampaignBehavior?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.Town, out var townId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.Town?.GetType());
-                return;
-            }
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.Town, out var townId)) return;
 
             // Send to clients from server
             NetworkReplaceCraftingOrder message = new(
@@ -180,16 +157,8 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void ReplaceCraftingOrder(NetworkReplaceCraftingOrder obj)
         {
-            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
-            {
-                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.TownId, out Town town))
-            {
-                Logger.Error("Unable to get object for townId {id}", obj.TownId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
 
             // Replace TaleWorlds implementation
             craftingCampaignBehavior._craftingOrders[town].Slots[obj.DifficultyLevel] = null; // Equivalent to craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(order), CraftingOrder can't be registered
@@ -198,26 +167,10 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void SendOrderCompleted(OrderCompleted obj)
         {
-            if (!objectManager.TryGetId(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.CraftingCampaignBehavior?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.Town, out var townId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.Town?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.CompleterHero, out var completerHeroId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.CompleterHero?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.MainHero, out var mainHeroId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.MainHero?.GetType());
-                return;
-            }
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.Town, out var townId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.CompleterHero, out var completerHeroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.MainHero, out var mainHeroId)) return;
 
             CraftingOrderBinaryPackage craftingOrderBinaryPackage = binaryPackageFactory.GetBinaryPackage<CraftingOrderBinaryPackage>(obj.CraftingOrder);
             byte[] craftingOrderData = BinaryFormatterSerializer.Serialize(craftingOrderBinaryPackage);
@@ -239,26 +192,10 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CompleteOrderServer(NetworkCompleteOrderServer obj)
         {
-            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
-            {
-                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.TownId, out Town town))
-            {
-                Logger.Error("Unable to get object for townId {id}", obj.TownId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.CompleterHeroId, out Hero completerHero))
-            {
-                Logger.Error("Unable to get object for completerHeroId {id}", obj.CompleterHeroId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.MainHeroId, out Hero mainHero))
-            {
-                Logger.Error("Unable to get object for mainHeroId {id}", obj.MainHeroId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.MainHeroId, out Hero mainHero)) return;
 
             CraftingOrderBinaryPackage craftingOrderBinaryPackage = BinaryFormatterSerializer.Deserialize<CraftingOrderBinaryPackage>(obj.CraftingOrderData);
             CraftingOrder craftingOrder = craftingOrderBinaryPackage.Unpack<CraftingOrder>(binaryPackageFactory);
@@ -313,21 +250,9 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CompleteOrderClients(NetworkCompleteOrderClients obj)
         {
-            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
-            {
-                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.TownId, out Town town))
-            {
-                Logger.Error("Unable to get object for townId {id}", obj.TownId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.CompleterHeroId, out Hero completerHero))
-            {
-                Logger.Error("Unable to get object for completerHeroId {id}", obj.CompleterHeroId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
 
             CraftingOrderBinaryPackage craftingOrderBinaryPackage = BinaryFormatterSerializer.Deserialize<CraftingOrderBinaryPackage>(obj.CraftingOrderData);
             CraftingOrder craftingOrder = craftingOrderBinaryPackage.Unpack<CraftingOrder>(binaryPackageFactory);

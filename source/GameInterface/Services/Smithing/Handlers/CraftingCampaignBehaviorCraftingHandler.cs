@@ -116,23 +116,11 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void SendSmeltingDone(SmeltingDone obj)
         {
-            if (!objectManager.TryGetId(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.CraftingCampaignBehavior?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.CraftingHero, out var craftingHeroId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.CraftingHero?.GetType());
-                return;
-            }
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingHero, out var craftingHeroId)) return;
 
             // Can't send equipmentElement over the network as it is a struct. Need to reconstruct at the other end
-            if (!objectManager.TryGetId(obj.EquipmentElement.Item, out var itemId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.EquipmentElement.Item?.GetType());
-                return;
-            }
+            if (!objectManager.TryGetIdWithLogging(obj.EquipmentElement.Item, out var itemId)) return;
             if (!objectManager.TryGetId(obj.EquipmentElement.ItemModifier, out var itemModifierId))
             {
                 itemModifierId = ""; // Assume EquipmentElement doesn't have an item modifier
@@ -158,33 +146,15 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void DoSmelting(NetworkDoSmelting obj)
         {
-            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
-            {
-                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.CraftingHeroId, out Hero craftingHero))
-            {
-                Logger.Error("Unable to get object for craftingHeroId {id}", obj.CraftingHeroId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.ItemId, out ItemObject item))
-            {
-                Logger.Error("Unable to get object for itemId {id}", obj.ItemId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.ItemId, out ItemObject item)) return;
+
             ItemModifier itemModifier = null;
-            if (obj.ItemModifierId != "" && !objectManager.TryGetObject(obj.ItemModifierId, out itemModifier))
-            {
-                Logger.Error("Unable to get object for itemModifierId {id}", obj.ItemModifierId);
-                return;
-            }
+            if (obj.ItemModifierId != "" && !objectManager.TryGetObjectWithLogging(obj.ItemModifierId, out itemModifier)) return;
+
             ItemObject cosmeticItem = null;
-            if (obj.CosmeticItemId != "" && !objectManager.TryGetObject(obj.CosmeticItemId, out cosmeticItem))
-            {
-                Logger.Error("Unable to get object for cosmeticItemId {id}", obj.CosmeticItemId);
-                return;
-            }
+            if (obj.CosmeticItemId != "" && !objectManager.TryGetObjectWithLogging(obj.CosmeticItemId, out cosmeticItem)) return;
 
             // Rebuild equipmentElement on server
             var equipmentElement = new EquipmentElement(item, itemModifier, cosmeticItem, obj.IsQuestItem);
@@ -213,16 +183,8 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void SendRefinementDone(RefinementDone obj)
         {
-            if (!objectManager.TryGetId(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.CraftingCampaignBehavior?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.CraftingHero, out var craftingHeroId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", obj.CraftingHero?.GetType());
-                return;
-            }
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingHero, out var craftingHeroId)) return;
 
             // Need to reconstruct formula at the other end
             Crafting.RefiningFormula formula = obj.RefiningFormula;
@@ -246,16 +208,8 @@ namespace GameInterface.Services.Smithing.Handlers
         private void DoRefinement(NetworkDoRefinement obj)
         {
             // Get objects from objectManager
-            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
-            {
-                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.CraftingHeroId, out Hero craftingHero))
-            {
-                Logger.Error("Unable to get object for craftingHeroId {id}", obj.CraftingHeroId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
 
             // Rebuild formula on server
             var formula = new Crafting.RefiningFormula(
@@ -299,26 +253,10 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void SendInternallyCreatedWeapon(CraftedWeaponInternallyCreated obj)
         {
-            if (!objectManager.TryGetId(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId))
-            {
-                Logger.Error("Unable to get network ID for Behavior instance of type {type}", obj.CraftingCampaignBehavior?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.CraftingHero, out var craftingHeroId))
-            {
-                Logger.Error("Unable to get network ID for CraftingHero instance of type {type}", obj.CraftingHero?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.WeaponDesign.Template, out var craftingTemplateId))
-            {
-                Logger.Error("Unable to get network ID for CraftingTemplate instance of type {type}", obj.WeaponDesign.Template?.GetType());
-                return;
-            }
-            if (!objectManager.TryGetId(obj.PlayerHero, out var playerHeroId))
-            {
-                Logger.Error("Unable to get network ID for CraftingHero instance of type {type}", obj.PlayerHero?.GetType());
-                return;
-            }
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingHero, out var craftingHeroId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.WeaponDesign.Template, out var craftingTemplateId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.PlayerHero, out var playerHeroId)) return;
 
             byte[] craftedItemObjectData = itemObjectInterface.PackageItemObject(obj.CraftedItemObject);
 
@@ -333,21 +271,13 @@ namespace GameInterface.Services.Smithing.Handlers
                     continue;
                 }
 
-                if (!objectManager.TryGetId(weaponDesignElement._craftingPiece, out var currentCraftingPieceId))
-                {
-                    Logger.Error("Unable to get network ID for CraftingPiece instance of type {type}", weaponDesignElement._craftingPiece?.GetType());
-                    return;
-                }
+                if (!objectManager.TryGetIdWithLogging(weaponDesignElement._craftingPiece, out var currentCraftingPieceId)) return;
                 weaponDesignElementCraftingPieceIds.Add(currentCraftingPieceId);
                 weaponDesignElementScalePercentages.Add(weaponDesignElement._scalePercentage);
             }
 
             var weaponModifierId = "";
-            if (obj.WeaponModifier != null && !objectManager.TryGetId(obj.WeaponModifier, out weaponModifierId))
-            {
-                Logger.Error("Unable to get network ID for WeaponModifier instance of type {type}", obj.WeaponModifier?.GetType());
-                return;
-            }
+            if (obj.WeaponModifier != null && !objectManager.TryGetIdWithLogging(obj.WeaponModifier, out weaponModifierId)) return;
 
             // Send to server from client
             NetworkCreateCraftedWeaponInternalServer message = new(
@@ -369,21 +299,9 @@ namespace GameInterface.Services.Smithing.Handlers
         private void CreateCraftedWeaponInternalServer(NetworkCreateCraftedWeaponInternalServer obj)
         {
             // Get objects from objectManager
-            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
-            {
-                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.CraftingHeroId, out Hero craftingHero))
-            {
-                Logger.Error("Unable to get object for craftingHeroId {id}", obj.CraftingHeroId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.CraftingTemplateId, out CraftingTemplate craftingTemplate))
-            {
-                Logger.Error("Unable to get object for craftingTemplateId {id}", obj.CraftingTemplateId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
 
             ItemObject craftedItemObject = itemObjectInterface.UnpackItemObject(obj.CraftedItemObjectData);
 
@@ -396,22 +314,14 @@ namespace GameInterface.Services.Smithing.Handlers
                     continue;
                 }
 
-                if (!objectManager.TryGetObject(obj.WeaponDesignElementCraftingPieceIds[i], out CraftingPiece currentCraftingPiece))
-                {
-                    Logger.Error("Unable to get object for craftingTemplateId {id}", obj.CraftingTemplateId);
-                    return;
-                }
+                if (!objectManager.TryGetObjectWithLogging(obj.WeaponDesignElementCraftingPieceIds[i], out CraftingPiece currentCraftingPiece)) return;
 
                 usedPiecesList.Add(new WeaponDesignElement(currentCraftingPiece, obj.WeaponDesignElementScalePercentages[i]));
             }
             WeaponDesignElement[] usedPieces = usedPiecesList.ToArray();
 
             ItemModifier weaponModifier = null;
-            if (obj.WeaponModifierId != "" && !objectManager.TryGetObject(obj.WeaponModifierId, out weaponModifier))
-            {
-                Logger.Error("Unable to get object for weaponModifierId {id}", obj.WeaponModifierId);
-                return;
-            }
+            if (obj.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(obj.WeaponModifierId, out weaponModifier)) return;
 
             // Replace original TaleWorlds implementation
 
@@ -434,7 +344,15 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
-            ItemObject.InitCraftedItemObject(ref craftedItemObject, craftedItemObject.Name, craftedItemObject.Culture, craftedItemObject.ItemFlags, craftedItemObject.Weight, craftedItemObject.Appearance, weaponDesign, craftedItemObject.Type);
+            ItemObject.InitCraftedItemObject(
+                ref craftedItemObject,
+                craftedItemObject.Name,
+                craftedItemObject.Culture,
+                craftedItemObject.ItemFlags,
+                craftedItemObject.Weight,
+                craftedItemObject.Appearance,
+                weaponDesign,
+                craftedItemObject.Type);
 
             using (new AllowedThread())
             {
@@ -443,11 +361,6 @@ namespace GameInterface.Services.Smithing.Handlers
 
             objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
             MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
-
-            foreach (ItemObject Item in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
-            {
-                Logger.Information("CraftingHandler: MBObjectManager item object with id: {id}", Item.StringId);
-            }
 
             if (obj.IsFreeMode)
             {
@@ -480,18 +393,10 @@ namespace GameInterface.Services.Smithing.Handlers
                 craftedItemObject.StringId = nextCraftedItemId;
             }
 
-            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
-            {
-                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
 
             ItemModifier weaponModifier = null;
-            if (obj.WeaponModifierId != "" && !objectManager.TryGetObject(obj.WeaponModifierId, out weaponModifier))
-            {
-                Logger.Error("Unable to get object for weaponModifierId {id}", obj.WeaponModifierId);
-                return;
-            }
+            if (obj.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(obj.WeaponModifierId, out weaponModifier)) return;
 
             objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
 
@@ -512,16 +417,8 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void SetHeroCraftingStaminaClients(NetworkSetHeroCraftingStamina obj)
         {
-            if (!objectManager.TryGetObject(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior))
-            {
-                Logger.Error("Unable to get object for craftingCampaignBehaviorId {id}", obj.CraftingCampaignBehaviorId);
-                return;
-            }
-            if (!objectManager.TryGetObject(obj.CraftingHeroId, out Hero craftingHero))
-            {
-                Logger.Error("Unable to get object for craftingHeroId {id}", obj.CraftingHeroId);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
 
             craftingCampaignBehavior.GetRecordForCompanion(craftingHero).CraftingStamina = MathF.Max(0, obj.Value);
         }

@@ -55,11 +55,7 @@ namespace GameInterface.Services.Smithing.Handlers
         // Need to load crafting data when the hero changes for the player
         private void Handle(MessagePayload<PlayerHeroChanged> obj)
         {
-            if (!objectManager.TryGetIdWithLogging(obj.What.NewHero, out string playerHeroId))
-            {
-                Logger.Error("Unable to get network ID for instance of type {type}", Hero.MainHero?.GetType());
-                return;
-            }
+            if (!objectManager.TryGetIdWithLogging(obj.What.NewHero, out string playerHeroId)) return;
 
             CraftingCampaignBehavior craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
 
@@ -86,20 +82,12 @@ namespace GameInterface.Services.Smithing.Handlers
 
             foreach (KeyValuePair<string, List<string>> openedPart in craftingPlayerData.PlayerOpenedPartsDictionary[playerHeroId])
             {
-                if (!objectManager.TryGetObject(openedPart.Key, out CraftingTemplate currentCraftingTemplate))
-                {
-                    Logger.Error("Unable to get object for CraftingTemplate {id}", openedPart.Key);
-                    continue;
-                }
+                if (!objectManager.TryGetObjectWithLogging(openedPart.Key, out CraftingTemplate currentCraftingTemplate)) continue;
 
                 List<CraftingPiece> currentCraftingPieces = new List<CraftingPiece>();
                 foreach (string craftingPieceId in openedPart.Value)
                 {
-                    if (!objectManager.TryGetObject(craftingPieceId, out CraftingPiece currentCraftingPiece))
-                    {
-                        Logger.Error("Unable to get object for CraftingPiece {id}", craftingPieceId);
-                        continue;
-                    }
+                    if (!objectManager.TryGetObjectWithLogging(craftingPieceId, out CraftingPiece currentCraftingPiece)) continue;
                     currentCraftingPieces.Add(currentCraftingPiece);
                 }
 
@@ -117,11 +105,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
             foreach (KeyValuePair<string, float> partXp in craftingPlayerData.PlayerOpenNewPartXpDictionary[playerHeroId])
             {
-                if (!objectManager.TryGetObject(partXp.Key, out CraftingTemplate currentCraftingTemplate))
-                {
-                    Logger.Error("Unable to get object for CraftingTemplate {id}", partXp.Key);
-                    continue;
-                }
+                if (!objectManager.TryGetObjectWithLogging(partXp.Key, out CraftingTemplate currentCraftingTemplate)) continue;
 
                 openNewPartXpDictionary[currentCraftingTemplate] = partXp.Value;
             }
@@ -138,11 +122,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
             foreach (string itemId in craftingPlayerData.PlayerCraftedItemsHistory[playerHeroId])
             {
-                if (!objectManager.TryGetObject(itemId, out ItemObject currentItemObject))
-                {
-                    Logger.Error("Unable to get object for ItemObject {id}", itemId);
-                    continue;
-                }
+                if (!objectManager.TryGetObjectWithLogging(itemId, out ItemObject currentItemObject)) continue;
 
                 craftedItemsHistory.Add(currentItemObject);
             }
