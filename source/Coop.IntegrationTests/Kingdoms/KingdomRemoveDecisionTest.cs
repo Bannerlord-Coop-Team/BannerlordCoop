@@ -21,7 +21,7 @@ namespace Coop.IntegrationTests.Kingdoms
         public void ServerKingdom_RemoveDecision_Publishes_AllClients()
         {
             // Arrange
-            var triggerMessage = new DecisionRemoved("Kingdom1", 5);
+            var triggerMessage = new DecisionRemoved();
 
             var server = TestEnvironment.Server;
 

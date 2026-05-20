@@ -17,9 +17,7 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownProsperityChanged_Publishes_AllClients()
         {
             // Arrange
-            string townId = "Settlement1";
-            float prosperity = 3500.0f;
-            var triggerMessage = new TownProsperityChanged(townId, prosperity);
+            var triggerMessage = new TownProsperityChanged();
 
             var server = TestEnvironment.Server;
 

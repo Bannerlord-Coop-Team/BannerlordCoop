@@ -17,9 +17,7 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownLastCapturedByChanged_Publishes_AllClients()
         {
             // Arrange
-            string townId = "Settlement1";
-            string clan = "Clan1";
-            var triggerMessage = new TownLastCapturedByChanged(townId, clan);
+            var triggerMessage = new TownLastCapturedByChanged();
 
             var server = TestEnvironment.Server;
 

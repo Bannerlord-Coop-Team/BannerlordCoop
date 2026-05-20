@@ -4,7 +4,7 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Common;
 using Coop.Core.Server.Connections.Messages;
-using GameInterface.Registry.Messages;
+using GameInterface.Registry;
 using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
@@ -20,6 +20,7 @@ public class CharacterCreationState : ClientStateBase
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IHeroInterface heroInterface;
+    private readonly IRegistryManager registryManager;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly ICoopFinalizer coopFinalizer;
@@ -29,6 +30,7 @@ public class CharacterCreationState : ClientStateBase
         IMessageBroker messageBroker,
         INetwork network,
         IHeroInterface heroInterface,
+        IRegistryManager registryManager,
         IControllerIdProvider controllerIdProvider,
         IControlledEntityRegistry controlledEntityRegistry,
         ICoopFinalizer coopFinalizer) : base(logic)
@@ -36,11 +38,11 @@ public class CharacterCreationState : ClientStateBase
         this.messageBroker = messageBroker;
         this.network = network;
         this.heroInterface = heroInterface;
+        this.registryManager = registryManager;
         this.controllerIdProvider = controllerIdProvider;
         this.controlledEntityRegistry = controlledEntityRegistry;
         this.coopFinalizer = coopFinalizer;
         messageBroker.Subscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
-        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_AllGameObjectRegistered);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
     }
@@ -48,23 +50,19 @@ public class CharacterCreationState : ClientStateBase
     public override void Dispose()
     {
         messageBroker.Unsubscribe<CharacterCreationFinished>(Handle_CharacterCreationFinished);
-        messageBroker.Unsubscribe<AllGameObjectsRegistered>(Handle_AllGameObjectRegistered);
         messageBroker.Unsubscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Unsubscribe<NetworkPlayerData>(Handle_NetworkPlayerData);
     }
 
     internal void Handle_CharacterCreationFinished(MessagePayload<CharacterCreationFinished> obj)
     {
-        messageBroker.Publish(this, new RegisterAllGameObjects());
-    }
+        registryManager.RegisterAllGameObjects();
 
-    internal void Handle_AllGameObjectRegistered(MessagePayload<AllGameObjectsRegistered> obj)
-    {
         var playerId = controllerIdProvider.ControllerId;
         var data = heroInterface.PackageMainHero();
 
         // Clear all registries so next time the game is loaded, it re-registers loaded save objects
-        messageBroker.Publish(this, new ClearAllRegistries());
+        registryManager.ClearAllRegistries();
 
         network.SendAll(new NetworkTransferedHero(playerId, data));
     }

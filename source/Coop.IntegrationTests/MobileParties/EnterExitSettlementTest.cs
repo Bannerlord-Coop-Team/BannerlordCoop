@@ -22,10 +22,7 @@ namespace Coop.IntegrationTests.MobileParties
         public void EnterSettlement_Publishes_AllClients()
         {
             // Arrange
-            var partyId = "Test Party";
-            var settlementId = "Test Settlement";
-
-            var message = new StartSettlementEncounterAttempted(partyId, settlementId);
+            var message = new StartSettlementEncounterAttempted();
 
             var client1 = TestEnvironment.Clients.First();
 
@@ -47,9 +44,7 @@ namespace Coop.IntegrationTests.MobileParties
         public void LeaveSettlement_Publishes_AllClients()
         {
             // Arrange
-            var partyId = "Test Party";
-
-            var message = new EndSettlementEncounterAttempted(partyId);
+            var message = new EndSettlementEncounterAttempted();
 
             var client1 = TestEnvironment.Clients.First();
 

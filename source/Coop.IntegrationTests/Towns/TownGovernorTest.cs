@@ -17,9 +17,7 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownGovernorChanged_Publishes_AllClients()
         {
             // Arrange
-            string townId = "Settlement1";
-            string governor = "Hero1";
-            var triggerMessage = new TownGovernorChanged(townId, governor);
+            var triggerMessage = new TownGovernorChanged();
 
             var server = TestEnvironment.Server;
 

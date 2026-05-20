@@ -30,9 +30,9 @@ namespace Coop.Tests.Server.States
             // Act
             serverLogic.State.Start();
 
-            var payload = new MessagePayload<LifetimesPatched>(null, new LifetimesPatched());
+            var payload = new MessagePayload<CampaignReady>(null, new CampaignReady());
             var initialState = Assert.IsType<InitialServerState>(serverLogic.State);
-            initialState.Handle_LifetimesPatched(payload);
+            initialState.Handle_GameLoaded(payload);
 
             // Assert
             Assert.IsType<ServerRunningState>(serverLogic.State);

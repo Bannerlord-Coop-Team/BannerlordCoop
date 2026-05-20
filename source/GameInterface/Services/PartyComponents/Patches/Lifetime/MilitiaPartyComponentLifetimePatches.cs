@@ -36,7 +36,7 @@ internal class MilitiaPartyComponentLifetimePatches
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created managed {name}", typeof(MilitiaPartyComponent));
-            return true;
+            return false;
         }
 
         var message = new PartyComponentCreated(__instance, settlement.StringId);

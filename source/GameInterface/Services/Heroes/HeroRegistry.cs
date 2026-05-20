@@ -1,13 +1,11 @@
-﻿using Common;
-using Common.Util;
+﻿using Common.Util;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.ObjectManager.Extensions;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -21,36 +19,32 @@ namespace GameInterface.Services.Registry;
 /// <summary>
 /// Registry for identifying ownership of <see cref="Hero"/> objects
 /// </summary>
-internal class HeroRegistry : IAutoRegistry<Hero>
+internal class HeroRegistry : AutoRegistryBase<Hero>
 {
-    ILogger Logger { get; }
-    public HeroRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public HeroRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager) : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(Hero), Array.Empty<Type>())
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (var hero in Hero.AllAliveHeroes)
         {
-            objectManager.AddExisting(hero.StringId, hero);
+            RegisterExistingObject(hero.StringId, hero);
         }
 
         foreach (var hero in Hero.DeadOrDisabledHeroes)
         {
-            objectManager.AddExisting(hero.StringId, hero);
+            RegisterExistingObject(hero.StringId, hero);
         }
     }
 
-    public void OnClientCreated(Hero obj, string id)
+    public override void OnClientCreated(Hero obj, string id)
     {
         using(new AllowedThread())
         {
@@ -67,15 +61,15 @@ internal class HeroRegistry : IAutoRegistry<Hero>
         Campaign.Current?.CampaignObjectManager?.OnHeroAdded(obj);
     }
 
-    public void OnClientDestroyed(Hero obj, string id)
+    public override void OnClientDestroyed(Hero obj, string id)
     {
     }
 
-    public void OnServerCreated(Hero obj, string id)
+    public override void OnServerCreated(Hero obj, string id)
     {
     }
 
-    public void OnServerDestroyed(Hero obj, string id)
+    public override void OnServerDestroyed(Hero obj, string id)
     {
     }
 }

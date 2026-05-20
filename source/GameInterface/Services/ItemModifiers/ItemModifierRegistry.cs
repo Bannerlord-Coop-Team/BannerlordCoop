@@ -1,12 +1,10 @@
-﻿using Common;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Threading;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -15,25 +13,20 @@ namespace GameInterface.Services.ItemModifiers;
 /// <summary>
 /// Registry for <see cref="ItemModifier"/> objects
 /// </summary>
-internal class ItemModifierRegistry : IAutoRegistry<ItemModifier>
+internal class ItemModifierRegistry : AutoRegistryBase<ItemModifier>
 {
-    ILogger Logger { get; }
-
-    private readonly IObjectManager objectManager;
-
-    public ItemModifierRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public ItemModifierRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(ItemModifier))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
     
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         var mbObjectManager = MBObjectManager.Instance;
         foreach (var group in mbObjectManager.GetObjectTypeList<ItemModifierGroup>())
@@ -41,24 +34,24 @@ internal class ItemModifierRegistry : IAutoRegistry<ItemModifier>
             foreach(var itemModifier in group.ItemModifiers)
             {
                 var networkId = itemModifier.StringId;
-                objectManager.AddExisting(networkId, itemModifier);
+                RegisterExistingObject(networkId, itemModifier);
             }
         }
     }
 
-    public void OnClientCreated(ItemModifier obj, string id)
+    public override void OnClientCreated(ItemModifier obj, string id)
     {
     }
 
-    public void OnClientDestroyed(ItemModifier obj, string id)
+    public override void OnClientDestroyed(ItemModifier obj, string id)
     {
     }
 
-    public void OnServerCreated(ItemModifier obj, string id)
+    public override void OnServerCreated(ItemModifier obj, string id)
     {
     }
 
-    public void OnServerDestroyed(ItemModifier obj, string id)
+    public override void OnServerDestroyed(ItemModifier obj, string id)
     {
     }
 }

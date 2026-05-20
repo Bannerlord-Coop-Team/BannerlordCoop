@@ -3,12 +3,11 @@
 using {{ library }};
 {{~ end ~}}
 
-namespace DynamicSync
+namespace DynamicSync;
+
+public record {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage : GenericEvent<{{ MemberDeclaringType }}, {{ MemberType }}>
 {
-    public record {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage : GenericEvent<{{ MemberDeclaringType }}, {{ MemberType }}>
+    public {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage({{ MemberDeclaringType }} instance, {{ MemberType }} value) : base(instance, value)
     {
-        public {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage({{ MemberDeclaringType }} instance, {{ MemberType }} value) : base(instance, value)
-        {
-        }
     }
 }

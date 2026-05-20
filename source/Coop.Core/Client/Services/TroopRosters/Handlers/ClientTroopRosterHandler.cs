@@ -54,7 +54,9 @@ public class ClientTroopRosterHandler : IHandler
     private void HandleAddToCounts(MessagePayload<NetworkChangeTroopRosterAddtoCounts> payload)
     {
         var obj = payload.What;
-        var message = new ChangeTroopRostersAddToCounts(obj.MobilePartyId, obj.Character, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.xpChanged, obj.RemoveDepleted, obj.Index);
+        var message = new ChangeTroopRostersAddToCounts(obj.MobilePartyId, obj.CharacterId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted, obj.Index);
+
+        Logger.Debug("[Client] Setting troop roster counts for MobilePartyId: {MobilePartyId}, CharacterId: {CharacterId}", obj.MobilePartyId, obj.CharacterId);
 
         messageBroker.Publish(this, message);
     }

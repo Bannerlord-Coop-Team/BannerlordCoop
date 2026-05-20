@@ -7,6 +7,8 @@ using HarmonyLib;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -15,20 +17,51 @@ internal class MapEventSideDestructionPatches
 {
     static readonly ILogger Logger = LogManager.GetLogger<MapEventSideDestructionPatches>();
 
-    [HarmonyPatch(nameof(MapEventSide.HandleMapEventEnd))]
-    static void Postfix(MapEventSide __instance)
+    [HarmonyPatch(nameof(MapEventSide.RemovePartyInternal))]
+    [HarmonyPrefix]
+    static bool Prefix(MapEventSide __instance, PartyBase party)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        if (ModInformation.IsClient)
+        int index = __instance._battleParties.FindIndexQ((MapEventParty p) => p.Party == party);
+
+        if (index == -1)
         {
-            Logger.Error("Client created managed {name}", typeof(MapEventSide));
-            return;
+            Logger.Error("Could not find {party} in {var}", party.Name, nameof(MapEventSide._battleParties));
+            return false;
         }
 
-        var message = new MapEventSideDestroyed(__instance);
+        MapEventParty mapEventParty = __instance._battleParties[index];
+        __instance._battleParties.RemoveAt(index);
+        __instance._mapEvent.RemoveInvolvedPartyInternal(mapEventParty);
+        if (__instance.LeaderParty == party)
+        {
+            __instance._mapFaction = __instance.LeaderParty.MapFaction;
+            if (__instance._battleParties.Count > 0)
+            {
+                __instance.LeaderParty = __instance._battleParties[0].Party;
+                __instance._mapFaction = __instance.LeaderParty.MapFaction;
+                __instance.CacheLeaderSimulationModifier();
+                return false;
+            }
+            __instance.MapEvent.FinalizeEvent();
+        }
 
-        MessageBroker.Instance.Publish(__instance, message);
+        return false;
+    }
+
+    [HarmonyPatch(nameof(MapEventSide.AddPartyInternal))]
+    [HarmonyPrefix]
+    static bool Prefix2(MapEventSide __instance, PartyBase party)
+    {
+        // Call original if we call this function
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
+        MapEventParty mapEventParty = new MapEventParty(party);
+        __instance._battleParties.Add(mapEventParty);
+        __instance._mapEvent.AddInvolvedPartyInternal(mapEventParty, __instance.MissionSide);
+
+        return false;
     }
 }

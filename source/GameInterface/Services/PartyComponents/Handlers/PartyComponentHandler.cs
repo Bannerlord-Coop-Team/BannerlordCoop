@@ -5,15 +5,12 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyComponents.Data;
 using GameInterface.Services.PartyComponents.Messages;
-using GameInterface.Services.PartyComponents.Patches;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Reflection;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.GauntletUI;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.PartyComponents.Handlers;

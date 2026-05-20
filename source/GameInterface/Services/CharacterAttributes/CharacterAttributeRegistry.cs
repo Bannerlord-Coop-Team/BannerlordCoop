@@ -1,4 +1,4 @@
-﻿using Common;
+﻿using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -6,49 +6,45 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.CharacterAttributes;
-internal class CharacterAttributeRegistry : IAutoRegistry<CharacterAttribute>
+internal class CharacterAttributeRegistry : AutoRegistryBase<CharacterAttribute>
 {
-    ILogger Logger { get; }
-    public CharacterAttributeRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public CharacterAttributeRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(CharacterAttribute), new Type[] { typeof(string) })
     };
 
     // TODO find destructor for banner effects
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (var obj in MBObjectManager.Instance.GetObjectTypeList<CharacterAttribute>())
         {
-            objectManager.AddExisting(obj.StringId, obj);
+            RegisterExistingObject(obj.StringId, obj);
         }
     }
 
-    public void OnClientCreated(CharacterAttribute obj, string id)
+    public override void OnClientCreated(CharacterAttribute obj, string id)
     {
     }
 
-    public void OnClientDestroyed(CharacterAttribute obj, string id)
+    public override void OnClientDestroyed(CharacterAttribute obj, string id)
     {
     }
 
-    public void OnServerCreated(CharacterAttribute obj, string id)
+    public override void OnServerCreated(CharacterAttribute obj, string id)
     {
     }
 
-    public void OnServerDestroyed(CharacterAttribute obj, string id)
+    public override void OnServerDestroyed(CharacterAttribute obj, string id)
     {
     }
 }

@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Util;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -14,31 +15,28 @@ using TaleWorlds.CampaignSystem.Settlements.Locations;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Settlements;
-internal class SettlementRegistry : IAutoRegistry<Settlement>
+internal class SettlementRegistry : AutoRegistryBase<Settlement>
 {
-    ILogger Logger { get; }
-    public SettlementRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public SettlementRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(Settlement), new Type[] { typeof(TextObject), typeof(LocationComplex), typeof(PartyTemplateObject)}),
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (var settlement in Settlement.All.OrderBy(obj => obj.Id))
         {
-            objectManager.AddExisting(settlement.StringId, settlement);
+            RegisterExistingObject(settlement.StringId, settlement);
         }
     }
 
-    public void OnClientCreated(Settlement obj, string id)
+    public override void OnClientCreated(Settlement obj, string id)
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
@@ -49,15 +47,15 @@ internal class SettlementRegistry : IAutoRegistry<Settlement>
         });
     }
 
-    public void OnClientDestroyed(Settlement obj, string id)
+    public override void OnClientDestroyed(Settlement obj, string id)
     {
     }
 
-    public void OnServerCreated(Settlement obj, string id)
+    public override void OnServerCreated(Settlement obj, string id)
     {
     }
 
-    public void OnServerDestroyed(Settlement obj, string id)
+    public override void OnServerDestroyed(Settlement obj, string id)
     {
     }
 }

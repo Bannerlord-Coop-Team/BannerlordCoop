@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -9,46 +10,40 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Towns;
-internal class TownRegistry : IAutoRegistry<Town>
+internal class TownRegistry : AutoRegistryBase<Town>
 {
-    private readonly IObjectManager objectManager;
-
-    ILogger Logger { get; }
-
     public TownRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-        this.objectManager = objectManager;
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(Town))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (var town in Town.AllFiefs)
         {
-            objectManager.AddExisting(town.StringId, town);
+            RegisterExistingObject(town.StringId, town);
         }
     }
 
-    public void OnClientCreated(Town obj, string id)
+    public override void OnClientCreated(Town obj, string id)
     {
     }
 
-    public void OnClientDestroyed(Town obj, string id)
+    public override void OnClientDestroyed(Town obj, string id)
     {
     }
 
-    public void OnServerCreated(Town obj, string id)
+    public override void OnServerCreated(Town obj, string id)
     {
     }
 
-    public void OnServerDestroyed(Town obj, string id)
+    public override void OnServerDestroyed(Town obj, string id)
     {
     }
 }

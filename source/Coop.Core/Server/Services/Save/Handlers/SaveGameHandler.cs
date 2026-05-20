@@ -2,9 +2,8 @@
 using Coop.Core.Server.Services.Save.Data;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
-using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
-using GameInterface.Services.MobileParties.Messages.Control;
+using GameInterface.Services.MobileParties.Interfaces;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
 
@@ -18,19 +17,22 @@ internal class SaveGameHandler : IHandler
     private readonly ICoopServer coopServer;
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
+    private readonly IMobilePartyInterface mobilePartyInterface;
 
     public SaveGameHandler(
         IMessageBroker messageBroker,
         ICoopSaveManager saveManager,
         ICoopServer coopServer,
         IControllerIdProvider controllerIdProvider,
-        IControlledEntityRegistry controlledEntityRegistry) 
+        IControlledEntityRegistry controlledEntityRegistry,
+        IMobilePartyInterface mobilePartyInterface) 
     {
         this.messageBroker = messageBroker;
         this.saveManager = saveManager;
         this.coopServer = coopServer;
         this.controllerIdProvider = controllerIdProvider;
         this.controlledEntityRegistry = controlledEntityRegistry;
+        this.mobilePartyInterface = mobilePartyInterface;
         messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
         messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
 
@@ -65,13 +67,7 @@ internal class SaveGameHandler : IHandler
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
-        if (savedSession == null)
-        {
-            messageBroker.Publish(this, new RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId));
-        }
-        else
-        {
-            controlledEntityRegistry.LoadControlledEntities(savedSession.ControlledEntityMap);
-        }
+        controlledEntityRegistry.LoadControlledEntities(savedSession.ControlledEntityMap);
+        mobilePartyInterface.RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId);
     }
 }

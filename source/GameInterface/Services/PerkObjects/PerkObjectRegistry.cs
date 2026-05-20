@@ -1,5 +1,4 @@
-﻿using Common;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -9,43 +8,40 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Services.PerkObjects;
-internal class ItemCategoryRegistry : IAutoRegistry<PerkObject>
+internal class ItemCategoryRegistry : AutoRegistryBase<PerkObject>
 {
-    ILogger Logger { get; }
-    public ItemCategoryRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public ItemCategoryRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(PerkObject), new Type[] { typeof(string) })
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (PerkObject trait in PerkObject.All)
         {
-            objectManager.AddExisting(trait.StringId, trait);
+            RegisterExistingObject(trait.StringId, trait);
         }
     }
 
-    public void OnClientCreated(PerkObject obj, string id)
+    public override void OnClientCreated(PerkObject obj, string id)
     {
     }
 
-    public void OnClientDestroyed(PerkObject obj, string id)
+    public override void OnClientDestroyed(PerkObject obj, string id)
     {
     }
 
-    public void OnServerCreated(PerkObject obj, string id)
+    public override void OnServerCreated(PerkObject obj, string id)
     {
     }
 
-    public void OnServerDestroyed(PerkObject obj, string id)
+    public override void OnServerDestroyed(PerkObject obj, string id)
     {
     }
 }

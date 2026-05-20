@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -9,43 +10,40 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 
 namespace GameInterface.Services.TraitObjects;
-internal class TraitObjectRegistry : IAutoRegistry<TraitObject>
+internal class TraitObjectRegistry : AutoRegistryBase<TraitObject>
 {
-    ILogger Logger { get; }
-    public TraitObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public TraitObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(TraitObject), new Type[] { typeof(string) })
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (TraitObject trait in TraitObject.All)
         {
-            objectManager.AddExisting(trait.StringId, trait);
+            RegisterExistingObject(trait.StringId, trait);
         }
     }
 
-    public void OnClientCreated(TraitObject obj, string id)
+    public override void OnClientCreated(TraitObject obj, string id)
     {
     }
 
-    public void OnClientDestroyed(TraitObject obj, string id)
+    public override void OnClientDestroyed(TraitObject obj, string id)
     {
     }
 
-    public void OnServerCreated(TraitObject obj, string id)
+    public override void OnServerCreated(TraitObject obj, string id)
     {
     }
 
-    public void OnServerDestroyed(TraitObject obj, string id)
+    public override void OnServerDestroyed(TraitObject obj, string id)
     {
     }
 }

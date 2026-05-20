@@ -22,9 +22,7 @@ namespace Coop.IntegrationTests.Villages
         public void ServerVillageHearthChanged_Publishes_AllClients()
         {
             // Arrange
-            string villageId = "Settlement1";
-            float hearth = 1.0f;
-            var triggerMessage = new VillageHearthChanged(villageId, hearth);
+            var triggerMessage = new VillageHearthChanged();
 
             var server = TestEnvironment.Server;
 
