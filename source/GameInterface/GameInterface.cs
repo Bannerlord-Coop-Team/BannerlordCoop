@@ -40,7 +40,6 @@ public class GameInterface : IGameInterface
         harmony.PatchCategory(assembly, HARMONY_STATIC_FIXES_CATEGORY);
         harmony.PatchAllUncategorized(assembly);
         dynamicSyncPatcher.PatchAll();
-        patchCollector.PatchAll();
     }
 
     public void UnpatchAll()

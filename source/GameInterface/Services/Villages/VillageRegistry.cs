@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -10,43 +11,40 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.Villages;
-internal class VillageRegistry : IAutoRegistry<Village>
+internal class VillageRegistry : AutoRegistryBase<Village>
 {
-    ILogger Logger { get; }
-    public VillageRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public VillageRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(Village))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (var village in Village.All)
         {
-            objectManager.AddExisting(village.StringId, village);
+            RegisterExistingObject(village.StringId, village);
         }
     }
 
-    public void OnClientCreated(Village obj, string id)
+    public override void OnClientCreated(Village obj, string id)
     {
     }
 
-    public void OnClientDestroyed(Village obj, string id)
+    public override void OnClientDestroyed(Village obj, string id)
     {
     }
 
-    public void OnServerCreated(Village obj, string id)
+    public override void OnServerCreated(Village obj, string id)
     {
     }
 
-    public void OnServerDestroyed(Village obj, string id)
+    public override void OnServerDestroyed(Village obj, string id)
     {
     }
 }

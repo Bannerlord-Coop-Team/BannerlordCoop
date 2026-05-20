@@ -1,6 +1,8 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Emit;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -18,12 +20,14 @@ public class DynamicSyncBuilder
     private readonly DynamicSyncRegistry dynamicSyncRegistry;
     private readonly DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder;
     private readonly DynamicSyncPatchBuilder dynamicSyncPatchBuilder;
+    private readonly DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder;
 
-    public DynamicSyncBuilder(DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder, DynamicSyncPatchBuilder dynamicSyncPatchBuilder)
+    public DynamicSyncBuilder(DynamicSyncRegistry dynamicSyncRegistry, DynamicSyncAssemblyInfoBuilder dynamicSyncAssemblyInfoBuilder, DynamicSyncPatchBuilder dynamicSyncPatchBuilder, DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder)
     {
         this.dynamicSyncRegistry = dynamicSyncRegistry;
         this.dynamicSyncAssemblyInfoBuilder = dynamicSyncAssemblyInfoBuilder;
         this.dynamicSyncPatchBuilder = dynamicSyncPatchBuilder;
+        this.dynamicSyncConstantsBuilder = dynamicSyncConstantsBuilder;
     }
 
     public Assembly Build()
@@ -91,6 +95,7 @@ public class DynamicSyncBuilder
         assemblies.Add(typeof(Enumerable).Assembly);
         assemblies.Add(typeof(Queue<>).Assembly);
         assemblies.Add(typeof(Console).Assembly);
+        assemblies.Add(typeof(ILogger).Assembly);
         assemblies.Add(Assembly.Load("System.Numerics.Vectors"));
 
         foreach (var asm in Assembly.GetExecutingAssembly().GetReferencedAssemblies())
@@ -109,13 +114,19 @@ public class DynamicSyncBuilder
 
         var syntaxTrees = dynamicSyncRegistry.Registrations
             .SelectMany(registration => dynamicSyncPatchBuilder.Build(registration.Key, registration.Value))
-            .Append(dynamicSyncAssemblyInfoBuilder.Build(assemblies.Select(a => a.GetName().Name)));
+            .Append(dynamicSyncAssemblyInfoBuilder.Build(assemblies.Select(a => a.GetName().Name))).ToList();
+        syntaxTrees = syntaxTrees.Append(dynamicSyncConstantsBuilder.Build()).ToList();
 
         // https://www.strathweb.com/2018/10/no-internalvisibleto-no-problem-bypassing-c-visibility-rules-with-roslyn/
         // Allow IgnoresAccessChecksTo for dynamic compilation
         var compilationOptions = new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
             .WithMetadataImportOptions(MetadataImportOptions.All)
-            .WithAllowUnsafe(true);
+            .WithAllowUnsafe(true)
+#if DEBUG
+            .WithOptimizationLevel(OptimizationLevel.Debug);
+#else
+            .WithOptimizationLevel(OptimizationLevel.Release);
+#endif
 
         var topLevelBinderFlagsProperty = typeof(CSharpCompilationOptions).GetProperty("TopLevelBinderFlags", BindingFlags.Instance | BindingFlags.NonPublic);
         topLevelBinderFlagsProperty.SetValue(compilationOptions, (uint)1 << 22);
@@ -128,23 +139,32 @@ public class DynamicSyncBuilder
             options: compilationOptions
         );
 
-        using (var assemblyStream = new MemoryStream())
-        using (var pdbStream = new MemoryStream())
+        using var assemblyStream = new MemoryStream();
+        using var pdbStream = new MemoryStream();
+
+        var emitOptions = new EmitOptions(
+            debugInformationFormat: DebugInformationFormat.PortablePdb
+        );
+
+        var result = dynamicAssembly.Emit(
+            peStream: assemblyStream,
+            pdbStream: pdbStream,
+            options: emitOptions
+        );
+
+        if (!result.Success)
         {
-            var result = dynamicAssembly.Emit(assemblyStream, pdbStream);
+            var errors = result.Diagnostics
+                .Where(d => d.Severity == DiagnosticSeverity.Error)
+                .Select(d => $"{d.Location} {d.GetMessage()}")
+                .ToList();
 
-            if (!result.Success)
-            {
-                var errors = result.Diagnostics
-                    .Where(d => d.Severity == DiagnosticSeverity.Error)
-                    .Select(d => $"{d.Location} {d.GetMessage()}")
-                    .ToList();
-                Logger.Error("[DynamicSync] Compilation failed with {ErrorCount} error(s):\n{Errors}",
-                    errors.Count, string.Join("\n", errors));
-                throw new InvalidOperationException(string.Join("\n", errors));
-            }
+            Logger.Error("[DynamicSync] Compilation failed with {ErrorCount} error(s):\n{Errors}",
+                errors.Count, string.Join("\n", errors));
 
-            return Assembly.Load(assemblyStream.GetBuffer());
-        };
+            throw new InvalidOperationException(string.Join("\n", errors));
+        }
+
+        return Assembly.Load(assemblyStream.GetBuffer());
     }
 }

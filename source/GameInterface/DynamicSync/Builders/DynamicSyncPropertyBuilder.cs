@@ -1,24 +1,33 @@
 ﻿using GameInterface.DynamicSync.Templates;
 using GameInterface.Services.ObjectManager;
 using ProtoBuf.Meta;
-using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text;
 
-namespace GameInterface.DynamicSync.Builders
+namespace GameInterface.DynamicSync.Builders;
+
+public class DynamicSyncPropertyBuilder : DynamicSyncBuilderBase
 {
-    public class DynamicSyncPropertyBuilder : DynamicSyncBuilderBase
+    public DynamicSyncPropertyBuilder(
+        IObjectManager objectManager,
+        DynamicSyncRegistry dynamicSyncRegistry,
+        DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder) : base(dynamicSyncRegistry, dynamicSyncConstantsBuilder)
     {
-        private readonly IObjectManager objectManager;
+    }
+    public string GetPrefix(Debuggable<PropertyInfo> propertyItem) => DynamicSyncUtils.GetPrefix(propertyItem);
 
-        public DynamicSyncPropertyBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry) : base(dynamicSyncRegistry)
+    public IEnumerable<string> GetMessages(Debuggable<PropertyInfo> propertyItem)
+    {
+        var propertyInfo = propertyItem.Value;
+
+        var templateData = GetTemplateData(propertyItem);
+        string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
+        string networkMessage;
+        if (RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType))
         {
-            this.objectManager = objectManager;
+            networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
         }
-        public string GetPrefix(PropertyInfo propertyInfo) => DynamicSyncUtils.GetPrefix(propertyInfo);
-
-        public IEnumerable<string> GetMessages(PropertyInfo propertyInfo)
+        else
         {
             var templateData = GetTemplateData(propertyInfo);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
@@ -33,35 +42,39 @@ namespace GameInterface.DynamicSync.Builders
                 networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate", templateData);
             }
 
-            DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetLocalMessage.cs", localMessage);
-            DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetNetworkMessage.cs", networkMessage);
+        DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetLocalMessage.cs", localMessage);
+        DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetNetworkMessage.cs", networkMessage);
 
-            yield return localMessage;
-            yield return networkMessage;
-        }
+        yield return localMessage;
+        yield return networkMessage;
+    }
 
-        public string GetSubscription(PropertyInfo propertyInfo)
+    public string GetSubscription(Debuggable<PropertyInfo> propertyItem)
+    {
+        var propertyInfo = propertyItem.Value;
+
+        var templateData = GetTemplateData(propertyItem);
+        if (RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType))
+            return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
+        else
+            return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
+    }
+
+    private object GetTemplateData(Debuggable<PropertyInfo> propertyItem)
+    {
+        var propertyInfo = propertyItem.Value;
+
+        var serializerNames = GetSerializerMethodNames(propertyInfo.PropertyType);
+        return new
         {
-            var templateData = GetTemplateData(propertyInfo);
-            var type = propertyInfo.PropertyType;
-            if (RuntimeTypeModel.Default.CanSerialize(type))
-                return TemplateParser.Parse("Handlers.SubscribeSetValueTemplate", templateData);
-            else
-                return TemplateParser.Parse("Handlers.SubscribeSetReferenceTemplate", templateData);
-        }
-
-        private object GetTemplateData(PropertyInfo propertyInfo)
-        {
-            var serializerNames = GetSerializerMethodNames(propertyInfo.PropertyType);
-            return new
-            {
-                MemberDeclaringType = propertyInfo.DeclaringType.Name,
-                MemberName = propertyInfo.Name,
-                MemberType = propertyInfo.PropertyType.Name,
-                Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
-                SerializeMethod = serializerNames.serialize,
-                DeserializeMethod = serializerNames.deserialize
-            };
-        }
+            MemberDeclaringType = propertyInfo.DeclaringType.Name,
+            MemberName = propertyInfo.Name,
+            MemberType = propertyInfo.PropertyType.Name,
+            Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
+            SerializeMethod = serializerNames.serialize,
+            DeserializeMethod = serializerNames.deserialize,
+            Interface = propertyInfo.PropertyType.IsInterface,
+            Debug = propertyItem.Debug
+        };
     }
 }

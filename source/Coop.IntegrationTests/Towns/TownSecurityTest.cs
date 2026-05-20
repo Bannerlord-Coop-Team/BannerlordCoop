@@ -17,9 +17,7 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownSecurityChanged_Publishes_AllClients()
         {
             // Arrange
-            string townId = "Settlement1";
-            float security = 50.0f;
-            var triggerMessage = new TownSecurityChanged(townId, security);
+            var triggerMessage = new TownSecurityChanged();
 
             var server = TestEnvironment.Server;
 

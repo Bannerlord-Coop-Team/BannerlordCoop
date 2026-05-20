@@ -28,5 +28,5 @@ namespace GameInterface.Services.MobileParties.Patches;
 internal class DisablePatrolPartiesCampaignBehavior
 {
     [HarmonyPatch(nameof(PatrolPartiesCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => !ModInformation.IsClient;
+    static bool Prefix() => ModInformation.IsServer;
 }

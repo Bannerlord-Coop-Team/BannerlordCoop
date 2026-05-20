@@ -14,10 +14,13 @@ namespace GameInterface.Services.TroopRosters.Handlers;
 
 public class TroopRosterHandler : IHandler
 {
+
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
+
+    private const bool Debug = true;
 
     public TroopRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
     {
@@ -33,28 +36,15 @@ public class TroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty mobileParty) == false)
-        {
-            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
-            return;
-        }
+        if (!objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty)) return;
 
         List<(Hero, CharacterObject, int)> herosValidated = new();
 
         // validate they are all good before recruiting any
         foreach (var troop in obj.TroopsInCart)
         {
-            if (objectManager.TryGetObject(troop.RecruiterHeroId, out Hero hero) == false)
-            {
-                Logger.Error("Unable to find Hero ({HeroId})", troop.RecruiterHeroId);
-                continue;
-            }
-
-            if (objectManager.TryGetObject(troop.CharacterObjectId, out CharacterObject characterObject) == false)
-            {
-                Logger.Error("Unable to find CharacterObject ({CharacterObjectId})", troop.CharacterObjectId);
-                continue;
-            }
+            if (!objectManager.TryGetObjectWithLogging(troop.RecruiterHeroId, out Hero hero)) continue;
+            if (!objectManager.TryGetObjectWithLogging(troop.CharacterObjectId, out CharacterObject characterObject)) continue;
 
 
             var volunteerTroopAtIndex = hero.VolunteerTypes[troop.TroopIndex];
@@ -98,17 +88,8 @@ public class TroopRosterHandler : IHandler
     private void HandleAddToCounts(MessagePayload<ChangeTroopRostersAddToCounts> payload)
     {
         var obj = payload.What;
-        if (objectManager.TryGetObject(obj.MobilePartyId, out MobileParty party) == false)
-        {
-            Logger.Error("Unable to find MobileParty ({mobilePartyId})", obj.MobilePartyId);
-            return;
-        }
-
-        if (objectManager.TryGetObject(obj.Character, out CharacterObject characterObject) == false)
-        {
-            Logger.Error("Unable to find CharacterObject ({characterObjectId})", obj.Character);
-            return;
-        }
+        if (!objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty party)) return;
+        if (!objectManager.TryGetObjectWithLogging(obj.Character, out CharacterObject characterObject)) return;
 
         AddToCountsTroopRosterPatch.RunAddToCounts(
             party,

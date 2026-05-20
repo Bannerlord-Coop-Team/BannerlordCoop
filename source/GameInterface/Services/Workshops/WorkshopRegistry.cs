@@ -12,21 +12,18 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Workshops
 {
-    internal class WorkshopRegistry : IAutoRegistry<Workshop>
+    internal class WorkshopRegistry : AutoRegistryBase<Workshop>
     {
-        ILogger Logger { get; }
-        public WorkshopRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+        public WorkshopRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+            : base(logger, autoRegistryFactory, objectManager)
         {
-            Logger = logger;
-
-            autoRegistryFactory.RegisterType(this);
         }
 
-        public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+        public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
-        public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+        public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-        public void RegisterAllObjects(IObjectManager objectManager)
+        public override void RegisterAllObjects()
         {
             foreach (Town town in Town.AllTowns)
             {
@@ -35,24 +32,25 @@ namespace GameInterface.Services.Workshops
                 foreach (Workshop workshop in town.Workshops)
                 {
                     var networkId = $"{nameof(Workshop)}_{town.StringId}_{counter++}";
-                    objectManager.AddExisting(networkId, workshop);
+                    if (workshop == null) continue;
+                    RegisterExistingObject(networkId, workshop);
                 }
             }
         }
 
-        public void OnClientCreated(Workshop obj, string id)
+        public override void OnClientCreated(Workshop obj, string id)
         {
         }
 
-        public void OnClientDestroyed(Workshop obj, string id)
+        public override void OnClientDestroyed(Workshop obj, string id)
         {
         }
 
-        public void OnServerCreated(Workshop obj, string id)
+        public override void OnServerCreated(Workshop obj, string id)
         {
         }
 
-        public void OnServerDestroyed(Workshop obj, string id)
+        public override void OnServerDestroyed(Workshop obj, string id)
         {
         }
     }

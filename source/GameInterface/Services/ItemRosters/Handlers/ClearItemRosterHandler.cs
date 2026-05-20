@@ -31,21 +31,9 @@ namespace GameInterface.Services.ItemRosters.Handlers
             ClearItemRoster msg = payload.What;
 
             ItemRoster roster;
-            if (objectManager.TryGetObject(msg.PartyBaseID, out Settlement s))
-            {
-                roster = s.ItemRoster;
-            }
-            else if (objectManager.TryGetObject(msg.PartyBaseID, out MobileParty p))
-            {
-                roster = p.ItemRoster;
-            }
-            else
-            {
-                Logger.Error("Failed to update item roster, no Settlement nor Party with ID '{partyBaseId}' was found", msg.PartyBaseID);
-                return;
-            }
+            if (!objectManager.TryGetObjectWithLogging(msg.PartyBaseID, out PartyBase partyBase)) return;
 
-            ItemRosterPatch.ClearOverride(roster);
+            ItemRosterPatch.ClearOverride(partyBase.ItemRoster);
         }
 
         public void Dispose()

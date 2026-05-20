@@ -22,9 +22,7 @@ namespace Coop.IntegrationTests.Villages
         public void ServerVillageTradeTaxAccumulateChanged_Publishes_AllClients()
         {
             // Arrange
-            string villageId = "Settlement1";
-            int tradeTaxAccumulated = 2000;
-            var triggerMessage = new VillageTaxAccumulateChanged(villageId, tradeTaxAccumulated);
+            var triggerMessage = new VillageTaxAccumulateChanged();
 
             var server = TestEnvironment.Server;
 

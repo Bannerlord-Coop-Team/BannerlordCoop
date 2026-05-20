@@ -1,24 +1,9 @@
-﻿using Common;
-using GameInterface.Services.ItemRosters;
-using HarmonyLib;
+﻿using HarmonyLib;
 using Helpers;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyBases.Patches;
-
-[HarmonyPatch(typeof(PartyBase))]
-internal class PartyBasePatch
-{
-    [HarmonyPatch(nameof(PartyBase.ItemRoster), MethodType.Setter)]
-    [HarmonyPostfix]
-    public static void ItemRosterSetterPostfix(PartyBase __instance)
-    {
-        if (ModInformation.IsClient) return;
-
-        ItemRosterLookup.Set(__instance.ItemRoster, __instance);
-    }
-}
 
 [HarmonyPatch(typeof(PartyBaseHelper))]
 internal class PartyBaseHelperPatch
@@ -40,5 +25,3 @@ internal class PartyBaseHelperPatch
         return false;
     }
 }
-
-

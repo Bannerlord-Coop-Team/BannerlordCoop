@@ -1,9 +1,11 @@
-﻿using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
@@ -13,47 +15,49 @@ namespace GameInterface.Services.Equipments;
 /// <summary>
 /// Registry for <see cref="Equipment"/> objects
 /// </summary>
-internal class EquipmentRegistry : IAutoRegistry<Equipment>
+internal class EquipmentRegistry : AutoRegistryBase<Equipment>
 {
-    ILogger Logger { get; }
-    public EquipmentRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public EquipmentRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
-    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public override void RegisterAllObjects()
     {
-        // Not sure if this can be skipped since due constructor patching all equipment will already be registered.
-        foreach (var equipmentRoster in Campaign.Current.AllEquipmentRosters)
-        {
-            if (equipmentRoster == null) continue;
-            foreach (Equipment equipment in equipmentRoster.AllEquipments)
-            {
-                if (objectManager.Contains(equipment)) continue;
+        var equipmentRosters = Campaign.Current?.AllEquipmentRosters?.Where(roster => roster != null);
+        if (equipmentRosters == null) return;
 
-                objectManager.AddNewObject(equipment, out var _);
+        foreach (var roster in equipmentRosters)
+        {
+            var equipments = roster.AllEquipments?.Where(equipment => equipment != null);
+            if (equipments == null) continue;
+
+            var i = 0;
+            foreach (var equipment in equipments)
+            {
+                var id = $"{roster.StringId}_{i++}";
+                RegisterExistingObject(id, equipment);
             }
         }
     }
 
-    public void OnClientCreated(Equipment obj, string id)
+    public override void OnClientCreated(Equipment obj, string id)
     {
     }
 
-    public void OnClientDestroyed(Equipment obj, string id)
+    public override void OnClientDestroyed(Equipment obj, string id)
     {
     }
 
-    public void OnServerCreated(Equipment obj, string id)
+    public override void OnServerCreated(Equipment obj, string id)
     {
     }
 
-    public void OnServerDestroyed(Equipment obj, string id)
+    public override void OnServerDestroyed(Equipment obj, string id)
     {
     }
 }

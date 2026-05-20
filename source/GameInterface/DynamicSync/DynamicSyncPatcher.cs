@@ -56,14 +56,18 @@ namespace GameInterface.DynamicSync
 
         public void PatchAll()
         {
-            if (!DynamicSyncConfiguration.Enabled)
-                return;
-            if (Assembly == null)
-                Assembly = dynamicSyncBuilder.Build();
+            if (DynamicSyncConfiguration.Enabled)
+            { 
+                if (Assembly == null)
+                    Assembly = dynamicSyncBuilder.Build();
 
-            harmony.PatchAllUncategorized(Assembly);
-
-            BindHandlers(Assembly);
+                harmony.PatchAllUncategorized(Assembly);
+                BindHandlers(Assembly);
+            }
+            else
+            {
+                BindHandlers(Assembly.GetAssembly(typeof(DynamicSyncPatcher)));
+            }
         }
     }
 }

@@ -19,11 +19,7 @@ public class SettlementHitPointsRatioAtIndexTest
     [Fact]
     public void ServerSettlementHitPointsRatioAtIndexChanged_Publishes_AllClients()
     {
-        string settlementId = "Settlement1";
-        int index = 0;
-        float hitPointsRatio = 29.0f;
-
-        var triggerMessage = new SettlementWallHitPointsRatioChanged(settlementId, index, hitPointsRatio);
+        var triggerMessage = new SettlementWallHitPointsRatioChanged();
 
         var server = TestEnvironment.Server;
 

@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Util;
+﻿using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -17,22 +16,20 @@ namespace GameInterface.Services.Kingdoms;
 /// <summary>
 /// Registry for <see cref="Kingdom"/> type
 /// </summary>
-internal class KingdomRegistry : IAutoRegistry<Kingdom>
+internal class KingdomRegistry : AutoRegistryBase<Kingdom>
 {
-    ILogger Logger { get; }
-    public KingdomRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public KingdomRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(Kingdom))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -44,11 +41,11 @@ internal class KingdomRegistry : IAutoRegistry<Kingdom>
 
         foreach (var kingdom in campaignObjectManager.Kingdoms)
         {
-            objectManager.AddExisting(kingdom.StringId, kingdom);
+            RegisterExistingObject(kingdom.StringId, kingdom);
         }
     }
 
-    public void OnClientCreated(Kingdom obj, string id)
+    public override void OnClientCreated(Kingdom obj, string id)
     {
         using(new AllowedThread())
         {
@@ -69,15 +66,15 @@ internal class KingdomRegistry : IAutoRegistry<Kingdom>
         Campaign.Current?.CampaignObjectManager?.AddKingdom(obj);
     }
 
-    public void OnClientDestroyed(Kingdom obj, string id)
+    public override void OnClientDestroyed(Kingdom obj, string id)
     {
     }
 
-    public void OnServerCreated(Kingdom obj, string id)
+    public override void OnServerCreated(Kingdom obj, string id)
     {
     }
 
-    public void OnServerDestroyed(Kingdom obj, string id)
+    public override void OnServerDestroyed(Kingdom obj, string id)
     {
     }
 }

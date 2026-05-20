@@ -65,7 +65,7 @@ namespace Coop.Tests.Client.States
             characterCreationState.Handle_CharacterCreationFinished(payload);
 
             // Assert
-            Assert.Single(TestMessageBroker.GetMessagesFromType<RegisterAllGameObjects>());
+            Assert.Single(TestMessageBroker.GetMessagesFromType<NetworkTransferedHero>());
         }
 
         [Fact]

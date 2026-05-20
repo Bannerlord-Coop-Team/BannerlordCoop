@@ -13,7 +13,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesLastTimeStampChanged()
         {
-            var triggerMessage = new LastTimeStampChanged(2, "testId");
+            var triggerMessage = new LastTimeStampChanged();
 
             var server = TestEnvironment.Server;
 
@@ -29,7 +29,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesCharacterObjectChanged()
         {
-            var triggerMessage = new CharacterObjectChanged("testChar", "testId");
+            var triggerMessage = new CharacterObjectChanged();
 
             var server = TestEnvironment.Server;
 
@@ -45,7 +45,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesFirstNameChanged()
         {
-            var triggerMessage = new FirstNameChanged("testChar", "testId");
+            var triggerMessage = new FirstNameChanged();
 
             var server = TestEnvironment.Server;
 
@@ -61,7 +61,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesNameChanged()
         {
-            var triggerMessage = new NameChanged("testChar", "testId");
+            var triggerMessage = new NameChanged();
 
             var server = TestEnvironment.Server;
 
@@ -77,7 +77,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesHairTagsChanged()
         {
-            var triggerMessage = new HairTagsChanged("testChar", "testId");
+            var triggerMessage = new HairTagsChanged();
 
             var server = TestEnvironment.Server;
 
@@ -93,7 +93,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesBeardTagsChanged()
         {
-            var triggerMessage = new BeardTagsChanged("testChar", "testId");
+            var triggerMessage = new BeardTagsChanged();
 
             var server = TestEnvironment.Server;
 
@@ -109,7 +109,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesTattooTagsChanged()
         {
-            var triggerMessage = new TattooTagsChanged("testChar", "testId");
+            var triggerMessage = new TattooTagsChanged();
 
             var server = TestEnvironment.Server;
 
@@ -125,7 +125,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesHeroStateChanged()
         {
-            var triggerMessage = new HeroStateChanged(2, "testId");
+            var triggerMessage = new HeroStateChanged();
 
             var server = TestEnvironment.Server;
 
@@ -141,7 +141,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesHeroLevelChanged()
         {
-            var triggerMessage = new HeroLevelChanged(2, "testId");
+            var triggerMessage = new HeroLevelChanged();
 
             var server = TestEnvironment.Server;
 
@@ -157,7 +157,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesSpcDaysInLocationChanged()
         {
-            var triggerMessage = new SpcDaysInLocationChanged(2, "testId");
+            var triggerMessage = new SpcDaysInLocationChanged();
 
             var server = TestEnvironment.Server;
 
@@ -173,7 +173,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesDefaultAgeChanged()
         {
-            var triggerMessage = new DefaultAgeChanged(2f, "testId");
+            var triggerMessage = new DefaultAgeChanged();
 
             var server = TestEnvironment.Server;
 
@@ -189,7 +189,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesBirthDayChanged()
         {
-            var triggerMessage = new BirthDayChanged(2L, "testId");
+            var triggerMessage = new BirthDayChanged();
 
             var server = TestEnvironment.Server;
 
@@ -205,7 +205,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesPowerChanged()
         {
-            var triggerMessage = new PowerChanged(2f, "testId");
+            var triggerMessage = new PowerChanged();
 
             var server = TestEnvironment.Server;
 
@@ -221,7 +221,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesCultureChanged()
         {
-            var triggerMessage = new CultureChanged("cultureObject", "testId");
+            var triggerMessage = new CultureChanged();
 
             var server = TestEnvironment.Server;
 
@@ -237,7 +237,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesHomeSettlementChanged()
         {
-            var triggerMessage = new HomeSettlementChanged("settlement", "testId");
+            var triggerMessage = new HomeSettlementChanged();
 
             var server = TestEnvironment.Server;
 
@@ -253,7 +253,7 @@ namespace Coop.IntegrationTests.Heroes
         [Fact]
         public void ServerRecievesPregnantChanged()
         {
-            var triggerMessage = new PregnantChanged(true, "testId");
+            var triggerMessage = new PregnantChanged();
 
             var server = TestEnvironment.Server;
 

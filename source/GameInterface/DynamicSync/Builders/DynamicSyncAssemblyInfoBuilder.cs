@@ -26,12 +26,12 @@ namespace GameInterface.DynamicSync.Builders
 
                 foreach (var fieldInfo in dynamicRegistryItem.Fields)
                 {
-                    ignoreCheckAccessAssemblies.Add(fieldInfo.FieldType.Assembly);
+                    ignoreCheckAccessAssemblies.Add(fieldInfo.Value.FieldType.Assembly);
                 }
 
                 foreach (var propertyInfo in dynamicRegistryItem.Properties)
                 {
-                    ignoreCheckAccessAssemblies.Add(propertyInfo.PropertyType.Assembly);
+                    ignoreCheckAccessAssemblies.Add(propertyInfo.Value.PropertyType.Assembly);
                 }
 
                 foreach (var targetMethod in dynamicRegistryItem.TargetMethods)
