@@ -24,7 +24,6 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ItemModifier, ItemModifierSurrogate>();
             AddSurrogate<TextObject, TextObjectSurrogate>();
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
-            AddSurrogate<IssueBase, IssueBaseSurrogate>();
         }
     }
 

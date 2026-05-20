@@ -48,7 +48,7 @@ namespace GameInterface.Services.Heroes
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.PreferredUpgradeFormation)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.HeroState)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.IsMinorFactionHero)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Issue)));
+            //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Issue)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.CompanionOf)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.Occupation)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Hero), nameof(Hero.DeathMark)));
