@@ -27,7 +27,6 @@ internal class SettlementComponentAuditor : IAuditor
 
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
-    private readonly AutoRegistry<SettlementComponent> settlementcomponentRegistry;
     private readonly IObjectManager objectManager;
     private readonly INetworkConfiguration configuration;
     private TaskCompletionSource<string> tcs;
@@ -35,13 +34,11 @@ internal class SettlementComponentAuditor : IAuditor
     public SettlementComponentAuditor(
         IMessageBroker messageBroker,
         INetwork network,
-        AutoRegistry<SettlementComponent> settlementcomponentRegistry,
         IObjectManager objectManager,
         INetworkConfiguration configuration)
     {
         this.messageBroker = messageBroker;
         this.network = network;
-        this.settlementcomponentRegistry = settlementcomponentRegistry;
         this.objectManager = objectManager;
         this.configuration = configuration;
         messageBroker.Subscribe<RequestSettlementComponentAudit>(Handle_Request);
@@ -113,21 +110,23 @@ internal class SettlementComponentAuditor : IAuditor
 
     private IEnumerable<SettlementComponent> GetSettlementComponents()
     {
-        return settlementcomponentRegistry.Objects.Values;
+        return Settlement.All.Select(x => x.SettlementComponent);
     }
 
     private IEnumerable<SettlementComponentAuditData> GetAuditData()
     {
         return GetSettlementComponents().Select(settlementComponent =>
-        {
-            objectManager.TryGetId(settlementComponent, out var networkId);
+            {
+                if (!objectManager.TryGetId(settlementComponent, out var networkId))
+                    return null;
 
-            return new SettlementComponentAuditData(
-                networkId,
-                settlementComponent.StringId,
-                settlementComponent.Name?.ToString()
-            );
-        });
+                return new SettlementComponentAuditData(
+                    networkId,
+                    settlementComponent.StringId,
+                    settlementComponent.Name?.ToString()
+                );
+            })
+            .Where(x => x is not null);
     }
 
     private string AuditData(SettlementComponentAuditData[] dataToAudit)

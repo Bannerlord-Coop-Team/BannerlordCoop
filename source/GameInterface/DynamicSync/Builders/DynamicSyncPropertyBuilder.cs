@@ -23,24 +23,15 @@ public class DynamicSyncPropertyBuilder : DynamicSyncBuilderBase
         var templateData = GetTemplateData(propertyItem);
         string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
         string networkMessage;
-        if (RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType))
+        var type = propertyInfo.PropertyType;
+        if (RuntimeTypeModel.Default.CanSerialize(type))
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
         }
         else
         {
-            var templateData = GetTemplateData(propertyInfo);
-            string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
-            string networkMessage;
-            var type = propertyInfo.PropertyType;
-            if (RuntimeTypeModel.Default.CanSerialize(type))
-            {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
-            }
-            else
-            {
-                networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate", templateData);
-            }
+            networkMessage = TemplateParser.Parse("Messages.NetworkSetReferenceMessageTemplate", templateData);
+        }
 
         DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetLocalMessage.cs", localMessage);
         DynamicSyncConfiguration.ExportFile($"{propertyInfo.DeclaringType.Name}/{propertyInfo.DeclaringType.Name}_{propertyInfo.Name}_SetNetworkMessage.cs", networkMessage);
