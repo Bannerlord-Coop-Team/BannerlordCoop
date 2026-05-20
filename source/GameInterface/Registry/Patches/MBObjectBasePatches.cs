@@ -22,9 +22,8 @@ internal class MBObjectBasePatches
         return false;
     }
 
-    public static List<Type> allowedTypes = new List<Type>()
+    public static HashSet<Type> allowedTypes = new HashSet<Type>()
     {
         typeof(MenuContext),
-
     };
 }

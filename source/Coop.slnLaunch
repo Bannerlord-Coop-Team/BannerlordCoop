@@ -28,5 +28,14 @@
         "Action": "Start"
       }
     ]
+  },
+  {
+    "Name": "Server Only",
+    "Projects": [
+      {
+        "Path": "Coop\\Coop.csproj",
+        "Action": "Start"
+      }
+    ]
   }
 ]

@@ -41,7 +41,6 @@ public static class PartyBehaviorPatch
     {
         if (!ModInformation.DISABLE_AI) return true;
             
-
         // This disables AI
         return __instance._mobileParty == MobileParty.MainParty;
     }

@@ -10,8 +10,8 @@ internal class MapEventSync : IDynamicSync
     public MapEventSync(DynamicSyncRegistry autoSyncBuilder)
     {
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.RetreatingSide)));
-        //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.BattleState)));
-        //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.Component)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.BattleState)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.Component)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.IsInvulnerable)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.IsPlayerSimulation)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.IsVisible)));
@@ -20,6 +20,7 @@ internal class MapEventSync : IDynamicSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.State)));
 
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.DiplomaticallyFinished)));
+        autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.StrengthOfSide)));
         //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._battleResultExplainers)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._mapEventResultsCalculated)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._battleState)));
@@ -31,6 +32,6 @@ internal class MapEventSync : IDynamicSync
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._mapEventType)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._mapEventResultsApplied)));
         // Collection of sides for the MapEvent
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), "_sides"));
+        //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), "_sides"));
     }
 }

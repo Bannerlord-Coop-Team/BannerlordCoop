@@ -15,9 +15,7 @@ public class SettlementHitPointsTest
     public void ServerSettlementHitPointsChanged_Publishes_AllClients()
     {
         // Arrange
-        string settlementId = "Settlement1";
-        float hitPoints = 99.5f;
-        var triggerMessage = new SettlementChangedSettlementHitPoints(settlementId, hitPoints);
+        var triggerMessage = new SettlementChangedSettlementHitPoints();
 
         var server = TestEnvironment.Server;
 

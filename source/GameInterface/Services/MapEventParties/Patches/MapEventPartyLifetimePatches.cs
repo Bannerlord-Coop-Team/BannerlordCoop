@@ -20,21 +20,21 @@ internal class MapEventPartyLifetimePatches
 
     [HarmonyPatch(typeof(MapEventParty), MethodType.Constructor, typeof(PartyBase))]
     [HarmonyPrefix]
-    private static bool CreateMapEventPartyPrefix(ref MapEventParty __instance, PartyBase party)
+    private static void CreateMapEventPartyPrefix(ref MapEventParty __instance, PartyBase party)
     {
         // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created managed {name}", typeof(MapEventParty));
-            return false;
+            return;
         }
 
         var message = new MapEventPartyCreated(__instance, party);
 
         MessageBroker.Instance.Publish(__instance, message);
 
-        return true;
+        return;
     }
 }

@@ -1,6 +1,10 @@
-﻿using GameInterface.Registry;
-using System.Linq;
-using System.Threading;
+﻿using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
+using System;
+using System.Collections.Generic;
+using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
@@ -8,13 +12,19 @@ using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.ItemRosters
 {
-    internal class ItemRosterRegistry : RegistryBase<ItemRoster>
+    internal class ItemRosterRegistry : AutoRegistryBase<ItemRoster>
     {
-        private const string ItemRosterIdPrefix = "CoopItemRoster";
-        private static int ItemRosterCounter = 0;
-        public ItemRosterRegistry(IRegistryCollection collection) : base(collection) { }
+        public override bool Debug => true;
 
-        public override void RegisterAll()
+        public ItemRosterRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager) : base(logger, autoRegistryFactory, objectManager)
+        {
+        }
+
+        public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+
+        public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+        public override void RegisterAllObjects()
         {
             var objectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -31,7 +41,7 @@ namespace GameInterface.Services.ItemRosters
                 RegisterExistingObject(party.StringId, party.ItemRoster);
             }
 
-            foreach(Settlement settlement in objectManager.Settlements)
+            foreach (Settlement settlement in objectManager.Settlements)
             {
                 if (settlement.ItemRoster == null) continue;
 
@@ -39,9 +49,20 @@ namespace GameInterface.Services.ItemRosters
             }
         }
 
-        protected override string GetNewId(ItemRoster itemRoster)
+        public override void OnClientCreated(ItemRoster obj, string id)
         {
-            return $"{ItemRosterIdPrefix}_{Interlocked.Increment(ref ItemRosterCounter)}";
+        }
+
+        public override void OnClientDestroyed(ItemRoster obj, string id)
+        {
+        }
+
+        public override void OnServerCreated(ItemRoster obj, string id)
+        {
+        }
+
+        public override void OnServerDestroyed(ItemRoster obj, string id)
+        {
         }
     }
 }

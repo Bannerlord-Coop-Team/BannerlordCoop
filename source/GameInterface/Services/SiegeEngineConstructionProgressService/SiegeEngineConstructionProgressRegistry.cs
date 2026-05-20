@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -12,42 +13,47 @@ using static TaleWorlds.CampaignSystem.Siege.SiegeEvent;
 
 namespace GameInterface.Services.SiegeEngineConstructionProgressService;
 
-internal class SiegeEngineConstructionProgressRegistry : IAutoRegistry<SiegeEngineConstructionProgress>
+internal class SiegeEngineConstructionProgressRegistry : AutoRegistryBase<SiegeEngineConstructionProgress>
 {
-    ILogger Logger { get; }
-    public SiegeEngineConstructionProgressRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public SiegeEngineConstructionProgressRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(SiegeEngineConstructionProgress));
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(SiegeEngineConstructionProgress));
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
-        foreach (var siegeEngineConstructionProgress in Campaign.Current.SiegeEventManager.SiegeEvents
-            .Select(siegeEvent => siegeEvent.BesiegerCamp.SiegeEngines.SiegePreparations))
+        var siegeEvents = Campaign.Current?.SiegeEventManager?.SiegeEvents;
+        if (siegeEvents == null) return;
+
+        foreach (var siegeEvent in siegeEvents)
         {
-            objectManager.AddNewObject(siegeEngineConstructionProgress, out _);
+            var settlement = siegeEvent?.BesiegedSettlement;
+            if (settlement == null) continue;
+
+            var progress = siegeEvent?.BesiegerCamp?.SiegeEngines?.SiegePreparations;
+            if (progress == null) continue;
+
+            RegisterExistingObject(settlement.StringId, progress);
         }
     }
 
-    public void OnClientCreated(SiegeEngineConstructionProgress obj, string id)
+    public override void OnClientCreated(SiegeEngineConstructionProgress obj, string id)
     {
     }
 
-    public void OnClientDestroyed(SiegeEngineConstructionProgress obj, string id)
+    public override void OnClientDestroyed(SiegeEngineConstructionProgress obj, string id)
     {
     }
 
-    public void OnServerCreated(SiegeEngineConstructionProgress obj, string id)
+    public override void OnServerCreated(SiegeEngineConstructionProgress obj, string id)
     {
     }
 
-    public void OnServerDestroyed(SiegeEngineConstructionProgress obj, string id)
+    public override void OnServerDestroyed(SiegeEngineConstructionProgress obj, string id)
     {
     }
 }

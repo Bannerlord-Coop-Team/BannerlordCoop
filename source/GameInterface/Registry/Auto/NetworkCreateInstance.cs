@@ -3,10 +3,10 @@ using ProtoBuf;
 
 namespace GameInterface.Registry.Auto;
 [ProtoContract(SkipConstructor = true)]
-class NetworkCreateInstance<T> : ICommand
+readonly struct NetworkCreateInstance<T> : ICommand
 {
     [ProtoMember(1)]
-    public string InstanceId { get; }
+    public readonly string InstanceId;
 
     public NetworkCreateInstance(string instanceId)
     {

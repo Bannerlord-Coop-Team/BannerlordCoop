@@ -18,13 +18,7 @@ public class SettlementMobilePartyCacheTest
     [Fact]
     public void ServerSettlementMobilePartyCacheChanged_Publishes_AllClients()
     {
-        string SettlementID = "Settlement1";
-        string MobilePartyID = "MobileParty1";
-        int lordParties = 69;
-        bool addMobileParty = true; // false is when remove logic is very similar so reused sync stuff.
-
-        var triggerMessage = new SettlementChangedMobileParty(SettlementID, MobilePartyID, lordParties, addMobileParty);
-
+        var triggerMessage = new SettlementChangedMobileParty();
 
         var server = TestEnvironment.Server;
 

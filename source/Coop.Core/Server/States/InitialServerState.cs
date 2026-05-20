@@ -1,10 +1,9 @@
 ﻿using Common.Messaging;
 using Common.Network;
-using GameInterface.Registry.Messages;
+using GameInterface.Registry;
 using GameInterface.Services.GameDebug.Messages;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.MobileParties.Messages;
-using System;
 
 namespace Coop.Core.Server.States;
 
@@ -15,14 +14,19 @@ public class InitialServerState : ServerStateBase
 {
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
+    private readonly IRegistryManager registryManager;
 
-    public InitialServerState(IServerLogic context, IMessageBroker messageBroker, INetwork network) : base(context)
+    public InitialServerState(
+        IServerLogic context,
+        IMessageBroker messageBroker,
+        INetwork network,
+        IRegistryManager registryManager) : 
+        base(context)
     {
         this.messageBroker = messageBroker;
         this.network = network;
+        this.registryManager = registryManager;
         messageBroker.Subscribe<CampaignReady>(Handle_GameLoaded);
-        messageBroker.Subscribe<AllGameObjectsRegistered>(Handle_GameObjectsRegistered);
-        messageBroker.Subscribe<LifetimesPatched>(Handle_LifetimesPatched);
     }
 
 
@@ -41,17 +45,9 @@ public class InitialServerState : ServerStateBase
         messageBroker.Publish(this, new RemoveMainParty());
 
         // Register all objects after main party is removed to keep order
-        messageBroker.Publish(this, new RegisterAllGameObjects());
-    }
+        registryManager.RegisterAllGameObjects();
+        registryManager.PatchLifetimes();
 
-    internal void Handle_GameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> payload)
-    {
-        messageBroker.Publish(this, new PatchLifetimes());
-    }
-
-    internal void Handle_LifetimesPatched(MessagePayload<LifetimesPatched> payload)
-    {
-        // Change to server running state
         Logic.SetState<ServerRunningState>();
     }
 

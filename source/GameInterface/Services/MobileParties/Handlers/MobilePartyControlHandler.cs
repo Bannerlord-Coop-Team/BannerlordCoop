@@ -1,5 +1,6 @@
 ﻿using Common;
 using Common.Messaging;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Entity.Data;
 using GameInterface.Services.MobileParties.Interfaces;
@@ -20,8 +21,6 @@ internal class MobilePartyControlHandler : IHandler
     private readonly IControlledEntityRegistry controlledEntityRegistry;
     private readonly IObjectManager objectManager;
     private readonly IControllerIdProvider controllerIdProvider;
-    private bool controlPartiesByDefault = false;
-
     private string ownerId => controllerIdProvider.ControllerId;
 
     public MobilePartyControlHandler(
@@ -38,21 +37,15 @@ internal class MobilePartyControlHandler : IHandler
         this.controllerIdProvider = controllerIdProvider;
         messageBroker.Subscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Subscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
-        messageBroker.Subscribe<PartyCreated>(Handle_MobilePartyCreated);
-        messageBroker.Subscribe<PartyDestroyed>(Handle_MobilePartyDestroyed);
     }
     public void Dispose()
     {
         messageBroker.Unsubscribe<RegisterAllPartiesAsControlled>(Handle_RegisterAllPartiesAsControlled);
         messageBroker.Unsubscribe<UpdateMobilePartyControl>(Handle_UpdateMobilePartyControl);
-        messageBroker.Unsubscribe<PartyCreated>(Handle_MobilePartyCreated);
-        messageBroker.Unsubscribe<PartyDestroyed>(Handle_MobilePartyDestroyed);
     }
 
     private void Handle_RegisterAllPartiesAsControlled(MessagePayload<RegisterAllPartiesAsControlled> obj)
     {
-        controlPartiesByDefault = true;
-
         partyInterface.RegisterAllPartiesAsControlled(ownerId);
     }
 
@@ -77,26 +70,5 @@ internal class MobilePartyControlHandler : IHandler
             bool aiDisabled = obj.What.IsRevocation ? false : true;
             party.Ai.SetDoNotMakeNewDecisions(aiDisabled);
         }
-    }
-
-    private void Handle_MobilePartyCreated(MessagePayload<PartyCreated> obj)
-    {
-        if (!controlPartiesByDefault) return;
-
-        if (!objectManager.TryGetIdWithLogging(obj.What.Instance, out var partyId))
-            return;
-
-        controlledEntityRegistry.RegisterAsControlled(ownerId, partyId);
-    }
-
-    private void Handle_MobilePartyDestroyed(MessagePayload<PartyDestroyed> obj)
-    {
-        if (!objectManager.TryGetIdWithLogging(obj.What.Instance, out var partyId))
-            return;
-
-        if (!controlledEntityRegistry.TryGetControlledEntity(partyId, out var controlledEntity))
-            return;
-
-        controlledEntityRegistry.RemoveAsControlled(controlledEntity);
     }
 }

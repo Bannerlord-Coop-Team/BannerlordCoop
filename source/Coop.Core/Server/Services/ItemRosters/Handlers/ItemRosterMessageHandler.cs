@@ -28,10 +28,10 @@ public class ItemRosterMessageHandler : IHandler
     {
         var message = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(message.PartyBase, out var partyBaseId)) return;
+        if (!objectManager.TryGetIdWithLogging(message.Instance, out var itemRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(message.Item, out var itemId)) return;
 
-        string? itemModifierId = null;
+        string itemModifierId = null;
         if (message.ItemModifier != null &&
             !objectManager.TryGetIdWithLogging(message.ItemModifier, out itemModifierId))
         {
@@ -39,7 +39,7 @@ public class ItemRosterMessageHandler : IHandler
         }
 
         network.SendAll(new NetworkItemRosterUpdate(
-            partyBaseId,
+            itemRosterId,
             itemId,
             itemModifierId,
             message.Amount));

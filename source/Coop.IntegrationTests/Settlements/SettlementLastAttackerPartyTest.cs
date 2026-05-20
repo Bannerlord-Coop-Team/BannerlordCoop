@@ -15,10 +15,7 @@ public class SettlementLastAttackerPartyTest
     [Fact]
     public void ServerLastAttackerPartyChanged_Publishes_AllClients()
     {
-        string settlementId = "Settlement1";
-        string mobilePartyId = "MobileParty1";
-
-        var triggerMessage = new SettlementChangedLastAttackerParty(settlementId, mobilePartyId);
+        var triggerMessage = new SettlementChangedLastAttackerParty();
 
         var server = TestEnvironment.Server;
 

@@ -158,6 +158,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
             if (!objectManager.TryGetObject(obj.SkillObjectId, out SkillObject skillObject))
             {
                 Logger.Error("Unable to get object for skill object id {id}", obj.SkillObjectId);
+                return;
             }
 
             // Replace original TaleWorlds implementation

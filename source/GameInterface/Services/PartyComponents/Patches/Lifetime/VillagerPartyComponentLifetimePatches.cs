@@ -32,7 +32,7 @@ internal class VillagerPartyComponentLifetimePatches
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created managed {name}", typeof(VillagerPartyComponent));
-            return true;
+            return false;
         }
 
         var message = new PartyComponentCreated(__instance);

@@ -233,6 +233,7 @@
 	    </AssemblyAttribute>
     </ItemGroup>
     <ItemGroup>
+      <EmbeddedResource Include="DynamicSync\Templates\DynamicConstantsTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfoTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\DynamicHandlerTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayReferenceTemplate.txt" />
@@ -257,6 +258,7 @@
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionRemoveValueMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionSetReferenceMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionSetValueMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetInterfaceReferenceMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetReferenceMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetValueMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\DynamicPatchTemplate.txt" />
@@ -330,5 +332,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Services\Kingdoms\Commands\" />
+    <Folder Include="Services\MapEvents\Messages\Join\" />
   </ItemGroup>
 </Project>

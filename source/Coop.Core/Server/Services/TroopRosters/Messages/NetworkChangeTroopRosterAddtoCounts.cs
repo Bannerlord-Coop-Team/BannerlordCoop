@@ -1,44 +1,51 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Coop.Core.Server.Services.TroopRosters.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public record NetworkChangeTroopRosterAddtoCounts : IEvent
+public readonly struct NetworkChangeTroopRosterAddtoCounts : IEvent
 {
     [ProtoMember(1)]
-    public string MobilePartyId { get; }
+    public readonly string MobilePartyId;
+
     [ProtoMember(2)]
-    public string Character { get; }
+    public readonly string CharacterId;
 
     [ProtoMember(3)]
-    public int Count { get; }
+    public readonly int Count;
 
     [ProtoMember(4)]
-    public bool InsertAtFront { get; }
+    public readonly bool InsertAtFront;
 
     [ProtoMember(5)]
-    public int WoundedCount { get; }
+    public readonly int WoundedCount;
 
     [ProtoMember(6)]
-    public int xpChanged { get; }
+    public readonly int XpChanged;
 
     [ProtoMember(7)]
-    public bool RemoveDepleted { get; }
-    [ProtoMember(8)]
-    public int Index { get; }
+    public readonly bool RemoveDepleted;
 
-    public NetworkChangeTroopRosterAddtoCounts(string mobilePartyId, string character, int count, bool insertAtFront, int woundedCount, int xpChanged, bool removeDepleted, int index)
+    [ProtoMember(8)]
+    public readonly int Index;
+
+    public NetworkChangeTroopRosterAddtoCounts(
+        string mobilePartyId,
+        string character,
+        int count,
+        bool insertAtFront,
+        int woundedCount,
+        int xpChanged,
+        bool removeDepleted,
+        int index)
     {
         MobilePartyId = mobilePartyId;
-        Character = character;
+        CharacterId = character;
         Count = count;
         InsertAtFront = insertAtFront;
         WoundedCount = woundedCount;
-        this.xpChanged = xpChanged;
+        XpChanged = xpChanged;
         RemoveDepleted = removeDepleted;
         Index = index;
     }

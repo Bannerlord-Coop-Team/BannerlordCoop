@@ -30,7 +30,7 @@ internal class CaravanPartyComponentLifetimePatches
         if (ModInformation.IsClient)
         {
             Logger.Error("Client created managed {name}", typeof(CaravanPartyComponent));
-            return true;
+            return false;
         }
 
         var message = new PartyComponentCreated(__instance);
