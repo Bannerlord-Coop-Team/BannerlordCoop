@@ -13,6 +13,7 @@
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
     <LangVersion>10</LangVersion>
+    <Nullable>annotations</Nullable>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <Platforms>x64</Platforms>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
