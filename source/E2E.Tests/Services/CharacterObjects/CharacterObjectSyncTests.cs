@@ -16,6 +16,7 @@ namespace E2E.Tests.Services.CharacterObjects
         {
             CharacterObjectId = TestEnvironment.CreateRegisteredObject<CharacterObject>();
             TestEnvironment.CreateRegisteredObject<Hero>();
+            TestEnvironment.CreateRegisteredObject<TraitObject>();
         }
         [Fact]
         public void Server_CharacterObject_Properties()
