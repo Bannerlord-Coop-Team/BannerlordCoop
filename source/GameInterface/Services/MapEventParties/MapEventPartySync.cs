@@ -17,6 +17,10 @@ namespace GameInterface.Services.MapEventParties
 
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._contributionToBattle)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._healthyManCountAtStart)));
+
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._diedInBattle)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._woundedInBattle)));
+            autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEventParty), nameof(MapEventParty._routedInBattle)));
         }
     }
 }

@@ -1,7 +1,5 @@
-﻿using Autofac.Features.OwnedInstances;
-using Common;
-using GameInterface.Services.Entity.Data;
-using GameInterface.Services.Heroes.Data;
+﻿using GameInterface.Services.Entity.Data;
+using GameInterface.Services.Players.Data;
 using ProtoBuf;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +14,7 @@ public interface ICoopSession
 {
     string UniqueGameId { get; }
     Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
+    Player[] Players { get; }
 }
 
 /// <inheritdoc cref="ICoopSession"/>
@@ -26,11 +25,14 @@ public class CoopSession : ICoopSession
     public string UniqueGameId { get; }
     [ProtoMember(2)]
     public Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
+    [ProtoMember(3)]
+    public Player[] Players { get; }
 
-    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>>  controlledEntityMap)
+    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>>  controlledEntityMap, Player[] players)
     {
         UniqueGameId = uniqueGameId;
         ControlledEntityMap = controlledEntityMap;
+        Players = players;
     }
 
     public override bool Equals(object obj)

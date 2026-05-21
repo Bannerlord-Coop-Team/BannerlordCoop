@@ -20,7 +20,6 @@ namespace GameInterface.Services.MapEventSides;
 /// </summary>
 internal class MapEventSideRegistry : AutoRegistryBase<MapEventSide>
 {
-    public override bool Debug => true;
     public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(MapEventSide), new Type[]
         {

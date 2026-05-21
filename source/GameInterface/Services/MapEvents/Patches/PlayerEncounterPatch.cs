@@ -1,21 +1,13 @@
 ﻿using Common;
-using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using HarmonyLib;
 using Helpers;
-using Serilog;
-using System.Linq;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
-using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.Core;
-using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Patches;
 
@@ -31,9 +23,7 @@ public class PlayerEncounterPatch
     {
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
-        if (ModInformation.IsServer) return true;
-
-        return false;
+        return ModInformation.IsServer;
     }
 
     [HarmonyPatch("PlayerSurrenderInternal")]

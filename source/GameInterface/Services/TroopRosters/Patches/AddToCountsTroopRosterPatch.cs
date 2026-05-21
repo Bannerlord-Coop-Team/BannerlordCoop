@@ -28,7 +28,7 @@ public class AddToCountsTroopRosterPatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         // Allow dummy rosters as the are only for caching
-        if (AllowDummyTroopRoster.IsDummyRoster(__instance)) return;
+        //if (AllowDummyTroopRoster.IsDummyRoster(__instance)) return;
 
         if (ModInformation.IsClient)
         {
@@ -36,10 +36,7 @@ public class AddToCountsTroopRosterPatch
             return;
         }
 
-
-        MobileParty mobileParty = __instance.OwnerParty.MobileParty;
-
-        var message = new TroopRosterAddToCountsChanged(mobileParty, character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
+        var message = new TroopRosterAddToCountsChanged(__instance, character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
 
         MessageBroker.Instance.Publish(__instance, message);
     }
@@ -51,7 +48,7 @@ public class AddToCountsTroopRosterPatch
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
         // Allow dummy rosters as the are only for caching
-        if (AllowDummyTroopRoster.IsDummyRoster(__instance)) return;
+        //if (AllowDummyTroopRoster.IsDummyRoster(__instance)) return;
 
         if (ModInformation.IsClient)
         {
@@ -59,33 +56,29 @@ public class AddToCountsTroopRosterPatch
             return;
         }
 
-        MobileParty mobileParty = __instance.OwnerParty.MobileParty;
-
-        var message = new TroopRosterAddToCountsAtIndexChanged(mobileParty.StringId, index, countChange, woundedCountChange, xpChange, removeDepleted);
+        var message = new TroopRosterAddToCountsAtIndexChanged(__instance, index, countChange, woundedCountChange, xpChange, removeDepleted);
 
         MessageBroker.Instance.Publish(__instance, message);
     }
 
-    public static void RunAddToCounts(MobileParty party, CharacterObject character, int count, bool insertAtFront, int woundedCount, int xpChange, bool removeDepleted, int index)
+    public static void RunAddToCounts(TroopRoster troopRoster, CharacterObject character, int count, bool insertAtFront, int woundedCount, int xpChange, bool removeDepleted, int index)
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                if(party.Party == null || party.MemberRoster == null) return;
-                party.MemberRoster.AddToCounts(character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
+                troopRoster.AddToCounts(character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
             }
         });
     }
 
-    public static void RunAddToCountsAtIndex(MobileParty party, int index, int count, int woundedCount, int xpChange, bool removeDepleted)
+    public static void RunAddToCountsAtIndex(TroopRoster troopRoster, int index, int count, int woundedCount, int xpChange, bool removeDepleted)
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
             {
-                if (party.Party == null || party.MemberRoster == null) return;
-                party.MemberRoster.AddToCountsAtIndex(index, count, woundedCount, xpChange, removeDepleted);
+                troopRoster.AddToCountsAtIndex(index, count, woundedCount, xpChange, removeDepleted);
             }
         });
     }

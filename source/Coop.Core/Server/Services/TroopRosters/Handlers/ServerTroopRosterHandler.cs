@@ -36,13 +36,13 @@ internal class ServerTroopRosterHandler : IHandler
     {
         var obj = payload.What;
 
-        if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.CharacterObject, out var characterObjectId)) return;
 
-        Logger.Debug("[Server] Sending troop roster add to counts change for MobileParty {MobilePartyId}, CharacterObject {CharacterObjectId}, Count {Count}, InsertAtFront {InsertAtFront}, WoundedCount {WoundedCount}, XpChanged {XpChanged}, RemoveDepleted {RemoveDepleted}, Index {Index}",
-            mobilePartyId, characterObjectId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted, obj.Index);
+        Logger.Debug("[Server] Sending troop roster add to counts change for TroopRoster {TroopRosterId}, CharacterObject {CharacterObjectId}, Count {Count}, InsertAtFront {InsertAtFront}, WoundedCount {WoundedCount}, XpChanged {XpChanged}, RemoveDepleted {RemoveDepleted}, Index {Index}",
+            troopRosterId, characterObjectId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted, obj.Index);
 
-        var message = new NetworkChangeTroopRosterAddtoCounts(mobilePartyId, characterObjectId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted, obj.Index);
+        var message = new NetworkChangeTroopRosterAddtoCounts(troopRosterId, characterObjectId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted, obj.Index);
         network.SendAll(message);
     }
     public void Dispose()

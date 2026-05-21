@@ -7,7 +7,9 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Siege;
+using TaleWorlds.Core;
 using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
@@ -73,5 +75,60 @@ public class MapEventDebugCammands
         _ = Campaign.Current.MapEventManager._mapEvents;
 
         return $"OK";
+    }
+
+    /// <summary>
+    /// Kills a random troop from the enemy side of the current map event.
+    /// </summary>
+    [CommandLineArgumentFunction("kill_random_troop", "coop.debug.mapevent")]
+    public static string KillRandomTroop(List<string> args)
+    {
+        var mapEvent = MobileParty.MainParty.MapEvent;
+        if (mapEvent is null)
+        {
+            return "Main party is not in a map event";
+        }
+
+        var mainPartySide = MobileParty.MainParty.MapEventSide;
+        if (mainPartySide is null)
+        {
+            return "Main party has no map event side";
+        }
+
+        var enemySide = mapEvent._sides
+            .SingleOrDefault(side => side != mainPartySide);
+
+        if (enemySide is null)
+        {
+            return "Failed to get enemy map event side";
+        }
+
+        var party = enemySide.Parties.FirstOrDefault();
+        if (party is null)
+        {
+            return "Enemy side has no parties";
+        }
+
+        var troops = party.Troops;
+        if (troops is null || troops.Count() == 0)
+        {
+            return "Enemy party has no troops";
+        }
+
+        var entries = troops._elementDictionary.ToArray();
+
+        if (entries.Length == 0)
+        {
+            return "Enemy party has no troops";
+        }
+
+        var randomEntry = entries[MBRandom.RandomInt(entries.Length)];
+
+        UniqueTroopDescriptor descriptor = randomEntry.Key;
+        FlattenedTroopRosterElement troopElement = randomEntry.Value;
+
+        enemySide.OnTroopKilled(descriptor);
+
+        return $"Killed random troop: {troopElement.Troop?.Name}";
     }
 }

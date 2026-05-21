@@ -9,6 +9,7 @@ using Serilog;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
 
@@ -88,11 +89,11 @@ public class TroopRosterHandler : IHandler
     private void HandleAddToCounts(MessagePayload<ChangeTroopRostersAddToCounts> payload)
     {
         var obj = payload.What;
-        if (!objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty party)) return;
+        if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
         if (!objectManager.TryGetObjectWithLogging(obj.Character, out CharacterObject characterObject)) return;
 
         AddToCountsTroopRosterPatch.RunAddToCounts(
-            party,
+            troopRoster,
             characterObject,
             obj.Count,
             obj.InsertAtFront,

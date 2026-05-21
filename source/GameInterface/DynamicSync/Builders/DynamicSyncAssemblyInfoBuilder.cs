@@ -18,7 +18,7 @@ namespace GameInterface.DynamicSync.Builders
         }
         public SyntaxTree Build(IEnumerable<string> assemblies)
         {
-            List<Assembly> ignoreCheckAccessAssemblies = new List<Assembly>();
+            var ignoreCheckAccessAssemblies = new HashSet<Assembly>();
             foreach (var registration in dynamicSyncRegistry.Registrations)
             {
                 var dynamicRegistryItem = registration.Value;

@@ -23,7 +23,7 @@ namespace Coop.IntegrationTests.Players
         [Fact]
         public void ServerNewPlayerRegistered_ClientPublishes_RegisterPlayer()
         {
-            Player player = new Player()
+            NetworkPlayerData player = new NetworkPlayerData()
             {
                 HeroData = Array.Empty<byte>(),
                 HeroStringId = "Hero-CoopParty",
