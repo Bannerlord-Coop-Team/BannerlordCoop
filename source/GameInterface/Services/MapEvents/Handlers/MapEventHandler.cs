@@ -37,6 +37,9 @@ internal class MapEventHandler : IHandler
 
         messageBroker.Subscribe<LeaveBattleAttempted>(Handle);
         messageBroker.Subscribe<NetworkLeaveBattle>(Handle);
+
+        messageBroker.Subscribe<MapEventBattleStateChangeAttempted>(Handle_MapEventBattleStateChangeAttempted);
+        messageBroker.Subscribe<NetworkChangeBattleState>(Handle_NetworkChangeBattleState);
     }
 
     public void Dispose()
@@ -148,5 +151,25 @@ internal class MapEventHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging<MapEventSide>(valueId, out var mapEventSide)) return;
 
         mapEvent._sides[index] = mapEventSide;
+    }
+
+    private void Handle_MapEventBattleStateChangeAttempted(MessagePayload<MapEventBattleStateChangeAttempted> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out var mapEventId))
+            return;
+
+        var message = new NetworkChangeBattleState(mapEventId, payload.What.BattleState);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkChangeBattleState(MessagePayload<NetworkChangeBattleState> payload)
+    {
+        if (!objectManager.TryGetObjectWithLogging<MapEvent>(payload.What.MapEventId, out var mapEvent))
+            return;
+
+        using (new AllowedThread())
+        {
+            mapEvent.BattleState = payload.What.BattleState;
+        }
     }
 }

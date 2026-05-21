@@ -56,6 +56,10 @@ internal class EncounterManagerPatches
     {
         if (!MapEventConfig.Enabled) return false;
 
+        // Disable player interactions
+        if (attackerParty.IsMobile && attackerParty.MobileParty.IsPlayerParty() &&
+            defenderParty.IsMobile && defenderParty.MobileParty.IsPlayerParty()) return false;
+
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
         if (ModInformation.IsClient) return true;

@@ -40,12 +40,8 @@ public class PlayerEncounterPatch
 
         return false;
     }
-}
 
-[HarmonyPatch(typeof(MenuHelper))]
-public class MenuHelperPatches
-{
-    [HarmonyPatch(nameof(MenuHelper.EncounterLeaveConsequence))]
+    [HarmonyPatch(nameof(PlayerEncounter.Finish))]
     [HarmonyPrefix]
     public static bool Prefix()
     {

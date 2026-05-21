@@ -156,14 +156,19 @@ internal class BattleHandler : IHandler
     private void Handle_PlayerLeaveBattle(MessagePayload<PlayerLeaveBattle> payload)
     {
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out string mapEventId)) return;
-        if (!objectManager.TryGetIdWithLogging(payload.What.MobileParty, out string MobilePartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.MobileParty, out string mobilePartyId)) return;
 
-        network.SendAll(new NetworkLeavePlayerBattle(mapEventId, MobilePartyId));
+        network.SendAll(new NetworkLeavePlayerBattle(mobilePartyId, mapEventId));
 
-        GameMenu.ExitToLast();
+        using (new AllowedThread())
+        {
+            payload.What.MapEvent.FinalizeEvent();
 
-        Campaign.Current.PlayerEncounter = null;
-        Campaign.Current.LocationEncounter = null;
+            GameMenu.ExitToLast();
+
+            Campaign.Current.PlayerEncounter = null;
+            Campaign.Current.LocationEncounter = null;
+        }
     }
 
     private void Handle_NetworkLeavePlayerBattle(MessagePayload<NetworkLeavePlayerBattle> payload)
