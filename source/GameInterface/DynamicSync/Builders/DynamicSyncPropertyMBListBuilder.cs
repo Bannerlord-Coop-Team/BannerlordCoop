@@ -9,23 +9,24 @@ namespace GameInterface.DynamicSync.Builders
 {
     public class DynamicSyncPropertyMBListBuilder : DynamicSyncBuilderBase
     {
-        private readonly IObjectManager objectManager;
-
-        public DynamicSyncPropertyMBListBuilder(IObjectManager objectManager, DynamicSyncRegistry dynamicSyncRegistry) : base(dynamicSyncRegistry)
+        public DynamicSyncPropertyMBListBuilder(
+            DynamicSyncRegistry dynamicSyncRegistry,
+            DynamicSyncConstantsBuilder dynamicSyncConstantsBuilder) : base(dynamicSyncRegistry, dynamicSyncConstantsBuilder)
         {
-            this.objectManager = objectManager;
         }
-        public string GetPrefix(PropertyInfo propertyInfo) => DynamicSyncUtils.GetPrefix(propertyInfo);
+        public string GetPrefix(Debuggable<PropertyInfo> propertyItem) => DynamicSyncUtils.GetPrefix(propertyItem);
 
-        public string GetTranspiler(PropertyInfo propertyInfo)
+        public string GetTranspiler(Debuggable<PropertyInfo> propertyItem)
         {
-            return TemplateParser.Parse("Patches.PropertyListChangeTranspilerTemplate", GetTemplateData(propertyInfo));
+            return TemplateParser.Parse("Patches.PropertyListChangeTranspilerTemplate", GetTemplateData(propertyItem));
         }
 
 
-        public IEnumerable<string> GetMessages(PropertyInfo propertyInfo)
+        public IEnumerable<string> GetMessages(Debuggable<PropertyInfo> propertyItem)
         {
-            var templateData = GetTemplateData(propertyInfo);
+            var propertyInfo = propertyItem.Value;
+
+            var templateData = GetTemplateData(propertyItem);
             string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
 
             string localAddMessage = TemplateParser.Parse("Messages.LocalCollectionAddMessageTemplate", templateData);
@@ -64,9 +65,11 @@ namespace GameInterface.DynamicSync.Builders
             yield return networkRemoveMessage;
         }
 
-        public string GetSubscription(PropertyInfo propertyInfo)
+        public string GetSubscription(Debuggable<PropertyInfo> propertyItem)
         {
-            var templateData = GetTemplateData(propertyInfo);
+            var propertyInfo = propertyItem.Value;
+
+            var templateData = GetTemplateData(propertyItem);
             if (RuntimeTypeModel.Default.CanSerialize(GetElementType(propertyInfo.PropertyType)))
                 return TemplateParser.Parse("Handlers.SubscribeCollectionValueTemplate", templateData);
             else
@@ -82,8 +85,10 @@ namespace GameInterface.DynamicSync.Builders
             return type.GetGenericArguments()[0];
         }
 
-        private object GetTemplateData(PropertyInfo propertyInfo)
+        private object GetTemplateData(Debuggable<PropertyInfo> propertyItem)
         {
+            var propertyInfo = propertyItem.Value;
+
             var serializers = GetSerializerMethodNames(GetElementType(propertyInfo.PropertyType));
             return new
             {
@@ -94,7 +99,8 @@ namespace GameInterface.DynamicSync.Builders
                 Libraries = DynamicSyncUtils.GetLibraries(propertyInfo),
                 NotReadOnly = propertyInfo.SetMethod != null,
                 SerializeMethod = serializers.serialize,
-                DeserializeMethod = serializers.deserialize
+                DeserializeMethod = serializers.deserialize,
+                Debuggable = propertyItem.Debug
             };
         }
     }

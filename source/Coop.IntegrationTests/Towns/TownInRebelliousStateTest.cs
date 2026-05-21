@@ -17,9 +17,7 @@ namespace Coop.IntegrationTests.Towns
         public void ServerTownInRebelliousStateChanged_Publishes_AllClients()
         {
             // Arrange
-            string townId = "Settlement1";
-            bool inRebelliousState = true;
-            var triggerMessage = new TownInRebelliousStateChanged(townId, inRebelliousState);
+            var triggerMessage = new TownInRebelliousStateChanged();
 
             var server = TestEnvironment.Server;
 

@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -11,43 +12,40 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.CraftingTemplates;
 
-internal class CraftingTemplateRegistry : IAutoRegistry<CraftingTemplate>
+internal class CraftingTemplateRegistry : AutoRegistryBase<CraftingTemplate>
 {
-    ILogger Logger { get; }
-    public CraftingTemplateRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public CraftingTemplateRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
     public IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(CraftingTemplate))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (var obj in MBObjectManager.Instance.GetObjectTypeList<CraftingTemplate>())
         {
-            objectManager.AddExisting(obj.StringId, obj);
+            RegisterExistingObject(obj.StringId, obj);
         }
     }
 
-    public void OnClientCreated(CraftingTemplate obj, string id)
+    public override void OnClientCreated(CraftingTemplate obj, string id)
     {
     }
 
-    public void OnClientDestroyed(CraftingTemplate obj, string id)
+    public override void OnClientDestroyed(CraftingTemplate obj, string id)
     {
     }
 
-    public void OnServerCreated(CraftingTemplate obj, string id)
+    public override void OnServerCreated(CraftingTemplate obj, string id)
     {
     }
 
-    public void OnServerDestroyed(CraftingTemplate obj, string id)
+    public override void OnServerDestroyed(CraftingTemplate obj, string id)
     {
     }
 }

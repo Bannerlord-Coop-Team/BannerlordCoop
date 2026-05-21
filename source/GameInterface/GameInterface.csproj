@@ -224,7 +224,7 @@
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.13.0" />
     <PackageReference Include="Microsoft.Extensions.Primitives" Version="9.0.2" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
-    <PackageReference Include="Scriban" Version="6.0.0" />
+    <PackageReference Include="Scriban" Version="7.2.0" />
     <PackageReference Include="Scrutor" Version="6.0.1" />
   </ItemGroup>
     <ItemGroup>
@@ -233,6 +233,7 @@
 	    </AssemblyAttribute>
     </ItemGroup>
     <ItemGroup>
+      <EmbeddedResource Include="DynamicSync\Templates\DynamicConstantsTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\DynamicAssemblyInfoTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\DynamicHandlerTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Handlers\SubscribeArrayReferenceTemplate.txt" />
@@ -257,6 +258,7 @@
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionRemoveValueMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionSetReferenceMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkCollectionSetValueMessageTemplate.txt" />
+      <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetInterfaceReferenceMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetReferenceMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Messages\NetworkSetValueMessageTemplate.txt" />
       <EmbeddedResource Include="DynamicSync\Templates\Patches\DynamicPatchTemplate.txt" />
@@ -330,5 +332,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Services\Kingdoms\Commands\" />
+    <Folder Include="Services\MapEvents\Messages\Join\" />
   </ItemGroup>
 </Project>

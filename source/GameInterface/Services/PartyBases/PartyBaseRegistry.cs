@@ -1,5 +1,4 @@
-﻿using Common;
-using GameInterface.Registry.Auto;
+﻿using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Serilog;
@@ -10,54 +9,46 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.PartyBases;
-internal class PartyBaseRegistry : IAutoRegistry<PartyBase>
+internal class PartyBaseRegistry : AutoRegistryBase<PartyBase>
 {
-    ILogger Logger { get; }
-    public PartyBaseRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public PartyBaseRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(PartyBase), new Type[] { typeof(MobileParty), typeof(Settlement) })
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
-
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override void RegisterAllObjects()
     {
         foreach (var party in MobileParty.All)
         {
-            var networkId = $"{party.StringId}";
-
-            if (objectManager.AddExisting(networkId, party.Party) == false)
-                Logger.Error("Unable to register PartyBase from Party with the object manager");
+            if (party?.Party == null) continue;
+            RegisterExistingObject(party.StringId, party.Party);
         }
 
         foreach (var settlement in Settlement.All)
         {
-            var networkId = $"{settlement.StringId}";
-
-            if (objectManager.AddExisting(networkId, settlement.Party) == false)
-                Logger.Error("Unable to register PartyBase from Party with the object manager");
+            if (settlement?.Party == null) continue;
+            RegisterExistingObject(settlement.StringId, settlement.Party);
         }
     }
 
-    public void OnClientCreated(PartyBase obj, string id)
+    public override void OnClientCreated(PartyBase obj, string id)
     {
     }
 
-    public void OnClientDestroyed(PartyBase obj, string id)
+    public override void OnClientDestroyed(PartyBase obj, string id)
     {
     }
 
-    public void OnServerCreated(PartyBase obj, string id)
+    public override void OnServerCreated(PartyBase obj, string id)
     {
     }
 
-    public void OnServerDestroyed(PartyBase obj, string id)
+    public override void OnServerDestroyed(PartyBase obj, string id)
     {
     }
 }

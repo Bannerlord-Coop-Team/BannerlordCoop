@@ -14,8 +14,18 @@ public class {{ MemberDeclaringType }}_{{ MemberName }}_PropertySetPrefix : Gene
             return;
         }
         
-        if(__instance.{{MemberName}} == value)
+        if(EqualityComparer<{{MemberType}}>.Default.Equals(__instance.{{MemberName}}, value))
+        {
+            {{~ if Debug ~}}
+            Logger.Debug("[Server] Value same, skipping {member}", "{{MemberDeclaringType}}.{{MemberName}}");
+            {{~ end ~}}
             return;
+
+        }
+
+        {{~ if Debug ~}}
+        Logger.Debug("[Server] Publishing local set message for {member}", "{{MemberDeclaringType}}.{{MemberName}}");
+        {{~ end ~}}
 
         var message = new {{MemberDeclaringType}}_{{MemberName}}_SetLocalMessage(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);

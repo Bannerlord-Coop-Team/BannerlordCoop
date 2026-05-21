@@ -24,7 +24,7 @@ namespace GameInterface.Services.MobileParties.Patches
             var message = new PartyEnterSettlementAttempted(settlement, mobileParty);
             MessageBroker.Instance.Publish(mobileParty, message);
 
-            return false;
+            return ModInformation.IsServer;
         }
 
         public static void OverrideApplyForParty(MobileParty mobileParty, Settlement settlement)

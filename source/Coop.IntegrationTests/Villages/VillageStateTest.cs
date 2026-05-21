@@ -18,9 +18,7 @@ public class VillageStateTest
     public void ServerVillageStateChanged_Publishes_AllClients()
     {
         // Arrange
-        string settlementId = "Settlement1";
-        int state = 0;
-        var triggerMessage = new VillageStateChanged(settlementId, state);
+        var triggerMessage = new VillageStateChanged();
 
         var server = TestEnvironment.Server;
 

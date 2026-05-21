@@ -12,21 +12,18 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals;
 
-internal class PartyVisualRegistry : IAutoRegistry<MobilePartyVisual>
+internal class PartyVisualRegistry : AutoRegistryBase<MobilePartyVisual>
 {
-    ILogger Logger { get; }
-    public PartyVisualRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public PartyVisualRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         var visualManager = MobilePartyVisualManager.Current;
 
@@ -48,23 +45,23 @@ internal class PartyVisualRegistry : IAutoRegistry<MobilePartyVisual>
         foreach (MobilePartyVisual visual in visualManager._visualsFlattened)
         {
             var party = visual.MapEntity.MobileParty;
-            objectManager.AddExisting(party.StringId, visual);
+            RegisterExistingObject(party.StringId, visual);
         }
     }
 
-    public void OnClientCreated(MobilePartyVisual obj, string id)
+    public override void OnClientCreated(MobilePartyVisual obj, string id)
     {
     }
 
-    public void OnClientDestroyed(MobilePartyVisual obj, string id)
+    public override void OnClientDestroyed(MobilePartyVisual obj, string id)
     {
     }
 
-    public void OnServerCreated(MobilePartyVisual obj, string id)
+    public override void OnServerCreated(MobilePartyVisual obj, string id)
     {
     }
 
-    public void OnServerDestroyed(MobilePartyVisual obj, string id)
+    public override void OnServerDestroyed(MobilePartyVisual obj, string id)
     {
     }
 }

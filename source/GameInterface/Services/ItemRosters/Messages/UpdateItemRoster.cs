@@ -11,14 +11,14 @@ namespace GameInterface.Services.ItemRosters.Messages;
 [BatchLogMessage]
 public readonly struct UpdateItemRoster : ICommand
 {
-    public readonly string PartyBaseId;
+    public readonly string ItemRosterId;
     public readonly string ItemId;
     public readonly string ItemModifierId;
     public readonly int Amount;
 
-    public UpdateItemRoster(string partyBaseId, string itemId, string itemModifierId, int amount)
+    public UpdateItemRoster(string itemRosterId, string itemId, string itemModifierId, int amount)
     {
-        PartyBaseId = partyBaseId;
+        ItemRosterId = itemRosterId;
         ItemId = itemId;
         ItemModifierId = itemModifierId;
         Amount = amount;

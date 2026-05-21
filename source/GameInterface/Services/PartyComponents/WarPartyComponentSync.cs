@@ -1,5 +1,4 @@
-﻿using GameInterface.AutoSync;
-using GameInterface.DynamicSync;
+﻿using GameInterface.DynamicSync;
 
 namespace GameInterface.Services.PartyComponents;
 internal class WarPartyComponentSync : IDynamicSync

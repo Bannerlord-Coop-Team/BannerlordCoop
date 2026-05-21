@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Bandits.Patches;
@@ -7,5 +8,5 @@ namespace GameInterface.Services.Bandits.Patches;
 internal class DisableBanditsCampaignBehavior
 {
     [HarmonyPatch(nameof(BanditSpawnCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => ModInformation.IsServer;
 }

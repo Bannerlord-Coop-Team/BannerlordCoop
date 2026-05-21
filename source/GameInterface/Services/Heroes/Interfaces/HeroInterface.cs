@@ -203,8 +203,8 @@ internal class HeroInterface : IHeroInterface
     {
         using(new AllowedThread())
         {
-            obj.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>($"Player_");
-            objectManager.AddExisting(obj.StringId, obj);
+            obj.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>($"Player");
+            objectManager.AddExisting($"{typeof(T).Name}_{obj.StringId}", obj);
         }
     }
 

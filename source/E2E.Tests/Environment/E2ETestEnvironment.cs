@@ -58,6 +58,7 @@ internal class E2ETestEnvironment : IDisposable
 
         Server.Resolve<TestMessageBroker>().SetStaticInstance();
         Server.Resolve<IGameInterface>().PatchAll();
+        Server.Resolve<IAutoSyncPatchCollector>().PatchAll();
 
         SetupDynamicSync();
 

@@ -2,7 +2,7 @@
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Entity;
-using GameInterface.Services.MobileParties.Patches;
+using GameInterface.Services.MapEvents.Patches;
 using GameInterface.Tests.Bootstrap;
 using System;
 using TaleWorlds.CampaignSystem.Party;

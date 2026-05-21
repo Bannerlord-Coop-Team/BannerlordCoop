@@ -1,18 +1,23 @@
-﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, RawSerializer.Serialize(data.Value))));
+﻿Subscribe<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+{
+{{~ if Debug ~}}
+	Logger.Debug("[Server] Sending network message for {type}", "{{MemberName}}");
+{{~ end ~}}
+	network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, RawSerializer.Serialize(data.Value)));
+});
 
 SubscribeNetwork<byte[], {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
 {
-{{ 
-if ReadOnly;
-}}
-	dynamicSyncRegistry.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{DeserializeMethod}}(data.Value, instance.{{MemberName}}));
-{{
-else
-}}
+{{~ if Debug ~}}
+	Logger.Debug("[Client] Received network set message for {type}", "{{MemberName}}");
+{{~ end ~}}
+
+{{~ if ReadOnly ~}}
+	DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, {{DeserializeMethod}}(data.Value, instance.{{MemberName}}));
+{{~ else ~}}
 	using (new AllowedThread())
 	{
 		instance.{{MemberName}} = RawSerializer.Deserialize<{{MemberType}}>(data.Value);
 	}
-{{end}}
-}
-);
+{{~ end ~}}
+});

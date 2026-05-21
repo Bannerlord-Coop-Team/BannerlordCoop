@@ -1,15 +1,10 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
-using Common.Util;
 using GameInterface.Services.FlattenedTroopRosters.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.TroopRosters.Handlers;
-using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.Roster;
-using TaleWorlds.Core;
 
 namespace GameInterface.Services.FlattenedTroopRosters.Handlers
 {
@@ -25,17 +20,17 @@ namespace GameInterface.Services.FlattenedTroopRosters.Handlers
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
-            messageBroker.Subscribe<FlattenedTroopRosterCreated>(Handle);
-            messageBroker.Subscribe<NetworkCreateFlattenedTroopRoster>(Handle);
+            messageBroker.Subscribe<FlattenedTroopRosterCreated>(Handle_FlattenedTroopRosterCreated);
+            messageBroker.Subscribe<NetworkCreateFlattenedTroopRoster>(Handle_NetworkCreateFlattenedTroopRoster);
         }
 
         public void Dispose()
         {
-            messageBroker.Unsubscribe<FlattenedTroopRosterCreated>(Handle);
-            messageBroker.Unsubscribe<NetworkCreateFlattenedTroopRoster>(Handle);
+            messageBroker.Unsubscribe<FlattenedTroopRosterCreated>(Handle_FlattenedTroopRosterCreated);
+            messageBroker.Unsubscribe<NetworkCreateFlattenedTroopRoster>(Handle_NetworkCreateFlattenedTroopRoster);
         }
 
-        private void Handle(MessagePayload<FlattenedTroopRosterCreated> obj)
+        private void Handle_FlattenedTroopRosterCreated(MessagePayload<FlattenedTroopRosterCreated> obj)
         {
             var payload = obj.What;
 
@@ -45,7 +40,7 @@ namespace GameInterface.Services.FlattenedTroopRosters.Handlers
             network.SendAll(message);
         }
 
-        private void Handle(MessagePayload<NetworkCreateFlattenedTroopRoster> obj)
+        private void Handle_NetworkCreateFlattenedTroopRoster(MessagePayload<NetworkCreateFlattenedTroopRoster> obj)
         {
             var payload = obj.What;
 

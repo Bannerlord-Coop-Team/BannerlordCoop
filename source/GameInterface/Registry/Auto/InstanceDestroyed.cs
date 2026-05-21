@@ -1,9 +1,9 @@
 ﻿using Common.Messaging;
 
 namespace GameInterface.Registry.Auto;
-class InstanceDestroyed<T> : IEvent
+readonly struct InstanceDestroyed<T> : IEvent
 {
-    public T Instance { get; }
+    public readonly T Instance;
 
     public InstanceDestroyed(T instance)
     {

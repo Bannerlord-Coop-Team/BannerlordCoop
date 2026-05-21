@@ -1,4 +1,5 @@
 ﻿using Common;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -11,45 +12,40 @@ using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.CultureObjects;
-internal class CultureObjectRegistry : IAutoRegistry<CultureObject>
+internal class CultureObjectRegistry : AutoRegistryBase<CultureObject>
 {
-    ILogger Logger { get; }
-    IObjectManager ObjectManager { get; }
-
     public CultureObjectRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-        ObjectManager = objectManager;
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(CultureObject))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (var culture in MBObjectManager.Instance.GetObjectTypeList<CultureObject>())
         {
-            objectManager.AddExisting(culture.StringId, culture);
+            RegisterExistingObject(culture.StringId, culture);
         }
     }
 
-    public void OnClientCreated(CultureObject obj, string id)
+    public override void OnClientCreated(CultureObject obj, string id)
     {
     }
 
-    public void OnClientDestroyed(CultureObject obj, string id)
+    public override void OnClientDestroyed(CultureObject obj, string id)
     {
     }
 
-    public void OnServerCreated(CultureObject obj, string id)
+    public override void OnServerCreated(CultureObject obj, string id)
     {
     }
 
-    public void OnServerDestroyed(CultureObject obj, string id)
+    public override void OnServerDestroyed(CultureObject obj, string id)
     {
     }
 }

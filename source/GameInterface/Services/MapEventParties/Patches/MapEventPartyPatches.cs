@@ -22,6 +22,7 @@ internal class MapEventPartyPatches
         if (ModInformation.IsServer) return true;
 
         MessageBroker.Instance.Publish(__instance, new OnTroopKilledAttempted(__instance, troopSeed.UniqueSeed));
+
         return false;
     }
 }

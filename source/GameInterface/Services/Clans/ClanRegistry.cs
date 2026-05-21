@@ -20,23 +20,20 @@ namespace GameInterface.Services.Clans;
 /// <summary>
 /// Registry class that assosiates <see cref="Clan"/> and a <see cref="string"/> id
 /// </summary>
-internal class ClanRegistry : IAutoRegistry<Clan>
+internal class ClanRegistry : AutoRegistryBase<Clan>
 {
-    ILogger Logger { get; }
-    public ClanRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public ClanRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(Clan))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         var mbObjectManager = Campaign.Current?.CampaignObjectManager;
 
@@ -48,11 +45,11 @@ internal class ClanRegistry : IAutoRegistry<Clan>
 
         foreach (var clan in mbObjectManager.Clans)
         {
-            objectManager.AddExisting(clan.StringId, clan);
+            RegisterExistingObject(clan.StringId, clan);
         }
     }
 
-    public void OnClientCreated(Clan obj, string id)
+    public override void OnClientCreated(Clan obj, string id)
     {
         using (new AllowedThread())
         {
@@ -64,15 +61,15 @@ internal class ClanRegistry : IAutoRegistry<Clan>
         Campaign.Current?.CampaignObjectManager?.AddClan(obj);
     }
 
-    public void OnClientDestroyed(Clan obj, string id)
+    public override void OnClientDestroyed(Clan obj, string id)
     {
     }
 
-    public void OnServerCreated(Clan obj, string id)
+    public override void OnServerCreated(Clan obj, string id)
     {
     }
 
-    public void OnServerDestroyed(Clan obj, string id)
+    public override void OnServerDestroyed(Clan obj, string id)
     {
     }
 }

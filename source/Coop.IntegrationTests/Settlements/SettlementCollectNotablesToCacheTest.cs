@@ -18,9 +18,7 @@ public class SettlementCollectNotablesToCacheTest
     public void ServerSettlementNotableCache_Publishes_AllClients()
     {
         // Arrange
-        string settlementId = "Settlement1";
-        var cacheNotables = new List<string> { "test1", "test2", "test3" };
-        var triggerMessage = new SettlementChangedNotablesCache(settlementId, cacheNotables);
+        var triggerMessage = new SettlementChangedNotablesCache();
 
         var server = TestEnvironment.Server;
 

@@ -5,7 +5,9 @@ using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map;
+using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
+using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PartyVisuals.Handlers
@@ -66,7 +68,13 @@ namespace GameInterface.Services.PartyVisuals.Handlers
 
         private void Handle(MessagePayload<NetworkDestroyPartyVisual> payload)
         {
-            objectManager.TryGetObject(payload.What.PartyVisualId, out MobilePartyVisual partyVisual);
+            if (!objectManager.TryGetObject(payload.What.PartyVisualId, out MobilePartyVisual partyVisual))
+            {
+                return;
+            }
+
+            MobilePartyVisualManager.Current.RemovePartyVisualForParty(partyVisual.MapEntity.MobileParty);
+
             objectManager.Remove(partyVisual);
         }
     }

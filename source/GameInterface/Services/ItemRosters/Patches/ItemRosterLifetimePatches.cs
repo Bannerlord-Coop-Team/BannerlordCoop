@@ -6,9 +6,23 @@ using GameInterface.Services.ItemRosters.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.ItemRosters.Patches;
+
+[HarmonyPatch(typeof(PartyBase))]
+internal class PartyBasePatch
+{
+    [HarmonyPatch(nameof(PartyBase.ItemRoster), MethodType.Setter)]
+    [HarmonyPrefix]
+    public static void ItemRosterSetterPrefix(PartyBase __instance, ItemRoster value)
+    {
+        if (ModInformation.IsClient) return;
+
+        ItemRosterLookup.Set(value, __instance);
+    }
+}
 
 [HarmonyPatch]
 internal class ItemRosterLifetimePatches

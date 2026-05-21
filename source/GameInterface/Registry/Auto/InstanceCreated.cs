@@ -3,9 +3,9 @@ using System;
 using System.Runtime.CompilerServices;
 
 namespace GameInterface.Registry.Auto;
-class InstanceCreated<T> : IEvent
+readonly struct InstanceCreated<T> : IEvent
 {
-    public T Instance { get; }
+    public readonly T Instance;
 
     public InstanceCreated(T instance)
     {

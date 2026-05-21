@@ -3,10 +3,12 @@ using GameInterface.CoopSessionData;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Registry.Messages;
 using GameInterface.Services.Entity;
-using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Control;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Smithing;
+using GameInterface.Services.MobileParties.Interfaces;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
 
@@ -21,6 +23,7 @@ internal class SaveGameHandler : IHandler
     private readonly IControllerIdProvider controllerIdProvider;
     private readonly ICoopSessionProvider coopSessionProvider;
     private readonly IControlledEntityRegistry controlledEntityRegistry;
+    private readonly IMobilePartyInterface mobilePartyInterface;
 
     public SaveGameHandler(
         IMessageBroker messageBroker,
@@ -28,7 +31,8 @@ internal class SaveGameHandler : IHandler
         ICoopServer coopServer,
         IControllerIdProvider controllerIdProvider,
         ICoopSessionProvider coopSessionProvider,
-        IControlledEntityRegistry controlledEntityRegistry) 
+        IControlledEntityRegistry controlledEntityRegistry,
+        IMobilePartyInterface mobilePartyInterface) 
     {
         this.messageBroker = messageBroker;
         this.saveManager = saveManager;
@@ -36,6 +40,7 @@ internal class SaveGameHandler : IHandler
         this.controllerIdProvider = controllerIdProvider;
         this.coopSessionProvider = coopSessionProvider;
         this.controlledEntityRegistry = controlledEntityRegistry;
+        this.mobilePartyInterface = mobilePartyInterface;
         messageBroker.Subscribe<GameSaved>(Handle_GameSaved);
         messageBroker.Subscribe<GameLoaded>(Handle_GameLoaded);
 
@@ -75,13 +80,7 @@ internal class SaveGameHandler : IHandler
 
     private void Handle_AllGameObjectsRegistered(MessagePayload<AllGameObjectsRegistered> obj)
     {
-        if (savedSession == null)
-        {
-            messageBroker.Publish(this, new RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId));
-        }
-        else
-        {
-            controlledEntityRegistry.LoadControlledEntities(savedSession.ControlledEntityMap);
-        }
+        controlledEntityRegistry.LoadControlledEntities(savedSession.ControlledEntityMap);
+        mobilePartyInterface.RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId);
     }
 }

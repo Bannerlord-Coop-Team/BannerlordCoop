@@ -13,18 +13,26 @@ public readonly struct TroopRosterAddToCountsChanged : ICommand
 
     public readonly bool InsertAtFront;
     public readonly int WoundedCount;
-    public readonly int xpChanged;
+    public readonly int XpChanged;
     public readonly bool RemoveDepleted;
     public readonly int Index;
 
-    public TroopRosterAddToCountsChanged(MobileParty mobileParty, CharacterObject characterObject, int count, bool insertAtFront, int woundedCount, int xpChanged, bool removeDepleted, int index)
+    public TroopRosterAddToCountsChanged(
+        MobileParty mobileParty,
+        CharacterObject characterObject,
+        int count,
+        bool insertAtFront,
+        int woundedCount,
+        int xpChanged,
+        bool removeDepleted,
+        int index)
     {
         MobileParty = mobileParty;
         CharacterObject = characterObject;
         Count = count;
         InsertAtFront = insertAtFront;
         WoundedCount = woundedCount;
-        this.xpChanged = xpChanged;
+        XpChanged = xpChanged;
         RemoveDepleted = removeDepleted;
         Index = index;
     }
