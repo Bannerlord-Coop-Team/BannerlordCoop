@@ -5,6 +5,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 namespace GameInterface.Surrogates;
 
 public interface ISurrogateCollection { }
@@ -24,6 +25,7 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ItemModifier, ItemModifierSurrogate>();
             AddSurrogate<TextObject, TextObjectSurrogate>();
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
+            AddSurrogate<PropertyOwner<TraitObject>, PropertyOwnerSurrogate>();
         }
     }
 

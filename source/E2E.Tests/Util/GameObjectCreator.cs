@@ -1,5 +1,6 @@
 ﻿using E2E.Tests.Util.ObjectBuilders;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
@@ -58,6 +59,7 @@ internal class GameObjectCreator
         { typeof(GarrisonPartyComponent), new GarrisonPartyComponentBuilder() },
         { typeof(VillageType), new VillageTypeBuilder() },
         { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
+        { typeof(TraitObject), new TraitObjectBuilder() },
     };
 
     public static T CreateInitializedObject<T>()
