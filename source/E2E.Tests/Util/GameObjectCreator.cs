@@ -58,6 +58,7 @@ internal class GameObjectCreator
         { typeof(GarrisonPartyComponent), new GarrisonPartyComponentBuilder() },
         { typeof(VillageType), new VillageTypeBuilder() },
         { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
+        { typeof(SiegeEvent.SiegeEngineMissile), new SiegeEngineMissileBuilder() }
     };
 
     public static T CreateInitializedObject<T>()
