@@ -34,10 +34,10 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Subscribe<RefinementVMCreated>(Handle);
             messageBroker.Subscribe<CraftingVMCreated>(Handle);
             messageBroker.Subscribe<WeaponDesignVMCreated>(Handle);
+            messageBroker.Subscribe<RefreshWeaponDesignVM>(Handle);
             messageBroker.Subscribe<NetworkRefreshSmelting>(Handle);
             messageBroker.Subscribe<NetworkRefreshRefinement>(Handle);
             messageBroker.Subscribe<NetworkRefreshCraftingVM>(Handle);
-            messageBroker.Subscribe<NetworkRefreshWeaponDesignVM>(Handle);
 
             currentSmeltingVM = null;
             currentRefinementVM = null;
@@ -51,10 +51,10 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Unsubscribe<RefinementVMCreated>(Handle);
             messageBroker.Unsubscribe<CraftingVMCreated>(Handle);
             messageBroker.Unsubscribe<WeaponDesignVMCreated>(Handle);
+            messageBroker.Unsubscribe<RefreshWeaponDesignVM>(Handle);
             messageBroker.Unsubscribe<NetworkRefreshSmelting>(Handle);
             messageBroker.Unsubscribe<NetworkRefreshRefinement>(Handle);
             messageBroker.Unsubscribe<NetworkRefreshCraftingVM>(Handle);
-            messageBroker.Unsubscribe<NetworkRefreshWeaponDesignVM>(Handle);
         }
 
         private void Handle(MessagePayload<SmeltingVMCreated> obj)
@@ -77,11 +77,17 @@ namespace GameInterface.Services.Smithing.Handlers
             currentWeaponDesignVM = obj.What.WeaponDesignVM;
         }
 
+        private void Handle(MessagePayload<RefreshWeaponDesignVM> obj)
+        {
+            // Error, object reference not set to instance of object. Happens when another client also has a WeaponDesignVM open?
+            currentWeaponDesignVM?.RefreshWeaponDesignMode(null);
+        }
+
         private void Handle(MessagePayload<NetworkRefreshSmelting> obj)
         {
-            currentSmeltingVM?.RefreshList();
             currentSmeltingVM?.RefreshValues();
-
+            currentSmeltingVM?.RefreshList();
+            
             RefreshCraftingVM();
         }
 
@@ -98,12 +104,6 @@ namespace GameInterface.Services.Smithing.Handlers
         private void Handle(MessagePayload<NetworkRefreshCraftingVM> obj)
         {
             RefreshCraftingVM();
-        }
-
-        private void Handle(MessagePayload<NetworkRefreshWeaponDesignVM> obj)
-        {
-            // Error, object reference not set to instance of object. Happens when another client also has a WeaponDesignVM open?
-            currentWeaponDesignVM?.RefreshWeaponDesignMode(null);
         }
 
         private void RefreshCraftingVM()

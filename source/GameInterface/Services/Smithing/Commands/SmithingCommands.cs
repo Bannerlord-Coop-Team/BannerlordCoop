@@ -129,19 +129,21 @@ internal class SmithingCommands
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
 
-        var testingHeroName = "Vaminesa the Minter"; // Random hero in Danustica, primary testing town
+        if (strings.Count == 0) return "Hero name argument required.";
+
+        var heroName = strings[0]; // Example hero name: "Vaminesa the Minter"
 
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var hero in Hero.AllAliveHeroes)
         {
-            if (hero.Name.ToString() == testingHeroName)
+            if (hero.Name.ToString() == heroName)
             {
                 for (int i = 0; i < 6; i++)
                 {
                     Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>().CreateTownOrder(hero, i);
                 }
 
-                stringBuilder.AppendLine("Orders have been added for " + testingHeroName + " in " + hero.CurrentSettlement.Town.Name.ToString());
+                stringBuilder.AppendLine("Orders have been added for " + heroName + " in " + hero.CurrentSettlement.Town.Name.ToString());
             }
         }
 

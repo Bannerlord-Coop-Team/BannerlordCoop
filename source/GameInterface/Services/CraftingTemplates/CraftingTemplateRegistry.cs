@@ -7,6 +7,7 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
@@ -19,9 +20,7 @@ internal class CraftingTemplateRegistry : AutoRegistryBase<CraftingTemplate>
     {
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(CraftingTemplate))
-    };
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(CraftingTemplate));
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 

@@ -15,6 +15,7 @@ public record CraftedWeaponInternallyCreated : IEvent
     public ItemModifier WeaponModifier;
     public string NextCraftedItemId;
     public Hero PlayerHero;
+    public Crafting CraftingLogic;
 
     public CraftedWeaponInternallyCreated(
         CraftingCampaignBehavior craftingCampaignBehavior,
@@ -24,7 +25,8 @@ public record CraftedWeaponInternallyCreated : IEvent
         WeaponDesign weaponDesign,
         ItemModifier weaponModifier,
         string nextCraftedItemId,
-        Hero playerHero)
+        Hero playerHero,
+        Crafting craftingLogic)
     {
         CraftingCampaignBehavior = craftingCampaignBehavior;
         IsFreeMode = isFreeMode;
@@ -34,5 +36,6 @@ public record CraftedWeaponInternallyCreated : IEvent
         WeaponModifier = weaponModifier;
         NextCraftedItemId = nextCraftedItemId;
         PlayerHero = playerHero;
+        CraftingLogic = craftingLogic;
     }
 }

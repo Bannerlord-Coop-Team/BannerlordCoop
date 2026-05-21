@@ -39,9 +39,10 @@ namespace GameInterface.Services.Smithing.Patches
 
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !isFreeMode);
             }
+            Crafting craftingLogic = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic;
 
             // Publish message with data
-            var message = new CraftedWeaponInternallyCreated(__instance, isFreeMode, crafterHero, craftedItemObject, weaponDesign, weaponModifier, nextCraftedItemId, Hero.MainHero);
+            var message = new CraftedWeaponInternallyCreated(__instance, isFreeMode, crafterHero, craftedItemObject, weaponDesign, weaponModifier, nextCraftedItemId, Hero.MainHero, craftingLogic);
             MessageBroker.Instance.Publish(__instance, message);
 
             // Need to return the ItemObject for client's CraftingVM

@@ -11,23 +11,20 @@ using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.CraftingPieces;
 
-internal class CraftingPieceRegistry : IAutoRegistry<CraftingPiece>
+internal class CraftingPieceRegistry : AutoRegistryBase<CraftingPiece>
 {
-    ILogger Logger { get; }
-    public CraftingPieceRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public CraftingPieceRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(CraftingPiece))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         foreach (var craftingPiece in MBObjectManager.Instance.GetObjects<CraftingPiece>(x => true))
         {
@@ -35,19 +32,19 @@ internal class CraftingPieceRegistry : IAutoRegistry<CraftingPiece>
         }
     }
 
-    public void OnClientCreated(CraftingPiece obj, string id)
+    public override void OnClientCreated(CraftingPiece obj, string id)
     {
     }
 
-    public void OnClientDestroyed(CraftingPiece obj, string id)
+    public override void OnClientDestroyed(CraftingPiece obj, string id)
     {
     }
 
-    public void OnServerCreated(CraftingPiece obj, string id)
+    public override void OnServerCreated(CraftingPiece obj, string id)
     {
     }
 
-    public void OnServerDestroyed(CraftingPiece obj, string id)
+    public override void OnServerDestroyed(CraftingPiece obj, string id)
     {
     }
 }

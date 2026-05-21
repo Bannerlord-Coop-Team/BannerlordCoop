@@ -11,6 +11,7 @@ namespace GameInterface.Services.Smithing.Messages;
 public record TownOrderCreated : IEvent
 {
     public CraftingCampaignBehavior CraftingCampaignBehavior;
+    public CraftingOrder CraftingOrder;
     public float TownOrderDifficulty;
     public int PieceTier;
     public CraftingTemplate RandomElement;
@@ -18,9 +19,10 @@ public record TownOrderCreated : IEvent
     public int OrderSlot;
     public string NextTownOrderId;
 
-    public TownOrderCreated(CraftingCampaignBehavior craftingCampaignBehavior, float townOrderDifficulty, int pieceTier, CraftingTemplate randomElement, Hero orderOwner, int orderSlot, string nextTownOrderId)
+    public TownOrderCreated(CraftingCampaignBehavior craftingCampaignBehavior, CraftingOrder craftingOrder, float townOrderDifficulty, int pieceTier, CraftingTemplate randomElement, Hero orderOwner, int orderSlot, string nextTownOrderId)
     {
         CraftingCampaignBehavior = craftingCampaignBehavior;
+        CraftingOrder = craftingOrder;
         TownOrderDifficulty = townOrderDifficulty;
         PieceTier = pieceTier;
         RandomElement = randomElement;
@@ -73,26 +75,30 @@ public class NetworkCreateTownOrder : ICommand
     public string CraftingCampaignBehaviorId;
 
     [ProtoMember(2)]
-    public float TownOrderDifficulty;
+    public string CraftingOrderId;
 
     [ProtoMember(3)]
-    public int PieceTier;
+    public float TownOrderDifficulty;
 
     [ProtoMember(4)]
-    public string RandomElementId;
+    public int PieceTier;
 
     [ProtoMember(5)]
-    public string OrderOwnerId;
+    public string RandomElementId;
 
     [ProtoMember(6)]
-    public int OrderSlot;
+    public string OrderOwnerId;
 
     [ProtoMember(7)]
+    public int OrderSlot;
+
+    [ProtoMember(8)]
     public string NextTownOrderId;
 
-    public NetworkCreateTownOrder(string craftingCampaignBehaviorId, float townOrderDifficulty, int pieceTier, string randomElementId, string orderOwnerId, int orderSlot, string nextTownOrderId)
+    public NetworkCreateTownOrder(string craftingCampaignBehaviorId, string craftingOrderId, float townOrderDifficulty, int pieceTier, string randomElementId, string orderOwnerId, int orderSlot, string nextTownOrderId)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
+        CraftingOrderId = craftingOrderId;
         TownOrderDifficulty = townOrderDifficulty;
         PieceTier = pieceTier;
         RandomElementId = randomElementId;
@@ -132,7 +138,7 @@ public class NetworkCompleteOrderServer : ICommand
     public string TownId;
 
     [ProtoMember(3)]
-    public byte[] CraftingOrderData;
+    public string CraftingOrderId;
 
     [ProtoMember(4)]
     public byte[] CraftedItemData;
@@ -146,11 +152,11 @@ public class NetworkCompleteOrderServer : ICommand
     [ProtoMember(7)]
     public bool Flag;
 
-    public NetworkCompleteOrderServer(string craftingCampaignBehaviorId, string townId, byte[] craftingOrderData, byte[] craftedItemData, string completerHeroId, string mainHeroId, bool flag)
+    public NetworkCompleteOrderServer(string craftingCampaignBehaviorId, string townId, string craftingOrderId, byte[] craftedItemData, string completerHeroId, string mainHeroId, bool flag)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         TownId = townId;
-        CraftingOrderData = craftingOrderData;
+        CraftingOrderId = craftingOrderId;
         CraftedItemData = craftedItemData;
         CompleterHeroId = completerHeroId;
         MainHeroId = mainHeroId;
@@ -168,7 +174,7 @@ public class NetworkCompleteOrderClients : ICommand
     public string TownId;
 
     [ProtoMember(3)]
-    public byte[] CraftingOrderData;
+    public string CraftingOrderId;
 
     [ProtoMember(4)]
     public byte[] CraftedItemData;
@@ -180,7 +186,7 @@ public class NetworkCompleteOrderClients : ICommand
     {
         CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
         TownId = cloneObject.TownId;
-        CraftingOrderData = cloneObject.CraftingOrderData;
+        CraftingOrderId = cloneObject.CraftingOrderId;
         CraftedItemData = cloneObject.CraftedItemData;
         CompleterHeroId = cloneObject.CompleterHeroId;
     }

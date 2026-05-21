@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
+using GameInterface.Registry.Auto;
 using GameInterface.Serialization;
 using GameInterface.Serialization.External;
 using GameInterface.Services.ItemObjects.Interfaces;
@@ -105,9 +106,15 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetIdWithLogging(obj.RandomElement, out var randomElementId)) return;
             if (!objectManager.TryGetIdWithLogging(obj.OrderOwner, out var orderOwnerId)) return;
 
+            if (!objectManager.AddNewObject(obj.CraftingOrder, out var craftingOrderId) &&
+                !objectManager.TryGetIdWithLogging(obj.CraftingOrder, out craftingOrderId)) return;
+
+            objectManager.TryGetObject(craftingOrderId, out CraftingOrder craftingOrder);
+
             // Send to clients from server
             NetworkCreateTownOrder message = new(
                 craftingCampaignBehaviorId,
+                craftingOrderId,
                 obj.TownOrderDifficulty,
                 obj.PieceTier,
                 randomElementId,
@@ -116,17 +123,18 @@ namespace GameInterface.Services.Smithing.Handlers
                 obj.NextTownOrderId
             );
             network.SendAll(message);
-
-            // Need to refresh client weapon designs for potential new orders while in CraftingState
-            //network.SendAll(new NetworkRefreshWeaponDesignVM()); // This is causing other errors
         }
 
         private void CreateTownOrder(NetworkCreateTownOrder obj)
         {
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.RandomElementId, out CraftingTemplate randomElement)) return;
+            //if (!objectManager.TryGetObjectWithLogging(obj.RandomElementId, out CraftingTemplate randomElement)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.OrderOwnerId, out Hero orderOwner)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
 
+            // Need to pass fields in CraftingCampaignBehavior.CraftedItemInitializationData  _preCraftedWeaponDesignItemData, rebuild and assign to craftingorder
+
+            /*
             // Replace TaleWorlds implementation
             WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
             craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(
@@ -139,6 +147,13 @@ namespace GameInterface.Services.Smithing.Handlers
                     obj.NextTownOrderId
                 )
             );
+            */
+
+            // craftingOrder has null fields when retrieving from objectmanager
+            craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(craftingOrder);
+
+            // Need to refresh client weapon designs for potential new orders while in CraftingState
+            MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM()); // Potentially causing errors
         }
 
         private void SendCraftingOrderReplaced(CraftingOrderReplaced obj)
@@ -161,7 +176,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
 
             // Replace TaleWorlds implementation
-            craftingCampaignBehavior._craftingOrders[town].Slots[obj.DifficultyLevel] = null; // Equivalent to craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(order), CraftingOrder can't be registered
+            craftingCampaignBehavior._craftingOrders[town].Slots[obj.DifficultyLevel] = null; // Equivalent to craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(order)
             //craftingCampaignBehavior.CreateTownOrder(hero, obj.DifficultyLevel); // Changes applied on clients from CreateTownOrder call in ReplaceCraftingOrder patch
         }
 
@@ -171,9 +186,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetIdWithLogging(obj.Town, out var townId)) return;
             if (!objectManager.TryGetIdWithLogging(obj.CompleterHero, out var completerHeroId)) return;
             if (!objectManager.TryGetIdWithLogging(obj.MainHero, out var mainHeroId)) return;
-
-            CraftingOrderBinaryPackage craftingOrderBinaryPackage = binaryPackageFactory.GetBinaryPackage<CraftingOrderBinaryPackage>(obj.CraftingOrder);
-            byte[] craftingOrderData = BinaryFormatterSerializer.Serialize(craftingOrderBinaryPackage);
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingOrder, out var craftingOrderId)) return;
 
             byte[] craftedItemData = itemObjectInterface.PackageItemObject(obj.CraftedItem);
 
@@ -181,7 +194,7 @@ namespace GameInterface.Services.Smithing.Handlers
             NetworkCompleteOrderServer message = new(
                 craftingCampaignBehaviorId,
                 townId,
-                craftingOrderData,
+                craftingOrderId,
                 craftedItemData,
                 completerHeroId,
                 mainHeroId,
@@ -196,9 +209,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.MainHeroId, out Hero mainHero)) return;
-
-            CraftingOrderBinaryPackage craftingOrderBinaryPackage = BinaryFormatterSerializer.Deserialize<CraftingOrderBinaryPackage>(obj.CraftingOrderData);
-            CraftingOrder craftingOrder = craftingOrderBinaryPackage.Unpack<CraftingOrder>(binaryPackageFactory);
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
 
             ItemObject craftedItem = itemObjectInterface.UnpackItemObject(obj.CraftedItemData);
 
@@ -240,12 +251,18 @@ namespace GameInterface.Services.Smithing.Handlers
                         ChangeRelationAction.ApplyRelationChangeBetweenHeroes(completerHero, orderOwner, (int)DefaultPerks.Crafting.ExperiencedSmith.SecondaryBonus, true);
                     }
                 }
+                CraftingOrder previousOrder = craftingCampaignBehavior._craftingOrders[town].Slots[craftingOrder.DifficultyLevel];
+
                 craftingCampaignBehavior._craftingOrders[town].RemoveTownOrder(craftingOrder);
+
+                // Remove previous order from objectManager
+                if (previousOrder is not null)
+                {
+                    MessageBroker.Instance.Publish(null, new InstanceDestroyed<CraftingOrder>(previousOrder));
+                }
             }
 
             CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
-
-            //network.SendAll(new NetworkRefreshWeaponDesignVM());
         }
 
         private void CompleteOrderClients(NetworkCompleteOrderClients obj)
@@ -253,9 +270,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
-
-            CraftingOrderBinaryPackage craftingOrderBinaryPackage = BinaryFormatterSerializer.Deserialize<CraftingOrderBinaryPackage>(obj.CraftingOrderData);
-            CraftingOrder craftingOrder = craftingOrderBinaryPackage.Unpack<CraftingOrder>(binaryPackageFactory);
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
 
             ItemObject craftedItem = itemObjectInterface.UnpackItemObject(obj.CraftedItemData);
 
@@ -270,6 +285,8 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
+
+            MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM());
         }
     }
 }

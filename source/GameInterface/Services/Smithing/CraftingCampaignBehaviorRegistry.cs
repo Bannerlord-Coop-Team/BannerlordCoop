@@ -10,41 +10,38 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.Smithing;
-internal class CraftingCampaignBehaviorRegistry : IAutoRegistry<CraftingCampaignBehavior>
+internal class CraftingCampaignBehaviorRegistry : AutoRegistryBase<CraftingCampaignBehavior>
 {
-    ILogger Logger { get; }
-    public CraftingCampaignBehaviorRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory)
+    public CraftingCampaignBehaviorRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        Logger = logger;
-
-        autoRegistryFactory.RegisterType(this);
     }
 
-    public IEnumerable<MethodBase> Constructors => new MethodBase[] {
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
         AccessTools.Constructor(typeof(CraftingCampaignBehavior))
     };
 
-    public IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
-    public void RegisterAllObjects(IObjectManager objectManager)
+    public override void RegisterAllObjects()
     {
         var craftingCampaignBehavior = Campaign.Current.CampaignBehaviorManager.GetBehavior<CraftingCampaignBehavior>();
         objectManager.AddExisting(craftingCampaignBehavior.StringId, craftingCampaignBehavior);
     }
 
-    public void OnClientCreated(CraftingCampaignBehavior obj, string id)
+    public override void OnClientCreated(CraftingCampaignBehavior obj, string id)
     {
     }
 
-    public void OnClientDestroyed(CraftingCampaignBehavior obj, string id)
+    public override void OnClientDestroyed(CraftingCampaignBehavior obj, string id)
     {
     }
 
-    public void OnServerCreated(CraftingCampaignBehavior obj, string id)
+    public override void OnServerCreated(CraftingCampaignBehavior obj, string id)
     {
     }
 
-    public void OnServerDestroyed(CraftingCampaignBehavior obj, string id)
+    public override void OnServerDestroyed(CraftingCampaignBehavior obj, string id)
     {
     }
 }

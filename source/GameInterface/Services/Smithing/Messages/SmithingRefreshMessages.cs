@@ -47,6 +47,13 @@ public record WeaponDesignVMCreated : IEvent
     }
 }
 
+public record RefreshWeaponDesignVM : IEvent
+{
+    public RefreshWeaponDesignVM()
+    {
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 public class NetworkRefreshSmelting : ICommand
 {
@@ -71,14 +78,6 @@ public class NetworkRefreshRefinement : ICommand
 public class NetworkRefreshCraftingVM : ICommand
 {
     public NetworkRefreshCraftingVM()
-    {
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-public class NetworkRefreshWeaponDesignVM : ICommand
-{
-    public NetworkRefreshWeaponDesignVM()
     {
     }
 }

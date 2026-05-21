@@ -2,6 +2,7 @@
 using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
@@ -44,10 +45,11 @@ namespace GameInterface.Services.Smithing.Patches
             CraftingTemplate randomElement = CraftingTemplate.All.GetRandomElement<CraftingTemplate>();
             string nextTownOrderId = __instance.GetNextTownOrderId();
             WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), __instance.GetWeaponPieces(randomElement, pieceTier), nextTownOrderId);
-            __instance._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(new CraftingOrder(orderOwner, townOrderDifficulty, weaponDesignTemplate, randomElement, orderSlot, nextTownOrderId));
+            CraftingOrder order = new CraftingOrder(orderOwner, townOrderDifficulty, weaponDesignTemplate, randomElement, orderSlot, nextTownOrderId);
+            __instance._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(order);
 
             // Publish message with data for clients
-            var message = new TownOrderCreated(__instance, townOrderDifficulty, pieceTier, randomElement, orderOwner, orderSlot, nextTownOrderId);
+            var message = new TownOrderCreated(__instance, order, townOrderDifficulty, pieceTier, randomElement, orderOwner, orderSlot, nextTownOrderId);
             MessageBroker.Instance.Publish(__instance, message);
 
             // Skip original
@@ -69,6 +71,8 @@ namespace GameInterface.Services.Smithing.Patches
             var message = new CraftingOrderReplaced(__instance, town, difficultyLevel);
             MessageBroker.Instance.Publish(__instance, message);
 
+            CraftingOrder previousOrder = __instance._craftingOrders[town].Slots[difficultyLevel];
+
             // Replace TaleWorlds implementation
             MBList<Hero> mblist = new MBList<Hero>();
             mblist.AddRange(town.Settlement.HeroesWithoutParty);
@@ -85,6 +89,12 @@ namespace GameInterface.Services.Smithing.Patches
             {
                 targetHero = mblist.GetRandomElement<Hero>();
                 __instance.CreateTownOrder(targetHero, difficultyLevel); // Call includes TownOrderCreated message from patch to update clients
+            }
+
+            // Remove previous order from objectManager
+            if (previousOrder is not null)
+            {
+                MessageBroker.Instance.Publish(null, new InstanceDestroyed<CraftingOrder>(previousOrder));
             }
 
             // Skip original

@@ -39,24 +39,4 @@ namespace GameInterface.Services.Smithing.Patches
             MessageBroker.Instance.Publish(__instance, message);
         }
     }
-
-    [HarmonyPatch(typeof(ItemObject))]
-    internal class InitCraftedItemObjectPatch
-    {
-        private static readonly ILogger Logger = LogManager.GetLogger<ItemObject>();
-
-        [HarmonyPatch("InitCraftedItemObject")]
-        [HarmonyPostfix]
-        public static void InitCraftedItemObject(ref ItemObject __instance, TextObject name, BasicCultureObject culture, ItemFlags itemProperties, float weight, float appearance, WeaponDesign craftedData, ItemObject.ItemTypeEnum itemType)
-        {
-            if (ModInformation.IsServer)
-            {
-                Logger.Information("InitCraftedItemObject called on server");
-            }
-            else
-            {
-                Logger.Information("InitCraftedItemObject called on client");
-            }
-        }
-    }
 }

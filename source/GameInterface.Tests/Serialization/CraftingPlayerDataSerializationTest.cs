@@ -59,9 +59,9 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             var deserializeFactory = container.Resolve<IBinaryPackageFactory>();
             CraftingPlayerData newCraftingPlayerData = returnedPackage.Unpack<CraftingPlayerData>(deserializeFactory);
 
-            Assert.Equal(craftingPlayerData.HeroOpenNewPartXpDictionary, newCraftingPlayerData.HeroOpenNewPartXpDictionary);
-            Assert.Equal(craftingPlayerData.HeroOpenedPartsDictionary, newCraftingPlayerData.HeroOpenedPartsDictionary);
-            Assert.Equal(craftingPlayerData.HeroCraftingItemsHistory, newCraftingPlayerData.HeroCraftingItemsHistory);
+            Assert.Equal(craftingPlayerData.PlayerOpenNewPartXpDictionary, newCraftingPlayerData.PlayerOpenNewPartXpDictionary);
+            Assert.Equal(craftingPlayerData.PlayerOpenedPartsDictionary, newCraftingPlayerData.PlayerOpenedPartsDictionary);
+            Assert.Equal(craftingPlayerData.PlayerCraftedItemsHistory, newCraftingPlayerData.PlayerCraftedItemsHistory);
         }
     }
 }

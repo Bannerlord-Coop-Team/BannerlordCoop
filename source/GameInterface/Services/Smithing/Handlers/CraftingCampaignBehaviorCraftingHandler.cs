@@ -2,8 +2,10 @@
 using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Serialization;
 using Common.Util;
 using GameInterface.Serialization;
+using GameInterface.Serialization.External;
 using GameInterface.Services.ItemObjects.Interfaces;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Interfaces;
@@ -31,6 +33,7 @@ namespace GameInterface.Services.Smithing.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
         private readonly INetwork network;
+        private readonly IBinaryPackageFactory binaryPackageFactory;
         private readonly IItemObjectInterface itemObjectInterface;
         private readonly ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface;
 
@@ -38,12 +41,14 @@ namespace GameInterface.Services.Smithing.Handlers
             IMessageBroker messageBroker,
             IObjectManager objectManager,
             INetwork network,
+            IBinaryPackageFactory binaryPackageFactory,
             IItemObjectInterface itemObjectInterface,
             ISessionCraftingPlayerDataInterface sessionCraftingPlayerDataInterface)
         {
             this.messageBroker = messageBroker;
             this.objectManager = objectManager;
             this.network = network;
+            this.binaryPackageFactory = binaryPackageFactory;
             this.itemObjectInterface = itemObjectInterface;
             this.sessionCraftingPlayerDataInterface = sessionCraftingPlayerDataInterface;
             messageBroker.Subscribe<SmeltingDone>(Handle);
@@ -258,7 +263,11 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetIdWithLogging(obj.WeaponDesign.Template, out var craftingTemplateId)) return;
             if (!objectManager.TryGetIdWithLogging(obj.PlayerHero, out var playerHeroId)) return;
 
+            // Failed to retrieve ID for object TaleWorlds.Core.ItemObject because not registered in ObjectManager yet, shouldn't cause any issues
             byte[] craftedItemObjectData = itemObjectInterface.PackageItemObject(obj.CraftedItemObject);
+
+            CraftingBinaryPackage package = binaryPackageFactory.GetBinaryPackage<CraftingBinaryPackage>(obj.CraftingLogic);
+            byte[] craftingLogicData = BinaryFormatterSerializer.Serialize(package);
 
             var weaponDesignElementCraftingPieceIds = new List<string>();
             var weaponDesignElementScalePercentages = new List<int>();
@@ -291,7 +300,8 @@ namespace GameInterface.Services.Smithing.Handlers
                 weaponDesignElementScalePercentages,
                 weaponModifierId,
                 obj.NextCraftedItemId,
-                playerHeroId
+                playerHeroId,
+                craftingLogicData
             );
             network.SendAll(message);
         }
@@ -304,6 +314,9 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
 
             ItemObject craftedItemObject = itemObjectInterface.UnpackItemObject(obj.CraftedItemObjectData);
+
+            CraftingBinaryPackage package = BinaryFormatterSerializer.Deserialize<CraftingBinaryPackage>(obj.CraftingLogicData);
+            Crafting craftingLogic = package.Unpack<Crafting>(binaryPackageFactory);
 
             List<WeaponDesignElement> usedPiecesList = new();
             for (int i = 0; i < obj.WeaponDesignElementCraftingPieceIds.Count; i++)
@@ -344,19 +357,15 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
-            ItemObject.InitCraftedItemObject(
-                ref craftedItemObject,
-                craftedItemObject.Name,
-                craftedItemObject.Culture,
-                craftedItemObject.ItemFlags,
-                craftedItemObject.Weight,
-                craftedItemObject.Appearance,
-                weaponDesign,
-                craftedItemObject.Type);
-
             using (new AllowedThread())
             {
-                craftedItemObject.StringId = nextCraftedItemId;
+                Crafting.GenerateItem(
+                weaponDesign,
+                craftedItemObject.Name,
+                craftedItemObject.Culture,
+                craftingLogic.CurrentItemModifierGroup,
+                ref craftedItemObject,
+                nextCraftedItemId);
             }
 
             objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
@@ -407,7 +416,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
                 AddItemToHistoryPatch.OverrideAddItemToHistory(ref craftingCampaignBehavior, craftedItemObject);
             }
-            else // Need to update craftingCampaignBehavior._craftedItemCount for every other client. Manage with DynamicSync instead?
+            else // Need to update craftingCampaignBehavior._craftedItemCount for every other client
             {
                 craftingCampaignBehavior.GetNextCraftedItemId();
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !obj.IsFreeMode);
