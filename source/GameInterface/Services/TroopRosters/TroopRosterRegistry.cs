@@ -22,7 +22,9 @@ internal class TroopRosterRegistry : AutoRegistryBase<TroopRoster>
     {
     }
 
-    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(TroopRoster));
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(TroopRoster))
+    };
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 

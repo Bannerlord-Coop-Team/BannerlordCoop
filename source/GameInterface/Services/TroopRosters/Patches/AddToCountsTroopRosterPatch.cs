@@ -27,9 +27,6 @@ public class AddToCountsTroopRosterPatch
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
 
-        // Allow dummy rosters as the are only for caching
-        //if (AllowDummyTroopRoster.IsDummyRoster(__instance)) return;
-
         if (ModInformation.IsClient)
         {
             Logger.Error("Client attempted to update managed {type}, {methodName}", typeof(ItemRoster), nameof(ItemRoster.AddToCounts));
@@ -46,9 +43,6 @@ public class AddToCountsTroopRosterPatch
     private static void AddToCountsAtIndexPrefix(ref TroopRoster __instance, int index, int countChange, int woundedCountChange, int xpChange, bool removeDepleted)
     {
         if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-        // Allow dummy rosters as the are only for caching
-        //if (AllowDummyTroopRoster.IsDummyRoster(__instance)) return;
 
         if (ModInformation.IsClient)
         {
