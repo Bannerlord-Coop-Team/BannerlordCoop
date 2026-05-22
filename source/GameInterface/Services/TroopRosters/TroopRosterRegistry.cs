@@ -2,6 +2,7 @@
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.TroopRosters.Patches;
 using HarmonyLib;
 using Serilog;
 using System;
@@ -15,6 +16,7 @@ using TaleWorlds.Library;
 namespace GameInterface.Services.TroopRosters;
 internal class TroopRosterRegistry : AutoRegistryBase<TroopRoster>
 {
+    public override bool Debug => true;
     public TroopRosterRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
     {

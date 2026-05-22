@@ -53,6 +53,11 @@ public static class PartyBehaviorPatch
         ref IInteractablePoint interactablePoint,
         ref CampaignVec2 bestTargetPoint)
     {
+        if (ModInformation.IsClient && __instance._mobileParty == MobileParty.MainParty)
+        {
+            ;
+        }
+
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;

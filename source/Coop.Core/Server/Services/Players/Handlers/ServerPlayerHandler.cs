@@ -1,6 +1,7 @@
 ﻿using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.Players.Messages;
+using GameInterface.Services.Players;
 using GameInterface.Services.Players.Messages;
 using System;
 
@@ -23,7 +24,6 @@ internal class ServerPlayerHandler : IHandler
     {
         var player = obj.What.Player;
         network.SendAll(new NetworkRegisterPlayer(player)); 
-
     }
 
     public void Dispose()

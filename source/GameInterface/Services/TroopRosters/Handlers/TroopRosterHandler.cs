@@ -1,26 +1,26 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
+using Common.Util;
 using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using GameInterface.Services.TroopRosters.Patches;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
 
 public class TroopRosterHandler : IHandler
 {
-
     private static readonly ILogger Logger = LogManager.GetLogger<TroopRosterHandler>();
     private readonly IMessageBroker messageBroker;
     private readonly IObjectManager objectManager;
     private readonly INetwork network;
-
-    private const bool Debug = true;
 
     public TroopRosterHandler(IMessageBroker messageBroker, IObjectManager objectManager, INetwork network)
     {
@@ -30,6 +30,15 @@ public class TroopRosterHandler : IHandler
 
         messageBroker.Subscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
         messageBroker.Subscribe<RecruitTroops>(HandleOnRecruitmentDone);
+
+        messageBroker.Subscribe<TroopRemoved>(Handle_TroopRemoved);
+        messageBroker.Subscribe<NetworkRemoveTroop>(Handle_NetworkRemoveTroop);
+    }
+
+    public void Dispose()
+    {
+        messageBroker.Unsubscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
+        messageBroker.Unsubscribe<RecruitTroops>(HandleOnRecruitmentDone);
     }
 
     public void HandleOnRecruitmentDone(MessagePayload<RecruitTroops> payload)
@@ -88,11 +97,11 @@ public class TroopRosterHandler : IHandler
     private void HandleAddToCounts(MessagePayload<ChangeTroopRostersAddToCounts> payload)
     {
         var obj = payload.What;
-        if (!objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty party)) return;
+        if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
         if (!objectManager.TryGetObjectWithLogging(obj.Character, out CharacterObject characterObject)) return;
 
         AddToCountsTroopRosterPatch.RunAddToCounts(
-            party,
+            troopRoster,
             characterObject,
             obj.Count,
             obj.InsertAtFront,
@@ -102,9 +111,34 @@ public class TroopRosterHandler : IHandler
             obj.Index);
     }
 
-    public void Dispose()
+
+
+    private void Handle_TroopRemoved(MessagePayload<TroopRemoved> payload)
     {
-        messageBroker.Unsubscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
-        messageBroker.Unsubscribe<RecruitTroops>(HandleOnRecruitmentDone);
+        if (!objectManager.TryGetIdWithLogging(payload.What.TroopRoster, out var troopRosterId))
+            return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Troop, out var characterObjectId)) 
+           return;
+
+        var message = new NetworkRemoveTroop(
+            troopRosterId,
+            characterObjectId,
+            payload.What.NumberToRemove,
+            payload.What.Xp);
+
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkRemoveTroop(MessagePayload<NetworkRemoveTroop> payload)
+    {
+        if (!objectManager.TryGetObjectWithLogging(payload.What.TroopRosterId, out TroopRoster troopRoster))
+            return;
+        if (!objectManager.TryGetObjectWithLogging(payload.What.TroopId, out CharacterObject troop))
+            return;
+
+        using(new AllowedThread())
+        {
+            troopRoster.RemoveTroop(troop, payload.What.NumberToRemove, xp: payload.What.Xp);
+        }
     }
 }

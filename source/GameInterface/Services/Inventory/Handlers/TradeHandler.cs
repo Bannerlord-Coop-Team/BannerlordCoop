@@ -51,7 +51,7 @@ internal class TradeHandler : IHandler
         var what = payload.What;
 
         string fromRosterId = null;
-        if (!what.IsDonating && !objectManager.TryGetIdWithLogging(what.FromRoster, out fromRosterId)) return;
+        if (!what.CanGainXpFromDiscarding && !objectManager.TryGetIdWithLogging(what.FromRoster, out fromRosterId)) return;
 
         if (!objectManager.TryGetIdWithLogging(what.ToRoster, out var toRosterId)) return;
         if (!objectManager.TryGetIdWithLogging(what.Hero, out var heroId)) return;
@@ -71,7 +71,7 @@ internal class TradeHandler : IHandler
             fromRosterId is null,
             toRosterId,
             what.IsTrading,
-            what.IsDonating,
+            what.CanGainXpFromDiscarding,
             heroId,
             what.TotalAmount,
             what.MerchantGold,
@@ -107,7 +107,7 @@ internal class TradeHandler : IHandler
             fromRoster,
             toRoster,
             message.IsTrading,
-            message.IsDonating,
+            message.CanGainXpFromDiscarding,
             hero,
             message.TotalAmount,
             message.MerchantGold,

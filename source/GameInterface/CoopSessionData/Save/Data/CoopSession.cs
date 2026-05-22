@@ -1,9 +1,9 @@
 ﻿using Autofac.Features.OwnedInstances;
 using Common;
-using GameInterface.Serialization.External;
 using GameInterface.Services.Entity.Data;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Players.Data;
 using ProtoBuf;
 using Serilog.Core;
 using System.Collections.Generic;
@@ -21,6 +21,7 @@ public interface ICoopSession
 {
     string UniqueGameId { get; }
     Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
+    Player[] Players { get; }
     CraftingPlayerData CraftingPlayerData { get; }
 }
 
@@ -33,12 +34,15 @@ public class CoopSession : ICoopSession
     [ProtoMember(2)]
     public Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
     [ProtoMember(3)]
+    public Player[] Players { get; }
+    [ProtoMember(4)]
     public CraftingPlayerData CraftingPlayerData { get; }
 
-    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>> controlledEntityMap, CraftingPlayerData craftingPlayerData)
+    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>>  controlledEntityMap, Player[] players, CraftingPlayerData craftingPlayerData)
     {
         UniqueGameId = uniqueGameId;
         ControlledEntityMap = controlledEntityMap;
+        Players = players;
         CraftingPlayerData = craftingPlayerData;
     }
 

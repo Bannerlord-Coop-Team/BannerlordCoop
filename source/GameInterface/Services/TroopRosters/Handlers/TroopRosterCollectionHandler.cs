@@ -29,6 +29,8 @@ namespace GameInterface.Services.TroopRosters.Handlers
 
             messageBroker.Subscribe<TroopRosterDataUpdated>(Handle);
             messageBroker.Subscribe<NetworkUpdateTroopRosterData>(Handle);
+
+            //messageBroker.Subscribe<TroopRosterAddToCountsAtIndexChanged>(Handle_TroopRosterAddToCountsAtIndexChanged);
         }
 
         public void Dispose()
@@ -41,11 +43,14 @@ namespace GameInterface.Services.TroopRosters.Handlers
         {
             var data = payload.What;
 
-            if (!objectManager.TryGetId(data.Instance, out string RosterId)) return;
+            if (!objectManager.TryGetIdWithLogging(data.Instance, out string troopRosterId)) return;
 
-            objectManager.TryGetId(data.Value.Character, out string CharacterId);
+            if (!objectManager.TryGetIdWithLogging(data.Value.Character, out string characterObjectId))
+                return;
 
-            network.SendAll(new NetworkUpdateTroopRosterData(RosterId, CharacterId,
+            network.SendAll(new NetworkUpdateTroopRosterData(
+                troopRosterId,
+                characterObjectId,
                 data.Value._number,
                 data.Value._woundedNumber,
                 data.Value._xp,
@@ -72,5 +77,18 @@ namespace GameInterface.Services.TroopRosters.Handlers
             troopRoster.ValidateTroopListCache();
             troopRoster._count = troopRoster.data.Length;
         }
+
+        //private void Handle_TroopRosterAddToCountsAtIndexChanged(MessagePayload<TroopRosterAddToCountsAtIndexChanged> payload)
+        //{
+        //    var data = payload.What;
+
+        //    if (!objectManager.TryGetIdWithLogging(data.TroopRoster, out string troopRosterId)) return;
+
+        //    network.SendAll(new NetworkUpdateTroopRosterData(RosterId, CharacterId,
+        //        data.Value._number,
+        //        data.Value._woundedNumber,
+        //        data.Value._xp,
+        //        data.Index));
+        //}
     }
 }

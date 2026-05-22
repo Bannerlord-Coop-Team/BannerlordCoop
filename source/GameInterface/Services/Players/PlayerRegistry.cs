@@ -1,4 +1,6 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.MobileParties.Extensions;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
 using System.Collections;
@@ -30,11 +32,13 @@ public interface IPlayerRegistry: IEnumerable<Player>
 internal class PlayerRegistry : IPlayerRegistry
 {
     private readonly IMessageBroker messageBroker;
+    private readonly IObjectManager objectManager;
     private readonly HashSet<Player> _players = new HashSet<Player>();
     private readonly HashSet<string> _playerMobileParties = new HashSet<string>();
 
-    public PlayerRegistry(IMessageBroker messageBroker) {
+    public PlayerRegistry(IMessageBroker messageBroker, IObjectManager objectManager) {
         this.messageBroker = messageBroker;
+        this.objectManager = objectManager;
     }
 
     /// <inheritdoc cref="IPlayerRegistry.AddPlayer(Player)"/>
@@ -42,15 +46,25 @@ internal class PlayerRegistry : IPlayerRegistry
     {
         if (!_players.Add(player)) return false;
 
-        if (!_playerMobileParties.Add(player.PartyStringId)) return false;
+        if (!_playerMobileParties.Add(player.PartyId)) return false;
+
+        if (objectManager.TryGetObjectWithLogging<MobileParty>(player.PartyId, out var mobileParty))
+        {
+            mobileParty.InvalidatePartyCache();
+        }
+
         messageBroker.Publish(this, new PlayerRegistered(player));
+
         return true;
     }
 
     /// <inheritdoc cref="IPlayerRegistry.Contains(MobileParty)"/>
     public bool Contains(MobileParty player)
     {
-        return _playerMobileParties.Contains(player.StringId);
+        if (!objectManager.TryGetIdWithLogging(player, out var partyId))
+            return false;
+
+        return _playerMobileParties.Contains(partyId);
     }
 
     public IEnumerator<Player> GetEnumerator()

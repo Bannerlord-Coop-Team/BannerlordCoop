@@ -60,7 +60,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             // Assign values
             kingdomObject.LastMercenaryOfferTime = new CampaignTime();
             kingdomObject.NotAttackableByPlayerUntilTime= new CampaignTime();
-            kingdomObject.LastArmyCreationDay = ReflectionExtensions.Random<int>();
 
             // Create settlements for one of the kingdoms cache lists
             Settlement settlement1 = (Settlement)FormatterServices.GetUninitializedObject(typeof(Settlement));
@@ -103,7 +102,6 @@ namespace GameInterface.Tests.Serialization.SerializerTests
             Kingdom newKingdomObject = returnedPackage.Unpack<Kingdom>(deserializeFactory);
 
             Assert.Equal(kingdomObject.LastMercenaryOfferTime, newKingdomObject.LastMercenaryOfferTime);
-            Assert.Equal(kingdomObject.LastArmyCreationDay, newKingdomObject.LastArmyCreationDay);
 
             List<Settlement> newSettlements = kingdomObject._settlementsCache;
             Assert.Equal(settlements.Count, newSettlements.Count);

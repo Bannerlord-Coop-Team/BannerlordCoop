@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using GameInterface.Services.Entity.Data;
+using GameInterface.Services.MobileParties.Extensions;
 using ProtoBuf;
 using Serilog;
 using System;
@@ -199,6 +200,8 @@ internal class ControlledEntityRegistry : IControlledEntityRegistry
 
             return false;
         }
+
+        PartyExtensions.InvalidateCache();
 
         return result;
     }

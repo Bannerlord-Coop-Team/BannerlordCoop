@@ -16,15 +16,12 @@ public record NetworkChangeSettlementMobileParty : IEvent
     [ProtoMember(2)]
     public string MobilePartyId { get; }
     [ProtoMember(3)]
-    public int NumberOfLordParties { get; }
-    [ProtoMember(4)]
     public bool AddMobileParty { get; }
 
-    public NetworkChangeSettlementMobileParty(string settlementId, string mobilePartyId, int numberOfLordParties, bool addMobileParty)
+    public NetworkChangeSettlementMobileParty(string settlementId, string mobilePartyId, bool addMobileParty)
     {
         SettlementId = settlementId;
         MobilePartyId = mobilePartyId;
-        NumberOfLordParties = numberOfLordParties;
         AddMobileParty = addMobileParty;
     }
 }

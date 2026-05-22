@@ -11,7 +11,7 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch(typeof(MapEventManager))]
 internal class MapEventManagerTickDisable
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<MapEventCollectionPatches>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MapEventManagerTickDisable>();
 
     [HarmonyPatch(nameof(MapEventManager.Tick))]
     [HarmonyPrefix]

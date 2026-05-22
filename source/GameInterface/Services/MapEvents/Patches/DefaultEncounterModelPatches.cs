@@ -17,16 +17,16 @@ internal class DefaultEncounterModelPatches
     {
         if (__result == null) return;
 
-        if (attackerParty.IsMobile && attackerParty.MobileParty.IsPlayerParty())
-        {
-            var message = new PlayerEncounterStarted(attackerParty.MobileParty, __result.MapEvent);
-            MessageBroker.Instance.Publish(attackerParty.MobileParty, message);
-        }
+        //if (attackerParty.IsMobile && attackerParty.MobileParty.IsPlayerParty())
+        //{
+        //    var message = new PlayerEncounterStarted(attackerParty.MobileParty, __result.MapEvent);
+        //    MessageBroker.Instance.Publish(attackerParty.MobileParty, message);
+        //}
 
-        if (defenderParty.IsMobile && defenderParty.MobileParty.IsPlayerParty())
-        {
-            var message = new PlayerEncounterStarted(defenderParty.MobileParty, __result.MapEvent);
-            MessageBroker.Instance.Publish(defenderParty.MobileParty, message);
-        }
+        //if (defenderParty.IsMobile && defenderParty.MobileParty.IsPlayerParty())
+        //{
+        //    var message = new PlayerEncounterStarted(defenderParty.MobileParty, __result.MapEvent);
+        //    MessageBroker.Instance.Publish(defenderParty.MobileParty, message);
+        //}
     }
 }

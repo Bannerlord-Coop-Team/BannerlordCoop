@@ -1,21 +1,21 @@
-﻿using System.Collections.Generic;
-using System.Reflection;
-using Common.Logging;
-using GameInterface.Services.TroopRosters.Messages;
-using GameInterface.Utils;
-using HarmonyLib;
-using Serilog;
-using TaleWorlds.CampaignSystem.Roster;
+﻿//using System.Collections.Generic;
+//using System.Reflection;
+//using Common.Logging;
+//using GameInterface.Services.TroopRosters.Messages;
+//using GameInterface.Utils;
+//using HarmonyLib;
+//using Serilog;
+//using TaleWorlds.CampaignSystem.Roster;
 
-namespace GameInterface.Services.TroopRosters.Patches
-{
-    [HarmonyPatch]
-    internal class TroopRosterCollectionPatches : GenericPatches<TroopRosterCollectionPatches, TroopRoster>
-    {
-        static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(TroopRoster));
+//namespace GameInterface.Services.TroopRosters.Patches
+//{
+//    [HarmonyPatch]
+//    internal class TroopRosterCollectionPatches : GenericPatches<TroopRosterCollectionPatches, TroopRoster>
+//    {
+//        static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredMethods(typeof(TroopRoster));
 
-        [HarmonyTranspiler]
-        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
-        => ArrayFieldChangeTranspiler<TroopRosterElement, TroopRosterDataUpdated>(instructions, nameof(TroopRoster.data));
-    }
-}
+//        [HarmonyTranspiler]
+//        static IEnumerable<CodeInstruction> Transpiler(IEnumerable<CodeInstruction> instructions)
+//        => ArrayFieldChangeTranspiler<TroopRosterElement, TroopRosterDataUpdated>(instructions, nameof(TroopRoster.data));
+//    }
+//}
