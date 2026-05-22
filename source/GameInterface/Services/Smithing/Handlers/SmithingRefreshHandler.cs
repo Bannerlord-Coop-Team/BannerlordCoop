@@ -1,11 +1,8 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
-using Common.Network;
-using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Messages;
-using HarmonyLib;
 using Serilog;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -82,8 +79,11 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<RefreshWeaponDesignVM> obj)
         {
-            if (Settlement.CurrentSettlement?.Town == obj.What.Town)
+            if (Settlement.CurrentSettlement?.Town == obj.What.Town && (bool)(currentCraftingVM?.IsInCraftingMode) && (bool)(currentWeaponDesignVM?.IsInOrderMode))
             {
+                // Need to add a way to close the crafting order selection if its open. This doesn't seem to work
+                //currentWeaponDesignVM?.ExecuteCloseOrderPopup();
+                
                 currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
                 CraftingOrderItemVM craftingOrderItemVM = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
                 if (craftingOrderItemVM != null)

@@ -169,7 +169,6 @@ namespace GameInterface.Services.Smithing.Handlers
             int[] smeltingOutputForItem = Campaign.Current.Models.SmithingModel.GetSmeltingOutputForItem(item);
 
             if (itemRoster.FindIndexOfElement(equipmentElement) < 0) return; // Needed to prevent spam clicking to smelt more than actually available
-
             itemRoster.AddToCounts(equipmentElement, -1);
             for (int i = 8; i >= 0; i--)
             {
@@ -178,7 +177,6 @@ namespace GameInterface.Services.Smithing.Handlers
                     itemRoster.AddToCounts(Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem((CraftingMaterials)i), smeltingOutputForItem[i]);
                 }
             }
-            
 
             int energyCostForSmelting = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmelting(item, craftingHero);
             int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmelting;

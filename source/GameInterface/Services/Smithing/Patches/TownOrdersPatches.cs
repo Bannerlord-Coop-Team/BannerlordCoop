@@ -17,6 +17,7 @@ using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
 using TaleWorlds.Core;
 using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
@@ -39,17 +40,8 @@ namespace GameInterface.Services.Smithing.Patches
             // Server should create random town orders to be consistent for all clients
             if (ModInformation.IsClient) return false;
 
-            // Replace TaleWorlds implementation for server
-            float townOrderDifficulty = CraftingCampaignBehavior.GetTownOrderDifficulty(orderOwner.CurrentSettlement.Town, orderSlot);
-            int pieceTier = (int)townOrderDifficulty / 50;
-            CraftingTemplate randomElement = CraftingTemplate.All.GetRandomElement<CraftingTemplate>();
-            string nextTownOrderId = __instance.GetNextTownOrderId();
-            WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), __instance.GetWeaponPieces(randomElement, pieceTier), nextTownOrderId);
-            CraftingOrder order = new CraftingOrder(orderOwner, townOrderDifficulty, weaponDesignTemplate, randomElement, orderSlot, nextTownOrderId);
-            __instance._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(order);
-
             // Publish message with data for clients
-            var message = new TownOrderCreated(__instance, order, townOrderDifficulty, pieceTier, randomElement, orderOwner, orderSlot, nextTownOrderId);
+            var message = new TownOrderCreated(__instance, orderOwner, orderSlot);
             MessageBroker.Instance.Publish(__instance, message);
 
             // Skip original

@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
+using Common.Util;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ItemObjects.Interfaces;
 using GameInterface.Services.ObjectManager;
@@ -60,14 +61,13 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<TownOrderCreated> obj)
         {
-            SendTownOrderCreated(obj.What);
+            CreateTownOrderServer(obj.What);
         }
 
         private void Handle(MessagePayload<NetworkCreateTownOrder> obj)
         {
             CreateTownOrder(obj.What);
         }
-
         private void Handle(MessagePayload<CraftingOrderReplaced> obj)
         {
             SendCraftingOrderReplaced(obj.What);
@@ -96,32 +96,46 @@ namespace GameInterface.Services.Smithing.Handlers
             CompleteOrderClients(obj.What);
         }
 
-        private void SendTownOrderCreated(TownOrderCreated obj)
+        private void CreateTownOrderServer(TownOrderCreated obj)
+        {
+            // Replace TaleWorlds implementation for server
+            float townOrderDifficulty = CraftingCampaignBehavior.GetTownOrderDifficulty(obj.OrderOwner.CurrentSettlement.Town, obj.OrderSlot);
+            int pieceTier = (int)townOrderDifficulty / 50;
+            CraftingTemplate randomElement = CraftingTemplate.All.GetRandomElement<CraftingTemplate>();
+            string nextTownOrderId = obj.CraftingCampaignBehavior.GetNextTownOrderId();
+
+            WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), obj.CraftingCampaignBehavior.GetWeaponPieces(randomElement, pieceTier), nextTownOrderId);
+            objectManager.AddNewObject(weaponDesignTemplate, out var weaponDesignId);
+
+            CraftingOrder order;
+            order = new CraftingOrder(obj.OrderOwner, townOrderDifficulty, weaponDesignTemplate, randomElement, obj.OrderSlot, nextTownOrderId);
+            using (new AllowedThread())
+            {
+                order.PreCraftedWeaponDesignItem.StringId = nextTownOrderId;
+            }
+
+            obj.CraftingCampaignBehavior._craftingOrders[obj.OrderOwner.CurrentSettlement.Town].AddTownOrder(order);
+
+            SendTownOrderCreated(obj, order, randomElement, pieceTier, nextTownOrderId);
+        }
+
+        private void SendTownOrderCreated(TownOrderCreated obj, CraftingOrder craftingOrder, CraftingTemplate randomElement, int pieceTier, string nextTownOrderId)
         {
             if (!objectManager.TryGetIdWithLogging(obj.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.RandomElement, out var randomElementId)) return;
             if (!objectManager.TryGetIdWithLogging(obj.OrderOwner, out var orderOwnerId)) return;
+            if (!objectManager.TryGetIdWithLogging(randomElement, out var randomElementId)) return;
 
-            objectManager.AddExisting(obj.CraftingOrder.PreCraftedWeaponDesignItem.StringId, obj.CraftingOrder.PreCraftedWeaponDesignItem);
-            objectManager.AddNewObject(obj.CraftingOrder.WeaponDesignTemplate, out var weaponDesignId);
-
-            if (!objectManager.AddNewObject(obj.CraftingOrder, out var craftingOrderId) &&
-                !objectManager.TryGetIdWithLogging(obj.CraftingOrder, out craftingOrderId)) return;
-
-            if (!objectManager.TryGetIdWithLogging(obj.CraftingOrder.PreCraftedWeaponDesignItem, out var craftedItemId)) return;
+            if (!objectManager.AddNewObject(craftingOrder, out var craftingOrderId) &&
+                !objectManager.TryGetIdWithLogging(craftingOrder, out craftingOrderId)) return;
 
             // Send to clients from server
             NetworkCreateTownOrder message = new(
                 craftingCampaignBehaviorId,
-                craftingOrderId,
-                craftedItemId,
-                weaponDesignId,
-                obj.TownOrderDifficulty,
-                obj.PieceTier,
-                randomElementId,
                 orderOwnerId,
-                obj.OrderSlot,
-                obj.NextTownOrderId
+                craftingOrderId,
+                randomElementId,
+                pieceTier,
+                nextTownOrderId
             );
             network.SendAll(message);
         }
@@ -132,19 +146,17 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetObjectWithLogging(obj.RandomElementId, out CraftingTemplate randomElement)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.OrderOwnerId, out Hero orderOwner)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
-            if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
+
+            WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
+            craftingOrder._weaponDesignTemplate = weaponDesignTemplate;
+
+            using (new AllowedThread())
+            {
+                Crafting.GenerateItem(weaponDesignTemplate, TextObject.GetEmpty(), orderOwner.Culture, randomElement.ItemModifierGroup, ref craftingOrder.PreCraftedWeaponDesignItem, obj.NextTownOrderId);
+            }
+            craftingOrder._preCraftedWeaponDesignItemData = new CraftingCampaignBehavior.CraftedItemInitializationData(craftingOrder.WeaponDesignTemplate, craftingOrder.PreCraftedWeaponDesignItem.Name, craftingOrder.OrderOwner.Culture);
 
             // Replace TaleWorlds implementation
-            /* Can't do this way because CraftingOrder constructor includes random components
-            WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
-            craftingOrder = new CraftingOrder(orderOwner, obj.TownOrderDifficulty, weaponDesignTemplate, randomElement, obj.OrderSlot, obj.NextTownOrderId);
-            */
-
-            craftedItem.WeaponDesign = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
-            craftingOrder.PreCraftedWeaponDesignItem = craftedItem;
-            //craftingOrder.WeaponDesignTemplate = craftedItem.WeaponDesign;
-            craftingOrder._preCraftedWeaponDesignItemData = new CraftingCampaignBehavior.CraftedItemInitializationData(craftingOrder.WeaponDesignTemplate, craftingOrder.PreCraftedWeaponDesignItem.Name, craftingOrder.OrderOwner.Culture);
-            
             craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(craftingOrder);
 
             // Need to refresh client weapon designs for potential new orders while in CraftingState
@@ -281,7 +293,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
             CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
 
-            MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(town));
+            MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(town)); // Causes some errors sometimes with each being different and hard to replicate. Such as one in in RichText.cs and one in the GauntletLayer
         }
     }
 }

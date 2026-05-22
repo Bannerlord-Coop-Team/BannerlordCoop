@@ -11,24 +11,14 @@ namespace GameInterface.Services.Smithing.Messages;
 public record TownOrderCreated : IEvent
 {
     public CraftingCampaignBehavior CraftingCampaignBehavior;
-    public CraftingOrder CraftingOrder;
-    public float TownOrderDifficulty;
-    public int PieceTier;
-    public CraftingTemplate RandomElement;
     public Hero OrderOwner;
     public int OrderSlot;
-    public string NextTownOrderId;
 
-    public TownOrderCreated(CraftingCampaignBehavior craftingCampaignBehavior, CraftingOrder craftingOrder, float townOrderDifficulty, int pieceTier, CraftingTemplate randomElement, Hero orderOwner, int orderSlot, string nextTownOrderId)
+    public TownOrderCreated(CraftingCampaignBehavior craftingCampaignBehavior, Hero orderOwner, int orderSlot)
     {
         CraftingCampaignBehavior = craftingCampaignBehavior;
-        CraftingOrder = craftingOrder;
-        TownOrderDifficulty = townOrderDifficulty;
-        PieceTier = pieceTier;
-        RandomElement = randomElement;
         OrderOwner = orderOwner;
         OrderSlot = orderSlot;
-        NextTownOrderId = nextTownOrderId;
     }
 }
 
@@ -75,43 +65,27 @@ public class NetworkCreateTownOrder : ICommand
     public string CraftingCampaignBehaviorId;
 
     [ProtoMember(2)]
-    public string CraftingOrderId;
-
-    [ProtoMember(3)]
-    public string CraftedItemId;
-
-    [ProtoMember(4)]
-    public string WeaponDesignId;
-
-    [ProtoMember(5)]
-    public float TownOrderDifficulty;
-
-    [ProtoMember(6)]
-    public int PieceTier;
-
-    [ProtoMember(7)]
-    public string RandomElementId;
-
-    [ProtoMember(8)]
     public string OrderOwnerId;
 
-    [ProtoMember(9)]
-    public int OrderSlot;
+    [ProtoMember(3)]
+    public string CraftingOrderId;
 
-    [ProtoMember(10)]
+    [ProtoMember(4)]
+    public string RandomElementId; // CraftingTemplateId
+
+    [ProtoMember(5)]
+    public int PieceTier;
+
+    [ProtoMember(6)]
     public string NextTownOrderId;
 
-    public NetworkCreateTownOrder(string craftingCampaignBehaviorId, string craftingOrderId, string craftedItemId, string weaponDesignId, float townOrderDifficulty, int pieceTier, string randomElementId, string orderOwnerId, int orderSlot, string nextTownOrderId)
+    public NetworkCreateTownOrder(string craftingCampaignBehaviorId, string orderOwnerId, string craftingOrderId, string randomElementId, int pieceTier, string nextTownOrderId)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
-        CraftingOrderId = craftingOrderId;
-        CraftedItemId = craftedItemId;
-        WeaponDesignId = weaponDesignId;
-        TownOrderDifficulty = townOrderDifficulty;
-        PieceTier = pieceTier;
-        RandomElementId = randomElementId;
         OrderOwnerId = orderOwnerId;
-        OrderSlot = orderSlot;
+        CraftingOrderId = craftingOrderId;
+        RandomElementId = randomElementId;
+        PieceTier = pieceTier;
         NextTownOrderId = nextTownOrderId;
     }
 }

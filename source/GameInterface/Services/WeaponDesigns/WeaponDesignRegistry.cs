@@ -1,4 +1,5 @@
-﻿using Common;
+﻿/*
+using Common;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
@@ -46,3 +47,4 @@ internal class WeaponDesignRegistry : AutoRegistryBase<WeaponDesign>
     {
     }
 }
+*/
