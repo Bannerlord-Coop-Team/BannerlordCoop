@@ -23,7 +23,8 @@ public class DynamicSyncPropertyBuilder : DynamicSyncBuilderBase
         var templateData = GetTemplateData(propertyItem);
         string localMessage = DynamicSyncUtils.GetLocalSetMessage(propertyInfo);
         string networkMessage;
-        if (RuntimeTypeModel.Default.CanSerialize(propertyInfo.PropertyType))
+        var type = propertyInfo.PropertyType;
+        if (RuntimeTypeModel.Default.CanSerialize(type))
         {
             networkMessage = TemplateParser.Parse("Messages.NetworkSetValueMessageTemplate", templateData);
         }

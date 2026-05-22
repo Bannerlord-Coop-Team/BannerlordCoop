@@ -3,7 +3,7 @@ using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
-
+using TaleWorlds.CampaignSystem.Issues;
 namespace GameInterface.Surrogates;
 
 public interface ISurrogateCollection { }
@@ -22,6 +22,7 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ItemModifierGroup, ItemModifierGroupSurrogate>();
             AddSurrogate<ItemModifier, ItemModifierSurrogate>();
             AddSurrogate<TextObject, TextObjectSurrogate>();
+            AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
         }
     }
 
