@@ -13,7 +13,7 @@ public readonly struct TradeAttempted : IEvent
     public readonly ItemRoster FromRoster;
     public readonly ItemRoster ToRoster;
     public readonly bool IsTrading;
-    public readonly bool IsDonating;
+    public readonly bool CanGainXpFromDiscarding;
     public readonly Hero Hero;
     public readonly int TotalAmount;
     public readonly int MerchantGold;
@@ -27,7 +27,7 @@ public readonly struct TradeAttempted : IEvent
         ItemRoster fromRoster,
         ItemRoster toRoster,
         bool isTrading,
-        bool isDonating,
+        bool canGainXpFromDiscarding,
         Hero hero,
         int totalAmount,
         int merchantGold,
@@ -40,7 +40,7 @@ public readonly struct TradeAttempted : IEvent
         FromRoster = fromRoster;
         ToRoster = toRoster;
         IsTrading = isTrading;
-        IsDonating = isDonating;
+        CanGainXpFromDiscarding = canGainXpFromDiscarding;
         Hero = hero;
         TotalAmount = totalAmount;
         MerchantGold = merchantGold;

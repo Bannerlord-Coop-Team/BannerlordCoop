@@ -8,7 +8,7 @@ using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MobileParties.Extensions;
 
-internal static class PartyExtensions
+public static class PartyExtensions
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MobileParty>();
 

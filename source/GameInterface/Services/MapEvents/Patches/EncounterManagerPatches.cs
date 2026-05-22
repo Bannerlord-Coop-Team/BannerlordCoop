@@ -22,8 +22,6 @@ namespace GameInterface.Services.MapEvents.Patches;
 [HarmonyPatch(typeof(EncounterManager))]
 internal class EncounterManagerPatches
 {
-    private const bool Enabled = false;
-
     private static ILogger Logger = LogManager.GetLogger<EncounterManagerPatches>();
 
     [HarmonyPrefix]
@@ -56,7 +54,11 @@ internal class EncounterManagerPatches
     [HarmonyPrefix]
     public static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
     {
-        if (!Enabled) return false;
+        if (!MapEventConfig.Enabled) return false;
+
+        // Disable player interactions
+        if (attackerParty.IsMobile && attackerParty.MobileParty.IsPlayerParty() &&
+            defenderParty.IsMobile && defenderParty.MobileParty.IsPlayerParty()) return false;
 
         if (AllowedThread.IsThisThreadAllowed()) return true;
 

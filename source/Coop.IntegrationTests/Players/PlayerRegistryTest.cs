@@ -23,16 +23,8 @@ namespace Coop.IntegrationTests.Players
         [Fact]
         public void ServerNewPlayerRegistered_ClientPublishes_RegisterPlayer()
         {
-            Player player = new Player()
-            {
-                HeroData = Array.Empty<byte>(),
-                HeroStringId = "Hero-CoopParty",
-                PartyStringId = "CoopParty",
-                CharacterObjectStringId = "characterObjectID",
-                ClanStringId = "ClanStringID"
-            };
+            var player = new Player("CoopParty");
             
-     
             var message = new PlayerRegistered(player);
 
             var server1 = TestEnvironment.Server;

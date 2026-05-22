@@ -2,11 +2,12 @@
 using Common.Messaging;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Messages;
 public readonly struct TroopRosterAddToCountsChanged : ICommand
 {
-    public readonly MobileParty MobileParty;
+    public readonly TroopRoster TroopRoster;
     public readonly CharacterObject CharacterObject;
 
     public readonly int Count;
@@ -18,7 +19,7 @@ public readonly struct TroopRosterAddToCountsChanged : ICommand
     public readonly int Index;
 
     public TroopRosterAddToCountsChanged(
-        MobileParty mobileParty,
+        TroopRoster troopRoster,
         CharacterObject characterObject,
         int count,
         bool insertAtFront,
@@ -27,7 +28,7 @@ public readonly struct TroopRosterAddToCountsChanged : ICommand
         bool removeDepleted,
         int index)
     {
-        MobileParty = mobileParty;
+        TroopRoster = troopRoster;
         CharacterObject = characterObject;
         Count = count;
         InsertAtFront = insertAtFront;

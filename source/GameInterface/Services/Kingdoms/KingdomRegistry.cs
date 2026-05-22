@@ -58,7 +58,6 @@ internal class KingdomRegistry : AutoRegistryBase<Kingdom>
             obj._distanceToClosestNonAllyFortificationCacheDirty = true;
             obj._isEliminated = false;
             obj.NotAttackableByPlayerUntilTime = CampaignTime.Zero;
-            obj.LastArmyCreationDay = (int)CampaignTime.Now.ToDays;
         }
 
         MBObjectManager.Instance?.RegisterPresumedObject(obj);

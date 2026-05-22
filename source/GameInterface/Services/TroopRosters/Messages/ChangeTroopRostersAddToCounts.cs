@@ -1,12 +1,9 @@
 ﻿using Common.Messaging;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace GameInterface.Services.TroopRosters.Messages;
-public record ChangeTroopRostersAddToCounts : IEvent
+public record ChangeTroopRostersAddToCounts : ICommand
 {
-    public string MobilePartyId { get; }
+    public string TroopRosterId { get; }
     public string Character { get; }
 
     public int Count { get; }
@@ -17,9 +14,9 @@ public record ChangeTroopRostersAddToCounts : IEvent
     public bool RemoveDepleted { get; }
     public int Index { get; }
 
-    public ChangeTroopRostersAddToCounts(string mobilePartyId, string character, int count, bool insertAtFront, int woundedCount, int xpChanged, bool removeDepleted, int index)
+    public ChangeTroopRostersAddToCounts(string troopRosterId, string character, int count, bool insertAtFront, int woundedCount, int xpChanged, bool removeDepleted, int index)
     {
-        MobilePartyId = mobilePartyId;
+        TroopRosterId = troopRosterId;
         Character = character;
         Count = count;
         InsertAtFront = insertAtFront;

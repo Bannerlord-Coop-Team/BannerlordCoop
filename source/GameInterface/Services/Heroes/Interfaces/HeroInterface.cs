@@ -28,7 +28,7 @@ public interface IHeroInterface : IGameAbstraction
     /// </summary>
     /// <param name="bytes">Hero as bytes</param>
     /// <returns>Hero string identifier</returns>
-    Player UnpackHero(string controllerId, byte[] bytes);
+    NetworkPlayerData UnpackHero(string controllerId, byte[] bytes);
 }
 
 internal class HeroInterface : IHeroInterface
@@ -61,7 +61,7 @@ internal class HeroInterface : IHeroInterface
         return BinaryFormatterSerializer.Serialize(package);
     }
 
-    public Player UnpackHero(string controllerId, byte[] bytes)
+    public NetworkPlayerData UnpackHero(string controllerId, byte[] bytes)
     {
         Hero hero = null;
 
@@ -76,13 +76,13 @@ internal class HeroInterface : IHeroInterface
         // Retrieve the Coop-assigned IDs so they can be written back onto each object's
         // StringId. If null (due to an ID collision fixed in AutoRegistry.RegisterExistingObject),
         // log and skip — assigning null would corrupt the object in CampaignObjectManager.
-        if (objectManager.TryGetId(hero, out var heroId) == false)
+        if (!objectManager.TryGetId(hero, out var heroId))
             Logger.Error("Failed to retrieve coop ID for hero, StringId will not be updated");
-        if (objectManager.TryGetId(hero.PartyBelongedTo, out var partyId) == false)
+        if (!objectManager.TryGetId(hero.PartyBelongedTo, out var partyId))
             Logger.Error("Failed to retrieve coop ID for hero's party (StringId={ExistingId}), StringId will not be updated", hero.PartyBelongedTo?.StringId);
-        if (objectManager.TryGetId(hero.CharacterObject, out var characterObjectId) == false)
+        if (!objectManager.TryGetId(hero.CharacterObject, out var characterObjectId))
             Logger.Error("Failed to retrieve coop ID for hero's CharacterObject, StringId will not be updated");
-        if (objectManager.TryGetId(hero.Clan, out var clanId) == false)
+        if (!objectManager.TryGetId(hero.Clan, out var clanId))
             Logger.Error("Failed to retrieve coop ID for hero's Clan, StringId will not be updated");
 
         //using (new AllowedThread())
@@ -100,7 +100,7 @@ internal class HeroInterface : IHeroInterface
         entityRegistry.RegisterAsControlled(controllerId, characterObjectId);
         entityRegistry.RegisterAsControlled(controllerId, clanId);
 
-        return new Player()
+        return new NetworkPlayerData()
         {
             HeroData = bytes,
             HeroStringId = heroId,

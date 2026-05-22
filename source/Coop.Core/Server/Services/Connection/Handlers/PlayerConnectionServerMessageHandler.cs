@@ -43,7 +43,7 @@ namespace Coop.Core.Server.Services.Connection.Handlers
 
         internal void Handle_NetworkConnected(MessagePayload<PackageGameSaveData> obj)
         {
-            messageBroker.Publish(this, new SendInformationMessage("A new player is joining the game, pausing"));
+            messageBroker.Publish(this, new SendInformationMessage("A player is joining the game, pausing"));
         }
 
         private void PlayerCampaignEnteredHandler(MessagePayload<PlayerCampaignEntered> obj)
