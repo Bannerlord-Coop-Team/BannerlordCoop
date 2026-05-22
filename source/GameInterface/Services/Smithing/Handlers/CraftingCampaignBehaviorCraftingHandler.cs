@@ -167,6 +167,10 @@ namespace GameInterface.Services.Smithing.Handlers
             // Replace original TaleWorlds implementation
             ItemRoster itemRoster = craftingHero.PartyBelongedTo.ItemRoster;
             int[] smeltingOutputForItem = Campaign.Current.Models.SmithingModel.GetSmeltingOutputForItem(item);
+
+            if (itemRoster.FindIndexOfElement(equipmentElement) < 0) return; // Needed to prevent spam clicking to smelt more than actually available
+
+            itemRoster.AddToCounts(equipmentElement, -1);
             for (int i = 8; i >= 0; i--)
             {
                 if (smeltingOutputForItem[i] != 0)
@@ -174,7 +178,7 @@ namespace GameInterface.Services.Smithing.Handlers
                     itemRoster.AddToCounts(Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem((CraftingMaterials)i), smeltingOutputForItem[i]);
                 }
             }
-            itemRoster.AddToCounts(equipmentElement, -1);
+            
 
             int energyCostForSmelting = Campaign.Current.Models.SmithingModel.GetEnergyCostForSmelting(item, craftingHero);
             int newHeroCraftingStamina = craftingCampaignBehavior.GetHeroCraftingStamina(craftingHero) - energyCostForSmelting;
@@ -228,11 +232,13 @@ namespace GameInterface.Services.Smithing.Handlers
             if (formula.Input1Count > 0)
             {
                 ItemObject craftingMaterialItem = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input1);
+                if (itemRoster.FindIndexOfElement(new EquipmentElement(craftingMaterialItem, null, null, false)) < 0) return; // Needed to prevent spam clicking to refine more than actually available
                 itemRoster.AddToCounts(craftingMaterialItem, -formula.Input1Count);
             }
             if (formula.Input2Count > 0)
             {
                 ItemObject craftingMaterialItem2 = Campaign.Current.Models.SmithingModel.GetCraftingMaterialItem(formula.Input2);
+                if (itemRoster.FindIndexOfElement(new EquipmentElement(craftingMaterialItem2, null, null, false)) < 0) return; // Needed to prevent spam clicking to refine more than actually available
                 itemRoster.AddToCounts(craftingMaterialItem2, -formula.Input2Count);
             }
             if (formula.OutputCount > 0)
