@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
@@ -49,8 +50,11 @@ public record WeaponDesignVMCreated : IEvent
 
 public record RefreshWeaponDesignVM : IEvent
 {
-    public RefreshWeaponDesignVM()
+    public Town Town;
+
+    public RefreshWeaponDesignVM(Town town)
     {
+        Town = town;
     }
 }
 

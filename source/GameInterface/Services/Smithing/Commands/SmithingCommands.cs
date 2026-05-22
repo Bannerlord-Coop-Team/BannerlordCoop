@@ -3,11 +3,7 @@ using Common;
 using Common.Logging;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Players;
-using GameInterface.Services.Players.Data;
 using Serilog;
-using Serilog.Core;
-using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
@@ -95,6 +91,9 @@ internal class SmithingCommands
         return "Hero not found.";
     }
 
+    /// <summary>
+    /// View town orders for a specified town
+    /// </summary>
     [CommandLineArgumentFunction("townorders", "coop.debug.crafting")]
     public static string ViewTownOrdersCommand(List<string> strings)
     {
@@ -124,6 +123,9 @@ internal class SmithingCommands
         return "Town not found.";
     }
 
+    /// <summary>
+    /// Add orders to a town by a hero in that town
+    /// </summary>
     [CommandLineArgumentFunction("addtownorder", "coop.debug.crafting")]
     public static string AddTestingTownOrderCommand(List<string> strings)
     {
@@ -155,6 +157,9 @@ internal class SmithingCommands
         return "Town not found.";
     }
 
+    /// <summary>
+    /// Add all existing crafted items to a given hero
+    /// </summary>
     [CommandLineArgumentFunction("addcrafteditems", "coop.debug.crafting")]
     public static string AddCraftedItemCommand(List<string> strings)
     {
@@ -197,6 +202,9 @@ internal class SmithingCommands
         return "Town not found.";
     }
 
+    /// <summary>
+    /// View crafted item history, showing all players on server and current player on client
+    /// </summary>
     [CommandLineArgumentFunction("crafteditemhistory", "coop.debug.crafting")]
     public static string ViewCraftedItemHistoryCommand(List<string> strings)
     {
@@ -231,6 +239,9 @@ internal class SmithingCommands
         return "Error finding crafting player data or no crafted item history";
     }
 
+    /// <summary>
+    /// View crafted pieces xp, showing all players on server and current player on client
+    /// </summary>
     [CommandLineArgumentFunction("craftingpiecesxp", "coop.debug.crafting")]
     public static string ViewPartsXpCommand(List<string> strings)
     {
@@ -265,6 +276,9 @@ internal class SmithingCommands
         return "Error finding crafting player data or no parts xp data";
     }
 
+    /// <summary>
+    /// View unlocked crafted pieces, showing all players on server and current player on client
+    /// </summary>
     [CommandLineArgumentFunction("unlockedcraftingpieces", "coop.debug.crafting")]
     public static string ViewUnlockedCraftingPieces(List<string> strings)
     {

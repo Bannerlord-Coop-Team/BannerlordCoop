@@ -1,36 +1,48 @@
-﻿using GameInterface.Registry;
+﻿using Common;
+using GameInterface.Registry.Auto;
+using GameInterface.Services.ObjectManager;
+using HarmonyLib;
+using Serilog;
+using System;
 using System.Collections.Generic;
-using System.Threading;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.CampaignBehaviors;
+using System.Reflection;
 using TaleWorlds.Core;
-using static TaleWorlds.CampaignSystem.CampaignBehaviors.CraftingCampaignBehavior;
+using TaleWorlds.ObjectSystem;
 
-namespace GameInterface.Services.ItemObjects
+namespace GameInterface.Services.WeaponDesigns;
+
+internal class WeaponDesignRegistry : AutoRegistryBase<WeaponDesign>
 {
-    internal class WeaponDesignRegistry : RegistryBase<WeaponDesign>
+    public WeaponDesignRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
+        : base(logger, autoRegistryFactory, objectManager)
     {
-        private const string ItemObjectIdPrefix = "CoopWeaponDesign";
-        private int InstanceCounter = 0;
+    }
 
-        public WeaponDesignRegistry(IRegistryCollection collection) : base(collection) { }
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(WeaponDesign));
 
-        public override void RegisterAll()
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+
+    public override void RegisterAllObjects()
+    {
+        foreach (var itemObject in MBObjectManager.Instance.GetObjectTypeList<ItemObject>())
         {
-            var dict = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>()._craftedItemDictionary;
-            foreach (KeyValuePair<ItemObject, CraftedItemInitializationData> craft in dict)
-            {
-                var networkId = $"{nameof(WeaponDesign)}_{craft.Key.StringId}";
-                if (RegisterNewObject(craft.Value.CraftedData, out var _) == false)
-                {
-                    Logger.Error($"Unable to register {craft.Value.CraftedData}");
-                }
-            }
+            objectManager.AddNewObject(itemObject.WeaponDesign, out var _);
         }
+    }
 
-        protected override string GetNewId(WeaponDesign obj)
-        {
-            return $"{ItemObjectIdPrefix}_{Interlocked.Increment(ref InstanceCounter)}";
-        }
+    public override void OnClientCreated(WeaponDesign obj, string id)
+    {
+    }
+
+    public override void OnClientDestroyed(WeaponDesign obj, string id)
+    {
+    }
+
+    public override void OnServerCreated(WeaponDesign obj, string id)
+    {
+    }
+
+    public override void OnServerDestroyed(WeaponDesign obj, string id)
+    {
     }
 }

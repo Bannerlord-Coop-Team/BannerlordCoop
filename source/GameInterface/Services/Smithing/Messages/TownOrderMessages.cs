@@ -78,27 +78,35 @@ public class NetworkCreateTownOrder : ICommand
     public string CraftingOrderId;
 
     [ProtoMember(3)]
-    public float TownOrderDifficulty;
+    public string CraftedItemId;
 
     [ProtoMember(4)]
-    public int PieceTier;
+    public string WeaponDesignId;
 
     [ProtoMember(5)]
-    public string RandomElementId;
+    public float TownOrderDifficulty;
 
     [ProtoMember(6)]
-    public string OrderOwnerId;
+    public int PieceTier;
 
     [ProtoMember(7)]
-    public int OrderSlot;
+    public string RandomElementId;
 
     [ProtoMember(8)]
+    public string OrderOwnerId;
+
+    [ProtoMember(9)]
+    public int OrderSlot;
+
+    [ProtoMember(10)]
     public string NextTownOrderId;
 
-    public NetworkCreateTownOrder(string craftingCampaignBehaviorId, string craftingOrderId, float townOrderDifficulty, int pieceTier, string randomElementId, string orderOwnerId, int orderSlot, string nextTownOrderId)
+    public NetworkCreateTownOrder(string craftingCampaignBehaviorId, string craftingOrderId, string craftedItemId, string weaponDesignId, float townOrderDifficulty, int pieceTier, string randomElementId, string orderOwnerId, int orderSlot, string nextTownOrderId)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         CraftingOrderId = craftingOrderId;
+        CraftedItemId = craftedItemId;
+        WeaponDesignId = weaponDesignId;
         TownOrderDifficulty = townOrderDifficulty;
         PieceTier = pieceTier;
         RandomElementId = randomElementId;

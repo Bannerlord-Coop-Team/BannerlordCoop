@@ -18,9 +18,7 @@ internal class CraftingPieceRegistry : AutoRegistryBase<CraftingPiece>
     {
     }
 
-    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(CraftingPiece))
-    };
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(CraftingPiece));
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 

@@ -357,6 +357,7 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
+            craftedItemObject.ItemComponent = null; // Need to clear the generated item component from the client, otherwise get duplicate weapons in Crafting.Generateitem
             using (new AllowedThread())
             {
                 Crafting.GenerateItem(
@@ -411,8 +412,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
             if (GameStateManager.Current.ActiveState is CraftingState currentState && currentState.CraftingLogic._craftedItemObject.StringId == nextCraftedItemId) // Only run on associated client with matching id
             {
-                // This line is duplicating the elements of craftedItemObject.Weapons, unsure if this causes any issues
-                currentState.CraftingLogic.SetItemObject(craftedItemObject, nextCraftedItemId);
+                currentState.CraftingLogic._craftedItemObject = craftedItemObject;
 
                 AddItemToHistoryPatch.OverrideAddItemToHistory(ref craftingCampaignBehavior, craftedItemObject);
             }

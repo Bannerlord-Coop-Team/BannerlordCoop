@@ -7,11 +7,14 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
+using System.Linq;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
+using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign.Order;
 
 namespace GameInterface.Services.Smithing.Handlers
 {
@@ -79,15 +82,28 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<RefreshWeaponDesignVM> obj)
         {
-            // Error, object reference not set to instance of object. Happens when another client also has a WeaponDesignVM open?
-            currentWeaponDesignVM?.RefreshWeaponDesignMode(null);
+            if (Settlement.CurrentSettlement?.Town == obj.What.Town)
+            {
+                currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
+                CraftingOrderItemVM craftingOrderItemVM = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
+                if (craftingOrderItemVM != null)
+                {
+                    currentWeaponDesignVM?.CraftingOrderPopup?.SelectOrder(craftingOrderItemVM);
+                }
+                else
+                {
+                    currentWeaponDesignVM?.ExecuteOpenFreeBuildTab();
+                }
+
+                RefreshCraftingVM();
+            }
         }
 
         private void Handle(MessagePayload<NetworkRefreshSmelting> obj)
         {
             currentSmeltingVM?.RefreshValues();
             currentSmeltingVM?.RefreshList();
-            
+
             RefreshCraftingVM();
         }
 
@@ -108,8 +124,8 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void RefreshCraftingVM()
         {
-            currentCraftingVM?.UpdateAll();
             currentCraftingVM?.RefreshValues();
+            currentCraftingVM?.UpdateAll();
         }
     }
 }
