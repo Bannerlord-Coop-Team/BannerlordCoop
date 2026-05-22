@@ -89,7 +89,7 @@ internal class MapEventHandler : IHandler
                 //        break;
                 //}
 
-                mapEvent.MapEventVisual.Initialize(mapEvent.Position, mapEvent.GetBattleSizeValue(), mapEvent.IsVisible);
+                mapEvent.MapEventVisual.Initialize(mapEvent.Position, mapEvent.IsVisible);
                 mapEvent.Component.InitializeComponent();
 
                 //mapEvent.Initialize(attackerParty, defenderParty, component, (MapEvent.BattleTypes)payload.What.BattleType);

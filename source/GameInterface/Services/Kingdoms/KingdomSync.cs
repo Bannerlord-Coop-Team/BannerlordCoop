@@ -23,7 +23,6 @@ namespace GameInterface.Services.Kingdoms
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.InformalName)));
             //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.InitialHomeLand)));
             //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.LabelColor)));
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.LastArmyCreationDay)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.LastKingdomDecisionConclusionDate)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.LastMercenaryOfferTime)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(Kingdom), nameof(Kingdom.MainHeroCrimeRating)));

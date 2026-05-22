@@ -11,6 +11,8 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Core;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents;
 
@@ -48,6 +50,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         {
             obj.StringId = id;
             obj._sides = new MapEventSide[2];
+            obj.WonRounds = new MBList<BattleSideEnum>();
         }
     }
 

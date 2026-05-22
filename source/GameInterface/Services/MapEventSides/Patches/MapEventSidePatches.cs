@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEventSides.Patches;

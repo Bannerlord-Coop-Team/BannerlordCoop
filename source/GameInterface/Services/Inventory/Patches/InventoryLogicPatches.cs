@@ -58,7 +58,7 @@ internal class InventoryLogicPatches
             __instance._rosters[0],
             __instance._rosters[1],
             __instance.IsTrading,
-            __instance.IsDiscardDonating,
+            __instance.CanGainXpFromDiscarding,
             __instance.OwnerParty.LeaderHero,
             __instance.TotalAmount,
             __instance.InventoryListener.GetGold(),

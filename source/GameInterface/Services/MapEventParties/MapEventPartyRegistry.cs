@@ -48,6 +48,7 @@ internal class MapEventPartyRegistry : AutoRegistryBase<MapEventParty>
             obj._woundedInBattle = new TroopRoster();
             obj._diedInBattle = new TroopRoster();
             obj._routedInBattle = new TroopRoster();
+            obj._roster = new FlattenedTroopRoster();
         }
     }
 
