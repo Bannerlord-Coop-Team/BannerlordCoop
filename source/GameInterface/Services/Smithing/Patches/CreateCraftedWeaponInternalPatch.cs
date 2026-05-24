@@ -41,15 +41,15 @@ namespace GameInterface.Services.Smithing.Patches
             }
             Crafting craftingLogic = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic;
 
-            // Publish message with data
-            var message = new CraftedWeaponInternallyCreated(__instance, isFreeMode, crafterHero, craftedItemObject, weaponDesign, weaponModifier, nextCraftedItemId, Hero.MainHero, craftingLogic);
-            MessageBroker.Instance.Publish(__instance, message);
-
             // Need to return the ItemObject for client's CraftingVM
             __result = craftedItemObject;
 
             // Patched separately for sending to server
             __instance.AddResearchPoints(weaponDesign.Template, Campaign.Current.Models.SmithingModel.GetPartResearchGainForSmithingItem(craftedItemObject, crafterHero, isFreeMode));
+
+            // Publish message with data
+            var message = new CraftedWeaponInternallyCreated(__instance, isFreeMode, crafterHero, craftedItemObject, weaponDesign, weaponModifier, nextCraftedItemId, Hero.MainHero, craftingLogic);
+            MessageBroker.Instance.Publish(__instance, message);
 
             // Skip original to override original client saving
             return false;

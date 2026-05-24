@@ -1,27 +1,19 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Policies;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
-using System;
-using System.Collections.Generic;
-using System.Security;
-using System.Text;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
-using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.CampaignSystem.CraftingSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
 using TaleWorlds.Core;
-using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
-using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Smithing.Patches
 {
@@ -100,7 +92,13 @@ namespace GameInterface.Services.Smithing.Patches
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            __instance.GetOrderResult(craftingOrder, craftedItem, out var flag, out var _, out var _, out var _);
+            Logger.Information("CompleteOrderPatch Attempting to get order result....");
+            bool flag = false;
+            using (new AllowedThread())
+            {
+                __instance.GetOrderResult(craftingOrder, craftedItem, out flag, out var _, out var _, out var _);
+            }
+            Logger.Information("CompleteOrderPatch Order result ran.");
 
             // Publish message with data
             var message = new OrderCompleted(__instance, town, craftingOrder, craftedItem, completerHero, Hero.MainHero, flag);

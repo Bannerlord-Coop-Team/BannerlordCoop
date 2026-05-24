@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using Common.Util;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Messages;
 using Serilog;
@@ -79,24 +80,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<RefreshWeaponDesignVM> obj)
         {
-            if (Settlement.CurrentSettlement?.Town == obj.What.Town && (bool)(currentCraftingVM?.IsInCraftingMode) && (bool)(currentWeaponDesignVM?.IsInOrderMode))
-            {
-                // Need to add a way to close the crafting order selection if its open. This doesn't seem to work
-                //currentWeaponDesignVM?.ExecuteCloseOrderPopup();
-                
-                currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
-                CraftingOrderItemVM craftingOrderItemVM = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
-                if (craftingOrderItemVM != null)
-                {
-                    currentWeaponDesignVM?.CraftingOrderPopup?.SelectOrder(craftingOrderItemVM);
-                }
-                else
-                {
-                    currentWeaponDesignVM?.ExecuteOpenFreeBuildTab();
-                }
-
-                RefreshCraftingVM();
-            }
+            RefreshWeaponDesignVM(obj.What.Town);
         }
 
         private void Handle(MessagePayload<NetworkRefreshSmelting> obj)
@@ -126,6 +110,36 @@ namespace GameInterface.Services.Smithing.Handlers
         {
             currentCraftingVM?.RefreshValues();
             currentCraftingVM?.UpdateAll();
+        }
+
+        private void RefreshWeaponDesignVM(Town town)
+        {
+            // Have to run on main thread to avoid UI related crashes
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                using (new AllowedThread())
+                {
+                    if (Settlement.CurrentSettlement?.Town == town && (bool)(currentCraftingVM?.IsInCraftingMode))
+                    {
+                        currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
+                        if (!(bool)(currentWeaponDesignVM?.IsInOrderMode))
+                        {
+                            currentWeaponDesignVM?.RefreshValues();
+                            return;
+                        }
+
+                        CraftingOrderItemVM craftingOrderItemVM = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
+                        if (craftingOrderItemVM != null)
+                        {
+                            currentWeaponDesignVM?.CraftingOrderPopup?.SelectOrder(craftingOrderItemVM);
+                        }
+                        else
+                        {
+                            currentWeaponDesignVM?.ExecuteOpenFreeBuildTab();
+                        }
+                    }
+                }
+            });
         }
     }
 }

@@ -293,7 +293,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
             CampaignEventDispatcher.Instance.OnCraftingOrderCompleted(town, craftingOrder, craftedItem, completerHero);
 
-            MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(town)); // Causes some errors sometimes with each being different and hard to replicate. Such as one in in RichText.cs and one in the GauntletLayer
+            MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(town));
         }
     }
 }
