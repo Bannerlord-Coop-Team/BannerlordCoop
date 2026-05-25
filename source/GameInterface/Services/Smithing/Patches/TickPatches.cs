@@ -45,8 +45,11 @@ namespace GameInterface.Services.Smithing.Patches
             // Only let server handle ticks
             if (ModInformation.IsClient) return false;
 
-            // Run on server
-            return true;
+            // Replace vanilla functionality
+            var message = new DailySettlementTick(__instance, settlement);
+            MessageBroker.Instance.Publish(__instance, message);
+
+            return false;
         }
 
         [HarmonyPatch("DailyTick")]
