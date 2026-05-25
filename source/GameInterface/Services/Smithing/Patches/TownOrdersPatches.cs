@@ -92,13 +92,11 @@ namespace GameInterface.Services.Smithing.Patches
             // Call original if we call this function
             if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-            Logger.Information("CompleteOrderPatch Attempting to get order result....");
             bool flag = false;
             using (new AllowedThread())
             {
                 __instance.GetOrderResult(craftingOrder, craftedItem, out flag, out var _, out var _, out var _);
             }
-            Logger.Information("CompleteOrderPatch Order result ran.");
 
             // Publish message with data
             var message = new OrderCompleted(__instance, town, craftingOrder, craftedItem, completerHero, Hero.MainHero, flag);

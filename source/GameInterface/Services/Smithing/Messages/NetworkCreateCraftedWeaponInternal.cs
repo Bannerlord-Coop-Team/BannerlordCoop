@@ -90,17 +90,32 @@ public class NetworkCreateCraftedWeaponInternalClients : ICommand
     [ProtoMember(5)]
     public bool IsFreeMode;
 
-    public NetworkCreateCraftedWeaponInternalClients(
-        string craftingCampaignBehaviorId,
-        byte[] craftedItemObjectData,
-        string nextCraftedItemId,
-        string weaponModifierId,
-        bool isFreeMode)
+    [ProtoMember(6)]
+    public string CraftingTemplateId;
+
+    [ProtoMember(7)]
+    public string WeaponName;
+
+    [ProtoMember(8)]
+    public List<string> WeaponDesignElementCraftingPieceIds;
+
+    [ProtoMember(9)]
+    public List<int> WeaponDesignElementScalePercentages;
+
+    [ProtoMember(10)]
+    public byte[] CraftingLogicData;
+
+    public NetworkCreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalServer cloneObject)
     {
-        CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
-        CraftedItemObjectData = craftedItemObjectData;
-        NextCraftedItemId = nextCraftedItemId;
-        WeaponModifierId = weaponModifierId;
-        IsFreeMode = isFreeMode;
+        CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
+        CraftedItemObjectData = cloneObject.CraftedItemObjectData;
+        NextCraftedItemId = cloneObject.NextCraftedItemId;
+        WeaponModifierId = cloneObject.WeaponModifierId;
+        IsFreeMode = cloneObject.IsFreeMode;
+        CraftingTemplateId = cloneObject.CraftingTemplateId;
+        WeaponName = cloneObject.WeaponName;
+        WeaponDesignElementCraftingPieceIds = cloneObject.WeaponDesignElementCraftingPieceIds;
+        WeaponDesignElementScalePercentages = cloneObject.WeaponDesignElementScalePercentages;
+        CraftingLogicData = cloneObject.CraftingLogicData;
     }
 }

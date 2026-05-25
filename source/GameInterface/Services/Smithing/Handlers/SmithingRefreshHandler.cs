@@ -13,6 +13,7 @@ using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Refinement;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.Smelting;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign;
 using TaleWorlds.CampaignSystem.ViewModelCollection.WeaponCrafting.WeaponDesign.Order;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.Smithing.Handlers
 {
@@ -87,6 +88,13 @@ namespace GameInterface.Services.Smithing.Handlers
         {
             currentSmeltingVM?.RefreshValues();
             currentSmeltingVM?.RefreshList();
+
+            if (currentSmeltingVM?.CurrentSelectedItem != null)
+            {
+                int num = (int)(currentSmeltingVM?.SmeltableItemList.FindIndex((SmeltingItemVM i) => i.EquipmentElement.Item == currentSmeltingVM?.CurrentSelectedItem.EquipmentElement.Item));
+                SmeltingItemVM newItem = (num != -1) ? currentSmeltingVM?.SmeltableItemList[num] : currentSmeltingVM?.SmeltableItemList.FirstOrDefault<SmeltingItemVM>();
+                currentSmeltingVM?.OnItemSelection(newItem);
+            }
 
             RefreshCraftingVM();
         }

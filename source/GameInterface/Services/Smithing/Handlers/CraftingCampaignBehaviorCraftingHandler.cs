@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Serialization;
@@ -11,11 +10,8 @@ using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Smithing.Interfaces;
 using GameInterface.Services.Smithing.Messages;
 using GameInterface.Services.Smithing.Patches;
-using HarmonyLib;
 using Serilog;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.GameState;
@@ -103,7 +99,7 @@ namespace GameInterface.Services.Smithing.Handlers
         private void Handle(MessagePayload<NetworkCreateCraftedWeaponInternalServer> obj)
         {
             // Send required data to all clients
-            NetworkCreateCraftedWeaponInternalClients message = new(obj.What.CraftingCampaignBehaviorId, obj.What.CraftedItemObjectData, obj.What.NextCraftedItemId, obj.What.WeaponModifierId, obj.What.IsFreeMode);
+            NetworkCreateCraftedWeaponInternalClients message = new(obj.What);
             network.SendAll(message);
 
             CreateCraftedWeaponInternalServer(obj.What);
@@ -312,7 +308,6 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateCraftedWeaponInternalServer(NetworkCreateCraftedWeaponInternalServer obj)
         {
-            // Get objects from objectManager
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingHeroId, out Hero craftingHero)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
@@ -322,20 +317,7 @@ namespace GameInterface.Services.Smithing.Handlers
             CraftingBinaryPackage package = BinaryFormatterSerializer.Deserialize<CraftingBinaryPackage>(obj.CraftingLogicData);
             Crafting craftingLogic = package.Unpack<Crafting>(binaryPackageFactory);
 
-            List<WeaponDesignElement> usedPiecesList = new();
-            for (int i = 0; i < obj.WeaponDesignElementCraftingPieceIds.Count; i++)
-            {
-                if (obj.WeaponDesignElementCraftingPieceIds[i] == "")
-                {
-                    usedPiecesList.Add(WeaponDesignElement.GetInvalidPieceForType((CraftingPiece.PieceTypes)i));
-                    continue;
-                }
-
-                if (!objectManager.TryGetObjectWithLogging(obj.WeaponDesignElementCraftingPieceIds[i], out CraftingPiece currentCraftingPiece)) return;
-
-                usedPiecesList.Add(new WeaponDesignElement(currentCraftingPiece, obj.WeaponDesignElementScalePercentages[i]));
-            }
-            WeaponDesignElement[] usedPieces = usedPiecesList.ToArray();
+            if (!GetUsedPieces(obj.WeaponDesignElementCraftingPieceIds, obj.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return;
 
             ItemModifier weaponModifier = null;
             if (obj.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(obj.WeaponModifierId, out weaponModifier)) return;
@@ -361,7 +343,7 @@ namespace GameInterface.Services.Smithing.Handlers
             }
 
             ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
-            craftedItemObject.ItemComponent = null; // Need to clear the generated item component from the client, otherwise get duplicate weapons in Crafting.Generateitem
+            craftedItemObject.ItemComponent = null; // Need to clear the generated item component from the client, otherwise get duplicate weapons in Crafting.Generateitem from Add() instead of a new list
             using (new AllowedThread())
             {
                 Crafting.GenerateItem(
@@ -399,18 +381,39 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void CreateCraftedWeaponInternalClients(NetworkCreateCraftedWeaponInternalClients obj)
         {
-            string nextCraftedItemId = obj.NextCraftedItemId;
-            ItemObject craftedItemObject = itemObjectInterface.UnpackItemObject(obj.CraftedItemObjectData);
-            ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
-            using (new AllowedThread())
-            {
-                craftedItemObject.StringId = nextCraftedItemId;
-            }
-
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftingTemplateId, out CraftingTemplate craftingTemplate)) return;
+
+            ItemObject craftedItemObject = itemObjectInterface.UnpackItemObject(obj.CraftedItemObjectData);
+
+            CraftingBinaryPackage package = BinaryFormatterSerializer.Deserialize<CraftingBinaryPackage>(obj.CraftingLogicData);
+            Crafting craftingLogic = package.Unpack<Crafting>(binaryPackageFactory);
+
+            if (!GetUsedPieces(obj.WeaponDesignElementCraftingPieceIds, obj.WeaponDesignElementScalePercentages, out WeaponDesignElement[] usedPieces)) return;
 
             ItemModifier weaponModifier = null;
             if (obj.WeaponModifierId != "" && !objectManager.TryGetObjectWithLogging(obj.WeaponModifierId, out weaponModifier)) return;
+
+            // Replace original TaleWorlds implementation
+            string nextCraftedItemId = obj.NextCraftedItemId;
+            WeaponDesign weaponDesign = new WeaponDesign(craftingTemplate, new TextObject(obj.WeaponName), usedPieces);
+            if (obj.IsFreeMode)
+            {
+                weaponDesign = new WeaponDesign(weaponDesign.Template, weaponDesign.WeaponName, weaponDesign.UsedPieces, nextCraftedItemId);
+            }
+
+            ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
+            craftedItemObject.ItemComponent = null; // Need to clear the generated item component from the client, otherwise get duplicate weapons in Crafting.Generateitem from Add() instead of a new list
+            using (new AllowedThread())
+            {
+                Crafting.GenerateItem(
+                weaponDesign,
+                craftedItemObject.Name,
+                craftedItemObject.Culture,
+                craftingLogic.CurrentItemModifierGroup,
+                ref craftedItemObject,
+                nextCraftedItemId);
+            }
 
             objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
 
@@ -426,6 +429,27 @@ namespace GameInterface.Services.Smithing.Handlers
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !obj.IsFreeMode);
                 MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
             }
+        }
+
+        private bool GetUsedPieces(List<string> craftingPieceIds, List<int> scalePercentages, out WeaponDesignElement[] usedPieces)
+        {
+            usedPieces = null;
+            List<WeaponDesignElement> usedPiecesList = new();
+            for (int i = 0; i < craftingPieceIds.Count; i++)
+            {
+                if (craftingPieceIds[i] == "")
+                {
+                    usedPiecesList.Add(WeaponDesignElement.GetInvalidPieceForType((CraftingPiece.PieceTypes)i));
+                    continue;
+                }
+
+                if (!objectManager.TryGetObjectWithLogging(craftingPieceIds[i], out CraftingPiece currentCraftingPiece)) return false;
+
+                usedPiecesList.Add(new WeaponDesignElement(currentCraftingPiece, scalePercentages[i]));
+            }
+
+            usedPieces = usedPiecesList.ToArray();
+            return true;
         }
 
         private void SetHeroCraftingStaminaClients(NetworkSetHeroCraftingStamina obj)

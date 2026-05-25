@@ -11,6 +11,7 @@ using System.Linq;
 using GameInterface.Services.MobileParties.Messages.Control;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.MobileParties.Interfaces;
+using Serilog.Core;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
 
@@ -84,6 +85,7 @@ internal class SaveGameHandler : IHandler
     {
         controlledEntityRegistry.LoadControlledEntities(savedSession.ControlledEntityMap);
         mobilePartyInterface.RegisterAllPartiesAsControlled(controllerIdProvider.ControllerId);
+        if (savedSession.Players == null) return;
         foreach (var player in savedSession.Players)
         {
             playerRegistry.AddPlayer(player);
