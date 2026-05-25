@@ -1,7 +1,6 @@
 ﻿// Ignore Spelling: Guids
 
 using Common.Messaging;
-using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Smithing;
 using ProtoBuf;

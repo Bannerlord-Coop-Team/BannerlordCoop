@@ -1,6 +1,7 @@
 ﻿using Common;
 using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Services.ItemObjects.Messages;
 using HarmonyLib;
 using Serilog;
@@ -18,6 +19,9 @@ namespace GameInterface.Services.ItemObjects.Patches
         [HarmonyPrefix]
         public static bool SetCraftedWeaponName(ref ItemObject __instance, TextObject weaponName)
         {
+            // Call original if we call this function
+            if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+
             var message = new CraftedWeaponNameSet(__instance, weaponName);
             MessageBroker.Instance.Publish(__instance, message);
 

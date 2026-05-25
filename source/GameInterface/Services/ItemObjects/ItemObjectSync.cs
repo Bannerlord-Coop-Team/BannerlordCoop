@@ -10,6 +10,7 @@ namespace GameInterface.Services.ItemObjects
     {
         public ItemObjectSync(DynamicSyncRegistry autoSyncBuilder)
         {
+            /*
             autoSyncBuilder.AddField(AccessTools.Field(typeof(ItemObject), nameof(ItemObject.Type)));
 
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.ItemComponent)));
@@ -46,6 +47,7 @@ namespace GameInterface.Services.ItemObjects
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.LodAtlasIndex)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.TierfOverride)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(ItemObject), nameof(ItemObject.WeaponDesign)));
+            */
         }
     }
 }

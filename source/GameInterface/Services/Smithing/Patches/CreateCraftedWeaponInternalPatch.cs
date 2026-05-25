@@ -34,7 +34,6 @@ namespace GameInterface.Services.Smithing.Patches
                 craftedItemObject = (GameStateManager.Current.ActiveState as CraftingState).CraftingLogic.GetCurrentCraftedItemObject(true, nextCraftedItemId);
                 ItemObject.InitAsPlayerCraftedItem(ref craftedItemObject);
 
-                // May need to replace this if causes issues, uses MBObjectManager
                 ItemObject registeredObject = MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);
 
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !isFreeMode);

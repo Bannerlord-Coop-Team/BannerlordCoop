@@ -131,9 +131,9 @@ internal class SmithingCommands
     {
         if (ModInformation.IsClient) return "Command can only be run on the server.";
 
-        //if (strings.Count == 0) return "Hero name argument required.";
+        if (strings.Count == 0) return "Hero name argument required.";
 
-        var heroName = "Zoros the Brewer"; // Example hero name: "Vaminesa the Minter"
+        var heroName = strings[0]; // Example hero name: "Vaminesa the Minter"
 
         StringBuilder stringBuilder = new StringBuilder();
         foreach (var hero in Hero.AllAliveHeroes)

@@ -1,8 +1,6 @@
 ﻿using Autofac;
 using Common;
 using Common.Logging;
-using GameInterface.CoopSessionData;
-using GameInterface.Services.ObjectManager;
 using Serilog;
 using System.Collections.Generic;
 using System.Text;

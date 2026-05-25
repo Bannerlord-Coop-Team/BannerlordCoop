@@ -1,15 +1,11 @@
 ﻿using Autofac.Features.OwnedInstances;
 using Common;
 using GameInterface.Services.Entity.Data;
-using GameInterface.Services.Heroes.Data;
 using GameInterface.Services.Smithing;
 using GameInterface.Services.Players.Data;
 using ProtoBuf;
-using Serilog.Core;
 using System.Collections.Generic;
 using System.Linq;
-using TaleWorlds.CampaignSystem;
-using TaleWorlds.Core;
 
 namespace GameInterface.CoopSessionData.Save.Data;
 
