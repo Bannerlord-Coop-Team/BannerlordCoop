@@ -263,7 +263,9 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetIdWithLogging(obj.WeaponDesign.Template, out var craftingTemplateId)) return;
             if (!objectManager.TryGetIdWithLogging(obj.PlayerHero, out var playerHeroId)) return;
 
-            // Failed to retrieve ID for object TaleWorlds.Core.ItemObject because not registered in ObjectManager yet, shouldn't cause any issues
+            // Need to add to object manager early for completing town orders
+            objectManager.AddExisting(obj.NextCraftedItemId, obj.CraftedItemObject);
+
             byte[] craftedItemObjectData = itemObjectInterface.PackageItemObject(obj.CraftedItemObject);
 
             CraftingBinaryPackage package = binaryPackageFactory.GetBinaryPackage<CraftingBinaryPackage>(obj.CraftingLogic);
@@ -415,8 +417,6 @@ namespace GameInterface.Services.Smithing.Handlers
                 nextCraftedItemId);
             }
 
-            objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
-
             if (GameStateManager.Current.ActiveState is CraftingState currentState && currentState.CraftingLogic._craftedItemObject.StringId == nextCraftedItemId) // Only run on associated client with matching id
             {
                 currentState.CraftingLogic._craftedItemObject = craftedItemObject;
@@ -425,6 +425,7 @@ namespace GameInterface.Services.Smithing.Handlers
             }
             else // Need to update craftingCampaignBehavior._craftedItemCount for every other client
             {
+                objectManager.AddExisting(nextCraftedItemId, craftedItemObject);
                 craftingCampaignBehavior.GetNextCraftedItemId();
                 CampaignEventDispatcher.Instance.OnNewItemCrafted(craftedItemObject, weaponModifier, !obj.IsFreeMode);
                 MBObjectManager.Instance.RegisterObject<ItemObject>(craftedItemObject);

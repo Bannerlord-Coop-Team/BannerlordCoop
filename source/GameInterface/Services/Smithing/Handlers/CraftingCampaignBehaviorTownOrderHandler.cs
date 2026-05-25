@@ -193,16 +193,15 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetIdWithLogging(obj.Town, out var townId)) return;
             if (!objectManager.TryGetIdWithLogging(obj.CompleterHero, out var completerHeroId)) return;
             if (!objectManager.TryGetIdWithLogging(obj.MainHero, out var mainHeroId)) return;
-            if (!objectManager.TryGetIdWithLogging(obj.CraftingOrder, out var craftingOrderId)) return; // CraftingOrderId is returning as null, unable to craft items from crafting orders generated since game start because of it
-
-            byte[] craftedItemData = itemObjectInterface.PackageItemObject(obj.CraftedItem);
+            if (!objectManager.TryGetIdWithLogging(obj.CraftingOrder, out var craftingOrderId)) return;
+            if (!objectManager.TryGetIdWithLogging(obj.CraftedItem, out var craftedItemId)) return;
 
             // Send to clients from server
             NetworkCompleteOrderServer message = new(
                 craftingCampaignBehaviorId,
                 townId,
                 craftingOrderId,
-                craftedItemData,
+                craftedItemId,
                 completerHeroId,
                 mainHeroId,
                 obj.Flag
@@ -217,8 +216,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.MainHeroId, out Hero mainHero)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
-
-            ItemObject craftedItem = itemObjectInterface.UnpackItemObject(obj.CraftedItemData);
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
 
             // Replace TaleWorlds implementation
 
@@ -278,8 +276,7 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetObjectWithLogging(obj.TownId, out Town town)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CompleterHeroId, out Hero completerHero)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
-
-            ItemObject craftedItem = itemObjectInterface.UnpackItemObject(obj.CraftedItemData);
+            if (!objectManager.TryGetObjectWithLogging(obj.CraftedItemId, out ItemObject craftedItem)) return;
 
             // Replace TaleWorlds implementation for clients
             if (craftingCampaignBehavior._craftingOrders[town].CustomOrders.Contains(craftingOrder))

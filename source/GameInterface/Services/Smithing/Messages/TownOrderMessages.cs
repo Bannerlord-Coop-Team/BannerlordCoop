@@ -123,7 +123,7 @@ public class NetworkCompleteOrderServer : ICommand
     public string CraftingOrderId;
 
     [ProtoMember(4)]
-    public byte[] CraftedItemData;
+    public string CraftedItemId;
 
     [ProtoMember(5)]
     public string CompleterHeroId;
@@ -134,12 +134,12 @@ public class NetworkCompleteOrderServer : ICommand
     [ProtoMember(7)]
     public bool Flag;
 
-    public NetworkCompleteOrderServer(string craftingCampaignBehaviorId, string townId, string craftingOrderId, byte[] craftedItemData, string completerHeroId, string mainHeroId, bool flag)
+    public NetworkCompleteOrderServer(string craftingCampaignBehaviorId, string townId, string craftingOrderId, string craftedItemId, string completerHeroId, string mainHeroId, bool flag)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
         TownId = townId;
         CraftingOrderId = craftingOrderId;
-        CraftedItemData = craftedItemData;
+        CraftedItemId = craftedItemId;
         CompleterHeroId = completerHeroId;
         MainHeroId = mainHeroId;
         Flag = flag;
@@ -159,7 +159,7 @@ public class NetworkCompleteOrderClients : ICommand
     public string CraftingOrderId;
 
     [ProtoMember(4)]
-    public byte[] CraftedItemData;
+    public string CraftedItemId;
 
     [ProtoMember(5)]
     public string CompleterHeroId;
@@ -169,7 +169,7 @@ public class NetworkCompleteOrderClients : ICommand
         CraftingCampaignBehaviorId = cloneObject.CraftingCampaignBehaviorId;
         TownId = cloneObject.TownId;
         CraftingOrderId = cloneObject.CraftingOrderId;
-        CraftedItemData = cloneObject.CraftedItemData;
+        CraftedItemId = cloneObject.CraftedItemId;
         CompleterHeroId = cloneObject.CompleterHeroId;
     }
 }
