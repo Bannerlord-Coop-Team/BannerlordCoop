@@ -63,50 +63,49 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
         private void OnOpenedPerkInternal(Hero hero, PerkObject perk)
         {
             if (hero == null) return;
-            {
-                if (perk == DefaultPerks.OneHanded.Trainer || perk == DefaultPerks.OneHanded.UnwaveringDefense || perk == DefaultPerks.TwoHanded.ThickHides || perk == DefaultPerks.Athletics.WellBuilt || perk == DefaultPerks.Medicine.PreventiveMedicine)
-                {
-                    hero.HitPoints += (int)perk.PrimaryBonus;
-                }
-                else if (perk == DefaultPerks.Crafting.VigorousSmith)
-                {
-                    hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Vigor, 1, false);
-                }
-                else if (perk == DefaultPerks.Crafting.StrongSmith)
-                {
-                    hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Control, 1, false);
-                }
-                else if (perk == DefaultPerks.Crafting.EnduringSmith)
-                {
-                    hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Endurance, 1, false);
-                }
-                else if (perk == DefaultPerks.Crafting.WeaponMasterSmith)
-                {
-                    hero.HeroDeveloper.AddFocus(DefaultSkills.OneHanded, 1, false);
-                    hero.HeroDeveloper.AddFocus(DefaultSkills.TwoHanded, 1, false);
-                }
-                else if (perk == DefaultPerks.Athletics.Durable)
-                {
-                    hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Endurance, 1, false);
-                }
-                else if (perk == DefaultPerks.Athletics.Steady)
-                {
-                    hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Control, 1, false);
-                }
-                else if (perk == DefaultPerks.Athletics.Strong)
-                {
-                    hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Vigor, 1, false);
-                }
 
-                // Substitute for Hero == Hero.MainHero
-                if (playerRegistry.Contains(hero.PartyBelongedTo) && (perk == DefaultPerks.OneHanded.Prestige || perk == DefaultPerks.TwoHanded.Hope || perk == DefaultPerks.Athletics.ImposingStature || perk == DefaultPerks.Bow.MerryMen || perk == DefaultPerks.Tactics.HordeLeader || perk == DefaultPerks.Scouting.MountedScouts || perk == DefaultPerks.Leadership.Authority || perk == DefaultPerks.Leadership.LeaderOfMasses || perk == DefaultPerks.Leadership.UltimateLeader))
-                {
-                    hero.PartyBelongedTo.MemberRoster.UpdateVersion();
-                }
-                if (perk.PrimaryRole == PartyRole.Captain)
-                {
-                    hero.UpdatePowerModifier();
-                }
+            if (perk == DefaultPerks.OneHanded.Trainer || perk == DefaultPerks.OneHanded.UnwaveringDefense || perk == DefaultPerks.TwoHanded.ThickHides || perk == DefaultPerks.Athletics.WellBuilt || perk == DefaultPerks.Medicine.PreventiveMedicine)
+            {
+                hero.HitPoints += (int)perk.PrimaryBonus;
+            }
+            else if (perk == DefaultPerks.Crafting.VigorousSmith)
+            {
+                hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Vigor, 1, false);
+            }
+            else if (perk == DefaultPerks.Crafting.StrongSmith)
+            {
+                hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Control, 1, false);
+            }
+            else if (perk == DefaultPerks.Crafting.EnduringSmith)
+            {
+                hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Endurance, 1, false);
+            }
+            else if (perk == DefaultPerks.Crafting.WeaponMasterSmith)
+            {
+                hero.HeroDeveloper.AddFocus(DefaultSkills.OneHanded, 1, false);
+                hero.HeroDeveloper.AddFocus(DefaultSkills.TwoHanded, 1, false);
+            }
+            else if (perk == DefaultPerks.Athletics.Durable)
+            {
+                hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Endurance, 1, false);
+            }
+            else if (perk == DefaultPerks.Athletics.Steady)
+            {
+                hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Control, 1, false);
+            }
+            else if (perk == DefaultPerks.Athletics.Strong)
+            {
+                hero.HeroDeveloper.AddAttribute(DefaultCharacterAttributes.Vigor, 1, false);
+            }
+
+            // Substitute for Hero == Hero.MainHero
+            if (playerRegistry.Contains(hero.PartyBelongedTo) && (perk == DefaultPerks.OneHanded.Prestige || perk == DefaultPerks.TwoHanded.Hope || perk == DefaultPerks.Athletics.ImposingStature || perk == DefaultPerks.Bow.MerryMen || perk == DefaultPerks.Tactics.HordeLeader || perk == DefaultPerks.Scouting.MountedScouts || perk == DefaultPerks.Leadership.Authority || perk == DefaultPerks.Leadership.LeaderOfMasses || perk == DefaultPerks.Leadership.UltimateLeader))
+            {
+                hero.PartyBelongedTo.MemberRoster.UpdateVersion();
+            }
+            if (perk.PrimaryRole == PartyRole.Captain)
+            {
+                hero.UpdatePowerModifier();
             }
         }
     }
