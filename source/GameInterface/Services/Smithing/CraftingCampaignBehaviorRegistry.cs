@@ -25,7 +25,7 @@ internal class CraftingCampaignBehaviorRegistry : AutoRegistryBase<CraftingCampa
 
     public override void RegisterAllObjects()
     {
-        var craftingCampaignBehavior = Campaign.Current.CampaignBehaviorManager.GetBehavior<CraftingCampaignBehavior>();
+        var craftingCampaignBehavior = Campaign.Current.GetCampaignBehavior<CraftingCampaignBehavior>();
         objectManager.AddExisting(craftingCampaignBehavior.StringId, craftingCampaignBehavior);
     }
 
