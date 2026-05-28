@@ -117,6 +117,9 @@ internal class SettlementExitEnterHandler : IHandler
         {
             using (new AllowedThread())
             {
+                // Set to move hold to prevent party from re-entering settlement immediately after encounter ends
+                MobileParty.MainParty.SetMoveModeHold();
+
                 PlayerEncounter.Finish(true);
                 Campaign.Current.SaveHandler.SignalAutoSave();
             }

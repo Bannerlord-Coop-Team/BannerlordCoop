@@ -38,7 +38,10 @@ public class LeaveSettlementActionPatches
         {
             using (new AllowedThread())
             {
-                if (party.CurrentSettlement != null) LeaveSettlementAction.ApplyForParty(party);
+                if (party.CurrentSettlement == null)
+                    return;
+                
+                LeaveSettlementAction.ApplyForParty(party);
             }
         });
     }
