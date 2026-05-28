@@ -1,5 +1,6 @@
 ﻿using ProtoBuf.Meta;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
@@ -23,6 +24,8 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ItemModifier, ItemModifierSurrogate>();
             AddSurrogate<TextObject, TextObjectSurrogate>();
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
+            AddSurrogate<ItemRosterElement, ItemRosterElementSurrogate>();
+            AddSurrogate<TroopRosterElement, TroopRosterElementSurrogate>();
 
             AddSurrogate<ExplainedNumber, ExplainedNumberSurrogate>();
             AddSurrogate<ExplainedNumber.StatExplainer, StatExplainerSurrogate>();
