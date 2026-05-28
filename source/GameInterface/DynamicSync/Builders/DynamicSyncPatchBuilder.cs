@@ -56,7 +56,6 @@ namespace GameInterface.DynamicSync.Builders
             this.dynamicSyncConstantsBuilder = dynamicSyncConstantsBuilder;
             this.dynamicSyncFieldPropertyOwnerBuilder = dynamicSyncFieldPropertyOwnerBuilder;
         }
-
         public List<SyntaxTree> Build(Type declaringType, DynamicSyncRegistryItem dynamicRegistryItem)
         {
             List<string> prefixes = new List<string>();

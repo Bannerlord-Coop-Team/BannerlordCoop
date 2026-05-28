@@ -25,7 +25,6 @@ namespace E2E.Tests.Services.CharacterObjects
             //Arrange
             assertHelper.AssertProperty<CharacterObject, bool>(nameof(CharacterObject.HiddenInEncyclopedia), true);
             assertHelper.AssertReferenceProperty<CharacterObject, Hero>(nameof(CharacterObject.HeroObject));
-
         }
         [Fact]
         public void Server_CharacterObject_Fields()
@@ -40,9 +39,6 @@ namespace E2E.Tests.Services.CharacterObjects
             assertHelper.AssertReferenceField<CharacterObject, CharacterObject>(nameof(CharacterObject._civilianEquipmentTemplate));
             assertHelper.AssertReferenceField<CharacterObject, CharacterObject>(nameof(CharacterObject._battleEquipmentTemplate));
             assertHelper.AssertField<CharacterObject, Occupation>(nameof(CharacterObject._occupation), Occupation.Tavernkeeper);
-
-
-
         }
     }
 }

@@ -7,8 +7,6 @@ using GameInterface.Services.SiegeEvents;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
-
-
 /// <summary>
 /// Configures AutoSync for CharacterObject
 /// </summary>
@@ -31,7 +29,6 @@ namespace GameInterface.Services.CharacterObjects
             //properties
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(CharacterObject), nameof(CharacterObject.HiddenInEncyclopedia)));
             autoSyncBuilder.AddProperty(AccessTools.Property(typeof(CharacterObject), nameof(CharacterObject.HeroObject)));
-
         }
     }
 }
