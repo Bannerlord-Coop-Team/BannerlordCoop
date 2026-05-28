@@ -5,6 +5,7 @@ using Coop.Core.Client.Messages;
 using Coop.Core.Client.States;
 using Coop.Tests.Mocks;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.Smithing;
 using System;
 using System.Linq;
 using Xunit;
@@ -35,7 +36,7 @@ namespace Coop.Tests.Client.States
             var campaignId = "12345";
 
             var payload = new MessagePayload<NetworkGameSaveDataReceived>(
-                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null));
+                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null, new CraftingPlayerData(new(), new(), new())));
 
             // Act
             currentState.Handle_NetworkGameSaveDataReceived(payload);
@@ -55,7 +56,7 @@ namespace Coop.Tests.Client.States
             var campaignId = "12345";
 
             var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
-                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null));
+                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null, new CraftingPlayerData(new(), new(), new())));
 
             currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
 
@@ -83,7 +84,7 @@ namespace Coop.Tests.Client.States
             var campaignId = "12345";
 
             var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
-                this, new NetworkGameSaveDataReceived(default, campaignId, null));
+                this, new NetworkGameSaveDataReceived(default, campaignId, null, new CraftingPlayerData(new(), new(), new())));
 
             currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
 
@@ -107,7 +108,7 @@ namespace Coop.Tests.Client.States
             var campaignId = "12345";
 
             var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
-                this, new NetworkGameSaveDataReceived(null, campaignId, null));
+                this, new NetworkGameSaveDataReceived(null, campaignId, null, new CraftingPlayerData(new(), new(), new())));
 
             currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
 
@@ -132,7 +133,7 @@ namespace Coop.Tests.Client.States
             var campaignId = "12345";
 
             var gameDataMessage = new MessagePayload<NetworkGameSaveDataReceived>(
-                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null));
+                this, new NetworkGameSaveDataReceived(gameSaveData, campaignId, null, new CraftingPlayerData(new(), new(), new())));
 
             currentState.Handle_NetworkGameSaveDataReceived(gameDataMessage);
 

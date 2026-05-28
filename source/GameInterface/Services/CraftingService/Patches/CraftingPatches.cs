@@ -13,7 +13,7 @@ namespace GameInterface.Services.CraftingService.Patches
         [HarmonyPrefix]
         private static bool OpenCraftingPrefix()
         {
-            return false;
+            return true;
         }
     }
 }

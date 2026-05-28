@@ -1,7 +1,11 @@
 ﻿using Autofac;
 using Coop.Core.Server.Services.Save;
-using Coop.Core.Server.Services.Save.Data;
+using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Entity;
+using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Smithing;
+using System;
+using System.Collections.Generic;
 using GameInterface.Services.Players.Data;
 using System.IO;
 using Xunit;
@@ -49,7 +53,7 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("Player2")
             };
 
-            ICoopSession sessionData = new CoopSession("SaveManagerTest", entityMap, players);
+            ICoopSession sessionData = new CoopSession("SaveManagerTest", entityMap, players, new CraftingPlayerData(new(), new(), new()));
 
             string saveFile = sessionData.UniqueGameId;
 
@@ -93,7 +97,7 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("Player2")
             };
 
-            ICoopSession sessionData = new CoopSession("SaveManagerTest", entityMap, players);
+            ICoopSession sessionData = new CoopSession("SaveManagerTest", entityMap, players, new CraftingPlayerData(new(), new(), new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId;
 

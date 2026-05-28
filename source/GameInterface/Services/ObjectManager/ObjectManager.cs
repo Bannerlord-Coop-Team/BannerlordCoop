@@ -11,14 +11,14 @@ namespace GameInterface.Services.ObjectManager;
 public interface IObjectManager
 {
     /// <summary>
-    /// Determins if an object is stored in the object manager
+    /// Determines if an object is stored in the object manager
     /// </summary>
     /// <param name="obj">Object to check if stored</param>
     /// <returns>True if stored, false if not</returns>
     bool Contains(object obj);
 
     /// <summary>
-    /// Determins if an StringId is stored in the object manager
+    /// Determines if a StringId is stored in the object manager
     /// </summary>
     /// <param name="id">StringId to check if stored</param>
     /// <returns>True if stored, false if not</returns>
@@ -86,7 +86,7 @@ public interface IObjectManager
 }
 
 /// <summary>
-/// Ground truth for storing and retreiving object and ids
+/// Ground truth for storing and retrieving object and ids
 /// </summary>
 public class ObjectManager : IObjectManager
 {
@@ -215,7 +215,10 @@ public class ObjectManager : IObjectManager
 
         if (string.IsNullOrEmpty(id)) return false;
 
-        if (!idObjs.TryGetValue(id, out var storedObj)) return false;
+        if (!idObjs.TryGetValue(id, out var storedObj) 
+            && !idObjs.TryGetValue($"{typeof(T).Name}_{id}", out storedObj)) { // If object not found also attempt with prefixed type name
+            return false;
+        }
 
         if (storedObj is not T castedObject)
         {

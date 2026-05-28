@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using Common;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.CraftingService.Patches
@@ -7,6 +8,6 @@ namespace GameInterface.Services.CraftingService.Patches
     internal class DisableCraftingCampaignBehavior
     {
         [HarmonyPatch(nameof(CraftingCampaignBehavior.RegisterEvents))]
-        static bool Prefix() => false;
+        static bool Prefix() => ModInformation.IsServer;
     }
 }
