@@ -62,7 +62,7 @@ namespace GameInterface.Services.HeroDevelopers.Handlers
 
         private void OnOpenedPerkInternal(Hero hero, PerkObject perk)
         {
-            if (hero != null)
+            if (hero == null) return;
             {
                 if (perk == DefaultPerks.OneHanded.Trainer || perk == DefaultPerks.OneHanded.UnwaveringDefense || perk == DefaultPerks.TwoHanded.ThickHides || perk == DefaultPerks.Athletics.WellBuilt || perk == DefaultPerks.Medicine.PreventiveMedicine)
                 {
