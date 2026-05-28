@@ -22,8 +22,8 @@ internal struct ItemRosterElementSurrogate
         ItemObjectId = itemRosterElement.EquipmentElement.Item?.StringId;
         Amount = itemRosterElement.Amount;
         ItemModifierId = itemRosterElement.EquipmentElement.ItemModifier?.StringId;
-
     }
+
     public static implicit operator ItemRosterElementSurrogate(ItemRosterElement itemRosterElement)
     {
         return new ItemRosterElementSurrogate(itemRosterElement);

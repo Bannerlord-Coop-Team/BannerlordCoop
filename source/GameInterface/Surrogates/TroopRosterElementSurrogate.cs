@@ -26,8 +26,8 @@ internal struct TroopRosterElementSurrogate
         Number = troopRosterElement.Number;
         WoundedNumber = troopRosterElement.WoundedNumber;
         Xp = troopRosterElement.Xp;
-
     }
+
     public static implicit operator TroopRosterElementSurrogate(TroopRosterElement troopRosterElement)
     {
         return new TroopRosterElementSurrogate(troopRosterElement);
