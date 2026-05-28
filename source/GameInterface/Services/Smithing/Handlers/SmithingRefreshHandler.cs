@@ -122,29 +122,29 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void RefreshWeaponDesignVM(Town town)
         {
+            if (Settlement.CurrentSettlement?.Town != town || !currentCraftingVM?.IsInCraftingMode)
+                return;
+                
             // Have to run on main thread to avoid UI related crashes
             GameLoopRunner.RunOnMainThread(() =>
             {
                 using (new AllowedThread())
                 {
-                    if (Settlement.CurrentSettlement?.Town == town && (bool)(currentCraftingVM?.IsInCraftingMode))
+                    currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
+                    if (!(bool)(currentWeaponDesignVM?.IsInOrderMode))
                     {
-                        currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
-                        if (!(bool)(currentWeaponDesignVM?.IsInOrderMode))
-                        {
-                            currentWeaponDesignVM?.RefreshValues();
-                            return;
-                        }
-
-                        CraftingOrderItemVM craftingOrderItemVM = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
-                        if (craftingOrderItemVM != null)
-                        {
-                            currentWeaponDesignVM?.CraftingOrderPopup?.SelectOrder(craftingOrderItemVM);
-                        }
-                        else
-                        {
-                            currentWeaponDesignVM?.ExecuteOpenFreeBuildTab();
-                        }
+                        currentWeaponDesignVM?.RefreshValues();
+                        return;
+                    }
+    
+                    CraftingOrderItemVM craftingOrderItemVM = currentWeaponDesignVM?.CraftingOrderPopup?.CraftingOrders?.FirstOrDefault((CraftingOrderItemVM x) => x.IsEnabled);
+                    if (craftingOrderItemVM != null)
+                    {
+                        currentWeaponDesignVM?.CraftingOrderPopup?.SelectOrder(craftingOrderItemVM);
+                    }
+                    else
+                    {
+                        currentWeaponDesignVM?.ExecuteOpenFreeBuildTab();
                     }
                 }
             });
