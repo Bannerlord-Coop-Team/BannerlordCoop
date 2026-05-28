@@ -60,6 +60,7 @@ internal class GameObjectCreator
         { typeof(VillageType), new VillageTypeBuilder() },
         { typeof(VillagerPartyComponent), new VillagerPartyComponentBuilder() },
         { typeof(TraitObject), new TraitObjectBuilder() },
+        { typeof(PropertyOwner<TraitObject>), new PropertyOwnerBuilder() }
     };
 
     public static T CreateInitializedObject<T>()

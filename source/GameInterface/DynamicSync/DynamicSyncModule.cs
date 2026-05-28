@@ -30,6 +30,7 @@ internal class DynamicSyncModule : Module
         builder.RegisterType<DynamicSyncPropertyListBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncPropertyQueueBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicSyncConstantsBuilder>().InstancePerLifetimeScope();
+        builder.RegisterType<DynamicSyncFieldPropertyOwnerBuilder>().InstancePerLifetimeScope();
         builder.RegisterType<DynamicHandler>().InstancePerLifetimeScope();
 
         foreach (var type in GetDynamicSyncClasses())

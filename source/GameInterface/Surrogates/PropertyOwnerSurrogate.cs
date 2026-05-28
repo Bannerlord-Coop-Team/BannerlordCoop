@@ -15,6 +15,8 @@ internal struct PropertyOwnerSurrogate
     public PropertyOwnerSurrogate(PropertyOwner<TraitObject> owner)
     {
         Attributes = new Dictionary<string, int>();
+        if (owner == null)
+            return;
         foreach (var property in owner.GetProperties())
         {
             Attributes[property.StringId] = owner.GetPropertyValue(property);

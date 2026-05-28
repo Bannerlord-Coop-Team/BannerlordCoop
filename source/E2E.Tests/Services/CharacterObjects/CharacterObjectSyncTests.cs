@@ -36,9 +36,7 @@ namespace E2E.Tests.Services.CharacterObjects
             assertHelper.AssertField<CharacterObject, CharacterRestrictionFlags>(nameof(CharacterObject._characterRestrictionFlags), CharacterRestrictionFlags.NotTransferableInPartyScreen);
             assertHelper.AssertReferenceField<CharacterObject, CharacterObject>(nameof(CharacterObject._originCharacter));
             assertHelper.AssertReferenceField<CharacterObject, TraitObject>(nameof(CharacterObject._persona));
-            //TODO
-            // _characterTraits cannot be tested until DynamicSyncPatchBuilder supports PropertyOwner<T> generic fields
-            //assertHelper.AssertField<CharacterObject, PropertyOwner<TraitObject>>(nameof(CharacterObject._characterTraits), new PropertyOwner<TraitObject>()); 
+            assertHelper.AssertPropertyOwnerField<CharacterObject, TraitObject>(nameof(CharacterObject._characterTraits));
             assertHelper.AssertReferenceField<CharacterObject, CharacterObject>(nameof(CharacterObject._civilianEquipmentTemplate));
             assertHelper.AssertReferenceField<CharacterObject, CharacterObject>(nameof(CharacterObject._battleEquipmentTemplate));
             assertHelper.AssertField<CharacterObject, Occupation>(nameof(CharacterObject._occupation), Occupation.Tavernkeeper);

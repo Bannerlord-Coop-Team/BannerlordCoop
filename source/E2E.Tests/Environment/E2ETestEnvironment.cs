@@ -16,6 +16,7 @@ using System.Reflection;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
+using TaleWorlds.ObjectSystem;
 using Xunit.Abstractions;
 
 namespace E2E.Tests.Environment;
@@ -1083,6 +1084,43 @@ internal class E2ETestEnvironment : IDisposable
 
                 Assert.Same(clientReference, fieldInfo.GetValue(clientInstance));
                 Assert.NotNull(clientReference);
+            }
+        }
+        public void AssertPropertyOwnerField<TDeclaring, TItem>(string fieldName)
+            where TItem : MBObjectBase
+        {
+            var expectedId = testEnvironment.CreateRegisteredObject<TItem>();
+            var fieldInfo = AccessTools.Field(typeof(TDeclaring), fieldName);
+            var intercept = testEnvironment.GetCollectionAddIntercept(fieldInfo);
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                var ownerBefore = (PropertyOwner<TItem>)fieldInfo.GetValue(clientInstance);
+                Assert.NotNull(ownerBefore);
+            }
+            Server.Call(() =>
+            {
+                Assert.True(Server.ObjectManager.TryGetObject<TInstance>(instanceId, out var serverInstance));
+                Assert.True(Server.ObjectManager.TryGetObject<TItem>(expectedId, out var serverTrait));
+
+                var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(serverInstance);
+                Assert.NotNull(owner);
+                intercept.Invoke(null, new object[] { owner, serverTrait, 1, serverInstance });
+
+                Assert.Equal(1, owner.GetPropertyValue(serverTrait));
+            });
+
+            foreach (var client in Clients)
+            {
+                Assert.True(client.ObjectManager.TryGetObject<TInstance>(instanceId, out var clientInstance));
+                Assert.True(client.ObjectManager.TryGetObject<TItem>(expectedId, out var clientTrait));
+
+                var owner = (PropertyOwner<TItem>)fieldInfo.GetValue(clientInstance);
+                Assert.NotNull(clientInstance);
+                Assert.NotNull(owner);
+                Assert.Equal(1, owner.GetPropertyValue(clientTrait));
+                Assert.NotNull(owner);
+                Assert.Equal(1, owner.GetPropertyValue(clientTrait));
             }
         }
 

@@ -1,19 +1,21 @@
-﻿using Common.Messaging;
-using GameInterface.Policies;
-using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Reflection.Emit;
-using System.Reflection;
-using Serilog;
+﻿using Common;
 using Common.Logging;
-using TaleWorlds.Library;
-using System.Linq;
+using Common.Messaging;
+using GameInterface.Policies;
 using GameInterface.Utils.LocalEvents;
+using HarmonyLib;
 using Newtonsoft.Json.Linq;
-using TaleWorlds.Diamond;
+using Serilog;
+using System;
 using System.Collections.Concurrent;
-using Common;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using System.Reflection.Emit;
+using TaleWorlds.Core;
+using TaleWorlds.Diamond;
+using TaleWorlds.Library;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Utils
 {
@@ -662,6 +664,65 @@ namespace GameInterface.Utils
             MessageBroker.Instance.Publish(instance, message);
 
             items[index] = item;
+        }
+        /// <summary>
+        /// Intercept that gets called when SetPropertyValue is called on a PropertyOwner field
+        /// </summary>
+        /// <typeparam name="TItem">Type of the property key</typeparam>
+        /// <typeparam name="TMessage">Message to be published on Change</typeparam>
+        /// <param name="owner">The PropertyOwner being modified</param>
+        /// <param name="attribute">The key being set</param>
+        /// <param name="value">The value being set</param>
+        /// <param name="instance">The class that holds the PropertyOwner field</param>
+        /// <remarks>
+        /// Can be called from other methods if the generic transpiler is not enough <br/>
+        /// Example: <br/>
+        /// public static void PropertyOwnerSetIntercept(PropertyOwner&lt;TraitObject&gt; owner, TraitObject attribute, int value, CharacterObject instance) <br/>
+        /// => PropertyOwnerSetIntercept&lt;TraitObject, CharacterObject__characterTraits_SetLocalMessage&gt;(owner, attribute, value, instance);
+        /// </remarks>
+        public static IEnumerable<CodeInstruction> PropertyOwnerFieldChangeTranspiler<TItem, TSetMessage>(
+    IEnumerable<CodeInstruction> instructions, string fieldName)
+    where TItem : MBObjectBase
+    where TSetMessage : IEvent
+        {
+            var fieldInfo = AccessTools.Field(typeof(TInstance), fieldName);
+            var setPropertyMethod = typeof(PropertyOwner<TItem>).GetMethod(nameof(PropertyOwner<TItem>.SetPropertyValue));
+            var setIntercept = typeof(GenericPatches<TPatch, TInstance>)
+                .GetMethod(nameof(PropertyOwnerSetIntercept))
+                .MakeGenericMethod(typeof(TItem), typeof(TSetMessage));
+
+            GenericPatchHelpers.CollectionAddInterceptCache.TryAdd(fieldInfo, setIntercept);
+
+            return PatchInstructions(instructions.ToList(),
+                (ci) => IsCorrectField(ci, fieldInfo),
+                setPropertyMethod,
+                setIntercept,
+                null,
+                null);
+        }
+
+        public static void PropertyOwnerSetIntercept<TItem, TMessage>(
+            PropertyOwner<TItem> owner, TItem attribute, int value, TInstance instance)
+            where TItem : MBObjectBase
+            where TMessage : IEvent
+        {
+            if (CallOriginalPolicy.IsOriginalAllowed())
+            {
+                owner.SetPropertyValue(attribute, value);
+                return;
+            }
+
+            if (ModInformation.IsClient)
+            {
+                Logger.Error("Client updated unmanaged {type}", typeof(TItem));
+                owner.SetPropertyValue(attribute, value);
+                return;
+            }
+
+            var message = (TMessage)Activator.CreateInstance(typeof(TMessage), instance, attribute, value);
+            MessageBroker.Instance.Publish(instance, message);
+
+            owner.SetPropertyValue(attribute, value);
         }
         #endregion
 
