@@ -1,10 +1,13 @@
-﻿using GameInterface.Services.Entity.Data;
+﻿using Autofac.Features.OwnedInstances;
+using Common;
+using GameInterface.Services.Entity.Data;
+using GameInterface.Services.Smithing;
 using GameInterface.Services.Players.Data;
 using ProtoBuf;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Coop.Core.Server.Services.Save.Data;
+namespace GameInterface.CoopSessionData.Save.Data;
 
 /// <summary>
 /// Represents the current state of the game that the game transfer
@@ -15,6 +18,7 @@ public interface ICoopSession
     string UniqueGameId { get; }
     Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
     Player[] Players { get; }
+    CraftingPlayerData CraftingPlayerData { get; }
 }
 
 /// <inheritdoc cref="ICoopSession"/>
@@ -27,12 +31,15 @@ public class CoopSession : ICoopSession
     public Dictionary<string, HashSet<ControlledEntity>> ControlledEntityMap { get; }
     [ProtoMember(3)]
     public Player[] Players { get; }
+    [ProtoMember(4)]
+    public CraftingPlayerData CraftingPlayerData { get; }
 
-    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>>  controlledEntityMap, Player[] players)
+    public CoopSession(string uniqueGameId, Dictionary<string, HashSet<ControlledEntity>>  controlledEntityMap, Player[] players, CraftingPlayerData craftingPlayerData)
     {
         UniqueGameId = uniqueGameId;
         ControlledEntityMap = controlledEntityMap;
         Players = players;
+        CraftingPlayerData = craftingPlayerData;
     }
 
     public override bool Equals(object obj)

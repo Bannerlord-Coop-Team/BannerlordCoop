@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.Entity;
 using GameInterface.Services.MapEvents.Patches;
+using GameInterface.Services.ObjectManager;
 using GameInterface.Tests.Bootstrap;
 using System;
 using TaleWorlds.CampaignSystem.Party;
@@ -29,6 +30,9 @@ public class PartyBehaviorPatchTests : IDisposable
         var party = ObjectHelper.SkipConstructor<MobileParty>();
         party.StringId = "TestEntityId";
 
+        var objectManager = Container.Resolve<IObjectManager>();
+        objectManager.AddExisting(party.StringId, party);
+
         var dt = 0.1f;
 
         // Act
@@ -48,9 +52,13 @@ public class PartyBehaviorPatchTests : IDisposable
 
         var idProvider = Container.Resolve<IControllerIdProvider>();
         var entityRegistry = Container.Resolve<IControlledEntityRegistry>();
+        var objectManager = Container.Resolve<IObjectManager>();
+
+        objectManager.AddExisting(party.StringId, party);
+        objectManager.TryGetId(party, out var partyId);
 
         idProvider.SetControllerId(controllerId);
-        entityRegistry.RegisterAsControlled(controllerId, party.StringId);
+        entityRegistry.RegisterAsControlled(controllerId, partyId);
 
         var dt = 0.1f;
 

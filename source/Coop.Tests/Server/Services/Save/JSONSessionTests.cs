@@ -1,7 +1,8 @@
 ﻿using Common.Serialization;
-using Coop.Core.Server.Services.Save.Data;
+using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Data;
+using GameInterface.Services.Smithing;
 using GameInterface.Services.Players.Data;
 using System;
 using System.Collections.Generic;
@@ -40,7 +41,7 @@ namespace Coop.Tests.Server.Services.Save
                 new Player("PlayerParty1")
             };
 
-            var sessionData = new CoopSession("TestId", entityRegistry.PackageControlledEntities(), players);
+            var sessionData = new CoopSession("TestId", entityRegistry.PackageControlledEntities(), players, new CraftingPlayerData(new(), new(), new()));
 
             string saveFile = SAVE_PATH + sessionData.UniqueGameId + ".json";
 
