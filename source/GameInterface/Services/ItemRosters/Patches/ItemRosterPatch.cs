@@ -78,8 +78,10 @@ namespace GameInterface.Services.ItemRosters.Patches
 
         public static void AddToCountsOverride(ItemRoster itemRoster, EquipmentElement rosterElement, int amount)
         {
-            // Delay if runs on main thread, causing issues with refreshing crafting related ViewModels
-            itemRoster?.AddToCounts(rosterElement, amount);
+            using (new AllowedThread())
+            {
+                itemRoster?.AddToCounts(rosterElement, amount);
+            }
         }
 
         public static void ClearOverride(ItemRoster itemRoster)

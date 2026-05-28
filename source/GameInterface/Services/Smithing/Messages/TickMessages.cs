@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Settlements;
 
@@ -33,8 +34,12 @@ public class NetworkHourlyTick : ICommand
     [ProtoMember(1)]
     public string CraftingCampaignBehaviorId;
 
-    public NetworkHourlyTick(string craftingCampaignBehaviorId)
+    [ProtoMember(2)]
+    public Dictionary<string, int> HeroIdCraftingRecords;
+
+    public NetworkHourlyTick(string craftingCampaignBehaviorId, Dictionary<string, int> heroIdCraftingRecords)
     {
         CraftingCampaignBehaviorId = craftingCampaignBehaviorId;
+        HeroIdCraftingRecords = heroIdCraftingRecords;
     }
 }

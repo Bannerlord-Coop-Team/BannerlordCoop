@@ -58,6 +58,13 @@ public record RefreshWeaponDesignVM : IEvent
     }
 }
 
+public class RefreshCraftingVM : IEvent
+{
+    public RefreshCraftingVM()
+    {
+    }
+}
+
 [ProtoContract(SkipConstructor = true)]
 public class NetworkRefreshSmelting : ICommand
 {
@@ -75,13 +82,5 @@ public class NetworkRefreshRefinement : ICommand
     public NetworkRefreshRefinement(string craftingHeroId)
     {
         CraftingHeroId = craftingHeroId;
-    }
-}
-
-[ProtoContract(SkipConstructor = true)]
-public class NetworkRefreshCraftingVM : ICommand
-{
-    public NetworkRefreshCraftingVM()
-    {
     }
 }

@@ -12,6 +12,7 @@ using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
+using static TaleWorlds.CampaignSystem.CampaignBehaviors.CraftingCampaignBehavior;
 
 namespace GameInterface.Services.Smithing.Handlers
 {
@@ -49,10 +50,15 @@ namespace GameInterface.Services.Smithing.Handlers
         {
             if (!objectManager.TryGetIdWithLogging(obj.What.CraftingCampaignBehavior, out var craftingCampaignBehaviorId)) return;
 
-            network.SendAll(new NetworkHourlyTick(craftingCampaignBehaviorId));
+            Dictionary<string, int> heroIdCraftingRecords = new Dictionary<string, int>();
+            foreach(KeyValuePair<Hero, HeroCraftingRecord> keyValuePair in obj.What.CraftingCampaignBehavior._heroCraftingRecords)
+            {
+                if (!objectManager.TryGetIdWithLogging(keyValuePair.Key, out var currentHeroId)) return;
 
-            // Needed because crafting stamina recovers as time passes while a client is in the crafting menu (unlike vanilla)
-            network.SendAll(new NetworkRefreshCraftingVM());
+                heroIdCraftingRecords[currentHeroId] = keyValuePair.Value.CraftingStamina;
+            }
+
+            network.SendAll(new NetworkHourlyTick(craftingCampaignBehaviorId, heroIdCraftingRecords));
         }
 
         private void Handle(MessagePayload<NetworkHourlyTick> obj)
@@ -62,27 +68,28 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<DailySettlementTick> obj)
         {
-            DailyTickSettlement(obj.What);
+            DailyTickSettlementInternal(obj.What);
         }
 
         private void HourlyTick(NetworkHourlyTick obj)
         {
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingCampaignBehaviorId, out CraftingCampaignBehavior craftingCampaignBehavior)) return;
 
-            foreach (KeyValuePair<Hero, CraftingCampaignBehavior.HeroCraftingRecord> keyValuePair in craftingCampaignBehavior._heroCraftingRecords)
+            if (obj.HeroIdCraftingRecords == null) return;
+
+            var heroCraftingRecords = craftingCampaignBehavior._heroCraftingRecords;
+            foreach (KeyValuePair<string, int> keyValuePair in obj.HeroIdCraftingRecords)
             {
-                if (keyValuePair.Key.CurrentSettlement != null)
-                {
-                    int maxHeroCraftingStamina = craftingCampaignBehavior.GetMaxHeroCraftingStamina(keyValuePair.Key);
-                    if (keyValuePair.Value.CraftingStamina < maxHeroCraftingStamina)
-                    {
-                        keyValuePair.Value.CraftingStamina = MathF.Min(maxHeroCraftingStamina, keyValuePair.Value.CraftingStamina + CraftingCampaignBehavior.GetStaminaHourlyRecoveryRate(keyValuePair.Key));
-                    }
-                }
+                if (!objectManager.TryGetObjectWithLogging<Hero>(keyValuePair.Key, out var currentHero)) return;
+
+                heroCraftingRecords[currentHero] = new HeroCraftingRecord(keyValuePair.Value);
             }
+
+            // Needed because crafting stamina recovers as time passes while a client is in the crafting menu (unlike vanilla)
+            messageBroker.Publish(this, new RefreshCraftingVM());
         }
 
-        private void DailyTickSettlement(DailySettlementTick obj)
+        private void DailyTickSettlementInternal(DailySettlementTick obj)
         {
             if (obj.Settlement.IsTown && obj.CraftingCampaignBehavior.CraftingOrders[obj.Settlement.Town].IsThereAvailableSlot())
             {
