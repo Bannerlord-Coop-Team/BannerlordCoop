@@ -59,17 +59,17 @@ public class SessionCraftingPlayerDataInterface : ISessionCraftingPlayerDataInte
 
     public void AddPlayerKeys(string playerHeroId)
     {
-        if (craftingData == null)
+        if (CraftingPlayerData == null)
         {
             Logger.Error("CraftingPlayerData was null");
             return;
         }
 
-        if (!craftingData.PlayerOpenNewPartXpDictionary.ContainsKey(playerHeroId))
+        if (!CraftingPlayerData.PlayerOpenNewPartXpDictionary.ContainsKey(playerHeroId))
         {
             CraftingPlayerData.PlayerOpenNewPartXpDictionary[playerHeroId] = new Dictionary<string, float>();
         }
-        if (!craftingData.PlayerOpenedPartsDictionary.ContainsKey(playerHeroId))
+        if (!CraftingPlayerData.PlayerOpenedPartsDictionary.ContainsKey(playerHeroId))
         {
             CraftingPlayerData.PlayerOpenedPartsDictionary[playerHeroId] = new Dictionary<string, List<string>>();
         }
