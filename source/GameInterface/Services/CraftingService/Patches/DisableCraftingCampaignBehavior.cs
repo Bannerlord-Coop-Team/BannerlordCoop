@@ -7,6 +7,6 @@ namespace GameInterface.Services.CraftingService.Patches
     internal class DisableCraftingCampaignBehavior
     {
         [HarmonyPatch(nameof(CraftingCampaignBehavior.RegisterEvents))]
-        static bool Prefix() => true;
+        static bool Prefix() => ModInformation.IsServer;
     }
 }
