@@ -15,17 +15,11 @@ SubscribeNetwork<{{MemberType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNe
     {
         newValue.Enqueue({{DeserializeMethod}}(data.Value[i]));
     }
-    {{ 
-    if ReadOnly;
-    }}
-	    DynamicSync.Constants.ReadonlySetters[{{ReadOnlySetterIndex}}](instance, newValue);
-    {{
-    else
-    }}
+    {{~ if ReadOnly ~}}
+	    AccessTools.Field(typeof({{MemberDeclaringType}}), "{{MemberName}}").SetValue(instance, value);
+    {{~ else ~}}
 	    instance.{{MemberName}} = newValue;
-    {{
-    end
-    }}
+    {{~ end ~}}
 });
 Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_AddLocalMessage>((instanceId, data) => 
 {

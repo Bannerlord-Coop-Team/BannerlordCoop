@@ -54,7 +54,7 @@ namespace GameInterface.Services.CraftingService.Patches
             if (ModInformation.IsClient)
             {
                 Logger.Error("Client created managed {name}", typeof(CraftingState));
-                return false;
+                return true;
             }
 
             var message = new CraftingRemoved(value);

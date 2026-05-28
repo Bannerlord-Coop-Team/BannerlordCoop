@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using Coop.Core.Client.Services.Players.Messages;
+using Coop.Core.Server.Connections;
+using GameInterface.Services.Players;
 using GameInterface.Services.Players.Messages;
 using System;
 using System.Collections.Generic;
@@ -14,22 +16,24 @@ internal class ClientPlayerHandler : IHandler
 {
 
     private IMessageBroker _messageBroker;
+    private readonly IPlayerRegistry playerRegistry;
 
-    public ClientPlayerHandler(IMessageBroker messageBroker)
+    public ClientPlayerHandler(IMessageBroker messageBroker, IPlayerRegistry playerRegistry)
     {
         _messageBroker = messageBroker;
+        this.playerRegistry = playerRegistry;
         _messageBroker.Subscribe<NetworkRegisterPlayer>(Handle);
+    }
+
+    public void Dispose()
+    {
+        _messageBroker.Unsubscribe<NetworkRegisterPlayer>(Handle);
     }
 
     private void Handle(MessagePayload<NetworkRegisterPlayer> obj)
     {
         var player = obj.What.Player;
 
-        _messageBroker.Publish(this, new RegisterPlayer(player));
-    }
-
-    public void Dispose()
-    {
-        _messageBroker.Unsubscribe<NetworkRegisterPlayer>(Handle);
+        playerRegistry.AddPlayer(player);
     }
 }

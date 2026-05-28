@@ -44,6 +44,7 @@ internal class RegistryManager : IRegistryManager
     public void RegisterAllGameObjects()
     {
         autoRegistryFactory.RegisterAll();
+        PartyExtensions.InvalidateCache();
 
         messageBroker.Publish(this, new AllGameObjectsRegistered());
     }

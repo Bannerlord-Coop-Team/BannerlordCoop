@@ -6,8 +6,13 @@ using GameInterface.Services.MapEventSides.Messages;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
+using System.Reflection;
+using System.Reflection.Emit;
+using System.Text;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.Library;
 using TaleWorlds.LinQuick;
 
 namespace GameInterface.Services.MapEvents.Patches;
@@ -47,20 +52,6 @@ internal class MapEventSideDestructionPatches
             }
             __instance.MapEvent.FinalizeEvent();
         }
-
-        return false;
-    }
-
-    [HarmonyPatch(nameof(MapEventSide.AddPartyInternal))]
-    [HarmonyPrefix]
-    static bool Prefix2(MapEventSide __instance, PartyBase party)
-    {
-        // Call original if we call this function
-        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
-
-        MapEventParty mapEventParty = new MapEventParty(party);
-        __instance._battleParties.Add(mapEventParty);
-        __instance._mapEvent.AddInvolvedPartyInternal(mapEventParty, __instance.MissionSide);
 
         return false;
     }

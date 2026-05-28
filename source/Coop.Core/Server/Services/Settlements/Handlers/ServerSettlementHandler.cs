@@ -122,7 +122,7 @@ internal class ServerSettlementHandler : IHandler
         if (!objectManager.TryGetIdWithLogging(obj.Settlement, out var settlementId)) return;
         if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var mobilePartyId)) return;
 
-        var message = new NetworkChangeSettlementMobileParty(settlementId, mobilePartyId, obj.NumberOfLordParties, obj.AddMobileParty);
+        var message = new NetworkChangeSettlementMobileParty(settlementId, mobilePartyId, obj.AddMobileParty);
         network.SendAll(message);
     }
 

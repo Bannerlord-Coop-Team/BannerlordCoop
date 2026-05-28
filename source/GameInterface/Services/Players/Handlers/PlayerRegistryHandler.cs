@@ -1,6 +1,7 @@
 ﻿using Common.Logging;
 using Common.Messaging;
 using GameInterface.Services.Heroes.Messages;
+using GameInterface.Services.Players.Data;
 using GameInterface.Services.Players.Messages;
 using Serilog;
 using System;
@@ -24,7 +25,9 @@ namespace GameInterface.Services.Players.Handlers
 
         private void Handle(MessagePayload<NewPlayerHeroRegistered> obj)
         {
-            var player = obj.What.Player;
+            var playerData = obj.What.Player;
+
+            var player = new Player(playerData.PartyStringId);
 
             if(!playerRegistry.AddPlayer(player))
             {

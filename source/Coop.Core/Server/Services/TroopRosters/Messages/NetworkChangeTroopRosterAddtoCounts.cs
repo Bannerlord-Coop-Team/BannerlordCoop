@@ -7,7 +7,7 @@ namespace Coop.Core.Server.Services.TroopRosters.Messages;
 public readonly struct NetworkChangeTroopRosterAddtoCounts : IEvent
 {
     [ProtoMember(1)]
-    public readonly string MobilePartyId;
+    public readonly string TroopRosterId;
 
     [ProtoMember(2)]
     public readonly string CharacterId;
@@ -31,7 +31,7 @@ public readonly struct NetworkChangeTroopRosterAddtoCounts : IEvent
     public readonly int Index;
 
     public NetworkChangeTroopRosterAddtoCounts(
-        string mobilePartyId,
+        string troopRosterId,
         string character,
         int count,
         bool insertAtFront,
@@ -40,7 +40,7 @@ public readonly struct NetworkChangeTroopRosterAddtoCounts : IEvent
         bool removeDepleted,
         int index)
     {
-        MobilePartyId = mobilePartyId;
+        TroopRosterId = troopRosterId;
         CharacterId = character;
         Count = count;
         InsertAtFront = insertAtFront;

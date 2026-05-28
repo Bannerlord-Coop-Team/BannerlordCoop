@@ -7,11 +7,11 @@ namespace GameInterface.Services.MapEventParties.Messages;
 public readonly struct OnTroopKilledAttempted : IEvent
 {
     public readonly MapEventParty MapEventParty;
-    public readonly int TroopSeed;
+    public readonly CharacterObject Troop;
 
-    public OnTroopKilledAttempted(MapEventParty mapEventParty, int troop)
+    public OnTroopKilledAttempted(MapEventParty mapEventParty, CharacterObject troop)
     {
         MapEventParty = mapEventParty;
-        TroopSeed = troop;
+        Troop = troop;
     }
 }

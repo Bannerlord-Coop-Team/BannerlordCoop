@@ -40,9 +40,11 @@ internal class MapEventPartyLifetimeHandler : IHandler
     {
         var obj = payload.What;
 
-        if (objectManager.AddNewObject(obj.MapEventParty, out var newId) == false) return;
+        if (!objectManager.AddNewObject(obj.MapEventParty, out var newId))
+            return;
 
-        if (objectManager.TryGetId(obj.PartyBase, out string partyBaseId) == false) return;
+        if (!objectManager.TryGetId(obj.PartyBase, out string partyBaseId))
+            return;
 
         network.SendAll(new NetworkCreateMapEventParty(newId, partyBaseId));
     }

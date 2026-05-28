@@ -1,11 +1,11 @@
 ﻿using ProtoBuf.Meta;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.CampaignSystem.Issues;
 using TaleWorlds.CampaignSystem.CharacterDevelopment;
+using static TaleWorlds.CampaignSystem.ExplainedNumber.StatExplainer;
 namespace GameInterface.Surrogates;
 
 public interface ISurrogateCollection { }
@@ -26,6 +26,9 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<TextObject, TextObjectSurrogate>();
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
             AddSurrogate<PropertyOwner<TraitObject>, PropertyOwnerSurrogate>();
+            AddSurrogate<ExplainedNumber, ExplainedNumberSurrogate>();
+            AddSurrogate<ExplainedNumber.StatExplainer, StatExplainerSurrogate>();
+            AddSurrogate<ExplanationLine, ExplanationLineSurrogate>();
         }
     }
 

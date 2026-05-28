@@ -13,6 +13,7 @@ using GameInterface.Services.ObjectManager;
 using LiteNetLib;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
@@ -53,6 +54,9 @@ internal class BattleHandler : IHandler
 
         messageBroker.Subscribe<PlayerEncounterStarted>(Handle_PlayerEncounterStarted);
         messageBroker.Subscribe<NetworkPlayerEncounterStarted>(Handle_NetworkPlayerEncounterStarted);
+
+        messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
+        messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
     }
 
 
@@ -152,14 +156,19 @@ internal class BattleHandler : IHandler
     private void Handle_PlayerLeaveBattle(MessagePayload<PlayerLeaveBattle> payload)
     {
         if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out string mapEventId)) return;
-        if (!objectManager.TryGetIdWithLogging(payload.What.MobileParty, out string MobilePartyId)) return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.MobileParty, out string mobilePartyId)) return;
 
-        network.SendAll(new NetworkLeavePlayerBattle(mapEventId, MobilePartyId));
+        network.SendAll(new NetworkLeavePlayerBattle(mobilePartyId, mapEventId));
 
-        GameMenu.ExitToLast();
+        using (new AllowedThread())
+        {
+            payload.What.MapEvent.FinalizeEvent();
 
-        Campaign.Current.PlayerEncounter = null;
-        Campaign.Current.LocationEncounter = null;
+            GameMenu.ExitToLast();
+
+            Campaign.Current.PlayerEncounter = null;
+            Campaign.Current.LocationEncounter = null;
+        }
     }
 
     private void Handle_NetworkLeavePlayerBattle(MessagePayload<NetworkLeavePlayerBattle> payload)
@@ -273,5 +282,46 @@ internal class BattleHandler : IHandler
         if (mobileParty != MobileParty.MainParty) return;
 
         PlayerEncounter.Current._mapEvent = mapEvent;
+    }
+
+    private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)
+    {
+        var message = payload.What;
+        if (!objectManager.TryGetIdWithLogging(message.MapEvent, out var mapEventSideId))
+            return;
+
+        var partyIds = new List<string>();
+
+        foreach (var addedParty in message.AddedParties)
+        {
+            if (objectManager.TryGetIdWithLogging(addedParty, out var mapEventPartyId))
+            {
+                partyIds.Add(mapEventPartyId);
+            }
+        }
+
+        network.SendAll(new NetworkAddInvolvedParties(
+            mapEventSideId,
+            partyIds.ToArray()
+        ));
+    }
+
+    private void Handle_NetworkAddInvolvedParties(MessagePayload<NetworkAddInvolvedParties> payload)
+    {
+        var message = payload.What;
+
+        if (!objectManager.TryGetObjectWithLogging<MapEvent>(message.MapEventId, out var mapEvent))
+            return;
+
+        using (new AllowedThread())
+        {
+            foreach(var mapEventPartyId in message.MapEventPartyIds)
+            {
+                if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
+                    continue;
+
+                mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
+            }
+        }
     }
 }

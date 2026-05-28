@@ -24,9 +24,9 @@ public record RegisterNewPlayerHero : ICommand
 public record NewPlayerHeroRegistered : IResponse
 {
     public NetPeer SendingPeer { get; }
-    public Player Player { get; }
+    public Players.Data.NetworkPlayerData Player { get; }
 
-    public NewPlayerHeroRegistered(NetPeer sendingPeer, Player playerData)
+    public NewPlayerHeroRegistered(NetPeer sendingPeer, Players.Data.NetworkPlayerData playerData)
     {
         SendingPeer = sendingPeer;
 

@@ -23,17 +23,17 @@ namespace GameInterface.Services.Heroes.Patches
     {
         private static readonly ILogger Logger = LogManager.GetLogger<HeroFieldPatches>();
 
-        private static IEnumerable<MethodBase> TargetMethods()
+        public static IEnumerable<MethodBase> TargetMethods()
         {
             foreach(var method in AccessTools.GetDeclaredMethods(typeof(Hero)))
             {
                 yield return method;
             }
-            yield return AccessTools.Method(typeof(HeroDeveloper), "CheckLevel");
-            yield return AccessTools.Method(typeof(HeroDeveloper), "ClearHeroLevel");
+            yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.CheckLevel));
+            yield return AccessTools.Method(typeof(HeroDeveloper), nameof(HeroDeveloper.ClearHeroLevel));
             yield return AccessTools.Method(typeof(MakePregnantAction), nameof(MakePregnantAction.ApplyInternal));
-            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(Hero) });
-            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), "CheckOffspringsToDeliver", new Type[] { typeof(PregnancyCampaignBehavior.Pregnancy) });
+            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringsToDeliver));
+            yield return AccessTools.Method(typeof(PregnancyCampaignBehavior), nameof(PregnancyCampaignBehavior.CheckOffspringToDeliver));
             yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.CreateRelativeNotableHero));
             yield return AccessTools.Method(typeof(HeroCreator), nameof(HeroCreator.DeliverOffSpring));
         }
