@@ -24,6 +24,7 @@ public class SessionCraftingPlayerDataInterface : ISessionCraftingPlayerDataInte
     private ICoopSessionProvider coopSessionProvider;
     private readonly IPlayerRegistry playerRegistry;
     private readonly IObjectManager objectManager;
+    private CraftingPlayerData CraftingPlayerData => coopSessionProvider.CoopSession.CraftingPlayerData;
 
     public SessionCraftingPlayerDataInterface(ICoopSessionProvider coopSessionProvider, IPlayerRegistry playerRegistry, IObjectManager objectManager)
     {
@@ -36,7 +37,7 @@ public class SessionCraftingPlayerDataInterface : ISessionCraftingPlayerDataInte
     {
         if (IsPlayerHeroIdValid(playerHeroId))
         {
-            coopSessionProvider.CoopSession.CraftingPlayerData.PlayerOpenNewPartXpDictionary[playerHeroId][craftingTemplateId] = xp;
+            CraftingPlayerData.PlayerOpenNewPartXpDictionary[playerHeroId][craftingTemplateId] = xp;
         }
     }
 
@@ -44,7 +45,7 @@ public class SessionCraftingPlayerDataInterface : ISessionCraftingPlayerDataInte
     {
         if (IsPlayerHeroIdValid(playerHeroId))
         {
-            coopSessionProvider.CoopSession.CraftingPlayerData.PlayerOpenedPartsDictionary[playerHeroId][craftingTemplateId].Add(craftingPieceId);
+            CraftingPlayerData.PlayerOpenedPartsDictionary[playerHeroId][craftingTemplateId].Add(craftingPieceId);
         }
     }
 
@@ -52,14 +53,12 @@ public class SessionCraftingPlayerDataInterface : ISessionCraftingPlayerDataInte
     {
         if (IsPlayerHeroIdValid(playerHeroId))
         {
-            coopSessionProvider.CoopSession.CraftingPlayerData.PlayerCraftedItemsHistory[playerHeroId] = craftedItemHistoryIds;
+            CraftingPlayerData.PlayerCraftedItemsHistory[playerHeroId] = craftedItemHistoryIds;
         }
     }
 
     public void AddPlayerKeys(string playerHeroId)
     {
-        CraftingPlayerData craftingData = coopSessionProvider.CoopSession.CraftingPlayerData;
-
         if (craftingData == null)
         {
             Logger.Error("CraftingPlayerData was null");
@@ -68,20 +67,20 @@ public class SessionCraftingPlayerDataInterface : ISessionCraftingPlayerDataInte
 
         if (!craftingData.PlayerOpenNewPartXpDictionary.ContainsKey(playerHeroId))
         {
-            craftingData.PlayerOpenNewPartXpDictionary[playerHeroId] = new Dictionary<string, float>();
+            CraftingPlayerData.PlayerOpenNewPartXpDictionary[playerHeroId] = new Dictionary<string, float>();
         }
         if (!craftingData.PlayerOpenedPartsDictionary.ContainsKey(playerHeroId))
         {
-            craftingData.PlayerOpenedPartsDictionary[playerHeroId] = new Dictionary<string, List<string>>();
+            CraftingPlayerData.PlayerOpenedPartsDictionary[playerHeroId] = new Dictionary<string, List<string>>();
         }
 
         foreach (CraftingTemplate craftingTemplate in CraftingTemplate.All)
         {
             if (!objectManager.TryGetIdWithLogging(craftingTemplate, out string craftingTemplateId)) return;
 
-            if (!craftingData.PlayerOpenedPartsDictionary[playerHeroId].ContainsKey(craftingTemplateId))
+            if (!CraftingPlayerData.PlayerOpenedPartsDictionary[playerHeroId].ContainsKey(craftingTemplateId))
             {
-                craftingData.PlayerOpenedPartsDictionary[playerHeroId][craftingTemplateId] = new List<string>();
+                CraftingPlayerData.PlayerOpenedPartsDictionary[playerHeroId][craftingTemplateId] = new List<string>();
             }
         }
     }
