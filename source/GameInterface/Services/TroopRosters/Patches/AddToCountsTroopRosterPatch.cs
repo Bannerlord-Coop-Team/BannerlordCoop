@@ -62,7 +62,7 @@ public class AddToCountsTroopRosterPatch
 
         if (ModInformation.IsClient)
         {
-            Logger.Error("Client attempted to update managed {type}, {methodName}", typeof(ItemRoster), "AddToCountsAtIndex");
+            Logger.Error("Client attempted to update managed {type}, {methodName}", typeof(TroopRoster), "AddToCountsAtIndex");
             return;
         }
 
@@ -77,6 +77,11 @@ public class AddToCountsTroopRosterPatch
         {
             using (new AllowedThread())
             {
+                if(woundedCount < 0)
+                {
+                    Logger.Error("Wounded count change cannot be negative. Character: {character}, Count: {count}, WoundedCount: {woundedCount}", character.Name, count, woundedCount);
+                    return;
+                }
                 troopRoster.AddToCounts(character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
             }
         });
@@ -88,6 +93,7 @@ public class AddToCountsTroopRosterPatch
         {
             using (new AllowedThread())
             {
+                if (troopRoster._troopRosterElementsVersion == -1) return;
                 troopRoster.AddToCountsAtIndex(index, count, woundedCount, xpChange, removeDepleted);
             }
         });

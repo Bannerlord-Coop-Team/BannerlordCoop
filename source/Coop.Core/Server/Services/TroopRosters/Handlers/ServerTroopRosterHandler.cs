@@ -24,6 +24,7 @@ internal class ServerTroopRosterHandler : IHandler
         this.network = network;
         this.objectManager = objectManager;
         messageBroker.Subscribe<TroopRosterAddToCountsChanged>(Handle_AddToCounts);
+        messageBroker.Subscribe<TroopRosterAddToCountsAtIndexChanged>(Handle_AddToCountsAtIndex);
         messageBroker.Subscribe<TroopRosterAddHeroToCountsChanged>(Handle_HeroAddToCounts);
         messageBroker.Subscribe<ClientRequestRecruitment>(HandleOnRecruitmentDone);
     }
@@ -40,6 +41,35 @@ internal class ServerTroopRosterHandler : IHandler
         var obj = payload.What;
         var message = new RecruitTroops(obj.MobilePartyId, obj.TroopsInCart);
         messageBroker.Publish(this, message);
+    }
+
+    private void Handle_AddToCountsAtIndex(MessagePayload<TroopRosterAddToCountsAtIndexChanged> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
+
+        if (TroopRosterConfig.Debug)
+        {
+            Logger.Debug("[Server] Sending troop roster add to counts at index change for " +
+                "TroopRoster {TroopRosterId}, " +
+                "CharacterObject {CharacterObjectId}, " +
+                "Count {Count}, " +
+                "InsertAtFront {InsertAtFront}, " +
+                "WoundedCount {WoundedCount}, " +
+                "XpChanged {XpChanged}, " +
+                "RemoveDepleted {RemoveDepleted}, " +
+                "Index {Index}",
+                troopRosterId,
+                obj.Count,
+                obj.WoundedCount,
+                obj.XpChanged,
+                obj.RemoveDepleted,
+                obj.Index);
+        }
+
+        var message = new NetworkChangeTroopRosterAddtoCountsAtIndex(troopRosterId, obj.Index, obj.Count, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted);
+        network.SendAll(message);
     }
 
     private void Handle_AddToCounts(MessagePayload<TroopRosterAddToCountsChanged> payload)

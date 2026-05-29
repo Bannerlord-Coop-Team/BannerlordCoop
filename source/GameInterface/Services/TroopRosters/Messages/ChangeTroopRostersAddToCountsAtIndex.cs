@@ -3,7 +3,7 @@
 namespace GameInterface.Services.TroopRosters.Messages;
 public record ChangeTroopRostersAddToCountsAtIndex : IEvent
 {
-    public string MobilePartyId { get; }
+    public string TroopRosterId  { get; }
     public int Index { get; }
     public int Count { get; }
     public int WoundedCount { get; }
@@ -11,9 +11,9 @@ public record ChangeTroopRostersAddToCountsAtIndex : IEvent
     public bool RemoveDepleted { get; }
 
 
-    public ChangeTroopRostersAddToCountsAtIndex(string mobilePartyId, int index, int count, int woundedCount, int xpChanged, bool removeDepleted)
+    public ChangeTroopRostersAddToCountsAtIndex(string troopRosterId, int index, int count, int woundedCount, int xpChanged, bool removeDepleted)
     {
-        MobilePartyId = mobilePartyId;
+        TroopRosterId = troopRosterId;
         Index = index;
         Count = count;
         WoundedCount = woundedCount;

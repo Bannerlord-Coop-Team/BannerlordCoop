@@ -30,6 +30,7 @@ public class TroopRosterHandler : IHandler
 
         
         messageBroker.Subscribe<ChangeTroopRostersAddToCounts>(Handle_AddToCounts);
+        messageBroker.Subscribe<ChangeTroopRostersAddToCountsAtIndex>(Handle_AddToCountsAtIndex);
         messageBroker.Subscribe<ChangeTroopRostersHeroAddToCounts>(Handle_HeroAddToCounts);
         messageBroker.Subscribe<RecruitTroops>(HandleOnRecruitmentDone);
 
@@ -40,6 +41,7 @@ public class TroopRosterHandler : IHandler
     public void Dispose()
     {
         messageBroker.Unsubscribe<ChangeTroopRostersAddToCounts>(Handle_AddToCounts);
+        messageBroker.Unsubscribe<ChangeTroopRostersAddToCountsAtIndex>(Handle_AddToCountsAtIndex);
         messageBroker.Unsubscribe<RecruitTroops>(HandleOnRecruitmentDone);
     }
 
@@ -94,6 +96,20 @@ public class TroopRosterHandler : IHandler
         }
 
         mobileParty.LeaderHero.Gold -= cost;
+    }
+
+    private void Handle_AddToCountsAtIndex(MessagePayload<ChangeTroopRostersAddToCountsAtIndex> payload)
+    {
+        var obj = payload.What;
+        if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
+
+        AddToCountsTroopRosterPatch.RunAddToCountsAtIndex(
+            troopRoster,
+            obj.Index,
+            obj.Count,
+            obj.WoundedCount,
+            obj.XpChanged,
+            obj.RemoveDepleted);
     }
 
     private void Handle_AddToCounts(MessagePayload<ChangeTroopRostersAddToCounts> payload)
@@ -153,9 +169,16 @@ public class TroopRosterHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(payload.What.TroopId, out CharacterObject troop))
             return;
 
-        using(new AllowedThread())
+        try
         {
-            troopRoster.RemoveTroop(troop, payload.What.NumberToRemove, xp: payload.What.Xp);
+            using (new AllowedThread())
+            {
+                troopRoster.RemoveTroop(troop, payload.What.NumberToRemove, xp: payload.What.Xp);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.Error(ex, "Error while removing troop from roster");
         }
     }
 }

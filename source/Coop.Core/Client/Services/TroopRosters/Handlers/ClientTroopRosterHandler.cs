@@ -24,6 +24,7 @@ public class ClientTroopRosterHandler : IHandler
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        messageBroker.Subscribe<NetworkChangeTroopRosterAddtoCountsAtIndex>(Handle_AddToCountsAtIndex);
         messageBroker.Subscribe<NetworkChangeTroopRosterAddtoCounts>(Handle_AddToCounts);
         messageBroker.Subscribe<NetworkChangeTroopRosterHeroAddtoCounts>(Handle_HeroAddToCounts);
         messageBroker.Subscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
@@ -31,6 +32,7 @@ public class ClientTroopRosterHandler : IHandler
 
     public void Dispose()
     {
+        messageBroker.Unsubscribe<NetworkChangeTroopRosterAddtoCountsAtIndex>(Handle_AddToCountsAtIndex);
         messageBroker.Unsubscribe<NetworkChangeTroopRosterAddtoCounts>(Handle_AddToCounts);
         messageBroker.Unsubscribe<NetworkChangeTroopRosterHeroAddtoCounts>(Handle_HeroAddToCounts);
         messageBroker.Unsubscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
@@ -60,6 +62,18 @@ public class ClientTroopRosterHandler : IHandler
         var message = new ClientRequestRecruitment(mobilePartyId, troops.ToArray());
 
         network.SendAll(message);
+    }
+    private void Handle_AddToCountsAtIndex(MessagePayload<NetworkChangeTroopRosterAddtoCountsAtIndex> payload)
+    {
+        var obj = payload.What;
+        var message = new ChangeTroopRostersAddToCountsAtIndex(obj.TroopRosterId, obj.Index, obj.Count, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted);
+
+        if (TroopRosterConfig.Debug)
+        {
+            Logger.Debug("[Client] Setting troop roster counts at index for TroopRosterId: {TroopRosterId}, Index: {Index}", obj.TroopRosterId, obj.Index);
+        }
+
+        messageBroker.Publish(this, message);
     }
     private void Handle_AddToCounts(MessagePayload<NetworkChangeTroopRosterAddtoCounts> payload)
     {
