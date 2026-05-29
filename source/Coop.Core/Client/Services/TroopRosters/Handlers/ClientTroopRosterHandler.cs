@@ -2,12 +2,9 @@
 using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
-using Coop.Core.Server.Services.TroopRosters.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.TroopRosters;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
-using System;
 using System.Collections.Generic;
 
 namespace Coop.Core.Client.Services.TroopRosters.Handlers;
@@ -24,17 +21,12 @@ public class ClientTroopRosterHandler : IHandler
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
-        messageBroker.Subscribe<NetworkChangeTroopRosterAddtoCountsAtIndex>(Handle_AddToCountsAtIndex);
-        messageBroker.Subscribe<NetworkChangeTroopRosterAddtoCounts>(Handle_AddToCounts);
-        messageBroker.Subscribe<NetworkChangeTroopRosterHeroAddtoCounts>(Handle_HeroAddToCounts);
+
         messageBroker.Subscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<NetworkChangeTroopRosterAddtoCountsAtIndex>(Handle_AddToCountsAtIndex);
-        messageBroker.Unsubscribe<NetworkChangeTroopRosterAddtoCounts>(Handle_AddToCounts);
-        messageBroker.Unsubscribe<NetworkChangeTroopRosterHeroAddtoCounts>(Handle_HeroAddToCounts);
         messageBroker.Unsubscribe<RecruitmentAttempted>(HandleOnRecruitmentDone);
     }
 
@@ -62,42 +54,5 @@ public class ClientTroopRosterHandler : IHandler
         var message = new ClientRequestRecruitment(mobilePartyId, troops.ToArray());
 
         network.SendAll(message);
-    }
-    private void Handle_AddToCountsAtIndex(MessagePayload<NetworkChangeTroopRosterAddtoCountsAtIndex> payload)
-    {
-        var obj = payload.What;
-        var message = new ChangeTroopRostersAddToCountsAtIndex(obj.TroopRosterId, obj.Index, obj.Count, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted);
-
-        if (TroopRosterConfig.Debug)
-        {
-            Logger.Debug("[Client] Setting troop roster counts at index for TroopRosterId: {TroopRosterId}, Index: {Index}", obj.TroopRosterId, obj.Index);
-        }
-
-        messageBroker.Publish(this, message);
-    }
-    private void Handle_AddToCounts(MessagePayload<NetworkChangeTroopRosterAddtoCounts> payload)
-    {
-        var obj = payload.What;
-        var message = new ChangeTroopRostersAddToCounts(obj.TroopRosterId, obj.CharacterId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted, obj.Index);
-
-        if (TroopRosterConfig.Debug)
-        {
-            Logger.Debug("[Client] Setting troop roster counts for TroopRosterId: {TroopRosterId}, CharacterId: {CharacterId}", obj.TroopRosterId, obj.CharacterId);
-        }
-
-        messageBroker.Publish(this, message);
-    }
-
-    private void Handle_HeroAddToCounts(MessagePayload<NetworkChangeTroopRosterHeroAddtoCounts> payload)
-    {
-        var obj = payload.What;
-        var message = new ChangeTroopRostersHeroAddToCounts(obj.TroopRosterId, obj.HeroId, obj.Count, obj.InsertAtFront, obj.WoundedCount, obj.XpChanged, obj.RemoveDepleted, obj.Index);
-
-        if (TroopRosterConfig.Debug)
-        {
-            Logger.Debug("[Client] Setting troop roster counts for TroopRosterId: {TroopRosterId}, HeroId: {HeroId}", obj.TroopRosterId, obj.HeroId);
-        }
-
-        messageBroker.Publish(this, message);
     }
 }

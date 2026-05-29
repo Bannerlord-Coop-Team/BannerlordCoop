@@ -8,7 +8,7 @@ namespace GameInterface.Services.TroopRosters.Messages;
 public readonly struct TroopRosterAddToCountsChanged : ICommand
 {
     public readonly TroopRoster TroopRoster;
-    public readonly CharacterObject CharacterObject;
+    public readonly CharacterObject Troop;
 
     public readonly int Count;
 
@@ -20,7 +20,7 @@ public readonly struct TroopRosterAddToCountsChanged : ICommand
 
     public TroopRosterAddToCountsChanged(
         TroopRoster troopRoster,
-        CharacterObject characterObject,
+        CharacterObject troop,
         int count,
         bool insertAtFront,
         int woundedCount,
@@ -29,7 +29,7 @@ public readonly struct TroopRosterAddToCountsChanged : ICommand
         int index)
     {
         TroopRoster = troopRoster;
-        CharacterObject = characterObject;
+        Troop = troop;
         Count = count;
         InsertAtFront = insertAtFront;
         WoundedCount = woundedCount;

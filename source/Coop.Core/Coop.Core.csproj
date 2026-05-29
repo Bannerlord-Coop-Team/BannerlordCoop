@@ -114,4 +114,7 @@
   <ItemGroup>
     <Publicize Include="TaleWorlds.Library" />
   </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Server\Services\TroopRosters\Messages\" />
+  </ItemGroup>
 </Project>
