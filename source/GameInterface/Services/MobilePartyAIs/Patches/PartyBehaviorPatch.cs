@@ -53,11 +53,6 @@ public static class PartyBehaviorPatch
         ref IInteractablePoint interactablePoint,
         ref CampaignVec2 bestTargetPoint)
     {
-        if (ModInformation.IsClient && __instance._mobileParty == MobileParty.MainParty)
-        {
-            ;
-        }
-
         if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
         if (BehaviorIsSame(ref __instance, ref newAiBehavior, ref interactablePoint, ref bestTargetPoint)) return false;
@@ -140,14 +135,22 @@ public static class PartyBehaviorPatch
                 }
             }
 
-            mobileParty.TargetPosition = targetPoint;
-            mobileParty.SetShortTermBehavior(newBehavior, interactablePoint);
 
-            partyAi.AiBehaviorInteractable = interactablePoint;
-            partyAi.BehaviorTarget = targetPoint;
+            try
+            {
+                mobileParty.TargetPosition = targetPoint;
+                mobileParty.SetShortTermBehavior(newBehavior, interactablePoint);
 
-            mobileParty.RecalculateShortTermBehavior();
-            partyAi.UpdateBehavior();
+                partyAi.AiBehaviorInteractable = interactablePoint;
+                partyAi.BehaviorTarget = targetPoint;
+
+                mobileParty.RecalculateShortTermBehavior();
+                partyAi.UpdateBehavior();
+            }
+            catch(Exception ex)
+            {
+                Logger.Error(ex, "Failed to update party behavior for {StringId}", mobileParty.StringId);
+            }
         }
     }
 }

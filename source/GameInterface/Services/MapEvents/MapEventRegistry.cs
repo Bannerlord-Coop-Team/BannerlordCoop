@@ -4,6 +4,7 @@ using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using SandBox.GauntletUI.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -31,7 +32,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
     {
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))
+        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinishBattle))
     };
 
     public override void RegisterAllObjects()
@@ -51,6 +52,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             obj.StringId = id;
             obj._sides = new MapEventSide[2];
             obj.WonRounds = new MBList<BattleSideEnum>();
+
+            Campaign.Current.MapEventManager.OnMapEventCreated(obj);
         }
     }
 
@@ -62,6 +65,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             {
                 obj.Component?.FinishComponent();
                 obj.FinalizeEventAux();
+
+                Campaign.Current.MapEventManager.Tick();
             }
         });
     }

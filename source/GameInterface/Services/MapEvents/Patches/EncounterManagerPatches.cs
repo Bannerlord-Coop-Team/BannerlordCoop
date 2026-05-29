@@ -89,19 +89,21 @@ internal class EncounterManagerPatches
         {
             try
             {
-                using var _ = new AllowedThread();
-                if (defender.IsMobile)
+                using (new AllowedThread())
                 {
-                    if (attacker.MobileParty.IsPartyControlled() == true)
+                    if (defender.IsMobile)
                     {
-                        InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
+                        if (attacker.MobileParty.IsPartyControlled() == true)
+                        {
+                            InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
+                        }
+                        EncounterManager.StartPartyEncounter(attacker, defender);
+                        return;
                     }
-                    EncounterManager.StartPartyEncounter(attacker, defender);
-                    return;
-                }
-                if (defender.IsSettlement)
-                {
-                    EncounterManager.StartSettlementEncounter(attacker.MobileParty, defender.Settlement);
+                    if (defender.IsSettlement)
+                    {
+                        EncounterManager.StartSettlementEncounter(attacker.MobileParty, defender.Settlement);
+                    }
                 }
             }
             catch(Exception ex)

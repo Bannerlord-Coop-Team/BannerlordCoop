@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEventSides.Patches;
 using GameInterface.Services.MobileParties.Extensions;
 using HarmonyLib;
@@ -24,7 +25,7 @@ internal class MapEventPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<MapEventPatches>();
 
-    private static ConditionalWeakTable<MapEvent, JoinTimeLimit> joinLimits = new();
+    private static readonly ConditionalWeakTable<MapEvent, JoinTimeLimit> joinLimits = new();
 
     class JoinTimeLimit
     {
@@ -82,22 +83,28 @@ internal class MapEventPatches
         return true;
     }
 
+    [HarmonyPatch(nameof(MapEvent.Update))]
+    [HarmonyPrefix]
+    // Disable update on clients
+    private static bool PrefixUpdate() => ModInformation.IsServer;
+
+
     [HarmonyPatch(nameof(MapEvent.OnBattleWon))]
     [HarmonyPrefix]
-    private static void PrefixOnBattleWon(MapEvent __instance)
+    private static bool PrefixOnBattleWon(MapEvent __instance)
     {
         var containsPlayer = __instance._sides.Any(side => side.Parties.Any(party => party.Party.MobileParty.IsPlayerParty()));
 
+        // Skip on client
         if (ModInformation.IsClient)
-        {
-            Logger.Error("Client called {MethodName}", nameof(MapEvent.OnBattleWon));
-            return;
-        }
+            return false;
 
         if (__instance.ContainsPlayerParty())
         {
             __instance.CalculateAndCommitMapEventResults();
         }
+
+        return true;
     }
 
     private static void PostfixCanPartyJoinBattle(MapEvent __instance, PartyBase party, ref bool __result)

@@ -16,9 +16,9 @@ internal class PartyBaseHelperPatch
             __result = false;
         if (party.LeaderHero != null)
             __result = party.LeaderHero.Culture.HasFeat(feat);
-        if (party.Culture != null)
+        if (party.MapFaction?.Culture != null)
             __result = party.Culture.HasFeat(feat);
-        if (party.Owner != null)
+        if (party.Owner?.Culture != null)
             __result = party.Owner.Culture.HasFeat(feat);
         __result = party.Settlement != null && party.Settlement.Culture.HasFeat(feat);
 

@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Xml.Linq;
+using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.ObjectManager;
 
@@ -83,6 +84,7 @@ public interface IObjectManager
     string CreateNewId(object obj, string baseId);
 
     int GetUniqueTypeId(object obj);
+    int EnsureNextUniqueIdAbove(object obj, int value);
 }
 
 /// <summary>
@@ -175,11 +177,30 @@ public class ObjectManager : IObjectManager
     {
         var type = obj.GetType();
 
-        return objectCounters.AddOrUpdate(
-            type,
-            1,                // initial value if missing
-            (_, current) => current + 1
-        );
+        lock(objectCounters)
+        {
+            return objectCounters.AddOrUpdate(
+                type,
+                1,                // initial value if missing
+                (_, current) => current + 1
+            );
+        }
+    }
+
+    public int EnsureNextUniqueIdAbove(object obj, int value)
+    {
+        var type = obj.GetType();
+
+        lock (objectCounters)
+        {
+            int nextValue = value + 1;
+
+            return objectCounters.AddOrUpdate(
+                type,
+                nextValue,
+                (_, current) => nextValue > current ? nextValue : current
+            );
+        }
     }
 
     public bool Contains(object obj)
@@ -260,6 +281,16 @@ public class ObjectManager : IObjectManager
 
         if (!TryGetId(obj, out id))
         {
+            if (obj is MBObjectBase mbObject)
+            {
+                logger.Error(
+                    "[{ClassName}] Failed to get id for object of type {ObjectType}, {StringId}",
+                    nameof(ObjectManager),
+                    obj.GetType().FullName,
+                    mbObject.StringId);
+                return false;
+            }
+
             logger.Error(
                 "[{ClassName}] Failed to get id for object of type {ObjectType}",
                 nameof(ObjectManager),

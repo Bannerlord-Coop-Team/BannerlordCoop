@@ -1,44 +1,47 @@
 ﻿using Common;
+using Common.Logging;
+using Common.Messaging;
+using GameInterface.Policies;
+using GameInterface.Services.MapEventParties.Messages;
 using HarmonyLib;
+using Serilog;
 using TaleWorlds.CampaignSystem.MapEvents;
-using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.MapEventParties.Patches;
 
 [HarmonyPatch(typeof(MapEventParty))]
 internal class MapEventPartyUpdatePatch
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<MapEventPartyUpdatePatch>();
+
     [HarmonyPrefix]
     [HarmonyPatch(nameof(MapEventParty.Update))]
     static bool PrefixUpdate(MapEventParty __instance)
     {
-        if (__instance._roster == null)
-        {
-            __instance._roster = new FlattenedTroopRoster(__instance.Party.MemberRoster.TotalManCount);
-        }
-        else
-        {
-            __instance._roster.Clear();
-        
-        }
-        if (__instance.Party.MemberRoster._troopRosterElements == null) return false;
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
 
-        foreach (TroopRosterElement troopRosterElement in __instance.Party.MemberRoster.GetTroopRoster())
+        if (ModInformation.IsClient)
         {
-            if (troopRosterElement.Character.IsHero)
-            {
-                if (!__instance._woundedInBattle.Contains(troopRosterElement.Character) && !__instance._diedInBattle.Contains(troopRosterElement.Character))
-                {
-                    __instance._roster.Add(troopRosterElement.Character, troopRosterElement.Character.HeroObject.IsWounded, troopRosterElement.Xp);
-                }
-            }
-            else
-            {
-                __instance._roster.Add(troopRosterElement.Character, troopRosterElement.Number, troopRosterElement.WoundedNumber);
-            }
+            Logger.Error("MapEventParty.Update was called on the client. This should never happen. Please report this to the mod developers.");
+            return false;
         }
 
+        return true;
+    }
 
-        return false;
+    [HarmonyPostfix]
+    [HarmonyPatch(nameof(MapEventParty.Update))]
+    static void PostfixUpdate(MapEventParty __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed()) return;
+
+        if (ModInformation.IsClient)
+        {
+            Logger.Error("MapEventParty.Update was called on the client. This should never happen. Please report this to the mod developers.");
+            return;
+        }
+
+        var message = new MapEventPartyUpdated(__instance, __instance._roster);
+        MessageBroker.Instance.Publish(__instance, message);
     }
 }

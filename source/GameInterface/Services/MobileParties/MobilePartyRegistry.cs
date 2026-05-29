@@ -43,9 +43,7 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
         this.messageBroker = messageBroker;
     }
 
-    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
-        AccessTools.Constructor(typeof(MobileParty), new Type[0])
-    };
+    public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MobileParty));
 
     public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
     {

@@ -8,10 +8,10 @@ namespace Coop.Core.Server.Services.Time.Messages;
 /// Time speed on server has changed event
 /// </summary>
 [ProtoContract(SkipConstructor = true)]
-public record NetworkChangeTimeControlMode : IEvent
+public readonly struct NetworkChangeTimeControlMode : IEvent
 {
     [ProtoMember(1)]
-    public TimeControlEnum NewControlMode { get; }
+    public readonly TimeControlEnum NewControlMode;
 
     public NetworkChangeTimeControlMode(TimeControlEnum newControlMode)
     {

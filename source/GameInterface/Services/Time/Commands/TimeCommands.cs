@@ -1,5 +1,6 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 using System;
 using System.Collections.Generic;
@@ -14,45 +15,11 @@ internal class TimeCommands
     [CommandLineArgumentFunction("get_time_mode", "coop.debug")]
     public static string GetTimeMode(List<string> strings)
     {
-        var tx = new GetterTransaction();
-
-        return $"{tx.GetTimeControlMode()}";
-    }
-}
-
-class GetterTransaction
-{
-    public GetterTransaction()
-    {
-        MessageBroker.Instance.Subscribe<TimeControlModeResponse>(Handle);
-    }
-
-    ~GetterTransaction()
-    {
-        MessageBroker.Instance.Unsubscribe<TimeControlModeResponse>(Handle);
-    }
-
-    TaskCompletionSource<TimeControlEnum> tcs;
-    public string GetTimeControlMode()
-    {
-        tcs = new TaskCompletionSource<TimeControlEnum>();
-        var cts = new CancellationTokenSource(1000);
-
-        MessageBroker.Instance.Publish(this, new GetTimeControlMode());
-
-        try
+        if (!ContainerProvider.TryResolve<ITimeControlInterface>(out var timeControlInterface))
         {
-            tcs.Task.Wait(cts.Token);
-            return $"{tcs.Task.Result}";
+            return "Failed to get time control interface";
         }
-        catch(OperationCanceledException)
-        {
-            return "Failed to get time mode";
-        }
-    }
 
-    private void Handle(MessagePayload<TimeControlModeResponse> payload)
-    {
-        tcs.SetResult(payload.What.TimeMode);
+        return $"{timeControlInterface.GetTimeControl()}";
     }
 }

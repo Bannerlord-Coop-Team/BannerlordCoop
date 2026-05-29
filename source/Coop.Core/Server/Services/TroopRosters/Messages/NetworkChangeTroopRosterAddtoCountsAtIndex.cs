@@ -4,26 +4,32 @@ using ProtoBuf;
 namespace Coop.Core.Server.Services.TroopRosters.Messages;
 
 [ProtoContract(SkipConstructor = true)]
-public record NetworkChangeTroopRosterAddtoCountsAtIndex : IEvent
+public readonly struct NetworkChangeTroopRosterAddtoCountsAtIndex : IEvent
 {
     [ProtoMember(1)]
-    public string MobilePartyId { get; }
+    public readonly string MobilePartyId;
     [ProtoMember(2)]
-    public int Index { get; }
+    public readonly int Index;
 
     [ProtoMember(3)]
-    public int Count { get; }
+    public readonly int Count;
 
     [ProtoMember(4)]
-    public int WoundedCount { get; }
+    public readonly int WoundedCount;
 
     [ProtoMember(5)]
-    public int XpChanged { get; }
+    public readonly int XpChanged;
 
     [ProtoMember(6)]
-    public bool RemoveDepleted { get; }
+    public readonly bool RemoveDepleted;
 
-    public NetworkChangeTroopRosterAddtoCountsAtIndex(string mobilePartyId, int index, int count, int woundedCount, int xpChanged, bool removeDepleted)
+    public NetworkChangeTroopRosterAddtoCountsAtIndex(
+        string mobilePartyId,
+        int index,
+        int count,
+        int woundedCount,
+        int xpChanged,
+        bool removeDepleted)
     {
         MobilePartyId = mobilePartyId;
         Index = index;

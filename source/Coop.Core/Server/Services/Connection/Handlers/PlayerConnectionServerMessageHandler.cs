@@ -30,14 +30,14 @@ namespace Coop.Core.Server.Services.Connection.Handlers
             this.network = network;
 
             messageBroker.Subscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
-            messageBroker.Subscribe<AttemptedTimeSpeedChanged>(AttemptedTimeSpeedChanged);
+            messageBroker.Subscribe<TimeSpeedChangedAttempted>(AttemptedTimeSpeedChanged);
             messageBroker.Subscribe<PackageGameSaveData>(Handle_NetworkConnected);
         }
 
         public void Dispose()
         {
             messageBroker.Unsubscribe<PlayerCampaignEntered>(PlayerCampaignEnteredHandler);
-            messageBroker.Unsubscribe<AttemptedTimeSpeedChanged>(AttemptedTimeSpeedChanged);
+            messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(AttemptedTimeSpeedChanged);
             messageBroker.Unsubscribe<PackageGameSaveData>(Handle_NetworkConnected);
         }
 
@@ -57,7 +57,7 @@ namespace Coop.Core.Server.Services.Connection.Handlers
             }
         }
 
-        private void AttemptedTimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
+        private void AttemptedTimeSpeedChanged(MessagePayload<TimeSpeedChangedAttempted> obj)
         {
             if (AnyLoaders())
             {

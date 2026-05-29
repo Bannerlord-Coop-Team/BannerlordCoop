@@ -33,6 +33,22 @@ public class AddToCountsTroopRosterPatch
             return;
         }
 
+        if (character.IsHero)
+        {
+            MessageBroker.Instance.Publish(
+                __instance, 
+                new TroopRosterAddHeroToCountsChanged(
+                    __instance, 
+                    character.HeroObject, 
+                    count, 
+                    insertAtFront, 
+                    woundedCount, 
+                    xpChange, 
+                    removeDepleted, 
+                    index));
+            return;
+        }
+
         var message = new TroopRosterAddToCountsChanged(__instance, character, count, insertAtFront, woundedCount, xpChange, removeDepleted, index);
 
         MessageBroker.Instance.Publish(__instance, message);

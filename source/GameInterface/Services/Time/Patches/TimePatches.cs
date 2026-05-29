@@ -32,7 +32,7 @@ internal class TimePatches
         if (value != __instance._timeControlMode)
         {
             var controlMode = timeControlModeConverter.Convert(value);
-            MessageBroker.Instance.Publish(__instance, new AttemptedTimeSpeedChanged(controlMode));
+            MessageBroker.Instance.Publish(__instance, new TimeSpeedChangedAttempted(controlMode));
         }
 
         return false;

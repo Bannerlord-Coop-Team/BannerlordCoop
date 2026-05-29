@@ -23,7 +23,7 @@ public class TimeControlTest
     public void SetTimeControlMode_Publishes_AllClients()
     {
         // Arrange
-        var message = new AttemptedTimeSpeedChanged(TimeControlEnum.Play_1x);
+        var message = new TimeSpeedChangedAttempted(TimeControlEnum.Play_1x);
         var client1 = TestEnvironment.Clients.First();
 
         // Act

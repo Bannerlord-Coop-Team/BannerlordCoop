@@ -5,10 +5,10 @@ using TaleWorlds.CampaignSystem;
 
 namespace GameInterface.Services.Heroes.Messages;
 
-public record AttemptedTimeSpeedChanged : IEvent
+public record TimeSpeedChangedAttempted : IEvent
 {
     public TimeControlEnum NewControlMode { get; }
-    public AttemptedTimeSpeedChanged(TimeControlEnum newControlMode)
+    public TimeSpeedChangedAttempted(TimeControlEnum newControlMode)
     {
         NewControlMode = newControlMode;
     }

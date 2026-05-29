@@ -28,7 +28,9 @@ public class TroopRosterHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
 
-        messageBroker.Subscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
+        
+        messageBroker.Subscribe<ChangeTroopRostersAddToCounts>(Handle_AddToCounts);
+        messageBroker.Subscribe<ChangeTroopRostersHeroAddToCounts>(Handle_HeroAddToCounts);
         messageBroker.Subscribe<RecruitTroops>(HandleOnRecruitmentDone);
 
         messageBroker.Subscribe<TroopRemoved>(Handle_TroopRemoved);
@@ -37,7 +39,7 @@ public class TroopRosterHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<ChangeTroopRostersAddToCounts>(HandleAddToCounts);
+        messageBroker.Unsubscribe<ChangeTroopRostersAddToCounts>(Handle_AddToCounts);
         messageBroker.Unsubscribe<RecruitTroops>(HandleOnRecruitmentDone);
     }
 
@@ -94,7 +96,7 @@ public class TroopRosterHandler : IHandler
         mobileParty.LeaderHero.Gold -= cost;
     }
 
-    private void HandleAddToCounts(MessagePayload<ChangeTroopRostersAddToCounts> payload)
+    private void Handle_AddToCounts(MessagePayload<ChangeTroopRostersAddToCounts> payload)
     {
         var obj = payload.What;
         if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
@@ -111,7 +113,22 @@ public class TroopRosterHandler : IHandler
             obj.Index);
     }
 
+    private void Handle_HeroAddToCounts(MessagePayload<ChangeTroopRostersHeroAddToCounts> payload)
+    {
+        var obj = payload.What;
+        if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
+        if (!objectManager.TryGetObjectWithLogging(obj.HeroId, out Hero hero)) return;
 
+        AddToCountsTroopRosterPatch.RunAddToCounts(
+            troopRoster,
+            hero.CharacterObject,
+            obj.Count,
+            obj.InsertAtFront,
+            obj.WoundedCount,
+            obj.XpChanged,
+            obj.RemoveDepleted,
+            obj.Index);
+    }
 
     private void Handle_TroopRemoved(MessagePayload<TroopRemoved> payload)
     {

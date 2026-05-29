@@ -51,7 +51,7 @@ namespace Coop.Tests.Server.Services.Time
             // Arrange
             var handler = serverTestComponent.Container.Resolve<TimeHandler>();
             var network = serverTestComponent.Container.Resolve<TestNetwork>();
-            var message = new MessagePayload<AttemptedTimeSpeedChanged>(null, new AttemptedTimeSpeedChanged(TimeControlEnum.Play_1x));
+            var message = new MessagePayload<TimeSpeedChangedAttempted>(null, new TimeSpeedChangedAttempted(TimeControlEnum.Play_1x));
 
             network.CreatePeer();
 
