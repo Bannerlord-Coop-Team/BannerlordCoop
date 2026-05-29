@@ -129,6 +129,8 @@ internal class BattleHandler : IHandler
         rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
         rec2.NeedsRandomTerrain = false;
         rec2.PlayingInCampaignMode = true;
+
+        // TODO make this server side
         rec2.RandomTerrainSeed = MBRandom.RandomInt(10000);
         rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
         rec2.SceneHasMapPatch = true;
@@ -172,6 +174,16 @@ internal class BattleHandler : IHandler
 
         var message = new NetworkStartBattle(attackerPartyBaseId, defenderPartyBaseId);
 
+
+
+        var hasPlayer = (data.Attacker.MobileParty?.IsPlayerParty() == true) ||
+                        (data.Defender.MobileParty?.IsPlayerParty() == true);
+
+        if (hasPlayer && AllPlayersInEvents())
+        {
+            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+        }
+
         network.SendAll(message);
     }
 
@@ -207,11 +219,6 @@ internal class BattleHandler : IHandler
             }
 
             return;
-        }
-
-        if (AllPlayersInEvents())
-        {
-            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
         }
 
         mapEventLogger.DebugMapEvent(playerParty.MapEvent, "Sending player battle response for player party {PlayerPartyId}", obj.PlayerPartyId);
