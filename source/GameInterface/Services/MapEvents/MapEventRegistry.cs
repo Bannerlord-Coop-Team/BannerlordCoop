@@ -64,7 +64,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             using (new AllowedThread())
             {
                 obj.Component?.FinishComponent();
-                obj.FinalizeEventAux();
+                obj.FinishBattle();
 
                 Campaign.Current.MapEventManager.Tick();
             }

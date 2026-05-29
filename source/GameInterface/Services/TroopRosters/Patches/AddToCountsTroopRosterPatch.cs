@@ -11,6 +11,7 @@ using Common;
 using Common.Util;
 using Serilog;
 using Common.Logging;
+using System;
 
 namespace GameInterface.Services.TroopRosters.Patches;
 
@@ -93,8 +94,15 @@ public class AddToCountsTroopRosterPatch
         {
             using (new AllowedThread())
             {
-                if (troopRoster._troopRosterElementsVersion == -1) return;
-                troopRoster.AddToCountsAtIndex(index, count, woundedCount, xpChange, removeDepleted);
+                try
+                {
+                    if (troopRoster._troopRosterElementsVersion == -1) return;
+                    troopRoster.AddToCountsAtIndex(index, count, woundedCount, xpChange, removeDepleted);
+                }
+                catch(Exception ex)
+                {
+                    Logger.Error(ex, "Failed to AddToCountsAtIndex");
+                }
             }
         });
     }

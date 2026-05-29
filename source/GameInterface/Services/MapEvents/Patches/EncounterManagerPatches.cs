@@ -52,26 +52,17 @@ internal class EncounterManagerPatches
 
     [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
     [HarmonyPrefix]
-    public static bool PrefixStartPartyEncounter(PartyBase attackerParty, PartyBase defenderParty)
+    public static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
     {
         if (!MapEventConfig.Enabled) return false;
 
         // Disable player interactions
-        if (attackerParty.MobileParty?.IsPlayerParty() == true &&
-            defenderParty.MobileParty?.IsPlayerParty() == true) return false;
+        if (attackerParty.IsMobile && attackerParty.MobileParty.IsPlayerParty() &&
+            defenderParty.IsMobile && defenderParty.MobileParty.IsPlayerParty()) return false;
 
-        return true;
-    }
+        if (AllowedThread.IsThisThreadAllowed()) return true;
 
-    [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
-    [HarmonyPostfix]
-    public static void PostfixStartPartyEncounter(PartyBase attackerParty, PartyBase defenderParty)
-    {
-        if (!MapEventConfig.Enabled) return;
-
-        if (AllowedThread.IsThisThreadAllowed()) return;
-
-        if (ModInformation.IsClient) return;
+        if (ModInformation.IsClient) return true;
 
         var message = new BattleStarted(attackerParty, defenderParty);
 
@@ -81,6 +72,8 @@ internal class EncounterManagerPatches
         }
 
         MessageBroker.Instance.Publish(null, message);
+
+        return true;
     }
 
     [HarmonyPrefix]
