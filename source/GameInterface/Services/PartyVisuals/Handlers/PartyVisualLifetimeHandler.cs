@@ -2,6 +2,7 @@
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
@@ -46,11 +47,15 @@ public class PartyVisualLifetimeHandler : IHandler
 
     private void Handle(MessagePayload<NetworkCreatePartyVisual> payload)
     {
+        if (payload.What.PartyBaseId == null) return;
+
         objectManager.TryGetObject<PartyBase>(payload.What.PartyBaseId, out var partyBase);
 
         using(new AllowedThread())
         {
-            MobilePartyVisual newVisual = new MobilePartyVisual(partyBase);
+            var mobileParty = partyBase.MobileParty;
+            MobilePartyVisualManager.Current.AddNewPartyVisualForParty(mobileParty);
+            var newVisual = partyBase.GetPartyVisual();
             objectManager.AddExisting(payload.What.PartyVisualId, newVisual);
         }
     }
@@ -74,6 +79,8 @@ public class PartyVisualLifetimeHandler : IHandler
         {
             MobilePartyVisualManager.Current.RemovePartyVisualForParty(partyVisual.MapEntity.MobileParty);
         }
+
+        partyVisual.RefreshPartyIcon();
 
         objectManager.Remove(partyVisual);
     }
