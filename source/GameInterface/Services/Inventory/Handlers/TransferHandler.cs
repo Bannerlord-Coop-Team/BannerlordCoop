@@ -37,10 +37,15 @@ internal class TransferHandler : IHandler
 
     private void Handle_TransferAttempted(MessagePayload<TransferAttempted> obj)
     {
-        if (!objectManager.TryGetIdWithLogging(obj.What.TargetItemRoster, out var targetItemRosterId)) return;
+        string fromItemRosterId = null;
+        if (obj.What.FromItemRoster != null && !objectManager.TryGetIdWithLogging(obj.What.FromItemRoster, out fromItemRosterId)) return;
+
+        string toItemRosterId = null;
+        if (obj.What.ToItemRoster != null && !objectManager.TryGetIdWithLogging(obj.What.ToItemRoster, out toItemRosterId)) return;
 
         var message = new CompleteTransfer(
-            targetItemRosterId,
+            fromItemRosterId,
+            toItemRosterId,
             obj.What.EquipmentElement,
             obj.What.Count);
 
@@ -49,10 +54,25 @@ internal class TransferHandler : IHandler
 
     private void Handle_CompleteTransfer(MessagePayload<CompleteTransfer> obj)
     {
-        if (!objectManager.TryGetObjectWithLogging<ItemRoster>(obj.What.TargetItemRosterId, out var targetItemRoster)) return;
+        ItemRoster fromItemRoster = null;
+        if (obj.What.FromItemRosterId != null && !objectManager.TryGetObjectWithLogging(obj.What.FromItemRosterId, out fromItemRoster)) return;
 
-        targetItemRoster.AddToCounts(obj.What.EquipmentElement, obj.What.Count);
+        ItemRoster toItemRoster = null;
+        if (obj.What.ToItemRosterId != null && !objectManager.TryGetObjectWithLogging(obj.What.ToItemRosterId, out toItemRoster)) return;
 
-        network.SendAll(new RefreshOtherInventory(obj.What.TargetItemRosterId));
+        int fromCount = obj.What.Count;
+        if (fromItemRoster != null)
+        {
+            int equipmentElementIndex = fromItemRoster.FindIndexOfElement(obj.What.EquipmentElement);
+            if (equipmentElementIndex >= 0 && fromItemRoster[equipmentElementIndex].Amount - fromCount < 0)
+            {
+                fromCount = 0;
+            }
+        }
+
+        fromItemRoster?.AddToCounts(obj.What.EquipmentElement, -fromCount);
+        toItemRoster?.AddToCounts(obj.What.EquipmentElement, obj.What.Count);
+
+        network.SendAll(new RefreshOtherInventory(obj.What.FromItemRosterId, obj.What.ToItemRosterId, obj.What.EquipmentElement));
     }
 }

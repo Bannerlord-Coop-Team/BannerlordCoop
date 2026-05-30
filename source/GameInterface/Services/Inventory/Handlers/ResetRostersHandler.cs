@@ -77,6 +77,6 @@ internal class ResetRostersHandler : IHandler
             targetItemRoster2?.AddToCounts(itemRosterElement.EquipmentElement, itemRosterElement.Amount);
         }
 
-        network.SendAll(new RefreshOtherInventory(obj.What.TargetItemRoster1Id));
+        //network.SendAll(new RefreshOtherInventory(obj.What.TargetItemRoster1Id));
     }
 }

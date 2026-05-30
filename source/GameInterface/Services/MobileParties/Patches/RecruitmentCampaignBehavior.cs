@@ -1,4 +1,5 @@
-﻿using HarmonyLib;
+﻿using GameInterface.Services.MobileParties.Extensions;
+using HarmonyLib;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -12,6 +13,9 @@ internal class RecruitmentCampaignBehaviorPatch
     [HarmonyPatch("CheckRecruiting")]
     private static bool CheckRecruitingPrefix(ref MobileParty mobileParty, ref Settlement settlement)
     {
+        // Let players handle recruiting for their own parties
+        if (mobileParty.IsPlayerParty()) return false;
+
         // TODO only allow for server and broadcast when it happens
         return true;
     }

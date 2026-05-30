@@ -39,14 +39,12 @@ internal struct TroopRosterElementSurrogate
             ? null
             : MBObjectManager.Instance.GetObject<CharacterObject>(surrogate.CharacterObjectId);
 
-        var troopRosterElement = new TroopRosterElement(character)
+        return new TroopRosterElement(character)
         {
             _number = surrogate.Number,
             _woundedNumber = surrogate.WoundedNumber,
             _xp = surrogate.Xp
-        };
-
-        return troopRosterElement;
+        }; ;
     }
 }
 

@@ -2,7 +2,6 @@
 using TaleWorlds.Core;
 using TaleWorlds.ObjectSystem;
 
-
 namespace GameInterface.Surrogates;
 
 [ProtoContract]
