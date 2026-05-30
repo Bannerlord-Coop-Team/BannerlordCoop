@@ -38,8 +38,6 @@ internal class PartyLifetimeHandler : IHandler
         messageBroker.Subscribe<NetworkPartyDisbanded>(Handle_NetworkPartyDisbanded);
     }
 
-
-
     public void Dispose()
     {
         messageBroker.Unsubscribe<DestroyPartyApplied>(Handle_PartyDestroyed);

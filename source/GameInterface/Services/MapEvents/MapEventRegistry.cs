@@ -4,6 +4,7 @@ using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Newtonsoft.Json.Linq;
 using SandBox.GauntletUI.Map;
 using Serilog;
 using System;
@@ -45,6 +46,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         }
     }
 
+    private static ConstructorInfo mapEventVisualCtorInfo = AccessTools.Constructor(typeof(GauntletMapEventVisual));
     public override void OnClientCreated(MapEvent obj, string id)
     {
         using (new AllowedThread())
@@ -72,12 +74,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
                 CampaignEventDispatcher.Instance.OnMapEventEnded(obj);
 
-                Campaign.Current.MapEventManager.Tick();
-
-                foreach(var party in obj.InvolvedParties)
-                {
-                    party?.SetVisualAsDirty();
-                }
+                // TODO might be needed
+                //Campaign.Current.MapEventManager.Tick();
             }
         });
     }

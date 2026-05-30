@@ -262,16 +262,16 @@ public class TroopRosterHandler : IHandler
         if (!objectManager.TryGetObjectWithLogging(payload.What.TroopId, out CharacterObject troop))
             return;
 
-        try
+        using (new AllowedThread())
         {
-            using (new AllowedThread())
+            try
             {
                 troopRoster.RemoveTroop(troop, payload.What.NumberToRemove, xp: payload.What.Xp);
             }
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Error while removing troop from roster, TroopRosterId: {TroopRosterId}", payload.What.TroopRosterId);
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error while removing troop from roster, TroopRosterId: {TroopRosterId}", payload.What.TroopRosterId);
+            }
         }
     }
 
@@ -328,13 +328,16 @@ public class TroopRosterHandler : IHandler
     {
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(payload.What.TroopRosterId, out var troopRoster)) return;
 
-        try
+        using (new AllowedThread())
         {
-            troopRoster.RemoveZeroCounts();
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to RemoveZeroCounts. TroopRosterId: {TroopRosterId}", payload.What.TroopRosterId);
+            try
+            {
+                troopRoster.RemoveZeroCounts();
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to RemoveZeroCounts. TroopRosterId: {TroopRosterId}", payload.What.TroopRosterId);
+            }
         }
     }
 
@@ -354,13 +357,16 @@ public class TroopRosterHandler : IHandler
 
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
 
-        try
+        using (new AllowedThread())
         {
-            troopRoster.AddXpToTroopAtIndex(obj.Index, obj.XpAmount);
-        }
-        catch (Exception ex)
-        {
-            Logger.Error(ex, "Failed to RemoveZeroCounts. TroopRosterId: {TroopRosterId}", payload.What.TroopRosterId);
+            try
+            {
+                troopRoster.AddXpToTroopAtIndex(obj.Index, obj.XpAmount);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to RemoveZeroCounts. TroopRosterId: {TroopRosterId}", payload.What.TroopRosterId);
+            }
         }
     }
 
@@ -382,7 +388,10 @@ public class TroopRosterHandler : IHandler
 
         try
         {
-            troopRoster.Clear();
+            using (new AllowedThread())
+            {
+                troopRoster.Clear();
+            }
         }
         catch (Exception ex)
         {

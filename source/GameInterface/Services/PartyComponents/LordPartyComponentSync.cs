@@ -9,7 +9,7 @@ namespace GameInterface.Services.PartyComponents
     {
         public LordPartyComponentSync(DynamicSyncRegistry autoSyncBuilder)
         {
-            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(LordPartyComponent), nameof(LordPartyComponent.Owner)));
+            autoSyncBuilder.AddProperty(AccessTools.Property(typeof(LordPartyComponent), nameof(LordPartyComponent.Owner)), debug: true);
 
             autoSyncBuilder.AddField(AccessTools.Field(typeof(LordPartyComponent), nameof(LordPartyComponent._leader)));
             autoSyncBuilder.AddField(AccessTools.Field(typeof(LordPartyComponent), nameof(LordPartyComponent._wagePaymentLimit)));

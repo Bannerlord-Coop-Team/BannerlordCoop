@@ -27,8 +27,6 @@ namespace GameInterface.Services.MobilePartyAIs.Patches;
 [HarmonyPatch(typeof(MobilePartyAi))]
 public static class PartyBehaviorPatch
 {
-    public const bool DEBUG_LOGGING = false;
-
     static readonly ILogger Logger = LogManager.GetLogger<MobilePartyAi>();
 
     /// <summary>
@@ -39,7 +37,7 @@ public static class PartyBehaviorPatch
     [HarmonyPatch("Tick")]
     private static bool TickPrefix(ref MobilePartyAi __instance)
     {
-        if (!ModInformation.DISABLE_AI) return true;
+        if (!MobilePartyAiConfig.DISABLE_AI) return true;
             
         // This disables AI
         return __instance._mobileParty == MobileParty.MainParty;
@@ -62,7 +60,7 @@ public static class PartyBehaviorPatch
         var message = new PartyBehaviorChangeAttempted(__instance, newAiBehavior, interactablePoint, bestTargetPoint);
         MessageBroker.Instance.Publish(__instance, message);
 
-        if (DEBUG_LOGGING && ModInformation.IsServer)
+        if (MobilePartyAiConfig.DEBUG && ModInformation.IsServer)
         {
             if (interactablePoint is null)
             {
@@ -154,40 +152,3 @@ public static class PartyBehaviorPatch
         }
     }
 }
-
-
-/// <summary>
-/// Patches for the methods of MapCameraView class.
-/// </summary>
-//[HarmonyPatch(typeof(MapCameraView))]
-//public static class MapCameraViewPatches
-//{
-//    private static readonly FieldInfo LabelNumberField = typeof(Label).GetField("m_label", BindingFlags.NonPublic | BindingFlags.Instance);
-
-//    /// <summary>
-//    /// Replaces the instructions in the else if (mainParty.Ai.ForceAiNoPathMode) block with Nop instructions.
-//    /// </summary>
-//    /// <param name="instructions">instructions of the patched method.</param>
-//    /// <returns></returns>
-//    [HarmonyPatch(nameof(MapCameraView.OnBeforeTick))]
-//    [HarmonyTranspiler]
-//    private static IEnumerable<CodeInstruction> OnBeforeTickPatch(IEnumerable<CodeInstruction> instructions)
-//    {
-//        bool FoundGoTo = false;
-//        bool FoundLabel = false;
-//        foreach (CodeInstruction instruction in instructions)
-//        {
-//            bool isGoTo33 = (instruction.opcode == OpCodes.Brfalse_S && instruction.operand is Label && (int)LabelNumberField.GetValue(instruction.operand) == 33);
-//            FoundGoTo = FoundGoTo || isGoTo33;
-//            FoundLabel = FoundLabel || (instruction.opcode == OpCodes.Ldarg_0 && instruction.labels.Any(label => (int)LabelNumberField.GetValue(label) == 33));
-//            if (FoundGoTo && !FoundLabel && !isGoTo33)
-//            {
-//                yield return new CodeInstruction(OpCodes.Nop);
-//            }
-//            else
-//            {
-//                yield return instruction;
-//            }
-//        }
-//    }
-//}

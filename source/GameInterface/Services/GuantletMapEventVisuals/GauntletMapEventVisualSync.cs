@@ -4,7 +4,7 @@ using SandBox.GauntletUI.Map;
 using System.Collections.Generic;
 using System.Reflection;
 
-namespace GameInterface.Services.MapEvents;
+namespace GameInterface.Services.GuantletMapEventVisuals;
 
 internal class GauntletMapEventVisualSync : IDynamicSync
 {

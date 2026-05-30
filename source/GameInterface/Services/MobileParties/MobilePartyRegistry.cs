@@ -1,4 +1,4 @@
-﻿using Autofac.Features.OwnedInstances;
+﻿using Common;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Registry.Auto;
@@ -9,11 +9,9 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Runtime.Serialization;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Naval;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.ViewModelCollection.Party;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.MobileParties;
@@ -76,25 +74,31 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
         MBObjectManager.Instance?.RegisterObjectInternalWithoutTypeId(obj, false, out _);
 
-        Campaign.Current?.CampaignObjectManager?.AddMobileParty(obj);
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            Campaign.Current?.CampaignObjectManager?.AddMobileParty(obj);
+        });
     }
 
     public override void OnClientDestroyed(MobileParty obj, string id)
     {
-        //using(new AllowedThread())
-        //{
-        //    try
-        //    {
-        //        Campaign.Current.MobilePartyLocator.RemoveLocatable(obj);
-        //        Campaign.Current.VisualTrackerManager.RemoveTrackedObject(obj, true);
-        //        CampaignEventDispatcher.Instance.OnPartyRemoved(obj.Party);
-        //        Campaign.Current.CampaignObjectManager.RemoveMobileParty(obj);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Logger.Error(ex, "Failed to remove party");
-        //    }
-        //}
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            using (new AllowedThread())
+            {
+                try
+                {
+                    Campaign.Current.MobilePartyLocator.RemoveLocatable(obj);
+                    Campaign.Current.VisualTrackerManager.RemoveTrackedObject(obj, true);
+                    CampaignEventDispatcher.Instance.OnPartyRemoved(obj.Party);
+                    Campaign.Current.CampaignObjectManager.RemoveMobileParty(obj);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to remove party");
+                }
+            }
+        });
     }
 
     public override void OnServerCreated(MobileParty obj, string id)

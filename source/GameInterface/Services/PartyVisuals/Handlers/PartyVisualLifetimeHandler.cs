@@ -1,4 +1,5 @@
-﻿using Common.Messaging;
+﻿using Common;
+using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
@@ -62,7 +63,9 @@ public class PartyVisualLifetimeHandler : IHandler
 
     private void Handle(MessagePayload<PartyVisualDestroyed> payload)
     {
-        objectManager.TryGetId(payload.What.MobilePartyVisual, out string visualId);
+        if (!objectManager.TryGetIdWithLogging(payload.What.MobilePartyVisual, out string visualId))
+            return;
+
         objectManager.Remove(payload.What.MobilePartyVisual);
 
         network.SendAll(new NetworkDestroyPartyVisual(visualId));
@@ -75,10 +78,13 @@ public class PartyVisualLifetimeHandler : IHandler
             return;
         }
 
-        using (new AllowedThread())
+        GameLoopRunner.RunOnMainThread(() =>
         {
-            MobilePartyVisualManager.Current.RemovePartyVisualForParty(partyVisual.MapEntity.MobileParty);
-        }
+            using (new AllowedThread())
+            {
+                MobilePartyVisualManager.Current.RemovePartyVisualForParty(partyVisual.MapEntity.MobileParty);
+            }
+        });
 
         objectManager.Remove(partyVisual);
     }

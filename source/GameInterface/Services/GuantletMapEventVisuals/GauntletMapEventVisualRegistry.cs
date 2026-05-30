@@ -3,11 +3,12 @@ using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
 
-namespace GameInterface.Services.MapEvents;
+namespace GameInterface.Services.GuantletMapEventVisuals;
 
 internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEventVisual>
 {
@@ -36,8 +37,30 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
         }
     }
 
-    public override void OnClientCreated(GauntletMapEventVisual obj, string id)
+    private static readonly FieldInfo OnDeactivateField =
+    AccessTools.Field(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual._onDeactivate));
+
+    private static readonly FieldInfo OnInitializedField =
+        AccessTools.Field(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual._onInitialized));
+
+    private static readonly FieldInfo OnVisibilityChangedField =
+        AccessTools.Field(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual._onVisibilityChanged));
+
+    public override void OnClientCreated(GauntletMapEventVisual visual, string id)
     {
+        var visualCreator = Campaign.Current.VisualCreator.MapEventVisualCreator as GauntletMapEventVisualCreator;
+
+        OnInitializedField.SetValue(
+            visual,
+            new Action<GauntletMapEventVisual>(visualCreator.OnMapEventInitialized));
+
+        OnVisibilityChangedField.SetValue(
+            visual,
+            new Action<GauntletMapEventVisual>(visualCreator.OnMapEventVisibilityChanged));
+
+        OnDeactivateField.SetValue(
+            visual,
+            new Action<GauntletMapEventVisual>(visualCreator.OnMapEventOver));
     }
 
     public override void OnClientDestroyed(GauntletMapEventVisual obj, string id)

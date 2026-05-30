@@ -39,16 +39,16 @@ internal class EncounterManagerPatches
         return false;
     }
 
-    [HarmonyPrefix]
-    [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
-    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
-    {
-        // Skip this method if party is not controlled
-        if (!mobileParty.IsPartyControlled())
-            return false;
+    //[HarmonyPrefix]
+    //[HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
+    //internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
+    //{
+    //    // Skip this method if party is not controlled
+    //    if (!mobileParty.IsPartyControlled())
+    //        return false;
 
-        return true;
-    }
+    //    return true;
+    //}
 
     [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
     [HarmonyPrefix]
@@ -60,16 +60,20 @@ internal class EncounterManagerPatches
         if (attackerParty.MobileParty?.IsPlayerParty() == true &&
             defenderParty.MobileParty?.IsPlayerParty() == true) return false;
 
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+
+        if (ModInformation.IsClient) return false;
+
         return true;
     }
 
     [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
     [HarmonyPostfix]
-    public static void PostfixStartPartyEncounter(PartyBase attackerParty, PartyBase defenderParty)
+    public static void PostfixStartPartyEncounter(PartyBase attackerParty, PartyBase defenderParty, bool __runOriginal)
     {
         if (AllowedThread.IsThisThreadAllowed()) return;
 
-        if (ModInformation.IsClient) return;
+        if (!__runOriginal) return;
 
         var message = new BattleStarted(attackerParty, defenderParty);
 
