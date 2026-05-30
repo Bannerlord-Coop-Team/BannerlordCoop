@@ -128,7 +128,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void RefreshWeaponDesignVM(Town town)
         {
-            if (Settlement.CurrentSettlement?.Town != town || (bool)(!currentCraftingVM?.IsInCraftingMode)) return;
+            if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM?.IsInCraftingMode == false) return;
 
             // Have to run on main thread to avoid UI related crashes
             GameLoopRunner.RunOnMainThread(() =>
