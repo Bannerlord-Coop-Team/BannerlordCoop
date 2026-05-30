@@ -80,8 +80,6 @@ public class PartyVisualLifetimeHandler : IHandler
             MobilePartyVisualManager.Current.RemovePartyVisualForParty(partyVisual.MapEntity.MobileParty);
         }
 
-        partyVisual.RefreshPartyIcon();
-
         objectManager.Remove(partyVisual);
     }
 }
