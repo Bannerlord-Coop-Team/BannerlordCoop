@@ -15,16 +15,20 @@ internal readonly struct NetworkUpdateBanditPartyComponentInitArgs : IEvent
     public readonly CampaignVec2 InitialPosition;
     [ProtoMember(4)]
     public readonly string PartyTemplateId;
+    [ProtoMember(5)]
+    public readonly string MobilePartyId;
 
     public NetworkUpdateBanditPartyComponentInitArgs(
         string banditPartyComponentId,
         string clanId,
         CampaignVec2 initialPosition,
-        string partyTemplateId)
+        string partyTemplateId,
+        string mobilePartyId)
     {
         BanditPartyComponentId = banditPartyComponentId;
         ClanId = clanId;
         InitialPosition = initialPosition;
         PartyTemplateId = partyTemplateId;
+        MobilePartyId = mobilePartyId;
     }
 }

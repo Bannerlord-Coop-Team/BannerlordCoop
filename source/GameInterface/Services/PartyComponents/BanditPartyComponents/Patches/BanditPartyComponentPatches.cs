@@ -75,45 +75,57 @@ public class BanditPartyComponentTranspilers
 {
     private static readonly ILogger Logger = LogManager.GetLogger<BanditPartyComponentTranspilers>();
 
-    public static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(BanditPartyComponent));
+    //public static IEnumerable<MethodBase> TargetMethods() => AccessTools.GetDeclaredConstructors(typeof(BanditPartyComponent));
 
 
-    [HarmonyTranspiler]
-    private static IEnumerable<CodeInstruction> InitializationArgsTranspiler(IEnumerable<CodeInstruction> instructions)
+    //[HarmonyTranspiler]
+    //private static IEnumerable<CodeInstruction> InitializationArgsTranspiler(IEnumerable<CodeInstruction> instructions)
+    //{
+    //    var field = AccessTools.Field(typeof(BanditPartyComponent), nameof(BanditPartyComponent._initializationArgs));
+    //    var fieldIntercept = AccessTools.Method(typeof(BanditPartyComponentTranspilers), nameof(InitializationArgsIntercept));
+
+    //    foreach (var instruction in instructions)
+    //    {
+    //        if (instruction.StoresField(field))
+    //        {
+    //            yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
+    //        }
+    //        else
+    //        {
+    //            yield return instruction;
+    //        }
+    //    }
+    //}
+    [HarmonyPatch("OnMobilePartySetOnCreation")]
+    [HarmonyPrefix]
+    private static bool OnMobilePartySetOnCreation_Prefix(BanditPartyComponent __instance)
     {
-        var field = AccessTools.Field(typeof(BanditPartyComponent), nameof(BanditPartyComponent._initializationArgs));
-        var fieldIntercept = AccessTools.Method(typeof(BanditPartyComponentTranspilers), nameof(InitializationArgsIntercept));
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;
+        if (ModInformation.IsClient) return true;
+        if (__instance.MobileParty == null) return true;
 
-        foreach (var instruction in instructions)
-        {
-            if (instruction.StoresField(field))
-            {
-                yield return new CodeInstruction(OpCodes.Call, fieldIntercept);
-            }
-            else
-            {
-                yield return instruction;
-            }
-        }
+        var message = new BanditPartyComponentInitArgsUpdated(__instance, __instance._initializationArgs);
+        MessageBroker.Instance.Publish(__instance, message);
+
+        return true;
     }
+    //public static void InitializationArgsIntercept(BanditPartyComponent instance, BanditPartyComponent.InitializationArgs initArgs)
+    //{
+    //    if (CallOriginalPolicy.IsOriginalAllowed())
+    //    {
+    //        instance._initializationArgs = initArgs;
+    //        return;
+    //    }
 
-    public static void InitializationArgsIntercept(BanditPartyComponent instance, BanditPartyComponent.InitializationArgs initArgs)
-    {
-        if (CallOriginalPolicy.IsOriginalAllowed())
-        {
-            instance._initializationArgs = initArgs;
-            return;
-        }
+    //    if (ModInformation.IsClient)
+    //    {
+    //        Logger.Error("Client updated managed {type}", nameof(instance._initializationArgs));
+    //        return;
+    //    }
 
-        if (ModInformation.IsClient)
-        {
-            Logger.Error("Client updated managed {type}", nameof(instance._initializationArgs));
-            return;
-        }
+    //    var message = new BanditPartyComponentInitArgsUpdated(instance, initArgs);
+    //    MessageBroker.Instance.Publish(instance, message);
 
-        var message = new BanditPartyComponentInitArgsUpdated(instance, initArgs);
-        MessageBroker.Instance.Publish(instance, message);
-
-        instance._initializationArgs = initArgs;
-    }
+    //    instance._initializationArgs = initArgs;
+    //}
 }

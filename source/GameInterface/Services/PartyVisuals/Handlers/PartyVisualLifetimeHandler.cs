@@ -3,10 +3,12 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.PartyVisuals.Messages;
 using SandBox.View.Map;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
+using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 
@@ -17,10 +19,12 @@ namespace GameInterface.Services.PartyVisuals.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly INetwork network;
         private readonly IObjectManager objectManager;
+        private ILogger logger;
 
 
-        public PartyVisualLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+        public PartyVisualLifetimeHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ILogger logger)
         {
+            this.logger = logger;
             this.messageBroker = messageBroker;
             this.network = network;
             this.objectManager = objectManager;
@@ -50,11 +54,19 @@ namespace GameInterface.Services.PartyVisuals.Handlers
         private void Handle(MessagePayload<NetworkCreatePartyVisual> payload)
         {
             objectManager.TryGetObject<PartyBase>(payload.What.PartyBaseId, out var partyBase);
-
-            using(new AllowedThread())
+            using (new AllowedThread())
             {
                 MobilePartyVisual newVisual = new MobilePartyVisual(partyBase);
                 objectManager.AddExisting(payload.What.PartyVisualId, newVisual);
+                var party = partyBase?.MobileParty;
+                if (party == null)
+                {
+                    logger.Information("MobileParty still null in NetworkCreatePartyVisual");
+                    return;
+                }
+                MobilePartyVisualManager.Current.AddNewPartyVisualForParty(party);
+                partyBase.GetPartyVisual().OnStartup();
+                partyBase.SetVisualAsDirty();
             }
         }
 

@@ -1,14 +1,20 @@
-﻿using GameInterface.Registry;
+﻿using Common.Util;
+using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
+using HarmonyLib;
 using SandBox.View.Map.Managers;
 using SandBox.View.Map.Visuals;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 using TaleWorlds.CampaignSystem.Party;
+using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.CampaignSystem.Settlements.Locations;
+using TaleWorlds.Localization;
 
 namespace GameInterface.Services.PartyVisuals;
 
@@ -17,9 +23,13 @@ internal class PartyVisualRegistry : AutoRegistryBase<MobilePartyVisual>
     public PartyVisualRegistry(ILogger logger, IAutoRegistryFactory autoRegistryFactory, IObjectManager objectManager)
         : base(logger, autoRegistryFactory, objectManager)
     {
+        Logger.Information("PartyVisualRegistry instantiated, constructors: {count}", Constructors.Count());
     }
 
-    public override IEnumerable<MethodBase> Constructors => Array.Empty<MethodBase>();
+    public override IEnumerable<MethodBase> Constructors => new MethodBase[] {
+        AccessTools.Constructor(typeof(MobilePartyVisual), new Type[] { typeof(PartyBase)}),
+    };
+
 
     public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
 
@@ -51,6 +61,11 @@ internal class PartyVisualRegistry : AutoRegistryBase<MobilePartyVisual>
 
     public override void OnClientCreated(MobilePartyVisual obj, string id)
     {
+        using (new AllowedThread())
+        {
+            if (obj.MapEntity?.MapFaction == null) return;
+            obj.ValidateIsDirty();
+        }
     }
 
     public override void OnClientDestroyed(MobilePartyVisual obj, string id)
