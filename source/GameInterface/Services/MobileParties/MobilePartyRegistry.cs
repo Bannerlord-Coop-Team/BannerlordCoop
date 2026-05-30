@@ -45,10 +45,11 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
     public override IEnumerable<MethodBase> Constructors => AccessTools.GetDeclaredConstructors(typeof(MobileParty));
 
-    public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
-    {
-        AccessTools.Method(typeof(MobileParty), nameof(MobileParty.RemoveParty))
-    };
+    public override IEnumerable<MethodBase> DestroyMethods => Array.Empty<MethodBase>();
+    //    new MethodBase[]
+    //{
+    //    AccessTools.Method(typeof(MobileParty), nameof(MobileParty.RemoveParty))
+    //};
 
 
     public override void RegisterAllObjects()
@@ -80,6 +81,20 @@ internal class MobilePartyRegistry : AutoRegistryBase<MobileParty>
 
     public override void OnClientDestroyed(MobileParty obj, string id)
     {
+        //using(new AllowedThread())
+        //{
+        //    try
+        //    {
+        //        Campaign.Current.MobilePartyLocator.RemoveLocatable(obj);
+        //        Campaign.Current.VisualTrackerManager.RemoveTrackedObject(obj, true);
+        //        CampaignEventDispatcher.Instance.OnPartyRemoved(obj.Party);
+        //        Campaign.Current.CampaignObjectManager.RemoveMobileParty(obj);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Logger.Error(ex, "Failed to remove party");
+        //    }
+        //}
     }
 
     public override void OnServerCreated(MobileParty obj, string id)

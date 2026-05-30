@@ -23,10 +23,10 @@ namespace GameInterface.Services.Smithing.Handlers
         private readonly IMessageBroker messageBroker;
         private readonly IObjectManager objectManager;
 
-        private SmeltingVM currentSmeltingVM;
-        private RefinementVM currentRefinementVM;
-        private CraftingVM currentCraftingVM;
-        private WeaponDesignVM currentWeaponDesignVM;
+        private SmeltingVM currentSmeltingVM = null;
+        private RefinementVM currentRefinementVM = null;
+        private CraftingVM currentCraftingVM = null;
+        private WeaponDesignVM currentWeaponDesignVM = null;
 
         public SmithingRefreshHandler(IMessageBroker messageBroker, IObjectManager objectManager)
         {
@@ -40,11 +40,6 @@ namespace GameInterface.Services.Smithing.Handlers
             messageBroker.Subscribe<NetworkRefreshSmelting>(Handle);
             messageBroker.Subscribe<NetworkRefreshRefinement>(Handle);
             messageBroker.Subscribe<RefreshCraftingVM>(Handle);
-
-            currentSmeltingVM = null;
-            currentRefinementVM = null;
-            currentCraftingVM = null;
-            currentWeaponDesignVM = null;
         }
 
         public void Dispose()
@@ -122,7 +117,9 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void RefreshWeaponDesignVM(Town town)
         {
-            if (Settlement.CurrentSettlement?.Town != town || (bool)(!currentCraftingVM?.IsInCraftingMode)) return;
+            if (Settlement.CurrentSettlement?.Town != town) return;
+            if (currentWeaponDesignVM == null) return;
+            if (currentCraftingVM?.IsInCraftingMode == false) return;
 
             // Have to run on main thread to avoid UI related crashes
             GameLoopRunner.RunOnMainThread(() =>
@@ -130,7 +127,7 @@ namespace GameInterface.Services.Smithing.Handlers
                 using (new AllowedThread())
                 {
                     currentWeaponDesignVM?.CraftingOrderPopup?.RefreshOrders();
-                    if (!(bool)(currentWeaponDesignVM?.IsInOrderMode))
+                    if (currentWeaponDesignVM?.IsInOrderMode == false)
                     {
                         currentWeaponDesignVM?.RefreshValues();
                         return;

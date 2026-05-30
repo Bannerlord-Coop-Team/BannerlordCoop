@@ -222,7 +222,14 @@ internal class MapEventPartyHandler : IHandler
 
         using (new AllowedThread())
         {
-            TakePrisonerAction.ApplyInternal(partyBase, hero);
+            try
+            {
+                TakePrisonerAction.ApplyInternal(partyBase, hero);
+            }
+            catch(Exception ex)
+            {
+                Logger.Error(ex, "Failed to run TakePrisonerAction.ApplyInternal");
+            }
         }
     }
 }

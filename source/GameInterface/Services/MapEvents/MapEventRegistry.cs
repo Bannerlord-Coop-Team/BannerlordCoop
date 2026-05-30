@@ -32,7 +32,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
 
     public override IEnumerable<MethodBase> DestroyMethods => new MethodBase[]
     {
-        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinishBattle))
+        AccessTools.Method(typeof(MapEvent), nameof(MapEvent.FinalizeEventAux))
     };
 
     public override void RegisterAllObjects()
@@ -64,9 +64,20 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             using (new AllowedThread())
             {
                 obj.Component?.FinishComponent();
-                obj.FinishBattle();
+                obj.FinalizeEventAux();
+
+                var visualCreator = Campaign.Current.VisualCreator.MapEventVisualCreator as GauntletMapEventVisualCreator;
+
+                visualCreator.OnMapEventOver(obj.MapEventVisual as GauntletMapEventVisual);
+
+                CampaignEventDispatcher.Instance.OnMapEventEnded(obj);
 
                 Campaign.Current.MapEventManager.Tick();
+
+                foreach(var party in obj.InvolvedParties)
+                {
+                    party?.SetVisualAsDirty();
+                }
             }
         });
     }
