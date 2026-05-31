@@ -61,9 +61,11 @@ internal class BattleHandler : IHandler
         this.timeControlInterface = timeControlInterface;
         this.mapEventLogger = mapEventLogger;
 
-        messageBroker.Subscribe<BattleStarted>(Handle_BattleStarted);
-        messageBroker.Subscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
+        //messageBroker.Subscribe<BattleStarted>(Handle_BattleStarted);
+        //messageBroker.Subscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
 
+        messageBroker.Subscribe<StartBattleAttempted>(Handle_StartBattleAttempted);
+        messageBroker.Subscribe<NetworkRequestStartBattle>(Handle_NetworkRequestStartBattle);
         messageBroker.Subscribe<PlayerLeaveBattle>(Handle_PlayerLeaveBattle);
         messageBroker.Subscribe<NetworkLeavePlayerBattle>(Handle_NetworkLeavePlayerBattle);
 
@@ -78,10 +80,10 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
     }
 
+
+
     public void Dispose()
     {
-        messageBroker.Unsubscribe<BattleStarted>(Handle_BattleStarted);
-        messageBroker.Unsubscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
 
         messageBroker.Unsubscribe<PlayerLeaveBattle>(Handle_PlayerLeaveBattle);
         messageBroker.Unsubscribe<NetworkLeavePlayerBattle>(Handle_NetworkLeavePlayerBattle);
@@ -158,101 +160,149 @@ internal class BattleHandler : IHandler
         }
     }
 
-    private void Handle_BattleStarted(MessagePayload<BattleStarted> payload)
+    private void Handle_StartBattleAttempted(MessagePayload<StartBattleAttempted> payload)
     {
-        var data = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(data.Attacker, out var attackerPartyBaseId))
+        if (!objectManager.TryGetIdWithLogging(payload.What.Attacker, out string attackerId))
+            return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Defender, out string defenderId))
+            return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.Settlement, out string settlementId))
             return;
 
-        if (!objectManager.TryGetIdWithLogging(data.Defender, out var defenderPartyBaseId))
-            return;
+        if (MapEventConfig.Debug)
+        {
+            Logger.Debug("Client requested to start battle. AttackerId={AttackerId}, DefenderId={DefenderId}, SettlementId={SettlementId}, BattleType={BattleType}",
+                attackerId, defenderId, settlementId, payload.What.BattleType);
+        }
 
-        var mapEvent = data.Attacker.MapEvent ?? data.Defender.MapEvent;
-
-        if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId))
-            return;
-
-        mapEventLogger.DebugMapEvent(
-            mapEvent,
-            "Battle started. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}, Attacker={AttackerName}, Defender={DefenderName}",
-            attackerPartyBaseId,
-            defenderPartyBaseId,
-            data.Attacker.GetPartyName(),
-            data.Defender.GetPartyName());
-
-        var attackerIsPlayer = data.Attacker.MobileParty?.IsPlayerParty() == true;
-        var defenderIsPlayer = data.Defender.MobileParty?.IsPlayerParty() == true;
-        var hasPlayer = attackerIsPlayer || defenderIsPlayer;
-
-        //if (hasPlayer && AllPlayersInMapEvents())
-        //{
-        //    mapEventLogger.DebugMapEvent(
-        //            mapEvent,
-        //            "All players are in map events. Pausing time on server.");
-
-        //    timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
-        //}
-
-        var message = new NetworkStartBattle(mapEventId, attackerPartyBaseId, defenderPartyBaseId);
-
-        mapEventLogger.DebugMapEvent(
-            mapEvent,
-            "Sending {MessageType}. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
-            nameof(NetworkStartBattle),
-            attackerPartyBaseId,
-            defenderPartyBaseId);
-
+        var message = new NetworkRequestStartBattle(attackerId, defenderId, settlementId, payload.What.BattleType);
         network.SendAll(message);
     }
 
-    private void Handle_NetworkStartBattle(MessagePayload<NetworkStartBattle> payload)
+    private void Handle_NetworkRequestStartBattle(MessagePayload<NetworkRequestStartBattle> payload)
     {
-        var message = payload.What;
-
-        if (!objectManager.TryGetObjectWithLogging(message.MapEventId, out MapEvent mapEvent))
+        if (!objectManager.TryGetObjectWithLogging<PartyBase>(payload.What.AttackerId, out var attacker))
+            return;
+        if (!objectManager.TryGetObjectWithLogging<PartyBase>(payload.What.DefenderId, out var defender))
             return;
 
-        if (!objectManager.TryGetObjectWithLogging(message.AttackerId, out PartyBase attacker))
-            return;
-
-        if (!objectManager.TryGetObjectWithLogging(message.DefenderId, out PartyBase defender))
+        Settlement settlement = null;
+        if (!string.IsNullOrEmpty(payload.What.SettlementId) &&
+            !objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out settlement))
             return;
 
         GameLoopRunner.RunOnMainThread(() =>
         {
-            try
+            using (new AllowedThread())
             {
-                using (new AllowedThread())
+                try
                 {
-                    if (defender.IsMobile)
-                    {
-                        if (attacker.MobileParty.IsPartyControlled() == true)
-                        {
-                            InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
-                        }
-                        EncounterManager.StartPartyEncounter(attacker, defender);
-
-                        return;
-                    }
-                    if (defender.IsSettlement)
-                    {
-                        EncounterManager.StartSettlementEncounter(attacker.MobileParty, defender.Settlement);
-                    }
+                    StartBattleAction.ApplyInternal(attacker, defender, settlement, payload.What.BattleType);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to start encounter for network battle request. AttackerId={AttackerId}, DefenderId={DefenderId}, SettlementId={SettlementId}, BattleType={BattleType}",
+                        payload.What.AttackerId, payload.What.DefenderId, payload.What.SettlementId, payload.What.BattleType);
                 }
             }
-            catch (Exception ex)
-            {
-                Logger.Error(ex, "Failed to start party encounter");
-            }
         });
-
-        mapEventLogger.DebugMapEvent(
-            mapEvent,
-            "Applied encounter override for network battle. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
-            message.AttackerId,
-            message.DefenderId);
     }
+
+    //private void Handle_BattleStarted(MessagePayload<BattleStarted> payload)
+    //{
+    //    var data = payload.What;
+
+    //    if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId))
+    //        return;
+
+    //    if (!objectManager.TryGetIdWithLogging(data.AttackerParty, out var attackerPartyBaseId))
+    //        return;
+
+    //    if (!objectManager.TryGetIdWithLogging(data.DefenderParty, out var defenderPartyBaseId))
+    //        return;
+
+    //    var mapEvent = data.AttackerParty.MapEvent ?? data.DefenderParty.MapEvent;
+
+    //    mapEventLogger.DebugMapEvent(
+    //        mapEvent,
+    //        "Battle started. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}, Attacker={AttackerName}, Defender={DefenderName}",
+    //        attackerPartyBaseId,
+    //        defenderPartyBaseId,
+    //        data.AttackerParty.GetPartyName(),
+    //        data.DefenderParty.GetPartyName());
+
+    //    var attackerIsPlayer = data.AttackerParty.MobileParty?.IsPlayerParty() == true;
+    //    var defenderIsPlayer = data.DefenderParty.MobileParty?.IsPlayerParty() == true;
+    //    var hasPlayer = attackerIsPlayer || defenderIsPlayer;
+
+    //    if (hasPlayer && AllPlayersInMapEvents())
+    //    {
+    //        mapEventLogger.DebugMapEvent(
+    //                mapEvent,
+    //                "All players are in map events. Pausing time on server.");
+
+    //        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+    //    }
+
+    //    var message = new NetworkStartBattle(mapEventId, attackerPartyBaseId, defenderPartyBaseId);
+
+    //    mapEventLogger.DebugMapEvent(
+    //        mapEvent,
+    //        "Sending {MessageType}. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
+    //        nameof(NetworkStartBattle),
+    //        attackerPartyBaseId,
+    //        defenderPartyBaseId);
+
+    //    network.SendAll(message);
+    //}
+
+    //private void Handle_NetworkStartBattle(MessagePayload<NetworkStartBattle> payload)
+    //{
+    //    var message = payload.What;
+
+    //    if (!objectManager.TryGetObjectWithLogging(message.MapEventId, out MapEvent mapEvent))
+    //        return;
+
+    //    if (!objectManager.TryGetObjectWithLogging(message.AttackerId, out PartyBase attacker))
+    //        return;
+
+    //    if (!objectManager.TryGetObjectWithLogging(message.DefenderId, out PartyBase defender))
+    //        return;
+
+    //    GameLoopRunner.RunOnMainThread(() =>
+    //    {
+    //        try
+    //        {
+    //            using (new AllowedThread())
+    //            {
+    //                if (defender.IsMobile)
+    //                {
+    //                    if (attacker.MobileParty.IsPartyControlled() == true)
+    //                    {
+    //                        InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
+    //                    }
+    //                    EncounterManager.StartPartyEncounter(attacker, defender);
+
+    //                    return;
+    //                }
+    //                if (defender.IsSettlement)
+    //                {
+    //                    EncounterManager.StartSettlementEncounter(attacker.MobileParty, defender.Settlement);
+    //                }
+    //            }
+    //        }
+    //        catch (Exception ex)
+    //        {
+    //            Logger.Error(ex, "Failed to start party encounter");
+    //        }
+    //    });
+
+    //    mapEventLogger.DebugMapEvent(
+    //        mapEvent,
+    //        "Applied encounter override for network battle. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
+    //        message.AttackerId,
+    //        message.DefenderId);
+    //}
 
     private bool AllPlayersInMapEvents()
     {
