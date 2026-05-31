@@ -11,6 +11,7 @@ using GameInterface.Registry.Auto;
 using GameInterface.Serialization;
 using GameInterface.Services;
 using GameInterface.Services.Entity;
+using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Players;
 using GameInterface.Services.Time;
@@ -40,6 +41,7 @@ public class GameInterfaceModule : Module
         builder.RegisterType<ControlledEntityRegistry>().As<IControlledEntityRegistry>().InstancePerLifetimeScope();
         builder.RegisterType<TimeControlModeConverter>().As<ITimeControlModeConverter>().InstancePerLifetimeScope();
         builder.RegisterType<PlayerRegistry>().As<IPlayerRegistry>().InstancePerLifetimeScope();
+        builder.RegisterType<MapEventLogger>().As<IMapEventLogger>().InstancePerLifetimeScope();
 
         builder.RegisterType<PacketManager>().As<IPacketManager>().InstancePerLifetimeScope();
 

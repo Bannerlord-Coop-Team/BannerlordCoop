@@ -57,6 +57,8 @@ internal class MapEventSideRegistry : AutoRegistryBase<MapEventSide>
     {
         AccessTools.Field(typeof(MapEventSide), nameof(MapEventSide._battleParties))
             .SetValue(obj, new MBList<MapEventParty>());
+
+        obj._nearbyPartiesAddedToPlayerMapEvent = new MBList<MobileParty>();
     }
 
     public override void OnClientDestroyed(MapEventSide obj, string id)

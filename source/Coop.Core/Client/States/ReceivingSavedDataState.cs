@@ -4,6 +4,7 @@ using Coop.Core.Client.Services.Heroes.Data;
 using Coop.Core.Client.Services.MobileParties.Messages;
 using Coop.Core.Common;
 using GameInterface.Services.GameState.Messages;
+using GameInterface.Services.UI.Messages;
 using LiteNetLib;
 
 namespace Coop.Core.Client.States;
@@ -30,7 +31,11 @@ public class ReceivingSavedDataState : ClientStateBase
         messageBroker.Subscribe<NetworkGameSaveDataReceived>(Handle_NetworkGameSaveDataReceived);
         messageBroker.Subscribe<MainMenuEntered>(Handle_MainMenuEntered);
         messageBroker.Subscribe<NetworkNewPartyCreated>(Handle_NetworkNewPartyCreated);
-        
+
+        // Keep a loading screen up while we receive and load the server world. This is the
+        // common state for both new (post character-creation) and returning clients, so the
+        // client's local/main-menu view isn't shown during the transition.
+        messageBroker.Publish(this, new StartLoadingScreen());
     }
 
     public override void Dispose()

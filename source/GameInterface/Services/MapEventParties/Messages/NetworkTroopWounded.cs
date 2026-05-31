@@ -9,11 +9,11 @@ public readonly struct NetworkTroopWounded : ICommand
     [ProtoMember(1)]
     public readonly string MapEventPartyId;
     [ProtoMember(2)]
-    public readonly string TroopId;
+    public readonly int TroopSeed;
 
-    public NetworkTroopWounded(string mapEventPartyId, string troopId)
+    public NetworkTroopWounded(string mapEventPartyId, int troopSeed)
     {
         MapEventPartyId = mapEventPartyId;
-        TroopId = troopId;
+        TroopSeed = troopSeed;
     }
 }

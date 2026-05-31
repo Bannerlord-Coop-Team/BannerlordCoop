@@ -14,6 +14,7 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Naval;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.ObjectSystem;
 
 namespace GameInterface.Services.Heroes.Interfaces;
@@ -174,9 +175,16 @@ internal class HeroInterface : IHeroInterface
 
     private void SetupHeroWithObjectManagers(Hero hero)
     {
+        var party = hero.PartyBelongedTo;
+
         RegisterObject(hero);
-        RegisterObject(hero.PartyBelongedTo);
+        RegisterObject(party);
         RegisterObject(hero.Clan);
+
+        RegisterObject(party.StringId, party.ItemRoster);
+        RegisterObject(party.StringId, party.Party);
+        RegisterObject($"{nameof(MobileParty.MemberRoster)}_{party.StringId}", party.MemberRoster);
+        RegisterObject($"{nameof(MobileParty.PrisonRoster)}_{party.StringId}", party.PrisonRoster);
 
         var campaignObjectManager = Campaign.Current?.CampaignObjectManager;
         if (campaignObjectManager == null)
@@ -186,9 +194,6 @@ internal class HeroInterface : IHeroInterface
         }
 
         campaignObjectManager.AddHero(hero);
-
-        var party = hero.PartyBelongedTo;
-
         campaignObjectManager.AddMobileParty(party);
 
         var partyBase = party.Party;
@@ -206,6 +211,11 @@ internal class HeroInterface : IHeroInterface
             obj.StringId = Campaign.Current.CampaignObjectManager.FindNextUniqueStringId<T>($"Player");
             objectManager.AddExisting($"{typeof(T).Name}_{obj.StringId}", obj);
         }
+    }
+
+    private void RegisterObject(string prefix, object obj)
+    {
+        objectManager.AddExisting($"{obj.GetType().Name}_{prefix}", obj);
     }
 
     private void SetupNewParty(Hero hero)

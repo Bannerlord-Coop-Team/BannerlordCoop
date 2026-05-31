@@ -8,6 +8,7 @@ internal class PartyComponentSync : IDynamicSync
 {
     public PartyComponentSync(DynamicSyncRegistry autoSyncBuilder)
     {
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(PartyComponent), nameof(PartyComponent.MobileParty)), debug: true);
+        // Not working always detected as same???
+        //autoSyncBuilder.AddProperty(AccessTools.Property(typeof(PartyComponent), nameof(PartyComponent.MobileParty)), debug: true);
     }
 }

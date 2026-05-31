@@ -29,8 +29,6 @@ namespace GameInterface.Services.TroopRosters.Handlers
 
             messageBroker.Subscribe<TroopRosterDataUpdated>(Handle);
             messageBroker.Subscribe<NetworkUpdateTroopRosterData>(Handle);
-
-            //messageBroker.Subscribe<TroopRosterAddToCountsAtIndexChanged>(Handle_TroopRosterAddToCountsAtIndexChanged);
         }
 
         public void Dispose()
@@ -77,18 +75,5 @@ namespace GameInterface.Services.TroopRosters.Handlers
             troopRoster.ValidateTroopListCache();
             troopRoster._count = troopRoster.data.Length;
         }
-
-        //private void Handle_TroopRosterAddToCountsAtIndexChanged(MessagePayload<TroopRosterAddToCountsAtIndexChanged> payload)
-        //{
-        //    var data = payload.What;
-
-        //    if (!objectManager.TryGetIdWithLogging(data.TroopRoster, out string troopRosterId)) return;
-
-        //    network.SendAll(new NetworkUpdateTroopRosterData(RosterId, CharacterId,
-        //        data.Value._number,
-        //        data.Value._woundedNumber,
-        //        data.Value._xp,
-        //        data.Index));
-        //}
     }
 }

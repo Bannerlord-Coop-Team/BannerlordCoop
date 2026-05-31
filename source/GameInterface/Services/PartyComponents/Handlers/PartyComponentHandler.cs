@@ -9,6 +9,7 @@ using HarmonyLib;
 using Serilog;
 using System;
 using System.Reflection;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Party.PartyComponents;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Library;
@@ -47,6 +48,9 @@ internal class PartyComponentHandler : IHandler
         this.objectManager = objectManager;
         messageBroker.Subscribe<PartyComponentCreated>(Handle);
         messageBroker.Subscribe<NetworkCreatePartyComponent>(Handle);
+
+        messageBroker.Subscribe<PartyComponentMobilePartyUpdated>(Handle_PartyComponentMobilePartyUpdated);
+        messageBroker.Subscribe<NetworkPartyComponentMobilePartyUpdated>(Handle_NetworkPartyComponentMobilePartyUpdated);
     }
 
     public void Dispose()
@@ -131,6 +135,35 @@ internal class PartyComponentHandler : IHandler
                     partyTypes.Length - 1,
                     data.Id);
                 break;
+        }
+    }
+
+    private void Handle_PartyComponentMobilePartyUpdated(MessagePayload<PartyComponentMobilePartyUpdated> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(obj.Instance, out var partyComponentId))
+            return;
+        if (!objectManager.TryGetIdWithLogging(obj.MobileParty, out var partyId))
+            return;
+
+        var message = new NetworkPartyComponentMobilePartyUpdated(partyComponentId, partyId);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkPartyComponentMobilePartyUpdated(MessagePayload<NetworkPartyComponentMobilePartyUpdated> payload)
+    {
+        var obj = payload.What;
+
+        if (!objectManager.TryGetObjectWithLogging<PartyComponent>(obj.InstanceId, out var partyComponent))
+            return;
+
+        if (!objectManager.TryGetObjectWithLogging<MobileParty>(obj.MobilePartyId, out var mobileParty))
+            return;
+
+        using (new AllowedThread())
+        {
+            partyComponent.MobileParty = mobileParty;
         }
     }
 }

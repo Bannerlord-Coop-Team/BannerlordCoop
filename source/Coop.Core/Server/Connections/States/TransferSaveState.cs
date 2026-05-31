@@ -4,6 +4,7 @@ using Coop.Core.Client.Messages;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.CoopSessionData;
 using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 
 namespace Coop.Core.Server.Connections.States;
@@ -14,21 +15,26 @@ namespace Coop.Core.Server.Connections.States;
 /// </summary>
 public class TransferSaveState : ConnectionStateBase
 {
-    private IMessageBroker messageBroker;
-    private INetwork network;
-    private ICoopSessionProvider coopSessionProvider;
+    private readonly IMessageBroker messageBroker;
+    private readonly INetwork network;
+    private readonly ICoopSessionProvider coopSessionProvider;
+    private readonly ITimeControlInterface timeControlInterface;
 
-    public TransferSaveState(IConnectionLogic connectionLogic, IMessageBroker messageBroker, INetwork network, ICoopSessionProvider coopSessionProvider)
+    public TransferSaveState(
+        IConnectionLogic connectionLogic,
+        IMessageBroker messageBroker,
+        INetwork network,
+        ICoopSessionProvider coopSessionProvider,
+        ITimeControlInterface timeControlInterface)
         : base(connectionLogic)
     {
         this.network = network;
         this.messageBroker = messageBroker;
         this.coopSessionProvider = coopSessionProvider;
-
+        this.timeControlInterface = timeControlInterface;
         messageBroker.Subscribe<GameSaveDataPackaged>(Handle_GameSaveDataPackaged);
 
-        messageBroker.Publish(this, new SetTimeControlMode(TimeControlEnum.Pause));
-        network.SendAll(new NetworkChangeTimeControlMode(TimeControlEnum.Pause));
+        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
 
         messageBroker.Publish(this, new PackageGameSaveData());
     }

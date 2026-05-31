@@ -6,6 +6,7 @@ using Common.Tests.Utils;
 using Coop.Core;
 using Coop.Tests.Mocks;
 using GameInterface.Registry;
+using GameInterface.Services.Entity;
 using GameInterface.Services.Heroes.Interfaces;
 using GameInterface.Services.Modules;
 using GameInterface.Services.Modules.Validators;
@@ -72,17 +73,19 @@ internal abstract class TestComponentBase
         builder.RegisterType<RegistryCollection>().As<IRegistryCollection>().InstancePerLifetimeScope();
         builder.RegisterInstance(new Mock<ILogger>().Object).As<ILogger>().SingleInstance();
 
-        RegisterMocks(builder);
+        RegisterMock<ILogger>(builder);
+        RegisterMock<IControlledEntityRegistry>(builder);
+        RegisterMock<IHeroInterface>(builder);
+        RegisterMock<IModuleInfoProvider>(builder);
 
         return builder;
     }
 
-    private ContainerBuilder RegisterMocks(ContainerBuilder builder)
+    private void RegisterMock<T>(ContainerBuilder builder) where T : class
     {
-        builder.RegisterInstance(ModuleInfoProviderMock.Object).SingleInstance();
-        builder.RegisterInstance(HeroInterfaceMock.Object).SingleInstance();
-
-        return builder;
+        var mock = new Mock<T>();
+        builder.RegisterInstance(mock).AsSelf().SingleInstance();
+        builder.RegisterInstance(mock.Object).As<T>().SingleInstance();
     }
 
     private IContainer SetupContainerProvider(ContainerBuilder builder)
