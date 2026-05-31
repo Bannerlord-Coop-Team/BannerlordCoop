@@ -16,6 +16,7 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using static TaleWorlds.Library.CommandLineFunctionality;
+using static TaleWorlds.MountAndBlade.MovementOrder;
 
 namespace GameInterface.Services.Villages.Commands;
 
@@ -210,6 +211,78 @@ public class MapEventDebugCammands
         return result;
     }
 
+    [CommandLineArgumentFunction("get_event_side", "coop.debug.mapevent")]
+    public static string GetEventSide(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.get_event_side <mapEventSideId>";
+        }
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Failed to get object manager";
+        }
+
+        var mapEventSideId = args[0];
+
+        if (!objectManager.TryGetObjectWithLogging<MapEventSide>(mapEventSideId, out var mapEventSide))
+        {
+            return $"Failed to find MapEvent with id: {mapEventSideId}";
+        }
+
+        var sb = new StringBuilder();
+
+        sb.AppendLine($"Map event side id: {mapEventSideId}");
+        sb.AppendLine();
+
+        AppendMapEventSidesDetails(sb, mapEventSide, "\t", "Side Details");
+
+        sb.AppendLine();
+
+        var result = sb.ToString();
+
+        Logger.Debug("{MapEventSide}", result);
+
+        return result;
+    }
+
+    [CommandLineArgumentFunction("get_event_party", "coop.debug.mapevent")]
+    public static string GetEventParty(List<string> args)
+    {
+        if (args.Count != 1)
+        {
+            return "Usage: coop.debug.mapevent.get_event_party <mapEventPartyId>";
+        }
+
+        if (!TryGetObjectManager(out var objectManager))
+        {
+            return "Failed to get object manager";
+        }
+
+        var mapEventPartyId = args[0];
+
+        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
+        {
+            return $"Failed to find MapEventParty with id: {mapEventPartyId}";
+        }
+
+        var sb = new StringBuilder();
+
+        sb.AppendLine($"Map event side id: {mapEventPartyId}");
+        sb.AppendLine();
+
+        AppendMapEventPartyDetails(sb, mapEventParty, "\t");
+
+        sb.AppendLine();
+
+        var result = sb.ToString();
+
+        Logger.Debug("{MapEventParty}", result);
+
+        return result;
+    }
+
     private static void AppendMapEventSummary(StringBuilder sb, MapEvent mapEvent)
     {
         sb.AppendLine("Summary:");
@@ -228,7 +301,7 @@ public class MapEventDebugCammands
 
         sb.AppendLine($"\t{sideName}: {string.Join(", ", FormatSideNames(side))}");
 
-        AppendObjectDetails(sb, side, "\t\t", "Side Details");
+        AppendMapEventSidesDetails(sb, side, "\t\t", "Side Details");
 
         sb.AppendLine("\t\tParties:");
 
@@ -261,10 +334,10 @@ public class MapEventDebugCammands
         var partyName = party.Party?.Name?.ToString() ?? "<null>";
         sb.AppendLine($"{indent}Party: {partyName}");
 
-        AppendObjectDetails(sb, party, indent, "MapEventParty Details");
+        AppendMapEventSidesDetails(sb, party, indent, "MapEventParty Details");
     }
 
-    private static void AppendObjectDetails(StringBuilder sb, object obj, string indent, string title)
+    private static void AppendMapEventSidesDetails(StringBuilder sb, object obj, string indent, string title)
     {
         if (obj == null)
         {
