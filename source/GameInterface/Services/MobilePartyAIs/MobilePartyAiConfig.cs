@@ -7,5 +7,5 @@ namespace GameInterface.Services.MobilePartyAIs;
 internal class MobilePartyAiConfig
 {
     public const bool DEBUG = false;
-    public const bool DISABLE_AI = false;
+    public const bool DISABLE_AI = true;
 }
