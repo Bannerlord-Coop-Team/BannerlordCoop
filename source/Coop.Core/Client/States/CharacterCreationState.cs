@@ -9,6 +9,7 @@ using GameInterface.Services.CharacterCreation.Messages;
 using GameInterface.Services.Entity;
 using GameInterface.Services.GameState.Messages;
 using GameInterface.Services.Heroes.Interfaces;
+using GameInterface.Services.UI.Messages;
 
 namespace Coop.Core.Client.States;
 
@@ -56,6 +57,10 @@ public class CharacterCreationState : ClientStateBase
 
     internal void Handle_CharacterCreationFinished(MessagePayload<CharacterCreationFinished> obj)
     {
+        // Cover the client's own (character-creation) world with a loading screen until the
+        // server campaign is ready, so the local world isn't briefly visible while we join.
+        messageBroker.Publish(this, new StartLoadingScreen());
+
         registryManager.RegisterAllGameObjects();
 
         var playerId = controllerIdProvider.ControllerId;
