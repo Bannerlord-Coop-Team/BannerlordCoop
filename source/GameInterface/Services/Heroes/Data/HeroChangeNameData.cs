@@ -11,8 +11,8 @@ public record HeroChangeNameData
     {
         // TODO use object manager or autosync
         HeroStringId = instance.StringId;
-        FullName = name.Value;
-        FirstName = firstName.Value;
+        FullName = name.ToString();
+        FirstName = firstName.ToString();
     }
 
     [ProtoMember(1)]
