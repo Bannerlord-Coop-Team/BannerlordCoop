@@ -7,6 +7,7 @@ using GameInterface.Registry.Auto;
 using GameInterface.Services.Smithing.Messages;
 using HarmonyLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.CampaignBehaviors;
 using TaleWorlds.CampaignSystem.CraftingSystem;
@@ -101,6 +102,13 @@ namespace GameInterface.Services.Smithing.Patches
             // Publish message with data
             var message = new OrderCompleted(__instance, town, craftingOrder, craftedItem, completerHero, Hero.MainHero, flag);
             MessageBroker.Instance.Publish(__instance, message);
+
+            // Dispatch message for sound cue and notification of how much money received
+            int amount = __instance.CalculateOrderPriceDifference(craftingOrder, craftedItem);
+            CampaignEventDispatcher.Instance.OnHeroOrPartyTradedGold(
+                    new ValueTuple<Hero, PartyBase>(null, null),
+                    new ValueTuple<Hero, PartyBase>(Hero.MainHero, null),
+                    new ValueTuple<int, string>(amount, ""), true);
 
             // Skip original
             return false;
