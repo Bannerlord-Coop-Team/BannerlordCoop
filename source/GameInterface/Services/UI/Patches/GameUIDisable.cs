@@ -19,7 +19,7 @@ namespace GameInterface.Services.UI.Patches
                 CharacterDeveloperState => ModInformation.IsClient,
                 PartyState => false,
                 InventoryState => ModInformation.IsClient,
-                ClanState => false,
+                ClanState => ModInformation.IsClient,
                 _ => true,
             };
         }
