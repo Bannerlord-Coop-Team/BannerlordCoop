@@ -7,5 +7,5 @@ namespace GameInterface.Services.CampaignService.Patches;
 internal class DisableViewDataTrackerCampaignBehavior
 {
     [HarmonyPatch(nameof(ViewDataTrackerCampaignBehavior.RegisterEvents))]
-    static bool Prefix() => false;
+    static bool Prefix() => true;
 }
