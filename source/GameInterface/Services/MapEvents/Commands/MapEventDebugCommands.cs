@@ -451,6 +451,9 @@ public class MapEventDebugCammands
         if (value is UniqueTroopDescriptor descriptor)
             return descriptor.ToString();
 
+        if (value is FlattenedTroopRoster flattenedTroopRoster)
+            return FormatFlattenedTroopRoster(flattenedTroopRoster);
+
         if (value is IEnumerable enumerable && !(value is string))
             return FormatEnumerable(enumerable);
 
@@ -528,5 +531,20 @@ public class MapEventDebugCammands
             .ToArray();
 
         return genericTypeName + "<" + string.Join(", ", genericArguments) + ">";
+    }
+
+    private static string FormatFlattenedTroopRoster(FlattenedTroopRoster flattenedRoster)
+    {
+        var stringBuilder = new StringBuilder();
+
+        stringBuilder.AppendLine("FlattenedTroopRoster");
+        stringBuilder.AppendLine("[");
+        foreach (var item in flattenedRoster)
+        {
+            stringBuilder.AppendLine($"\t[{item._uniqueNo}]: {item.Troop.StringId}");
+        }
+        stringBuilder.AppendLine("]");
+
+        return stringBuilder.ToString();
     }
 }

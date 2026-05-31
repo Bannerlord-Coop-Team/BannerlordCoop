@@ -2,6 +2,6 @@
 
 internal static class MapEventConfig
 {
-    public const bool Enabled = true;
-    public const bool Debug = true;
+    public const bool Enabled = false;
+    public const bool Debug = false;
 }

@@ -40,34 +40,34 @@ internal class EncounterManagerPatches
         return false;
     }
 
-    [HarmonyPrefix]
-    [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
-    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
-    {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+    //[HarmonyPrefix]
+    //[HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
+    //internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
+    //{
+    //    if (AllowedThread.IsThisThreadAllowed()) return true;
 
-        return ModInformation.IsServer;
-    }
+    //    return ModInformation.IsServer;
+    //}
 
-    [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
-    [HarmonyPrefix]
-    public static bool PrefixStartPartyEncounter(PartyBase attackerParty, PartyBase defenderParty)
-    {
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+    //[HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
+    //[HarmonyPrefix]
+    //public static bool PrefixStartPartyEncounter(PartyBase attackerParty, PartyBase defenderParty)
+    //{
+    //    if (AllowedThread.IsThisThreadAllowed()) return true;
 
-        if (ModInformation.IsServer) return true;
+    //    if (ModInformation.IsServer) return true;
 
-        var message = new BattleStarted(attackerParty, defenderParty);
+    //    var message = new BattleStarted(attackerParty, defenderParty);
 
-        if (attackerParty.MobileParty.IsPlayerParty())
-        {
-            InformationManager.DisplayMessage(new InformationMessage($"Player is engaging in battle with {attackerParty.Name}"));
-        }
+    //    if (attackerParty.MobileParty.IsPlayerParty())
+    //    {
+    //        InformationManager.DisplayMessage(new InformationMessage($"Player is engaging in battle with {attackerParty.Name}"));
+    //    }
 
-        MessageBroker.Instance.Publish(null, message);
+    //    MessageBroker.Instance.Publish(null, message);
 
-        return true;
-    }
+    //    return true;
+    //}
 
     [HarmonyPrefix]
     [HarmonyPatch(nameof(EncounterManager.Tick))]
