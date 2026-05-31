@@ -8,6 +8,7 @@ using GameInterface.Services.MobileParties.Messages.Behavior;
 using HarmonyLib;
 using Serilog;
 using System;
+using System.Runtime.CompilerServices;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
@@ -39,41 +40,22 @@ internal class EncounterManagerPatches
         return false;
     }
 
-    //[HarmonyPrefix]
-    //[HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
-    //internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
-    //{
-    //    // Skip this method if party is not controlled
-    //    if (!mobileParty.IsPartyControlled())
-    //        return false;
+    [HarmonyPrefix]
+    [HarmonyPatch(nameof(EncounterManager.HandleEncounterForMobileParty))]
+    internal static bool HandleEncounterForMobilePartyPatch(ref MobileParty mobileParty, ref float dt)
+    {
+        if (AllowedThread.IsThisThreadAllowed()) return true;
 
-    //    return true;
-    //}
+        return ModInformation.IsServer;
+    }
 
     [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
     [HarmonyPrefix]
     public static bool PrefixStartPartyEncounter(PartyBase attackerParty, PartyBase defenderParty)
     {
-        if (!MapEventConfig.Enabled) return false;
-
-        // Disable player interactions
-        if (attackerParty.MobileParty?.IsPlayerParty() == true &&
-            defenderParty.MobileParty?.IsPlayerParty() == true) return false;
-
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
-        if (ModInformation.IsClient) return false;
-
-        return true;
-    }
-
-    [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
-    [HarmonyPostfix]
-    public static void PostfixStartPartyEncounter(PartyBase attackerParty, PartyBase defenderParty, bool __runOriginal)
-    {
-        if (AllowedThread.IsThisThreadAllowed()) return;
-
-        if (!__runOriginal) return;
+        if (ModInformation.IsServer) return true;
 
         var message = new BattleStarted(attackerParty, defenderParty);
 
@@ -83,6 +65,8 @@ internal class EncounterManagerPatches
         }
 
         MessageBroker.Instance.Publish(null, message);
+
+        return true;
     }
 
     [HarmonyPrefix]
@@ -90,36 +74,6 @@ internal class EncounterManagerPatches
     internal static bool TickPatch(float dt)
     {
         return ModInformation.IsServer;
-    }
-
-    internal static void OverrideOnPartyInteraction(PartyBase attacker, PartyBase defender)
-    {
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            try
-            {
-                using (new AllowedThread())
-                {
-                    if (defender.IsMobile)
-                    {
-                        if (attacker.MobileParty.IsPartyControlled() == true)
-                        {
-                            InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
-                        }
-                        EncounterManager.StartPartyEncounter(attacker, defender);
-                        return;
-                    }
-                    if (defender.IsSettlement)
-                    {
-                        EncounterManager.StartSettlementEncounter(attacker.MobileParty, defender.Settlement);
-                    }
-                }
-            }
-            catch(Exception ex)
-            {
-                Logger.Error(ex, "Failed to start party encounter");
-            }
-        });
     }
 }
 

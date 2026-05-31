@@ -60,7 +60,6 @@ public class MapEventDebugCammands
 
         EncounterManager.StartPartyEncounter(MobileParty.MainParty.Party, partyBase);
 
-
         return $"MapEvent Started";
     }
 

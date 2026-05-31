@@ -40,11 +40,11 @@ internal sealed class MapEventLogger : IMapEventLogger
     {
         if (!MapEventConfig.Debug) return;
 
-        var values = BuildPropertyValues(mapEventId, propertyValues);
-
-        Logger.Debug(
-            "[{InstanceType}][MapEvent:{MapEventId}] " + messageTemplate,
-            values);
+        Logger
+            .ForContext("InstanceType", ModInformation.IsServer ? "Server" : "Client")
+            .ForContext("LogGroup", "MapEvent")
+            .ForContext("MapEventId", mapEventId)
+            .Debug(messageTemplate, propertyValues ?? Array.Empty<object>());
     }
 
     public void ErrorMapEvent(Exception ex, MapEvent mapEvent, string messageTemplate, params object[] propertyValues)
@@ -56,24 +56,10 @@ internal sealed class MapEventLogger : IMapEventLogger
 
     public void ErrorMapEventId(Exception ex, string mapEventId, string messageTemplate, params object[] propertyValues)
     {
-        var values = BuildPropertyValues(mapEventId, propertyValues);
-
-        Logger.Error(
-            ex,
-            "[{InstanceType}][MapEvent:{MapEventId}] " + messageTemplate,
-            values);
-    }
-
-    private static object[] BuildPropertyValues(string mapEventId, object[] propertyValues)
-    {
-        propertyValues ??= Array.Empty<object>();
-
-        var values = new object[propertyValues.Length + 2];
-        values[0] = ModInformation.IsServer ? "Server" : "Client";
-        values[1] = mapEventId;
-
-        Array.Copy(propertyValues, 0, values, 2, propertyValues.Length);
-
-        return values;
+        Logger
+            .ForContext("InstanceType", ModInformation.IsServer ? "Server" : "Client")
+            .ForContext("LogGroup", "MapEvent")
+            .ForContext("MapEventId", mapEventId)
+            .Error(ex, messageTemplate, propertyValues ?? Array.Empty<object>());
     }
 }

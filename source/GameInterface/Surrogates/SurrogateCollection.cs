@@ -4,6 +4,7 @@ using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using static TaleWorlds.CampaignSystem.ExplainedNumber.StatExplainer;
+
 namespace GameInterface.Surrogates;
 
 public interface ISurrogateCollection { }
@@ -27,6 +28,20 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ExplainedNumber, ExplainedNumberSurrogate>();
             AddSurrogate<ExplainedNumber.StatExplainer, StatExplainerSurrogate>();
             AddSurrogate<ExplanationLine, ExplanationLineSurrogate>();
+
+            AddSurrogate<Vec3, Vec3Surrogate>();
+            AddSurrogate<SunInformation, SunInformationSurrogate>();
+            AddSurrogate<RainInformation, RainInformationSurrogate>();
+            AddSurrogate<SnowInformation, SnowInformationSurrogate>();
+            AddSurrogate<AmbientInformation, AmbientInformationSurrogate>();
+            AddSurrogate<FogInformation, FogInformationSurrogate>();
+            AddSurrogate<SkyInformation, SkyInformationSurrogate>();
+            AddSurrogate<NauticalInformation, NauticalInformationSurrogate>();
+            AddSurrogate<TimeInformation, TimeInformationSurrogate>();
+            AddSurrogate<AreaInformation, AreaInformationSurrogate>();
+            AddSurrogate<PostProcessInformation, PostProcessInformationSurrogate>();
+            AddSurrogate<AtmosphereInfo, AtmosphereInfoSurrogate>();
+            AddSurrogate<MissionInitializerRecord, MissionInitializerRecordSurrogate>();
         }
     }
 

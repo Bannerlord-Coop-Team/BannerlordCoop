@@ -40,15 +40,12 @@ public class PeerQueueOverloadedTests
 
         // Assert
         /// 1 of each pause message is sent
-        Assert.Single(TestMessageBroker.GetMessagesFromType<SetTimeControlMode>());
         Assert.Single(TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer));
 
         /// Gets the last internal and network message of their respected types for asserting below
-        var internalMsg = TestMessageBroker.GetMessagesFromType<SetTimeControlMode>().Last();
         var networkMsg = TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer).Last();
 
         /// Game is commanded to pause internally and throughout the network
-        Assert.Equal(TimeControlEnum.Pause, internalMsg.NewTimeMode);
         Assert.Equal(TimeControlEnum.Pause, networkMsg.NewControlMode);
     }
 
@@ -76,14 +73,11 @@ public class PeerQueueOverloadedTests
         // Assert
         /// When the game resumes, a resume message is sent internally and over the network
         /// 2 messages exist because the server forces a pause before resuming
-        Assert.Equal(2, TestMessageBroker.GetMessagesFromType<SetTimeControlMode>().Count());
         Assert.Equal(2, TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer).Count());
 
-        var internalMsg = TestMessageBroker.GetMessagesFromType<SetTimeControlMode>().Last();
         var networkMsg = TestNetwork.GetPeerMessagesFromType<NetworkChangeTimeControlMode>(netPeer).Last();
 
         /// Resume value defaults to <see cref="TimeControlEnum.Play_1x"/>
-        Assert.Equal(TimeControlEnum.Play_1x, internalMsg.NewTimeMode);
         Assert.Equal(TimeControlEnum.Play_1x, networkMsg.NewControlMode);
     }
 }

@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -14,7 +15,9 @@ using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -26,6 +29,7 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Diamond;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -56,6 +60,7 @@ internal class BattleHandler : IHandler
         this.playerRegistry = playerRegistry;
         this.timeControlInterface = timeControlInterface;
         this.mapEventLogger = mapEventLogger;
+
         messageBroker.Subscribe<BattleStarted>(Handle_BattleStarted);
         messageBroker.Subscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
 
@@ -111,12 +116,17 @@ internal class BattleHandler : IHandler
             side.MakeReadyForMission(null);
         }
 
-        var message = new NetworkStartAttackMission();
+        int randomTerrainSeed = MBRandom.RandomInt(10000);
+        float damageToFriends = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+        float damageFromPlayerToFriends = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+
+        var message = new NetworkStartAttackMission(randomTerrainSeed, damageToFriends, damageFromPlayerToFriends);
         network.SendAll(message);
     }
 
     private void Handle_NetworkStartAttackMission(MessagePayload<NetworkStartAttackMission> payload)
     {
+        var msg = payload.What;
         var battle = PlayerEncounter.Battle;
         bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
         CampaignVec2 position = MobileParty.MainParty.Position;
@@ -124,18 +134,15 @@ internal class BattleHandler : IHandler
         IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
         MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
 
-
         string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
         MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
         TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
         rec2.TerrainType = (int)faceTerrainType2;
-        rec2.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-        rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+        rec2.DamageToFriendsMultiplier = msg.DamageToFriendsMultiplier;
+        rec2.DamageFromPlayerToFriendsMultiplier = msg.DamageFromPlayerToFriendsMultiplier;
         rec2.NeedsRandomTerrain = false;
         rec2.PlayingInCampaignMode = true;
-
-        // TODO make this server side
-        rec2.RandomTerrainSeed = MBRandom.RandomInt(10000);
+        rec2.RandomTerrainSeed = msg.RandomTerrainSeed;
         rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
         rec2.SceneHasMapPatch = true;
         rec2.DecalAtlasGroup = 2;
@@ -145,7 +152,10 @@ internal class BattleHandler : IHandler
         position = battle.DefenderSide.LeaderParty.Position;
         rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
 
-        CampaignMission.OpenBattleMission(rec2);
+        using (new AllowedThread())
+        {
+            CampaignMission.OpenBattleMission(rec2);
+        }
     }
 
     private void Handle_BattleStarted(MessagePayload<BattleStarted> payload)
@@ -160,6 +170,9 @@ internal class BattleHandler : IHandler
 
         var mapEvent = data.Attacker.MapEvent ?? data.Defender.MapEvent;
 
+        if (!objectManager.TryGetIdWithLogging(mapEvent, out var mapEventId))
+            return;
+
         mapEventLogger.DebugMapEvent(
             mapEvent,
             "Battle started. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}, Attacker={AttackerName}, Defender={DefenderName}",
@@ -172,16 +185,16 @@ internal class BattleHandler : IHandler
         var defenderIsPlayer = data.Defender.MobileParty?.IsPlayerParty() == true;
         var hasPlayer = attackerIsPlayer || defenderIsPlayer;
 
-        if (hasPlayer && AllPlayersInMapEvents())
-        {
-            mapEventLogger.DebugMapEvent(
-                    mapEvent,
-                    "All players are in map events. Pausing time on server.");
+        //if (hasPlayer && AllPlayersInMapEvents())
+        //{
+        //    mapEventLogger.DebugMapEvent(
+        //            mapEvent,
+        //            "All players are in map events. Pausing time on server.");
 
-            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
-        }
+        //    timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+        //}
 
-        var message = new NetworkStartBattle(attackerPartyBaseId, defenderPartyBaseId);
+        var message = new NetworkStartBattle(mapEventId, attackerPartyBaseId, defenderPartyBaseId);
 
         mapEventLogger.DebugMapEvent(
             mapEvent,
@@ -197,15 +210,42 @@ internal class BattleHandler : IHandler
     {
         var message = payload.What;
 
+        if (!objectManager.TryGetObjectWithLogging(message.MapEventId, out MapEvent mapEvent))
+            return;
+
         if (!objectManager.TryGetObjectWithLogging(message.AttackerId, out PartyBase attacker))
             return;
 
         if (!objectManager.TryGetObjectWithLogging(message.DefenderId, out PartyBase defender))
             return;
 
-        var mapEvent = attacker.MapEvent ?? defender.MapEvent;
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            try
+            {
+                using (new AllowedThread())
+                {
+                    if (defender.IsMobile)
+                    {
+                        if (attacker.MobileParty.IsPartyControlled() == true)
+                        {
+                            InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
+                        }
+                        EncounterManager.StartPartyEncounter(attacker, defender);
 
-        EncounterManagerPatches.OverrideOnPartyInteraction(attacker, defender);
+                        return;
+                    }
+                    if (defender.IsSettlement)
+                    {
+                        EncounterManager.StartSettlementEncounter(attacker.MobileParty, defender.Settlement);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Failed to start party encounter");
+            }
+        });
 
         mapEventLogger.DebugMapEvent(
             mapEvent,
