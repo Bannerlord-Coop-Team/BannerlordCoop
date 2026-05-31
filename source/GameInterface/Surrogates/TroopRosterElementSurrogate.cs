@@ -44,7 +44,7 @@ internal struct TroopRosterElementSurrogate
             _number = surrogate.Number,
             _woundedNumber = surrogate.WoundedNumber,
             _xp = surrogate.Xp
-        }; ;
+        };
     }
 }
 

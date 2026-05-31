@@ -1,5 +1,8 @@
 ﻿using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.Inventory.Messages;
 using HarmonyLib;
+using Helpers;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.ViewModelCollection.Inventory;
@@ -15,7 +18,7 @@ namespace GameInterface.Services.Inventory.Patches
 
         [HarmonyPatch(nameof(SPInventoryVM.ExecuteBuyAllItems))]
         [HarmonyPrefix]
-        public static bool ExecuteBuyAllItems(ref SPInventoryVM __instance)
+        public static bool ExecuteBuyAllItemsPrefix(ref SPInventoryVM __instance)
         {
             if (!__instance._inventoryLogic.IsTrading) return true;
 
@@ -54,6 +57,37 @@ namespace GameInterface.Services.Inventory.Patches
             __instance.CurrentFocusedItem = null;
 
             return false;
+        }
+
+        [HarmonyPatch(nameof(SPInventoryVM.TransferAllForSettlement))]
+        [HarmonyPrefix]
+        public static bool TransferAllForSettlementPrefix(ref SPInventoryVM __instance)
+        {
+            if (!__instance._inventoryLogic.IsTrading) return true;
+
+            int availableSettlementGold = __instance.LeftInventoryOwnerGold;
+            int cost = 0;
+
+            // Only approximate, might not be the best estimate as it doesn't factor in changing costs as items are bought
+            foreach (SPItemVM itemVM in __instance.RightItemListVM)
+            {
+                if (itemVM != null && !itemVM.IsFiltered && !itemVM.IsLocked && itemVM.IsTransferable)
+                {
+                    cost += itemVM.TotalCost * itemVM.ItemCount;
+                }
+            }
+
+            if (availableSettlementGold - cost < 0)
+            {
+                //MBInformationManager.AddQuickInformation(GameTexts.FindText("str_trader_doesnt_have_enough_money", null), 0, null, null, "");
+                InformationManager.ShowInquiry(new InquiryData("", GameTexts.FindText("str_trader_doesnt_have_enough_money", null).ToString(), false, true, GameTexts.FindText("str_yes", null).ToString(), GameTexts.FindText("str_no", null).ToString(), delegate ()
+                {
+                    InventoryScreenHelper.CloseScreen(false);
+                }, null, "", 0f, null, null, null), false, false);
+                return false;
+            }
+
+            return true;
         }
     }
 }
