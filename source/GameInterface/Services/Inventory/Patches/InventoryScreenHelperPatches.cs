@@ -14,7 +14,8 @@ internal class InventoryScreenHelperPatches
     {
         AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenScreenAsTrade)),
         AccessTools.Method(typeof(InventoryScreenHelper), nameof(InventoryScreenHelper.OpenInventoryPresentation)),
-        AccessTools.Method(typeof(InventoryLogic), nameof(InventoryLogic.ResetLogic)),
+        AccessTools.Method(typeof(InventoryLogic), nameof(InventoryLogic.TransferItem)),
+        AccessTools.Method(typeof(InventoryLogic), nameof(InventoryLogic.SlaughterItem))
     };
 
     static void Prefix()
