@@ -4,6 +4,7 @@ using Common.Network;
 using GameInterface.Services.Inventory.Messages;
 using GameInterface.Services.ObjectManager;
 using Serilog;
+using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
@@ -65,18 +66,26 @@ internal class ResetRostersHandler : IHandler
         ItemRoster targetItemRoster2 = null;
         if (obj.What.TargetItemRoster2Id != null && !objectManager.TryGetObjectWithLogging<ItemRoster>(obj.What.TargetItemRoster2Id, out targetItemRoster2)) return;
 
-        targetItemRoster1?.Clear();
-        foreach(var itemRosterElement in obj.What.BackupItemRoster1Elements ?? Enumerable.Empty<ItemRosterElement>())
-        {
-            targetItemRoster1?.AddToCounts(itemRosterElement.EquipmentElement, itemRosterElement.Amount);
-        }
+        HashSet<EquipmentElement> changedEquipmentElements = new HashSet<EquipmentElement>();
 
-        targetItemRoster2?.Clear();
-        foreach (var itemRosterElement in obj.What.BackupItemRoster2Elements ?? Enumerable.Empty<ItemRosterElement>())
-        {
-            targetItemRoster2?.AddToCounts(itemRosterElement.EquipmentElement, itemRosterElement.Amount);
-        }
+        ClearAndAdd(targetItemRoster1, obj.What.BackupItemRoster1Elements, changedEquipmentElements);
+        ClearAndAdd(targetItemRoster2, obj.What.BackupItemRoster2Elements, changedEquipmentElements);
 
-        network.SendAll(new RefreshOtherInventory(obj.What.TargetItemRoster1Id));
+        network.SendAll(new RefreshOtherInventory(obj.What.TargetItemRoster1Id, obj.What.TargetItemRoster2Id, changedEquipmentElements));
+    }
+
+    private void ClearAndAdd(ItemRoster targetItemRoster, ItemRosterElement[] backupElements, HashSet<EquipmentElement> changedEquipmentElements)
+    {
+        if (targetItemRoster == null) return;
+
+        targetItemRoster.Clear();
+        foreach (var itemRosterElement in backupElements ?? Enumerable.Empty<ItemRosterElement>())
+        {
+            int modifiedIndex = targetItemRoster.AddToCounts(itemRosterElement.EquipmentElement, itemRosterElement.Amount);
+            if (modifiedIndex >= 0 && targetItemRoster[modifiedIndex].Amount > 0)
+            {
+                changedEquipmentElements.Add(itemRosterElement.EquipmentElement);
+            }
+        }
     }
 }

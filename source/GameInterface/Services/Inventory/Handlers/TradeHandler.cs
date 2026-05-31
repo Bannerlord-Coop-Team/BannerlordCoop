@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -116,6 +117,11 @@ internal class TradeHandler : IHandler
             boughtItems,
             soldItems
         );
+
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            network.SendAll(new RefreshAfterTrade(message.ToItemRosterId, message.FromItemRosterId));
+        });
     }
 
     private (ItemRosterElementData, int)[] ResolveTradeItemIds(

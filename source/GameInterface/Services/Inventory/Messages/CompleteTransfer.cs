@@ -8,20 +8,25 @@ namespace GameInterface.Services.Inventory.Messages;
 internal readonly struct CompleteTransfer : ICommand
 {
     [ProtoMember(1)]
-    public readonly string TargetItemRosterId;
+    public readonly string FromItemRosterId;
 
     [ProtoMember(2)]
-    public readonly EquipmentElement EquipmentElement;
+    public readonly string ToItemRosterId;
 
     [ProtoMember(3)]
+    public readonly EquipmentElement EquipmentElement;
+
+    [ProtoMember(4)]
     public readonly int Count;
 
     public CompleteTransfer(
-        string targetItemRosterId,
+        string fromItemRosterId,
+        string toItemRosterId,
         EquipmentElement equipmentElement,
         int count)
     {
-        TargetItemRosterId = targetItemRosterId;
+        FromItemRosterId = fromItemRosterId;
+        ToItemRosterId = toItemRosterId;
         EquipmentElement = equipmentElement;
         Count = count;
     }

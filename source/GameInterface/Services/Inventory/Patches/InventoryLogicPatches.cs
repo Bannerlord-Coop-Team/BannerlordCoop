@@ -6,6 +6,7 @@ using GameInterface.Services.Inventory.Messages;
 using HarmonyLib;
 using Helpers;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
@@ -14,6 +15,7 @@ using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
 
 namespace GameInterface.Services.Inventory.Patches;
@@ -61,6 +63,14 @@ internal class InventoryLogicPatches
             }
         }
 
+        if (__instance.OwnerCharacter != null && __instance.OwnerCharacter.HeroObject != null && __instance.IsTrading)
+        {
+            CampaignEventDispatcher.Instance.OnHeroOrPartyTradedGold(
+                new ValueTuple<Hero, PartyBase>(null, null),
+                new ValueTuple<Hero, PartyBase>(__instance.OwnerCharacter.HeroObject, null),
+                new ValueTuple<int, string>(MathF.Min(-__instance.TotalAmount, __instance.InventoryListener.GetGold()), ""), true);
+        }
+        
         __instance._partyInitialEquipment = new InventoryLogic.PartyEquipment(__instance.OwnerParty);
         if (__instance.IsOtherPartyFromPlayerClan && __instance.LeftMemberRoster != null)
         {
@@ -99,18 +109,54 @@ internal class InventoryLogicPatches
     public static bool ResetLogicPrefix(ref InventoryLogic __instance, bool fromCancel)
     {
         AllowedThread.AllowThisThread();
-        for (int i = 0; i < 2; i++)
+
+        // Compute new backup other item roster from current roster +- player's transaction history
+        ItemRoster newOtherBackupItemRoster = new(__instance._rosters[0]);
+        foreach (KeyValuePair<EquipmentElement, InventoryLogic.ItemLog> transaction in __instance._transactionHistory._transactionLogs)
         {
-            __instance._rosters[i].Clear();
-            __instance._rosters[i].Add(__instance._rostersBackup[i]);
+            int newAmount = transaction.Value.Count * (transaction.Value.IsSelling ? -1 : 1);
+
+            int elementIndex = newOtherBackupItemRoster.FindIndexOfElement(transaction.Key);
+            if (elementIndex >= 0 && newOtherBackupItemRoster[elementIndex].Amount + newAmount < 0)
+            {
+                newAmount -= newOtherBackupItemRoster[elementIndex].Amount + newAmount;
+            }
+
+            newOtherBackupItemRoster.AddToCounts(transaction.Key, newAmount);
         }
+
+        // Compute new backup player item roster from current other roster and existing backup. Handles cases where a transferred item has already been transferred or bought by another player while trading
+        ItemRoster newPlayerBackupItemRoster = new(__instance._rostersBackup[1]);
+        foreach (var transaction in __instance._transactionHistory.GetSoldItems())
+        {
+            int elementIndex = __instance._rosters[0].FindIndexOfElement(transaction.Item1.EquipmentElement);
+            if (elementIndex < 0)
+            {
+                // No more of this item left in the other roster, remove from items to reset
+                newPlayerBackupItemRoster.Remove(new ItemRosterElement(transaction.Item1.EquipmentElement, newPlayerBackupItemRoster.GetItemNumber(transaction.Item1.EquipmentElement.Item)));
+                continue;
+            }
+
+            int amountDifference = __instance._rosters[0][elementIndex].Amount - transaction.Item1.Amount;
+            if (amountDifference < 0)
+            {
+                // Not enough left of this item in the other roster, subtract to make up the difference
+                newPlayerBackupItemRoster.AddToCounts(transaction.Item1.EquipmentElement, amountDifference);
+            }
+        }
+
+        __instance._rosters[0].Clear();
+        __instance._rosters[0].Add(newOtherBackupItemRoster); //(__instance._rostersBackup[0]);
+        __instance._rosters[1].Clear();
+        __instance._rosters[1].Add(newPlayerBackupItemRoster); //(__instance._rostersBackup[1]);
+
         AllowedThread.RevokeThisThread();
 
         var message = new ResetRosters(
             __instance._rosters[0],
-            __instance._rostersBackup[0],
+            newOtherBackupItemRoster, //__instance._rostersBackup[0],
             __instance._rosters[1],
-            __instance._rostersBackup[1],
+            newPlayerBackupItemRoster, //__instance._rostersBackup[1],
             __instance, fromCancel
         );
         MessageBroker.Instance.Publish(__instance, message);
@@ -149,27 +195,42 @@ internal class InventoryLogicPatches
     {
         EquipmentElement equipmentElement = transferCommand.ElementToTransfer.EquipmentElement;
         bool shouldManageOtherInventory = ShouldManageOtherInventory(ref __instance);
+        int amount = transferCommand.Amount;
+
+        ItemRoster fromItemRoster = null;
+        ItemRoster toItemRoster = null;
 
         // Both of these can be true, send messages for each
         AllowedThread.AllowThisThread();
         if (transferCommand.FromSide == InventoryLogic.InventorySide.PlayerInventory || (transferCommand.FromSide == InventoryLogic.InventorySide.OtherInventory && shouldManageOtherInventory))
         {
             // Reverse operation needs to be performed in main body to avoid crashing, add back so the server can manage from here
-            __instance._rosters[(int)transferCommand.FromSide].AddToCounts(transferCommand.ElementToTransfer.EquipmentElement, transferCommand.Amount);
-
-            var message = new TransferAttempted(__instance._rosters[(int)transferCommand.FromSide], equipmentElement, -transferCommand.Amount);
-            MessageBroker.Instance.Publish(__instance, message);
+            fromItemRoster = __instance._rosters[(int)transferCommand.FromSide];
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                fromItemRoster.AddToCounts(equipmentElement, amount);
+            });
         }
 
         if (transferCommand.ToSide == InventoryLogic.InventorySide.PlayerInventory || (transferCommand.ToSide == InventoryLogic.InventorySide.OtherInventory && shouldManageOtherInventory))
         {
             // Reverse operation needs to be performed in main body to avoid crashing, remove so the server can manage from here
-            __instance._rosters[(int)transferCommand.ToSide].AddToCounts(transferCommand.ElementToTransfer.EquipmentElement, -transferCommand.Amount);
-
-            var message = new TransferAttempted(__instance._rosters[(int)transferCommand.ToSide], equipmentElement, transferCommand.Amount);
-            MessageBroker.Instance.Publish(__instance, message);
+            toItemRoster = __instance._rosters[(int)transferCommand.ToSide];
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                toItemRoster.AddToCounts(equipmentElement, -amount);
+            });
         }
         AllowedThread.RevokeThisThread();
+
+        var transferMessage = new TransferAttempted(
+            fromItemRoster,
+            toItemRoster,
+            equipmentElement,
+            transferCommand.Amount
+        );
+
+        MessageBroker.Instance.Publish(__instance, transferMessage);
     }
 
     // Some inventory modes such as the default don't need the other item roster to be managed on the server
@@ -177,7 +238,8 @@ internal class InventoryLogicPatches
     private static bool ShouldManageOtherInventory(ref InventoryLogic logic)
     {
         // Expand as needed for other inventory modes
-        return logic._inventoryMode != InventoryScreenHelper.InventoryMode.Default;
+        return logic._inventoryMode != InventoryScreenHelper.InventoryMode.Default
+            && logic._inventoryMode != InventoryScreenHelper.InventoryMode.Loot;
     }
 
     [HarmonyPatch(nameof(InventoryLogic.SlaughterItem))]
@@ -189,12 +251,16 @@ internal class InventoryLogicPatches
         int hideCount = equipmentElement.Item.HorseComponent.HideCount;
 
         // Undo AddToCounts operations so server can manage
-        __instance._rosters[1].AddToCounts(DefaultItems.Meat, -meatCount);
-        __instance._rosters[1].AddToCounts(itemRosterElement.EquipmentElement, 1);
-        __instance._rosters[1].AddToCounts(DefaultItems.Hides, -hideCount);
+        ItemRoster itemRoster = __instance._rosters[1];
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            itemRoster.AddToCounts(DefaultItems.Meat, -meatCount);
+            itemRoster.AddToCounts(itemRosterElement.EquipmentElement, 1);
+            itemRoster.AddToCounts(DefaultItems.Hides, -hideCount);
+        });
 
         // Send data to server
-        var message = new ItemSlaughtered(__instance._rosters[1], equipmentElement, meatCount, hideCount);
+        var message = new ItemSlaughtered(itemRoster, equipmentElement, meatCount, hideCount);
         MessageBroker.Instance.Publish(__instance, message);
     }
 
