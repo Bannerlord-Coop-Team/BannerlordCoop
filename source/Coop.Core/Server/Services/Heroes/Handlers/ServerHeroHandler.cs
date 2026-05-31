@@ -23,11 +23,13 @@ internal class ServerHeroHandler : IHandler
         this.server = server;
         this.configuration = configuration;
         messageBroker.Subscribe<HeroNameChanged>(Handle_HeroNameChanged);
+        messageBroker.Subscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
     }
 
     public void Dispose()
     {
         messageBroker.Unsubscribe<HeroNameChanged>(Handle_HeroNameChanged);
+        messageBroker.Unsubscribe<NetworkChangeHeroName>(Handle_NetworkChangeHeroName);
     }
 
     private void Handle_HeroNameChanged(MessagePayload<HeroNameChanged> obj)
@@ -37,5 +39,14 @@ internal class ServerHeroHandler : IHandler
         var message = new NetworkChangeHeroName(payload.Data);
 
         server.SendAll(message);
+    }
+
+    private void Handle_NetworkChangeHeroName(MessagePayload<NetworkChangeHeroName> obj)
+    {
+        var data = obj.What.Data;
+
+        messageBroker.Publish(this, new ChangeHeroName(data));
+
+        server.SendAll(new NetworkChangeHeroName(data));
     }
 }

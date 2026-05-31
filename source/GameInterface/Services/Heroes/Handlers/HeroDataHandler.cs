@@ -1,17 +1,21 @@
 ﻿using Common.Logging;
 using Common.Messaging;
+using GameInterface.Services.Clans;
 using GameInterface.Services.Heroes.Messages;
 using GameInterface.Services.Heroes.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.Template.Handlers;
 using GameInterface.Services.Template.Messages;
 using GameInterface.Services.Template.Patches;
+using SandBox.GauntletUI;
 using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.ScreenSystem;
 
 namespace GameInterface.Services.Heroes.Handlers;
 internal class HeroDataHandler : IHandler
@@ -49,5 +53,12 @@ internal class HeroDataHandler : IHandler
         var firstName = new TextObject(data.FirstName);
 
         HeroDataPatches.SetNameOverride(hero, fullName, firstName);
+
+        InformationManager.DisplayMessage(new InformationMessage($"Changed hero name to {fullName}"));
+
+        if (ScreenManager.TopScreen is GauntletClanScreen clanScreen)
+        {
+            clanScreen._dataSource?.RefreshValues();
+        }
     }
 }
