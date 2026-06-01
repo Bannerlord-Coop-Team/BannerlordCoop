@@ -180,6 +180,7 @@ internal class HeroInterface : IHeroInterface
         RegisterObject(hero);
         RegisterObject(party);
         RegisterObject(hero.Clan);
+        RegisterObject(hero.CharacterObject);
 
         RegisterObject(party.StringId, party.ItemRoster);
         RegisterObject(party.StringId, party.Party);
