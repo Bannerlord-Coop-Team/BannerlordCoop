@@ -38,7 +38,7 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
     }
 
     private static readonly FieldInfo OnDeactivateField =
-    AccessTools.Field(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual._onDeactivate));
+        AccessTools.Field(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual._onDeactivate));
 
     private static readonly FieldInfo OnInitializedField =
         AccessTools.Field(typeof(GauntletMapEventVisual), nameof(GauntletMapEventVisual._onInitialized));
@@ -65,6 +65,7 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
 
     public override void OnClientDestroyed(GauntletMapEventVisual obj, string id)
     {
+        obj.OnMapEventEnd();
     }
 
     public override void OnServerCreated(GauntletMapEventVisual obj, string id)

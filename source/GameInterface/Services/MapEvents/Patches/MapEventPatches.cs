@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using GameInterface.Policies;
 using GameInterface.Services.MapEvents.Messages;
+using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
 using GameInterface.Services.MapEventSides.Patches;
 using GameInterface.Services.MobileParties.Extensions;
@@ -61,6 +62,22 @@ internal class MapEventPatches
             var message = new MapEventInvolvedPartiesAdded(__instance, partiesAdded);
             MessageBroker.Instance.Publish(__instance, message);
         }
+    }
+
+    [HarmonyPatch(nameof(MapEvent.FinalizeEventAux))]
+    [HarmonyPrefix]
+    private static bool PrefixFinalizeEventAux(MapEvent __instance)
+    {
+        if (CallOriginalPolicy.IsOriginalAllowed())
+            return true;
+
+        if (ModInformation.IsServer)
+            return true;
+
+        var message = new MapEventFinalizeAttempted(__instance);
+        MessageBroker.Instance.Publish(__instance, message);
+
+        return false;
     }
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]

@@ -14,7 +14,9 @@ using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players;
+using LiteNetLib;
 using Serilog;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -59,8 +61,9 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<BattleStarted>(Handle_BattleStarted);
         messageBroker.Subscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
 
-        messageBroker.Subscribe<PlayerLeaveBattle>(Handle_PlayerLeaveBattle);
-        messageBroker.Subscribe<NetworkLeavePlayerBattle>(Handle_NetworkLeavePlayerBattle);
+        messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
+        messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
+        messageBroker.Subscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
 
         messageBroker.Subscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Subscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
@@ -73,13 +76,11 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
     }
 
+
     public void Dispose()
     {
         messageBroker.Unsubscribe<BattleStarted>(Handle_BattleStarted);
         messageBroker.Unsubscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
-
-        messageBroker.Unsubscribe<PlayerLeaveBattle>(Handle_PlayerLeaveBattle);
-        messageBroker.Unsubscribe<NetworkLeavePlayerBattle>(Handle_NetworkLeavePlayerBattle);
 
         messageBroker.Unsubscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Unsubscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
@@ -214,6 +215,37 @@ internal class BattleHandler : IHandler
             message.DefenderId);
     }
 
+    private void Handle_MapEventFinalizeAttempted(MessagePayload<MapEventFinalizeAttempted> payload)
+    {
+
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out string mapEventId))
+            return;
+
+        if (MapEventConfig.Debug)
+            mapEventLogger.DebugMapEvent(payload.What.MapEvent, "Map event finalize attempted. Sending network message to finalize map event on all clients.");
+
+        var message = new NetworkMapEventFinalizeAttempted(mapEventId);
+        network.SendAll(message);
+    }
+    private void Handle_NetworkMapEventFinalizeAttempted(MessagePayload<NetworkMapEventFinalizeAttempted> payload)
+    {
+        if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent))
+            return;
+
+        if (MapEventConfig.Debug)
+            mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
+
+        mapEvent.FinalizeEventAux();
+
+        var message = new NetworkMapEventFinalized();
+        network.Send(payload.Who as NetPeer, message);
+    }
+
+    private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
+    {
+        GameMenu.ExitToLast();
+    }
+
     private bool AllPlayersInMapEvents()
     {
         return playerRegistry.All(player =>
@@ -223,93 +255,6 @@ internal class BattleHandler : IHandler
 
             return playerParty.MapEvent != null;
         });
-    }
-
-    private void Handle_PlayerLeaveBattle(MessagePayload<PlayerLeaveBattle> payload)
-    {
-        if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out string mapEventId)) return;
-        if (!objectManager.TryGetIdWithLogging(payload.What.MobileParty, out string mobilePartyId)) return;
-
-        mapEventLogger.DebugMapEvent(payload.What.MapEvent, "Player leaving battle with mobile party {MobilePartyId}", mobilePartyId);
-
-        network.SendAll(new NetworkLeavePlayerBattle(mobilePartyId, mapEventId));
-
-        using (new AllowedThread())
-        {
-            payload.What.MapEvent.FinalizeEvent();
-
-            GameMenu.ExitToLast();
-
-            Campaign.Current.PlayerEncounter = null;
-            Campaign.Current.LocationEncounter = null;
-        }
-    }
-
-    private void Handle_NetworkLeavePlayerBattle(MessagePayload<NetworkLeavePlayerBattle> payload)
-    {
-        if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
-        if (!objectManager.TryGetObjectWithLogging(payload.What.MobilePartyId, out MobileParty playerParty)) return;
-
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network player leave battle for mobile party {MobilePartyId}", payload.What.MobilePartyId);
-
-        Settlement currentSettlement = playerParty.CurrentSettlement;
-        int numberOfInvolvedMen = mapEvent.GetNumberOfInvolvedMen(playerParty.Party.Side);
-        bool forcePlayerOutFromSettlement;
-        if (currentSettlement?.SiegeEvent != null)
-        {
-            forcePlayerOutFromSettlement = currentSettlement?.MapFaction != playerParty.MapFaction;
-        }
-        else
-        {
-            forcePlayerOutFromSettlement = true;
-        }
-
-        playerParty.TeleportPartyToOutSideOfEncounterRadius();
-
-        var enemyParties = mapEvent._sides.Single(side => !side.Parties.Any(x => x.Party == playerParty.Party));
-
-        foreach (var mapEventParty in enemyParties.Parties)
-        {
-            var disableTime = DefaultMobilePartyAIModelPatches.DisablePlayerAttackTimes.GetOrCreateValue(mapEventParty.Party.MobileParty.Ai);
-
-            disableTime[playerParty] = CampaignTime.HoursFromNow(2);
-        }
-
-        mapEventLogger.DebugMapEvent(mapEvent, "Finalizing map event after network player leave");
-        mapEvent.FinalizeEvent();
-
-        if (playerParty.CurrentSettlement != null && playerParty.AttachedTo == null && forcePlayerOutFromSettlement)
-        {
-            LeaveSettlementAction.ApplyForParty(playerParty);
-        }
-
-        if (playerParty.BesiegerCamp != null)
-        {
-            playerParty.BesiegerCamp = null;
-        }
-        if (mapEvent != null && !mapEvent.IsFinalized && !mapEvent.IsRaid && numberOfInvolvedMen == playerParty.Party.NumberOfHealthyMembers)
-        {
-            //MapEvent mapEvent2 = mapEvent;
-            //PlayerEncounter playerEncounter = PlayerEncounter.Current;
-            //FlattenedTroopRoster[] priorTroops;
-            //if (playerEncounter == null)
-            //{
-            //    priorTroops = null;
-            //}
-            //else
-            //{
-            //    BattleSimulation battleSimulation = mapEvent.BattleSimulation;
-            //    priorTroops = ((battleSimulation != null) ? battleSimulation.SelectedTroops : null);
-            //}
-
-            // TODO sync simulation
-            //mapEvent2.SimulateBattleSetup(priorTroops);
-            //mapEvent.SimulateBattleRound((playerParty.Party.Side == BattleSideEnum.Attacker) ? 1 : 0, (playerParty.Party.Side == BattleSideEnum.Attacker) ? 0 : 1);
-        }
-        if (currentSettlement != null)
-        {
-            EncounterManager.StartSettlementEncounter(playerParty, currentSettlement);
-        }
     }
 
     private void Handle_PlayerSurrendered(MessagePayload<PlayerSurrendered> payload)

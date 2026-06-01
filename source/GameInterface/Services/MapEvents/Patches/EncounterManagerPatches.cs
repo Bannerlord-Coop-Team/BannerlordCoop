@@ -56,10 +56,6 @@ internal class EncounterManagerPatches
     {
         if (!MapEventConfig.Enabled) return false;
 
-        // Disable player interactions
-        if (attackerParty.IsMobile && attackerParty.MobileParty.IsPlayerParty() &&
-            defenderParty.IsMobile && defenderParty.MobileParty.IsPlayerParty()) return false;
-
         if (AllowedThread.IsThisThreadAllowed()) return true;
 
         if (ModInformation.IsClient) return true;
@@ -76,12 +72,12 @@ internal class EncounterManagerPatches
         return true;
     }
 
-    [HarmonyPrefix]
-    [HarmonyPatch(nameof(EncounterManager.Tick))]
-    internal static bool TickPatch(float dt)
-    {
-        return ModInformation.IsServer;
-    }
+    //[HarmonyPrefix]
+    //[HarmonyPatch(nameof(EncounterManager.Tick))]
+    //internal static bool TickPatch(float dt)
+    //{
+    //    return ModInformation.IsServer;
+    //}
 
     internal static void OverrideOnPartyInteraction(PartyBase attacker, PartyBase defender)
     {
