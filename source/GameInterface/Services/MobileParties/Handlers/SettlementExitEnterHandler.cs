@@ -7,9 +7,12 @@ using GameInterface.Services.MobileParties.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
+using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
+using TaleWorlds.Library;
 
 namespace GameInterface.Services.MobileParties.Handlers;
 
@@ -117,10 +120,33 @@ internal class SettlementExitEnterHandler : IHandler
         {
             using (new AllowedThread())
             {
-                // Set to move hold to prevent party from re-entering settlement immediately after encounter ends
-                MobileParty.MainParty.SetMoveModeHold();
+                var mainParty = MobileParty.MainParty;
+                var settlement = mainParty.CurrentSettlement ?? PlayerEncounter.EncounterSettlement;
 
-                PlayerEncounter.Finish(true);
+                // Move the party out to the settlement gate
+                if (settlement != null)
+                    mainParty.Position = settlement.GatePosition;
+
+                // Remove the party from the settlement explicitly. On the client
+                // PlayerEncounter.Current is frequently already null at this point, which
+                // makes Finish() a no-op that never reaches its LeaveSettlement() branch,
+                // leaving the party registered inside the settlement.
+                if (mainParty.CurrentSettlement != null)
+                    LeaveSettlementAction.ApplyForParty(mainParty);
+
+                if (PlayerEncounter.Current != null)
+                {
+                    PlayerEncounter.Finish(true);
+                }
+                else if (Campaign.Current.CurrentMenuContext != null)
+                {
+                    // No active encounter but a settlement menu is still open, this closes it
+                    GameMenu.ExitToLast();
+                }
+
+                // Hold so the party does not immediately re-path back into the settlement.
+                mainParty.SetMoveModeHold();
+
                 Campaign.Current.SaveHandler.SignalAutoSave();
             }
         });
