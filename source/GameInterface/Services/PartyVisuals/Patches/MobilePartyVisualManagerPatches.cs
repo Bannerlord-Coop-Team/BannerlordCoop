@@ -1,15 +1,8 @@
-﻿using Common;
-using Common.Logging;
-using Common.Messaging;
-using GameInterface.Policies;
-using GameInterface.Services.PartyVisuals.Messages;
+﻿using Common.Logging;
 using HarmonyLib;
-using SandBox.View.Map;
 using SandBox.View.Map.Managers;
-using SandBox.View.Map.Visuals;
 using Serilog;
 using System;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.PartyVisuals.Patches
@@ -46,11 +39,24 @@ namespace GameInterface.Services.PartyVisuals.Patches
             });
             for (int num = 0; num < __instance._dirtyPartyVisualCount + 1; num++)
             {
-                __instance._dirtyPartiesList[num].ValidateIsDirty();
+                try
+                {
+                    __instance._dirtyPartiesList[num].ValidateIsDirty();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to validate is party visual dirty");
+                }
             }
             for (int num2 = __instance._fadingPartiesFlatten.Count - 1; num2 >= 0; num2--)
             {
-                __instance._fadingPartiesFlatten[num2].TickFadingState(realDt, dt);
+                try {
+                    __instance._fadingPartiesFlatten[num2].TickFadingState(realDt, dt);
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Failed to tick fading state");
+                }
             }
 
             return false;
