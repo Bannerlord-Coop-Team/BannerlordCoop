@@ -1,19 +1,16 @@
 ﻿using Common.Messaging;
-using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.MapEvents.Messages.Start;
 
-internal readonly struct BattleStarted : IEvent
+internal readonly struct BattleStarted : IMessage
 {
-    public readonly MapEvent MapEvent;
-    public readonly PartyBase AttackerParty;
-    public readonly PartyBase DefenderParty;
+    public readonly PartyBase Attacker;
+    public readonly PartyBase Defender;
 
-    public BattleStarted(MapEvent mapEvent, PartyBase attackerParty, PartyBase defenderParty)
+    public BattleStarted(PartyBase attacker, PartyBase defender)
     {
-        MapEvent = mapEvent;
-        AttackerParty = attackerParty;
-        DefenderParty = defenderParty;
+        Attacker = attacker;
+        Defender = defender;
     }
 }

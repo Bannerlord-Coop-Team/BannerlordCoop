@@ -19,9 +19,9 @@ using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
 
-public class MapEventDebugCommands
+public class MapEventDebugCammands
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCommands>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCammands>();
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -59,6 +59,7 @@ public class MapEventDebugCommands
         }
 
         EncounterManager.StartPartyEncounter(MobileParty.MainParty.Party, partyBase);
+
 
         return $"MapEvent Started";
     }
@@ -210,78 +211,6 @@ public class MapEventDebugCommands
         return result;
     }
 
-    [CommandLineArgumentFunction("get_event_side", "coop.debug.mapevent")]
-    public static string GetEventSide(List<string> args)
-    {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.mapevent.get_event_side <mapEventSideId>";
-        }
-
-        if (!TryGetObjectManager(out var objectManager))
-        {
-            return "Failed to get object manager";
-        }
-
-        var mapEventSideId = args[0];
-
-        if (!objectManager.TryGetObjectWithLogging<MapEventSide>(mapEventSideId, out var mapEventSide))
-        {
-            return $"Failed to find MapEvent with id: {mapEventSideId}";
-        }
-
-        var sb = new StringBuilder();
-
-        sb.AppendLine($"Map event side id: {mapEventSideId}");
-        sb.AppendLine();
-
-        AppendMapEventSidesDetails(sb, mapEventSide, "\t", "Side Details");
-
-        sb.AppendLine();
-
-        var result = sb.ToString();
-
-        Logger.Debug("{MapEventSide}", result);
-
-        return result;
-    }
-
-    [CommandLineArgumentFunction("get_event_party", "coop.debug.mapevent")]
-    public static string GetEventParty(List<string> args)
-    {
-        if (args.Count != 1)
-        {
-            return "Usage: coop.debug.mapevent.get_event_party <mapEventPartyId>";
-        }
-
-        if (!TryGetObjectManager(out var objectManager))
-        {
-            return "Failed to get object manager";
-        }
-
-        var mapEventPartyId = args[0];
-
-        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(mapEventPartyId, out var mapEventParty))
-        {
-            return $"Failed to find MapEventParty with id: {mapEventPartyId}";
-        }
-
-        var sb = new StringBuilder();
-
-        sb.AppendLine($"Map event side id: {mapEventPartyId}");
-        sb.AppendLine();
-
-        AppendMapEventPartyDetails(sb, mapEventParty, "\t");
-
-        sb.AppendLine();
-
-        var result = sb.ToString();
-
-        Logger.Debug("{MapEventParty}", result);
-
-        return result;
-    }
-
     private static void AppendMapEventSummary(StringBuilder sb, MapEvent mapEvent)
     {
         sb.AppendLine("Summary:");
@@ -300,7 +229,7 @@ public class MapEventDebugCommands
 
         sb.AppendLine($"\t{sideName}: {string.Join(", ", FormatSideNames(side))}");
 
-        AppendMapEventSidesDetails(sb, side, "\t\t", "Side Details");
+        AppendObjectDetails(sb, side, "\t\t", "Side Details");
 
         sb.AppendLine("\t\tParties:");
 
@@ -333,10 +262,10 @@ public class MapEventDebugCommands
         var partyName = party.Party?.Name?.ToString() ?? "<null>";
         sb.AppendLine($"{indent}Party: {partyName}");
 
-        AppendMapEventSidesDetails(sb, party, indent, "MapEventParty Details");
+        AppendObjectDetails(sb, party, indent, "MapEventParty Details");
     }
 
-    private static void AppendMapEventSidesDetails(StringBuilder sb, object obj, string indent, string title)
+    private static void AppendObjectDetails(StringBuilder sb, object obj, string indent, string title)
     {
         if (obj == null)
         {
@@ -450,9 +379,6 @@ public class MapEventDebugCommands
         if (value is UniqueTroopDescriptor descriptor)
             return descriptor.ToString();
 
-        if (value is FlattenedTroopRoster flattenedTroopRoster)
-            return FormatFlattenedTroopRoster(flattenedTroopRoster);
-
         if (value is IEnumerable enumerable && !(value is string))
             return FormatEnumerable(enumerable);
 
@@ -530,20 +456,5 @@ public class MapEventDebugCommands
             .ToArray();
 
         return genericTypeName + "<" + string.Join(", ", genericArguments) + ">";
-    }
-
-    public static string FormatFlattenedTroopRoster(FlattenedTroopRoster flattenedRoster)
-    {
-        var stringBuilder = new StringBuilder();
-
-        stringBuilder.AppendLine("FlattenedTroopRoster");
-        stringBuilder.AppendLine("[");
-        foreach (var item in flattenedRoster)
-        {
-            stringBuilder.AppendLine($"\t[{item._uniqueNo}]: {item.Troop.StringId}");
-        }
-        stringBuilder.AppendLine("]");
-
-        return stringBuilder.ToString();
     }
 }
