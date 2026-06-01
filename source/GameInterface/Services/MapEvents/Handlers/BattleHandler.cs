@@ -1,5 +1,4 @@
-﻿using Common;
-using Common.Logging;
+﻿using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -15,9 +14,7 @@ using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players;
-using LiteNetLib;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
@@ -29,7 +26,6 @@ using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
-using TaleWorlds.Diamond;
 using TaleWorlds.Library;
 
 namespace GameInterface.Services.MapEvents.Handlers;
@@ -60,12 +56,9 @@ internal class BattleHandler : IHandler
         this.playerRegistry = playerRegistry;
         this.timeControlInterface = timeControlInterface;
         this.mapEventLogger = mapEventLogger;
+        messageBroker.Subscribe<BattleStarted>(Handle_BattleStarted);
+        messageBroker.Subscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
 
-        //messageBroker.Subscribe<BattleStarted>(Handle_BattleStarted);
-        //messageBroker.Subscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
-
-        messageBroker.Subscribe<StartBattleAttempted>(Handle_StartBattleAttempted);
-        messageBroker.Subscribe<NetworkRequestStartBattle>(Handle_NetworkRequestStartBattle);
         messageBroker.Subscribe<PlayerLeaveBattle>(Handle_PlayerLeaveBattle);
         messageBroker.Subscribe<NetworkLeavePlayerBattle>(Handle_NetworkLeavePlayerBattle);
 
@@ -80,10 +73,10 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
     }
 
-
-
     public void Dispose()
     {
+        messageBroker.Unsubscribe<BattleStarted>(Handle_BattleStarted);
+        messageBroker.Unsubscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
 
         messageBroker.Unsubscribe<PlayerLeaveBattle>(Handle_PlayerLeaveBattle);
         messageBroker.Unsubscribe<NetworkLeavePlayerBattle>(Handle_NetworkLeavePlayerBattle);
@@ -113,22 +106,17 @@ internal class BattleHandler : IHandler
 
         mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Setting attack mission attempted to true");
 
-        foreach (var side in mapEvent._sides)
+        foreach(var side in mapEvent._sides)
         {
             side.MakeReadyForMission(null);
         }
 
-        int randomTerrainSeed = MBRandom.RandomInt(10000);
-        float damageToFriends = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-        float damageFromPlayerToFriends = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
-
-        var message = new NetworkStartAttackMission(randomTerrainSeed, damageToFriends, damageFromPlayerToFriends);
+        var message = new NetworkStartAttackMission();
         network.SendAll(message);
     }
 
     private void Handle_NetworkStartAttackMission(MessagePayload<NetworkStartAttackMission> payload)
     {
-        var msg = payload.What;
         var battle = PlayerEncounter.Battle;
         bool isNavalEncounter = PlayerEncounter.IsNavalEncounter();
         CampaignVec2 position = MobileParty.MainParty.Position;
@@ -136,15 +124,18 @@ internal class BattleHandler : IHandler
         IMapScene mapSceneWrapper = Campaign.Current.MapSceneWrapper;
         MapPatchData mapPatchAtPosition = mapSceneWrapper.GetMapPatchAtPosition(position);
 
+
         string battleScene = Campaign.Current.Models.SceneModel.GetBattleSceneForMapPatch(mapPatchAtPosition, isNavalEncounter);
         MissionInitializerRecord rec2 = new MissionInitializerRecord(battleScene);
         TerrainType faceTerrainType2 = Campaign.Current.MapSceneWrapper.GetFaceTerrainType(MobileParty.MainParty.CurrentNavigationFace);
         rec2.TerrainType = (int)faceTerrainType2;
-        rec2.DamageToFriendsMultiplier = msg.DamageToFriendsMultiplier;
-        rec2.DamageFromPlayerToFriendsMultiplier = msg.DamageFromPlayerToFriendsMultiplier;
+        rec2.DamageToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
+        rec2.DamageFromPlayerToFriendsMultiplier = Campaign.Current.Models.DifficultyModel.GetPlayerTroopsReceivedDamageMultiplier();
         rec2.NeedsRandomTerrain = false;
         rec2.PlayingInCampaignMode = true;
-        rec2.RandomTerrainSeed = msg.RandomTerrainSeed;
+
+        // TODO make this server side
+        rec2.RandomTerrainSeed = MBRandom.RandomInt(10000);
         rec2.AtmosphereOnCampaign = Campaign.Current.Models.MapWeatherModel.GetAtmosphereModel(MobileParty.MainParty.Position);
         rec2.SceneHasMapPatch = true;
         rec2.DecalAtlasGroup = 2;
@@ -157,166 +148,71 @@ internal class BattleHandler : IHandler
         CampaignMission.OpenBattleMission(rec2);
     }
 
-    private void Handle_StartBattleAttempted(MessagePayload<StartBattleAttempted> payload)
+    private void Handle_BattleStarted(MessagePayload<BattleStarted> payload)
     {
-        if (!objectManager.TryGetIdWithLogging(payload.What.Attacker, out string attackerId))
-            return;
-        if (!objectManager.TryGetIdWithLogging(payload.What.Defender, out string defenderId))
-            return;
-        if (!objectManager.TryGetIdWithLogging(payload.What.Settlement, out string settlementId))
+        var data = payload.What;
+
+        if (!objectManager.TryGetIdWithLogging(data.Attacker, out var attackerPartyBaseId))
             return;
 
-        if (MapEventConfig.Debug)
+        if (!objectManager.TryGetIdWithLogging(data.Defender, out var defenderPartyBaseId))
+            return;
+
+        var mapEvent = data.Attacker.MapEvent ?? data.Defender.MapEvent;
+
+        mapEventLogger.DebugMapEvent(
+            mapEvent,
+            "Battle started. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}, Attacker={AttackerName}, Defender={DefenderName}",
+            attackerPartyBaseId,
+            defenderPartyBaseId,
+            data.Attacker.GetPartyName(),
+            data.Defender.GetPartyName());
+
+        var attackerIsPlayer = data.Attacker.MobileParty?.IsPlayerParty() == true;
+        var defenderIsPlayer = data.Defender.MobileParty?.IsPlayerParty() == true;
+        var hasPlayer = attackerIsPlayer || defenderIsPlayer;
+
+        if (hasPlayer && AllPlayersInMapEvents())
         {
-            Logger.Debug("Client requested to start battle. AttackerId={AttackerId}, DefenderId={DefenderId}, SettlementId={SettlementId}, BattleType={BattleType}",
-                attackerId, defenderId, settlementId, payload.What.BattleType);
+            mapEventLogger.DebugMapEvent(
+                    mapEvent,
+                    "All players are in map events. Pausing time on server.");
+
+            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
         }
 
-        var message = new NetworkRequestStartBattle(attackerId, defenderId, settlementId, payload.What.BattleType);
+        var message = new NetworkStartBattle(attackerPartyBaseId, defenderPartyBaseId);
+
+        mapEventLogger.DebugMapEvent(
+            mapEvent,
+            "Sending {MessageType}. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
+            nameof(NetworkStartBattle),
+            attackerPartyBaseId,
+            defenderPartyBaseId);
+
         network.SendAll(message);
     }
 
-    private void Handle_NetworkRequestStartBattle(MessagePayload<NetworkRequestStartBattle> payload)
+    private void Handle_NetworkStartBattle(MessagePayload<NetworkStartBattle> payload)
     {
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(payload.What.AttackerId, out var attacker))
-            return;
-        if (!objectManager.TryGetObjectWithLogging<PartyBase>(payload.What.DefenderId, out var defender))
-            return;
+        var message = payload.What;
 
-        Settlement settlement = null;
-        if (!string.IsNullOrEmpty(payload.What.SettlementId) &&
-            !objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out settlement))
+        if (!objectManager.TryGetObjectWithLogging(message.AttackerId, out PartyBase attacker))
             return;
 
+        if (!objectManager.TryGetObjectWithLogging(message.DefenderId, out PartyBase defender))
+            return;
 
+        var mapEvent = attacker.MapEvent ?? defender.MapEvent;
 
-        GameLoopRunner.RunOnMainThread(() =>
-        {
-            using (new AllowedThread())
-            {
-                try
-                {
-                    StartBattleAction.ApplyInternal(attacker, defender, settlement, payload.What.BattleType);
+        EncounterManagerPatches.OverrideOnPartyInteraction(attacker, defender);
 
-                    var attackerIsPlayer = attacker.MobileParty?.IsPlayerParty() == true;
-                    var defenderIsPlayer = defender.MobileParty?.IsPlayerParty() == true;
-                    var hasPlayer = attackerIsPlayer || defenderIsPlayer;
-
-                    var mapEvent = attacker.MapEvent ?? defender.MapEvent;
-
-                    if (hasPlayer && AllPlayersInMapEvents())
-                    {
-                        mapEventLogger.DebugMapEvent(
-                                mapEvent,
-                                "All players are in map events. Pausing time on server.");
-
-                        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.Error(ex, "Failed to start encounter for network battle request. AttackerId={AttackerId}, DefenderId={DefenderId}, SettlementId={SettlementId}, BattleType={BattleType}",
-                        payload.What.AttackerId, payload.What.DefenderId, payload.What.SettlementId, payload.What.BattleType);
-                }
-            }
-        });
+        mapEventLogger.DebugMapEvent(
+            mapEvent,
+            "Applied encounter override for network battle. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
+            message.AttackerId,
+            message.DefenderId);
     }
-
-    //private void Handle_BattleStarted(MessagePayload<BattleStarted> payload)
-    //{
-    //    var data = payload.What;
-
-    //    if (!objectManager.TryGetIdWithLogging(data.MapEvent, out var mapEventId))
-    //        return;
-
-    //    if (!objectManager.TryGetIdWithLogging(data.AttackerParty, out var attackerPartyBaseId))
-    //        return;
-
-    //    if (!objectManager.TryGetIdWithLogging(data.DefenderParty, out var defenderPartyBaseId))
-    //        return;
-
-    //    var mapEvent = data.AttackerParty.MapEvent ?? data.DefenderParty.MapEvent;
-
-    //    mapEventLogger.DebugMapEvent(
-    //        mapEvent,
-    //        "Battle started. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}, Attacker={AttackerName}, Defender={DefenderName}",
-    //        attackerPartyBaseId,
-    //        defenderPartyBaseId,
-    //        data.AttackerParty.GetPartyName(),
-    //        data.DefenderParty.GetPartyName());
-
-    //    var attackerIsPlayer = data.AttackerParty.MobileParty?.IsPlayerParty() == true;
-    //    var defenderIsPlayer = data.DefenderParty.MobileParty?.IsPlayerParty() == true;
-    //    var hasPlayer = attackerIsPlayer || defenderIsPlayer;
-
-    //    if (hasPlayer && AllPlayersInMapEvents())
-    //    {
-    //        mapEventLogger.DebugMapEvent(
-    //                mapEvent,
-    //                "All players are in map events. Pausing time on server.");
-
-    //        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
-    //    }
-
-    //    var message = new NetworkStartBattle(mapEventId, attackerPartyBaseId, defenderPartyBaseId);
-
-    //    mapEventLogger.DebugMapEvent(
-    //        mapEvent,
-    //        "Sending {MessageType}. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
-    //        nameof(NetworkStartBattle),
-    //        attackerPartyBaseId,
-    //        defenderPartyBaseId);
-
-    //    network.SendAll(message);
-    //}
-
-    //private void Handle_NetworkStartBattle(MessagePayload<NetworkStartBattle> payload)
-    //{
-    //    var message = payload.What;
-
-    //    if (!objectManager.TryGetObjectWithLogging(message.MapEventId, out MapEvent mapEvent))
-    //        return;
-
-    //    if (!objectManager.TryGetObjectWithLogging(message.AttackerId, out PartyBase attacker))
-    //        return;
-
-    //    if (!objectManager.TryGetObjectWithLogging(message.DefenderId, out PartyBase defender))
-    //        return;
-
-    //    GameLoopRunner.RunOnMainThread(() =>
-    //    {
-    //        try
-    //        {
-    //            using (new AllowedThread())
-    //            {
-    //                if (defender.IsMobile)
-    //                {
-    //                    if (attacker.MobileParty.IsPartyControlled() == true)
-    //                    {
-    //                        InformationManager.DisplayMessage(new InformationMessage("Started encounter"));
-    //                    }
-    //                    EncounterManager.StartPartyEncounter(attacker, defender);
-
-    //                    return;
-    //                }
-    //                if (defender.IsSettlement)
-    //                {
-    //                    EncounterManager.StartSettlementEncounter(attacker.MobileParty, defender.Settlement);
-    //                }
-    //            }
-    //        }
-    //        catch (Exception ex)
-    //        {
-    //            Logger.Error(ex, "Failed to start party encounter");
-    //        }
-    //    });
-
-    //    mapEventLogger.DebugMapEvent(
-    //        mapEvent,
-    //        "Applied encounter override for network battle. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
-    //        message.AttackerId,
-    //        message.DefenderId);
-    //}
 
     private bool AllPlayersInMapEvents()
     {

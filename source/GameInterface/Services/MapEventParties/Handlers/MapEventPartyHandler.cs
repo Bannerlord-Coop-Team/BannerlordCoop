@@ -3,9 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using Common.Util;
 using GameInterface.Services.MapEventParties.Messages;
-using GameInterface.Services.MapEvents;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.Villages.Commands;
 using Serilog;
 using System;
 using TaleWorlds.CampaignSystem;
@@ -42,10 +40,16 @@ internal class MapEventPartyHandler : IHandler
         messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
         messageBroker.Subscribe<NetworkTakePrisoner>(Handle_NetworkTakePrisoner);
 
+        // Client
+        messageBroker.Subscribe<RequestMapEventPartyUpdate>(Handle_RequestMapEventPartyUpdate);
+        messageBroker.Subscribe<NetworkRequestMapEventPartyUpdate>(Handle_NetworkRequestMapEventPartyUpdate);
+
         // Server
         messageBroker.Subscribe<MapEventPartyUpdated>(Handle_MapEventPartyUpdated);
         messageBroker.Subscribe<NetworkUpdateMapEventParty>(Handle_NetworkUpdateMapEventParty);
     }
+
+
 
     public void Dispose()
     {
@@ -59,6 +63,22 @@ internal class MapEventPartyHandler : IHandler
         messageBroker.Unsubscribe<NetworkTroopRouted>(Handle_NetworkTroopRouted);
     }
 
+    private void Handle_RequestMapEventPartyUpdate(MessagePayload<RequestMapEventPartyUpdate> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.MapEventParty, out var mapEventPartyId))
+            return;
+
+        network.SendAll(new NetworkRequestMapEventPartyUpdate(mapEventPartyId));
+    }
+
+    private void Handle_NetworkRequestMapEventPartyUpdate(MessagePayload<NetworkRequestMapEventPartyUpdate> payload)
+    {
+        if (!objectManager.TryGetObjectWithLogging<MapEventParty>(payload.What.MapEventPartyId, out var mapEventParty))
+            return;
+
+        mapEventParty.Update();
+    }
+
     private void Handle_MapEventPartyUpdated(MessagePayload<MapEventPartyUpdated> payload)
     {
         var obj = payload.What;
@@ -67,13 +87,6 @@ internal class MapEventPartyHandler : IHandler
             return;
 
         var flattenedTroops = FlattenedTroopSerializer.Serialize(obj.Roster, objectManager);
-
-        if (MapEventConfig.Debug)
-        {
-            Logger
-                .ForContext("FlattenedTrooops", MapEventDebugCommands.FormatFlattenedTroopRoster(obj.Roster))
-                .Debug("Sending FlattenedTroopRoster, ID: {MapEventPartyId}", mapEventPartyId);
-        }
 
         var message = new NetworkUpdateMapEventParty(mapEventPartyId, flattenedTroops);
         network.SendAll(message);
@@ -87,13 +100,6 @@ internal class MapEventPartyHandler : IHandler
             return;
 
         mapEventParty._roster = FlattenedTroopSerializer.Deserialize(obj.FlattenedTroops, objectManager);
-
-        if (MapEventConfig.Debug)
-        {
-            Logger
-                .ForContext("FlattenedTrooops", MapEventDebugCommands.FormatFlattenedTroopRoster(mapEventParty._roster))
-                .Debug("Client setting FlattenedTroopRoster, ID: {MapEventPartyId}", obj.MapEventPartyId);
-        }
 
         messageBroker.Publish(this, new MapEventTroopsUpdated(mapEventParty));
     }
@@ -216,14 +222,7 @@ internal class MapEventPartyHandler : IHandler
 
         using (new AllowedThread())
         {
-            try
-            {
-                TakePrisonerAction.ApplyInternal(partyBase, hero);
-            }
-            catch(Exception ex)
-            {
-                Logger.Error(ex, "Failed to run TakePrisonerAction.ApplyInternal");
-            }
+            TakePrisonerAction.ApplyInternal(partyBase, hero);
         }
     }
 }

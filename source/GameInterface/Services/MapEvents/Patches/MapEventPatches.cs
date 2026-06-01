@@ -65,20 +65,22 @@ internal class MapEventPatches
 
     [HarmonyPatch(nameof(MapEvent.BattleState), MethodType.Setter)]
     [HarmonyPrefix]
-    private static void PrefixBattleState(MapEvent __instance, BattleState value)
+    private static bool PrefixBattleState(MapEvent __instance, BattleState value)
     {
         if (CallOriginalPolicy.IsOriginalAllowed())
         {
-            return;
+            return true;
         }
 
         if (ModInformation.IsServer)
         {
-            return;
+            return true;
         }
 
         var message = new MapEventBattleStateChangeAttempted(__instance, value);
         MessageBroker.Instance.Publish(__instance, message);
+
+        return true;
     }
 
     [HarmonyPatch(nameof(MapEvent.Update))]
@@ -91,6 +93,8 @@ internal class MapEventPatches
     [HarmonyPrefix]
     private static bool PrefixOnBattleWon(MapEvent __instance)
     {
+        var containsPlayer = __instance._sides.Any(side => side.Parties.Any(party => party.Party.MobileParty.IsPlayerParty()));
+
         // Skip on client
         if (ModInformation.IsClient)
             return false;

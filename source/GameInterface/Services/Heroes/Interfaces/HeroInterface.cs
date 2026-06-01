@@ -227,7 +227,7 @@ internal class HeroInterface : IHeroInterface
             party.Anchor = new AnchorPoint(party);
         }
         
-        party.IsVisible = true;
+        party.IsVisible = true;  
         party.Party.SetVisualAsDirty();
 
         party.CheckPositionsForMapChangeAndUpdateIfNeeded();

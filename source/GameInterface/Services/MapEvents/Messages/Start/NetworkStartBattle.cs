@@ -7,15 +7,12 @@ namespace GameInterface.Services.MapEvents.Messages.Start;
 internal readonly struct NetworkStartBattle : ICommand
 {
     [ProtoMember(1)]
-    public readonly string MapEventId;
-    [ProtoMember(2)]
     public readonly string AttackerId;
-    [ProtoMember(3)]
+    [ProtoMember(2)]
     public readonly string DefenderId;
 
-    public NetworkStartBattle(string mapEventId, string attackerId, string defenderId)
+    public NetworkStartBattle(string attackerId, string defenderId)
     {
-        MapEventId = mapEventId;
         AttackerId = attackerId;
         DefenderId = defenderId;
     }

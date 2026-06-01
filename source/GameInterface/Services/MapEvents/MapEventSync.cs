@@ -18,9 +18,9 @@ internal class MapEventSync : IDynamicSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.MapEventSettlement)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.Position)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.State)));
-        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.TroopUpgradeTracker)));
+        autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MapEvent), nameof(MapEvent.TroopUpgradeTracker)), debug: true);
 
-        autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.MapEventVisual)));
+        autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.MapEventVisual)), debug: true);
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.DiplomaticallyFinished)));
         autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent.StrengthOfSide)));
         //autoSyncBuilder.AddField(AccessTools.Field(typeof(MapEvent), nameof(MapEvent._battleResultExplainers)));
