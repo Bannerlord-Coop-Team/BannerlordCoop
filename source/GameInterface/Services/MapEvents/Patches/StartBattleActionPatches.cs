@@ -1,18 +1,12 @@
 ﻿using Common;
 using Common.Messaging;
 using GameInterface.Policies;
-using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Start;
 using HarmonyLib;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using TaleWorlds.CampaignSystem.Actions;
-using TaleWorlds.CampaignSystem.GameComponents;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
-using static TaleWorlds.CampaignSystem.MapEvents.MapEvent;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -35,20 +29,3 @@ internal class StartBattleActionPatches
         return true;
     }
 }
-
-//[HarmonyPatch(typeof(DefaultEncounterModel))]
-//internal class DefaultEncounterModelPatches
-//{
-//    [HarmonyPatch(nameof(DefaultEncounterModel.CreateMapEventComponentForEncounter))]
-//    [HarmonyPostfix]
-//    public static void PostfixCreateMapEventComponentForEncounter(PartyBase attackerParty, PartyBase defenderParty, MapEventComponent __result)
-//    {
-//        if (CallOriginalPolicy.IsOriginalAllowed()) return;
-
-//        if (ModInformation.IsServer)
-//        {
-//            var startBattleMessage = new BattleStarted(__result.MapEvent, attackerParty, defenderParty);
-//            MessageBroker.Instance.Publish(null, startBattleMessage);
-//        }
-//    }
-//}

@@ -16,13 +16,12 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Localization;
 using static TaleWorlds.Library.CommandLineFunctionality;
-using static TaleWorlds.MountAndBlade.MovementOrder;
 
 namespace GameInterface.Services.Villages.Commands;
 
-public class MapEventDebugCammands
+public class MapEventDebugCommands
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCammands>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCommands>();
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -533,7 +532,7 @@ public class MapEventDebugCammands
         return genericTypeName + "<" + string.Join(", ", genericArguments) + ">";
     }
 
-    private static string FormatFlattenedTroopRoster(FlattenedTroopRoster flattenedRoster)
+    public static string FormatFlattenedTroopRoster(FlattenedTroopRoster flattenedRoster)
     {
         var stringBuilder = new StringBuilder();
 

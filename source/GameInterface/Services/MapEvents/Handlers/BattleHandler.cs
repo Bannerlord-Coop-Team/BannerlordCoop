@@ -113,7 +113,7 @@ internal class BattleHandler : IHandler
 
         mapEventLogger.DebugMapEvent(mapEvent, "Handling network attack mission attempted for map event. Setting attack mission attempted to true");
 
-        foreach(var side in mapEvent._sides)
+        foreach (var side in mapEvent._sides)
         {
             side.MakeReadyForMission(null);
         }
@@ -154,10 +154,7 @@ internal class BattleHandler : IHandler
         position = battle.DefenderSide.LeaderParty.Position;
         rec2.PatchEncounterDir = (v2 - position.ToVec2()).Normalized();
 
-        using (new AllowedThread())
-        {
-            CampaignMission.OpenBattleMission(rec2);
-        }
+        CampaignMission.OpenBattleMission(rec2);
     }
 
     private void Handle_StartBattleAttempted(MessagePayload<StartBattleAttempted> payload)
@@ -191,6 +188,8 @@ internal class BattleHandler : IHandler
             !objectManager.TryGetObjectWithLogging<Settlement>(payload.What.SettlementId, out settlement))
             return;
 
+
+
         GameLoopRunner.RunOnMainThread(() =>
         {
             using (new AllowedThread())
@@ -198,6 +197,21 @@ internal class BattleHandler : IHandler
                 try
                 {
                     StartBattleAction.ApplyInternal(attacker, defender, settlement, payload.What.BattleType);
+
+                    var attackerIsPlayer = attacker.MobileParty?.IsPlayerParty() == true;
+                    var defenderIsPlayer = defender.MobileParty?.IsPlayerParty() == true;
+                    var hasPlayer = attackerIsPlayer || defenderIsPlayer;
+
+                    var mapEvent = attacker.MapEvent ?? defender.MapEvent;
+
+                    if (hasPlayer && AllPlayersInMapEvents())
+                    {
+                        mapEventLogger.DebugMapEvent(
+                                mapEvent,
+                                "All players are in map events. Pausing time on server.");
+
+                        timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+                    }
                 }
                 catch (Exception ex)
                 {
