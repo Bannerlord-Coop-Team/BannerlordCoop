@@ -40,12 +40,21 @@ namespace GameInterface.Services.Banners.Handlers
         }
 
         /// <summary>
-        /// Local edit by this player: forward to the network.
+        /// Local edit by this player: resolve the clan's network id and forward to the network.
         /// </summary>
         private void Handle(MessagePayload<PlayerBannerChanged> obj)
         {
-            var payload = obj.What;
-            network.SendAll(new NetworkUpdatePlayerBanner(payload.BannerCode, payload.ClanId, payload.Color, payload.Color2));
+            var clan = obj.What.Clan;
+
+            if (clan == null) return;
+
+            if (objectManager.TryGetId(clan, out string clanId) == false)
+            {
+                Logger.Error("Unable to resolve network id for clan {clanName}", clan.Name);
+                return;
+            }
+
+            network.SendAll(new NetworkUpdatePlayerBanner(clan.Banner.Serialize(), clanId, clan.Color, clan.Color2));
         }
 
         /// <summary>

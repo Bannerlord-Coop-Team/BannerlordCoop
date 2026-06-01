@@ -20,11 +20,8 @@ namespace GameInterface.Services.Banners.Patches
 
             if (clan?.Banner == null) return;
 
-            MessageBroker.Instance.Publish(__instance, new PlayerBannerChanged(
-                clan.StringId,
-                clan.Banner.Serialize(),
-                clan.Color,
-                clan.Color2));
+            // Pass the clan through; the handler resolves its network id via the object manager.
+            MessageBroker.Instance.Publish(__instance, new PlayerBannerChanged(clan));
         }
     }
 }
