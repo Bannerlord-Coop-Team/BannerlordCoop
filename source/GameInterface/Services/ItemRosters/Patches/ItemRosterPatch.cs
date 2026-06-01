@@ -78,10 +78,13 @@ namespace GameInterface.Services.ItemRosters.Patches
 
         public static void AddToCountsOverride(ItemRoster itemRoster, EquipmentElement rosterElement, int amount)
         {
-            using (new AllowedThread())
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                itemRoster?.AddToCounts(rosterElement, amount);
-            }
+                using (new AllowedThread())
+                {
+                    itemRoster?.AddToCounts(rosterElement, amount);
+                }
+            });
         }
 
         public static void ClearOverride(ItemRoster itemRoster)

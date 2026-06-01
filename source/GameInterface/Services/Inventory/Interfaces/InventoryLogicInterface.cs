@@ -142,7 +142,7 @@ namespace GameInterface.Services.Inventory.Interfaces
                         MobilePartyHelper.PartyAddSharedXp(ownerHero.PartyBelongedTo, (float)xpBonusForDiscardingItems);
                     }
 
-                    toRoster.AddToCounts(rosterElement.EquipmentElement, -rosterElement.Amount);
+                    //toRoster.AddToCounts(rosterElement.EquipmentElement, -rosterElement.Amount);
                 }
             }
 
@@ -151,18 +151,6 @@ namespace GameInterface.Services.Inventory.Interfaces
             {
                 // Sets the gold of the other party
                 currentSettlementComponent.Gold += totalAmount;
-
-                foreach (ItemRosterElement rosterElement in boughtItems.Select(x => x.Item1))
-                {
-                    toRoster.AddToCounts(rosterElement.EquipmentElement, rosterElement.Amount);
-                    fromRoster.AddToCounts(rosterElement.EquipmentElement, -rosterElement.Amount);
-                }
-
-                foreach (ItemRosterElement rosterElement in soldItems.Select(x => x.Item1))
-                {
-                    toRoster.AddToCounts(rosterElement.EquipmentElement, -rosterElement.Amount);
-                    fromRoster.AddToCounts(rosterElement.EquipmentElement, rosterElement.Amount);
-                }
             }
             else if (((currentMobileParty != null) ? currentMobileParty.Party.LeaderHero : null) != null && isTrading)
             {
