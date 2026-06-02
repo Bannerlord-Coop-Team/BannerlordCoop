@@ -2,9 +2,12 @@
 using Common.Logging;
 using HarmonyLib;
 using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
+using TaleWorlds.CampaignSystem.Settlements;
 
 namespace GameInterface.Services.MapEvents.Patches;
 
@@ -25,5 +28,12 @@ internal class DebugMapEventPatches
         }
 
         return true;
+    }
+
+    [HarmonyPatch(typeof(PlayerEncounter), nameof(PlayerEncounter.Init), new Type[] { typeof(PartyBase), typeof(PartyBase), typeof(Settlement) })]
+    [HarmonyPrefix]
+    private static void Prefix_BattleState(PartyBase attackerParty, PartyBase defenderParty, Settlement settlement)
+    {
+        ;
     }
 }

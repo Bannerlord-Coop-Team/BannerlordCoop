@@ -60,6 +60,10 @@ internal class BattleHandler : IHandler
         this.mapEventLogger = mapEventLogger;
         messageBroker.Subscribe<BattleStarted>(Handle_BattleStarted);
         messageBroker.Subscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
+        messageBroker.Subscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
+
+        messageBroker.Subscribe<PlayerPartyInteracted>(Handle_PlayerPartyInteracted);
+        messageBroker.Subscribe<NetworkPlayerPartyInteracted>(Handle_NetworkPlayerPartyInteracted);
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
@@ -75,7 +79,6 @@ internal class BattleHandler : IHandler
         messageBroker.Subscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
         messageBroker.Subscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
     }
-
 
     public void Dispose()
     {
@@ -169,19 +172,6 @@ internal class BattleHandler : IHandler
             data.Attacker.GetPartyName(),
             data.Defender.GetPartyName());
 
-        var attackerIsPlayer = data.Attacker.MobileParty?.IsPlayerParty() == true;
-        var defenderIsPlayer = data.Defender.MobileParty?.IsPlayerParty() == true;
-        var hasPlayer = attackerIsPlayer || defenderIsPlayer;
-
-        if (hasPlayer && AllPlayersInMapEvents())
-        {
-            mapEventLogger.DebugMapEvent(
-                    mapEvent,
-                    "All players are in map events. Pausing time on server.");
-
-            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
-        }
-
         var message = new NetworkStartBattle(attackerPartyBaseId, defenderPartyBaseId);
 
         mapEventLogger.DebugMapEvent(
@@ -213,6 +203,33 @@ internal class BattleHandler : IHandler
             "Applied encounter override for network battle. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
             message.AttackerId,
             message.DefenderId);
+    }
+
+    private void Handle_PlayerPartyInteracted(MessagePayload<PlayerPartyInteracted> payload)
+    {
+        if (!objectManager.TryGetIdWithLogging(payload.What.RequestingParty, out string requestingPartyId))
+            return;
+        if (!objectManager.TryGetIdWithLogging(payload.What.TargetParty, out string receivingPartyId))
+            return;
+
+        var message = new NetworkPlayerPartyInteracted(requestingPartyId, receivingPartyId);
+        network.SendAll(message);
+    }
+
+    private void Handle_NetworkPlayerPartyInteracted(MessagePayload<NetworkPlayerPartyInteracted> payload)
+    {
+        if (!objectManager.TryGetObjectWithLogging(payload.What.RequestingPartyId, out MobileParty requestingParty))
+            return;
+        if (!objectManager.TryGetObjectWithLogging(payload.What.TargetPartyId, out MobileParty targetParty))
+            return;
+
+        // This will recieve requests to other clients
+        if (requestingParty != MobileParty.MainParty || targetParty != MobileParty.MainParty)
+        {
+            return;
+        }
+
+        requestingParty.OnPartyInteraction(targetParty);
     }
 
     private void Handle_MapEventFinalizeAttempted(MessagePayload<MapEventFinalizeAttempted> payload)
@@ -250,17 +267,6 @@ internal class BattleHandler : IHandler
         }
         
         GameMenu.ExitToLast();
-    }
-
-    private bool AllPlayersInMapEvents()
-    {
-        return playerRegistry.All(player =>
-        {
-            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.PartyId, out var playerParty))
-                return false;
-
-            return playerParty.MapEvent != null;
-        });
     }
 
     private void Handle_PlayerSurrendered(MessagePayload<PlayerSurrendered> payload)
@@ -340,5 +346,24 @@ internal class BattleHandler : IHandler
                 mapEvent.TroopUpgradeTracker.AddParty(mapEventParty);
             }
         }
+    }
+
+    private void Handle_PlayerJoinedBattle(MessagePayload<PlayerJoinedBattle> payload)
+    {
+        if (AllPlayersInMapEvents())
+        {
+            timeControlInterface.ServerSetTimeControl(TimeControlEnum.Pause);
+        }
+    }
+
+    private bool AllPlayersInMapEvents()
+    {
+        return playerRegistry.All(player =>
+        {
+            if (!objectManager.TryGetObjectWithLogging<MobileParty>(player.PartyId, out var playerParty))
+                return false;
+
+            return playerParty.MapEvent != null;
+        });
     }
 }
