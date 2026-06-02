@@ -50,27 +50,27 @@ internal class EncounterManagerPatches
         return true;
     }
 
-    [HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
-    [HarmonyPrefix]
-    public static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
-    {
-        if (!MapEventConfig.Enabled) return false;
+    //[HarmonyPatch(nameof(EncounterManager.StartPartyEncounter))]
+    //[HarmonyPrefix]
+    //public static bool Prefix(PartyBase attackerParty, PartyBase defenderParty)
+    //{
+    //    if (!MapEventConfig.Enabled) return false;
 
-        if (AllowedThread.IsThisThreadAllowed()) return true;
+    //    if (AllowedThread.IsThisThreadAllowed()) return true;
 
-        if (ModInformation.IsClient) return true;
+    //    if (ModInformation.IsClient) return true;
 
-        var message = new BattleStarted(attackerParty, defenderParty);
+    //    var message = new BattleStarted(attackerParty, defenderParty);
 
-        if (attackerParty.MobileParty.IsPlayerParty())
-        {
-            InformationManager.DisplayMessage(new InformationMessage($"Player is engaging in battle with {attackerParty.Name}"));
-        }
+    //    if (attackerParty.MobileParty.IsPlayerParty())
+    //    {
+    //        InformationManager.DisplayMessage(new InformationMessage($"Player is engaging in battle with {attackerParty.Name}"));
+    //    }
 
-        MessageBroker.Instance.Publish(null, message);
+    //    MessageBroker.Instance.Publish(null, message);
 
-        return true;
-    }
+    //    return true;
+    //}
 
     //[HarmonyPrefix]
     //[HarmonyPatch(nameof(EncounterManager.Tick))]

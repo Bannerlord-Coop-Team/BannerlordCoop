@@ -8,25 +8,18 @@ using GameInterface.Services.MapEvents.Logging;
 using GameInterface.Services.MapEvents.Messages;
 using GameInterface.Services.MapEvents.Messages.Leave;
 using GameInterface.Services.MapEvents.Messages.Start;
-using GameInterface.Services.MapEvents.Patches;
-using GameInterface.Services.MobileParties.Extensions;
-using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.PartyBases.Extensions;
 using GameInterface.Services.Players;
 using LiteNetLib;
 using Serilog;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Encounters;
 using TaleWorlds.CampaignSystem.GameMenus;
 using TaleWorlds.CampaignSystem.Map;
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
-using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 
@@ -58,19 +51,11 @@ internal class BattleHandler : IHandler
         this.playerRegistry = playerRegistry;
         this.timeControlInterface = timeControlInterface;
         this.mapEventLogger = mapEventLogger;
-        messageBroker.Subscribe<BattleStarted>(Handle_BattleStarted);
-        messageBroker.Subscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
         messageBroker.Subscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
-
-        messageBroker.Subscribe<PlayerPartyInteracted>(Handle_PlayerPartyInteracted);
-        messageBroker.Subscribe<NetworkPlayerPartyInteracted>(Handle_NetworkPlayerPartyInteracted);
 
         messageBroker.Subscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
         messageBroker.Subscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
-
-        messageBroker.Subscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
-        messageBroker.Subscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
 
         messageBroker.Subscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Subscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
@@ -82,14 +67,18 @@ internal class BattleHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<BattleStarted>(Handle_BattleStarted);
-        messageBroker.Unsubscribe<NetworkStartBattle>(Handle_NetworkStartBattle);
+        messageBroker.Unsubscribe<PlayerJoinedBattle>(Handle_PlayerJoinedBattle);
 
-        messageBroker.Unsubscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
-        messageBroker.Unsubscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
+        messageBroker.Unsubscribe<MapEventFinalizeAttempted>(Handle_MapEventFinalizeAttempted);
+        messageBroker.Unsubscribe<NetworkMapEventFinalizeAttempted>(Handle_NetworkMapEventFinalizeAttempted);
+        messageBroker.Unsubscribe<NetworkMapEventFinalized>(Handle_NetworkMapEventFinalized);
 
         messageBroker.Unsubscribe<MapEventInvolvedPartiesAdded>(Handle_MapEventInvolvedPartiesAdded);
         messageBroker.Unsubscribe<NetworkAddInvolvedParties>(Handle_NetworkAddInvolvedParties);
+
+        messageBroker.Unsubscribe<AttackMissionAttempted>(Handle_AttackMissionAttempted);
+        messageBroker.Unsubscribe<NetworkAttackMissionAttempted>(Handle_NetworkAttackMissionAttempted);
+        messageBroker.Unsubscribe<NetworkStartAttackMission>(Handle_NetworkStartAttackMission);
     }
 
     private void Handle_AttackMissionAttempted(MessagePayload<AttackMissionAttempted> payload)
@@ -152,86 +141,6 @@ internal class BattleHandler : IHandler
         CampaignMission.OpenBattleMission(rec2);
     }
 
-    private void Handle_BattleStarted(MessagePayload<BattleStarted> payload)
-    {
-        var data = payload.What;
-
-        if (!objectManager.TryGetIdWithLogging(data.Attacker, out var attackerPartyBaseId))
-            return;
-
-        if (!objectManager.TryGetIdWithLogging(data.Defender, out var defenderPartyBaseId))
-            return;
-
-        var mapEvent = data.Attacker.MapEvent ?? data.Defender.MapEvent;
-
-        mapEventLogger.DebugMapEvent(
-            mapEvent,
-            "Battle started. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}, Attacker={AttackerName}, Defender={DefenderName}",
-            attackerPartyBaseId,
-            defenderPartyBaseId,
-            data.Attacker.GetPartyName(),
-            data.Defender.GetPartyName());
-
-        var message = new NetworkStartBattle(attackerPartyBaseId, defenderPartyBaseId);
-
-        mapEventLogger.DebugMapEvent(
-            mapEvent,
-            "Sending {MessageType}. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
-            nameof(NetworkStartBattle),
-            attackerPartyBaseId,
-            defenderPartyBaseId);
-
-        network.SendAll(message);
-    }
-
-    private void Handle_NetworkStartBattle(MessagePayload<NetworkStartBattle> payload)
-    {
-        var message = payload.What;
-
-        if (!objectManager.TryGetObjectWithLogging(message.AttackerId, out PartyBase attacker))
-            return;
-
-        if (!objectManager.TryGetObjectWithLogging(message.DefenderId, out PartyBase defender))
-            return;
-
-        var mapEvent = attacker.MapEvent ?? defender.MapEvent;
-
-        EncounterManagerPatches.OverrideOnPartyInteraction(attacker, defender);
-
-        mapEventLogger.DebugMapEvent(
-            mapEvent,
-            "Applied encounter override for network battle. AttackerId={AttackerPartyBaseId}, DefenderId={DefenderPartyBaseId}",
-            message.AttackerId,
-            message.DefenderId);
-    }
-
-    private void Handle_PlayerPartyInteracted(MessagePayload<PlayerPartyInteracted> payload)
-    {
-        if (!objectManager.TryGetIdWithLogging(payload.What.RequestingParty, out string requestingPartyId))
-            return;
-        if (!objectManager.TryGetIdWithLogging(payload.What.TargetParty, out string receivingPartyId))
-            return;
-
-        var message = new NetworkPlayerPartyInteracted(requestingPartyId, receivingPartyId);
-        network.SendAll(message);
-    }
-
-    private void Handle_NetworkPlayerPartyInteracted(MessagePayload<NetworkPlayerPartyInteracted> payload)
-    {
-        if (!objectManager.TryGetObjectWithLogging(payload.What.RequestingPartyId, out MobileParty requestingParty))
-            return;
-        if (!objectManager.TryGetObjectWithLogging(payload.What.TargetPartyId, out MobileParty targetParty))
-            return;
-
-        // This will recieve requests to other clients
-        if (requestingParty != MobileParty.MainParty || targetParty != MobileParty.MainParty)
-        {
-            return;
-        }
-
-        requestingParty.OnPartyInteraction(targetParty);
-    }
-
     private void Handle_MapEventFinalizeAttempted(MessagePayload<MapEventFinalizeAttempted> payload)
     {
 
@@ -267,39 +176,6 @@ internal class BattleHandler : IHandler
         }
         
         GameMenu.ExitToLast();
-    }
-
-    private void Handle_PlayerSurrendered(MessagePayload<PlayerSurrendered> payload)
-    {
-        if (!objectManager.TryGetIdWithLogging(payload.What.MapEvent, out string mapEventId)) return;
-        if (!objectManager.TryGetIdWithLogging(payload.What.MobileParty, out string mobilePartyId)) return;
-
-        mapEventLogger.DebugMapEvent(payload.What.MapEvent, "Player surrendered with mobile party {MobilePartyId}", mobilePartyId);
-
-        var message = new NetworkPlayerSurrendered(mobilePartyId, mapEventId);
-
-        network.SendAll(message);
-
-        using (new AllowedThread())
-        {
-            PlayerEncounter.Current._playerSurrender = true;
-            payload.What.MobileParty.BesiegerCamp = null;
-
-            GameMenu.ActivateGameMenu("taken_prisoner");
-
-            PlayerEncounter.Current._stateHandled = true;
-        }
-    }
-
-    private void Handle_NetworkPlayerSurrendered(MessagePayload<NetworkPlayerSurrendered> payload)
-    {
-        if (!objectManager.TryGetObjectWithLogging(payload.What.MapEventId, out MapEvent mapEvent)) return;
-        if (!objectManager.TryGetObjectWithLogging(payload.What.MobilePartyId, out MobileParty mobileParty)) return;
-
-        mapEventLogger.DebugMapEvent(mapEvent, "Handling network player surrender for mobile party {MobilePartyId} on side {BattleSide}", payload.What.MobilePartyId, mobileParty.Party.Side);
-
-        mapEvent.DoSurrender(mobileParty.Party.Side);
-        mapEvent.FinalizeEvent();
     }
 
     private void Handle_MapEventInvolvedPartiesAdded(MessagePayload<MapEventInvolvedPartiesAdded> payload)
