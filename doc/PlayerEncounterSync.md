@@ -1,7 +1,9 @@
 # Syncing `PlayerEncounter` in BannerlordCoop
 
-A design for synchronizing player encounters, battles, and conversations within the
-existing GameInterface / Coop.Core message + network framework.
+Synchronizing player encounters, battles, and conversations within the existing
+GameInterface / Coop.Core message + network framework. §1–4 are the target design and mental
+model; **§5 documents the current implementation** (in the `MapEvents` service as of commit
+`a201b1f0`); §6–8 cover the concrete layout, edge cases, and remaining work.
 
 ---
 
@@ -36,7 +38,7 @@ The world mutations that actually need to be shared are:
 | Battle results, casualties, loot, prisoners | **Server** | partially `MapEvents` |
 | Time / pause state | **Server** | `Time` service (`ITimeControlInterface`) |
 | Conversation *consequences* (claim, recruit, relation, war/peace, quests) | **Server**, per‑domain | per‑field services (e.g. settlement claim) |
-| The encounter menu UI, the conversation UI, the local state machine | **Each client, locally** | this service (`PlayerEncounters`) |
+| The encounter menu UI, the conversation UI, the local state machine | **Each client, locally** | vanilla, run locally on each client (see §5) |
 
 Everything else — opening a menu, opening a conversation, ticking the encounter
 state machine — is **local** to the owning client and must only run for the player
@@ -361,141 +363,142 @@ shared world; local pausing is already neutralized by `DisableGameMenuPausePatch
 
 ---
 
-## 6. Concrete service layout
+## 6. Concrete service layout (current)
+
+Everything is in the **`MapEvents`** service — there is no `PlayerEncounters` folder. The
+pieces that implement the flows in §5:
 
 ```
-source/GameInterface/Services/PlayerEncounters/
-├── PlayerEncounterConfig.cs                 // const bool Enabled / Debug (mirror MapEventConfig)
-├── Messages/
-│   ├── RequestPlayerEncounter.cs            // IEvent  (owner → broker)            [exists]
-│   ├── NetworkRequestPartyEncounter.cs      // ICommand (owner → server)           [exists]
-│   ├── NetworkPartyEncounterCreated.cs      // ICommand (server → owner)           [exists; make MapEventId nullable]
-│   ├── EncounterFinished.cs                 // IEvent  (owner → broker) [new]      // no-MapEvent finish
-│   └── NetworkEncounterFinished.cs          // ICommand (owner → server / ack)     [new]
+source/GameInterface/Services/MapEvents/
+├── MapEventConfig.cs                         // const bool Enabled / Debug
 ├── Handlers/
-│   └── PlayerEncounterHandler.cs            // bridges all of the above            [exists; split responsibilities]
+│   ├── BattleHandler.cs                      // start, finalize, surrender, involved-parties, mission launch
+│   └── MapEventHandler.cs
+├── Logging/MapEventLogger.cs
+├── Messages/
+│   ├── Start/
+│   │   ├── BattleStarted.cs                  // IEvent  (server-side, from StartPartyEncounter prefix)
+│   │   ├── NetworkStartBattle.cs             // ICommand (broadcast → clients replicate the encounter)
+│   │   ├── AttackMissionAttempted.cs / NetworkAttackMissionAttempted.cs / NetworkStartAttackMission.cs  // mission launch
+│   │   └── StartBattleAttempted.cs / NetworkRequestStartBattle.cs
+│   ├── Leave/
+│   │   ├── MapEventFinalizeAttempted.cs      // IEvent  (client-side, from FinalizeEventAux prefix)
+│   │   ├── NetworkMapEventFinalizeAttempted.cs   // ICommand (client → server: finalize authoritatively)
+│   │   ├── NetworkMapEventFinalized.cs       // IEvent  (server → requesting client: ExitToLast)
+│   │   └── PlayerSurrendered.cs / NetworkPlayerSurrendered.cs
+│   ├── MapEventBattleStateChangeAttempted.cs / NetworkChangeBattleState.cs
+│   └── MapEventInvolvedPartiesAdded.cs / NetworkAddInvolvedParties.cs
 └── Patches/
-    ├── PlayerEncounterInitPatch.cs          // PlayerEncounter.Init(atk,def,stl) prefix  [the commented-out one]
-    └── PlayerEncounterFinishPatch.cs        // PlayerEncounter.Finish prefix (no-MapEvent case)
+    ├── EncounterManagerPatches.cs            // StartPartyEncounter / StartSettlementEncounter /
+    │                                         //   HandleEncounterForMobileParty / OverrideOnPartyInteraction
+    ├── PlayerEncounterPatches.cs             // StartBattleInternal / PlayerSurrenderInternal / CheckNearbyParties…
+    ├── MapEventPatches.cs                    // FinalizeEventAux / Update(client-disabled) / OnBattleWon /
+    │                                         //   BattleState / AddInvolvedPartyInternal / CanPartyJoinBattle
+    ├── StartBattleActionPatches.cs / EncounterAttackConsequencePatch.cs / TakePrisonerActionPatches.cs
+    ├── EncounterManagerAllowTemporaryRosters.cs / MapEventRobustnessPatches.cs / MapEventUpdatePatch.cs
+    └── Disable/  (DisableBattle… / DisableCampaignWarManager… / DisableEncounterCaptureTheEnemyOnConsequence / …)
 ```
 
-Reconcile with existing patches in `MapEvents` (keep there, do not duplicate):
-- `EncounterManagerPatches` (StartPartyEncounter / StartSettlementEncounter / Tick / HandleEncounterForMobileParty)
-- `PlayerEncounterPatches` (StartBattleInternal / PlayerSurrenderInternal / Finish / CheckNearbyParties…)
-- `BattleHandler` (battle + mission start, leave, surrender, involved parties)
+Removed in the rework (do **not** re-add unless re-designing): the `PlayerEncounters` service
+(`RequestPlayerEncounter` / `NetworkRequestPartyEncounter` / `NetworkPartyEncounterCreated`,
+`PlayerEncounterHandler`, the `PlayerEncounter.Init`/`DoMeeting` patches, and the
+`ConversationDiagnosticPatches` / `EncounterMenuDiagnosticPatches`); `MapEventManagerTickDisable`;
+`PlayerEncounterPatch.cs`; the `PlayerLeaveBattle` / `NetworkLeavePlayerBattle` messages.
 
-> Rule of thumb: **`MapEvents` owns the battle/MapEvent layer; `PlayerEncounters` owns the
-> player‑facing encounter/menu/conversation flow.** They communicate by ids, not by
-> reaching into each other's state.
+> Rule of thumb in the current code: **`MapEvents` owns the entire battle/MapEvent layer**;
+> the **player‑facing menu/conversation flow is left to vanilla and runs locally** on each
+> client. The two are not separated into distinct services.
 
-### 6.1 Patch: encounter entry (`PlayerEncounter.Init`)
+### 6.1 Encounter entry — actual
 
-Restore the commented‑out `PlayerEncounterInitPatch` with these guards:
+There is **no patch on `PlayerEncounter.Init`**. Vanilla `Init` runs wherever it is reached.
+The entry point the mod patches is `EncounterManager.StartPartyEncounter`
+(`EncounterManagerPatches.Prefix`): client runs it locally; server runs it locally **and**
+publishes `BattleStarted` for broadcast/replication (see §5.2).
 
-```csharp
-[HarmonyPatch(typeof(PlayerEncounter))]
-internal class PlayerEncounterInitPatch
-{
-    [HarmonyPatch(nameof(PlayerEncounter.Init), new[]{ typeof(PartyBase), typeof(PartyBase), typeof(Settlement) })]
-    [HarmonyPrefix]
-    public static bool PrefixInit(PlayerEncounter __instance,
-        PartyBase attackerParty, PartyBase defenderParty, Settlement settlement)
-    {
-        if (AllowedThread.IsThisThreadAllowed()) return true;   // our own handler is driving it
-        if (ModInformation.IsServer) return true;               // server runs authoritative Init path
+### 6.2 Battle replication — actual
 
-        // Only the controlling client may originate an encounter for its MainParty
-        if (MobileParty.MainParty?.IsPartyControlled() != true) return false;
+`Handle_BattleStarted` (server) → `SendAll(NetworkStartBattle)` →
+`Handle_NetworkStartBattle` (clients) → `EncounterManagerPatches.OverrideOnPartyInteraction`
+re‑runs `StartPartyEncounter`/`StartSettlementEncounter` under `AllowedThread`. Mission scene
+launch is `AttackMissionAttempted → NetworkAttackMissionAttempted → NetworkStartAttackMission
+→ CampaignMission.OpenBattleMission`. Results commit server‑side in
+`MapEventPatches.PrefixOnBattleWon`.
 
-        MessageBroker.Instance.Publish(__instance,
-            new RequestPlayerEncounter(attackerParty, defenderParty, settlement));
-        return false;
-    }
-}
-```
+### 6.3 The neutral‑meeting NRE — still open
 
-(The debounce — `CanSendRequest` — is fine to keep; `Init` can be re‑entered while the menu
-churns.)
-
-### 6.2 Handler responsibilities (clean split)
-
-- `Handle_RequestPlayerEncounter` (runs on the **owning client**): resolve ids, `SendAll`
-  `NetworkRequestPartyEncounter` (only the server acts on it).
-- `Handle_NetworkRequestPartyEncounter` (**server only** — guard with `ModInformation.IsServer`):
-  validate, compute `menu`, create a `MapEvent` *only if the menu needs one*, then
-  `Send(requesterPeer, NetworkPartyEncounterCreated{...})`.
-- `Handle_NetworkPartyEncounterCreated` (**owner only**): rebuild local `PlayerEncounter`
-  (`Finish` old → `Start` → `SetupFields`), `LeaveEncounter = false`, `ActivateGameMenu(menu)`.
-  Run the world‑mutating bits inside `using (new AllowedThread())` so the entry patch lets
-  them through.
-
-Add explicit `if (ModInformation.IsServer)` / owner checks to each handler so a message that
-fans out to everyone only *acts* where it should.
-
-### 6.3 Fixing the neutral‑meeting NRE
-
-For the meeting path the server must **not** create a `MapEvent`. With `mapEventId == null`,
-the owner seeds `SetupFields(attacker, defender)` (so `_encounteredParty` is valid and
-`SpeakerAgent` resolves) and activates `"encounter_meeting"`. The vanilla conversation‑end
-consequence then sets `LeaveEncounter = true`, so the menu re‑init `Finish()`es and never
-falls into the `"encounter"` battle branch that calls
-`CanMainPartyLeaveBattleCommonCondition()` with a null `MapEvent`.
-
-If `OnConversationEnd` is not reliably firing on the owner, add a guard patch on
-`game_menu_encounter_meeting_on_init` (or on the `"encounter"` leave/abandon conditions) that
-bails when `MobileParty.MainParty.MapEvent == null`.
+This is **not fixed** in the current implementation (no `PlayerEncounter.Init` interception,
+no menu gating). When an encounter resolves to a conversation whose partner has no hero
+(leaderless party → troop partner), no opening dialog line matches, `SpeakerAgent` stays null,
+and `MissionConversationVM.Refresh()` NREs. Likewise, encounters resolving to a menu owned by a
+**disabled** campaign behavior crash with a null `GameMenu`. See §5.4 "Known gaps" and §8 for
+the remediation options (sync `LeaderHero` / gate the meeting path; stop `Disable*CampaignBehavior`
+patches from also dropping menu/dialog registration).
 
 ### 6.4 Player‑vs‑player meetings (future)
 
-When two **players** meet, the "conversation" is between two humans. Options:
-- Suppress the vanilla conversation entirely and show a lightweight interaction menu
-  (trade / form army / nothing), or
-- Route a real conversation only on one side and mirror chosen consequences.
-
-Out of scope for the first pass, but the ownership rule keeps it tractable: the *requester*
-is the owner of the flow; the other player's party is just `_encounteredParty`.
+Unchanged as a future concern. When two **players** meet, the "conversation" is between two
+humans. Options: suppress the vanilla conversation and show a lightweight interaction menu
+(trade / form army / nothing), or route a real conversation on one side and mirror chosen
+consequences. Currently both clients would run the vanilla conversation locally against each
+other's parties, which is not handled.
 
 ---
 
-## 7. Edge cases / open questions
+## 7. Edge cases / open questions (current state)
 
-- **Re‑entrancy.** `Init`/menu churn re‑publishes requests. Keep the debounce, and make
-  `Handle_NetworkPartyEncounterCreated` idempotent (finish any existing `Current` first — it
-  already does).
-- **Encountered party joins a battle in progress** (`join_encounter`, `army_encounter`,
-  siege). The server already has the `MapEvent`; send its id and let the owner `JoinBattle`
-  via the existing `MapEvents` join path rather than re‑deriving sides.
-- **Owner disconnects mid‑encounter.** Server must release any pause/unpause policy and tear
-  down a half‑created `MapEvent`. Hook into the existing connection/disconnect handlers.
+- **Leaderless / under‑synced party conversation.** Partner resolves to a troop (because
+  `party.LeaderHero` is null), no opening dialog line matches → `SpeakerAgent` null →
+  `MissionConversationVM.Refresh()` NRE. Open: confirm whether the party should have a synced
+  `LeaderHero` (sync gap) vs is genuinely leaderless (don't route it into `DoMeeting`).
+- **Menus owned by disabled behaviors.** `Disable*CampaignBehavior` patches that do
+  `RegisterEvents() => false` also drop the menus/dialog those behaviors register. Confirmed
+  for `raid_occupied` (`DisableVillageHostileActionCampaignBehavior`); same risk for Notables /
+  CommonTownsfolk / CommonVillagers / Guards / HideoutConversations / Villager. Activating an
+  unregistered menu yields a null `GameMenu` in `MenuContext.HandleStates()`.
+- **Finalize propagation.** The §5.5 finalize round‑trip only acks the **requesting** client
+  (`ExitToLast`) and finalizes on the server. Other clients rely on `MapEvent` state sync +
+  `MapEventManager.Tick` purging finalized events — not an explicit broadcast. Watch for
+  lingering/desynced `MapEvent`s on non‑participating clients.
+- **Double‑drive of `MapEvent`s.** Because clients both replicate the encounter
+  (`OverrideOnPartyInteraction` → `StartPartyEncounter` locally) and receive synced
+  `MapEvent`/`MapEventSide` objects, mismatches can surface as `MapEventSide.RemovePartyInternal`
+  index errors during `set_MapEventSide`. Re‑enabling `MapEventManager.Tick` mitigated the worst
+  of it; the contention is still a latent source of bugs.
 - **Settlement entry.** `town_outside` / `village_outside` / `castle_outside` go through the
   `Settlements` / `MobileParties` settlement‑encounter messages
-  (`StartSettlementEncounterAttempted`) — keep that path; don't duplicate it here.
-- **MapEvent id availability.** `NetworkPartyEncounterCreated` assumes the `MapEvent` is
-  already registered with the object manager on the owner. Ensure the `MapEvents` creation +
-  registration broadcast lands **before** (or atomically with) the owner message, or have the
-  owner resolve‑with‑retry.
+  (`StartSettlementEncounterAttempted`) — separate path, unchanged.
 - **Naval encounters** use `CampaignMission.OpenConversationMission` instead of
-  `CampaignMapConversation.OpenConversation`. The owner‑local path handles both; just make
-  sure `_encounteredParty.MobileParty.IsCurrentlyAtSea` is consistent on the owner.
+  `CampaignMapConversation.OpenConversation`; both run locally and are subject to the same
+  leaderless‑partner gap.
+- **Owner disconnects mid‑encounter / battle.** No explicit teardown of a half‑created
+  `MapEvent` or release of the server pause; relies on existing connection/disconnect handlers.
 
 ---
 
-## 8. Phased implementation plan
+## 8. Remaining work / roadmap
 
-1. **Gate MapEvent creation** in `Handle_NetworkRequestPartyEncounter` on "menu needs a
-   battle". Make `NetworkPartyEncounterCreated.MapEventId` nullable. → fixes the neutral
-   meeting (`SpeakerAgent` null) and the `CanMainPartyLeaveBattleCommonCondition` NRE.
-2. **Add owner / server guards** to every handler (`IsServer`, `IsPartyControlled`) so
-   menus/conversations only run on the owner.
-3. **Restore `PlayerEncounterInitPatch`** with the standard guard pattern; remove ad‑hoc
-   entry points.
-4. **Add the no‑MapEvent finish path** (`EncounterFinished` / `NetworkEncounterFinished`) and
-   make the existing `Finish` patch route meetings to it (not battle teardown).
-5. **Delegate battles to `MapEvents`** — replace the local `DetermineAndCreateMapEvent` with
-   a call into the MapEvents creation flow; carry only the resulting `mapEventId`.
-6. **Time policy**: none for meetings/menus — the world keeps ticking. Battles continue to
-   use the existing `BattleHandler` pause policy.
-7. **P‑v‑P meetings** and **disconnect cleanup** as follow‑ups.
+Relative to the **current** `MapEvents`‑based implementation (the design in §1–4 is the target
+end‑state; §5 is where the code is now):
+
+1. **Fix the conversation crashes (highest priority).** Two distinct causes:
+   - *Disabled‑behavior registration loss* — make each `Disable*CampaignBehavior` keep its
+     game‑menu / dialog registration (let `OnSessionLaunched`/`AddGameMenus` run) while skipping
+     only the problematic event/AI handlers; or stop disabling `RegisterEvents` wholesale.
+   - *Leaderless partner* — ensure `MobileParty.LeaderHero` syncs to clients, or gate the
+     meeting/`DoMeeting` path so a party with no hero partner never opens a map conversation.
+2. **Harden finalize propagation.** Broadcast finalize to all participating clients (not just
+   the requester), and make sure server‑initiated finalizes reach clients.
+3. **Reduce `MapEvent` double‑drive.** Decide whether clients replicate encounters locally
+   *or* purely consume synced `MapEvent`s, and remove the contention (see §3, §7).
+4. **Time policy** — unchanged: meetings/menus never pause; battles pause via
+   `BattleHandler` when all players are in map events.
+5. **P‑v‑P meetings** and **disconnect cleanup** as follow‑ups.
+
+> Longer‑term, if the broadcast‑replication model keeps producing `MapEvent` contention, revisit
+> the §5(proposed)/§1–4 owner‑targeted, server‑authoritative model: client requests, server
+> creates the `MapEvent` once and broadcasts it, owning client reacts — instead of every client
+> re‑deriving the encounter.
 
 ---
 

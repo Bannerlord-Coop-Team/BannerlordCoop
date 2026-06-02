@@ -243,6 +243,12 @@ internal class BattleHandler : IHandler
 
     private void Handle_NetworkMapEventFinalized(MessagePayload<NetworkMapEventFinalized> payload)
     {
+        if (PlayerEncounter.Current != null)
+        {
+            // TODO determine force out of settlement
+            PlayerEncounter.Finish(true);
+        }
+        
         GameMenu.ExitToLast();
     }
 

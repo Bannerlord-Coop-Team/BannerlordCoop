@@ -142,8 +142,6 @@ internal class MapEventPartyHandler : IHandler
 
         if (!objectManager.TryGetIdWithLogging(obj.MapEventParty, out var mapEventPartyId))
             return;
-        if (!objectManager.TryGetIdWithLogging(obj.TroopSeed, out var troopId))
-            return;
 
         var message = new NetworkTroopWounded(mapEventPartyId, obj.TroopSeed);
 

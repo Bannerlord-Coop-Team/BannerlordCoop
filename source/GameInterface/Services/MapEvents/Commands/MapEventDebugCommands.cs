@@ -19,9 +19,9 @@ using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.Villages.Commands;
 
-public class MapEventDebugCammands
+public class MapEventDebugCommands
 {
-    private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCammands>();
+    private static readonly ILogger Logger = LogManager.GetLogger<MapEventDebugCommands>();
 
     /// <summary>
     /// Attempts to get the ObjectManager
@@ -62,26 +62,6 @@ public class MapEventDebugCammands
 
 
         return $"MapEvent Started";
-    }
-
-    [CommandLineArgumentFunction("test", "coop.debug.mapevent")]
-    public static string Test1(List<string> args)
-    {
-        //if (args.Count != 2)
-        //{
-        //    return "Usage: coop.debug.besiegercamp.set_number_of_troops_killed_on_side <besiegerCampId> <value> ";
-        //}
-
-        if (TryGetObjectManager(out var objectManager) == false)
-        {
-            return "Unable to resolve ObjectManager";
-        }
-        _ = objectManager;
-        _ = PlayerEncounter.Current;
-
-        _ = Campaign.Current.MapEventManager._mapEvents;
-
-        return $"OK";
     }
 
     /// <summary>
@@ -137,6 +117,30 @@ public class MapEventDebugCammands
         enemySide.OnTroopKilled(descriptor);
 
         return $"Killed random troop: {troopElement.Troop?.Name}";
+    }
+
+    /// <summary>
+    /// Lists the fields and properties of the current PlayerEncounter.
+    /// </summary>
+    [CommandLineArgumentFunction("list_player_encounter", "coop.debug.mapevent")]
+    public static string ListPlayerEncounter(List<string> args)
+    {
+        var playerEncounter = PlayerEncounter.Current;
+        if (playerEncounter == null)
+        {
+            return "No current PlayerEncounter";
+        }
+
+        var sb = new StringBuilder();
+
+        sb.AppendLine("PlayerEncounter:");
+        AppendObjectDetails(sb, playerEncounter, "\t", "PlayerEncounter Details");
+
+        var result = sb.ToString();
+
+        Logger.Debug("{PlayerEncounter}", result);
+
+        return result;
     }
 
     [CommandLineArgumentFunction("get_events", "coop.debug.mapevent")]
