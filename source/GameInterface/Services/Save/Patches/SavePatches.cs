@@ -11,10 +11,11 @@ class SavePatches
 {
     static bool Prefix(Game __instance, ref string saveName)
     {
-        // Disable saving for the client so we don't have to worry about pausing to save
-        if (ModInformation.IsClient) return false;
+        if (ModInformation.IsServer)
+        {
+            MessageBroker.Instance.Publish(__instance, new GameSaved(saveName));
+        }
 
-        MessageBroker.Instance.Publish(__instance, new GameSaved(saveName));
         return true;
     }
 }
