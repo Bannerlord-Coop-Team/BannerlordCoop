@@ -1,7 +1,7 @@
 ﻿using Common.Messaging;
 using ProtoBuf;
 
-namespace GameInterface.Services.MapEvents.Messages.Leave;
+namespace GameInterface.Services.PlayerCaptivityService.Messages;
 
 [ProtoContract(SkipConstructor = true)]
 public readonly struct NetworkPlayerSurrendered : ICommand

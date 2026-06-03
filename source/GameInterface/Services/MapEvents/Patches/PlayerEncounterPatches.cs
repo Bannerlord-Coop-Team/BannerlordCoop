@@ -3,7 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MapEvents.Handlers;
-using GameInterface.Services.MapEvents.Messages.Leave;
+using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem.Encounters;

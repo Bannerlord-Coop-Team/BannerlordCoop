@@ -2,7 +2,7 @@
 using TaleWorlds.CampaignSystem.MapEvents;
 using TaleWorlds.CampaignSystem.Party;
 
-namespace GameInterface.Services.MapEvents.Messages.Leave;
+namespace GameInterface.Services.PlayerCaptivityService.Messages;
 
 public readonly struct PlayerSurrendered : IEvent
 {

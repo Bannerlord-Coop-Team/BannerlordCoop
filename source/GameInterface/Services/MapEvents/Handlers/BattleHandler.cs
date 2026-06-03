@@ -1,4 +1,5 @@
-﻿using Common.Logging;
+﻿using Common;
+using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
@@ -161,7 +162,11 @@ internal class BattleHandler : IHandler
         if (MapEventConfig.Debug)
             mapEventLogger.DebugMapEvent(mapEvent, "Handling network map event finalize attempted. Finalizing map event.");
 
-        mapEvent.FinalizeEventAux();
+        GameLoopRunner.RunOnMainThread(() =>
+        {
+            mapEvent.FinalizeEventAux();
+        }, blocking: true);
+        
 
         var message = new NetworkMapEventFinalized();
         network.Send(payload.Who as NetPeer, message);
