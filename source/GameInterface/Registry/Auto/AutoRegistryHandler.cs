@@ -78,6 +78,8 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
     private void Handle_NetworkCreateInstance(MessagePayload<NetworkCreateInstance<T>> payload)
     {
+        // TODO drop on loading clients
+
         var newInstance = ObjectHelper.SkipConstructor<T>();
 
         var id = payload.What.InstanceId;
@@ -131,6 +133,8 @@ class AutoRegistryHandler<T> : IHandler where T : class
 
     private void Handle_NetworkDestroyInstance(MessagePayload<NetworkDestroyInstance<T>> payload)
     {
+        // TODO drop on loading clients
+
         if (!ObjectManager.TryGetObjectWithLogging(payload.What.InstanceId, out T obj)) return;
 
         if (Registry.Debug)

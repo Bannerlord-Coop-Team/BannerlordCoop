@@ -1,4 +1,5 @@
-﻿using GameInterface.Registry.Auto;
+﻿using Common.Util;
+using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using SandBox.GauntletUI.Map;
@@ -65,7 +66,10 @@ internal class GauntletMapEventVisualRegistry : AutoRegistryBase<GauntletMapEven
 
     public override void OnClientDestroyed(GauntletMapEventVisual obj, string id)
     {
-        obj.OnMapEventEnd();
+        using (new AllowedThread())
+        {
+            obj.OnMapEventEnd();
+        }
     }
 
     public override void OnServerCreated(GauntletMapEventVisual obj, string id)

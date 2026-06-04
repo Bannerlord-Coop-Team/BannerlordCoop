@@ -147,17 +147,16 @@ namespace GameInterface.Services.Smithing.Handlers
             if (!objectManager.TryGetObjectWithLogging(obj.OrderOwnerId, out Hero orderOwner)) return;
             if (!objectManager.TryGetObjectWithLogging(obj.CraftingOrderId, out CraftingOrder craftingOrder)) return;
 
-            WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
-            craftingOrder._weaponDesignTemplate = weaponDesignTemplate;
-
             using (new AllowedThread())
             {
+                WeaponDesign weaponDesignTemplate = new WeaponDesign(randomElement, TextObject.GetEmpty(), craftingCampaignBehavior.GetWeaponPieces(randomElement, obj.PieceTier), obj.NextTownOrderId);
+                craftingOrder._weaponDesignTemplate = weaponDesignTemplate;
                 Crafting.GenerateItem(weaponDesignTemplate, TextObject.GetEmpty(), orderOwner.Culture, randomElement.ItemModifierGroup, ref craftingOrder.PreCraftedWeaponDesignItem, obj.NextTownOrderId);
-            }
-            craftingOrder._preCraftedWeaponDesignItemData = new CraftingCampaignBehavior.CraftedItemInitializationData(craftingOrder.WeaponDesignTemplate, craftingOrder.PreCraftedWeaponDesignItem.Name, craftingOrder.OrderOwner.Culture);
+                craftingOrder._preCraftedWeaponDesignItemData = new CraftingCampaignBehavior.CraftedItemInitializationData(craftingOrder.WeaponDesignTemplate, craftingOrder.PreCraftedWeaponDesignItem.Name, craftingOrder.OrderOwner.Culture);
 
-            // Replace TaleWorlds implementation
-            craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(craftingOrder);
+                // Replace TaleWorlds implementation
+                craftingCampaignBehavior._craftingOrders[orderOwner.CurrentSettlement.Town].AddTownOrder(craftingOrder);
+            }
 
             // Need to refresh client weapon designs for potential new orders while in CraftingState
             MessageBroker.Instance.Publish(this, new RefreshWeaponDesignVM(orderOwner.CurrentSettlement.Town));

@@ -106,7 +106,7 @@ internal class BattleHandler : IHandler
         }
 
         var message = new NetworkStartAttackMission();
-        network.SendAll(message);
+        network.Send(payload.Who as NetPeer, message);
     }
 
     private void Handle_NetworkStartAttackMission(MessagePayload<NetworkStartAttackMission> payload)

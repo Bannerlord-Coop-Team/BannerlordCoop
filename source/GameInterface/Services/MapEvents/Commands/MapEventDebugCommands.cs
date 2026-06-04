@@ -90,7 +90,7 @@ public class MapEventDebugCommands
             return "Failed to get enemy map event side";
         }
 
-        var party = enemySide.Parties.FirstOrDefault();
+        var party = enemySide.Parties[MBRandom.RandomInt(enemySide.Parties.Count)];
         if (party is null)
         {
             return "Enemy side has no parties";
@@ -117,6 +117,80 @@ public class MapEventDebugCommands
         enemySide.OnTroopKilled(descriptor);
 
         return $"Killed random troop: {troopElement.Troop?.Name}";
+    }
+
+    /// <summary>
+    /// Kills all but one troop from the enemy side of the current map event.
+    /// </summary>
+    [CommandLineArgumentFunction("kill_all_but_one", "coop.debug.mapevent")]
+    public static string KillAllButOneTroop(List<string> args)
+    {
+        var mapEvent = MobileParty.MainParty.MapEvent;
+        if (mapEvent is null)
+        {
+            return "Main party is not in a map event";
+        }
+
+        var mainPartySide = MobileParty.MainParty.MapEventSide;
+        if (mainPartySide is null)
+        {
+            return "Main party has no map event side";
+        }
+
+        var enemySide = mapEvent._sides
+            .SingleOrDefault(side => side != mainPartySide);
+
+        if (enemySide is null)
+        {
+            return "Failed to get enemy map event side";
+        }
+
+        if (enemySide.Parties is null || enemySide.Parties.Count == 0)
+        {
+            return "Enemy side has no parties";
+        }
+
+        var allTroops = new List<(MapEventParty Party, UniqueTroopDescriptor Descriptor, FlattenedTroopRosterElement Element)>();
+
+        foreach (var party in enemySide.Parties)
+        {
+            if (party?.Troops?._elementDictionary is null)
+                continue;
+
+            foreach (var entry in party.Troops._elementDictionary)
+            {
+                var descriptor = entry.Key;
+                var element = entry.Value;
+
+                allTroops.Add((party, descriptor, element));
+            }
+        }
+
+        if (allTroops.Count == 0)
+        {
+            return "Enemy side has no troops";
+        }
+
+        if (allTroops.Count == 1)
+        {
+            return $"Enemy side already has only one troop: {allTroops[0].Element.Troop?.Name}";
+        }
+
+        var survivorIndex = MBRandom.RandomInt(allTroops.Count);
+        var survivor = allTroops[survivorIndex];
+
+        var killedCount = 0;
+
+        for (var i = 0; i < allTroops.Count; i++)
+        {
+            if (i == survivorIndex)
+                continue;
+
+            enemySide.OnTroopKilled(allTroops[i].Descriptor);
+            killedCount++;
+        }
+
+        return $"Killed {killedCount} troops. Survivor: {survivor.Element.Troop?.Name}";
     }
 
     /// <summary>

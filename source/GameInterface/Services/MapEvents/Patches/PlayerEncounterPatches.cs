@@ -3,6 +3,7 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Util;
 using GameInterface.Services.MapEvents.Handlers;
+using GameInterface.Services.MapEvents.Messages.Conversation;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
 using Serilog;
@@ -16,6 +17,24 @@ namespace GameInterface.Services.MapEvents.Patches;
 internal class PlayerEncounterPatches
 {
     private static readonly ILogger Logger = LogManager.GetLogger<PlayerEncounterPatches>();
+
+    [HarmonyPatch(nameof(PlayerEncounter.RestartPlayerEncounter))]
+    [HarmonyPrefix]
+    public static bool RestartPlayerEncounterPrefix(PartyBase defenderParty, PartyBase attackerParty, bool forcePlayerOutFromSettlement)
+    {
+        // Our own server-approved re-run (AllowedThread) runs the real RestartPlayerEncounter.
+        if (AllowedThread.IsThisThreadAllowed()) return true;
+
+        // The server runs RestartPlayerEncounter locally (authoritative).
+        if (ModInformation.IsServer) return true;
+
+        // Client: gate the encounter restart behind server approval. The send is rate-limited in
+        // ConversationRequestHandler (max 1 request / 500ms) so a retried restart does not spam the server. On
+        // approval the handler re-runs RestartPlayerEncounter under an AllowedThread; rejected requests never re-run it.
+        MessageBroker.Instance.Publish(null, new ConversationRequested(defenderParty, attackerParty, forcePlayerOutFromSettlement, ConversationRestartSource.PlayerEncounter));
+
+        return false;
+    }
 
     [HarmonyPatch("StartBattleInternal")]
     [HarmonyPrefix]
