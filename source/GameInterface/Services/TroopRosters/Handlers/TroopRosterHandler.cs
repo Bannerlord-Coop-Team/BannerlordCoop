@@ -6,6 +6,8 @@ using Common.Util;
 using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
+using GameInterface.Services.UI.Notifications.Messages;
+using LiteNetLib;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -121,6 +123,8 @@ public class TroopRosterHandler : IHandler
         }
 
         mobileParty.LeaderHero.Gold -= cost;
+
+        network.Send(payload.What.Who as NetPeer, new NotifyGoldChange(-cost));
     }
 
     private void Handle_AddToCountsChanged(MessagePayload<TroopRosterAddToCountsChanged> payload)

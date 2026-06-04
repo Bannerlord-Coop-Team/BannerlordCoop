@@ -364,4 +364,38 @@ public class HeroDebugCommand
 
         return $"Hero Issue: {hero.Issue?.StringId ?? "none"}";
     }
+
+    /// <summary>
+    /// View available volunteers for a target hero
+    /// </summary>
+    [CommandLineArgumentFunction("volunteers", "coop.debug.hero")]
+    public static string ViewVolunteersCommand(List<string> strings)
+    {
+        if (strings.Count == 0) return "Hero id required";
+
+        StringBuilder stringBuilder = new StringBuilder();
+        foreach (var hero in Hero.AllAliveHeroes)
+        {
+            if (hero.StringId == strings[0])
+            {
+                stringBuilder.AppendLine(hero.Name.ToString());
+                foreach (var volunteer in hero.VolunteerTypes)
+                {
+                    if (volunteer == null)
+                    {
+                        stringBuilder.AppendLine("[EMPTY SLOT]");
+                        continue;
+                    }
+                    stringBuilder.AppendLine(volunteer.Name.ToString());
+                }
+            }
+        }
+
+        string result = stringBuilder.ToString();
+        if (result.Length > 0)
+        {
+            return result;
+        }
+        return "Hero not found.";
+    }
 }

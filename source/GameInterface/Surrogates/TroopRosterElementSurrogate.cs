@@ -17,12 +17,21 @@ internal struct TroopRosterElementSurrogate
     [ProtoMember(3)]
     public int WoundedNumber { get; set; }
 
-    [ProtoMember(3)]
+    [ProtoMember(4)]
     public int Xp { get; set; }
 
     public TroopRosterElementSurrogate(TroopRosterElement troopRosterElement)
     {
-        CharacterObjectId = troopRosterElement.Character.StringId;
+        if (troopRosterElement.Equals(new TroopRosterElement(null)))
+        {
+            CharacterObjectId = null;
+            Number = 0;
+            WoundedNumber = 0;
+            Xp = 0;
+            return;
+        }
+
+        CharacterObjectId = troopRosterElement.Character?.StringId;
         Number = troopRosterElement.Number;
         WoundedNumber = troopRosterElement.WoundedNumber;
         Xp = troopRosterElement.Xp;

@@ -32,7 +32,7 @@ internal class ServerTroopRosterHandler : IHandler
     private void HandleOnRecruitmentDone(MessagePayload<ClientRequestRecruitment> payload)
     {
         var obj = payload.What;
-        var message = new RecruitTroops(obj.MobilePartyId, obj.TroopsInCart);
+        var message = new RecruitTroops(obj.MobilePartyId, obj.TroopsInCart, payload.Who);
         messageBroker.Publish(this, message);
     }
 }
