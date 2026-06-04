@@ -24,21 +24,22 @@ internal class PartyIsSpottedServerPatch
 internal class PartyVisibilityOnServerPatch
 {
     //[HarmonyPostfix]
-    //[HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Getter)]
-    //private static void PostfixIsVisible(ref bool __result)
-    //{
-    //    if (ModInformation.IsServer || Debugger.IsAttached)
-    //    {
-    //        __result = true;
-    //    }
-    //}
+    [HarmonyPatch(nameof(MobileParty.IsVisible), MethodType.Getter)]
+    private static void PostfixIsVisible(MobileParty __instance, ref bool __result)
+    {
+        if (ModInformation.IsServer || Debugger.IsAttached)
+        {
+            // Return is active (inactive is player captivity)
+            __result = __instance.IsActive;
+        }
+    }
 
-    //[HarmonyPatch(nameof(MobileParty.IsInspected), MethodType.Setter)]
-    //private static void PrefixIsInspected(ref bool value)
-    //{
-    //    if (ModInformation.IsServer || Debugger.IsAttached)
-    //    {
-    //        value = true;
-    //    }
-    //}
+    [HarmonyPatch(nameof(MobileParty.IsInspected), MethodType.Setter)]
+    private static void PrefixIsInspected(ref bool value)
+    {
+        if (ModInformation.IsServer || Debugger.IsAttached)
+        {
+            value = true;
+        }
+    }
 }
