@@ -1,8 +1,13 @@
 ﻿using Common.Logging;
+using Common.Messaging;
+using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Data;
+using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Interfaces;
@@ -19,6 +24,11 @@ public interface ITroopRosterInterface : IGameAbstraction
     /// Updates target roster with incoming data from the client.
     /// </summary>
     void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero);
+
+    /// <summary>
+    /// Runs troop recruitment logic on the server and replies with updated gold notification.
+    /// </summary>
+    void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart, out int changedGold);
 }
 
 internal class TroopRosterInterface : ITroopRosterInterface
@@ -80,5 +90,54 @@ internal class TroopRosterInterface : ITroopRosterInterface
             troopRosterElement._xp = troopRosterElementData.Xp;
             targetTroopRoster.Add(troopRosterElement);
         }
+    }
+
+    public void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart, out int changedGold)
+    {
+        changedGold = 0;
+
+        if (!objectManager.TryGetObjectWithLogging(mobilePartyId, out MobileParty mobileParty)) return;
+
+        List<(Hero, CharacterObject, int)> herosValidated = new();
+
+        // Validate troops before committing to recruiting
+        foreach (var troop in troopsInCart)
+        {
+            if (!objectManager.TryGetObjectWithLogging(troop.RecruiterHeroId, out Hero hero)) continue;
+            if (!objectManager.TryGetObjectWithLogging(troop.CharacterObjectId, out CharacterObject characterObject)) continue;
+
+            var volunteerTroopAtIndex = hero.VolunteerTypes[troop.TroopIndex];
+
+            if (volunteerTroopAtIndex is null) continue;
+
+            herosValidated.Add((hero, characterObject, troop.TroopIndex));
+        }
+
+        // Calculate cost before changing any data
+        var cost = 0;
+        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
+        {
+            cost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(characterObject, mobileParty.LeaderHero).RoundedResultNumber;
+        }
+
+        // Do not apply recruitment if the player does not have enough gold
+        if (cost > mobileParty.LeaderHero.Gold)
+        {
+            Logger.Warning("Attempted to recruit troops that cost more than the player had");
+            return;
+        }
+
+        // Commit recruitment
+        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
+        {
+            hero.VolunteerTypes[index] = null;
+            MessageBroker.Instance.Publish(this, new VolunteerTypesArrayUpdated(hero, null, index));
+
+            mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
+            CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
+        }
+
+        mobileParty.LeaderHero.Gold -= cost;
+        changedGold = -cost;
     }
 }

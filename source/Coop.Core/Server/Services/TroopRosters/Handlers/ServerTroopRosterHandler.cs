@@ -3,11 +3,10 @@ using Common.Messaging;
 using Common.Network;
 using Coop.Core.Client.Services.TroopRosters.Messages;
 using GameInterface.Services.ObjectManager;
-using GameInterface.Services.TroopRosters;
-using GameInterface.Services.TroopRosters.Messages;
+using GameInterface.Services.TroopRosters.Interfaces;
+using GameInterface.Services.UI.Notifications.Messages;
 using LiteNetLib;
 using Serilog;
-using System;
 
 namespace Coop.Core.Server.Services.TroopRosters.Handlers;
 internal class ServerTroopRosterHandler : IHandler
@@ -16,12 +15,15 @@ internal class ServerTroopRosterHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IObjectManager objectManager;
+    private readonly ITroopRosterInterface troopRosterInterface;
 
-    public ServerTroopRosterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager)
+    public ServerTroopRosterHandler(IMessageBroker messageBroker, INetwork network, IObjectManager objectManager, ITroopRosterInterface troopRosterInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.objectManager = objectManager;
+        this.troopRosterInterface = troopRosterInterface;
+
         messageBroker.Subscribe<ClientRequestRecruitment>(HandleOnRecruitmentDone);
     }
 
@@ -32,8 +34,8 @@ internal class ServerTroopRosterHandler : IHandler
 
     private void HandleOnRecruitmentDone(MessagePayload<ClientRequestRecruitment> payload)
     {
-        var obj = payload.What;
-        var message = new RecruitTroops(obj.MobilePartyId, obj.TroopsInCart, payload.Who as NetPeer);
-        messageBroker.Publish(this, message);
+        troopRosterInterface.HandleOnRecruitmentDone(payload.What.MobilePartyId, payload.What.TroopsInCart, out var changedGold);
+
+        network.Send(payload.Who as NetPeer, new NotifyGoldChange(changedGold));
     }
 }

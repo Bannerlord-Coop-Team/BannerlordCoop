@@ -3,16 +3,11 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
-using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
-using GameInterface.Services.UI.Notifications.Messages;
-using LiteNetLib;
 using Serilog;
 using System;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
-using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
@@ -32,7 +27,6 @@ public class TroopRosterHandler : IHandler
 
         messageBroker.Subscribe<TroopRosterAddToCountsChanged>(Handle_AddToCountsChanged);
         messageBroker.Subscribe<NetworkChangeTroopRosterAddToCounts>(Handle_AddToCounts);
-        messageBroker.Subscribe<RecruitTroops>(HandleOnRecruitmentDone);
 
         messageBroker.Subscribe<TroopRemoved>(Handle_TroopRemoved);
         messageBroker.Subscribe<NetworkRemoveTroop>(Handle_NetworkRemoveTroop);
@@ -54,7 +48,6 @@ public class TroopRosterHandler : IHandler
     {
         messageBroker.Unsubscribe<TroopRosterAddToCountsChanged>(Handle_AddToCountsChanged);
         messageBroker.Unsubscribe<NetworkChangeTroopRosterAddToCounts>(Handle_AddToCounts);
-        messageBroker.Unsubscribe<RecruitTroops>(HandleOnRecruitmentDone);
 
         messageBroker.Unsubscribe<TroopRemoved>(Handle_TroopRemoved);
         messageBroker.Unsubscribe<NetworkRemoveTroop>(Handle_NetworkRemoveTroop);
@@ -70,61 +63,6 @@ public class TroopRosterHandler : IHandler
 
         messageBroker.Unsubscribe<TroopRosterCleared>(Handle_TroopRosterCleared);
         messageBroker.Unsubscribe<NetworkClearTroopRoster>(Handle_NetworkClearTroopRoster);
-    }
-
-    public void HandleOnRecruitmentDone(MessagePayload<RecruitTroops> payload)
-    {
-        var obj = payload.What;
-
-        if (!objectManager.TryGetObjectWithLogging(obj.MobilePartyId, out MobileParty mobileParty)) return;
-
-        List<(Hero, CharacterObject, int)> herosValidated = new();
-
-        // validate they are all good before recruiting any
-        foreach (var troop in obj.TroopsInCart)
-        {
-            if (!objectManager.TryGetObjectWithLogging(troop.RecruiterHeroId, out Hero hero)) continue;
-            if (!objectManager.TryGetObjectWithLogging(troop.CharacterObjectId, out CharacterObject characterObject)) continue;
-
-
-            var volunteerTroopAtIndex = hero.VolunteerTypes[troop.TroopIndex];
-
-            if (volunteerTroopAtIndex is null)
-            {
-                // later send decline for specific reason
-                continue;
-            }
-
-            herosValidated.Add((hero, characterObject, troop.TroopIndex));
-        }
-
-        // Calculate cost before changing any data
-        var cost = 0;
-        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
-        {
-            cost += Campaign.Current.Models.PartyWageModel.GetTroopRecruitmentCost(characterObject, mobileParty.LeaderHero).RoundedResultNumber;
-        }
-
-        // Do not apply recruitment if the player does not have enough gold
-        if (cost > mobileParty.LeaderHero.Gold)
-        {
-            Logger.Warning("Attempted to recruit troops that cost more than the player had");
-            return;
-        }
-
-        // Commit recruitment
-        foreach ((Hero hero, CharacterObject characterObject, int index) in herosValidated)
-        {
-            hero.VolunteerTypes[index] = null;
-            messageBroker.Publish(this, new VolunteerTypesArrayUpdated(hero, null, index));
-
-            mobileParty.MemberRoster.AddToCounts(characterObject, 1, false, 0, 0, true, -1);
-            CampaignEventDispatcher.Instance.OnUnitRecruited(characterObject, 1);
-        }
-
-        mobileParty.LeaderHero.Gold -= cost;
-
-        network.Send(payload.What.Who as NetPeer, new NotifyGoldChange(-cost));
     }
 
     private void Handle_AddToCountsChanged(MessagePayload<TroopRosterAddToCountsChanged> payload)
