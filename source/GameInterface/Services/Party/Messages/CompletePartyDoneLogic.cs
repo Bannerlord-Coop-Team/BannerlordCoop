@@ -1,5 +1,7 @@
 ﻿using Common.Messaging;
 using GameInterface.Services.MapEventParties;
+using GameInterface.Services.Party.Data;
+using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
 using System;
 using System.Collections.Generic;
@@ -23,22 +25,22 @@ internal readonly struct CompletePartyDoneLogic : ICommand
     public readonly FlattenedTroop[] RecruitedPrisonersRoster;
 
     [ProtoMember(5)]
-    public readonly List<(string, int, int, int)> LeftMemberRosterData;
+    public readonly TroopRosterData LeftMemberRosterData;
 
     [ProtoMember(6)]
-    public readonly List<(string, int, int, int)> LeftPrisonerRosterData;
+    public readonly TroopRosterData LeftPrisonerRosterData;
 
     [ProtoMember(7)]
-    public readonly List<(string, int, int, int)> RightMemberRosterData;
+    public readonly TroopRosterData RightMemberRosterData;
 
     [ProtoMember(8)]
-    public readonly List<(string, int, int, int)> RightPrisonerRosterData;
+    public readonly TroopRosterData RightPrisonerRosterData;
 
     [ProtoMember(9)]
     public readonly ItemRosterElement[] RightOwnerPartyItemRosterData;
 
     [ProtoMember(10)]
-    public readonly List<Tuple<string, string, int>> UpgradedTroopHistoryIds;
+    public readonly UpgradedTroopHistoryData UpgradedTroopHistoryIds;
 
     [ProtoMember(11)]
     public readonly string LeftPartyId;
@@ -60,12 +62,12 @@ internal readonly struct CompletePartyDoneLogic : ICommand
         FlattenedTroop[] takenPrisonersRoster,
         FlattenedTroop[] donatedPrisonersRoster,
         FlattenedTroop[] recruitedPrisonersRoster,
-        List<(string, int, int, int)> leftMemberRosterData,
-        List<(string, int, int, int)> leftPrisonerRosterData,
-        List<(string, int, int, int)> rightMemberRosterData,
-        List<(string, int, int, int)> rightPrisonerRosterData,
+        TroopRosterData leftMemberRosterData,
+        TroopRosterData leftPrisonerRosterData,
+        TroopRosterData rightMemberRosterData,
+        TroopRosterData rightPrisonerRosterData,
         ItemRosterElement[] rightOwnerPartyItemRosterData,
-        List<Tuple<string, string, int>> upgradedTroopHistoryIds,
+        UpgradedTroopHistoryData upgradedTroopHistoryIds,
         string leftPartyId,
         int partyGoldChangeAmount,
         int partyInfluenceChangeAmount,

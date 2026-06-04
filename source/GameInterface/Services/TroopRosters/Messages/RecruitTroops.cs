@@ -9,9 +9,9 @@ public readonly struct RecruitTroops : ICommand
 
     public readonly TroopInfo[] TroopsInCart;
 
-    public readonly object Who;
+    public readonly NetPeer Who;
 
-    public RecruitTroops(string mobilePartyId, TroopInfo[] troopsInCart, object who)
+    public RecruitTroops(string mobilePartyId, TroopInfo[] troopsInCart, NetPeer who)
     {
         MobilePartyId = mobilePartyId;
         TroopsInCart = troopsInCart;

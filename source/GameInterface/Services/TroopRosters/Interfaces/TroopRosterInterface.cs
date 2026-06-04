@@ -1,7 +1,7 @@
 ﻿using Common.Logging;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.TroopRosters.Data;
 using Serilog;
-using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Roster;
 
@@ -13,12 +13,12 @@ public interface ITroopRosterInterface : IGameAbstraction
     /// Pack troop roster elements to allow for sending over the network.
     /// The string Id can either represent a Hero Id or a CharacterObject Id.
     /// </summary>
-    List<(string, int, int, int)> PackTroopRosterData(TroopRoster troopRoster);
+    TroopRosterData PackTroopRosterData(TroopRoster troopRoster);
 
     /// <summary>
     /// Updates target roster with incoming data from the client.
     /// </summary>
-    void UpdateWithData(TroopRoster targetTroopRoster, List<(string, int, int, int)> packedTroopRosterElements, Hero mainHero);
+    void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero);
 }
 
 internal class TroopRosterInterface : ITroopRosterInterface
@@ -32,22 +32,23 @@ internal class TroopRosterInterface : ITroopRosterInterface
         this.objectManager = objectManager;
     }
 
-    public List<(string, int, int, int)> PackTroopRosterData(TroopRoster troopRoster)
+    public TroopRosterData PackTroopRosterData(TroopRoster troopRoster)
     {
-        var packedData = new List<(string, int, int, int)>();
+        var packedData = new TroopRosterData(new());
         foreach (TroopRosterElement troopRosterElement in troopRoster.data)
         {
             if (!objectManager.TryGetIdWithLogging(troopRosterElement.Character?.HeroObject, out string characterId)
                 && !objectManager.TryGetIdWithLogging(troopRosterElement.Character, out characterId)) continue;
 
-            packedData.Add((characterId, troopRosterElement.Number, troopRosterElement.WoundedNumber, troopRosterElement.Xp));
+            packedData.Data.Add(new TroopRosterElementData(characterId, troopRosterElement.Number, troopRosterElement.WoundedNumber, troopRosterElement.Xp));
         }
+
         return packedData;
     }
 
-    public void UpdateWithData(TroopRoster targetTroopRoster, List<(string, int, int, int)> packedTroopRosterElements, Hero mainHero)
+    public void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero)
     {
-        if (packedTroopRosterElements == null) return;
+        if (packedTroopRosterElements.Data == null) return;
 
         // Clear without removing MainHero (causes issues if MainHero is removed)
         for (int i = targetTroopRoster._count - 1; i >= 0; i--)
@@ -56,16 +57,16 @@ internal class TroopRosterInterface : ITroopRosterInterface
             targetTroopRoster.AddToCounts(targetTroopRoster.data[i].Character, -targetTroopRoster.data[i].Number, false, -targetTroopRoster.data[i].WoundedNumber, 0, true);
         }
 
-        // Rebuild rooster with new data
-        foreach ((string characterId, int number, int woundedNumber, int xp) in packedTroopRosterElements)
+        // Rebuild roster with new data
+        foreach (var troopRosterElementData in packedTroopRosterElements.Data)
         {
             TroopRosterElement troopRosterElement;
-            if (objectManager.TryGetObjectWithLogging<Hero>(characterId, out var hero))
+            if (objectManager.TryGetObjectWithLogging<Hero>(troopRosterElementData.CharacterId, out var hero))
             {
                 if (hero == mainHero) continue;
                 troopRosterElement = new TroopRosterElement(hero.CharacterObject);
             }
-            else if (objectManager.TryGetObjectWithLogging<CharacterObject>(characterId, out var character))
+            else if (objectManager.TryGetObjectWithLogging<CharacterObject>(troopRosterElementData.CharacterId, out var character))
             {
                 troopRosterElement = new TroopRosterElement(character);
             }
@@ -74,9 +75,9 @@ internal class TroopRosterInterface : ITroopRosterInterface
                 continue;
             }
 
-            troopRosterElement._number = number;
-            troopRosterElement._woundedNumber = woundedNumber;
-            troopRosterElement._xp = xp;
+            troopRosterElement._number = troopRosterElementData.Number;
+            troopRosterElement._woundedNumber = troopRosterElementData.WoundedNumber;
+            troopRosterElement._xp = troopRosterElementData.Xp;
             targetTroopRoster.Add(troopRosterElement);
         }
     }

@@ -3,6 +3,7 @@ using Common.Messaging;
 using Common.Network;
 using GameInterface.Services.MapEventParties;
 using GameInterface.Services.ObjectManager;
+using GameInterface.Services.Party.Data;
 using GameInterface.Services.Party.Messages;
 using GameInterface.Services.TroopRosters.Interfaces;
 using GameInterface.Services.UI.Notifications.Messages;
@@ -58,13 +59,13 @@ internal class PartyDoneLogicHandler : IHandler
         string leftPartyId = null;
         if (obj.What.LeftParty != null && !objectManager.TryGetIdWithLogging(obj.What.LeftParty, out leftPartyId)) return;
 
-        List<Tuple<string, string, int>> upgradedTroopHistoryIds = new();
+        var upgradedTroopHistory = new UpgradedTroopHistoryData(new());
         foreach (Tuple<CharacterObject, CharacterObject, int> tuple in obj.What.UpgradedTroopHistory)
         {
             if (!objectManager.TryGetIdWithLogging(tuple.Item1, out var character1Id)) continue;
             if (!objectManager.TryGetIdWithLogging(tuple.Item2, out var character2Id)) continue;
 
-            upgradedTroopHistoryIds.Add(new(character1Id, character2Id, tuple.Item3));
+            upgradedTroopHistory.Data.Add(new(character1Id, character2Id, tuple.Item3));
         }
 
         var leftMemberRosterData = troopRosterInterface.PackTroopRosterData(obj.What.LeftMemberRoster);
@@ -82,7 +83,7 @@ internal class PartyDoneLogicHandler : IHandler
             rightMemberRosterData,
             rightPrisonerRosterData,
             obj.What.RightOwnerPartyItemRoster._data,
-            upgradedTroopHistoryIds,
+            upgradedTroopHistory,
             leftPartyId,
             obj.What.PartyGoldChangeAmount,
             obj.What.PartyInfluenceChangeAmount,
@@ -101,14 +102,14 @@ internal class PartyDoneLogicHandler : IHandler
         if (obj.What.LeftPartyId != null && !objectManager.TryGetObjectWithLogging<PartyBase>(obj.What.LeftPartyId, out leftParty)) return;
 
         List<Tuple<CharacterObject, CharacterObject, int>> upgradedTroopHistory = new();
-        if (obj.What.UpgradedTroopHistoryIds != null)
+        if (obj.What.UpgradedTroopHistoryIds.Data != null)
         {
-            foreach (Tuple<string, string, int> tuple in obj.What.UpgradedTroopHistoryIds)
+            foreach (var elementData in obj.What.UpgradedTroopHistoryIds.Data)
             {
-                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(tuple.Item1, out var character1)) continue;
-                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(tuple.Item2, out var character2)) continue;
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.Character1Id, out var character1)) continue;
+                if (!objectManager.TryGetObjectWithLogging<CharacterObject>(elementData.Character2Id, out var character2)) continue;
 
-                upgradedTroopHistory.Add(new(character1, character2, tuple.Item3));
+                upgradedTroopHistory.Add(new(character1, character2, elementData.Number));
             }
         }
 

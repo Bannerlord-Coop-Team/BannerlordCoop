@@ -26,7 +26,6 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<TextObject, TextObjectSurrogate>();
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
             AddSurrogate<ItemRosterElement, ItemRosterElementSurrogate>();
-            AddSurrogate<TroopRosterElement, TroopRosterElementSurrogate>();
 
             AddSurrogate<ExplainedNumber, ExplainedNumberSurrogate>();
             AddSurrogate<ExplainedNumber.StatExplainer, StatExplainerSurrogate>();

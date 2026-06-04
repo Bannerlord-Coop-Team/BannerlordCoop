@@ -1,6 +1,6 @@
 ﻿using Common.Messaging;
+using GameInterface.Services.TroopRosters.Data;
 using ProtoBuf;
-using System.Collections.Generic;
 
 namespace GameInterface.Services.Party.Messages;
 
@@ -11,11 +11,11 @@ internal readonly struct SellPrisoners : ICommand
     public readonly string SellingPartyId;
 
     [ProtoMember(2)]
-    public readonly List<(string, int, int, int)> LeftPrisonerRosterData;
+    public readonly TroopRosterData LeftPrisonerRosterData;
 
     public SellPrisoners(
         string sellingPartyId,
-        List<(string, int, int, int)> leftPrisonerRosterData)
+        TroopRosterData leftPrisonerRosterData)
     {
         SellingPartyId = sellingPartyId;
         LeftPrisonerRosterData = leftPrisonerRosterData;
