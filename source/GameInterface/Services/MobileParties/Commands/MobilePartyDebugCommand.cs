@@ -44,6 +44,7 @@ internal static class MobilePartyDebugCommand
         
         stringBuilder.AppendLine($"MobileParty info for: {owner}");
         stringBuilder.AppendLine($"StringID: {mobileParty.StringId}");
+        stringBuilder.AppendLine($"IsActive: {mobileParty.IsActive}");
         stringBuilder.AppendLine($"Speed: {mobileParty.Speed}");
         stringBuilder.AppendLine($"DefaultInventoryCapacityModel: {mobileParty.InventoryCapacity}");
         stringBuilder.AppendLine($"Weight Carried: {mobileParty.TotalWeightCarried}");
