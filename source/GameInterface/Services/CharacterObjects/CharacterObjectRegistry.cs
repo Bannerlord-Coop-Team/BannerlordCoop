@@ -1,4 +1,5 @@
 ﻿using Common;
+using Common.Util;
 using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
@@ -8,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using TaleWorlds.Core;
 
 namespace GameInterface.Services.CharacterObjects;
@@ -34,6 +36,10 @@ internal class CharacterObjectRegistry : AutoRegistryBase<CharacterObject>
 
     public override void OnClientCreated(CharacterObject obj, string id)
     {
+        using (new AllowedThread())
+        {
+            obj._characterTraits = new PropertyOwner<TraitObject>();
+        }
     }
 
     public override void OnClientDestroyed(CharacterObject obj, string id)

@@ -1,0 +1,2 @@
+﻿[HarmonyTranspiler]
+static IEnumerable<CodeInstruction> {{MemberName}}ChangeTranspiler(IEnumerable<CodeInstruction> instructions) => PropertyOwnerFieldChangeTranspiler<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>(instructions, "{{MemberName}}");
