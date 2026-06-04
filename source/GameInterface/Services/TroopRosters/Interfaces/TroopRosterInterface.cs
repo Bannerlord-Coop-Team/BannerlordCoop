@@ -26,7 +26,7 @@ public interface ITroopRosterInterface : IGameAbstraction
     void UpdateWithData(TroopRoster targetTroopRoster, TroopRosterData packedTroopRosterElements, Hero mainHero);
 
     /// <summary>
-    /// Runs troop recruitment logic on the server and replies with updated gold notification.
+    /// Runs troop recruitment logic for client requests.
     /// </summary>
     void HandleOnRecruitmentDone(string mobilePartyId, TroopInfo[] troopsInCart, out int changedGold);
 }
