@@ -1,9 +1,11 @@
 
 using Common;
+using Common.Logging;
 using GameInterface.Services.MobileParties.Audit;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
 using Helpers;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,44 +21,152 @@ using static TaleWorlds.Library.CommandLineFunctionality;
 
 namespace GameInterface.Services.MobileParties.Commands;
 
-internal static class MobilePartyDebugCommand
+internal class MobilePartyDebugCommand
 {
+    private static readonly ILogger Logger = LogManager.GetLogger<MobilePartyDebugCommand>();
+
     [CommandLineArgumentFunction("info", "coop.debug.mobileparty")]
     public static string Info(List<string> args)
     {
-        if(args.Count < 1)
+        if (args.Count < 1)
         {
             return "Usage: coop.debug.mobileparty.info <PartyStringID>";
         }
 
         MobileParty mobileParty = Campaign.Current.CampaignObjectManager.Find<MobileParty>(args[0]);
 
-        if(mobileParty == null )
+        if (mobileParty == null)
         {
             return string.Format("ID: '{0}' not found", args[0]);
         }
 
-        Hero owner = mobileParty.Owner;
-        var _lastCalculatedSpeed = mobileParty._lastCalculatedSpeed;
-        var explanations = mobileParty.SpeedExplained.GetExplanations();
-
         var stringBuilder = new StringBuilder();
-        
-        stringBuilder.AppendLine($"MobileParty info for: {owner}");
-        stringBuilder.AppendLine($"StringID: {mobileParty.StringId}");
-        stringBuilder.AppendLine($"Speed: {mobileParty.Speed}");
-        stringBuilder.AppendLine($"DefaultInventoryCapacityModel: {mobileParty.InventoryCapacity}");
-        stringBuilder.AppendLine($"Weight Carried: {mobileParty.TotalWeightCarried}");
-        stringBuilder.AppendLine($"LastCalculated Speed: {_lastCalculatedSpeed}");
-        stringBuilder.AppendLine($"Player Skills: ");
-        foreach (SkillObject skill in Skills.All)
-        {
-            int skillValue = owner.GetSkillValue(skill);
-            stringBuilder.AppendLine($"{skill.StringId}: {skillValue}");
-        }
-        stringBuilder.AppendLine($"Explanations: {explanations}");
+        stringBuilder.AppendLine($"MobileParty info for: {SafeToString(mobileParty)}");
+        stringBuilder.AppendLine($"StringID: {SafeToString(mobileParty.StringId)}");
+        stringBuilder.AppendLine($"Name: {SafeToString(mobileParty.Name)}");
+        stringBuilder.AppendLine();
 
-        return stringBuilder.ToString();
+        stringBuilder.AppendLine("Fields:");
+        AppendFields(stringBuilder, mobileParty);
+
+        var result = stringBuilder.ToString();
+
+        Logger.Debug("{Info}", result);
+
+        return result;
+    }
+
+    private static void AppendFields(StringBuilder stringBuilder, object instance)
+    {
+        if (instance == null)
+        {
+            stringBuilder.AppendLine("<null>");
+            return;
+        }
+
+        var type = instance.GetType();
+
+        foreach (var field in GetAllInstanceFields(type))
+        {
+            try
+            {
+                object value;
+
+                try
+                {
+                    value = field.GetValue(instance);
+                }
+                catch (Exception e)
+                {
+                    stringBuilder.AppendLine($"{field.DeclaringType.FullName}.{field.Name}: <failed to get value: {e.GetType().Name}: {e.Message}>");
+                    continue;
+                }
+
+                var formattedName = GetFriendlyFieldName(field);
+                var formattedType = GetFriendlyTypeName(field.FieldType);
+                var formattedValue = SafeToString(value);
+
+                stringBuilder.AppendLine($"{field.DeclaringType.FullName}.{formattedName} ({formattedType}): {formattedValue}");
+            }
+            catch (Exception e)
+            {
+                stringBuilder.AppendLine($"{field.DeclaringType.FullName}.{field.Name}: <failed to print field: {e.GetType().Name}: {e.Message}>");
+            }
+        }
+    }
+
+    private static IEnumerable<FieldInfo> GetAllInstanceFields(Type type)
+    {
+        const BindingFlags flags =
+            BindingFlags.Instance |
+            BindingFlags.Public |
+            BindingFlags.NonPublic |
+            BindingFlags.DeclaredOnly;
+
+        var current = type;
+
+        while (current != null && current != typeof(object))
+        {
+            foreach (var field in current.GetFields(flags))
+            {
+                yield return field;
+            }
+
+            current = current.BaseType;
+        }
+    }
+
+    private static string GetFriendlyFieldName(FieldInfo field)
+    {
+        // Auto-property backing field:
+        // <PropertyName>k__BackingField
+        if (field.Name.StartsWith("<") && field.Name.Contains(">k__BackingField"))
+        {
+            var endIndex = field.Name.IndexOf(">k__BackingField", StringComparison.Ordinal);
+            if (endIndex > 1)
+            {
+                var propertyName = field.Name.Substring(1, endIndex - 1);
+                return $"{field.Name} backing for property '{propertyName}'";
+            }
+        }
+
+        return field.Name;
+    }
+
+    private static string SafeToString(object value)
+    {
+        if (value == null)
+            return "<null>";
+
+        try
+        {
+            return value.ToString();
+        }
+        catch (Exception e)
+        {
+            return $"<ToString failed: {e.GetType().Name}: {e.Message}>";
+        }
+    }
+
+    private static string GetFriendlyTypeName(Type type)
+    {
+        if (type == null)
+            return "<null type>";
+
+        if (!type.IsGenericType)
+            return type.FullName ?? type.Name;
+
+        var genericTypeName = type.GetGenericTypeDefinition().FullName ?? type.Name;
+        var tickIndex = genericTypeName.IndexOf('`');
+
+        if (tickIndex >= 0)
+            genericTypeName = genericTypeName.Substring(0, tickIndex);
+
+        var genericArguments = type.GetGenericArguments()
+            .Select(GetFriendlyTypeName)
+            .ToArray();
+
+        return $"{genericTypeName}<{string.Join(", ", genericArguments)}>";
     }
 
     // coop.debug.mobileparty.createParty lord_1_1 town_V1
