@@ -51,10 +51,13 @@
   <ItemGroup>
     <Compile Remove="Client\Services\MobileParties\Messages\Data\**" />
     <Compile Remove="Server\Services\Kingdoms\Messages\**" />
+    <Compile Remove="Server\Services\TroopRosters\Messages\**" />
     <EmbeddedResource Remove="Client\Services\MobileParties\Messages\Data\**" />
     <EmbeddedResource Remove="Server\Services\Kingdoms\Messages\**" />
+    <EmbeddedResource Remove="Server\Services\TroopRosters\Messages\**" />
     <None Remove="Client\Services\MobileParties\Messages\Data\**" />
     <None Remove="Server\Services\Kingdoms\Messages\**" />
+    <None Remove="Server\Services\TroopRosters\Messages\**" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Autofac" Version="8.2.0" />

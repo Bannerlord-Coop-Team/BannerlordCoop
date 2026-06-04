@@ -68,8 +68,5 @@ internal class MobilePartySync : IDynamicSync
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsGarrison)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsCustomParty)));
         autoSyncBuilder.AddProperty(AccessTools.Property(typeof(MobileParty), nameof(MobileParty.IsBandit)));
-
-        
-        
     }
 }

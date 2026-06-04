@@ -121,5 +121,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="DynamicSync\Snapshots\" />
+    <Folder Include="Services\Parties\Patches\" />
   </ItemGroup>
 </Project>

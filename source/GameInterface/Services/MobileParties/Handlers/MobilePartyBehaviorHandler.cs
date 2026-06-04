@@ -6,6 +6,7 @@ using GameInterface.Services.Entity;
 using GameInterface.Services.MobileParties.Data;
 using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.MobileParties.Messages.Behavior;
+using GameInterface.Services.MobilePartyAIs;
 using GameInterface.Services.MobilePartyAIs.Patches;
 using GameInterface.Services.ObjectManager;
 using Serilog;
@@ -105,7 +106,7 @@ internal class MobilePartyBehaviorHandler : IHandler
         {
             PartyBehaviorPatch.SetAiBehavior(party.Ai, data.NewAiBehavior, partyBase, data.BestTargetPoint);
 
-            if (PartyBehaviorPatch.DEBUG_LOGGING)
+            if (MobilePartyAiConfig.DEBUG)
             {
                 Logger.Debug(
                     "Setting AI behavior. PartyId: {PartyId}, Behavior: {Behavior}, TargetParty: {TargetParty}, BestTargetPoint: {BestTargetPoint}",

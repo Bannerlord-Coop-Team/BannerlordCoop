@@ -28,9 +28,7 @@ internal class MapEventPartyPatches
         if (ModInformation.IsServer) return true;
 
         __instance._roster.OnTroopKilled(troopSeed);
-
-        var troop = __instance._roster[troopSeed].Troop;
-        MessageBroker.Instance.Publish(__instance, new OnTroopKilledAttempted(__instance, troop));
+        MessageBroker.Instance.Publish(__instance, new OnTroopKilledAttempted(__instance, troopSeed.UniqueSeed));
 
         return false;
     }
@@ -45,9 +43,20 @@ internal class MapEventPartyPatches
         if (ModInformation.IsServer) return true;
 
         __instance._roster.OnTroopWounded(troopSeed);
+        MessageBroker.Instance.Publish(__instance, new OnTroopWoundedAttempted(__instance, troopSeed.UniqueSeed));
 
-        var troop = __instance._roster[troopSeed].Troop;
-        MessageBroker.Instance.Publish(__instance, new OnTroopWoundedAttempted(__instance, troop));
+        return false;
+    }
+
+    [HarmonyPatch(nameof(MapEventParty.OnTroopRouted))]
+    [HarmonyPrefix]
+    private static bool PrefixOnTroopRouted(MapEventParty __instance, ref UniqueTroopDescriptor troopSeed)
+    {
+        // Call original if we call this function
+        if (CallOriginalPolicy.IsOriginalAllowed()) return true;  
+
+        __instance._roster.OnTroopRouted(troopSeed);
+        MessageBroker.Instance.Publish(__instance, new OnTroopRoutedAttempted(__instance, troopSeed.UniqueSeed));
 
         return false;
     }

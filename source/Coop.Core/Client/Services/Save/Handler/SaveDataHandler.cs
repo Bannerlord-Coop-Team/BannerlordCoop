@@ -2,7 +2,6 @@
 using Coop.Core.Client.Messages;
 using GameInterface.CoopSessionData.Save.Data;
 using GameInterface.Services.Smithing.Messages;
-using GameInterface.Services.UI.Messages;
 
 namespace Coop.Core.Client.Services.Save.Handler
 {
@@ -30,7 +29,9 @@ namespace Coop.Core.Client.Services.Save.Handler
 
         private void Handle_NetworkGameSaveDataReceived(MessagePayload<NetworkGameSaveDataReceived> obj)
         {
-            messageBroker.Publish(this, new EndLoadingScreen()); // TODO update to work
+            // The loading screen is intentionally NOT ended here: save data has only just
+            // arrived and the server world has not loaded yet. It is ended once the campaign
+            // is ready (see LoadingState.Handle_CampaignLoaded).
             saveDataMessage = obj.What;
 
             messageBroker.Publish(this, new InitializeClientCraftingData(saveDataMessage.CraftingPlayerData));

@@ -33,7 +33,15 @@ namespace GameInterface.Services.PartyVisuals.Patches
                         Logger.Warning("Index {index} was out of bounds for visuals flattened list of size {size}", i, __instance._visualsFlattened.Count);
                         continue;
                     }
-                    __instance._visualsFlattened[i].Tick(dt, realDt, ref __instance._dirtyPartyVisualCount, ref __instance._dirtyPartiesList);
+
+                    try
+                    {
+                        __instance._visualsFlattened[i].Tick(dt, realDt, ref __instance._dirtyPartyVisualCount, ref __instance._dirtyPartiesList);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex, "Failed to tick party visual");
+                    }
                 }
             });
             for (int num = 0; num < __instance._dirtyPartyVisualCount + 1; num++)

@@ -86,27 +86,33 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void Handle(MessagePayload<NetworkRefreshSmelting> obj)
         {
-            currentSmeltingVM?.RefreshValues();
-            currentSmeltingVM?.RefreshList();
-
-            if (currentSmeltingVM?.CurrentSelectedItem != null)
+            GameLoopRunner.RunOnMainThread(() =>
             {
-                int num = (int)(currentSmeltingVM?.SmeltableItemList.FindIndex((SmeltingItemVM i) => i.EquipmentElement.Item == currentSmeltingVM?.CurrentSelectedItem.EquipmentElement.Item));
-                SmeltingItemVM newItem = (num != -1) ? currentSmeltingVM?.SmeltableItemList[num] : currentSmeltingVM?.SmeltableItemList.FirstOrDefault<SmeltingItemVM>();
-                currentSmeltingVM?.OnItemSelection(newItem);
-            }
+                currentSmeltingVM?.RefreshValues();
+                currentSmeltingVM?.RefreshList();
 
-            RefreshCraftingVM();
+                if (currentSmeltingVM?.CurrentSelectedItem != null)
+                {
+                    int num = (int)(currentSmeltingVM?.SmeltableItemList.FindIndex((SmeltingItemVM i) => i.EquipmentElement.Item == currentSmeltingVM?.CurrentSelectedItem.EquipmentElement.Item));
+                    SmeltingItemVM newItem = (num != -1) ? currentSmeltingVM?.SmeltableItemList[num] : currentSmeltingVM?.SmeltableItemList.FirstOrDefault<SmeltingItemVM>();
+                    currentSmeltingVM?.OnItemSelection(newItem);
+                }
+
+                RefreshCraftingVM();
+            });
         }
 
         private void Handle(MessagePayload<NetworkRefreshRefinement> obj)
         {
             if (!objectManager.TryGetObjectWithLogging(obj.What.CraftingHeroId, out Hero craftingHero)) return;
 
-            currentRefinementVM?.RefreshRefinementActionsList(craftingHero);
-            currentCraftingVM?.OnRefinementSelectionChange();
+            GameLoopRunner.RunOnMainThread(() =>
+            {
+                currentRefinementVM?.RefreshRefinementActionsList(craftingHero);
+                currentCraftingVM?.OnRefinementSelectionChange();
 
-            RefreshCraftingVM();
+                RefreshCraftingVM();
+            });
         }
 
         private void Handle(MessagePayload<RefreshCraftingVM> obj)
@@ -122,7 +128,7 @@ namespace GameInterface.Services.Smithing.Handlers
 
         private void RefreshWeaponDesignVM(Town town)
         {
-            if (Settlement.CurrentSettlement?.Town != town || (bool)(!currentCraftingVM?.IsInCraftingMode)) return;
+            if (Settlement.CurrentSettlement?.Town != town || currentCraftingVM == null || currentCraftingVM.IsInCraftingMode == false) return;
 
             // Have to run on main thread to avoid UI related crashes
             GameLoopRunner.RunOnMainThread(() =>

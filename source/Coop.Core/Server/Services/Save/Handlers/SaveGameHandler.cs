@@ -9,6 +9,7 @@ using GameInterface.Services.MobileParties.Interfaces;
 using GameInterface.Services.Players;
 using System.Linq;
 using GameInterface.Services.Smithing;
+using GameInterface.Services.Players.Data;
 
 namespace Coop.Core.Server.Services.Save.Handlers;
 
@@ -75,6 +76,10 @@ internal class SaveGameHandler : IHandler
     private void Handle_GameLoaded(MessagePayload<GameLoaded> obj)
     {
         savedSession = saveManager.LoadCoopSession(obj.What.SaveName);
+        if(savedSession == null)
+        {
+            savedSession = new CoopSession(obj.What.SaveName, new(), new Player[0], new CraftingPlayerData(new(), new(), new()));
+        }
         coopSessionProvider.CoopSession = savedSession;
     }
 

@@ -4,6 +4,8 @@ using GameInterface.Registry;
 using GameInterface.Registry.Auto;
 using GameInterface.Services.ObjectManager;
 using HarmonyLib;
+using Newtonsoft.Json.Linq;
+using SandBox.GauntletUI.Map;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -44,6 +46,7 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
         }
     }
 
+    private static ConstructorInfo mapEventVisualCtorInfo = AccessTools.Constructor(typeof(GauntletMapEventVisual));
     public override void OnClientCreated(MapEvent obj, string id)
     {
         using (new AllowedThread())
@@ -51,6 +54,8 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             obj.StringId = id;
             obj._sides = new MapEventSide[2];
             obj.WonRounds = new MBList<BattleSideEnum>();
+
+            Campaign.Current.MapEventManager.OnMapEventCreated(obj);
         }
     }
 
@@ -62,6 +67,15 @@ internal class MapEventRegistry : AutoRegistryBase<MapEvent>
             {
                 obj.Component?.FinishComponent();
                 obj.FinalizeEventAux();
+
+                var visualCreator = Campaign.Current.VisualCreator.MapEventVisualCreator as GauntletMapEventVisualCreator;
+
+                visualCreator.OnMapEventOver(obj.MapEventVisual as GauntletMapEventVisual);
+
+                CampaignEventDispatcher.Instance.OnMapEventEnded(obj);
+
+                // TODO might be needed
+                //Campaign.Current.MapEventManager.Tick();
             }
         });
     }

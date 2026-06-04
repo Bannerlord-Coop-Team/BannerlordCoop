@@ -108,6 +108,41 @@ public abstract class AutoRegistryBase<T> : IAutoRegistry<T> where T : class
     {
         id = $"{typeof(T).Name}_{id}";
 
+        EnsureObjectManagerCounter(id, obj);
+
         objectManager.AddExisting(id, obj);
+    }
+
+    private void EnsureObjectManagerCounter(string id, T obj)
+    {
+        // IDs may look like:
+        //   Type_description_123
+        //
+        // The description itself may contain underscores, so only inspect
+        // the text after the final underscore.
+        var lastUnderscoreIndex = id.LastIndexOf('_');
+
+        // No underscore, or underscore is the final character:
+        //   "Hero"
+        //   "Hero_MainHero_"
+        //
+        // In either case, there is no numeric suffix to parse.
+        if (lastUnderscoreIndex < 0 || lastUnderscoreIndex == id.Length - 1)
+            return;
+
+        // Extract the possible numeric suffix.
+        var numberText = id.Substring(lastUnderscoreIndex + 1);
+
+        // Only update the counter when the suffix is a valid integer.
+        // Non-generated IDs like "Hero_MainHero_primary" are ignored.
+        if (!int.TryParse(numberText, out var uniqueId))
+            return;
+
+        // Ensure the next generated ID for this object's type is greater than
+        // the ID we just registered.
+        //
+        // For example, if this object is registered as "..._42", then the next
+        // generated ID should be at least 43.
+        objectManager.EnsureNextUniqueIdAbove(obj, uniqueId);
     }
 }

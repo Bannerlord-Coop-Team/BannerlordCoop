@@ -4,6 +4,7 @@ using Common.Network;
 using Coop.Core.Server.Connections;
 using Coop.Core.Server.Services.Time.Messages;
 using GameInterface.Services.Heroes.Enum;
+using GameInterface.Services.Heroes.Interaces;
 using GameInterface.Services.Heroes.Messages;
 using Serilog;
 using System;
@@ -24,59 +25,40 @@ public class TimeHandler : IHandler
     private readonly IMessageBroker messageBroker;
     private readonly INetwork network;
     private readonly IClientRegistry clientRegistry;
+    private readonly ITimeControlInterface timeControlInterface;
 
-    public TimeHandler(IMessageBroker messageBroker, INetwork network, IClientRegistry clientRegistry)
+    public TimeHandler(IMessageBroker messageBroker, INetwork network, IClientRegistry clientRegistry, ITimeControlInterface timeControlInterface)
     {
         this.messageBroker = messageBroker;
         this.network = network;
         this.clientRegistry = clientRegistry;
-        this.messageBroker.Subscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
+        this.timeControlInterface = timeControlInterface;
+        this.messageBroker.Subscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
         this.messageBroker.Subscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
-        this.messageBroker.Subscribe<TimeControlModeResponse>(Handle_TimeControlModeResponse);
 
-        AddUnpausePolicy(PlayersLoadingPolicy);
+        timeControlInterface.AddUnpausePolicy(PlayersLoadingPolicy);
     }
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<AttemptedTimeSpeedChanged>(Handle_TimeSpeedChanged);
+        messageBroker.Unsubscribe<TimeSpeedChangedAttempted>(Handle_TimeSpeedChanged);
         messageBroker.Unsubscribe<NetworkRequestTimeSpeedChange>(Handle_NetworkRequestTimeSpeedChange);
-        messageBroker.Unsubscribe<TimeControlModeResponse>(Handle_TimeControlModeResponse);
 
-        RemoveUnpausePolicy(PlayersLoadingPolicy);
-    }
-
-    List<WeakDelegate> unpausePolicies = new List<WeakDelegate>();
-    /// <summary>
-    /// Adds a policy to consider whether unpausing is allowed
-    /// </summary>
-    /// <param name="policy">Function to check if unpausing is allowed. True is allowed and false is NOT allowed</param>
-    public void AddUnpausePolicy(Func<bool> policy)
-    {
-        unpausePolicies.Add(policy);
-    }
-
-    /// <summary>
-    /// Removed a policy to consider whether unpausing is allowed
-    /// </summary>
-    /// <param name="policy">Policy to remove</param>
-    public void RemoveUnpausePolicy(Func<bool> policy)
-    {
-        unpausePolicies.Remove(policy);
+        timeControlInterface.RemoveUnpausePolicy(PlayersLoadingPolicy);
     }
 
     internal void Handle_NetworkRequestTimeSpeedChange(MessagePayload<NetworkRequestTimeSpeedChange> obj)
     {
         var newMode = obj.What.NewControlMode;
 
-        SetTimeMode(newMode);
+        timeControlInterface.ServerSetTimeControl(newMode);
     }
 
-    internal void Handle_TimeSpeedChanged(MessagePayload<AttemptedTimeSpeedChanged> obj)
+    internal void Handle_TimeSpeedChanged(MessagePayload<TimeSpeedChangedAttempted> obj)
     {
         var newMode = obj.What.NewControlMode;
 
-        SetTimeMode(newMode);
+        timeControlInterface.ServerSetTimeControl(newMode);
     }
 
     private bool PlayersLoadingPolicy()
@@ -89,54 +71,5 @@ public class TimeHandler : IHandler
         }
 
         return true;
-    }
-
-
-    /// <summary>
-    /// If any unpause policy fails, unpausing is not allowed
-    /// </summary>
-    /// <returns>True if unpausing is not allowed, otherwise False</returns>
-    private bool UnpauseDisallowed()
-    {
-        return unpausePolicies.Any(policy => policy.IsAlive && policy.Invoke<bool>(Array.Empty<object>()) == false);
-    }
-
-    public bool SetTimeMode(TimeControlEnum timeMode)
-    {
-        if (timeMode != TimeControlEnum.Pause && UnpauseDisallowed()) return false;  
-
-        Logger.Verbose("Server changing time to {mode}", timeMode);
-
-        messageBroker.Publish(this, new SetTimeControlMode(timeMode));
-        network.SendAll(new NetworkChangeTimeControlMode(timeMode));
-        return true;
-    }
-
-
-    TaskCompletionSource<TimeControlEnum> tcs;
-    public bool TryGetTimeControlMode(out TimeControlEnum timeControlMode)
-    {
-        tcs = new();
-
-        var cts = new CancellationTokenSource(1000);
-
-        timeControlMode = TimeControlEnum.Pause;
-        try
-        {
-            tcs.Task.Wait(cts.Token);
-            timeControlMode = tcs.Task.Result;
-            return true;
-        }
-        catch (OperationCanceledException)
-        {
-            Logger.Error("Unable to get time control mode");
-        }
-
-        return false;
-    }
-
-    private void Handle_TimeControlModeResponse(MessagePayload<TimeControlModeResponse> payload)
-    {
-        tcs.SetResult(payload.What.TimeMode);
     }
 }
