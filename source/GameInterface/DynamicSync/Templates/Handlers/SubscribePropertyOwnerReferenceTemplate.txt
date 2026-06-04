@@ -1,0 +1,13 @@
+﻿Subscribe<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetLocalMessage>((instanceId, data) => 
+{
+    if (!objectManager.TryGetId(data.Value, out string id)) return;
+    network.SendAll(new {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage(instanceId, id, data.PropertyValue));
+});
+SubscribeNetwork<{{ElementType}}, {{ MemberDeclaringType}}_{{ MemberName }}_SetNetworkMessage>((instance, data) => 
+{
+    if (!objectManager.TryGetObject<{{ElementType}}>(data.ValueId, out {{ElementType}} element)) return;
+    using (new AllowedThread())
+    {
+        instance.{{MemberName}}.SetPropertyValue(element, data.PropertyValue);
+    }
+});

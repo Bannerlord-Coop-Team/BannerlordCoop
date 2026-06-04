@@ -4,6 +4,8 @@ using TaleWorlds.CampaignSystem.Roster;
 using TaleWorlds.Core;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
+using TaleWorlds.CampaignSystem.Issues;
+using TaleWorlds.CampaignSystem.CharacterDevelopment;
 using static TaleWorlds.CampaignSystem.ExplainedNumber.StatExplainer;
 
 namespace GameInterface.Surrogates;
@@ -25,6 +27,7 @@ internal class SurrogateCollection : ISurrogateCollection
             AddSurrogate<ItemModifier, ItemModifierSurrogate>();
             AddSurrogate<TextObject, TextObjectSurrogate>();
             AddSurrogate<EquipmentElement, EquipmentElementSurrogate>();
+            AddSurrogate<PropertyOwner<TraitObject>, PropertyOwnerSurrogate>();
             AddSurrogate<ItemRosterElement, ItemRosterElementSurrogate>();
             AddSurrogate<TroopRosterElement, TroopRosterElementSurrogate>();
 
