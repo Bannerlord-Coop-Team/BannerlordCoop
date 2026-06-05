@@ -3,7 +3,9 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.MapEventParties.Messages;
 using GameInterface.Services.MapEvents.Logging;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using Helpers;
@@ -37,6 +39,8 @@ internal class PlayerCaptivityHandler : IHandler
         this.objectManager = objectManager;
         this.network = network;
         this.messageBroker = messageBroker;
+        messageBroker.Subscribe<PrisonerTaken>(Handle_PrisonerTaken);
+
         messageBroker.Subscribe<PlayerSurrendered>(Handle_PlayerSurrendered);
         messageBroker.Subscribe<NetworkPlayerSurrendered>(Handle_NetworkPlayerSurrendered);
 
@@ -45,6 +49,23 @@ internal class PlayerCaptivityHandler : IHandler
         messageBroker.Subscribe<EndPlayerCaptivityAttempted>(Handle_PlayerCaptivityEnded);
         messageBroker.Subscribe<NetworkEndPlayerCaptivityAttempted>(Handle_NetworkEndPlayerCaptivityAttempted);
         messageBroker.Subscribe<NetworkPlayerCaptivityEnded>(Handle_NetworkPlayerCaptivityEnded);
+    }
+
+    private void Handle_PrisonerTaken(MessagePayload<PrisonerTaken> payload)
+    {
+        var obj = payload.What;
+
+        var hero = obj.PrisonerHero;
+        var mobileParty = hero.PartyBelongedTo;
+
+        if (mobileParty?.IsPlayerParty() == false)
+            return;
+
+        hero.PartyBelongedToAsPrisoner = payload.What.CapturerParty;
+        hero.PartyBelongedTo = null;
+
+        mobileParty.IsActive = false;
+        mobileParty.ChangePartyLeader(null);
     }
 
     public void Dispose()
@@ -61,14 +82,6 @@ internal class PlayerCaptivityHandler : IHandler
         var message = new NetworkPlayerSurrendered(playerParty, mapEventId);
 
         network.SendAll(message);
-
-        using (new AllowedThread())
-        {
-            if (PlayerEncounter.Current != null)
-            {
-                PlayerEncounter.LeaveEncounter = true;
-            }
-        }
     }
 
     private void Handle_NetworkPlayerSurrendered(MessagePayload<NetworkPlayerSurrendered> payload)
@@ -91,6 +104,14 @@ internal class PlayerCaptivityHandler : IHandler
     {
         GameLoopRunner.RunOnMainThread(() =>
         {
+            using (new AllowedThread())
+            {
+                if (PlayerEncounter.Current != null)
+                {
+                    PlayerEncounter.LeaveEncounter = true;
+                }
+            }
+
             var playerCaptivity = Campaign.Current.PlayerCaptivity;
             var captorParty = payload.What.CaptorParty;
             if (captorParty == null)

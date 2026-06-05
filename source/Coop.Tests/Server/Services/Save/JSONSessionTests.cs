@@ -38,7 +38,7 @@ namespace Coop.Tests.Server.Services.Save
 
             var players = new Player[]
             {
-                new Player("PlayerParty1")
+                new Player("PlayerHero","PlayerParty1")
             };
 
             var sessionData = new CoopSession("TestId", entityRegistry.PackageControlledEntities(), players, new CraftingPlayerData(new(), new(), new()));

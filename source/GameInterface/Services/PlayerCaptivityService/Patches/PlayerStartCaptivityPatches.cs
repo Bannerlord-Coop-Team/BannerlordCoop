@@ -1,16 +1,25 @@
 ﻿using Common;
+using Common.Logging;
 using Common.Messaging;
+using GameInterface.Policies;
+using GameInterface.Services.MapEventParties.Messages;
+using GameInterface.Services.MobileParties.Extensions;
 using GameInterface.Services.PlayerCaptivityService.Messages;
 using HarmonyLib;
+using Serilog;
+using System;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.Party;
 
 namespace GameInterface.Services.PlayerCaptivityService.Patches;
 
-[HarmonyPatch(typeof(Hero))]
+[HarmonyPatch]
 internal class PlayerStartCaptivityPatches
 {
-    [HarmonyPatch(nameof(Hero.PartyBelongedToAsPrisoner), MethodType.Setter)]
+    private static readonly ILogger Logger = LogManager.GetLogger<PlayerStartCaptivityPatches>();
+
+    [HarmonyPatch(typeof(Hero), nameof(Hero.PartyBelongedToAsPrisoner), MethodType.Setter)]
     [HarmonyPostfix]
     private static void Postfix_PartyBelongedToAsPrisoner(Hero __instance, PartyBase value)
     {

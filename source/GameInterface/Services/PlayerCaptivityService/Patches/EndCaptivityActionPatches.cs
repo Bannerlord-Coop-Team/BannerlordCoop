@@ -6,6 +6,7 @@ using HarmonyLib;
 using Serilog;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
+using TaleWorlds.CampaignSystem.CampaignBehaviors;
 
 namespace GameInterface.Services.PlayerCaptivityService.Patches;
 
