@@ -3,11 +3,14 @@ using Common.Logging;
 using Common.Messaging;
 using Common.Network;
 using Common.Util;
+using GameInterface.Services.Heroes.Messages.Collections;
 using GameInterface.Services.ObjectManager;
 using GameInterface.Services.TroopRosters.Messages;
 using Serilog;
 using System;
+using System.Collections.Generic;
 using TaleWorlds.CampaignSystem;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Roster;
 
 namespace GameInterface.Services.TroopRosters.Handlers;
@@ -24,9 +27,6 @@ public class TroopRosterHandler : IHandler
         this.messageBroker = messageBroker;
         this.objectManager = objectManager;
         this.network = network;
-
-        messageBroker.Subscribe<TroopRosterAddToCountsChanged>(Handle_AddToCountsChanged);
-        messageBroker.Subscribe<NetworkChangeTroopRosterAddToCounts>(Handle_AddToCounts);
 
         messageBroker.Subscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
         messageBroker.Subscribe<NetworkAddToCountsAtIndex>(Handle_NetworkAddToCountsAtIndex);
@@ -55,9 +55,6 @@ public class TroopRosterHandler : IHandler
 
     public void Dispose()
     {
-        messageBroker.Unsubscribe<TroopRosterAddToCountsChanged>(Handle_AddToCountsChanged);
-        messageBroker.Unsubscribe<NetworkChangeTroopRosterAddToCounts>(Handle_AddToCounts);
-
         messageBroker.Unsubscribe<CountsAtIndexAdded>(Handle_CountsAtIndexAdded);
         messageBroker.Unsubscribe<NetworkAddToCountsAtIndex>(Handle_NetworkAddToCountsAtIndex);
 
@@ -108,38 +105,16 @@ public class TroopRosterHandler : IHandler
         return objectManager.TryGetIdWithLogging(objectToResolve, out objectId);
     }
 
-    /// <summary>
-    /// Resolves the index of the element with the given character within the roster on the
-    /// receiving side. The element is keyed by character rather than a raw index so positional
-    /// differences between the authority and this instance do not corrupt the wrong slot.
-    /// </summary>
-    private bool TryResolveTroopIndex(TroopRoster troopRoster, string objectId, bool isHero, out int index)
-    {
-        index = -1;
-        if (!TryResolveCharacterObject(objectId, isHero, out var character)) return false;
-
-        index = troopRoster.FindIndexOfTroop(character);
-        if (index < 0)
-        {
-            Logger.Error("Could not find troop {ObjectId} in roster to resolve its index", objectId);
-            return false;
-        }
-
-        return true;
-    }
-
     #region AddToCountsAtIndex
     private void Handle_CountsAtIndexAdded(MessagePayload<CountsAtIndexAdded> payload)
     {
         var obj = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
-        if (!TryGetCharacterId(obj.Character, out var objectId, out var isHero)) return;
 
         network.SendAll(new NetworkAddToCountsAtIndex(
             troopRosterId,
-            objectId,
-            isHero,
+            obj.Index,
             obj.CountChange,
             obj.WoundedCountChange,
             obj.XpChange,
@@ -151,13 +126,12 @@ public class TroopRosterHandler : IHandler
         var obj = payload.What;
 
         if (!objectManager.TryGetObjectWithLogging(obj.TroopRosterId, out TroopRoster troopRoster)) return;
-        if (!TryResolveTroopIndex(troopRoster, obj.ObjectId, obj.IsHero, out var index)) return;
 
         using (new AllowedThread())
         {
             try
             {
-                troopRoster.AddToCountsAtIndex(index, obj.CountChange, obj.WoundedCountChange, obj.XpChange, obj.RemoveDepleted);
+                troopRoster.AddToCountsAtIndex(obj.Index, obj.CountChange, obj.WoundedCountChange, obj.XpChange, obj.RemoveDepleted);
             }
             catch (Exception ex)
             {
@@ -231,9 +205,8 @@ public class TroopRosterHandler : IHandler
         var obj = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
-        if (!TryGetCharacterId(obj.Character, out var objectId, out var isHero)) return;
 
-        network.SendAll(new NetworkSetElementNumber(troopRosterId, objectId, isHero, obj.Number));
+        network.SendAll(new NetworkSetElementNumber(troopRosterId, obj.Index, obj.Number));
     }
 
     private void Handle_NetworkSetElementNumber(MessagePayload<NetworkSetElementNumber> payload)
@@ -241,13 +214,12 @@ public class TroopRosterHandler : IHandler
         var obj = payload.What;
 
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
-        if (!TryResolveTroopIndex(troopRoster, obj.ObjectId, obj.IsHero, out var index)) return;
 
         using (new AllowedThread())
         {
             try
             {
-                troopRoster.SetElementNumber(index, obj.Number);
+                troopRoster.SetElementNumber(obj.Index, obj.Number);
             }
             catch (Exception ex)
             {
@@ -263,9 +235,8 @@ public class TroopRosterHandler : IHandler
         var obj = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
-        if (!TryGetCharacterId(obj.Character, out var objectId, out var isHero)) return;
 
-        network.SendAll(new NetworkSetElementWoundedNumber(troopRosterId, objectId, isHero, obj.Number));
+        network.SendAll(new NetworkSetElementWoundedNumber(troopRosterId, obj.Index, obj.Number));
     }
 
     private void Handle_NetworkSetElementWoundedNumber(MessagePayload<NetworkSetElementWoundedNumber> payload)
@@ -273,13 +244,12 @@ public class TroopRosterHandler : IHandler
         var obj = payload.What;
 
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
-        if (!TryResolveTroopIndex(troopRoster, obj.ObjectId, obj.IsHero, out var index)) return;
 
         using (new AllowedThread())
         {
             try
             {
-                troopRoster.SetElementWoundedNumber(index, obj.Number);
+                troopRoster.SetElementWoundedNumber(obj.Index, obj.Number);
             }
             catch (Exception ex)
             {
@@ -295,9 +265,8 @@ public class TroopRosterHandler : IHandler
         var obj = payload.What;
 
         if (!objectManager.TryGetIdWithLogging(obj.TroopRoster, out var troopRosterId)) return;
-        if (!TryGetCharacterId(obj.Character, out var objectId, out var isHero)) return;
 
-        network.SendAll(new NetworkSetElementXp(troopRosterId, objectId, isHero, obj.Number));
+        network.SendAll(new NetworkSetElementXp(troopRosterId, obj.Index, obj.Number));
     }
 
     private void Handle_NetworkSetElementXp(MessagePayload<NetworkSetElementXp> payload)
@@ -305,13 +274,12 @@ public class TroopRosterHandler : IHandler
         var obj = payload.What;
 
         if (!objectManager.TryGetObjectWithLogging<TroopRoster>(obj.TroopRosterId, out var troopRoster)) return;
-        if (!TryResolveTroopIndex(troopRoster, obj.ObjectId, obj.IsHero, out var index)) return;
 
         using (new AllowedThread())
         {
             try
             {
-                troopRoster.SetElementXp(index, obj.Number);
+                troopRoster.SetElementXp(obj.Index, obj.Number);
             }
             catch (Exception ex)
             {

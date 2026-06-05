@@ -10,19 +10,15 @@ internal readonly struct NetworkSetElementNumber : ICommand
     public readonly string TroopRosterId;
 
     [ProtoMember(2)]
-    public readonly string ObjectId;
+    public readonly int Index;
 
     [ProtoMember(3)]
-    public readonly bool IsHero;
-
-    [ProtoMember(4)]
     public readonly int Number;
 
-    public NetworkSetElementNumber(string troopRosterId, string objectId, bool isHero, int number)
+    public NetworkSetElementNumber(string troopRosterId, int index, int number)
     {
         TroopRosterId = troopRosterId;
-        ObjectId = objectId;
-        IsHero = isHero;
+        Index = index;
         Number = number;
     }
 }

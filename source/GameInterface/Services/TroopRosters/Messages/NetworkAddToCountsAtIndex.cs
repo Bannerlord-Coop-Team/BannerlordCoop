@@ -10,28 +10,30 @@ internal readonly struct NetworkAddToCountsAtIndex : ICommand
     public readonly string TroopRosterId;
 
     [ProtoMember(2)]
-    public readonly string ObjectId;
+    public readonly int Index;
 
     [ProtoMember(3)]
-    public readonly bool IsHero;
-
-    [ProtoMember(4)]
     public readonly int CountChange;
 
-    [ProtoMember(5)]
+    [ProtoMember(4)]
     public readonly int WoundedCountChange;
 
-    [ProtoMember(6)]
+    [ProtoMember(5)]
     public readonly int XpChange;
 
-    [ProtoMember(7)]
+    [ProtoMember(6)]
     public readonly bool RemoveDepleted;
 
-    public NetworkAddToCountsAtIndex(string troopRosterId, string objectId, bool isHero, int countChange, int woundedCountChange, int xpChange, bool removeDepleted)
+    public NetworkAddToCountsAtIndex(
+        string troopRosterId,
+        int index,
+        int countChange,
+        int woundedCountChange,
+        int xpChange,
+        bool removeDepleted)
     {
         TroopRosterId = troopRosterId;
-        ObjectId = objectId;
-        IsHero = isHero;
+        Index = index;
         CountChange = countChange;
         WoundedCountChange = woundedCountChange;
         XpChange = xpChange;

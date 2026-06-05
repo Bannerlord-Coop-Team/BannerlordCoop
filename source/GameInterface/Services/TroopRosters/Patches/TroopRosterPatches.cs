@@ -33,7 +33,7 @@ internal class TroopRosterPatches
         }
 
         MessageBroker.Instance.Publish(__instance,
-            new CountsAtIndexAdded(__instance, __instance.GetCharacterAtIndex(index), countChange, woundedCountChange, xpChange, removeDepleted));
+            new CountsAtIndexAdded(__instance, index, countChange, woundedCountChange, xpChange, removeDepleted));
     }
 
     [HarmonyPatch(nameof(TroopRoster.AddNewElement))]
@@ -78,7 +78,7 @@ internal class TroopRosterPatches
             return;
         }
 
-        MessageBroker.Instance.Publish(__instance, new ElementNumberSet(__instance, __instance.GetCharacterAtIndex(index), number));
+        MessageBroker.Instance.Publish(__instance, new ElementNumberSet(__instance, index, number));
     }
 
     [HarmonyPatch(nameof(TroopRoster.SetElementWoundedNumber))]
@@ -93,7 +93,7 @@ internal class TroopRosterPatches
             return;
         }
 
-        MessageBroker.Instance.Publish(__instance, new ElementWoundedNumberSet(__instance, __instance.GetCharacterAtIndex(index), number));
+        MessageBroker.Instance.Publish(__instance, new ElementWoundedNumberSet(__instance, index, number));
     }
 
     [HarmonyPatch(nameof(TroopRoster.SetElementXp))]
@@ -108,7 +108,7 @@ internal class TroopRosterPatches
             return;
         }
 
-        MessageBroker.Instance.Publish(__instance, new ElementXpSet(__instance, __instance.GetCharacterAtIndex(index), number));
+        MessageBroker.Instance.Publish(__instance, new ElementXpSet(__instance, index, number));
     }
 
     [HarmonyPatch(nameof(TroopRoster.ShiftTroopToIndex))]
